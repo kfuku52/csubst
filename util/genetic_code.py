@@ -428,6 +428,24 @@ def get_codon_table(ncbi_id):
     return_ct = [[a, c] for a, c in zip(amino_acids, codons)]
     return return_ct
 
+# IUPAC nucleotide ambiguity codes
+# Cornish-Bowden (1985) Nucl. Acids Res. 13: 3021-3030.
+ambiguous_table = {
+    'M':['A','C'],
+    'R': ['A', 'G'],
+    'W': ['A', 'T'],
+    'S': ['C', 'G'],
+    'Y': ['C', 'T'],
+    'K': ['G', 'T'],
+    'V': ['A', 'C', 'G'],
+    'H': ['A', 'C', 'T'],
+    'D': ['A', 'G', 'T'],
+    'B': ['C', 'G', 'T'],
+    'X': ['G', 'A', 'T', 'C'],
+    'N': ['G', 'A', 'T', 'C'],
+}
+
+
 class Test(unittest.TestCase):
 
     def setUp(self):

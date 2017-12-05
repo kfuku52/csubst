@@ -2,7 +2,46 @@ import time
 import numpy
 import pandas
 import joblib
-from util.util import *
+import sys
+from util.table import *
+
+def get_substitution_tensor(state_tensor, mode, g):
+    num_branch = state_tensor.shape[0]
+    num_site = state_tensor.shape[1]
+    if mode=='asis':
+        num_syngroup = 1
+        num_state = state_tensor.shape[2]
+        diag_zero = numpy.diag([-1] * num_state) + 1
+    elif mode=='syn':
+        num_syngroup = len(g['amino_acid_orders'])
+        num_state = g['max_synonymous_size']
+    axis = [num_branch,num_syngroup,num_site,num_state,num_state] # axis = [branch,synonymous_group,site,state_from,state_to]
+    sub_tensor = numpy.zeros(axis, dtype=state_tensor.dtype)
+    if not g['ml_anc']:
+        sub_tensor[:,:,:,:,:] = numpy.nan
+    for node in g['tree'].traverse():
+        if not node.is_root():
+            child = node.numerical_label
+            parent = node.up.numerical_label
+            if state_tensor[parent, :, :].sum()!=0:
+                if mode=='asis':
+                    sub_matrix = numpy.einsum("sa,sd,ad->sad", state_tensor[parent, :, :], state_tensor[child, :, :], diag_zero) # s=site, a=ancestral, d=derived
+                    #sub_matrix = numpy.einsum("ij,jk,ik->jik", state_tensor[parent, :, :], state_tensor[child, :, :], diag_zero)
+                    sub_tensor[child, 0, :, :, :] = sub_matrix
+                elif mode=='syn':
+                    for s,aa in enumerate(g['amino_acid_orders']):
+                        ind = numpy.array(g['synonymous_indices'][aa])
+                        size = len(ind)
+                        diag_zero = numpy.diag([-1] * size) + 1
+                        parent_matrix = state_tensor[parent, :, ind] # axis is swapped, shape=[state,site]
+                        child_matrix = state_tensor[child, :, ind] # axis is swapped, shape=[state,site]
+                        sub_matrix = numpy.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
+                        #sub_matrix = numpy.einsum("ij,jk,ik->jik", state_tensor[parent, :, ind], state_tensor[child, :, ind], diag_zero)
+                        sub_tensor[child, s, :, :size, :size] = sub_matrix
+    if g['min_sub_pp']!=0:
+        sub_tensor = (numpy.nan_to_num(sub_tensor)>=g['min_pp'])
+    print(mode, ': size of substitution tensor :', int(sys.getsizeof(sub_tensor) / (1024 * 1024)), 'MB', flush=True)
+    return sub_tensor
 
 def get_b(g, sub_tensor, attr):
     column_names=['branch_name','branch_id',attr+'_sub']
@@ -16,6 +55,7 @@ def get_b(g, sub_tensor, attr):
     df = df.dropna(axis=0)
     df['branch_id'] = df['branch_id'].astype(int)
     df = df.sort_values(by='branch_id')
+    df = set_substitution_dtype(df=df)
     return(df)
 
 def get_s(sub_tensor, attr):
@@ -26,6 +66,7 @@ def get_s(sub_tensor, attr):
     df[attr+'_sub'] = numpy.nan_to_num(sub_tensor).sum(axis=4).sum(axis=3).sum(axis=1).sum(axis=0)
     df['site'] = df['site'].astype(int)
     df = df.sort_values(by='site')
+    df = set_substitution_dtype(df=df)
     return(df)
 
 def get_cs(id_combinations, sub_tensor, attr):
@@ -40,6 +81,7 @@ def get_cs(id_combinations, sub_tensor, attr):
             df[:, 4] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], sg, :, :, :].prod(axis=0).sum(axis=(1, 2)))  # spe2spe
     cn = ['site',] + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     df = pandas.DataFrame(df, columns=cn)
+    df = set_substitution_dtype(df=df)
     return (df)
 
 def get_bs(S_tensor, N_tensor):
@@ -53,6 +95,7 @@ def get_bs(S_tensor, N_tensor):
         df.loc[ind, 'branch_id'] = i
         df.loc[ind, 'S_sub'] = numpy.nan_to_num(S_tensor[i, :, :, :, :]).sum(axis=(0,2,3))
         df.loc[ind, 'N_sub'] = numpy.nan_to_num(N_tensor[i, :, :, :, :]).sum(axis=(0,2,3))
+    df = set_substitution_dtype(df=df)
     return(df)
 
 def sub_tensor2cb_obsolete(id_combinations, sub_tensor): # always slower than the other
@@ -99,6 +142,7 @@ def sub_tensor2cb_obsolete(id_combinations, sub_tensor): # always slower than th
             spe2spe += spe2spe_sg
         df[start:end, arity + 3] = spe2spe.sum(axis=(2, 3)).sum(axis=1)
         del spe2spe, spe2spe_sg, spe2spe_shape
+    df = set_substitution_dtype(df=df)
     return (df)
 
 def sub_tensor2cb(id_combinations, sub_tensor):
@@ -133,6 +177,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
     df = pandas.DataFrame(df, columns=cn)
     df = sort_labels(df)
     df = df.dropna()
+    df = set_substitution_dtype(df=df)
     return df
 
 def sub_tensor2cbs(id_combinations, sub_tensor):
@@ -178,5 +223,6 @@ def get_cbs(id_combinations, sub_tensor, attr, nslots):
     df = pandas.DataFrame(df, columns=cn1+cn2+cn3)
     df = df.dropna()
     df = sort_labels(df)
+    df = set_substitution_dtype(df=df)
     print(type(df), flush=True)
     return(df)

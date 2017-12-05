@@ -1,13 +1,15 @@
 import os
 import re
 import ete3
-from util.util import *
+import pandas
+import itertools
+from util.tree import *
+from util.genetic_code import ambiguous_table
 
 def rerooting_by_topology_matching(tree_from, tree_to):
     tree_from.ladderize()
     tree_to.ladderize()
     print('Before rerooting, Robinson-Foulds distance =', tree_from.robinson_foulds(tree_to, unrooted_trees=True)[0])
-    print('Rerooting, Robinson-Foulds distance =')
     outgroup_labels = tree_from.get_descendants()[0].get_leaf_names()
     for node in tree_to.traverse():
         if (node.is_leaf())&(not node.name in outgroup_labels):
@@ -41,8 +43,9 @@ def get_input_information(g):
     g['tree'] = add_numerical_node_labels(g['tree'])
     internal_node_name = True
     for node in g['tree'].traverse():
-        if node.name=='':
-            internal_node_name = False
+        if not node.is_root():
+            if node.name=='':
+                internal_node_name = False
     if not internal_node_name:
         g['node_label_tree_file'] = g['infile_dir']+[ f for f in files if f.endswith('.treefile') ][0]
         f = open(g['node_label_tree_file'])
@@ -67,12 +70,12 @@ def get_input_information(g):
     elif g['num_input_state'] > 20:
         g['input_data_type'] = 'cdn'
         g['codon_orders'] = state_table.columns[3:].str.replace('p_','').tolist()
-    if g['nuc2cdn']:
+    if (g['calc_omega'])&(g['input_data_type']=='nuc'):
         g['state_columns'] = list(itertools.product(numpy.arange(len(g['input_state'])), repeat=3))
         codon_orders = list(itertools.product(g['input_state'], repeat=3))
         codon_orders = [ c[0]+c[1]+c[2] for c in codon_orders]
         g['codon_orders'] = codon_orders
-    if (g['nuc2cdn'])|(g['input_data_type']=='cdn'):
+    if (g['calc_omega'])|(g['input_data_type']=='cdn'):
         g['amino_acid_orders'] = sorted(list(set([ c[0] for c in g['codon_table'] if c[0]!='*' ])))
         synonymous_groups = dict()
         for aa in list(set(g['amino_acid_orders'])):
@@ -90,6 +93,18 @@ def get_input_information(g):
         g['max_synonymous_size'] = max([ len(si) for si in synonymous_indices.values() ])
     return g
 
+def get_state_index(state, input_state, ambiguous_table):
+    if isinstance(state, str):
+        states = [state,]
+    else:
+        print('state should be str instance.')
+    if len(set(list(state)).intersection(set(ambiguous_table.keys())))>0:
+        for amb in ambiguous_table.keys():
+            vals = ambiguous_table[amb]
+            states = [ s.replace(amb, val) for s in states for val in vals ]
+    state_index = [ input_state.index(s) for s in states ]
+    return state_index
+
 def get_state_tensor(g):
     g['tree'].link_to_alignment(alignment=g['aln_file'], alg_format='fasta')
     num_node = len(list(g['tree'].traverse()))
@@ -98,7 +113,9 @@ def get_state_tensor(g):
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = numpy.zeros(axis, dtype=numpy.float64)
     for node in g['tree'].traverse():
-        if node.is_leaf():
+        if node.is_root():
+            print('Root node is skipped.')
+        elif node.is_leaf():
             seq = node.sequence
             if g['input_data_type']=='cdn':
                 if len(seq)%3!=0:
@@ -107,14 +124,16 @@ def get_state_tensor(g):
                 for s in numpy.arange(int(len(seq)/3)):
                     codon = seq[(s*3):((s+1)*3)]
                     if not '-' in codon:
-                        codon_index = g['codon_orders'].index(codon)
-                        state_matrix[s,codon_index] = 1
+                        codon_index = get_state_index(state=codon, input_state=g['codon_orders'], ambiguous_table=ambiguous_table)
+                        for ci in codon_index:
+                            state_matrix[s,ci] = 1/len(codon_index)
             elif g['input_data_type']=='nuc':
                 state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=numpy.float64)
                 for s in numpy.arange(len(seq)):
                     if seq[s]!='-':
-                        nuc_index = g['input_state'].index(seq[s])
-                        state_matrix[s, nuc_index] = 1
+                        nuc_index = get_state_index(state=seq[s], input_state=g['input_state'], ambiguous_table=ambiguous_table)
+                        for ni in nuc_index:
+                            state_matrix[s, ni] = 1/len(nuc_index)
             state_tensor[node.numerical_label,:,:] = state_matrix
         else:
             state_matrix = state_table.loc[(state_table['Node']==node.name),:].iloc[:,3:]
@@ -124,10 +143,13 @@ def get_state_tensor(g):
                 state_tensor[node.numerical_label,:,:] = state_matrix
     if g['ml_anc']:
         idxmax = numpy.argmax(state_tensor, axis=2)
-        state_tensor = numpy.zeros(state_tensor.shape, dtype=numpy.bool)
-        for b in numpy.arange(state_tensor.shape[0]):
-            for s in numpy.arange(state_tensor.shape[1]):
-                state_tensor[b,s,idxmax[b,s]] = 1
+        state_tensor2 = numpy.zeros(state_tensor.shape, dtype=numpy.bool)
+        for b in numpy.arange(state_tensor2.shape[0]):
+            if state_tensor[b,:,:].sum()!=0:
+                for s in numpy.arange(state_tensor2.shape[1]):
+                    state_tensor2[b,s,idxmax[b,s]] = 1
+        state_tensor = state_tensor2
+        del state_tensor2
     return(state_tensor)
 
 

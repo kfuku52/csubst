@@ -1,13 +1,9 @@
-import numpy
-import pandas
-from util.util import *
 from util.substitution import *
+from util.combination import *
 
 def node_combination_subsamples_rifle(g, arity, rep):
-    all_ids = list()
-    for node in g['tree'].traverse():
-        if not node.is_root():
-            all_ids.append(node.numerical_label)
+    all_ids = [ n.numerical_label for n in g['tree'].traverse() ]
+    sub_ids = g['sub_branches']
     all_dep_ids = dict()
     for node in g['tree'].traverse():
         ancestor_ids = [ node.numerical_label for node in node.iter_ancestors() if not node.is_root() ]
@@ -29,7 +25,7 @@ def node_combination_subsamples_rifle(g, arity, rep):
             print('Node combination subsampling failed', str(rep), 'times. Exiting.')
             break
         selected_ids = set()
-        nonselected_ids = all_ids
+        nonselected_ids = sub_ids
         dep_ids = set()
         flag = 0
         for a in numpy.arange(arity):
@@ -49,13 +45,12 @@ def node_combination_subsamples_rifle(g, arity, rep):
                 id_combinations.append(selected_ids)
                 i += 1
     id_combinations = numpy.array([ list(ic) for ic in id_combinations ])
+    id_combinations = id_combinations[:rep, :]
     return id_combinations
 
 def node_combination_subsamples_shotgun(g, arity, rep):
-    all_ids = list()
-    for node in g['tree'].traverse():
-        if not node.is_root():
-            all_ids.append(node.numerical_label)
+    all_ids = [ n.numerical_label for n in g['tree'].traverse() ]
+    sub_ids = g['sub_branches']
     dep_ids = list()
     for leaf in g['tree'].iter_leaves():
         dep_id = [leaf.numerical_label,] + [ node.numerical_label for node in leaf.iter_ancestors() if not node.is_root() ]
@@ -73,7 +68,7 @@ def node_combination_subsamples_shotgun(g, arity, rep):
     while (id_combinations.shape[0] < rep)&(id_combinations_dif > rep/50):
         ss_matrix = numpy.zeros(shape=(len(all_ids), rep), dtype=numpy.bool_, order='C')
         for i in numpy.arange(rep):
-            ind = numpy.random.choice(a=all_ids, size=arity, replace=False)
+            ind = numpy.random.choice(a=sub_ids, size=arity, replace=False)
             ss_matrix[ind,i] = 1
         is_dependent_col = False
         for dep_id in dep_ids:
@@ -94,6 +89,8 @@ def node_combination_subsamples_shotgun(g, arity, rep):
     if id_combinations.shape[0] < rep:
         print('Inefficient subsampling. Exiting node_combinations_subsamples()')
         id_combinations = numpy.array([])
+    else:
+        id_combinations = id_combinations[:rep,:]
     return id_combinations
 
 def calc_combinat_branch_omega(cb, b, s, S_tensor, N_tensor, g, rho_subsample, arity):

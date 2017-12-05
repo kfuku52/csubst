@@ -4,24 +4,16 @@
 # for example, ASRV is less biased in nonSonymous substitutions
 # for example, # nonSonymous substs are largely different between branch 1 and branch 2
 
-import os
-import sys
-import time
-import itertools
-import collections
 import argparse
-
-import numpy
-import pandas
-import joblib
-import ete3
 
 from util import parser_phylobayes
 from util import parser_iqtree
-from util.codon_table import *
-from util.util import *
-from util.substitution import *
-from util.combinatorial_omega import *
+from util.genetic_code import *
+from util.sequence import *
+from util.omega import *
+from util.combination import *
+from util.table import *
+from util.param import *
 
 csubst_start = time.time()
 
@@ -34,7 +26,7 @@ parser.add_argument('--infile_dir', metavar='PATH',type=str, required=True, help
 parser.add_argument('--infile_type', metavar='[phylobayes|iqtree]', default='phylobayes', type=str, help='The input file format.')
 parser.add_argument('--aln_file', metavar='PATH', default='', type=str, help='Alignment fasta file. Specify if csubst cannot find it in the infile_dir.')
 parser.add_argument('--tre_file', metavar='PATH', default='', type=str, help='Rooted tree newick file. Specify if csubst cannot find it in the infile_dir.')
-parser.add_argument('--nuc2cdn', metavar='INTEGER', default=1, type=int, help='Interpret nucleotide-based ancestral states as codons.')
+parser.add_argument('--calc_omega', metavar='INTEGER', default=1, type=int, help='Calculate omega for convergence rate.')
 parser.add_argument('--ml_anc', metavar='INTEGER', default=0, type=float, help='Maximum-likelihood-like analysis by binarizing ancestral states.')
 parser.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float, help='The minimum posterior probability of single substitutions to count. Set 0 for a full Bayesian counting without binarization.')
 parser.add_argument('--b', metavar='INTEGER',default=1, type=int, help='Branch output. 0 or 1. Set 1 to get the output.')
@@ -60,8 +52,8 @@ if g['infile_type']=='phylobayes':
     g = parser_phylobayes.get_input_information(g)
     if g['input_data_type']=='nuc':
         state_nuc = parser_phylobayes.get_state_tensor(g)
-        if g['nuc2cdn']:
-            state_cdn = nuc2cdn_state(state_nuc=state_nuc, g=g)
+        if g['calc_omega']:
+            state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
             state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
     if g['input_data_type']=='cdn':
         state_cdn = parser_phylobayes.get_state_tensor(g)
@@ -70,19 +62,26 @@ elif g['infile_type']=='iqtree':
     g = parser_iqtree.get_input_information(g)
     if g['input_data_type']=='nuc':
         state_nuc = parser_iqtree.get_state_tensor(g)
-        if g['nuc2cdn']:
-            state_cdn = nuc2cdn_state(state_nuc=state_nuc, g=g)
+        if g['calc_omega']:
+            state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
             state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
     if g['input_data_type']=='cdn':
         state_cdn = parser_iqtree.get_state_tensor(g)
         state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
 
 for key in sorted(list(g.keys())):
-    print(key, g[key])
+    if key=='tree':
+        print(key)
+        print(g[key].get_ascii(attributes=['name','numerical_label'], show_internal=True))
+    else:
+        print(key, g[key])
 
 N_tensor = get_substitution_tensor(state_tensor=state_pep, mode='asis', g=g)
-if g['nuc2cdn']:
+sub_branches = numpy.where(N_tensor.sum(axis=(1,2,3,4))!=0)[0].tolist()
+if g['calc_omega']:
     S_tensor = get_substitution_tensor(state_tensor=state_cdn, mode='syn', g=g)
+    sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
+g['sub_branches'] = sub_branches
 
 id_combinations = prepare_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
 
@@ -98,6 +97,8 @@ print('Synonymous substitutions / site =', S_total / num_site)
 print('Nonsynonymous substitutions / site =', N_total / num_site)
 elapsed_time = int(time.time() - start)
 print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+
+
 
 if g['bs']:
     start = time.time()
@@ -222,7 +223,7 @@ if g['cb']:
             tmp_df_rho.loc[current_arity,c] = tmp_rho_stats[c]
         df_rho = df_rho.append(tmp_df_rho)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
-    df_rho.to_csv('higher_order_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
-print("\ncsubst completed. Elapsed time =", int(time.time()-csubst_start), '[sec]',  flush=True)
+    df_rho.to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
 
+print("\ncsubst completed. Elapsed time =", int(time.time()-csubst_start), '[sec]',  flush=True)
 
