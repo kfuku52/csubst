@@ -1,4 +1,5 @@
 import os
+import numpy
 
 def get_global_parameters(args):
     g = dict()
@@ -28,6 +29,19 @@ def get_global_parameters(args):
             print('The rooted tree file not found. Use --tre option.', tree_files)
     return g
 
-
+def get_dep_ids(g):
+    dep_ids = list()
+    for leaf in g['tree'].iter_leaves():
+        dep_id = [leaf.numerical_label,] + [ node.numerical_label for node in leaf.iter_ancestors() if not node.is_root() ]
+        dep_id = numpy.sort(numpy.array(dep_id))
+        dep_ids.append(dep_id)
+    if g['exclude_sisters']:
+        for node in g['tree'].traverse():
+            children = node.get_children()
+            if len(children)>1:
+                dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
+                dep_ids.append(dep_id)
+    g['dep_ids'] = dep_ids
+    return g
 
 

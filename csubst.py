@@ -68,6 +68,7 @@ elif g['infile_type']=='iqtree':
     if g['input_data_type']=='cdn':
         state_cdn = parser_iqtree.get_state_tensor(g)
         state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
+g = get_dep_ids(g)
 
 for key in sorted(list(g.keys())):
     if key=='tree':
@@ -76,10 +77,10 @@ for key in sorted(list(g.keys())):
     else:
         print(key, g[key])
 
-N_tensor = get_substitution_tensor(state_tensor=state_pep, mode='asis', g=g)
+N_tensor = get_substitution_tensor(state_tensor=state_pep, mode='asis', g=g, mmap_attr='N')
 sub_branches = numpy.where(N_tensor.sum(axis=(1,2,3,4))!=0)[0].tolist()
 if g['calc_omega']:
-    S_tensor = get_substitution_tensor(state_tensor=state_cdn, mode='syn', g=g)
+    S_tensor = get_substitution_tensor(state_tensor=state_cdn, mode='syn', g=g, mmap_attr='S')
     sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
 g['sub_branches'] = sub_branches
 
@@ -97,8 +98,6 @@ print('Synonymous substitutions / site =', S_total / num_site)
 print('Nonsynonymous substitutions / site =', N_total / num_site)
 elapsed_time = int(time.time() - start)
 print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
-
-
 
 if g['bs']:
     start = time.time()
@@ -155,8 +154,8 @@ if g['cs']:
 if g['cbs']:
     start = time.time()
     print("Making combinat-branch-site table.", flush=True)
-    cbsS = get_cbs(id_combinations, S_tensor, attr='S', nslots=g['nslots'])
-    cbsN = get_cbs(id_combinations, N_tensor, attr='N', nslots=g['nslots'])
+    cbsS = get_cbs(id_combinations, S_tensor, attr='S', g=g)
+    cbsN = get_cbs(id_combinations, N_tensor, attr='N', g=g)
     cbs = merge_tables(cbsS, cbsN)
     del cbsS, cbsN
     cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
@@ -190,8 +189,8 @@ if g['cb']:
             if id_combinations.shape[0] == 0:
                 print('No combination satisfied phylogenetic independency. Ending higher-order analysis.')
                 break
-        cbS = get_cb(id_combinations, S_tensor, g, attr='S')
-        cbN = get_cb(id_combinations, N_tensor, g, attr='N')
+        cbS = get_cb(id_combinations, S_tensor, g, 'S')
+        cbN = get_cb(id_combinations, N_tensor, g, 'N')
         cb = merge_tables(cbS, cbN)
         del cbS, cbN
         if current_arity==2:
@@ -224,6 +223,9 @@ if g['cb']:
         df_rho = df_rho.append(tmp_df_rho)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
     df_rho.to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
+
+tmp_files = [ f for f in os.listdir() if f.startswith('tmp.csubst.') ]
+_ = [ os.remove(ts) for ts in tmp_files ]
 
 print("\ncsubst completed. Elapsed time =", int(time.time()-csubst_start), '[sec]',  flush=True)
 
