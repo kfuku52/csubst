@@ -42,7 +42,8 @@ parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, h
 parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
 parser.add_argument('--resampling_size', metavar='INTEGER',default=50000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
 parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
-parser.add_argument('--exclude_wg', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude branches within foreground lineages in branch combinatioin analysis.')
+parser.add_argument('--exclude_wg', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude branches within foreground lineages in branch combination analysis.')
+parser.add_argument('--cb_stats', metavar='PATH',default=None, type=str, help='Use precalculated rho parameters in branch combination analysis.')
 
 args = parser.parse_args()
 g = get_global_parameters(args)
@@ -75,6 +76,9 @@ elif g['infile_type']=='iqtree':
 if not g['foreground'] is None:
     g = get_foreground_branch(g)
 g = get_dep_ids(g)
+if not g['cb_stats'] is None:
+    g['df_cb_stats'] = pandas.read_csv(g['cb_stats'], sep='\t', header=0)
+
 
 for key in sorted(list(g.keys())):
     if key=='tree':
@@ -218,7 +222,7 @@ if g['cb']:
             #rs_estimated = {'rhoSconv':numpy.sqrt(rhoSconv_at_2)**current_arity, 'rhoNconv':numpy.sqrt(rhoNconv_at_2)**current_arity}
             #print('rhoSconv estimated from arity = 2:', rs_estimated['rhoSconv'])
             #print('rhoNconv estimated from arity = 2:', rs_estimated['rhoNconv'])
-        cb,tmp_rho_stats = calc_combinat_branch_omega(cb, b, s, S_tensor, N_tensor, g, rs, current_arity)
+        cb,tmp_rho_stats = calc_omega(cb, b, s, S_tensor, N_tensor, g, rs)
         file_name = "csubst_cb_"+str(current_arity)+".tsv"
         cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)

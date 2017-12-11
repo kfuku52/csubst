@@ -46,7 +46,6 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
                         sub_tensor[child, s, :, :size, :size] = sub_matrix
     if g['min_sub_pp']!=0:
         sub_tensor = (numpy.nan_to_num(sub_tensor)>=g['min_sub_pp'])
-    print(mode, ': size of substitution tensor :', int(sys.getsizeof(sub_tensor) / (1024 * 1024)), 'MB', flush=True)
     return sub_tensor
 
 def get_b(g, sub_tensor, attr):
