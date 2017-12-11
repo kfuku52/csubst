@@ -41,6 +41,8 @@ parser.add_argument('--min_branch_sub', metavar='FLOAT',default=1.0, type=float,
 parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, help='Minimum nonSonymous convergent substitutions. Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
 parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
 parser.add_argument('--resampling_size', metavar='INTEGER',default=50000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
+parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
+
 args = parser.parse_args()
 g = get_global_parameters(args)
 
@@ -69,6 +71,9 @@ elif g['infile_type']=='iqtree':
         state_cdn = parser_iqtree.get_state_tensor(g)
         state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
 g = get_dep_ids(g)
+
+if not g['foreground'] is None:
+    g = get_foreground_branch(g)
 
 for key in sorted(list(g.keys())):
     if key=='tree':
@@ -167,12 +172,17 @@ if g['cbs']:
 if g['cb']:
     #cols = ['arity','method','num_combinat','rhoSconv','rhoNconv','Sany2any','Sany2spe','Nany2any','Nany2spe']
     #df_rho = pandas.DataFrame(index=[], columns=cols)
+    end_flag = 0
     df_rho = pandas.DataFrame([])
     for current_arity in numpy.arange(g['current_arity'], g['max_arity']+1):
         start = time.time()
         print("Making combinat-branch table. Arity =", current_arity, flush=True)
         g['current_arity'] = current_arity
-        if current_arity > 2:
+        if (current_arity == 2) & (g['foreground'] is None):
+            id_combinations = id_combinations
+        elif (current_arity==2)&(not g['foreground'] is None):
+            id_combinations = prepare_node_combinations(g=g, target_nodes=g['fg_id'], arity=current_arity, check_attr='name')
+        elif current_arity > 2:
             is_stat_enough = (cb[g['target_stat']]>=g['min_stat'])|(cb[g['target_stat']].isnull())
             is_Nany2spe_enough = (cb['Nany2spe']>=g['min_Nany2spe'])
             is_branch_sub_enough = True
@@ -184,10 +194,13 @@ if g['cb']:
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
             conditions = (is_stat_enough)&(is_branch_sub_enough)&(is_Nany2spe_enough)
             branch_ids = cb.loc[conditions,id_columns].values
+            if len(set(branch_ids.ravel().tolist())) < current_arity:
+                end_flag = 1
+                break
             del cb
             id_combinations = prepare_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity, check_attr='name')
             if id_combinations.shape[0] == 0:
-                print('No combination satisfied phylogenetic independency. Ending higher-order analysis.')
+                end_flag = 1
                 break
         cbS = get_cb(id_combinations, S_tensor, g, 'S')
         cbN = get_cb(id_combinations, N_tensor, g, 'N')
@@ -221,8 +234,10 @@ if g['cb']:
         for c in list(tmp_rho_stats.keys()):
             tmp_df_rho.loc[current_arity,c] = tmp_rho_stats[c]
         df_rho = df_rho.append(tmp_df_rho)
+        df_rho.to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
-    df_rho.to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
+    if end_flag:
+        print('No combination satisfied phylogenetic independency. Ending higher-order analysis.')
 
 tmp_files = [ f for f in os.listdir() if f.startswith('tmp.csubst.') ]
 _ = [ os.remove(ts) for ts in tmp_files ]

@@ -28,7 +28,11 @@ def prepare_node_combinations(g, target_nodes=None, arity=2, check_attr=None, ve
         node_combinations = list(itertools.combinations(target_nodes, arity))
         node_combinations = [set(nc) for nc in node_combinations]
         node_combinations = numpy.array([list(nc) for nc in node_combinations])
-    else:
+    if isinstance(target_nodes, list):
+        node_combinations = list(itertools.combinations(target_nodes, arity))
+        node_combinations = [set(nc) for nc in node_combinations]
+        node_combinations = numpy.array([list(nc) for nc in node_combinations])
+    elif 'shape' in dir(target_nodes):
         index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
         print('# combinations for unions =', len(index_combinations))
         axis = (len(index_combinations), target_nodes.shape[1]+1)

@@ -1,5 +1,6 @@
 import os
 import numpy
+import pandas
 
 def get_global_parameters(args):
     g = dict()
@@ -44,4 +45,27 @@ def get_dep_ids(g):
     g['dep_ids'] = dep_ids
     return g
 
+def get_foreground_branch(g):
+    g['fg_input'] = pandas.read_csv(g['foreground'], sep='\t', comment='#', skip_blank_lines=True, header=None)
+    g['fg_input'] = g['fg_input'][0].tolist()
+    g['fg_leaf_name'] = list()
+    leaf_names = [ leaf.name for leaf in g['tree'].get_leaves() ]
+    for fg in g['fg_input']:
+        match_leaves = [ ln for ln in leaf_names if ln.startswith(fg) ]
+        if len(match_leaves)==1:
+            g['fg_leaf_name'].append(match_leaves[0])
+        else:
+            print('The foreground leaf name cannot be identified:', fg, match_leaves)
+    g['fg_id'] = [ node.numerical_label for node in g['tree'].traverse() if node.name in g['fg_leaf_name'] ]
+    dif = 1
+    while dif:
+        num_id = len(g['fg_id'])
+        for node in g['tree'].traverse():
+            child_ids = [ child.numerical_label for child in node.get_children() ]
+            if all([ id in g['fg_id'] for id in child_ids ])&(len(child_ids)!=0):
+                if node.numerical_label not in g['fg_id']:
+                    g['fg_id'].append(node.numerical_label)
+                    print(node.numerical_label)
+        dif = len(g['fg_id']) - num_id
+    return g
 
