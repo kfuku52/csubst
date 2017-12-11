@@ -206,7 +206,7 @@ if g['cb']:
         cbN = get_cb(id_combinations, N_tensor, g, 'N')
         cb = merge_tables(cbS, cbN)
         del cbS, cbN
-        if current_arity==2:
+        if (current_arity==2)&(g['foreground'] is None):
             rs = 'all'
             rhoNconv_at_2 = cb['Nany2spe'].sum() / cb['Nany2any'].sum()
             rhoSconv_at_2 = cb['Sany2spe'].sum() / cb['Sany2any'].sum()
