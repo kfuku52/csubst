@@ -42,6 +42,7 @@ parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, h
 parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
 parser.add_argument('--resampling_size', metavar='INTEGER',default=50000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
 parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
+parser.add_argument('--exclude_wg', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude branches within foreground lineages in branch combinatioin analysis.')
 
 args = parser.parse_args()
 g = get_global_parameters(args)
@@ -70,10 +71,10 @@ elif g['infile_type']=='iqtree':
     if g['input_data_type']=='cdn':
         state_cdn = parser_iqtree.get_state_tensor(g)
         state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
-g = get_dep_ids(g)
 
 if not g['foreground'] is None:
     g = get_foreground_branch(g)
+g = get_dep_ids(g)
 
 for key in sorted(list(g.keys())):
     if key=='tree':
