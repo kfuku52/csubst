@@ -42,7 +42,9 @@ def get_dep_ids(g):
             if len(children)>1:
                 dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
                 dep_ids.append(dep_id)
+    g['dep_ids'] = dep_ids
     if (g['exclude_wg'])&(g['foreground'] is not None):
+        fg_dep_ids = list()
         for node in g['tree'].traverse():
             if all([ ln in g['fg_leaf_name'] for ln in node.get_leaf_names() ])&(len(node.get_leaf_names())>1):
                 flag = 0
@@ -51,8 +53,8 @@ def get_dep_ids(g):
                 elif not all([ ln in g['fg_leaf_name'] for ln in node.up.get_leaf_names() ]):
                     flag = 1
                 if flag:
-                    dep_ids.append(numpy.array([node.numerical_label,] + [ n.numerical_label for n in node.get_descendants() ]))
-    g['dep_ids'] = dep_ids
+                    fg_dep_ids.append(numpy.array([node.numerical_label,] + [ n.numerical_label for n in node.get_descendants() ]))
+        g['fg_dep_ids'] = fg_dep_ids
     return g
 
 def get_foreground_branch(g):

@@ -14,7 +14,7 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             df_mmap[i, :] = node_union
             i += 1
 
-def prepare_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True):
+def prepare_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True, foreground=False):
     tree = g['tree']
     all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
     if verbose:
@@ -54,6 +54,9 @@ def prepare_node_combinations(g, target_nodes=None, arity=2, check_attr=None, ve
     is_dependent_col = False
     for dep_id in g['dep_ids']:
         is_dependent_col = (is_dependent_col)|(nc_matrix[dep_id,:].sum(axis=0)>1)
+    if (foreground)&(g['foreground'] is not None):
+        for fg_dep_id in g['fg_dep_ids']:
+            is_dependent_col = (is_dependent_col) | (nc_matrix[fg_dep_id, :].sum(axis=0) > 1)
     nc_matrix = nc_matrix[:,~is_dependent_col]
     rows,cols = numpy.where(nc_matrix==1)
     unique_cols = numpy.unique(cols)

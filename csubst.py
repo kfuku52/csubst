@@ -182,7 +182,8 @@ if g['cb']:
         if (current_arity == 2) & (g['foreground'] is None):
             id_combinations = id_combinations
         elif (current_arity==2)&(not g['foreground'] is None):
-            id_combinations = prepare_node_combinations(g=g, target_nodes=g['fg_id'], arity=current_arity, check_attr='name')
+            id_combinations = prepare_node_combinations(g=g, target_nodes=g['fg_id'], arity=current_arity,
+                                                        check_attr='name', foreground=True)
         elif current_arity > 2:
             is_stat_enough = (cb[g['target_stat']]>=g['min_stat'])|(cb[g['target_stat']].isnull())
             is_Nany2spe_enough = (cb['Nany2spe']>=g['min_Nany2spe'])
@@ -199,7 +200,8 @@ if g['cb']:
                 end_flag = 1
                 break
             del cb
-            id_combinations = prepare_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity, check_attr='name')
+            id_combinations = prepare_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
+                                                        check_attr='name', foreground=True)
             if id_combinations.shape[0] == 0:
                 end_flag = 1
                 break
