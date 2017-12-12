@@ -38,7 +38,8 @@ parser.add_argument('--cbs', metavar='INTEGER',default=0, type=int, help='Combin
 parser.add_argument('--target_stat', metavar='[omega_conv_unif|omega_conv_asrvN|omega_conv_asrvNS...]', default='omega_conv_asrvN', type=str, help='The statistics used to explore higher-order branch combinations.')
 parser.add_argument('--min_stat', metavar='FLOAT',default=1.0, type=float, help='If a branch combination has the target_stat greater than this value, higher-order combinations are explored.')
 parser.add_argument('--min_branch_sub', metavar='FLOAT',default=1.0, type=float, help='Minimum substitutions in a branch. Branches < min_branch_sub are excluded from branch combination analyses.')
-parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, help='Minimum nonSonymous convergent substitutions. Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
+parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, help='Minimum nonsonymous convergent substitutions. Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
+parser.add_argument('--min_NCoD', metavar='FLOAT',default=0.15, type=float, help='Minimum nonsynonymous C/D. C/D < min_NCoD are excluded from higher-order analyses.')
 parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
 parser.add_argument('--resampling_size', metavar='INTEGER',default=50000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
 parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
@@ -191,6 +192,7 @@ if g['cb']:
         elif current_arity > 2:
             is_stat_enough = (cb[g['target_stat']]>=g['min_stat'])|(cb[g['target_stat']].isnull())
             is_Nany2spe_enough = (cb['Nany2spe']>=g['min_Nany2spe'])
+            is_NCoD_enough = (cb['NCoD']>=g['min_NCoD'])
             is_branch_sub_enough = True
             for a in numpy.arange(current_arity-1):
                 target_columns = ['S_sub_'+str(a+1), 'N_sub_'+str(a+1)]
@@ -198,7 +200,7 @@ if g['cb']:
             num_branch_ids = (is_stat_enough).sum()
             print('arity =', current_arity, ': qualified combinations =', num_branch_ids)
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-            conditions = (is_stat_enough)&(is_branch_sub_enough)&(is_Nany2spe_enough)
+            conditions = (is_stat_enough)&(is_branch_sub_enough)&(is_Nany2spe_enough)&(is_NCoD_enough)
             branch_ids = cb.loc[conditions,id_columns].values
             if len(set(branch_ids.ravel().tolist())) < current_arity:
                 end_flag = 1
@@ -244,7 +246,7 @@ if g['cb']:
         df_rho.to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
     if end_flag:
-        print('No combination satisfied phylogenetic independency. Ending higher-order analysis.')
+        print('No combination satisfied phylogenetic independency. Ending branch combination analysis.')
 
 tmp_files = [ f for f in os.listdir() if f.startswith('tmp.csubst.') ]
 _ = [ os.remove(ts) for ts in tmp_files ]

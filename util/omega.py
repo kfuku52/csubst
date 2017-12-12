@@ -99,4 +99,6 @@ def calc_omega(cb, b, s, S_tensor, N_tensor, g, rho_subsample):
     cb['omega_pair_asrvN'] = (cb['Nany2any'] / cb['EN_pair_asrv']) / (cb['Sany2any'] / cb['ES_pair_unif'])
     cb['omega_conv_asrvN'] = (cb['Nany2spe'] / cb['EN_conv_asrv']) / (cb['Sany2spe'] / cb['ES_conv_unif'])
     cb['omega_div_asrvN'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['EN_div_asrv']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ES_div_unif'])
+    cb['NCoD'] = cb['Nany2spe'] / (cb['Nany2any'] - cb['Nany2spe'])
+    cb['SCoD'] = cb['Sany2spe'] / (cb['Sany2any'] - cb['Sany2spe'])
     return(cb, rho_stats)
