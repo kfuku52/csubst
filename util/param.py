@@ -1,6 +1,7 @@
 import os
 import numpy
 import pandas
+import copy
 
 def get_global_parameters(args):
     g = dict()
@@ -54,6 +55,8 @@ def get_dep_ids(g):
                     flag = 1
                 if flag:
                     fg_dep_ids.append(numpy.array([node.numerical_label,] + [ n.numerical_label for n in node.get_descendants() ]))
+        if (g['fg_sister'])|(g['fg_parent']):
+            fg_dep_ids.append(numpy.array(g['marginal_id']))
         g['fg_dep_ids'] = fg_dep_ids
     return g
 
@@ -78,5 +81,23 @@ def get_foreground_branch(g):
                 if node.numerical_label not in g['fg_id']:
                     g['fg_id'].append(node.numerical_label)
         dif = len(g['fg_id']) - num_id
+    g['target_id'] = copy.deepcopy(g['fg_id'])
+    with open('csubst_target_branch.txt', 'w') as f:
+        for x in g['target_id']:
+            f.write(str(x)+'\n')
     return g
 
+def get_marginal_branch(g):
+    marginal_ids = list()
+    for node in g['tree'].traverse():
+        if (node.numerical_label in g['fg_id'])&(not node.is_root()):
+            if g['fg_sister']:
+                marginal_ids += [ sister.numerical_label for sister in node.get_sisters() ]
+            if g['fg_parent']:
+                    marginal_ids.append(node.up.numerical_label)
+    g['marginal_id'] = list(set(marginal_ids)-set(g['fg_id']))
+    g['fg_id'] = g['target_id'] + g['marginal_id']
+    with open('csubst_marginal_branch.txt', 'w') as f:
+        for x in g['marginal_id']:
+            f.write(str(x)+'\n')
+    return g

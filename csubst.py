@@ -5,6 +5,7 @@
 # for example, # nonSonymous substs are largely different between branch 1 and branch 2
 
 import argparse
+import copy
 
 from util import parser_phylobayes
 from util import parser_iqtree
@@ -42,9 +43,13 @@ parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, h
 parser.add_argument('--min_NCoD', metavar='FLOAT',default=0.15, type=float, help='Minimum nonsynonymous C/D. C/D < min_NCoD are excluded from higher-order analyses.')
 parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
 parser.add_argument('--resampling_size', metavar='INTEGER',default=50000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
+parser.add_argument('--cb_stats', metavar='PATH',default=None, type=str, help='Use precalculated rho parameters in branch combination analysis.')
+
 parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
 parser.add_argument('--exclude_wg', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude branches within foreground lineages in branch combination analysis.')
-parser.add_argument('--cb_stats', metavar='PATH',default=None, type=str, help='Use precalculated rho parameters in branch combination analysis.')
+parser.add_argument('--fg_sister', metavar='INT',default=0, type=int, help='')
+parser.add_argument('--fg_parent', metavar='INT',default=0, type=int, help='')
+
 
 args = parser.parse_args()
 g = get_global_parameters(args)
@@ -76,10 +81,16 @@ elif g['infile_type']=='iqtree':
 
 if not g['foreground'] is None:
     g = get_foreground_branch(g)
+    g = get_marginal_branch(g)
+
 g = get_dep_ids(g)
 if not g['cb_stats'] is None:
     g['df_cb_stats'] = pandas.read_csv(g['cb_stats'], sep='\t', header=0)
 
+tree = copy.deepcopy(g['tree'])
+for node in tree.traverse():
+    node.name = node.name+'|'+str(node.numerical_label)
+tree.write(format=1, outfile='csubst_tree.nwk')
 
 for key in sorted(list(g.keys())):
     if key=='tree':
