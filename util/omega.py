@@ -76,13 +76,17 @@ def calc_omega(cb, b, s, S_tensor, N_tensor, g, rho_subsample):
     cb['EN_div_unif'] = cb['EN_pair_unif'] * rhoNdiv
     cb['ES_conv_unif'] = cb['ES_pair_unif'] * rho_stats['rhoSconv']
     cb['ES_div_unif'] = cb['ES_pair_unif'] * rhoSdiv
-    N_asrv = numpy.reshape((s['N_sub'] / s['N_sub'].sum()).values, newshape=(1,s.shape[0]))
-    S_asrv = numpy.reshape((s['S_sub'] / s['S_sub'].sum()).values, newshape=(1,s.shape[0]))
+    N_asrv = numpy.reshape((s['N_sub'] / s['N_sub'].sum()).values, newshape=(1,num_site))
+    S_asrv = numpy.reshape((s['S_sub'] / s['S_sub'].sum()).values, newshape=(1,num_site))
     EN_pair_asrv = 1
     ES_pair_asrv = 1
     for a in numpy.arange(arity):
-        EN_pair_asrv = EN_pair_asrv * (1 - ((1 - N_asrv) ** numpy.expand_dims(cb['N_sub_'+str(a+1)], axis=1)))
-        ES_pair_asrv = ES_pair_asrv * (1 - ((1 - S_asrv) ** numpy.expand_dims(cb['S_sub_'+str(a+1)], axis=1)))
+        #EN_pair_asrv = EN_pair_asrv * (1 - ((1 - N_asrv) ** numpy.expand_dims(cb['N_sub_'+str(a+1)], axis=1)))
+        #ES_pair_asrv = ES_pair_asrv * (1 - ((1 - S_asrv) ** numpy.expand_dims(cb['S_sub_'+str(a+1)], axis=1)))
+        #EN_pair_asrv = EN_pair_asrv * (1 - ((1 - N_asrv) * (numpy.expand_dims(cb['N_sub_' + str(a + 1)], axis=1)/num_site)))
+        #ES_pair_asrv = ES_pair_asrv * (1 - ((1 - S_asrv) * (numpy.expand_dims(cb['S_sub_' + str(a + 1)], axis=1)/num_site)))
+        EN_pair_asrv = EN_pair_asrv * (N_asrv * numpy.expand_dims(cb['N_sub_' + str(a + 1)], axis=1))
+        ES_pair_asrv = ES_pair_asrv * (S_asrv * numpy.expand_dims(cb['S_sub_' + str(a + 1)], axis=1))
     cb['EN_pair_asrv'] = EN_pair_asrv.sum(axis=1)
     cb['ES_pair_asrv'] = ES_pair_asrv.sum(axis=1)
     del EN_pair_asrv, ES_pair_asrv
@@ -101,4 +105,8 @@ def calc_omega(cb, b, s, S_tensor, N_tensor, g, rho_subsample):
     cb['omega_div_asrvN'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['EN_div_asrv']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ES_div_unif'])
     cb['NCoD'] = cb['Nany2spe'] / (cb['Nany2any'] - cb['Nany2spe'])
     cb['SCoD'] = cb['Sany2spe'] / (cb['Sany2any'] - cb['Sany2spe'])
+    rho_stats['EN_pair_unif'] = cb['EN_pair_unif'].sum()
+    rho_stats['ES_pair_unif'] = cb['ES_pair_unif'].sum()
+    rho_stats['EN_pair_asrv'] = cb['EN_pair_asrv'].sum()
+    rho_stats['ES_pair_asrv'] = cb['ES_pair_asrv'].sum()
     return(cb, rho_stats)

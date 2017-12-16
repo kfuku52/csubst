@@ -42,7 +42,7 @@ parser.add_argument('--min_branch_sub', metavar='FLOAT',default=1.0, type=float,
 parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, help='Minimum nonsonymous convergent substitutions. Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
 parser.add_argument('--min_NCoD', metavar='FLOAT',default=0.15, type=float, help='Minimum nonsynonymous C/D. C/D < min_NCoD are excluded from higher-order analyses.')
 parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
-parser.add_argument('--resampling_size', metavar='INTEGER',default=50000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
+parser.add_argument('--resampling_size', metavar='INTEGER',default=100000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
 parser.add_argument('--cb_stats', metavar='PATH',default=None, type=str, help='Use precalculated rho parameters in branch combination analysis.')
 
 parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
