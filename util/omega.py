@@ -1,16 +1,63 @@
 from util.substitution import *
 from util.combination import *
 
-def calc_omega(cb, b, s, S_tensor, N_tensor, g, rho_subsample):
-    rho_stats = dict()
+def get_cb_stats(cb, b, s, g, arity, rhoNconv, rhoSconv):
     num_site = s.shape[0]
-    arity = cb.columns.str.startswith('branch_id_').sum()
+    rhoNdiv = 1 - rhoNconv
+    rhoSdiv = 1 - rhoSconv
     for a in numpy.arange(arity):
         b_tmp = b.loc[:,['branch_id','S_sub','N_sub']]
         b_tmp.columns = [ c+'_'+str(a+1) for c in b_tmp.columns ]
         cb = pandas.merge(cb, b_tmp, on='branch_id_'+str(a+1), how='left')
         del b_tmp
-    del b
+    cb['EN_pair_unif'] = 1
+    cb['ES_pair_unif'] = 1
+    for a in numpy.arange(arity):
+        cb['EN_pair_unif'] = cb['EN_pair_unif'] * (cb['N_sub_'+str(a+1)] / num_site)
+        cb['ES_pair_unif'] = cb['ES_pair_unif'] * (cb['S_sub_'+str(a+1)] / num_site)
+    cb['EN_pair_unif'] = cb['EN_pair_unif'] * num_site
+    cb['ES_pair_unif'] = cb['ES_pair_unif'] * num_site
+    cb['EN_conv_unif'] = cb['EN_pair_unif'] * rhoNconv
+    cb['EN_div_unif'] = cb['EN_pair_unif'] * rhoNdiv
+    cb['ES_conv_unif'] = cb['ES_pair_unif'] * rhoSconv
+    cb['ES_div_unif'] = cb['ES_pair_unif'] * rhoSdiv
+    N_asrv = numpy.reshape((s['N_sub'] / s['N_sub'].sum()).values, newshape=(1,num_site))
+    S_asrv = numpy.reshape((s['S_sub'] / s['S_sub'].sum()).values, newshape=(1,num_site))
+    EN_pair_asrv = 1
+    ES_pair_asrv = 1
+    for a in numpy.arange(arity):
+        EN_pair_asrv = EN_pair_asrv * (N_asrv * numpy.expand_dims(cb['N_sub_' + str(a + 1)], axis=1))
+        ES_pair_asrv = ES_pair_asrv * (S_asrv * numpy.expand_dims(cb['S_sub_' + str(a + 1)], axis=1))
+    cb['EN_pair_asrv'] = EN_pair_asrv.sum(axis=1)
+    cb['ES_pair_asrv'] = ES_pair_asrv.sum(axis=1)
+    del EN_pair_asrv, ES_pair_asrv
+    cb['EN_conv_asrv'] = cb['EN_pair_asrv'] * rhoNconv
+    cb['EN_div_asrv'] = cb['EN_pair_asrv'] * rhoNdiv
+    cb['ES_conv_asrv'] = cb['ES_pair_asrv'] * rhoSconv
+    cb['ES_div_asrv'] = cb['ES_pair_asrv'] * rhoSdiv
+    cb['omega_pair_unif'] = (cb['Nany2any'] / cb['EN_pair_unif']) / (cb['Sany2any'] / cb['ES_pair_unif'])
+    cb['omega_conv_unif'] = (cb['Nany2spe'] / cb['EN_conv_unif']) / (cb['Sany2spe'] / cb['ES_conv_unif'])
+    cb['omega_div_unif'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['EN_div_unif']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ES_div_unif'])
+    cb['omega_pair_asrv'] = (cb['Nany2any'] / cb['EN_pair_asrv']) / (cb['Sany2any'] / cb['ES_pair_asrv'])
+    cb['omega_conv_asrv'] = (cb['Nany2spe'] / cb['EN_conv_asrv']) / (cb['Sany2spe'] / cb['ES_conv_asrv'])
+    cb['omega_div_asrv'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['EN_div_asrv']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ES_div_asrv'])
+    cb['NCoD'] = cb['Nany2spe'] / (cb['Nany2any'] - cb['Nany2spe'])
+    cb['SCoD'] = cb['Sany2spe'] / (cb['Sany2any'] - cb['Sany2spe'])
+    return cb
+
+def print_cb_stats(cb, prefix):
+    arity = cb.columns.str.startswith('branch_id_').sum()
+    hd = 'arity='+str(arity)+', '+prefix+':'
+    print(hd, 'median omega_pair_unif =', numpy.round(cb['omega_pair_unif'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_conv_unif =', numpy.round(cb['omega_conv_unif'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_div_unif  =', numpy.round(cb['omega_div_unif'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_pair_asrv =', numpy.round(cb['omega_pair_asrv'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_conv_asrv =', numpy.round(cb['omega_conv_asrv'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_div_asrv  =', numpy.round(cb['omega_div_asrv'].median(), decimals=3), flush=True)
+
+def calc_omega(cb, b, s, S_tensor, N_tensor, g, rho_subsample):
+    rho_stats = dict()
+    arity = cb.columns.str.startswith('branch_id_').sum()
     flag = 0
     if g['cb_stats'] is None:
         flag = 1
@@ -48,6 +95,8 @@ def calc_omega(cb, b, s, S_tensor, N_tensor, g, rho_subsample):
             del cbS, cbN
             rhoNconv = cb_subsample['Nany2spe'].sum() / cb_subsample['Nany2any'].sum()
             rhoSconv = cb_subsample['Sany2spe'].sum() / cb_subsample['Sany2any'].sum()
+        cb_subsample = get_cb_stats(cb_subsample, b, s, g, arity, rhoNconv, rhoSconv)
+        print_cb_stats(cb=cb_subsample, prefix='cb_subsample')
         rho_stats['arity'] = arity
         rho_stats['method'] = subsampling_type
         rho_stats['num_combinat'] = cb_subsample.shape[0]
@@ -58,55 +107,22 @@ def calc_omega(cb, b, s, S_tensor, N_tensor, g, rho_subsample):
         rho_stats['Nany2any'] = cb_subsample['Nany2any'].sum()
         rho_stats['Nany2spe'] = cb_subsample['Nany2spe'].sum()
         rho_stats['num_processor'] = g['nslots']
+        rho_stats['EN_pair_unif'] = cb_subsample['EN_pair_unif'].sum()
+        rho_stats['ES_pair_unif'] = cb_subsample['ES_pair_unif'].sum()
+        rho_stats['EN_pair_asrv'] = cb_subsample['EN_pair_asrv'].sum()
+        rho_stats['ES_pair_asrv'] = cb_subsample['ES_pair_asrv'].sum()
+        rho_stats['EN_conv_unif'] = rho_stats['EN_pair_unif'] * rho_stats['rhoNconv']
+        rho_stats['ES_conv_unif'] = rho_stats['ES_pair_unif'] * rho_stats['rhoSconv']
+        rho_stats['EN_conv_unif'] = rho_stats['EN_pair_asrv'] * rho_stats['rhoNconv']
+        rho_stats['ES_conv_unif'] = rho_stats['ES_pair_asrv'] * rho_stats['rhoSconv']
+        if g['cb_subsample']:
+            file_name = "csubst_cb_subsample_" + str(arity) + ".tsv"
+            cb_subsample.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
         del cb_subsample
     print('rhoSconv =', rho_stats['rhoSconv'],
           'total Sany2spe/Sany2any =', rho_stats['Sany2spe'], '/', rho_stats['Sany2any'])
     print('rhoNconv =', rho_stats['rhoNconv'],
           'total Nany2spe/Nany2any =', rho_stats['Nany2spe'], '/', rho_stats['Nany2any'])
-    rhoNdiv = 1 - rho_stats['rhoNconv']
-    rhoSdiv = 1 - rho_stats['rhoSconv']
-    cb['EN_pair_unif'] = 1
-    cb['ES_pair_unif'] = 1
-    for a in numpy.arange(arity):
-        cb['EN_pair_unif'] = cb['EN_pair_unif'] * (cb['N_sub_'+str(a+1)] / num_site)
-        cb['ES_pair_unif'] = cb['ES_pair_unif'] * (cb['S_sub_'+str(a+1)] / num_site)
-    cb['EN_pair_unif'] = cb['EN_pair_unif'] * num_site
-    cb['ES_pair_unif'] = cb['ES_pair_unif'] * num_site
-    cb['EN_conv_unif'] = cb['EN_pair_unif'] * rho_stats['rhoNconv']
-    cb['EN_div_unif'] = cb['EN_pair_unif'] * rhoNdiv
-    cb['ES_conv_unif'] = cb['ES_pair_unif'] * rho_stats['rhoSconv']
-    cb['ES_div_unif'] = cb['ES_pair_unif'] * rhoSdiv
-    N_asrv = numpy.reshape((s['N_sub'] / s['N_sub'].sum()).values, newshape=(1,num_site))
-    S_asrv = numpy.reshape((s['S_sub'] / s['S_sub'].sum()).values, newshape=(1,num_site))
-    EN_pair_asrv = 1
-    ES_pair_asrv = 1
-    for a in numpy.arange(arity):
-        #EN_pair_asrv = EN_pair_asrv * (1 - ((1 - N_asrv) ** numpy.expand_dims(cb['N_sub_'+str(a+1)], axis=1)))
-        #ES_pair_asrv = ES_pair_asrv * (1 - ((1 - S_asrv) ** numpy.expand_dims(cb['S_sub_'+str(a+1)], axis=1)))
-        #EN_pair_asrv = EN_pair_asrv * (1 - ((1 - N_asrv) * (numpy.expand_dims(cb['N_sub_' + str(a + 1)], axis=1)/num_site)))
-        #ES_pair_asrv = ES_pair_asrv * (1 - ((1 - S_asrv) * (numpy.expand_dims(cb['S_sub_' + str(a + 1)], axis=1)/num_site)))
-        EN_pair_asrv = EN_pair_asrv * (N_asrv * numpy.expand_dims(cb['N_sub_' + str(a + 1)], axis=1))
-        ES_pair_asrv = ES_pair_asrv * (S_asrv * numpy.expand_dims(cb['S_sub_' + str(a + 1)], axis=1))
-    cb['EN_pair_asrv'] = EN_pair_asrv.sum(axis=1)
-    cb['ES_pair_asrv'] = ES_pair_asrv.sum(axis=1)
-    del EN_pair_asrv, ES_pair_asrv
-    cb['EN_conv_asrv'] = cb['EN_pair_asrv'] * rho_stats['rhoNconv']
-    cb['EN_div_asrv'] = cb['EN_pair_asrv'] * rhoNdiv
-    cb['ES_conv_asrv'] = cb['ES_pair_asrv'] * rho_stats['rhoSconv']
-    cb['ES_div_asrv'] = cb['ES_pair_asrv'] * rhoSdiv
-    cb['omega_pair_unif'] = (cb['Nany2any'] / cb['EN_pair_unif']) / (cb['Sany2any'] / cb['ES_pair_unif'])
-    cb['omega_conv_unif'] = (cb['Nany2spe'] / cb['EN_conv_unif']) / (cb['Sany2spe'] / cb['ES_conv_unif'])
-    cb['omega_div_unif'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['EN_div_unif']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ES_div_unif'])
-    cb['omega_pair_asrvNS'] = (cb['Nany2any'] / cb['EN_pair_asrv']) / (cb['Sany2any'] / cb['ES_pair_asrv'])
-    cb['omega_conv_asrvNS'] = (cb['Nany2spe'] / cb['EN_conv_asrv']) / (cb['Sany2spe'] / cb['ES_conv_asrv'])
-    cb['omega_div_asrvNS'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['EN_div_asrv']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ES_div_asrv'])
-    cb['omega_pair_asrvN'] = (cb['Nany2any'] / cb['EN_pair_asrv']) / (cb['Sany2any'] / cb['ES_pair_unif'])
-    cb['omega_conv_asrvN'] = (cb['Nany2spe'] / cb['EN_conv_asrv']) / (cb['Sany2spe'] / cb['ES_conv_unif'])
-    cb['omega_div_asrvN'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['EN_div_asrv']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ES_div_unif'])
-    cb['NCoD'] = cb['Nany2spe'] / (cb['Nany2any'] - cb['Nany2spe'])
-    cb['SCoD'] = cb['Sany2spe'] / (cb['Sany2any'] - cb['Sany2spe'])
-    rho_stats['EN_pair_unif'] = cb['EN_pair_unif'].sum()
-    rho_stats['ES_pair_unif'] = cb['ES_pair_unif'].sum()
-    rho_stats['EN_pair_asrv'] = cb['EN_pair_asrv'].sum()
-    rho_stats['ES_pair_asrv'] = cb['ES_pair_asrv'].sum()
+    cb = get_cb_stats(cb, b, s, g, arity, rho_stats['rhoNconv'], rho_stats['rhoSconv'])
+    print_cb_stats(cb=cb, prefix='cb')
     return(cb, rho_stats)

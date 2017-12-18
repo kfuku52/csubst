@@ -19,36 +19,50 @@ from util.param import *
 csubst_start = time.time()
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--version', action='version', version='%(prog)s 0.1') # version
-parser.add_argument('--max_arity', metavar='INTEGER', default=2, type=int, help='The maximum combinatorial number of branches. Set 2 for paired substitutions.')
-parser.add_argument('--nslots', metavar='INTEGER',default=1, type=int, help='The number of processors for parallel computations.')
+
+# Inputs
 parser.add_argument('--ncbi_codon_table', metavar='INTEGER',type=int, required=True, help='NCBI codon table id.')
 parser.add_argument('--infile_dir', metavar='PATH',type=str, required=True, help='PATH to the input file directory.')
 parser.add_argument('--infile_type', metavar='[phylobayes|iqtree]', default='phylobayes', type=str, help='The input file format.')
 parser.add_argument('--aln_file', metavar='PATH', default='', type=str, help='Alignment fasta file. Specify if csubst cannot find it in the infile_dir.')
 parser.add_argument('--tre_file', metavar='PATH', default='', type=str, help='Rooted tree newick file. Specify if csubst cannot find it in the infile_dir.')
-parser.add_argument('--calc_omega', metavar='INTEGER', default=1, type=int, help='Calculate omega for convergence rate.')
+
+# Foreground specification
+parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
+parser.add_argument('--exclude_wg', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude branches within foreground lineages in branch combination analysis.')
+parser.add_argument('--fg_sister', metavar='INT',default=0, type=int, help='')
+parser.add_argument('--fg_parent', metavar='INT',default=0, type=int, help='')
+
+# branch combinations
+parser.add_argument('--max_arity', metavar='INTEGER', default=2, type=int, help='The maximum combinatorial number of branches. Set 2 for paired substitutions.')
+parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
+
+# Thresholds
 parser.add_argument('--ml_anc', metavar='INTEGER', default=0, type=float, help='Maximum-likelihood-like analysis by binarizing ancestral states.')
 parser.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float, help='The minimum posterior probability of single substitutions to count. Set 0 for a full Bayesian counting without binarization.')
+parser.add_argument('--target_stat', metavar='[omega_conv_unif|omega_conv_asrv...]', default='omega_conv_asrv', type=str, help='The statistics used to explore higher-order branch combinations.')
+parser.add_argument('--min_stat', metavar='FLOAT',default=1.0, type=float, help='If a branch combination has the target_stat greater than this value, higher-order combinations are explored.')
+parser.add_argument('--min_branch_sub', metavar='FLOAT',default=1.0, type=float, help='Minimum substitutions in a branch. Branches < min_branch_sub are excluded from branch combination analyses.')
+parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, help='Minimum nonsonymous convergent substitutions. Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
+parser.add_argument('--min_NCoD', metavar='FLOAT',default=0.15, type=float, help='Minimum nonsynonymous C/D. C/D < min_NCoD are excluded from higher-order analyses.')
+
+# Outputs
 parser.add_argument('--b', metavar='INTEGER',default=1, type=int, help='Branch output. 0 or 1. Set 1 to get the output.')
 parser.add_argument('--s', metavar='INTEGER',default=0, type=int, help='Site output. 0 or 1. Set 1 to get the output.')
 parser.add_argument('--cs', metavar='INTEGER',default=0, type=int, help='Combinatorial-site output. 0 or 1. Set 1 to get the output.')
 parser.add_argument('--cb', metavar='INTEGER',default=1, type=int, help='Combinatorial-branch output. 0 or 1. Set 1 to get the output.')
 parser.add_argument('--bs', metavar='INTEGER',default=0, type=int, help='Branch-site output. 0 or 1. Set 1 to get the output.')
 parser.add_argument('--cbs', metavar='INTEGER',default=0, type=int, help='Combinatorial-branch-site output. 0 or 1. Set 1 to get the output.')
-parser.add_argument('--target_stat', metavar='[omega_conv_unif|omega_conv_asrvN|omega_conv_asrvNS...]', default='omega_conv_asrvN', type=str, help='The statistics used to explore higher-order branch combinations.')
-parser.add_argument('--min_stat', metavar='FLOAT',default=1.0, type=float, help='If a branch combination has the target_stat greater than this value, higher-order combinations are explored.')
-parser.add_argument('--min_branch_sub', metavar='FLOAT',default=1.0, type=float, help='Minimum substitutions in a branch. Branches < min_branch_sub are excluded from branch combination analyses.')
-parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, help='Minimum nonsonymous convergent substitutions. Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
-parser.add_argument('--min_NCoD', metavar='FLOAT',default=0.15, type=float, help='Minimum nonsynonymous C/D. C/D < min_NCoD are excluded from higher-order analyses.')
-parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
+
+# Omega calculation
+parser.add_argument('--calc_omega', metavar='INTEGER', default=1, type=int, help='Calculate omega for convergence rate.')
 parser.add_argument('--resampling_size', metavar='INTEGER',default=100000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
 parser.add_argument('--cb_stats', metavar='PATH',default=None, type=str, help='Use precalculated rho parameters in branch combination analysis.')
+parser.add_argument('--cb_subsample', metavar='INTEGER', default=0, type=int, help='cb subsample output. 0 or 1. Set 1 to get the output.')
 
-parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
-parser.add_argument('--exclude_wg', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude branches within foreground lineages in branch combination analysis.')
-parser.add_argument('--fg_sister', metavar='INT',default=0, type=int, help='')
-parser.add_argument('--fg_parent', metavar='INT',default=0, type=int, help='')
+# Misc
+parser.add_argument('--nslots', metavar='INTEGER',default=1, type=int, help='The number of processors for parallel computations.')
+parser.add_argument('--version', action='version', version='%(prog)s 0.1')
 
 
 args = parser.parse_args()
@@ -239,15 +253,6 @@ if g['cb']:
         file_name = "csubst_cb_"+str(current_arity)+".tsv"
         cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
-        print('median omega_pair_unif =', numpy.round(cb['omega_pair_unif'].median(),decimals=3), flush=True)
-        print('median omega_conv_unif =', numpy.round(cb['omega_conv_unif'].median(),decimals=3), flush=True)
-        print('median omega_div_unif  =', numpy.round(cb['omega_div_unif'].median(),decimals=3), flush=True)
-        print('median omega_pair_asrvNS =', numpy.round(cb['omega_pair_asrvNS'].median(),decimals=3), flush=True)
-        print('median omega_conv_asrvNS =', numpy.round(cb['omega_conv_asrvNS'].median(),decimals=3), flush=True)
-        print('median omega_div_asrvNS  =', numpy.round(cb['omega_div_asrvNS'].median(),decimals=3), flush=True)
-        print('median omega_pair_asrvN =', numpy.round(cb['omega_pair_asrvN'].median(),decimals=3), flush=True)
-        print('median omega_conv_asrvN =', numpy.round(cb['omega_conv_asrvN'].median(),decimals=3), flush=True)
-        print('median omega_div_asrvN  =', numpy.round(cb['omega_div_asrvN'].median(),decimals=3), flush=True)
         elapsed_time = int(time.time() - start)
         tmp_rho_stats['elapsed_sec'] = elapsed_time
         tmp_df_rho = pandas.DataFrame(index=[current_arity,], columns=sorted(list(tmp_rho_stats.keys())))

@@ -108,7 +108,17 @@ def get_state_index(state, input_state, ambiguous_table):
 def get_state_tensor(g):
     g['tree'].link_to_alignment(alignment=g['aln_file'], alg_format='fasta')
     num_node = len(list(g['tree'].traverse()))
-    state_file = [ f for f in os.listdir(g['infile_dir']) if f.endswith('.state') ][0]
+    state_files = [ f for f in os.listdir(g['infile_dir']) if f.endswith('.state') ]
+    if len(state_files)>1:
+        print('Multiple state files detected:', state_files)
+    flag = 1
+    for sf in state_files:
+        if 'CODON' in sf:
+            flag = 0
+            state_file = sf
+    if flag:
+        state_file = state_files[0]
+    print('Reading the state file:', state_file)
     state_table = pandas.read_csv(g['infile_dir'] + state_file, sep="\t", index_col=False, header=0, comment='#')
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = numpy.zeros(axis, dtype=numpy.float64)
