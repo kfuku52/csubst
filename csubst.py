@@ -56,7 +56,8 @@ parser.add_argument('--cbs', metavar='INTEGER',default=0, type=int, help='Combin
 
 # Omega calculation
 parser.add_argument('--calc_omega', metavar='INTEGER', default=1, type=int, help='Calculate omega for convergence rate.')
-parser.add_argument('--resampling_size', metavar='INTEGER',default=100000, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
+parser.add_argument('--omega_method', metavar='[rho|permutation]', default='permutation', type=str, help='')
+parser.add_argument('--num_subsample', metavar='INTEGER',default=0, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
 parser.add_argument('--cb_stats', metavar='PATH',default=None, type=str, help='Use precalculated rho parameters in branch combination analysis.')
 parser.add_argument('--cb_subsample', metavar='INTEGER', default=0, type=int, help='cb subsample output. 0 or 1. Set 1 to get the output.')
 
@@ -98,7 +99,9 @@ if not g['foreground'] is None:
     g = get_marginal_branch(g)
 
 g = get_dep_ids(g)
-if not g['cb_stats'] is None:
+if g['cb_stats'] is None:
+    g['df_cb_stats'] = pandas.DataFrame()
+else:
     g['df_cb_stats'] = pandas.read_csv(g['cb_stats'], sep='\t', header=0)
 
 tree = copy.deepcopy(g['tree'])
@@ -201,8 +204,6 @@ if g['cbs']:
     print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 
 if g['cb']:
-    #cols = ['arity','method','num_combinat','rhoSconv','rhoNconv','Sany2any','Sany2spe','Nany2any','Nany2spe']
-    #df_rho = pandas.DataFrame(index=[], columns=cols)
     end_flag = 0
     df_rho = pandas.DataFrame([])
     for current_arity in numpy.arange(g['current_arity'], g['max_arity']+1):
@@ -240,26 +241,17 @@ if g['cb']:
         cbN = get_cb(id_combinations, N_tensor, g, 'N')
         cb = merge_tables(cbS, cbN)
         del cbS, cbN
-        if (current_arity==2)&(g['foreground'] is None):
-            rs = 'all'
-            rhoNconv_at_2 = cb['Nany2spe'].sum() / cb['Nany2any'].sum()
-            rhoSconv_at_2 = cb['Sany2spe'].sum() / cb['Sany2any'].sum()
-        else:
-            rs = g['resampling_size']
-            #rs_estimated = {'rhoSconv':numpy.sqrt(rhoSconv_at_2)**current_arity, 'rhoNconv':numpy.sqrt(rhoNconv_at_2)**current_arity}
-            #print('rhoSconv estimated from arity = 2:', rs_estimated['rhoSconv'])
-            #print('rhoNconv estimated from arity = 2:', rs_estimated['rhoNconv'])
-        cb,tmp_rho_stats = calc_omega(cb, b, s, S_tensor, N_tensor, g, rs)
+        cb,g = calc_omega(cb, b, s, S_tensor, N_tensor, g)
         file_name = "csubst_cb_"+str(current_arity)+".tsv"
         cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
         elapsed_time = int(time.time() - start)
-        tmp_rho_stats['elapsed_sec'] = elapsed_time
-        tmp_df_rho = pandas.DataFrame(index=[current_arity,], columns=sorted(list(tmp_rho_stats.keys())))
-        for c in list(tmp_rho_stats.keys()):
-            tmp_df_rho.loc[current_arity,c] = tmp_rho_stats[c]
-        df_rho = df_rho.append(tmp_df_rho)
-        df_rho.to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
+        if g['omega_method']=='rho':
+            if 'elapsed_sec' not in g['df_cb_stats'].columns:
+                g['df_cb_stats']['elapsed_sec'] = numpy.nan
+            g['df_cb_stats'].loc[(g['df_cb_stats']['arity'] == g['current_arity']), 'elapsed_sec'] = elapsed_time
+            g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
+            g['df_cb_stats'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
     if end_flag:
         print('No combination satisfied phylogenetic independency. Ending branch combination analysis.')
