@@ -246,7 +246,7 @@ if g['cb']:
         cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
         elapsed_time = int(time.time() - start)
-        if g['omega_method']=='rho':
+        if (g['omega_method']=='rho')|(g['cb_subsample']):
             if 'elapsed_sec' not in g['df_cb_stats'].columns:
                 g['df_cb_stats']['elapsed_sec'] = numpy.nan
             g['df_cb_stats'].loc[(g['df_cb_stats']['arity'] == g['current_arity']), 'elapsed_sec'] = elapsed_time
