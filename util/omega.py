@@ -178,7 +178,7 @@ def print_cb_stats(cb, prefix):
     print(hd, 'median omega_conv_asrv =', numpy.round(cb['omega_conv_asrv'].median(), decimals=3), flush=True)
     print(hd, 'median omega_div_asrv  =', numpy.round(cb['omega_div_asrv'].median(), decimals=3), flush=True)
 
-def get_rho(cb, b, s, g, N_tensor S_tensor):
+def get_rho(cb, b, s, g, N_tensor, S_tensor):
     if g['cb_stats'] is not None:
         print('Retrieving pre-calculated rho')
         rhoSany2spe = g['df_cb_stats'].loc[g['df_cb_stats']['arity'] == g['current_arity'], 'rhoSany2spe'].values
