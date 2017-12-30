@@ -195,9 +195,9 @@ def get_rho(cb, b, s, g, N_tensor, S_tensor):
         print('Estimating rho from', str(g['num_subsample']), 'subsampled combinations')
         method = 'shotgun'  # 'shotgun' is approx. 2 times faster than 'rifle'
         if method == 'shotgun':
-            id_combinations = node_combination_subsamples_shotgun(g=g, arity=g['current_arity'], rep=rho_subsample)
+            id_combinations = node_combination_subsamples_shotgun(g=g, arity=g['current_arity'], rep=g['num_subsample'])
         elif method == 'rifle':
-            id_combinations = node_combination_subsamples_rifle(g=g, arity=g['current_arity'], rep=rho_subsample)
+            id_combinations = node_combination_subsamples_rifle(g=g, arity=g['current_arity'], rep=g['num_subsample'])
         subsampling_type = 'subsample'
         if id_combinations.shape[0] == 0:
             print('Recalculating cb to estimate rho from all combinations.')
