@@ -246,7 +246,7 @@ def get_rho(cb, b, s, g, N_tensor, S_tensor):
 
 def calc_omega(cb, b, s, S_tensor, N_tensor, g):
     if (g['omega_method']=='rho')|(g['cb_subsample']):
-        g = get_rho(cb, g)
+        g = get_rho(cb, b, s, g, N_tensor, S_tensor)
     cb = get_cb_stats(cb, b, s, g, N_tensor, S_tensor)
     print_cb_stats(cb=cb, prefix='cb')
     return(cb, g)
