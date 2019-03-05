@@ -1,0 +1,10 @@
+1	Callithrix_jacchus_ENSCJAG00000022394
+1	Callithrix_jacchus_ENSCJAG00000021082
+
+2	Monodelphis_domestica_ENSMODG00000004055
+2	Monodelphis_domestica_ENSMODG00000022821
+2	Monodelphis_domestica_ENSMODG00000025017
+2	Monodelphis_domestica_ENSMODG00000023385
+2	Monodelphis_domestica_ENSMODG00000023304
+
+3	Ovis_aries_ENSOARG00000018803
