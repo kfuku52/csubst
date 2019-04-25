@@ -26,5 +26,32 @@ pip install git+https://github.com/kfuku52/csubst
 csubst -h 
 ```
 
+## Test run
+```
+# Download a test data
+svn export https://github.com/kfuku52/csubst/trunk/data/OG0002332
+
+# Enter the directory
+cd ./OG0002332
+
+# Run IQ-TREE to get the .state file
+# It's included already
+#iqtree \
+#-s OG0002332.cds.trimal.fasta \
+#-te OG0002332.root.nosupport.nwk \
+#-m MFP \
+#-st CODON1 \
+#-nt 4 \
+#-asr
+
+# Run csubst
+csubst \
+--nslots 4 \
+--infile_dir ./ \
+--infile_type iqtree \
+--aln_file OG0002332.cds.trimal.fasta \
+--tre_file OG0002332.root.nosupport.nwk
+```
+
 ## Licensing
 **csubst** is BSD-licensed (3 clause). See [LICENSE](LICENSE) for details.

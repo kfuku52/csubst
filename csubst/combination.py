@@ -59,12 +59,11 @@ def prepare_node_combinations(g, target_nodes=None, arity=2, check_attr=None, ve
         node_combinations = numpy.unique(df_mmap[df_mmap.sum(axis=1)!=0,:], axis=0)
     if verbose:
         flat_fg_dep_ids = list(itertools.chain(*g['fg_dep_ids']))
-        if isinstance(target_nodes[0], list):
-            num_target_node = sum([ len(lineage) for lineage in target_nodes ])
-            num_wg_node = sum([ len(set(lineage).intersection(set(flat_fg_dep_ids))) for lineage in target_nodes ])
-        else:
-            num_target_node = len(target_nodes)
-            num_wg_node = len(set(target_nodes).intersection(set(flat_fg_dep_ids)))
+        # TODO: standardize target_nodes type and eliminate this if structure
+        if not isinstance(target_nodes, numpy.ndarray):
+            target_nodes = numpy.array(target_nodes)
+        num_target_node = len(target_nodes.flat)
+        num_wg_node = len(set(target_nodes.flat).intersection(set(flat_fg_dep_ids)))
         print("all target nodes:", num_target_node, flush=True)
         print('within-lineage target nodes to be excluded:', num_wg_node, flush=True)
         print("all node combinations: ", len(node_combinations), flush=True)

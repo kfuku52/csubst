@@ -21,48 +21,78 @@ csubst_start = time.time()
 parser = argparse.ArgumentParser()
 
 # Inputs
-parser.add_argument('--ncbi_codon_table', metavar='INTEGER',type=int, required=True, help='NCBI codon table id.')
-parser.add_argument('--infile_dir', metavar='PATH',type=str, required=True, help='PATH to the input file directory.')
-parser.add_argument('--infile_type', metavar='[phylobayes|iqtree]', default='phylobayes', type=str, help='The input file format.')
-parser.add_argument('--aln_file', metavar='PATH', default='', type=str, help='Alignment fasta file. Specify if csubst cannot find it in the infile_dir.')
-parser.add_argument('--tre_file', metavar='PATH', default='', type=str, help='Rooted tree newick file. Specify if csubst cannot find it in the infile_dir.')
+parser.add_argument('--ncbi_codon_table', metavar='INTEGER',type=int, required=False, default=1,
+                    help='default=%(default)s: NCBI codon table id.')
+parser.add_argument('--infile_dir', metavar='PATH',type=str, required=True,
+                    help='default=%(default)s: PATH to the input file directory.')
+parser.add_argument('--infile_type', metavar='[phylobayes|iqtree]', default='iqtree', type=str, choices=['iqtree','phylobayes'],
+                    help='default=%(default)s: The input file format.')
+parser.add_argument('--aln_file', metavar='PATH', default='', type=str,
+                    help='default=%(default)s: Alignment fasta file. Specify if csubst cannot find it in the infile_dir.')
+parser.add_argument('--tre_file', metavar='PATH', default='', type=str,
+                    help='default=%(default)s: Rooted tree newick file. Specify if csubst cannot find it in the infile_dir.')
 
 # Foreground specification
-parser.add_argument('--foreground', metavar='PATH',default=None, type=str, help='Foreground taxa for higher-order analysis.')
-parser.add_argument('--exclude_wg', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude branches within foreground lineages in branch combination analysis.')
-parser.add_argument('--fg_sister', metavar='INT',default=0, type=int, help='')
-parser.add_argument('--fg_parent', metavar='INT',default=0, type=int, help='')
+parser.add_argument('--foreground', metavar='PATH',default=None, type=str,
+                    help='default=%(default)s: Foreground taxa for higher-order analysis.')
+parser.add_argument('--exclude_wg', metavar='INTEGER',default=1, type=int,
+                    help='default=%(default)s: Set 1 to exclude branches within foreground lineages in branch combination analysis.')
+parser.add_argument('--fg_sister', metavar='INT',default=0, type=int,
+                    help='default=%(default)s: ')
+parser.add_argument('--fg_parent', metavar='INT',default=0, type=int,
+                    help='default=%(default)s: ')
 
 # branch combinations
-parser.add_argument('--max_arity', metavar='INTEGER', default=2, type=int, help='The maximum combinatorial number of branches. Set 2 for paired substitutions.')
-parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int, help='Set 1 to exclude sister branches in branch combinatioin analysis.')
+parser.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
+                    help='default=%(default)s: The maximum combinatorial number of branches. Set 2 for paired substitutions.')
+parser.add_argument('--exclude_sisters', metavar='INTEGER',default=1, type=int,
+                    help='default=%(default)s: Set 1 to exclude sister branches in branch combinatioin analysis.')
 
 # Thresholds
-parser.add_argument('--ml_anc', metavar='INTEGER', default=0, type=float, help='Maximum-likelihood-like analysis by binarizing ancestral states.')
-parser.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float, help='The minimum posterior probability of single substitutions to count. Set 0 for a full Bayesian counting without binarization.')
-parser.add_argument('--target_stat', metavar='[omega_conv_unif|omega_conv_asrv...]', default='omega_conv_asrv', type=str, help='The statistics used to explore higher-order branch combinations.')
-parser.add_argument('--min_stat', metavar='FLOAT',default=1.0, type=float, help='If a branch combination has the target_stat greater than this value, higher-order combinations are explored.')
-parser.add_argument('--min_branch_sub', metavar='FLOAT',default=1.0, type=float, help='Minimum substitutions in a branch. Branches < min_branch_sub are excluded from branch combination analyses.')
-parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float, help='Minimum nonsonymous convergent substitutions. Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
-parser.add_argument('--min_NCoD', metavar='FLOAT',default=0.15, type=float, help='Minimum nonsynonymous C/D. C/D < min_NCoD are excluded from higher-order analyses.')
+parser.add_argument('--ml_anc', metavar='INTEGER', default=1, type=float,
+                    help='default=%(default)s: Maximum-likelihood-like analysis by binarizing ancestral states.')
+parser.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,
+                    help='default=%(default)s: The minimum posterior probability of single substitutions to count. Set 0 for a full Bayesian counting without binarization.')
+parser.add_argument('--target_stat', metavar='[omega_conv_unif|omega_conv_asrv...]', default='omega_conv_asrv', type=str,
+                    help='default=%(default)s: The statistics used to explore higher-order branch combinations.')
+parser.add_argument('--min_stat', metavar='FLOAT',default=1.0, type=float,
+                    help='default=%(default)s: If a branch combination has the target_stat greater than this value, higher-order combinations are explored.')
+parser.add_argument('--min_branch_sub', metavar='FLOAT',default=1.0, type=float,
+                    help='default=%(default)s: Minimum substitutions in a branch. Branches < min_branch_sub are excluded from branch combination analyses.')
+parser.add_argument('--min_Nany2spe', metavar='FLOAT',default=1.0, type=float,
+                    help='default=%(default)s: Minimum nonsonymous convergent substitutions. Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
+parser.add_argument('--min_NCoD', metavar='FLOAT',default=0.15, type=float,
+                    help='default=%(default)s: Minimum nonsynonymous C/D. C/D < min_NCoD are excluded from higher-order analyses.')
 
 # Outputs
-parser.add_argument('--b', metavar='INTEGER',default=1, type=int, help='Branch output. 0 or 1. Set 1 to get the output.')
-parser.add_argument('--s', metavar='INTEGER',default=0, type=int, help='Site output. 0 or 1. Set 1 to get the output.')
-parser.add_argument('--cs', metavar='INTEGER',default=0, type=int, help='Combinatorial-site output. 0 or 1. Set 1 to get the output.')
-parser.add_argument('--cb', metavar='INTEGER',default=1, type=int, help='Combinatorial-branch output. 0 or 1. Set 1 to get the output.')
-parser.add_argument('--bs', metavar='INTEGER',default=0, type=int, help='Branch-site output. 0 or 1. Set 1 to get the output.')
-parser.add_argument('--cbs', metavar='INTEGER',default=0, type=int, help='Combinatorial-branch-site output. 0 or 1. Set 1 to get the output.')
+parser.add_argument('--b', metavar='INTEGER',default=1, type=int,
+                    help='default=%(default)s: Branch output. 0 or 1. Set 1 to get the output.')
+parser.add_argument('--s', metavar='INTEGER',default=0, type=int,
+                    help='default=%(default)s: Site output. 0 or 1. Set 1 to get the output.')
+parser.add_argument('--cs', metavar='INTEGER',default=0, type=int,
+                    help='default=%(default)s: Combinatorial-site output. 0 or 1. Set 1 to get the output.')
+parser.add_argument('--cb', metavar='INTEGER',default=1, type=int,
+                    help='default=%(default)s: Combinatorial-branch output. 0 or 1. Set 1 to get the output.')
+parser.add_argument('--bs', metavar='INTEGER',default=0, type=int,
+                    help='default=%(default)s: Branch-site output. 0 or 1. Set 1 to get the output.')
+parser.add_argument('--cbs', metavar='INTEGER',default=0, type=int,
+                    help='default=%(default)s: Combinatorial-branch-site output. 0 or 1. Set 1 to get the output.')
 
 # Omega calculation
-parser.add_argument('--calc_omega', metavar='INTEGER', default=1, type=int, help='Calculate omega for convergence rate.')
-parser.add_argument('--omega_method', metavar='[rho|permutation]', default='permutation', type=str, help='')
-parser.add_argument('--num_subsample', metavar='INTEGER',default=0, type=int, help='The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
-parser.add_argument('--cb_stats', metavar='PATH',default=None, type=str, help='Use precalculated rho parameters in branch combination analysis.')
-parser.add_argument('--cb_subsample', metavar='INTEGER', default=0, type=int, help='cb subsample output. 0 or 1. Set 1 to get the output.')
+parser.add_argument('--calc_omega', metavar='INTEGER', default=1, type=int,
+                    help='default=%(default)s: Calculate omega for convergence rate.')
+parser.add_argument('--omega_method', metavar='[rho|permutation]', default='permutation', type=str,
+                    help='default=%(default)s: ')
+parser.add_argument('--num_subsample', metavar='INTEGER',default=0, type=int,
+                    help='default=%(default)s: The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
+parser.add_argument('--cb_stats', metavar='PATH',default=None, type=str,
+                    help='default=%(default)s: Use precalculated rho parameters in branch combination analysis.')
+parser.add_argument('--cb_subsample', metavar='INTEGER', default=0, type=int,
+                    help='default=%(default)s: cb subsample output. 0 or 1. Set 1 to get the output.')
 
 # Misc
-parser.add_argument('--nslots', metavar='INTEGER',default=1, type=int, help='The number of processors for parallel computations.')
+parser.add_argument('--nslots', metavar='INTEGER',default=1, type=int,
+                    help='default=%(default)s: The number of processors for parallel computations.')
 parser.add_argument('--version', action='version', version='%(prog)s 0.1')
 
 
