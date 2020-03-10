@@ -11,11 +11,12 @@
 
 ## Dependencies
 **csubst** runs on python >3.5 and it depends on the following python packages.
-* [python 3.x](https://www.python.org/)
+* [python 3](https://www.python.org/)
 * [ete3](https://github.com/etetoolkit/ete)
 * [numpy](https://github.com/numpy/numpy)
 * [pandas](https://github.com/pandas-dev/pandas)
 * [joblib](https://github.com/joblib/joblib)
+* [cython](https://cython.org/)
 
 ## Installation
 ```

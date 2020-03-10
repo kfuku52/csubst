@@ -14,12 +14,12 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             df_mmap[i, :] = node_union
             i += 1
 
-def prepare_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True, foreground=False):
+def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True, foreground=False):
     tree = g['tree']
     all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
     if verbose:
-        print("arity:", arity, flush=True)
-        print("all nodes:", len(all_nodes), flush=True)
+        print("Arity:", arity, flush=True)
+        print("All nodes: {:,}".format(len(all_nodes)), flush=True)
     if (target_nodes is None):
         target_nodes = list()
         for node in all_nodes:
@@ -64,7 +64,7 @@ def prepare_node_combinations(g, target_nodes=None, arity=2, check_attr=None, ve
             target_nodes = numpy.array(target_nodes)
         num_target_node = len(target_nodes.flat)
         num_wg_node = len(set(target_nodes.flat).intersection(set(flat_fg_dep_ids)))
-        print("all target nodes:", num_target_node, flush=True)
+        print("all target nodes: {:,}".format(num_target_node), flush=True)
         print('within-lineage target nodes to be excluded:', num_wg_node, flush=True)
         print("all node combinations: ", len(node_combinations), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=numpy.bool)
@@ -84,7 +84,7 @@ def prepare_node_combinations(g, target_nodes=None, arity=2, check_attr=None, ve
         id_combinations[i,:] = rows[cols==i]
     id_combinations.sort(axis=1)
     if verbose:
-        print("independent node combinations: ", id_combinations.shape[0], flush=True)
+        print("independent node combinations: {:,}".format(id_combinations.shape[0]), flush=True)
     return(id_combinations)
 
 def node_combination_subsamples_rifle(g, arity, rep):
@@ -156,3 +156,22 @@ def node_combination_subsamples_shotgun(g, arity, rep):
     else:
         id_combinations = id_combinations[:rep,:]
     return id_combinations
+
+def calc_substitution_patterns(cb):
+    for key in ['S_sub','N_sub']:
+        cols = cb.columns[cb.columns.str.startswith(key)].tolist()
+        sub_patterns = cb.loc[:,cols]
+        sub_patterns2 = pandas.DataFrame(numpy.zeros(sub_patterns.shape), columns=cols)
+        for i in numpy.arange(len(cols)):
+            sub_patterns2.loc[:,cols[i]] = sub_patterns.apply(lambda x: numpy.sort(x)[i], axis=1)
+        sub_patterns2.loc[:,'index2'] = numpy.arange(sub_patterns2.shape[0])
+        sub_patterns3 = sub_patterns2.loc[:,cols].drop_duplicates()
+        sp_min = int(sub_patterns3.sum(axis=1).min())
+        sp_max = int(sub_patterns3.sum(axis=1).max())
+        txt = 'Number of {} patterns among {:,} branch combinations={:,}, Min total subs={:,}, Max total subs={:,}'
+        print(txt.format(key, cb.shape[0], sub_patterns3.shape[0], sp_min, sp_max), flush=True)
+        sub_patterns3.loc[:,'sub_pattern_id'] = numpy.arange(sub_patterns3.shape[0])
+        sub_patterns4 = pandas.merge(sub_patterns2, sub_patterns3, on=cols, sort=False)
+        sub_patterns4 = sub_patterns4.sort_values(axis=0, by='index2', ascending=True).reset_index()
+        cb.loc[:,key+'_pattern_id'] = sub_patterns4.loc[:,'sub_pattern_id']
+    return cb

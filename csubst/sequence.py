@@ -26,3 +26,21 @@ def cdn2pep_state(state_cdn, g):
     for i,aa in enumerate(g['amino_acid_orders']):
         state_pep[:, :, i] = state_cdn[:,:,g['synonymous_indices'][aa]].sum(axis=2)
     return state_pep
+
+def write_alignment(state, orders, outfile, g):
+    aln_out = ''
+    for node in g['tree'].traverse():
+        if node.is_root():
+            continue
+        nlabel = node.numerical_label
+        aln_tmp = '>'+node.name+'|'+str(nlabel)+'\n'
+        for i in numpy.arange(state.shape[1]):
+            index = numpy.where(state[nlabel,i,:]==1)[0]
+            if len(index)==1:
+                aln_tmp += orders[index[0]]
+            else:
+                aln_tmp += '---'
+        aln_out += aln_tmp+'\n'
+    with open(outfile, 'w') as f:
+        print('Writing an alignment:', outfile, flush=True)
+        f.write(aln_out)

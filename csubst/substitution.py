@@ -2,7 +2,6 @@ import time
 import numpy
 import pandas
 import joblib
-import sys
 import os
 from csubst.table import *
 from csubst.parallel import *
@@ -18,10 +17,10 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
         num_syngroup = len(g['amino_acid_orders'])
         num_state = g['max_synonymous_size']
     axis = (num_branch,num_syngroup,num_site,num_state,num_state) # axis = [branch,synonymous_group,site,state_from,state_to]
-    #sub_tensor = numpy.zeros(axis, dtype=state_tensor.dtype)
     mmap_tensor = os.path.join(os.getcwd(), 'tmp.csubst.sub_tensor.'+mmap_attr+'.mmap')
     if os.path.exists(mmap_tensor): os.unlink(mmap_tensor)
-    print(mmap_tensor, state_tensor.dtype,axis)
+    txt = 'Memory map is generated. dtype={}, axis={}, path={}'
+    print(txt.format(state_tensor.dtype, axis, mmap_tensor), flush=True)
     sub_tensor = numpy.memmap(mmap_tensor, dtype=state_tensor.dtype, shape=axis, mode='w+')
     if not g['ml_anc']:
         sub_tensor[:,:,:,:,:] = numpy.nan
@@ -32,7 +31,6 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
             if state_tensor[parent, :, :].sum()!=0:
                 if mode=='asis':
                     sub_matrix = numpy.einsum("sa,sd,ad->sad", state_tensor[parent, :, :], state_tensor[child, :, :], diag_zero) # s=site, a=ancestral, d=derived
-                    #sub_matrix = numpy.einsum("ij,jk,ik->jik", state_tensor[parent, :, :], state_tensor[child, :, :], diag_zero)
                     sub_tensor[child, 0, :, :, :] = sub_matrix
                 elif mode=='syn':
                     for s,aa in enumerate(g['amino_acid_orders']):
@@ -42,7 +40,6 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
                         parent_matrix = state_tensor[parent, :, ind] # axis is swapped, shape=[state,site]
                         child_matrix = state_tensor[child, :, ind] # axis is swapped, shape=[state,site]
                         sub_matrix = numpy.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
-                        #sub_matrix = numpy.einsum("ij,jk,ik->jik", state_tensor[parent, :, ind], state_tensor[child, :, ind], diag_zero)
                         sub_tensor[child, s, :, :size, :size] = sub_matrix
     if g['min_sub_pp']!=0:
         sub_tensor = (numpy.nan_to_num(sub_tensor)>=g['min_sub_pp'])
@@ -120,8 +117,9 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
             df[i, arity+2] += sub_tensor[id_combinations[j,:], sg, :, :, :].sum(axis=2).prod(axis=0).sum(axis=1).sum(axis=0)  # any2spe
             df[i, arity+3] += sub_tensor[id_combinations[j,:], sg, :, :, :].prod(axis=0).sum(axis=(1, 2)).sum(axis=0)  # spe2spe
         if j % 1000 == 0:
-            id_range = str(mmap_start) + '-' + str(mmap_start + id_combinations.shape[0])
-            print('cb:', j, 'th in id', id_range, ':', int(time.time() - start_time), '[sec]', flush=True)
+            mmap_end = mmap_start + id_combinations.shape[0]
+            txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
+            print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
     if not mmap:
         return (df)
 
@@ -137,7 +135,11 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         axis = (id_combinations.shape[0], arity+4)
-        df_mmap = numpy.memmap(mmap_out, dtype=numpy.int64, shape=axis, mode='w+')
+        if (sub_tensor.dtype==numpy.bool):
+            data_type = numpy.int32
+        else:
+            data_type = numpy.float64
+        df_mmap = numpy.memmap(mmap_out, dtype=data_type, shape=axis, mode='w+')
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(sub_tensor2cb)
             (ids, sub_tensor, True, df_mmap, ms) for ids, ms in zip(id_chunks, mmap_starts)
@@ -156,7 +158,8 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
     if mmap:
         df = df_mmap
     else:
-        df = numpy.zeros([id_combinations.shape[0]*num_site, arity+5])
+        shape = (int(id_combinations.shape[0]*num_site), arity+5)
+        df = numpy.zeros(shape=shape, dtype=numpy.int32)
     node=0
     start_time = time.time()
     for i in numpy.arange(id_combinations.shape[0]):
@@ -164,14 +167,17 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
         row_end = ((node+1)*num_site)+(mmap_start*num_site)
         df[row_start:row_end,:arity] = id_combinations[node,:] # branch_ids
         df[row_start:row_end,arity] = sites # site
+        ic = id_combinations[i,:]
         for sg in range(sub_tensor.shape[1]):
-            df[row_start:row_end,arity+1] += sub_tensor[id_combinations[i,:],sg,:,:,:].sum(axis=(2,3)).prod(axis=0) #any2any
-            df[row_start:row_end,arity+2] += sub_tensor[id_combinations[i,:],sg,:,:,:].sum(axis=3).prod(axis=0).sum(axis=1) #spe2any
-            df[row_start:row_end,arity+3] += sub_tensor[id_combinations[i,:],sg,:,:,:].sum(axis=2).prod(axis=0).sum(axis=1) #any2spe
-            df[row_start:row_end,arity+4] += sub_tensor[id_combinations[i,:],sg,:,:,:].prod(axis=0).sum(axis=(1,2)) #spe2spe
-        if node%1000 ==0:
-            id_range = str(mmap_start)+'-'+str(mmap_start+id_combinations.shape[0])
-            print('cbs:', node, 'th in id', id_range, ':', int(time.time()-start_time), '[sec]', flush=True)
+            df[row_start:row_end,arity+1] += sub_tensor[ic,sg,:,:,:].sum(axis=(2,3)).prod(axis=0) #any2any
+            df[row_start:row_end,arity+2] += sub_tensor[ic,sg,:,:,:].sum(axis=3).prod(axis=0).sum(axis=1) #spe2any
+            df[row_start:row_end,arity+3] += sub_tensor[ic,sg,:,:,:].sum(axis=2).prod(axis=0).sum(axis=1) #any2spe
+            df[row_start:row_end,arity+4] += sub_tensor[ic,sg,:,:,:].prod(axis=0).sum(axis=(1,2)) #spe2spe
+        if node%1000==0:
+            mmap_start = mmap_start
+            mmap_end = mmap_start+id_combinations.shape[0]
+            txt = 'cbs: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
+            print(txt.format(node, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
         node += 1
     if not mmap:
         return df

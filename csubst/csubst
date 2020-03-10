@@ -6,6 +6,8 @@
 
 import argparse
 import copy
+import datetime
+import time
 
 from csubst import parser_phylobayes
 from csubst import parser_iqtree
@@ -17,6 +19,7 @@ from csubst.table import *
 from csubst.param import *
 
 csubst_start = time.time()
+print('csubst start:', datetime.datetime.now(datetime.timezone.utc),  flush=True)
 
 parser = argparse.ArgumentParser()
 
@@ -124,6 +127,9 @@ elif g['infile_type']=='iqtree':
         state_cdn = parser_iqtree.get_state_tensor(g)
         state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
 
+write_alignment(state=state_cdn, orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', g=g)
+write_alignment(state=state_pep, orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', g=g)
+
 if not g['foreground'] is None:
     g = get_foreground_branch(g)
     g = get_marginal_branch(g)
@@ -139,14 +145,6 @@ for node in tree.traverse():
     node.name = node.name+'|'+str(node.numerical_label)
 tree.write(format=1, outfile='csubst_tree.nwk')
 
-if False:
-    for key in sorted(list(g.keys())):
-        if key=='tree':
-            print(key)
-            print(g[key].get_ascii(attributes=['name','numerical_label'], show_internal=True))
-        else:
-            print(key, g[key])
-
 N_tensor = get_substitution_tensor(state_tensor=state_pep, mode='asis', g=g, mmap_attr='N')
 sub_branches = numpy.where(N_tensor.sum(axis=(1,2,3,4))!=0)[0].tolist()
 if g['calc_omega']:
@@ -154,18 +152,18 @@ if g['calc_omega']:
     sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
 g['sub_branches'] = sub_branches
 
-id_combinations = prepare_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
+id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
 
 S_total = numpy.nan_to_num(S_tensor).sum(axis=(0,1,2,3,4))
 N_total = numpy.nan_to_num(N_tensor).sum(axis=(0,1,2,3,4))
 num_branch = g['num_node'] -1
 num_site = S_tensor.shape[2]
-print('Synonymous substitutions / tree =', S_total)
-print('Nonsynonymous substitutions / tree =', N_total)
-print('Synonymous substitutions / branch =', S_total / num_branch)
-print('Nonsynonymous substitutions / branch =', N_total / num_branch)
-print('Synonymous substitutions / site =', S_total / num_site)
-print('Nonsynonymous substitutions / site =', N_total / num_site)
+print('Synonymous substitutions / tree = {:,}'.format(S_total), flush=True)
+print('Nonsynonymous substitutions / tree = {:,}'.format(N_total), flush=True)
+print('Synonymous substitutions / branch =', S_total / num_branch, flush=True)
+print('Nonsynonymous substitutions / branch =', N_total / num_branch, flush=True)
+print('Synonymous substitutions / site =', S_total / num_site, flush=True)
+print('Nonsynonymous substitutions / site =', N_total / num_site, flush=True)
 elapsed_time = int(time.time() - start)
 print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 
@@ -188,6 +186,10 @@ if (g['b'])|(g['cb']):
     bS = get_b(g, S_tensor, attr='S')
     bN = get_b(g, N_tensor, attr='N')
     b = merge_tables(bS, bN)
+    txt = 'Number of {} patterns among {:,} branches={:,}, min={:,}, max={:,}'
+    for key in ['S_sub','N_sub']:
+        p = b.loc[:,key].drop_duplicates().values
+        print(txt.format(key, b.shape[0], p.shape[0], p.min(), p.max()), flush=True)
     del bS, bN
     if g['b']:
         b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
@@ -237,6 +239,7 @@ if g['cbs']:
 if g['cb']:
     end_flag = 0
     df_rho = pandas.DataFrame([])
+    # noinspection PyInterpreter,PyInterpreter
     for current_arity in numpy.arange(g['current_arity'], g['max_arity']+1):
         start = time.time()
         print("Making combinat-branch table. Arity =", current_arity, flush=True)
@@ -244,7 +247,7 @@ if g['cb']:
         if (current_arity == 2) & (g['foreground'] is None):
             id_combinations = id_combinations
         elif (current_arity==2)&(not g['foreground'] is None):
-            id_combinations = prepare_node_combinations(g=g, target_nodes=g['fg_id'], arity=current_arity,
+            id_combinations = get_node_combinations(g=g, target_nodes=g['fg_id'], arity=current_arity,
                                                         check_attr='name', foreground=True)
         elif current_arity > 2:
             is_stat_enough = (cb[g['target_stat']]>=g['min_stat'])|(cb[g['target_stat']].isnull())
@@ -255,7 +258,7 @@ if g['cb']:
                 target_columns = ['S_sub_'+str(a+1), 'N_sub_'+str(a+1)]
                 is_branch_sub_enough = is_branch_sub_enough&(cb.loc[:,target_columns].sum(axis=1)>=g['min_branch_sub'])
             num_branch_ids = (is_stat_enough).sum()
-            print('arity =', current_arity, ': qualified combinations =', num_branch_ids)
+            print('Arity =', current_arity, ': qualified combinations =', num_branch_ids)
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
             conditions = (is_stat_enough)&(is_branch_sub_enough)&(is_Nany2spe_enough)&(is_NCoD_enough)
             branch_ids = cb.loc[conditions,id_columns].values
@@ -263,7 +266,7 @@ if g['cb']:
                 end_flag = 1
                 break
             del cb
-            id_combinations = prepare_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
+            id_combinations = get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
                                                         check_attr='name', foreground=True)
             if id_combinations.shape[0] == 0:
                 end_flag = 1
@@ -272,7 +275,9 @@ if g['cb']:
         cbN = get_cb(id_combinations, N_tensor, g, 'N')
         cb = merge_tables(cbS, cbN)
         del cbS, cbN
-        cb,g = calc_omega(cb, b, s, S_tensor, N_tensor, g)
+        cb = get_substitutions_per_branch(cb, b, g)
+        cb = calc_substitution_patterns(cb)
+        cb,g = calc_omega(cb, b, S_tensor, N_tensor, g)
         file_name = "csubst_cb_"+str(current_arity)+".tsv"
         cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
@@ -290,5 +295,6 @@ if g['cb']:
 tmp_files = [ f for f in os.listdir() if f.startswith('tmp.csubst.') ]
 _ = [ os.remove(ts) for ts in tmp_files ]
 
-print("\ncsubst completed. Elapsed time =", int(time.time()-csubst_start), '[sec]',  flush=True)
-
+txt = "\ncsubst completed. Elapsed time = {:,} sec"
+print(txt.format(int(time.time()-csubst_start)),  flush=True)
+print('csubst end:', datetime.datetime.now(datetime.timezone.utc),  flush=True)
