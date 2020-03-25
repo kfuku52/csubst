@@ -84,7 +84,9 @@ parser.add_argument('--cbs', metavar='INTEGER',default=0, type=int,
 # Omega calculation
 parser.add_argument('--calc_omega', metavar='INTEGER', default=1, type=int,
                     help='default=%(default)s: Calculate omega for convergence rate.')
-parser.add_argument('--omega_method', metavar='[rho|permutation]', default='permutation', type=str,
+parser.add_argument('--calc_distribution', metavar='no|yes', default='yes', type=int, choices=['no','yes'],
+                    help='default=%(default)s: Calculate omega for convergence rate.')
+parser.add_argument('--omega_method', metavar='[rho|permutation]', default='permutation', type=str, choices=['rho','permutation'],
                     help='default=%(default)s: ')
 parser.add_argument('--num_subsample', metavar='INTEGER',default=0, type=int,
                     help='default=%(default)s: The number of combinatorial branch resampling to estimate rho in higher-order analyses.')

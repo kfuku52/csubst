@@ -157,13 +157,15 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['ESspe2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2spe', asrv=True)
         cb['ENany2dif_asrv'] = cb['ENany2any_asrv'] - cb['ENany2spe_asrv']
         cb['ESany2dif_asrv'] = cb['ESany2any_asrv'] - cb['ESany2spe_asrv']
-
-        cb['QNany2any_asrv'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2any')
-        cb['QSany2any_asrv'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2any')
-        cb['Qany2any_asrv_omega'] = cb['QNany2any_asrv'] / cb['QSany2any_asrv']
-        cb['QNany2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2spe')
-        cb['QSany2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2spe')
-        cb['Qany2spe_asrv_omega'] = cb['QNany2spe_asrv'] / cb['QSany2spe_asrv']
+        if g['calc_distribution']=='yes':
+            cb['QNany2any_asrv'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2any')
+            cb['QSany2any_asrv'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2any')
+            cb['QNspe2any_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2any')
+            cb['QSspe2any_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2any')
+            cb['QNany2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2spe')
+            cb['QSany2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2spe')
+            cb['QNspe2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2spe')
+            cb['QSspe2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2spe')
 
     return cb
 
