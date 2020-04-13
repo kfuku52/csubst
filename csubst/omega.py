@@ -25,12 +25,93 @@ def get_Econv_unif_permutation(cb, sub_tensor):
                     E_conv_b += tmp_E_conv
     return E_conv_b
 
+def calc_E_mean(mode, cb, sub_sad, sub_bad, num_site, combinat_site_prob, asrv, sg_a_d):
+    E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
+    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
+    for i,sg,a,d in sg_a_d:
+        # TODO: nan in a and d can be skipped in S
+        if a==d:
+            continue
+        if combinat_site_prob:
+            if asrv:
+                if mode == 'spe2spe':
+                    sub_sites = sub_sad[sg, :, a, d]
+                elif mode == 'spe2any':
+                    sub_sites = sub_sad[sg, :, a]
+                elif mode == 'any2spe':
+                    sub_sites = sub_sad[sg, :, d]
+                elif mode == 'any2any':
+                    sub_sites = sub_sad[sg, :]
+                sub_sites_sum = sub_sites.sum()
+                if sub_sites_sum==0:
+                    sub_sites_sum = 1
+                sub_sites = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, num_site))
+            else:
+                sub_sites = numpy.ones(shape=(1, num_site)) / num_site
+        if mode == 'spe2spe':
+            sub_branches = sub_bad[:, sg, a, d]
+        elif mode == 'spe2any':
+            sub_branches = sub_bad[:, sg, a]
+        elif mode == 'any2spe':
+            sub_branches = sub_bad[:, sg, d]
+        elif mode == 'any2any':
+            sub_branches = sub_bad[:, sg]
+        df_sub_ad = pandas.DataFrame({
+            'branch_id': numpy.arange(sub_bad.shape[0]),
+            'sub_branches': sub_branches,
+        })
+        tmp_E = 1
+        for bc in bid_columns:
+            df_tmp = pandas.merge(cb.loc[:,[bc,]], df_sub_ad, left_on=bc, right_on='branch_id',
+                                  how='left', sort=False)
+            #tmp_E *= 1 - ((1-sub_sites) ** numpy.expand_dims(df_tmp['sub_branches'].values, axis=1)) # underestimate E
+            tmp_E *= (sub_sites * numpy.expand_dims(df_tmp['sub_branches'], axis=1))
+        E_b += tmp_E.sum(axis=1)
+    return E_b
 
+def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, num_site, dfq, combinat_site_prob, asrv, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk):
+    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
+    for i,sg,a,d in sgad_chunk:
+        # TODO: nan in a and d can be skipped in S
+        if a==d:
+            continue
+        if combinat_site_prob:
+            if asrv:
+                if mode == 'spe2spe':
+                    sub_sites = sub_sad[sg, :, a, d]
+                elif mode == 'spe2any':
+                    sub_sites = sub_sad[sg, :, a]
+                elif mode == 'any2spe':
+                    sub_sites = sub_sad[sg, :, d]
+                elif mode == 'any2any':
+                    sub_sites = sub_sad[sg, :]
+                sub_sites_sum = sub_sites.sum()
+                if sub_sites_sum==0:
+                    sub_sites_sum = 1
+                sub_sites = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, num_site))
+            else:
+                sub_sites = numpy.ones(shape=(1, num_site)) / num_site
+        if mode == 'spe2spe':
+            sub_branches = sub_bad[:, sg, a, d]
+        elif mode == 'spe2any':
+            sub_branches = sub_bad[:, sg, a]
+        elif mode == 'any2spe':
+            sub_branches = sub_bad[:, sg, d]
+        elif mode == 'any2any':
+            sub_branches = sub_bad[:, sg]
+        # TODO: skip zero-substitution branches
+        p = sub_sites[0]
+        if p.sum()!=0:
+            pm_start = time.time()
+            array_site = numpy.arange(num_site)
+            cb_ids = cb.loc[:,bid_columns].values
+            dfq[:,:] += get_permutations(cb_ids, array_site, sub_branches, p, quantile_niter)
+            txt = '{}: {}/{} synonymous_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
+            print(txt.format(obs_col, i, num_sgad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
-def calc_E_stat(cb, sub_tensor, mode, asrv, stat='mean', quantile_niter=1000, sub_pattern_col=None, obs_col=None, combinat_site_prob=True): # TODO, parallel computation
+def calc_E_stat(cb, sub_tensor, mode, asrv, stat='mean', quantile_niter=1000, sub_pattern_col=None, obs_col=None, combinat_site_prob=True, g=None):
     sub_tensor = numpy.nan_to_num(sub_tensor)
     num_site = sub_tensor.shape[2]
-    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     if mode=='spe2spe':
         sub_bad = sub_tensor.sum(axis=2)  # branch, synonymous_group, ancestral_state, derived_state
         ancestral_states = numpy.arange(sub_bad.shape[2])
@@ -55,71 +136,31 @@ def calc_E_stat(cb, sub_tensor, mode, asrv, stat='mean', quantile_niter=1000, su
         derived_states = ['2any',]
         if combinat_site_prob:
             sub_sad = sub_tensor.sum(axis=(0, 3, 4))
-    dfq = numpy.zeros(shape=(cb.shape[0], quantile_niter), dtype=numpy.int32)
-    if not combinat_site_prob:
-        if asrv:
-            sub_sites = sub_tensor.sum(axis=(0,1,3,4))
-            sub_sites_sum = sub_sites.sum()
-            if sub_sites_sum==0:
-                sub_sites_sum = 1
-            sub_sites = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, num_site))
-        else:
-            sub_sites = numpy.ones(shape=(1, num_site)) / num_site
-    E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
-    for sg in numpy.arange(sub_bad.shape[1]):
-        for a in ancestral_states: # nan can be skipped in S
-            for d in derived_states: # nan can be skipped in S
-                if a != d:
-                    if combinat_site_prob:
-                        if asrv:
-                            if mode == 'spe2spe':
-                                sub_sites = sub_sad[sg, :, a, d]
-                            elif mode == 'spe2any':
-                                sub_sites = sub_sad[sg, :, a]
-                            elif mode == 'any2spe':
-                                sub_sites = sub_sad[sg, :, d]
-                            elif mode == 'any2any':
-                                sub_sites = sub_sad[sg, :]
-                            sub_sites_sum = sub_sites.sum()
-                            if sub_sites_sum==0:
-                                sub_sites_sum = 1
-                            sub_sites = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, num_site))
-                        else:
-                            sub_sites = numpy.ones(shape=(1, num_site)) / num_site
-                    if mode == 'spe2spe':
-                        sub_branches = sub_bad[:, sg, a, d]
-                    elif mode == 'spe2any':
-                        sub_branches = sub_bad[:, sg, a]
-                    elif mode == 'any2spe':
-                        sub_branches = sub_bad[:, sg, d]
-                    elif mode == 'any2any':
-                        sub_branches = sub_bad[:, sg]
-                    df_sub_ad = pandas.DataFrame({
-                        'branch_id': numpy.arange(sub_bad.shape[0]),
-                        'sub_branches': sub_branches,
-                    })
-                    if stat=='mean':
-                        tmp_E = 1
-                        for bc in bid_columns:
-                            df_tmp = pandas.merge(cb.loc[:,[bc,]], df_sub_ad, left_on=bc, right_on='branch_id',
-                                                  how='left', sort=False)
-                            #tmp_E *= 1 - ((1-sub_sites) ** numpy.expand_dims(df_tmp['sub_branches'].values, axis=1)) # underestimate E
-                            tmp_E *= (sub_sites * numpy.expand_dims(df_tmp['sub_branches'], axis=1))
-                        E_b += tmp_E.sum(axis=1)
-                    if stat=='quantile': # TODO: skip zero-substitution branches
-                        p = sub_sites[0]
-                        if p.sum()!=0:
-                            pm_start = time.time()
-                            array_site = numpy.arange(num_site)
-                            cb_ids = cb.loc[:,bid_columns].values
-                            dfq[:,:] += get_permutations(cb_ids, array_site, sub_branches, p, quantile_niter)
-                            print('Time elapsed for {:,} permutation: {:,} [sec]'.format(quantile_niter, int(time.time()-pm_start)), flush=True)
-
-    # TODO: poisson approximation
-    if stat=='quantile':
+    sg_a_d = list(itertools.product(numpy.arange(sub_bad.shape[1]), ancestral_states, derived_states))
+    num_sgad_combinat = len(sg_a_d)
+    sg_a_d = [ [i,]+list(items) for i,items in zip(range(num_sgad_combinat), sg_a_d) ]
+    if stat=='mean':
+        # TODO, parallel computation
+        E_b = calc_E_mean(mode, cb, sub_sad, sub_bad, num_site, combinat_site_prob, asrv, sg_a_d)
+    elif stat=='quantile':
+        mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
+        if os.path.exists(mmap_out): os.unlink(mmap_out)
+        dfq = numpy.memmap(filename=mmap_out, dtype=numpy.int32, shape=(cb.shape[0], quantile_niter), mode='w+')
+        sgad_chunks,mmap_start_not_necessary_here = get_chunks(sg_a_d, g['nslots'])
+        joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
+            joblib.delayed(joblib_calc_quantile)
+            (mode, cb, sub_sad, sub_bad, num_site, dfq, combinat_site_prob, asrv, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk) for sgad_chunk in sgad_chunks
+        )
+        if os.path.exists(mmap_out): os.unlink(mmap_out)
+        E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
         for i in cb.index:
+            # TODO: poisson approximation
             obs_value = cb.loc[i,obs_col]
-            E_b[i] = (dfq[i,:]<obs_value).sum() / quantile_niter
+            gt_rank = (dfq[i,:]<obs_value).sum()
+            ge_rank = (dfq[i,:]<=obs_value).sum()
+            corrected_rank = (gt_rank+ge_rank)/2
+            E_b[i] = corrected_rank / quantile_niter
+
     return E_b
 
 def get_E(cb, g, N_tensor, S_tensor):
@@ -158,14 +199,14 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['ENany2dif_asrv'] = cb['ENany2any_asrv'] - cb['ENany2spe_asrv']
         cb['ESany2dif_asrv'] = cb['ESany2any_asrv'] - cb['ESany2spe_asrv']
         if g['calc_distribution']=='yes':
-            cb['QNany2any_asrv'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2any')
-            cb['QSany2any_asrv'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2any')
-            cb['QNspe2any_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2any')
-            cb['QSspe2any_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2any')
-            cb['QNany2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2spe')
-            cb['QSany2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2spe')
-            cb['QNspe2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2spe')
-            cb['QSspe2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2spe')
+            cb['QNany2any_asrv'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2any', g=g)
+            cb['QSany2any_asrv'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2any', g=g)
+            cb['QNspe2any_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2any', g=g)
+            cb['QSspe2any_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2any', g=g)
+            cb['QNany2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2spe', g=g)
+            cb['QSany2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2spe', g=g)
+            cb['QNspe2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2spe', g=g)
+            cb['QSspe2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2spe', g=g)
 
     return cb
 

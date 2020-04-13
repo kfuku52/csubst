@@ -194,15 +194,15 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     else:
         id_chunks,mmap_starts = get_chunks(id_combinations, g['nslots'])
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cbs.out.mmap')
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
+        if os.path.exists(mmap_out): os.remove(mmap_out)
         axis = (id_combinations.shape[0]*sub_tensor.shape[2], arity+5)
-        df_mmap = numpy.memmap(mmap_out, dtype=numpy.int64, shape=axis, mode='w+')
+        df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(sub_tensor2cbs)
             (ids, sub_tensor, True, df_mmap, ms) for ids,ms in zip(id_chunks,mmap_starts)
         )
         df = pandas.DataFrame(df_mmap, columns=cn1 + cn2 + cn3)
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
+        if os.path.exists(mmap_out): os.remove(mmap_out)
     df = df.dropna()
     df = sort_labels(df)
     df = set_substitution_dtype(df=df)
