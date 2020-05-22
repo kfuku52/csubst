@@ -25,6 +25,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         for node in all_nodes:
             if (check_attr is None)|(check_attr in dir(node)):
                 target_nodes.append(node.numerical_label)
+        target_nodes = numpy.array(target_nodes)
         node_combinations = list(itertools.combinations(target_nodes, arity))
         node_combinations = [set(nc) for nc in node_combinations]
         node_combinations = numpy.array([list(nc) for nc in node_combinations])
@@ -40,14 +41,15 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             node_combinations = numpy.array(node_combinations)
         else:
             print('Foregound branches: All possible combinations will be examined.')
-            #target_nodes = target_nodes[0]
             node_combinations = list(itertools.combinations(target_nodes, arity))
             node_combinations = [set(nc) for nc in node_combinations]
             node_combinations = numpy.array([list(nc) for nc in node_combinations])
+    if (target_nodes.shape.__len__()==1):
+        target_nodes = numpy.expand_dims(target_nodes, axis=1)
     elif 'shape' in dir(target_nodes):
         index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
         print('# combinations for unions =', len(index_combinations))
-        axis = (len(index_combinations), target_nodes.shape[1]+1)
+        axis = (len(index_combinations), arity)
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         df_mmap = numpy.memmap(mmap_out, dtype=numpy.int64, shape=axis, mode='w+')
@@ -59,9 +61,6 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         node_combinations = numpy.unique(df_mmap[df_mmap.sum(axis=1)!=0,:], axis=0)
     if verbose:
         flat_fg_dep_ids = list(itertools.chain(*g['fg_dep_ids']))
-        # TODO: standardize target_nodes type and eliminate this if structure
-        if not isinstance(target_nodes, numpy.ndarray):
-            target_nodes = numpy.array(target_nodes)
         num_target_node = len(target_nodes.flat)
         num_wg_node = len(set(target_nodes.flat).intersection(set(flat_fg_dep_ids)))
         print("all target nodes: {:,}".format(num_target_node), flush=True)

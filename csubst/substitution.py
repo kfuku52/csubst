@@ -22,7 +22,7 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
     txt = 'Memory map is generated. dtype={}, axis={}, path={}'
     print(txt.format(state_tensor.dtype, axis, mmap_tensor), flush=True)
     sub_tensor = numpy.memmap(mmap_tensor, dtype=state_tensor.dtype, shape=axis, mode='w+')
-    if not g['ml_anc']:
+    if (g['ml_anc']=='no'):
         sub_tensor[:,:,:,:,:] = numpy.nan
     for node in g['tree'].traverse():
         if not node.is_root():
@@ -42,7 +42,10 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
                         sub_matrix = numpy.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
                         sub_tensor[child, s, :, :size, :size] = sub_matrix
     if g['min_sub_pp']!=0:
-        sub_tensor = (numpy.nan_to_num(sub_tensor)>=g['min_sub_pp'])
+        if (g['ml_anc']=='yes'):
+            print('--ml_anc is set. --min_sub_pp is not applied.')
+        else:
+            sub_tensor = (numpy.nan_to_num(sub_tensor)>=g['min_sub_pp'])
     return sub_tensor
 
 def get_b(g, sub_tensor, attr):

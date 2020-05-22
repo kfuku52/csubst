@@ -20,7 +20,7 @@
 ## Installation
 ```
 # Installation with pip
-pip install git+https://github.com/kfuku52/csubst
+pip install -e git+https://github.com/kfuku52/csubst
 
 # This should show complete options
 csubst -h 

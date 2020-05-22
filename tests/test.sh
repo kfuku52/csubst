@@ -23,23 +23,23 @@ csubst \
 --infile_type iqtree \
 --aln_file ${file_aln} \
 --tre_file ${file_tree} \
---calc_omega 1 \
---ml_anc 1 \
---b 1 \
---s 1 \
---cs 0 \
---cb 1 \
---bs 1 \
---cbs 0 \
+--calc_omega yes \
+--ml_anc yes \
+--b yes \
+--s yes \
+--cs no \
+--cb yes \
+--bs yes \
+--cbs no \
 --target_stat omega_conv_asrv \
 --min_stat 3 \
 --min_branch_sub 1 \
 --min_Nany2spe 5 \
---exclude_sisters 1 \
+--exclude_sisters yes \
 --num_subsample 10000 \
---cb_subsample 1 \
+--cb_subsample yes \
 --omega_method permutation \
---exclude_wg 0 \
+--exclude_wg no \
 --foreground ${file_fg}
 
 
