@@ -3,6 +3,7 @@ from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 from numpy import get_include # for "cimport numpy"
 import os
+import re
 import platform
 
 if platform.system() == 'Darwin':
