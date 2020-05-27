@@ -9,6 +9,7 @@ from csubst.genetic_code import ambiguous_table
 def get_input_information(g):
     files = os.listdir(g['infile_dir'])
     g['tree'] = ete3.PhyloNode(g['tre_file'], format=1)
+    assert len(g['tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['tre_file'])
     g['tree'] = add_numerical_node_labels(g['tree'])
     internal_node_name = True
     for node in g['tree'].traverse():
@@ -65,16 +66,16 @@ def get_input_information(g):
         g['codon_orders'] = codon_orders
     if (g['calc_omega']=='yes')|(g['input_data_type']=='cdn'):
         g['amino_acid_orders'] = sorted(list(set([ c[0] for c in g['codon_table'] if c[0]!='*' ])))
-        synonymous_groups = dict()
+        matrix_groups = dict()
         for aa in list(set(g['amino_acid_orders'])):
-            synonymous_groups[aa] = [ c[1] for c in g['codon_table'] if c[0]==aa ]
-        g['synonymous_groups'] = synonymous_groups
+            matrix_groups[aa] = [ c[1] for c in g['codon_table'] if c[0]==aa ]
+        g['matrix_groups'] = matrix_groups
         synonymous_indices = dict()
-        for aa in synonymous_groups.keys():
+        for aa in matrix_groups.keys():
             synonymous_indices[aa] = []
         for i,c in enumerate(g['codon_orders']):
-            for aa in synonymous_groups.keys():
-                if c in synonymous_groups[aa]:
+            for aa in matrix_groups.keys():
+                if c in matrix_groups[aa]:
                     synonymous_indices[aa].append(i)
                     break
         g['synonymous_indices'] = synonymous_indices

@@ -7,7 +7,7 @@ from csubst.omega_cy import *
 def get_Econv_unif_permutation(cb, sub_tensor):
     num_site = sub_tensor.shape[2]
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-    sub_bad = sub_tensor.sum(axis=2)  # branch, synonymous_group, ancestral_state, derived_state
+    sub_bad = sub_tensor.sum(axis=2)  # branch, matrix_group, ancestral_state, derived_state
     E_conv_b = 0
     for sg in numpy.arange(sub_bad.shape[1]):
         for a in numpy.arange(sub_bad.shape[2]):
@@ -32,7 +32,7 @@ def calc_E_mean(mode, cb, sub_sad, sub_bad, num_site, combinat_site_prob, asrv, 
         # TODO: nan in a and d can be skipped in S
         if a==d:
             continue
-        if combinat_site_prob:
+        if combinat_site_prob: # TODO: Does this "if" (or combinat_site_prob) necessary?
             if asrv:
                 if mode == 'spe2spe':
                     sub_sites = sub_sad[sg, :, a, d]
@@ -106,34 +106,34 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, num_site, dfq, combinat_sit
             array_site = numpy.arange(num_site)
             cb_ids = cb.loc[:,bid_columns].values
             dfq[:,:] += get_permutations(cb_ids, array_site, sub_branches, p, quantile_niter)
-            txt = '{}: {}/{} synonymous_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
+            txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
             print(txt.format(obs_col, i, num_sgad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
 def calc_E_stat(cb, sub_tensor, mode, asrv, stat='mean', quantile_niter=1000, sub_pattern_col=None, obs_col=None, combinat_site_prob=True, g=None):
     sub_tensor = numpy.nan_to_num(sub_tensor)
     num_site = sub_tensor.shape[2]
     if mode=='spe2spe':
-        sub_bad = sub_tensor.sum(axis=2)  # branch, synonymous_group, ancestral_state, derived_state
+        sub_bad = sub_tensor.sum(axis=2)  # branch, matrix_group, ancestral_state, derived_state
         ancestral_states = numpy.arange(sub_bad.shape[2])
         derived_states = numpy.arange(sub_bad.shape[3])
         if combinat_site_prob:
             sub_sad = sub_tensor.sum(axis=0)
     elif mode=='spe2any':
-        sub_bad = sub_tensor.sum(axis=(2, 4))  # branch, synonymous_group, ancestral_state
+        sub_bad = sub_tensor.sum(axis=(2, 4))  # branch, matrix_group, ancestral_state
         ancestral_states = numpy.arange(sub_bad.shape[2])
-        derived_states = ['2any',]
+        derived_states = ['2any',] # dummy
         if combinat_site_prob:
             sub_sad = sub_tensor.sum(axis=(0, 4))
     elif mode=='any2spe':
-        sub_bad = sub_tensor.sum(axis=(2, 3))  # branch, synonymous_group, derived_state
-        ancestral_states = ['any2',]
+        sub_bad = sub_tensor.sum(axis=(2, 3))  # branch, matrix_group, derived_state
+        ancestral_states = ['any2',] # dummy
         derived_states = numpy.arange(sub_bad.shape[2])
         if combinat_site_prob:
             sub_sad = sub_tensor.sum(axis=(0, 3))
     elif mode=='any2any':
-        sub_bad = sub_tensor.sum(axis=(2, 3, 4))  # branch, synonymous_group
-        ancestral_states = ['any2',]
-        derived_states = ['2any',]
+        sub_bad = sub_tensor.sum(axis=(2, 3, 4))  # branch, matrix_group
+        ancestral_states = ['any2',] # dummy
+        derived_states = ['2any',] # dummy
         if combinat_site_prob:
             sub_sad = sub_tensor.sum(axis=(0, 3, 4))
     sg_a_d = list(itertools.product(numpy.arange(sub_bad.shape[1]), ancestral_states, derived_states))

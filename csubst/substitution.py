@@ -16,7 +16,7 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
     elif mode=='syn':
         num_syngroup = len(g['amino_acid_orders'])
         num_state = g['max_synonymous_size']
-    axis = (num_branch,num_syngroup,num_site,num_state,num_state) # axis = [branch,synonymous_group,site,state_from,state_to]
+    axis = (num_branch,num_syngroup,num_site,num_state,num_state) # axis = [branch,matrix_group,site,state_from,state_to]
     mmap_tensor = os.path.join(os.getcwd(), 'tmp.csubst.sub_tensor.'+mmap_attr+'.mmap')
     if os.path.exists(mmap_tensor): os.unlink(mmap_tensor)
     txt = 'Memory map is generated. dtype={}, axis={}, path={}'
@@ -79,7 +79,7 @@ def get_cs(id_combinations, sub_tensor, attr):
     df = numpy.zeros([num_site, 5])
     df[:, 0] = numpy.arange(num_site)
     for i in numpy.arange(id_combinations.shape[0]):
-        for sg in numpy.arange(sub_tensor.shape[1]):
+        for sg in numpy.arange(sub_tensor.shape[1]): # TODO: Couldn't this sg included in the matrix calc using .sum()?
             df[:, 1] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], sg, :, :, :].sum(axis=(2, 3)).prod(axis=0))  # any2any
             df[:, 2] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], sg, :, :, :].sum(axis=3).prod(axis=0).sum(axis=1))  # spe2any
             df[:, 3] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], sg, :, :, :].sum(axis=2).prod(axis=0).sum(axis=1))  # any2spe

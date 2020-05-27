@@ -1,4 +1,5 @@
 import numpy
+import itertools
 
 def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
@@ -76,3 +77,27 @@ def transfer_internal_node_names(tree_to, tree_from):
                     if set(to.get_leaf_names())==set(fr.get_leaf_names()):
                         to.name = fr.name
     return tree_to
+
+def get_node_distance(tree, cb):
+    if not 'numerical_label' in dir(tree):
+        tree = add_numerical_node_labels(tree)
+    tree_dict = dict()
+    for node in tree.traverse():
+        tree_dict[node.numerical_label] = node
+    cn1 = cb.columns[cb.columns.str.startswith('branch_id_')]
+    cn2 = ["dist_node_num", "dist_bl"]
+    for cn2_item in cn2:
+        cb.loc[:,cn2_item] = numpy.nan
+    for i in cb.index:
+        nodes = [ tree_dict[n] for n in cb.loc[i,cn1].tolist() ]
+        node_dists = list()
+        node_nums = list()
+        for nds in list(itertools.combinations(nodes, 2)):
+            node_dist = nds[0].get_distance(target=nds[1], topology_only=False)
+            node_dists.append(node_dist - nds[1].dist)
+            node_nums.append(nds[0].get_distance(target=nds[1], topology_only=True))
+        node_dist = max(node_dists) # Maximum number among pairwise distances
+        node_num = max(node_nums) # Maximum number among pairwise distances
+        cb.loc[i,"dist_node_num"] = node_num
+        cb.loc[i,"dist_bl"] = node_dist
+    return(cb)

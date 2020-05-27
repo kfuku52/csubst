@@ -37,7 +37,6 @@ csubst \
 --min_Nany2spe 5 \
 --exclude_sisters yes \
 --num_subsample 10000 \
---cb_subsample yes \
 --omega_method permutation \
 --exclude_wg no \
 --foreground ${file_fg}

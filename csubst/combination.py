@@ -5,6 +5,8 @@ import numpy
 import pandas
 from csubst.parallel import *
 
+# TODO: dep_id may be more efficient in bool matrix?
+
 def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
     arity = target_nodes.shape[1] + 1
     i = mmap_start
