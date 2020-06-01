@@ -25,29 +25,28 @@ def get_Econv_unif_permutation(cb, sub_tensor):
                     E_conv_b += tmp_E_conv
     return E_conv_b
 
-def calc_E_mean(mode, cb, sub_sad, sub_bad, num_site, combinat_site_prob, asrv, sg_a_d):
+def calc_E_mean(mode, cb, sub_sad, sub_bad, num_site, asrv, sg_a_d):
     E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     for i,sg,a,d in sg_a_d:
         # TODO: nan in a and d can be skipped in S
         if a==d:
             continue
-        if combinat_site_prob: # TODO: Does this "if" (or combinat_site_prob) necessary?
-            if asrv:
-                if mode == 'spe2spe':
-                    sub_sites = sub_sad[sg, :, a, d]
-                elif mode == 'spe2any':
-                    sub_sites = sub_sad[sg, :, a]
-                elif mode == 'any2spe':
-                    sub_sites = sub_sad[sg, :, d]
-                elif mode == 'any2any':
-                    sub_sites = sub_sad[sg, :]
-                sub_sites_sum = sub_sites.sum()
-                if sub_sites_sum==0:
-                    sub_sites_sum = 1
-                sub_sites = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, num_site))
-            else:
-                sub_sites = numpy.ones(shape=(1, num_site)) / num_site
+        if asrv:
+            if mode == 'spe2spe':
+                sub_sites = sub_sad[sg, :, a, d]
+            elif mode == 'spe2any':
+                sub_sites = sub_sad[sg, :, a]
+            elif mode == 'any2spe':
+                sub_sites = sub_sad[sg, :, d]
+            elif mode == 'any2any':
+                sub_sites = sub_sad[sg, :]
+            sub_sites_sum = sub_sites.sum()
+            if sub_sites_sum==0:
+                sub_sites_sum = 1
+            sub_sites = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, num_site))
+        else:
+            sub_sites = numpy.ones(shape=(1, num_site)) / num_site
         if mode == 'spe2spe':
             sub_branches = sub_bad[:, sg, a, d]
         elif mode == 'spe2any':
@@ -69,28 +68,27 @@ def calc_E_mean(mode, cb, sub_sad, sub_bad, num_site, combinat_site_prob, asrv, 
         E_b += tmp_E.sum(axis=1)
     return E_b
 
-def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, num_site, dfq, combinat_site_prob, asrv, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk):
+def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, num_site, dfq, asrv, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk):
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     for i,sg,a,d in sgad_chunk:
         # TODO: nan in a and d can be skipped in S
         if a==d:
             continue
-        if combinat_site_prob:
-            if asrv:
-                if mode == 'spe2spe':
-                    sub_sites = sub_sad[sg, :, a, d]
-                elif mode == 'spe2any':
-                    sub_sites = sub_sad[sg, :, a]
-                elif mode == 'any2spe':
-                    sub_sites = sub_sad[sg, :, d]
-                elif mode == 'any2any':
-                    sub_sites = sub_sad[sg, :]
-                sub_sites_sum = sub_sites.sum()
-                if sub_sites_sum==0:
-                    sub_sites_sum = 1
-                sub_sites = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, num_site))
-            else:
-                sub_sites = numpy.ones(shape=(1, num_site)) / num_site
+        if asrv:
+            if mode == 'spe2spe':
+                sub_sites = sub_sad[sg, :, a, d]
+            elif mode == 'spe2any':
+                sub_sites = sub_sad[sg, :, a]
+            elif mode == 'any2spe':
+                sub_sites = sub_sad[sg, :, d]
+            elif mode == 'any2any':
+                sub_sites = sub_sad[sg, :]
+            sub_sites_sum = sub_sites.sum()
+            if sub_sites_sum==0:
+                sub_sites_sum = 1
+            sub_sites = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, num_site))
+        else:
+            sub_sites = numpy.ones(shape=(1, num_site)) / num_site
         if mode == 'spe2spe':
             sub_branches = sub_bad[:, sg, a, d]
         elif mode == 'spe2any':
@@ -109,39 +107,35 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, num_site, dfq, combinat_sit
             txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
             print(txt.format(obs_col, i+1, num_sgad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
-def calc_E_stat(cb, sub_tensor, mode, asrv, stat='mean', quantile_niter=1000, sub_pattern_col=None, obs_col=None, combinat_site_prob=True, g=None):
+def calc_E_stat(cb, sub_tensor, mode, asrv, stat='mean', quantile_niter=1000, sub_pattern_col=None, obs_col=None, g=None):
     sub_tensor = numpy.nan_to_num(sub_tensor)
     num_site = sub_tensor.shape[2]
     if mode=='spe2spe':
         sub_bad = sub_tensor.sum(axis=2)  # branch, matrix_group, ancestral_state, derived_state
         ancestral_states = numpy.arange(sub_bad.shape[2])
         derived_states = numpy.arange(sub_bad.shape[3])
-        if combinat_site_prob:
-            sub_sad = sub_tensor.sum(axis=0)
+        sub_sad = sub_tensor.sum(axis=0)
     elif mode=='spe2any':
         sub_bad = sub_tensor.sum(axis=(2, 4))  # branch, matrix_group, ancestral_state
         ancestral_states = numpy.arange(sub_bad.shape[2])
         derived_states = ['2any',] # dummy
-        if combinat_site_prob:
-            sub_sad = sub_tensor.sum(axis=(0, 4))
+        sub_sad = sub_tensor.sum(axis=(0, 4))
     elif mode=='any2spe':
         sub_bad = sub_tensor.sum(axis=(2, 3))  # branch, matrix_group, derived_state
         ancestral_states = ['any2',] # dummy
         derived_states = numpy.arange(sub_bad.shape[2])
-        if combinat_site_prob:
-            sub_sad = sub_tensor.sum(axis=(0, 3))
+        sub_sad = sub_tensor.sum(axis=(0, 3))
     elif mode=='any2any':
         sub_bad = sub_tensor.sum(axis=(2, 3, 4))  # branch, matrix_group
         ancestral_states = ['any2',] # dummy
         derived_states = ['2any',] # dummy
-        if combinat_site_prob:
-            sub_sad = sub_tensor.sum(axis=(0, 3, 4))
+        sub_sad = sub_tensor.sum(axis=(0, 3, 4))
     sg_a_d = list(itertools.product(numpy.arange(sub_bad.shape[1]), ancestral_states, derived_states))
     num_sgad_combinat = len(sg_a_d)
     sg_a_d = [ [i,]+list(items) for i,items in zip(range(num_sgad_combinat), sg_a_d) ]
     if stat=='mean':
         # TODO, parallel computation
-        E_b = calc_E_mean(mode, cb, sub_sad, sub_bad, num_site, combinat_site_prob, asrv, sg_a_d)
+        E_b = calc_E_mean(mode, cb, sub_sad, sub_bad, num_site, asrv, sg_a_d)
     elif stat=='quantile':
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
@@ -149,7 +143,7 @@ def calc_E_stat(cb, sub_tensor, mode, asrv, stat='mean', quantile_niter=1000, su
         sgad_chunks,mmap_start_not_necessary_here = get_chunks(sg_a_d, g['nslots'])
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(joblib_calc_quantile)
-            (mode, cb, sub_sad, sub_bad, num_site, dfq, combinat_site_prob, asrv, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk) for sgad_chunk in sgad_chunks
+            (mode, cb, sub_sad, sub_bad, num_site, dfq, asrv, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk) for sgad_chunk in sgad_chunks
         )
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
