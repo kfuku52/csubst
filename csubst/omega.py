@@ -107,7 +107,7 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, num_site, dfq, combinat_sit
             cb_ids = cb.loc[:,bid_columns].values
             dfq[:,:] += get_permutations(cb_ids, array_site, sub_branches, p, quantile_niter)
             txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
-            print(txt.format(obs_col, i, num_sgad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
+            print(txt.format(obs_col, i+1, num_sgad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
 def calc_E_stat(cb, sub_tensor, mode, asrv, stat='mean', quantile_niter=1000, sub_pattern_col=None, obs_col=None, combinat_site_prob=True, g=None):
     sub_tensor = numpy.nan_to_num(sub_tensor)
@@ -169,54 +169,39 @@ def get_E(cb, g, N_tensor, S_tensor):
         rhoSany2spe = g['df_cb_stats'].loc[(g['df_cb_stats']['arity'] == g['current_arity']), 'rhoSany2spe'].values
         rhoNany2dif = 1 - rhoNany2spe
         rhoSany2dif = 1 - rhoSany2spe
-        cb['ENany2any_unif'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=False)
-        cb['ESany2any_unif'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=False)
-        cb['ENany2any_asrv'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=True)
-        cb['ESany2any_asrv'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=True)
-        cb['ENany2spe_unif'] = cb['ENany2any_unif'] * rhoNany2spe
-        cb['ENany2dif_unif'] = cb['ENany2any_unif'] * rhoNany2dif
-        cb['ESany2spe_unif'] = cb['ESany2any_unif'] * rhoSany2spe
-        cb['ESany2dif_unif'] = cb['ESany2any_unif'] * rhoSany2dif
-        cb['ENany2spe_asrv'] = cb['ENany2any_asrv'] * rhoNany2spe
-        cb['ENany2dif_asrv'] = cb['ENany2any_asrv'] * rhoNany2dif
-        cb['ESany2spe_asrv'] = cb['ESany2any_asrv'] * rhoSany2spe
-        cb['ESany2dif_asrv'] = cb['ESany2any_asrv'] * rhoSany2dif
+        cb['ENany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=g['asrv'])
+        cb['ESany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=g['asrv'])
+        cb['ENany2spe'] = cb['ENany2any'] * rhoNany2spe
+        cb['ENany2dif'] = cb['ENany2any'] * rhoNany2dif
+        cb['ESany2spe'] = cb['ESany2any'] * rhoSany2spe
+        cb['ESany2dif'] = cb['ESany2any'] * rhoSany2dif
     elif g['omega_method']=='permutation':
-        cb['ENany2any_unif'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=False)
-        cb['ENany2spe_unif'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=False)
-        cb['ESany2any_unif'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=False)
-        cb['ESany2spe_unif'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=False)
-        cb['ENany2dif_unif'] = cb['ENany2any_unif'] - cb['ENany2spe_unif']
-        cb['ESany2dif_unif'] = cb['ESany2any_unif'] - cb['ESany2spe_unif']
-        cb['ENany2any_asrv'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=True)
-        cb['ENspe2any_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2any', asrv=True)
-        cb['ENany2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=True)
-        cb['ENspe2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2spe', asrv=True)
-        cb['ESany2any_asrv'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=True)
-        cb['ESspe2any_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2any', asrv=True)
-        cb['ESany2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=True)
-        cb['ESspe2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2spe', asrv=True)
-        cb['ENany2dif_asrv'] = cb['ENany2any_asrv'] - cb['ENany2spe_asrv']
-        cb['ESany2dif_asrv'] = cb['ESany2any_asrv'] - cb['ESany2spe_asrv']
+        cb['ENany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=g['asrv'])
+        cb['ENspe2any'] = calc_E_stat(cb, N_tensor, mode='spe2any', asrv=g['asrv'])
+        cb['ENany2spe'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=g['asrv'])
+        cb['ENspe2spe'] = calc_E_stat(cb, N_tensor, mode='spe2spe', asrv=g['asrv'])
+        cb['ESany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=g['asrv'])
+        cb['ESspe2any'] = calc_E_stat(cb, S_tensor, mode='spe2any', asrv=g['asrv'])
+        cb['ESany2spe'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=g['asrv'])
+        cb['ESspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', asrv=g['asrv'])
+        cb['ENany2dif'] = cb['ENany2any'] - cb['ENany2spe']
+        cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
         if g['calc_distribution']=='yes':
-            cb['QNany2any_asrv'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2any', g=g)
-            cb['QSany2any_asrv'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2any', g=g)
-            cb['QNspe2any_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2any', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2any', g=g)
-            cb['QSspe2any_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2any', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2any', g=g)
-            cb['QNany2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2spe', g=g)
-            cb['QSany2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2spe', g=g)
-            cb['QNspe2spe_asrv'] = calc_E_stat(cb, N_tensor, mode='spe2spe', asrv=True, stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2spe', g=g)
-            cb['QSspe2spe_asrv'] = calc_E_stat(cb, S_tensor, mode='spe2spe', asrv=True, stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2spe', g=g)
+            cb['QNany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', asrv=g['asrv'], stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2any', g=g)
+            cb['QSany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', asrv=g['asrv'], stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2any', g=g)
+            #cb['QNspe2any'] = calc_E_stat(cb, N_tensor, mode='spe2any', asrv=g['asrv'], stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2any', g=g)
+            #cb['QSspe2any'] = calc_E_stat(cb, S_tensor, mode='spe2any', asrv=g['asrv'], stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2any', g=g)
+            cb['QNany2spe'] = calc_E_stat(cb, N_tensor, mode='any2spe', asrv=g['asrv'], stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nany2spe', g=g)
+            cb['QSany2spe'] = calc_E_stat(cb, S_tensor, mode='any2spe', asrv=g['asrv'], stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sany2spe', g=g)
+            #cb['QNspe2spe'] = calc_E_stat(cb, N_tensor, mode='spe2spe', asrv=g['asrv'], stat='quantile', sub_pattern_col='N_sub_pattern_id', obs_col='Nspe2spe', g=g)
+            #cb['QSspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', asrv=g['asrv'], stat='quantile', sub_pattern_col='S_sub_pattern_id', obs_col='Sspe2spe', g=g)
 
     return cb
 
 def get_omega(cb):
-    cb['omega_pair_unif'] = (cb['Nany2any'] / cb['ENany2any_unif']) / (cb['Sany2any'] / cb['ESany2any_unif'])
-    cb['omega_conv_unif'] = (cb['Nany2spe'] / cb['ENany2spe_unif']) / (cb['Sany2spe'] / cb['ESany2spe_unif'])
-    cb['omega_div_unif'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['ENany2dif_unif']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ESany2dif_unif'])
-    cb['omega_pair_asrv'] = (cb['Nany2any'] / cb['ENany2any_asrv']) / (cb['Sany2any'] / cb['ESany2any_asrv'])
-    cb['omega_conv_asrv'] = (cb['Nany2spe'] / cb['ENany2spe_asrv']) / (cb['Sany2spe'] / cb['ESany2spe_asrv'])
-    cb['omega_div_asrv'] = ((cb['Nany2any']-cb['Nany2spe']) / cb['ENany2dif_asrv']) / ((cb['Sany2any']-cb['Sany2spe']) / cb['ESany2dif_asrv'])
+    cb['omega_pair'] = (cb['Nany2any'] / cb['ENany2any']) / (cb['Sany2any'] / cb['ESany2any'])
+    cb['omega_conv'] = (cb['Nany2spe'] / cb['ENany2spe']) / (cb['Sany2spe'] / cb['ESany2spe'])
+    cb['omega_div'] = ((cb['Nany2any']-cb['Nany2spe'])/cb['ENany2dif']) / ((cb['Sany2any']-cb['Sany2spe'])/cb['ESany2dif'])
     return cb
 
 def get_CoD(cb):
@@ -228,12 +213,9 @@ def get_CoD(cb):
 def print_cb_stats(cb, prefix):
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'arity='+str(arity)+', '+prefix+':'
-    print(hd, 'median omega_pair_unif =', numpy.round(cb['omega_pair_unif'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_conv_unif =', numpy.round(cb['omega_conv_unif'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_div_unif  =', numpy.round(cb['omega_div_unif'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_pair_asrv =', numpy.round(cb['omega_pair_asrv'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_conv_asrv =', numpy.round(cb['omega_conv_asrv'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_div_asrv  =', numpy.round(cb['omega_div_asrv'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_pair =', numpy.round(cb['omega_pair'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_conv =', numpy.round(cb['omega_conv'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_div  =', numpy.round(cb['omega_div'].median(), decimals=3), flush=True)
 
 def get_rho(cb, b, g, N_tensor, S_tensor):
     if g['cb_stats'] is not None:
@@ -280,8 +262,8 @@ def get_rho(cb, b, g, N_tensor, S_tensor):
         cb_subsample = get_E(cb_subsample, g, N_tensor, S_tensor)
         cb_subsample = get_omega(cb_subsample)
         print_cb_stats(cb=cb_subsample, prefix='cb_subsample')
-        column_names = ['num_combinat','Sany2any','Sany2spe','Nany2any','Nany2spe','ENany2any_unif','ESany2any_unif',
-                        'ENany2any_asrv','ESany2any_asrv','ENany2spe_unif','ESany2spe_unif','ENany2spe_asrv','ESany2spe_asrv',]
+        column_names = ['num_combinat','Sany2any','Sany2spe','Nany2any','Nany2spe',
+                        'ENany2any','ESany2any','ENany2spe','ESany2spe',]
         for col in column_names:
             if not col in g['df_cb_stats'].columns:
                 g['df_cb_stats'][col] = numpy.nan
@@ -291,14 +273,10 @@ def get_rho(cb, b, g, N_tensor, S_tensor):
         g['df_cb_stats'].loc[cond,'Sany2spe'] = cb_subsample['Sany2spe'].sum()
         g['df_cb_stats'].loc[cond,'Nany2any'] = cb_subsample['Nany2any'].sum()
         g['df_cb_stats'].loc[cond,'Nany2spe'] = cb_subsample['Nany2spe'].sum()
-        g['df_cb_stats'].loc[cond,'ENany2any_unif'] = cb_subsample['ENany2any_unif'].sum()
-        g['df_cb_stats'].loc[cond,'ESany2any_unif'] = cb_subsample['ESany2any_unif'].sum()
-        g['df_cb_stats'].loc[cond,'ENany2any_asrv'] = cb_subsample['ENany2any_asrv'].sum()
-        g['df_cb_stats'].loc[cond,'ESany2any_asrv'] = cb_subsample['ESany2any_asrv'].sum()
-        g['df_cb_stats']['ENany2spe_unif'] = g['df_cb_stats']['ENany2any_unif'] * g['df_cb_stats']['rhoNany2spe']
-        g['df_cb_stats']['ESany2spe_unif'] = g['df_cb_stats']['ESany2any_unif'] * g['df_cb_stats']['rhoSany2spe']
-        g['df_cb_stats']['ENany2spe_asrv'] = g['df_cb_stats']['ENany2any_asrv'] * g['df_cb_stats']['rhoNany2spe']
-        g['df_cb_stats']['ESany2spe_asrv'] = g['df_cb_stats']['ESany2any_asrv'] * g['df_cb_stats']['rhoSany2spe']
+        g['df_cb_stats'].loc[cond,'ENany2any'] = cb_subsample['ENany2any'].sum()
+        g['df_cb_stats'].loc[cond,'ESany2any'] = cb_subsample['ESany2any'].sum()
+        g['df_cb_stats']['ENany2spe'] = g['df_cb_stats']['ENany2any'] * g['df_cb_stats']['rhoNany2spe']
+        g['df_cb_stats']['ESany2spe'] = g['df_cb_stats']['ESany2any'] * g['df_cb_stats']['rhoSany2spe']
     if (g['cb_subsample']=='yes')&(g['df_cb_stats'].loc[(g['df_cb_stats']['arity']==g['current_arity']),'method'].values=='subsample'):
         file_name = "csubst_cb_subsample_" + str(g['current_arity']) + ".tsv"
         cb_subsample.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
@@ -313,7 +291,7 @@ def get_substitutions_per_branch(cb, b, g):
     return(cb)
 
 def calc_omega(cb, b, S_tensor, N_tensor, g):
-    if (g['omega_method']=='rho')|(g['cb_subsample']=='yes'):
+    if (g['omega_method']=='rho')&(g['cb_subsample']=='yes'):
         g = get_rho(cb, b, g, N_tensor, S_tensor)
     cb = get_E(cb, g, N_tensor, S_tensor)
     cb = get_omega(cb)

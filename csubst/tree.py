@@ -5,7 +5,6 @@ def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
     all_leaf_names.sort()
     leaf_numerical_labels = dict()
-    power = 0
     for i in range(0, len(all_leaf_names)):
         leaf_numerical_labels[all_leaf_names[i]] = 2**i
     numerical_labels = list()
