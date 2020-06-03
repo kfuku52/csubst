@@ -59,12 +59,12 @@ def get_input_information(g):
     elif g['num_input_state'] > 20:
         g['input_data_type'] = 'cdn'
         g['codon_orders'] = state_table.columns[3:].str.replace('p_','').tolist()
-    if (g['calc_omega']=='yes')&(g['input_data_type']=='nuc'):
+    if (g['calc_omega'])&(g['input_data_type']=='nuc'):
         g['state_columns'] = list(itertools.product(numpy.arange(len(g['input_state'])), repeat=3))
         codon_orders = list(itertools.product(g['input_state'], repeat=3))
         codon_orders = [ c[0]+c[1]+c[2] for c in codon_orders]
         g['codon_orders'] = codon_orders
-    if (g['calc_omega']=='yes')|(g['input_data_type']=='cdn'):
+    if (g['calc_omega'])|(g['input_data_type']=='cdn'):
         g['amino_acid_orders'] = sorted(list(set([ c[0] for c in g['codon_table'] if c[0]!='*' ])))
         matrix_groups = dict()
         for aa in list(set(g['amino_acid_orders'])):
@@ -130,7 +130,7 @@ def get_state_tensor(g):
                 print('Node name not found in .state file:', node.name)
             else:
                 state_tensor[node.numerical_label,:,:] = state_matrix
-    if (g['ml_anc']=='yes'):
+    if (g['ml_anc']):
         print('Ancestral state frequency is converted to the ML-like binary states.')
         idxmax = numpy.argmax(state_tensor, axis=2)
         state_tensor2 = numpy.zeros(state_tensor.shape, dtype=numpy.bool_)

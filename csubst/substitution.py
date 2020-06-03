@@ -42,7 +42,7 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
                         sub_matrix = numpy.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
                         sub_tensor[child, s, :, :size, :size] = sub_matrix
     if g['min_sub_pp']!=0:
-        if (g['ml_anc']=='yes'):
+        if (g['ml_anc']):
             print('--ml_anc is set. --min_sub_pp is not applied.')
         else:
             sub_tensor = (numpy.nan_to_num(sub_tensor)>=g['min_sub_pp'])
@@ -212,3 +212,9 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     print(type(df), flush=True)
     return(df)
 
+def get_relative_sub_sites(sub_sites):
+    sub_sites_sum = sub_sites.sum()
+    if sub_sites_sum==0:
+        sub_sites_sum = 1
+    out = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, sub_sites.shape[0]))
+    return out

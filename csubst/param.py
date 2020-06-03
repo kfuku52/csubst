@@ -44,7 +44,7 @@ def get_dep_ids(g):
                 dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
                 dep_ids.append(dep_id)
     g['dep_ids'] = dep_ids
-    if (g['foreground'] is not None)&(g['exclude_wg']=='yes'):
+    if (g['foreground'] is not None)&(g['exclude_wg']):
         fg_dep_ids = list()
         for node in g['tree'].traverse():
             for i in numpy.arange(len(g['fg_leaf_name'])):
@@ -56,7 +56,7 @@ def get_dep_ids(g):
                         flag = 1
                     if flag:
                         fg_dep_ids.append(numpy.array([node.numerical_label,] + [ n.numerical_label for n in node.get_descendants() ]))
-        if (g['fg_sister']=='yes')|(g['fg_parent']=='yes'):
+        if (g['fg_sister'])|(g['fg_parent']):
             fg_dep_ids.append(numpy.array(g['marginal_id']))
         g['fg_dep_ids'] = fg_dep_ids
     else:
@@ -101,9 +101,9 @@ def get_marginal_branch(g):
     marginal_ids = list()
     for node in g['tree'].traverse():
         if (node.numerical_label in g['target_id'])&(not node.is_root()):
-            if (g['fg_sister']=='yes'):
+            if (g['fg_sister']):
                 marginal_ids += [ sister.numerical_label for sister in node.get_sisters() ]
-            if (g['fg_parent']=='yes'):
+            if (g['fg_parent']):
                     marginal_ids.append(node.up.numerical_label)
     g['marginal_id'] = list(set(marginal_ids)-set(g['target_id']))
     lineage_fg_id = g['target_id'] + g['marginal_id']
