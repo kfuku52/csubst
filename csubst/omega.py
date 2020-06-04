@@ -25,6 +25,29 @@ def get_Econv_unif_permutation(cb, sub_tensor):
                     E_conv_b += tmp_E_conv
     return E_conv_b
 
+def get_each_sub_sites(sub_sad, mode, sg, a, d):
+    if mode == 'spe2spe':
+        sub_sites = sub_sad[sg, :, a, d]
+    elif mode == 'spe2any':
+        sub_sites = sub_sad[sg, :, a]
+    elif mode == 'any2spe':
+        sub_sites = sub_sad[sg, :, d]
+    elif mode == 'any2any':
+        sub_sites = sub_sad[sg, :]
+    sub_sites = get_relative_sub_sites(sub_sites)
+    return sub_sites
+
+def get_sub_branches(sub_bad, mode, sg, a, d):
+    if mode == 'spe2spe':
+        sub_branches = sub_bad[:, sg, a, d]
+    elif mode == 'spe2any':
+        sub_branches = sub_bad[:, sg, a]
+    elif mode == 'any2spe':
+        sub_branches = sub_bad[:, sg, d]
+    elif mode == 'any2any':
+        sub_branches = sub_bad[:, sg]
+    return sub_branches
+
 def calc_E_mean(mode, cb, sub_sad, sub_bad, asrv, sub_sites, sg_a_d):
     E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
@@ -33,23 +56,8 @@ def calc_E_mean(mode, cb, sub_sad, sub_bad, asrv, sub_sites, sg_a_d):
         if (a==d):
             continue
         if (asrv=='each'):
-            if mode == 'spe2spe':
-                sub_sites = sub_sad[sg, :, a, d]
-            elif mode == 'spe2any':
-                sub_sites = sub_sad[sg, :, a]
-            elif mode == 'any2spe':
-                sub_sites = sub_sad[sg, :, d]
-            elif mode == 'any2any':
-                sub_sites = sub_sad[sg, :]
-            sub_sites = get_relative_sub_sites(sub_sites)
-        if mode == 'spe2spe':
-            sub_branches = sub_bad[:, sg, a, d]
-        elif mode == 'spe2any':
-            sub_branches = sub_bad[:, sg, a]
-        elif mode == 'any2spe':
-            sub_branches = sub_bad[:, sg, d]
-        elif mode == 'any2any':
-            sub_branches = sub_bad[:, sg]
+            sub_sites = get_each_sub_sites(sub_sad, mode, sg, a, d)
+        sub_branches = get_sub_branches(sub_bad, mode, sg, a, d)
         df_sub_ad = pandas.DataFrame({
             'branch_id': numpy.arange(sub_bad.shape[0]),
             'sub_branches': sub_branches,
@@ -71,23 +79,8 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, asrv, sub_sites, quant
         if (a==d):
             continue
         if (asrv=='each'):
-            if mode == 'spe2spe':
-                sub_sites = sub_sad[sg, :, a, d]
-            elif mode == 'spe2any':
-                sub_sites = sub_sad[sg, :, a]
-            elif mode == 'any2spe':
-                sub_sites = sub_sad[sg, :, d]
-            elif mode == 'any2any':
-                sub_sites = sub_sad[sg, :]
-            sub_sites = get_relative_sub_sites(sub_sites)
-        if mode == 'spe2spe':
-            sub_branches = sub_bad[:, sg, a, d]
-        elif mode == 'spe2any':
-            sub_branches = sub_bad[:, sg, a]
-        elif mode == 'any2spe':
-            sub_branches = sub_bad[:, sg, d]
-        elif mode == 'any2any':
-            sub_branches = sub_bad[:, sg]
+            sub_sites = get_each_sub_sites(sub_sad, mode, sg, a, d)
+        sub_branches = get_sub_branches(sub_bad, mode, sg, a, d)
         p = sub_sites[0]
         if p.sum()==0:
             continue

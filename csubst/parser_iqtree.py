@@ -101,10 +101,14 @@ def mask_missing_sites(state_tensor, tree):
         if (node.is_root())|(node.is_leaf()):
             continue
         nl = node.numerical_label
-        leaf_nls = numpy.array([ l.numerical_label for l in node.get_leaves() ], dtype=int)
-        leaf_tensor = state_tensor[leaf_nls,:,:].sum(axis=0)
-        is_leaf_nonzero = (leaf_tensor!=0)
-        state_tensor[nl,:,:] = state_tensor[nl,:,:] * is_leaf_nonzero
+        child0_leaf_nls = numpy.array([ l.numerical_label for l in node.get_children()[0].get_leaves() ], dtype=int)
+        child1_leaf_nls = numpy.array([ l.numerical_label for l in node.get_children()[1].get_leaves() ], dtype=int)
+        sister_leaf_nls = numpy.array([ l.numerical_label for l in node.get_sisters()[0].get_leaves() ], dtype=int)
+        c0 = (state_tensor[child0_leaf_nls,:,:].sum(axis=0)!=0) # is_child0_leaf_nonzero
+        c1 = (state_tensor[child1_leaf_nls,:,:].sum(axis=0)!=0) # is_child1_leaf_nonzero
+        s = (state_tensor[sister_leaf_nls,:,:].sum(axis=0)!=0) # is_sister_leaf_nonzero
+        is_nonzero = (c0&c1)|(c0&s)|(c1&s)
+        state_tensor[nl,:,:] = state_tensor[nl,:,:] * is_nonzero
     return state_tensor
 
 def get_state_tensor(g):
