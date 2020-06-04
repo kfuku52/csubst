@@ -106,7 +106,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         elif (SN=='N'):
             sub_sites = g['sub_sites']['N']
     else:
-        sub_sites = g['sub_sites']
+        sub_sites = g['sub_sites'][g['asrv']]
     if mode=='spe2spe':
         sub_bad = sub_tensor.sum(axis=2)  # branch, matrix_group, ancestral_state, derived_state
         ancestral_states = numpy.arange(sub_bad.shape[2])

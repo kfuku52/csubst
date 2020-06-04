@@ -111,7 +111,7 @@ psr.add_argument('--cb_subsample', metavar='yes|no', default='yes', type=str, ch
                  help='default=%(default)s: Activated if "--omega_method rho". cb subsample output.')
 
 # Among-site rate variation
-psr.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str, choices=['no','pool','ns','each','file'],
+psr.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str, choices=['no','pool','sn','each','file'],
                  help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation.')
 psr.add_argument('--asrv_file', metavar='PATH', default='infer', type=str,
                  help='default=%(default)s: Precalculated ASRV file. "infer" to automatically detect IQ-TREE\'s *.rate file.')
@@ -240,7 +240,7 @@ if (g['s']) | (g['cb']):
             g['sub_sites'][SN] = sub_sites
         del sub_sites
     elif (g['asrv']=='each'):
-        g['sub_sites'] = 'Site probability will be calculated in each iteration'
+        g['sub_sites']['each'] = 'Site probability will be calculated in each iteration'
     elif (g['asrv']=='file'):
         if (g['asrv_file']=='infer'):
             file_path = g['aln_file']+'.rate'
@@ -251,7 +251,7 @@ if (g['s']) | (g['cb']):
         sub_sites = pandas.read_csv(file_path, sep='\t', header=0, comment='#')
         sub_sites = sub_sites.loc[:,'C_Rate'].values
         sub_sites = get_relative_sub_sites(sub_sites)
-        g['sub_sites'] = sub_sites
+        g['sub_sites'][g['asrv']] = sub_sites
         del sub_sites
     del sS, sN
     if (g['s']):
