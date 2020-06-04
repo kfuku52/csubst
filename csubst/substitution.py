@@ -218,3 +218,35 @@ def get_relative_sub_sites(sub_sites):
         sub_sites_sum = 1
     out = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, sub_sites.shape[0]))
     return out
+
+def get_sub_sites(g, sS, sN):
+    num_site = sS.shape[0]
+    g['sub_sites'] = dict()
+    if (g['asrv']=='no'):
+        g['sub_sites']['no'] = numpy.ones(shape=(1, num_site)) / num_site
+    elif (g['asrv']=='pool'):
+        sub_sites = sS['S_sub'].values + sN['N_sub'].values
+        sub_sites = get_relative_sub_sites(sub_sites)
+        g['sub_sites']['pool'] = sub_sites
+        del sub_sites
+    elif (g['asrv']=='sn'):
+        for SN,df in zip(['S','N'],[sS,sN]):
+            sub_sites = df[SN+'_sub'].values
+            sub_sites = get_relative_sub_sites(sub_sites)
+            g['sub_sites'][SN] = sub_sites
+        del sub_sites
+    elif (g['asrv']=='each'):
+        g['sub_sites']['each'] = 'Site probability will be calculated in each iteration'
+    elif (g['asrv']=='file'):
+        if (g['asrv_file']=='infer'):
+            file_path = g['aln_file']+'.rate'
+        else:
+            file_path = g['asrv_file']
+        assert os.path.exists(file_path), 'IQ-TREE\'s .rate file was not detected. Please specify file PATH in --asrv_file.'
+        print('IQ-TREE\'s .rate file was detected. Loading.')
+        sub_sites = pandas.read_csv(file_path, sep='\t', header=0, comment='#')
+        sub_sites = sub_sites.loc[:,'C_Rate'].values
+        sub_sites = get_relative_sub_sites(sub_sites)
+        g['sub_sites'][g['asrv']] = sub_sites
+        del sub_sites
+    return g
