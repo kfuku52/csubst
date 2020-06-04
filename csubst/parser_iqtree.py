@@ -96,6 +96,17 @@ def get_state_index(state, input_state, ambiguous_table):
     state_index = [ input_state.index(s) for s in states ]
     return state_index
 
+def mask_missing_sites(state_tensor, tree):
+    for node in tree.traverse():
+        if (node.is_root())|(node.is_leaf()):
+            continue
+        nl = node.numerical_label
+        leaf_nls = numpy.array([ l.numerical_label for l in node.get_leaves() ], dtype=int)
+        leaf_tensor = state_tensor[leaf_nls,:,:].sum(axis=0)
+        is_leaf_nonzero = (leaf_tensor!=0)
+        state_tensor[nl,:,:] = state_tensor[nl,:,:] * is_leaf_nonzero
+    return state_tensor
+
 def get_state_tensor(g):
     g['tree'].link_to_alignment(alignment=g['aln_file'], alg_format='fasta')
     num_node = len(list(g['tree'].traverse()))
@@ -105,7 +116,7 @@ def get_state_tensor(g):
     state_tensor = numpy.zeros(axis, dtype=numpy.float64)
     for node in g['tree'].traverse():
         if node.is_root():
-            print('Root node is excluded from the analysis.')
+            continue
         elif node.is_leaf():
             seq = node.sequence.upper()
             state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=numpy.float64)
@@ -126,12 +137,13 @@ def get_state_tensor(g):
             state_tensor[node.numerical_label,:,:] = state_matrix
         else:
             state_matrix = state_table.loc[(state_table['Node']==node.name),:].iloc[:,3:]
-            is_missing = (state_table.loc[:,'State']=='???')
+            is_missing = (state_table.loc[:,'State']=='???') | (state_table.loc[:,'State']=='?')
             state_matrix.loc[is_missing,:] = 0
             if state_matrix.shape[0]==0:
                 print('Node name not found in .state file:', node.name)
             else:
                 state_tensor[node.numerical_label,:,:] = state_matrix
+    state_tensor = mask_missing_sites(state_tensor, g['tree'])
     if (g['ml_anc']):
         print('Ancestral state frequency is converted to the ML-like binary states.')
         idxmax = numpy.argmax(state_tensor, axis=2)

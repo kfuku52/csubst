@@ -58,7 +58,8 @@ def calc_E_mean(mode, cb, sub_sad, sub_bad, asrv, sub_sites, sg_a_d):
         for bc in bid_columns:
             df_tmp = pandas.merge(cb.loc[:,[bc,]], df_sub_ad, left_on=bc, right_on='branch_id',
                                   how='left', sort=False)
-            #tmp_E *= 1 - ((1-sub_sites) ** numpy.expand_dims(df_tmp['sub_branches'].values, axis=1)) # underestimate E
+            # This is meant to correct multiple substitutions, but it underestimates E.
+            #tmp_E *= 1 - ((1-sub_sites) ** numpy.expand_dims(df_tmp['sub_branches'].values, axis=1))
             tmp_E *= (sub_sites * numpy.expand_dims(df_tmp['sub_branches'], axis=1))
         E_b += tmp_E.sum(axis=1)
     return E_b
