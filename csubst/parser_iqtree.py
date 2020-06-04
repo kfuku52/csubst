@@ -126,6 +126,8 @@ def get_state_tensor(g):
             state_tensor[node.numerical_label,:,:] = state_matrix
         else:
             state_matrix = state_table.loc[(state_table['Node']==node.name),:].iloc[:,3:]
+            is_missing = (state_table.loc[:,'State']=='???')
+            state_matrix.loc[is_missing,:] = 0
             if state_matrix.shape[0]==0:
                 print('Node name not found in .state file:', node.name)
             else:
