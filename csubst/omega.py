@@ -25,61 +25,47 @@ def get_Econv_unif_permutation(cb, sub_tensor):
                     E_conv_b += tmp_E_conv
     return E_conv_b
 
-def get_each_sub_sites(sub_sad, mode, sg, a, d):
-    if mode == 'spe2spe':
-        sub_sites = sub_sad[sg, :, a, d]
-    elif mode == 'spe2any':
-        sub_sites = sub_sad[sg, :, a]
-    elif mode == 'any2spe':
-        sub_sites = sub_sad[sg, :, d]
-    elif mode == 'any2any':
-        sub_sites = sub_sad[sg, :]
-    sub_sites = get_relative_sub_sites(sub_sites)
-    return sub_sites
-
-def get_sub_branches(sub_bad, mode, sg, a, d):
-    if mode == 'spe2spe':
-        sub_branches = sub_bad[:, sg, a, d]
-    elif mode == 'spe2any':
-        sub_branches = sub_bad[:, sg, a]
-    elif mode == 'any2spe':
-        sub_branches = sub_bad[:, sg, d]
-    elif mode == 'any2any':
-        sub_branches = sub_bad[:, sg]
-    return sub_branches
-
-def calc_E_mean(mode, cb, sub_sad, sub_bad, asrv, sub_sites, sg_a_d):
+def calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g):
     E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     for i,sg,a,d in sg_a_d:
         # TODO: nan in a and d can be skipped in S
         if (a==d):
             continue
-        if (asrv=='each'):
-            sub_sites = get_each_sub_sites(sub_sad, mode, sg, a, d)
+        if (g['asrv']=='each'):
+            sub_sites = get_each_sub_sites(sub_sad, mode, sg, a, d, g)
+        elif (g['asrv']=='sn'):
+            if (obs_col.startswith('S')):
+                sub_sites = g['sub_sites']['S']
+            elif (obs_col.startswith('N')):
+                sub_sites = g['sub_sites']['N']
+        else:
+            sub_sites = g['sub_sites'][g['asrv']]
         sub_branches = get_sub_branches(sub_bad, mode, sg, a, d)
-        df_sub_ad = pandas.DataFrame({
-            'branch_id': numpy.arange(sub_bad.shape[0]),
-            'sub_branches': sub_branches,
-        })
-        tmp_E = 1
-        for bc in bid_columns:
-            df_tmp = pandas.merge(cb.loc[:,[bc,]], df_sub_ad, left_on=bc, right_on='branch_id',
-                                  how='left', sort=False)
-            # This is meant to correct multiple substitutions, but it underestimates E.
-            #tmp_E *= 1 - ((1-sub_sites) ** numpy.expand_dims(df_tmp['sub_branches'].values, axis=1))
-            tmp_E *= (sub_sites * numpy.expand_dims(df_tmp['sub_branches'], axis=1))
+        tmp_E = numpy.ones(shape=(E_b.shape[0], sub_sites.shape[1]), dtype=numpy.float64)
+        for bid in numpy.unique(cb.loc[:,bid_columns].values):
+            is_b = False
+            for bc in bid_columns:
+                is_b = (is_b)|(cb.loc[:,bc]==bid)
+            tmp_E[is_b,:] *= sub_sites[bid,:] * sub_branches[bid]
         E_b += tmp_E.sum(axis=1)
     return E_b
 
-def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, asrv, sub_sites, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk):
+def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk, g):
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     for i,sg,a,d in sgad_chunk:
         # TODO: nan in a and d can be skipped in S
         if (a==d):
             continue
-        if (asrv=='each'):
-            sub_sites = get_each_sub_sites(sub_sad, mode, sg, a, d)
+        if (g['asrv']=='each'):
+            sub_sites = get_each_sub_sites(sub_sad, mode, sg, a, d, g)
+        elif (g['asrv']=='sn'):
+                if (obs_col.startswith('S')):
+                    sub_sites = g['sub_sites']['S']
+                elif (obs_col.startswith('N')):
+                    sub_sites = g['sub_sites']['N']
+        else:
+            sub_sites = g['sub_sites'][g['asrv']]
         sub_branches = get_sub_branches(sub_bad, mode, sg, a, d)
         p = sub_sites[0]
         if p.sum()==0:
@@ -93,14 +79,6 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, asrv, sub_sites, quant
 
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g={}):
     sub_tensor = numpy.nan_to_num(sub_tensor)
-    num_site = sub_tensor.shape[2]
-    if (g['asrv']=='sn'):
-        if (SN=='S'):
-            sub_sites = g['sub_sites']['S']
-        elif (SN=='N'):
-            sub_sites = g['sub_sites']['N']
-    else:
-        sub_sites = g['sub_sites'][g['asrv']]
     if mode=='spe2spe':
         sub_bad = sub_tensor.sum(axis=2)  # branch, matrix_group, ancestral_state, derived_state
         ancestral_states = numpy.arange(sub_bad.shape[2])
@@ -124,18 +102,18 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     sg_a_d = list(itertools.product(numpy.arange(sub_bad.shape[1]), ancestral_states, derived_states))
     num_sgad_combinat = len(sg_a_d)
     sg_a_d = [ [i,]+list(items) for i,items in zip(range(num_sgad_combinat), sg_a_d) ]
+    obs_col = SN+mode
     if stat=='mean':
         # TODO, parallel computation
-        E_b = calc_E_mean(mode, cb, sub_sad, sub_bad, g['asrv'], sub_sites, sg_a_d)
+        E_b = calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g)
     elif stat=='quantile':
-        obs_col = SN+mode
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         dfq = numpy.memmap(filename=mmap_out, dtype=numpy.int32, shape=(cb.shape[0], quantile_niter), mode='w+')
         sgad_chunks,mmap_start_not_necessary_here = get_chunks(sg_a_d, g['nslots'])
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(joblib_calc_quantile)
-            (mode, cb, sub_sad, sub_bad, dfq, g['asrv'], sub_sites, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk) for sgad_chunk in sgad_chunks
+            (mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk, g) for sgad_chunk in sgad_chunks
         )
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)

@@ -88,6 +88,20 @@ def csubst_main(g):
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 
+    if (g['s']) | (g['cb']):
+        start = time.time()
+        print("Making site table.", flush=True)
+        sS = get_s(S_tensor, attr='S')
+        sN = get_s(N_tensor, attr='N')
+        s = merge_tables(sS, sN)
+        g = get_sub_sites(g, sS, sN, state_tensor=state_cdn)
+        del sS, sN
+        if (g['s']):
+            s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
+        print(s.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
+        elapsed_time = int(time.time() - start)
+        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+
     del state_cdn, state_pep
 
     if (g['b']) | (g['cb']):
@@ -104,20 +118,6 @@ def csubst_main(g):
         if (g['b']):
             b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(b.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
-        elapsed_time = int(time.time() - start)
-        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
-
-    if (g['s']) | (g['cb']):
-        start = time.time()
-        print("Making site table.", flush=True)
-        sS = get_s(S_tensor, attr='S')
-        sN = get_s(N_tensor, attr='N')
-        s = merge_tables(sS, sN)
-        g = get_sub_sites(g, sS, sN)
-        del sS, sN
-        if (g['s']):
-            s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
-        print(s.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 

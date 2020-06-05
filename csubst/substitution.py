@@ -212,31 +212,19 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     print(type(df), flush=True)
     return(df)
 
-def get_relative_sub_sites(sub_sites):
-    sub_sites_sum = sub_sites.sum()
-    if sub_sites_sum==0:
-        sub_sites_sum = 1
-    out = numpy.reshape(sub_sites/sub_sites_sum, newshape=(1, sub_sites.shape[0]))
-    return out
-
-def get_sub_sites(g, sS, sN):
+def get_sub_sites(g, sS, sN, state_tensor):
     num_site = sS.shape[0]
+    num_branch = len(list(g['tree'].traverse()))
+    g['is_site_nonmissing'] = numpy.zeros(shape=[num_branch, num_site], dtype=numpy.bool)
+    for node in g['tree'].traverse():
+        nl = node.numerical_label
+        g['is_site_nonmissing'][nl,:] = (state_tensor[nl,:,:].sum(axis=1)!=0)
     g['sub_sites'] = dict()
+    g['sub_sites'][g['asrv']] = numpy.zeros(shape=[num_branch, num_site], dtype=numpy.float64)
     if (g['asrv']=='no'):
-        g['sub_sites']['no'] = numpy.ones(shape=(1, num_site)) / num_site
+        sub_sites = numpy.ones(shape=[num_site,]) / num_site
     elif (g['asrv']=='pool'):
         sub_sites = sS['S_sub'].values + sN['N_sub'].values
-        sub_sites = get_relative_sub_sites(sub_sites)
-        g['sub_sites']['pool'] = sub_sites
-        del sub_sites
-    elif (g['asrv']=='sn'):
-        for SN,df in zip(['S','N'],[sS,sN]):
-            sub_sites = df[SN+'_sub'].values
-            sub_sites = get_relative_sub_sites(sub_sites)
-            g['sub_sites'][SN] = sub_sites
-        del sub_sites
-    elif (g['asrv']=='each'):
-        g['sub_sites']['each'] = 'Site probability will be calculated in each iteration'
     elif (g['asrv']=='file'):
         if (g['asrv_file']=='infer'):
             file_path = g['aln_file']+'.rate'
@@ -246,7 +234,53 @@ def get_sub_sites(g, sS, sN):
         print('IQ-TREE\'s .rate file was detected. Loading.')
         sub_sites = pandas.read_csv(file_path, sep='\t', header=0, comment='#')
         sub_sites = sub_sites.loc[:,'C_Rate'].values
-        sub_sites = get_relative_sub_sites(sub_sites)
-        g['sub_sites'][g['asrv']] = sub_sites
-        del sub_sites
+    if (g['asrv']=='sn'):
+        for SN,df in zip(['S','N'],[sS,sN]):
+            g['sub_sites'][SN] = numpy.zeros(shape=[num_branch, num_site], dtype=numpy.float64)
+            sub_sites = df[SN+'_sub'].values
+            for node in g['tree'].traverse():
+                nl = node.numerical_label
+                adjusted_sub_sites = sub_sites * g['is_site_nonmissing'][nl,:]
+                total_sub_sites = adjusted_sub_sites.sum()
+                total_sub_sites = 1 if (total_sub_sites==0) else total_sub_sites
+                adjusted_sub_sites = adjusted_sub_sites/total_sub_sites
+                g['sub_sites'][SN][nl,:] = adjusted_sub_sites
+    elif (g['asrv']!='each'):
+        for node in g['tree'].traverse():
+            nl = node.numerical_label
+            is_site_nonmissing = (state_tensor[nl,:,:].sum(axis=1)!=0)
+            adjusted_sub_sites = sub_sites * is_site_nonmissing
+            total_sub_sites = adjusted_sub_sites.sum()
+            total_sub_sites = 1 if (total_sub_sites==0) else total_sub_sites
+            adjusted_sub_sites = adjusted_sub_sites/total_sub_sites
+            g['sub_sites'][g['asrv']][nl,:] = adjusted_sub_sites
     return g
+
+def get_each_sub_sites(sub_sad, mode, sg, a, d, g):
+    sub_sites = numpy.zeros(shape=g['is_site_nonmissing'].shape, dtype=numpy.float64)
+    if mode == 'spe2spe':
+        nonadjusted_sub_sites = sub_sad[sg, :, a, d]
+    elif mode == 'spe2any':
+        nonadjusted_sub_sites = sub_sad[sg, :, a]
+    elif mode == 'any2spe':
+        nonadjusted_sub_sites = sub_sad[sg, :, d]
+    elif mode == 'any2any':
+        nonadjusted_sub_sites = sub_sad[sg, :]
+    for node in g['tree'].traverse():
+        nl = node.numerical_label
+        sub_sites[nl,:] = nonadjusted_sub_sites * g['is_site_nonmissing'][nl,:]
+        total_sub_sites = sub_sites[nl,:].sum()
+        total_sub_sites = 1 if (total_sub_sites==0) else total_sub_sites
+        sub_sites[nl,:] = sub_sites[nl,:] / total_sub_sites
+    return sub_sites
+
+def get_sub_branches(sub_bad, mode, sg, a, d):
+    if mode == 'spe2spe':
+        sub_branches = sub_bad[:, sg, a, d]
+    elif mode == 'spe2any':
+        sub_branches = sub_bad[:, sg, a]
+    elif mode == 'any2spe':
+        sub_branches = sub_bad[:, sg, d]
+    elif mode == 'any2any':
+        sub_branches = sub_bad[:, sg]
+    return sub_branches

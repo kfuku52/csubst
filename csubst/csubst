@@ -4,8 +4,6 @@
 # for example, ASRV is less biased in nonsyonymous substitutions
 # for example, # nonsyonymous substs are largely different between branch 1 and branch 2
 
-# TODO: inter-branch distance
-# TODO: use IQ-TREE output for ASRV
 # TODO: sparse https://sparse.pydata.org/en/stable/
 
 import argparse
