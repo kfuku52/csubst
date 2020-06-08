@@ -29,29 +29,36 @@ csubst -h
 ## Test run
 ```
 # Download a test data
-svn export https://github.com/kfuku52/csubst/trunk/data/OG0002332
+svn export https://github.com/kfuku52/csubst/trunk/data/PGK
 
 # Enter the directory
 cd ./OG0002332
 
-# Run IQ-TREE to get the .state file
-# It's included already
-#iqtree \
-#-s OG0002332.cds.trimal.fasta \
-#-te OG0002332.root.nosupport.nwk \
-#-m MFP \
-#-st CODON1 \
-#-nt 4 \
-#-asr
+# Run IQ-TREE (version >=2.0.0) to get output files 
+# (.state, .rate, and .treefile)
+# It's included in the downloaded directory 
+# so you don't have to run IQ-TREE in this test.
+# tree.nwk should be rooted.
+iqtree \
+-s alignment.fa \
+-te tree.nwk \
+-m MFP \
+--seqtype CODON1 \
+--threads-max 4 \
+--ancestral \
+--rate
 
 # Run csubst
 csubst \
---nslots 4 \
+--ncbi_codon_table 1 \
+--aln_file alignment.fa \
+--tre_file tree.nwk \
 --infile_dir ./ \
 --infile_type iqtree \
---aln_file OG0002332.cds.trimal.fasta \
---tre_file OG0002332.root.nosupport.nwk
+--max_arity 3 \
+--nslots 4
 ```
+## Tips
 
 ## Licensing
 **csubst** is BSD-licensed (3 clause). See [LICENSE](LICENSE) for details.

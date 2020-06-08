@@ -1,5 +1,6 @@
 import numpy
 import itertools
+import re
 
 def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
@@ -20,7 +21,8 @@ def add_numerical_node_labels(tree):
     return(tree)
 
 def transfer_root(tree_to, tree_from, verbose=False):
-    assert len(set(tree_to.get_leaf_names()) - set(tree_from.get_leaf_names())) == 0
+    same_leaf_set = len(set(tree_to.get_leaf_names()) - set(tree_from.get_leaf_names())) == 0
+    assert same_leaf_set, 'Input tree and iqtree\'s treefile did not have identical leaves.'
     subroot_leaves = [ n.get_leaf_names() for n in tree_from.get_children() ]
     is_n0_bigger_than_n1 = (len(subroot_leaves[0]) > len(subroot_leaves[1]))
     ingroups = subroot_leaves[0] if is_n0_bigger_than_n1 else subroot_leaves[1]
@@ -33,7 +35,6 @@ def transfer_root(tree_to, tree_from, verbose=False):
     else:
         outgroup_ancestor = tree_to.get_common_ancestor(outgroups)
     tree_to.set_outgroup(outgroup_ancestor)
-    subroot_node_names = [n.name for n in tree_to.get_children()]
     subroot_to = tree_to.get_children()
     subroot_from = tree_from.get_children()
     total_subroot_length_to = sum([n.dist for n in subroot_to])
@@ -67,8 +68,8 @@ def rerooting_by_topology_matching(tree_from, tree_to):
     return tree_to
 
 def transfer_internal_node_names(tree_to, tree_from):
-    rf_dist = tree_to.robinson_foulds(tree_from)[0]
-    assert rf_dist==0, 'tree topologies are different. RF distance ='+str(rf_dist)
+    rf_dist = tree_to.robinson_foulds(tree_from, expand_polytomies=True)[0]
+    assert rf_dist==0, 'tree topologies are different. RF distance = {}'.format(rf_dist)
     for to in tree_to.traverse():
         if not to.is_leaf():
             for fr in tree_from.traverse():
@@ -100,3 +101,20 @@ def get_node_distance(tree, cb):
         cb.loc[i,"dist_node_num"] = node_num
         cb.loc[i,"dist_bl"] = node_dist
     return(cb)
+
+def standardize_node_names(tree):
+    for node in tree.traverse():
+        node.name = re.sub('\[.*', '', node.name)
+        node.name = re.sub('/.*', '', node.name)
+        node.name = re.sub('^\'', '', node.name)
+        node.name = re.sub('\'$', '', node.name)
+    return tree
+
+def is_internal_node_labeled(tree):
+    is_labeled = True
+    for node in tree.traverse():
+        if not node.is_root():
+            if node.name=='':
+                is_labeled = False
+    return is_labeled
+

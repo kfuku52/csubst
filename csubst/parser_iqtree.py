@@ -10,15 +10,12 @@ def get_input_information(g):
     files = os.listdir(g['infile_dir'])
     g['tree'] = ete3.PhyloNode(g['tre_file'], format=1)
     assert len(g['tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['tre_file'])
+    g['tree'] = standardize_node_names(g['tree'])
     g['tree'] = add_numerical_node_labels(g['tree'])
-    internal_node_name = True
-    for node in g['tree'].traverse():
-        if not node.is_root():
-            if node.name=='':
-                internal_node_name = False
-    if not internal_node_name:
+    if not is_internal_node_labeled(g['tree']):
         tree_files = [ f for f in files if f.endswith('.treefile') ]
-        assert (len(tree_files)!=0), 'No IQ-TREE *.treefile file detected.'
+        txt = 'No IQ-TREE *.treefile file detected. This file is necessary to correctly label internal node names.'
+        assert (len(tree_files)!=0), txt
         if (len(tree_files)>1):
             print('Multiple IQ-TREE *.treefile files detected: '+','.join(tree_files))
             assumed_treefile_name = g['aln_file']+'.treefile'
@@ -31,9 +28,7 @@ def get_input_information(g):
         tree_string = f.readline()
         g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
         f.close()
-        for node in g['node_label_tree'].traverse():
-            node.name = re.sub('\[.*', '', node.name)
-            node.name = re.sub('/.*', '', node.name)
+        g['node_label_tree'] = standardize_node_names(g['node_label_tree'])
         g['node_label_tree'] = transfer_root(tree_to=g['node_label_tree'], tree_from=g['tree'], verbose=False)
         g['tree'] = transfer_internal_node_names(tree_to=g['tree'], tree_from=g['node_label_tree'])
     g['num_node'] = len(list(g['tree'].traverse()))

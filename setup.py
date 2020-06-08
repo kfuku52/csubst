@@ -1,11 +1,12 @@
+import re
+import ast
+import platform
+import os
+
 from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 from numpy import get_include # for "cimport numpy"
-import os
-import re
-import ast
-import platform
 
 if platform.system() == 'Darwin':
     # https://stackoverflow.com/questions/39114132/cython-fatal-error-numpy-arrayobject-h-file-not-found-using-numpy

@@ -11,9 +11,7 @@ import datetime
 import time
 from distutils.util import strtobool
 from csubst.main import *
-
-csubst_start = time.time()
-print('csubst start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+from __init__ import __version__
 
 psr = argparse.ArgumentParser()
 
@@ -65,7 +63,7 @@ psr.add_argument('--min_stat', metavar='FLOAT', default=1.0, type=float,
 psr.add_argument('--min_branch_sub', metavar='FLOAT', default=1.0, type=float,
                  help='default=%(default)s: Minimum substitutions in a branch. '
                       'Branches < min_branch_sub are excluded from branch combination analyses.')
-psr.add_argument('--min_Nany2spe', metavar='FLOAT', default=1.0, type=float,
+psr.add_argument('--min_Nany2spe', metavar='FLOAT', default=0, type=float,
                  help='default=%(default)s: Minimum nonsonymous convergent substitutions. '
                       'Branch combinations < min_Nany2spe are excluded from higher-order analyses.')
 
@@ -107,11 +105,12 @@ psr.add_argument('--asrv_file', metavar='PATH', default='infer', type=str,
 # Misc
 psr.add_argument('--nslots', metavar='INTEGER', default=1, type=int,
                  help='default=%(default)s: The number of processors for parallel computations.')
-psr.add_argument('--version', action='version', version='<the version>')
-
+psr.add_argument('--version', action='version', version='csubst version '+__version__)
 
 args = psr.parse_args()
 g = get_global_parameters(args)
+csubst_start = time.time()
+print('csubst start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 csubst_main(g)
 txt = "\ncsubst completed. Elapsed time = {:,} sec"
 print(txt.format(int(time.time() - csubst_start)), flush=True)
