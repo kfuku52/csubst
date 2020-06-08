@@ -11,7 +11,7 @@ import datetime
 import time
 from distutils.util import strtobool
 from csubst.main import *
-from __init__ import __version__
+from csubst.__init__ import __version__
 
 psr = argparse.ArgumentParser()
 

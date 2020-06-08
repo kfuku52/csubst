@@ -55,7 +55,7 @@ csubst \
 --tre_file tree.nwk \
 --infile_dir ./ \
 --infile_type iqtree \
---max_arity 3 \
+--max_arity 2 \
 --nslots 4
 ```
 ## Tips
