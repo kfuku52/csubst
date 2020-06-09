@@ -31,7 +31,7 @@ csubst \
 --cb yes \
 --bs yes \
 --cbs no \
---target_stat omega_conv_asrv \
+--target_stat omega_any2spe_asrv \
 --min_stat 3 \
 --min_branch_sub 1 \
 --min_Nany2spe 5 \

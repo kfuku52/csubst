@@ -161,8 +161,8 @@ def csubst_main(g):
                 id_combinations = get_node_combinations(g=g, target_nodes=g['fg_id'], arity=current_arity,
                                                         check_attr='name', foreground=True)
             elif current_arity > 2:
-                is_stat_enough = (cb[g['target_stat']] >= g['min_stat']) | (cb[g['target_stat']].isnull())
-                is_Nany2spe_enough = (cb['Nany2spe'] >= g['min_Nany2spe'])
+                is_stat_enough = (cb.loc[:,g['target_stat']] >= g['min_stat']) | (cb.loc[:,g['target_stat']].isnull())
+                is_combinat_sub_enough = ((cb.loc[:,'Nany2any']+cb.loc[:,'Nany2any']) >= g['min_combinat_sub'])
                 is_branch_sub_enough = True
                 for a in numpy.arange(current_arity - 1):
                     target_columns = ['S_sub_' + str(a + 1), 'N_sub_' + str(a + 1)]
@@ -171,7 +171,7 @@ def csubst_main(g):
                 num_branch_ids = (is_stat_enough).sum()
                 print('Arity =', current_arity, ': qualified combinations =', num_branch_ids)
                 id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-                conditions = (is_stat_enough) & (is_branch_sub_enough) & (is_Nany2spe_enough)
+                conditions = (is_stat_enough) & (is_branch_sub_enough) & (is_combinat_sub_enough)
                 branch_ids = cb.loc[conditions, id_columns].values
                 if len(set(branch_ids.ravel().tolist())) < current_arity:
                     end_flag = 1

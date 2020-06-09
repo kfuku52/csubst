@@ -124,7 +124,6 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             ge_rank = (dfq[i,:]<=obs_value).sum()
             corrected_rank = (gt_rank+ge_rank)/2
             E_b[i] = corrected_rank / quantile_niter
-
     return E_b
 
 def get_E(cb, g, N_tensor, S_tensor):
@@ -139,7 +138,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['ENany2dif'] = cb['ENany2any'] * rhoNany2dif
         cb['ESany2spe'] = cb['ESany2any'] * rhoSany2spe
         cb['ESany2dif'] = cb['ESany2any'] * rhoSany2dif
-    elif g['omega_method']=='permutation':
+    elif g['omega_method']=='ind':
         cb['ENany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='mean', SN='N', g=g)
         cb['ENspe2any'] = calc_E_stat(cb, N_tensor, mode='spe2any', stat='mean', SN='N', g=g)
         cb['ENany2spe'] = calc_E_stat(cb, N_tensor, mode='any2spe', stat='mean', SN='N', g=g)
@@ -159,13 +158,14 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['QSany2spe'] = calc_E_stat(cb, S_tensor, mode='any2spe', stat='quantile', SN='S', g=g)
         #cb['QNspe2spe'] = calc_E_stat(cb, N_tensor, mode='spe2spe', stat='quantile', SN='N', g=g)
         #cb['QSspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', stat='quantile', SN='S', g=g)
-
     return cb
 
 def get_omega(cb):
-    cb['omega_pair'] = (cb['Nany2any'] / cb['ENany2any']) / (cb['Sany2any'] / cb['ESany2any'])
-    cb['omega_conv'] = (cb['Nany2spe'] / cb['ENany2spe']) / (cb['Sany2spe'] / cb['ESany2spe'])
-    cb['omega_div'] = ((cb['Nany2any']-cb['Nany2spe'])/cb['ENany2dif']) / ((cb['Sany2any']-cb['Sany2spe'])/cb['ESany2dif'])
+    cb.loc[:,'omega_any2any'] = (cb.loc[:,'Nany2any'] / cb.loc[:,'ENany2any']) / (cb.loc[:,'Sany2any'] / cb.loc[:,'ESany2any'])
+    cb.loc[:,'omega_any2spe'] = (cb.loc[:,'Nany2spe'] / cb.loc[:,'ENany2spe']) / (cb.loc[:,'Sany2spe'] / cb.loc[:,'ESany2spe'])
+    dNdif = ((cb.loc[:,'Nany2any']-cb.loc[:,'Nany2spe'])/cb.loc[:,'ENany2dif'])
+    dSdif = ((cb.loc[:,'Sany2any']-cb.loc[:,'Sany2spe'])/cb['ESany2dif'])
+    cb.loc[:,'omega_any2dif'] = dNdif / dSdif
     return cb
 
 def get_CoD(cb):
@@ -177,9 +177,9 @@ def get_CoD(cb):
 def print_cb_stats(cb, prefix):
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'arity='+str(arity)+', '+prefix+':'
-    print(hd, 'median omega_pair =', numpy.round(cb['omega_pair'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_conv =', numpy.round(cb['omega_conv'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_div  =', numpy.round(cb['omega_div'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_any2any =', numpy.round(cb['omega_any2any'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_any2spe =', numpy.round(cb['omega_any2spe'].median(), decimals=3), flush=True)
+    print(hd, 'median omega_any2dif  =', numpy.round(cb['omega_any2dif'].median(), decimals=3), flush=True)
 
 def get_rho(cb, b, g, N_tensor, S_tensor):
     if g['cb_stats'] is not None:
