@@ -31,22 +31,28 @@ psr.add_argument('--tre_file', metavar='PATH', default='', type=str,
 
 # Foreground specification
 psr.add_argument('--foreground', metavar='PATH', default=None, type=str,
-                 help='default=%(default)s: Foreground taxa for higher-order analysis.')
+                 help='default=%(default)s: Foreground taxa for higher-order analysis. '
+                      'The file should contain two columns separated by a tab: '
+                      '1st column for lineage IDs and 2nd for regex-compatible leaf names.')
 psr.add_argument('--exclude_wg', metavar='yes|no', default='yes', type=strtobool,
                  help='default=%(default)s: Set "yes" to exclude branches within individual foreground lineages '
                       'in branch combination analysis.')
-psr.add_argument('--fg_sister', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Include the sister branches of the foreground stem branches. '
-                      'They may serve as "negative controls" relative to the foreground lineages.')
+psr.add_argument('--fg_stem_only', metavar='yes|no', default='no', type=strtobool,
+                 help='default=%(default)s: Set "yes" to exclude non-stem branches of foreground lineages.')
 psr.add_argument('--fg_parent', metavar='yes|no', default='no', type=strtobool,
                  help='default=%(default)s: Include the parent branches of the foreground stem branches. '
                       'They may serve as "negative controls" relative to the foreground lineages.')
+psr.add_argument('--fg_sister', metavar='yes|no', default='no', type=strtobool,
+                 help='default=%(default)s: Include the sister branches of the foreground stem branches. '
+                      'They may serve as "negative controls" relative to the foreground lineages.')
+psr.add_argument('--fg_sister_stem_only', metavar='yes|no', default='no', type=strtobool,
+                 help='default=%(default)s: Set "yes" to exclude non-stem branches of sister lineages.')
 
 # branch combinations
 psr.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
                  help='default=%(default)s: The maximum combinatorial number of branches. '
                       'Set 2 for paired substitutions. 3 or larger for higher-order combinations.')
-psr.add_argument('--exclude_sisters', metavar='yes|no', default='yes', type=str, choices=['yes', 'no'],
+psr.add_argument('--exclude_sisters', metavar='yes|no', default='yes', type=strtobool,
                  help='default=%(default)s: Set "yes" to exclude sister branches in branch combination analysis.')
 
 # Thresholds
@@ -97,7 +103,7 @@ psr.add_argument('--num_subsample', metavar='INTEGER', default=10000, type=int,
                  help='default=%(default)s: Activated if "--omega_method rho". The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
 psr.add_argument('--cb_stats', metavar='PATH', default=None, type=str,
                  help='default=%(default)s: Activated if "--omega_method rho". PATH to csubst_cb_stats.tsv. Use precalculated rho parameters in branch combination analysis.')
-psr.add_argument('--cb_subsample', metavar='yes|no', default='yes', type=str, choices=['yes', 'no'],
+psr.add_argument('--cb_subsample', metavar='yes|no', default='yes', type=strtobool,
                  help='default=%(default)s: Activated if "--omega_method rho". cb subsample output.')
 
 # Among-site rate variation

@@ -1,5 +1,4 @@
 import os
-import re
 import ete3
 import pandas
 import itertools

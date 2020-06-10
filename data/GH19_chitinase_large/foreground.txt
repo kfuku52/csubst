@@ -1,3 +1,4 @@
-1	Cfol-v3-22778
-2	Nepenthes_alata_comp52811-c0-seq1
-2	Nepenthes_alata_comp58763-c0-seq1
+1	Nepenthes_alata_.*
+2	Cephalotus_follicularis_.*
+3	Sarracenia_purpurea_.*
+4	Utricularia_gibba_.*

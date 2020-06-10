@@ -31,24 +31,9 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         node_combinations = list(itertools.combinations(target_nodes, arity))
         node_combinations = [set(nc) for nc in node_combinations]
         node_combinations = numpy.array([list(nc) for nc in node_combinations])
-    if isinstance(target_nodes, list):
-        if isinstance(target_nodes[0], list):
-            print('Foregound branches: Only between-lineage combinations will be examined.')
-            node_combinations = list()
-            target_nodes = numpy.array(target_nodes)
-            print(target_nodes)
-            lineage_combinations = itertools.combinations(numpy.arange(len(target_nodes)), arity)
-            for lc in lineage_combinations:
-                node_combinations = node_combinations + list(itertools.product(*target_nodes[list(lc)]))
-            node_combinations = numpy.array(node_combinations)
-        else:
-            print('Foregound branches: All possible combinations will be examined.')
-            node_combinations = list(itertools.combinations(target_nodes, arity))
-            node_combinations = [set(nc) for nc in node_combinations]
-            node_combinations = numpy.array([list(nc) for nc in node_combinations])
-    if (target_nodes.shape.__len__()==1):
-        target_nodes = numpy.expand_dims(target_nodes, axis=1)
-    elif 'shape' in dir(target_nodes):
+    elif isinstance(target_nodes, numpy.ndarray):
+        if (target_nodes.shape.__len__()==1):
+            target_nodes = numpy.expand_dims(target_nodes, axis=1)
         index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
         print('# combinations for unions =', len(index_combinations))
         axis = (len(index_combinations), arity)
@@ -63,11 +48,11 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         node_combinations = numpy.unique(df_mmap[df_mmap.sum(axis=1)!=0,:], axis=0)
     if verbose:
         flat_fg_dep_ids = list(itertools.chain(*g['fg_dep_ids']))
-        num_target_node = len(target_nodes.flat)
-        num_wg_node = len(set(target_nodes.flat).intersection(set(flat_fg_dep_ids)))
+        num_target_node = len(list(target_nodes.flat))
+        num_wg_node = len(set(list(target_nodes.flat)).intersection(set(flat_fg_dep_ids)))
         print("all target nodes: {:,}".format(num_target_node), flush=True)
-        print('within-lineage target nodes to be excluded:', num_wg_node, flush=True)
-        print("all node combinations: ", len(node_combinations), flush=True)
+        print('within-lineage target nodes to be excluded: {:,}'.format(num_wg_node), flush=True)
+        print("all node combinations: {:,}".format(len(node_combinations)), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=numpy.bool)
     for i in numpy.arange(node_combinations.shape[0]):
         nc_matrix[node_combinations[i,:],i] = 1

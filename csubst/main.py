@@ -153,14 +153,14 @@ def csubst_main(g):
         # noinspection PyInterpreter,PyInterpreter
         for current_arity in numpy.arange(g['current_arity'], g['max_arity'] + 1):
             start = time.time()
-            print("Making combinat-branch table. Arity =", current_arity, flush=True)
+            print("Making combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
             g['current_arity'] = current_arity
             if (current_arity == 2) & (g['foreground'] is None):
                 id_combinations = id_combinations
             elif (current_arity == 2) & (not g['foreground'] is None):
-                id_combinations = get_node_combinations(g=g, target_nodes=g['fg_id'], arity=current_arity,
+                id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
                                                         check_attr='name', foreground=True)
-            elif current_arity > 2:
+            elif (current_arity > 2):
                 is_stat_enough = (cb.loc[:,g['target_stat']] >= g['min_stat']) | (cb.loc[:,g['target_stat']].isnull())
                 is_combinat_sub_enough = ((cb.loc[:,'Nany2any']+cb.loc[:,'Nany2any']) >= g['min_combinat_sub'])
                 is_branch_sub_enough = True
@@ -169,7 +169,7 @@ def csubst_main(g):
                     is_branch_sub_enough = is_branch_sub_enough & (
                             cb.loc[:, target_columns].sum(axis=1) >= g['min_branch_sub'])
                 num_branch_ids = (is_stat_enough).sum()
-                print('Arity =', current_arity, ': qualified combinations =', num_branch_ids)
+                print('Arity = {:,}: qualified combinations = {:,}'.format(current_arity, num_branch_ids), flush=True)
                 id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
                 conditions = (is_stat_enough) & (is_branch_sub_enough) & (is_combinat_sub_enough)
                 branch_ids = cb.loc[conditions, id_columns].values
@@ -190,11 +190,12 @@ def csubst_main(g):
             cb = get_substitutions_per_branch(cb, b, g)
             cb = calc_substitution_patterns(cb)
             cb, g = calc_omega(cb, b, S_tensor, N_tensor, g)
+            cb = get_foreground_branch_num(cb, g)
             file_name = "csubst_cb_" + str(current_arity) + ".tsv"
             cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
             print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
             elapsed_time = int(time.time() - start)
-            if (g['omega_method'] == 'rho') & (g['cb_subsample'] == 'yes'):
+            if (g['omega_method'] == 'rho') & (g['cb_subsample']):
                 if 'elapsed_sec' not in g['df_cb_stats'].columns:
                     g['df_cb_stats']['elapsed_sec'] = numpy.nan
                 g['df_cb_stats'].loc[(g['df_cb_stats']['arity'] == g['current_arity']), 'elapsed_sec'] = elapsed_time

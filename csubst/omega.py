@@ -1,5 +1,3 @@
-#import pyximport
-#pyximport.install()
 from csubst.substitution import *
 from csubst.combination import *
 from csubst.omega_cy import *
@@ -241,7 +239,7 @@ def get_rho(cb, b, g, N_tensor, S_tensor):
         g['df_cb_stats'].loc[cond,'ESany2any'] = cb_subsample['ESany2any'].sum()
         g['df_cb_stats']['ENany2spe'] = g['df_cb_stats']['ENany2any'] * g['df_cb_stats']['rhoNany2spe']
         g['df_cb_stats']['ESany2spe'] = g['df_cb_stats']['ESany2any'] * g['df_cb_stats']['rhoSany2spe']
-    if (g['cb_subsample']=='yes')&(g['df_cb_stats'].loc[(g['df_cb_stats']['arity']==g['current_arity']),'method'].values=='subsample'):
+    if (g['cb_subsample'])&(g['df_cb_stats'].loc[(g['df_cb_stats']['arity']==g['current_arity']),'method'].values=='subsample'):
         file_name = "csubst_cb_subsample_" + str(g['current_arity']) + ".tsv"
         cb_subsample.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
     return g
@@ -255,7 +253,7 @@ def get_substitutions_per_branch(cb, b, g):
     return(cb)
 
 def calc_omega(cb, b, S_tensor, N_tensor, g):
-    if (g['omega_method']=='rho')&(g['cb_subsample']=='yes'):
+    if (g['omega_method']=='rho')&(g['cb_subsample']):
         g = get_rho(cb, b, g, N_tensor, S_tensor)
     cb = get_E(cb, g, N_tensor, S_tensor)
     cb = get_omega(cb)
