@@ -65,11 +65,101 @@ def get_dep_ids(g):
         g['fg_dep_ids'] = numpy.array([])
     return g
 
+def combinations_count(n, r):
+    # https://github.com/nkmk/python-snippets/blob/05a53ae96736577906a8805b38bce6cc210fe11f/notebook/combinations_count.py#L1-L14
+    from operator import mul
+    from functools import reduce
+    r = min(r, n - r)
+    numer = reduce(mul, range(n, n - r, -1), 1)
+    denom = reduce(mul, range(1, r + 1), 1)
+    return numer // denom
+
+def get_df_clade_size(g):
+    num_branch = max([ n.numerical_label for n in g['tree'].traverse() ])
+    branch_ids = numpy.arange(num_branch)
+    cols = ['branch_id','size','is_foreground_stem']
+    df_clade_size = pandas.DataFrame(index=branch_ids, columns=cols)
+    df_clade_size.loc[:,'branch_id'] = branch_ids
+    df_clade_size.loc[:,'is_foreground_stem'] = False
+    for node in g['tree'].traverse():
+        if node.is_root():
+            continue
+        bid = node.numerical_label
+        df_clade_size.at[bid,'size'] = len(node.get_leaf_names())
+        if (node.is_foreground==True)&(node.up.is_foreground==False):
+            df_clade_size.at[bid,'is_foreground_stem'] = True
+    return df_clade_size
+
+def foreground_clade_randomization(df_clade_size, g, min_bin_count=10):
+    size_array = df_clade_size.loc[:,'size'].values.astype(numpy.int)
+    size_min = size_array.min()
+    size_max = size_array.max()
+    sizes = numpy.unique(size_array)[::-1] # To start counting from rarer (larger) clades
+    bins = numpy.array([size_max+1,], dtype=numpy.int)
+    count = 0
+    for size in sizes:
+        is_size = (size_array==size)
+        count += is_size.sum()
+        if (count >= min_bin_count):
+            bins = numpy.append(bins, size)
+            count = 0
+    if len(bins)<2:
+        bins = numpy.array([size_min, size_max], dtype=numpy.int)
+    bins = bins[::-1]
+    df_clade_size.loc[:,'bin'] = numpy.digitize(size_array, bins, right=False)
+    is_fg = (df_clade_size.loc[:,'is_foreground_stem']==True)
+    fg_bins = df_clade_size.loc[is_fg,'bin']
+    df_clade_size.loc[:,'is_foreground_stem_randomized'] = df_clade_size.loc[:,'is_foreground_stem']
+    df_clade_size.loc[:,'is_blocked'] = False
+    for bin in df_clade_size.loc[:,'bin'].unique()[::-1]:
+        is_bin = (df_clade_size.loc[:,'bin']==bin)
+        is_blocked = df_clade_size.loc[:,'is_blocked'].values
+        min_bin_size = df_clade_size.loc[is_bin,'size'].min()
+        max_bin_size = df_clade_size.loc[is_bin,'size'].max()
+        num_fg_bin = (fg_bins==bin).sum()
+        num_bin = is_bin.sum()
+        num_unblocked_bin = (is_bin&~is_blocked).sum()
+        cc_w = combinations_count(n=num_unblocked_bin, r=num_fg_bin)
+        cc_wo = combinations_count(n=num_bin, r=num_fg_bin)
+        txt = 'bin {}: foreground/all clades = {:,}/{:,}, ' \
+              'min/max clade sizes = {:,}/{:,}, ' \
+              'randomization complexity with/without considering branch independency = {:,}/{:,}'
+        print(txt.format(bin, num_fg_bin, num_bin, min_bin_size, max_bin_size, cc_w, cc_wo), flush=True)
+        before_randomization = df_clade_size.loc[is_bin&~is_blocked,'is_foreground_stem_randomized'].values
+        after_randomization = numpy.random.permutation(before_randomization)
+        df_clade_size.loc[is_bin&~is_blocked,'is_foreground_stem_randomized'] = after_randomization
+        is_new_fg = is_bin&~is_blocked&(df_clade_size.loc[:,'is_foreground_stem_randomized']==True)
+        new_fg_bids = df_clade_size.loc[is_new_fg,'branch_id'].values
+        for new_fg_bid in new_fg_bids:
+            for node in g['tree'].traverse():
+                if (node.numerical_label==new_fg_bid):
+                    des_bids = [ d.numerical_label for d in node.traverse() ]
+                    df_clade_size.loc[des_bids,'is_blocked'] = True
+                    break
+    return df_clade_size
+
+def get_new_foreground_ids(df_clade_size, g):
+    is_new_fg = (df_clade_size.loc[:,'is_foreground_stem_randomized']==True)
+    fg_stem_bids = df_clade_size.loc[is_new_fg,'branch_id'].values
+    new_fg_ids = list()
+    if (g['fg_stem_only']):
+        new_fg_ids = fg_stem_bids
+    else:
+        for fg_stem_bid in fg_stem_bids:
+            for node in g['tree'].traverse():
+                if (node.numerical_label==fg_stem_bid):
+                    new_lineage_fg_ids = [ n.numerical_label for n in node.traverse() ]
+                    new_fg_ids = new_fg_ids + new_lineage_fg_ids
+    new_fg_ids = numpy.array(new_fg_ids, dtype=numpy.int)
+    return new_fg_ids
+
 def get_foreground_branch(g):
     g['fg_df'] = pandas.read_csv(g['foreground'], sep='\t', comment='#', skip_blank_lines=True, header=None)
     g['fg_leaf_name'] = list()
     g['target_id'] = numpy.zeros(shape=(0,), dtype=numpy.int) # numerical_label for leaves in --foreground as well as their ancestors
     leaf_names = [ leaf.name for leaf in g['tree'].get_leaves() ]
+    for node in g['tree'].traverse():
+        node.is_foreground = False # initializing
     lineages = g['fg_df'].iloc[:,0].unique()
     for i in numpy.arange(len(lineages)):
         g['fg_leaf_name'].append([])
@@ -85,18 +175,19 @@ def get_foreground_branch(g):
             else:
                 print('The foreground leaf name cannot be identified:', lln, match_leaves)
         fg_leaf_name_set = set(g['fg_leaf_name'][i])
-        if g['fg_stem_only']:
+        if (g['fg_stem_only']|g['fg_random']):
             for node in g['tree'].traverse():
-                node.is_foreground = False # initializing
+                node.is_lineage_foreground = False # initializing
             for node in g['tree'].traverse():
                 node_leaf_name_set = set(node.get_leaf_names())
                 if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
+                    node.is_lineage_foreground = True
                     node.is_foreground = True
         for node in g['tree'].traverse():
             node_leaf_name_set = set(node.get_leaf_names())
             if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
                 if g['fg_stem_only']:
-                    if (node.is_foreground==True)&(node.up.is_foreground==False):
+                    if (node.is_lineage_foreground==True)&(node.up.is_lineage_foreground==False):
                         lineage_fg_id.append(node.numerical_label)
                 else:
                     lineage_fg_id.append(node.numerical_label)
@@ -115,6 +206,19 @@ def get_foreground_branch(g):
         for x in g['target_id']:
             f.write(str(x)+'\n')
     g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
+    if (g['fg_random']):
+        print('starting foreground randomization.')
+        g['fg_id_original'] = copy.deepcopy(g['fg_id'])
+        g['fg_leaf_name_original'] = copy.deepcopy(g['fg_leaf_name'])
+        df_clade_size = get_df_clade_size(g)
+        df_clade_size = foreground_clade_randomization(df_clade_size, g, min_bin_count=10)
+        g['target_id'] = get_new_foreground_ids(df_clade_size, g)
+        g['fg_id'] = copy.deepcopy(g['target_id'])
+        new_fg_leaf_names = [ n.get_leaf_names() for n in g['tree'].traverse() if n.numerical_label in g['fg_id'] ]
+        new_fg_leaf_names = list(itertools.chain(*new_fg_leaf_names))
+        new_fg_leaf_names = list(set(new_fg_leaf_names))
+        g['fg_leaf_name'] = new_fg_leaf_names
+        print('ending foreground randomization.\n')
     return g
 
 def get_marginal_branch(g):
@@ -151,10 +255,15 @@ def get_foreground_branch_num(cb, g):
     is_enough_stat = (cb.loc[:,g['target_stat']]>=g['min_stat'])
     is_foreground = (cb.loc[:,'fg_branch_num']==arity)
     num_enough = is_enough_stat.sum()
+    num_fg = is_foreground.sum()
     num_fg_enough = (is_enough_stat&is_foreground).sum()
     num_all = cb.shape[0]
-    percent_fg_enough = num_fg_enough / num_enough * 100
-    conc_factor = (num_fg_enough/num_enough) / (num_enough/num_all)
+    if (num_enough==0):
+        percent_fg_enough = 0
+        conc_factor = 0
+    else:
+        percent_fg_enough = num_fg_enough / num_enough * 100
+        conc_factor = (num_fg_enough/num_enough) / (num_fg/num_all)
     txt = 'arity={}, foreground branch combinations with {} >= {} = {:.0f}% ({:,}/{:,}, ' \
           'total examined = {:,}, concentration factor = {:.1f})'
     txt = txt.format(arity, g['target_stat'], g['min_stat'], percent_fg_enough, num_fg_enough, num_enough, num_all, conc_factor)

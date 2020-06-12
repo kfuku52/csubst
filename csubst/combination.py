@@ -45,7 +45,11 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             joblib.delayed(node_union)
             (ids, target_nodes, df_mmap, ms) for ids, ms in zip(chunks, starts)
         )
-        node_combinations = numpy.unique(df_mmap[df_mmap.sum(axis=1)!=0,:], axis=0)
+        is_valid_combination = (df_mmap.sum(axis=1)!=0)
+        if (is_valid_combination.sum()>0):
+            node_combinations = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
+        else:
+            node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int)
     if verbose:
         flat_fg_dep_ids = list(itertools.chain(*g['fg_dep_ids']))
         num_target_node = len(list(target_nodes.flat))
