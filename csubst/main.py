@@ -1,4 +1,3 @@
-import copy
 import time
 
 from csubst import parser_iqtree
@@ -10,6 +9,70 @@ from csubst.sequence import *
 from csubst.table import *
 from csubst.tree import *
 from csubst.substitution import get_sub_sites
+
+def cb_search(g, b, S_tensor, N_tensor, mode='', write_cb=True):
+    end_flag = 0
+    g = initialize_df_cb_stats(g)
+    g['df_cb_stats'].loc[:, 'mode'] = mode
+    for current_arity in numpy.arange(2, g['max_arity'] + 1):
+        start = time.time()
+        print("Making combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
+        g['current_arity'] = current_arity
+        if (current_arity == 2) & (g['foreground'] is None):
+            id_combinations = id_combinations
+        elif (current_arity == 2) & (not g['foreground'] is None):
+            id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
+                                                    check_attr='name', foreground=True)
+        elif (current_arity > 2):
+            is_stat_enough = (cb.loc[:,g['target_stat']] >= g['min_stat']) | (cb.loc[:,g['target_stat']].isnull())
+            is_combinat_sub_enough = ((cb.loc[:,'Nany2any']+cb.loc[:,'Nany2any']) >= g['min_combinat_sub'])
+            is_branch_sub_enough = True
+            for a in numpy.arange(current_arity - 1):
+                target_columns = ['S_sub_' + str(a + 1), 'N_sub_' + str(a + 1)]
+                is_branch_sub_enough = is_branch_sub_enough & (
+                        cb.loc[:, target_columns].sum(axis=1) >= g['min_branch_sub'])
+            num_branch_ids = (is_stat_enough).sum()
+            print('Arity = {:,}: qualified combinations = {:,}'.format(current_arity, num_branch_ids), flush=True)
+            id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
+            conditions = (is_stat_enough) & (is_branch_sub_enough) & (is_combinat_sub_enough)
+            branch_ids = cb.loc[conditions, id_columns].values
+            if len(set(branch_ids.ravel().tolist())) < current_arity:
+                end_flag = 1
+                break
+            del cb
+            id_combinations = get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
+                                                    check_attr='name', foreground=True)
+            if id_combinations.shape[0] == 0:
+                end_flag = 1
+                break
+        cbS = get_cb(id_combinations, S_tensor, g, 'S')
+        cbN = get_cb(id_combinations, N_tensor, g, 'N')
+        cb = merge_tables(cbS, cbN)
+        del cbS, cbN
+        cb = get_node_distance(g['tree'], cb)
+        cb = get_substitutions_per_branch(cb, b, g)
+        cb = calc_substitution_patterns(cb)
+        cb, g = calc_omega(cb, b, S_tensor, N_tensor, g)
+        cb, g = get_foreground_branch_num(cb, g)
+        if write_cb:
+            file_name = "csubst_cb_" + str(current_arity) + ".tsv"
+            cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
+            print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
+        is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
+        med_dist_bl = cb.loc[(cb.loc[:,'fg_branch_num']==current_arity),'dist_bl'].median()
+        med_dist_node_num = cb.loc[(cb.loc[:,'fg_branch_num']==current_arity),'dist_node_num'].median()
+        g['df_cb_stats'].loc[is_arity,'fg_median_dist_bl'] = med_dist_bl
+        g['df_cb_stats'].loc[is_arity,'fg_median_dist_node_num'] = med_dist_node_num
+        elapsed_time = int(time.time() - start)
+        g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
+        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+        if end_flag:
+            print('No combination satisfied phylogenetic independency. Ending branch combination analysis.')
+            break
+    g['df_cb_stats'] = g['df_cb_stats'].loc[(~g['df_cb_stats'].loc[:,'elapsed_sec'].isnull()),:]
+    g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
+    g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+    return g
 
 def csubst_main(g):
     start = time.time()
@@ -40,20 +103,12 @@ def csubst_main(g):
     write_alignment(state=state_cdn, orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', g=g)
     write_alignment(state=state_pep, orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', g=g)
 
-    if not g['foreground'] is None:
+    if g['foreground'] is not None:
         g = get_foreground_branch(g)
         g = get_marginal_branch(g)
 
     g = get_dep_ids(g)
-    if g['cb_stats'] is None:
-        g['df_cb_stats'] = pandas.DataFrame()
-    else:
-        g['df_cb_stats'] = pandas.read_csv(g['cb_stats'], sep='\t', header=0)
-
-    tree = copy.deepcopy(g['tree'])
-    for node in tree.traverse():
-        node.name = node.name + '|' + str(node.numerical_label)
-    tree.write(format=1, outfile='csubst_tree.nwk')
+    write_tree(g['tree'])
 
     N_tensor = get_substitution_tensor(state_tensor=state_pep, mode='asis', g=g, mmap_attr='N')
     sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()
@@ -115,6 +170,7 @@ def csubst_main(g):
             p = b.loc[:, key].drop_duplicates().values
             print(txt.format(key, b.shape[0], p.shape[0], p.min(), p.max()), flush=True)
         del bS, bN
+        b = annotate_foreground(b, g)
         if (g['b']):
             b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(b.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
@@ -148,62 +204,19 @@ def csubst_main(g):
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 
     if (g['cb']):
-        end_flag = 0
-        df_rho = pandas.DataFrame([])
-        # noinspection PyInterpreter,PyInterpreter
-        for current_arity in numpy.arange(g['current_arity'], g['max_arity'] + 1):
-            start = time.time()
-            print("Making combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
-            g['current_arity'] = current_arity
-            if (current_arity == 2) & (g['foreground'] is None):
-                id_combinations = id_combinations
-            elif (current_arity == 2) & (not g['foreground'] is None):
-                id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
-                                                        check_attr='name', foreground=True)
-            elif (current_arity > 2):
-                is_stat_enough = (cb.loc[:,g['target_stat']] >= g['min_stat']) | (cb.loc[:,g['target_stat']].isnull())
-                is_combinat_sub_enough = ((cb.loc[:,'Nany2any']+cb.loc[:,'Nany2any']) >= g['min_combinat_sub'])
-                is_branch_sub_enough = True
-                for a in numpy.arange(current_arity - 1):
-                    target_columns = ['S_sub_' + str(a + 1), 'N_sub_' + str(a + 1)]
-                    is_branch_sub_enough = is_branch_sub_enough & (
-                            cb.loc[:, target_columns].sum(axis=1) >= g['min_branch_sub'])
-                num_branch_ids = (is_stat_enough).sum()
-                print('Arity = {:,}: qualified combinations = {:,}'.format(current_arity, num_branch_ids), flush=True)
-                id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-                conditions = (is_stat_enough) & (is_branch_sub_enough) & (is_combinat_sub_enough)
-                branch_ids = cb.loc[conditions, id_columns].values
-                if len(set(branch_ids.ravel().tolist())) < current_arity:
-                    end_flag = 1
-                    break
-                del cb
-                id_combinations = get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
-                                                        check_attr='name', foreground=True)
-                if id_combinations.shape[0] == 0:
-                    end_flag = 1
-                    break
-            cbS = get_cb(id_combinations, S_tensor, g, 'S')
-            cbN = get_cb(id_combinations, N_tensor, g, 'N')
-            cb = merge_tables(cbS, cbN)
-            del cbS, cbN
-            cb = get_node_distance(tree, cb)
-            cb = get_substitutions_per_branch(cb, b, g)
-            cb = calc_substitution_patterns(cb)
-            cb, g = calc_omega(cb, b, S_tensor, N_tensor, g)
-            cb = get_foreground_branch_num(cb, g)
-            file_name = "csubst_cb_" + str(current_arity) + ".tsv"
-            cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
-            print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
-            elapsed_time = int(time.time() - start)
-            if (g['omega_method'] == 'rho') & (g['cb_subsample']):
-                if 'elapsed_sec' not in g['df_cb_stats'].columns:
-                    g['df_cb_stats']['elapsed_sec'] = numpy.nan
-                g['df_cb_stats'].loc[(g['df_cb_stats']['arity'] == g['current_arity']), 'elapsed_sec'] = elapsed_time
-                g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
-                g['df_cb_stats'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
-            print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
-        if end_flag:
-            print('No combination satisfied phylogenetic independency. Ending branch combination analysis.')
+        g['df_cb_stats_main'] = pandas.DataFrame()
+        g = cb_search(g, b, S_tensor, N_tensor, mode='foreground', write_cb=True)
+        if (g['foreground'] is not None)&(g['fg_random']>0):
+            for i in numpy.arange(0, g['fg_random']):
+                print('starting foreground randomization round {:,}'.format(i+1), flush=True)
+                g = get_foreground_branch(g)
+                g = randomize_foreground_branch(g)
+                g = get_marginal_branch(g)
+                g = cb_search(g, b, S_tensor, N_tensor, mode='randomization_'+str(i+1), write_cb=False)
+                print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
+
+        g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]
+

@@ -1,6 +1,7 @@
 import numpy
 import itertools
 import re
+import copy
 
 def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
@@ -118,3 +119,8 @@ def is_internal_node_labeled(tree):
                 is_labeled = False
     return is_labeled
 
+def write_tree(tree):
+    tree2 = copy.deepcopy(tree)
+    for node in tree2.traverse():
+        node.name = node.name + '|' + str(node.numerical_label)
+    tree2.write(format=1, outfile='csubst_tree.nwk')

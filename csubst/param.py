@@ -206,19 +206,19 @@ def get_foreground_branch(g):
         for x in g['target_id']:
             f.write(str(x)+'\n')
     g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
-    if (g['fg_random']):
-        print('starting foreground randomization.')
-        g['fg_id_original'] = copy.deepcopy(g['fg_id'])
-        g['fg_leaf_name_original'] = copy.deepcopy(g['fg_leaf_name'])
-        df_clade_size = get_df_clade_size(g)
-        df_clade_size = foreground_clade_randomization(df_clade_size, g, min_bin_count=10)
-        g['target_id'] = get_new_foreground_ids(df_clade_size, g)
-        g['fg_id'] = copy.deepcopy(g['target_id'])
-        new_fg_leaf_names = [ n.get_leaf_names() for n in g['tree'].traverse() if n.numerical_label in g['fg_id'] ]
-        new_fg_leaf_names = list(itertools.chain(*new_fg_leaf_names))
-        new_fg_leaf_names = list(set(new_fg_leaf_names))
-        g['fg_leaf_name'] = new_fg_leaf_names
-        print('ending foreground randomization.\n')
+    return g
+
+def randomize_foreground_branch(g):
+    g['fg_id_original'] = copy.deepcopy(g['fg_id'])
+    g['fg_leaf_name_original'] = copy.deepcopy(g['fg_leaf_name'])
+    df_clade_size = get_df_clade_size(g)
+    df_clade_size = foreground_clade_randomization(df_clade_size, g, min_bin_count=10)
+    g['target_id'] = get_new_foreground_ids(df_clade_size, g)
+    g['fg_id'] = copy.deepcopy(g['target_id'])
+    new_fg_leaf_names = [ n.get_leaf_names() for n in g['tree'].traverse() if n.numerical_label in g['fg_id'] ]
+    new_fg_leaf_names = list(itertools.chain(*new_fg_leaf_names))
+    new_fg_leaf_names = list(set(new_fg_leaf_names))
+    g['fg_leaf_name'] = new_fg_leaf_names
     return g
 
 def get_marginal_branch(g):
@@ -258,7 +258,7 @@ def get_foreground_branch_num(cb, g):
     num_fg = is_foreground.sum()
     num_fg_enough = (is_enough_stat&is_foreground).sum()
     num_all = cb.shape[0]
-    if (num_enough==0):
+    if (num_enough==0)|(num_fg==0):
         percent_fg_enough = 0
         conc_factor = 0
     else:
@@ -268,4 +268,36 @@ def get_foreground_branch_num(cb, g):
           'total examined = {:,}, concentration factor = {:.1f})'
     txt = txt.format(arity, g['target_stat'], g['min_stat'], percent_fg_enough, num_fg_enough, num_enough, num_all, conc_factor)
     print(txt, flush=True)
-    return cb
+    is_arity = (g['df_cb_stats'].loc[:,'arity']==arity)
+    g['df_cb_stats'].loc[is_arity,'num_examined'] = num_all
+    g['df_cb_stats'].loc[is_arity,'num_fg'] = num_fg
+    g['df_cb_stats'].loc[is_arity,'num_qualified'] = num_enough
+    g['df_cb_stats'].loc[is_arity,'num_fg_qualified'] = num_fg_enough
+    g['df_cb_stats'].loc[is_arity,'fg_conc_factor'] = conc_factor
+    return cb, g
+
+def annotate_foreground(b, g):
+    if len(g['fg_id']):
+        b.loc[:,'is_foreground'] = 'no'
+        b.loc[g['fg_id'],'is_foreground'] = 'yes'
+    else:
+        b.loc[:,'is_foreground'] = 'yes'
+    if len(g['marginal_id']):
+        b.loc[:,'is_marginal'] = 'no'
+        b.loc[g['marginal_id'],'is_marginal'] = 'yes'
+    else:
+        b.loc[:,'is_marginal'] = 'no'
+    return b
+
+def initialize_df_cb_stats(g):
+    if g['cb_stats'] is None:
+        ind = numpy.arange(0, g['max_arity'])
+        cols = ['arity','elapsed_sec','fg_median_dist_bl','fg_median_dist_node_num',]
+        cols = cols + ['num_examined','num_fg','num_qualified','num_fg_qualified','fg_conc_factor',]
+        g['df_cb_stats'] = pandas.DataFrame(index=ind, columns=cols)
+        g['df_cb_stats'].loc[:,'arity'] = ind + 1
+        g['df_cb_stats'].loc[:,'target_stat'] = g['target_stat']
+        g['df_cb_stats'].loc[:,'min_stat'] = g['min_stat']
+    else:
+        g['df_cb_stats'] = pandas.read_csv(g['cb_stats'], sep='\t', header=0)
+    return(g)

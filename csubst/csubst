@@ -49,8 +49,10 @@ psr.add_argument('--fg_sister', metavar='yes|no', default='no', type=strtobool,
                       'They may serve as "negative controls" relative to the foreground lineages.')
 psr.add_argument('--fg_sister_stem_only', metavar='yes|no', default='no', type=strtobool,
                  help='default=%(default)s: Set "yes" to exclude non-stem branches of sister lineages.')
-psr.add_argument('--fg_random', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Randomly select the same number and size of clades as foreground.')
+psr.add_argument('--fg_random', metavar='INT', default=0, type=int,
+                 help='default=%(default)s: Randomly select the same number and size of clades as foreground '
+                      'and run analysis N times. Larger numbers may take time.'
+                 )
 
 
 # branch combinations
