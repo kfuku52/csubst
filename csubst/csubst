@@ -36,9 +36,9 @@ psr.add_argument('--foreground', metavar='PATH', default=None, type=str,
                  help='default=%(default)s: Foreground taxa for higher-order analysis. '
                       'The file should contain two columns separated by a tab: '
                       '1st column for lineage IDs and 2nd for regex-compatible leaf names.')
+# TODO: This might be redundant to --fg_stem_only
 psr.add_argument('--exclude_wg', metavar='yes|no', default='yes', type=strtobool,
-                 help='default=%(default)s: Set "yes" to exclude branches within individual foreground lineages '
-                      'in branch combination analysis.')
+                 help='default=%(default)s: Set "yes" to exclude branche combinations within individual foreground lineages.')
 psr.add_argument('--fg_stem_only', metavar='yes|no', default='no', type=strtobool,
                  help='default=%(default)s: Set "yes" to exclude non-stem branches of foreground lineages.')
 psr.add_argument('--fg_parent', metavar='yes|no', default='no', type=strtobool,
@@ -53,7 +53,6 @@ psr.add_argument('--fg_random', metavar='INT', default=0, type=int,
                  help='default=%(default)s: Randomly select the same number and size of clades as foreground '
                       'and run analysis N times. Larger numbers may take time.'
                  )
-
 
 # branch combinations
 psr.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,

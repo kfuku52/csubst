@@ -10,7 +10,7 @@ from csubst.table import *
 from csubst.tree import *
 from csubst.substitution import get_sub_sites
 
-def cb_search(g, b, S_tensor, N_tensor, mode='', write_cb=True):
+def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
     end_flag = 0
     g = initialize_df_cb_stats(g)
     g['df_cb_stats'].loc[:, 'mode'] = mode
@@ -20,7 +20,7 @@ def cb_search(g, b, S_tensor, N_tensor, mode='', write_cb=True):
         g['current_arity'] = current_arity
         if (current_arity == 2) & (g['foreground'] is None):
             id_combinations = id_combinations
-        elif (current_arity == 2) & (not g['foreground'] is None):
+        elif (current_arity == 2) & (g['foreground'] is not None):
             id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
                                                     check_attr='name', foreground=True)
         elif (current_arity > 2):
@@ -103,12 +103,11 @@ def csubst_main(g):
     write_alignment(state=state_cdn, orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', g=g)
     write_alignment(state=state_pep, orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', g=g)
 
-    if g['foreground'] is not None:
-        g = get_foreground_branch(g)
-        g = get_marginal_branch(g)
-
+    g = get_foreground_branch(g)
+    g = get_marginal_branch(g)
     g = get_dep_ids(g)
     write_tree(g['tree'])
+    plot_branch_category(g)
 
     N_tensor = get_substitution_tensor(state_tensor=state_pep, mode='asis', g=g, mmap_attr='N')
     sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()
@@ -205,7 +204,7 @@ def csubst_main(g):
 
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()
-        g = cb_search(g, b, S_tensor, N_tensor, mode='foreground', write_cb=True)
+        g = cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='foreground', write_cb=True)
         if (g['foreground'] is not None)&(g['fg_random']>0):
             for i in numpy.arange(0, g['fg_random']):
                 print('starting foreground randomization round {:,}'.format(i+1), flush=True)

@@ -2,6 +2,7 @@ import numpy
 import itertools
 import re
 import copy
+import ete3
 
 def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
@@ -124,3 +125,34 @@ def write_tree(tree):
     for node in tree2.traverse():
         node.name = node.name + '|' + str(node.numerical_label)
     tree2.write(format=1, outfile='csubst_tree.nwk')
+
+def branch_category_layout(node):
+    nstyle = ete3.NodeStyle()
+    nstyle['size'] = 0
+    nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
+    if node.is_foreground:
+        branch_color = 'red'
+    elif node.is_marginal:
+        branch_color = 'blue'
+    else:
+        branch_color = 'black'
+    nstyle["hz_line_color"] = branch_color
+    nstyle["vt_line_color"] = branch_color
+    nlabel = node.name+'|'+str(node.numerical_label)
+    nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor = branch_color)
+    ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+    node.set_style(nstyle)
+
+def plot_branch_category(g):
+    try:
+        from ete3 import TreeStyle
+        from ete3 import NodeStyle
+    except ImportError:
+        print('TreeStyle and/or NodeStyle are not available in installed ete3. Plotting is skipped.', flush=True)
+        return None
+    ts = ete3.TreeStyle()
+    ts.mode = 'r'
+    ts.show_leaf_name = False
+    ts.layout_fn = branch_category_layout
+    file_name = 'csubst_branch_category.pdf'
+    g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
