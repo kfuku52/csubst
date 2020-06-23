@@ -52,6 +52,8 @@ psr.add_argument('--fg_random', metavar='INT', default=0, type=int,
                  help='default=%(default)s: Randomly select the same number and size of clades as foreground '
                       'and run analysis N times. Larger numbers may take time.'
                  )
+psr.add_argument('--fg_force_exhaustive', metavar='yes|no', default='no', type=strtobool,
+                 help='default=%(default)s: Set "yes" to analyze all branch combinations even with foreground specification.')
 
 # branch combinations
 psr.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,

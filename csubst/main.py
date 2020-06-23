@@ -18,7 +18,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         start = time.time()
         print("Making combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
         g['current_arity'] = current_arity
-        if (current_arity == 2) & (g['foreground'] is None):
+        if (current_arity == 2) & ((g['foreground'] is None)|(g['fg_force_exhaustive'])):
             id_combinations = id_combinations
         elif (current_arity == 2) & (g['foreground'] is not None):
             id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,

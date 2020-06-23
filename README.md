@@ -28,25 +28,29 @@ csubst -h
 
 ## Test run
 ```
-# Download a test data
+# Download test data
+# PGK data are also available in csubst/data.
+# If svn is not installed in your environment, 
+# download zip for the entire repo from "Clone or download". 
 svn export https://github.com/kfuku52/csubst/trunk/data/PGK
 
 # Enter the directory
-cd ./OG0002332
+cd ./PGK
 
 # Run IQ-TREE (version >=2.0.0) to get output files 
 # (.state, .rate, and .treefile)
 # It's included in the downloaded directory 
 # so you don't have to run IQ-TREE in this test.
 # tree.nwk should be rooted.
-iqtree \
--s alignment.fa \
--te tree.nwk \
--m MFP \
---seqtype CODON1 \
---threads-max 4 \
---ancestral \
---rate
+
+#iqtree \
+#-s alignment.fa \
+#-te tree.nwk \
+#-m MG+F3X4+R3 \
+#--seqtype CODON1 \
+#--threads-max 4 \
+#--ancestral \
+#--rate
 
 # Run csubst
 csubst \
