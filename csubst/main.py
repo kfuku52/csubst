@@ -18,11 +18,15 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         start = time.time()
         print("Making combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
         g['current_arity'] = current_arity
-        if (current_arity == 2) & ((g['foreground'] is None)|(g['fg_force_exhaustive'])):
-            id_combinations = id_combinations
-        elif (current_arity == 2) & (g['foreground'] is not None):
-            id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
-                                                    check_attr='name', foreground=True)
+        if (current_arity == 2):
+            if (g['foreground'] is not None) & (g['fg_force_exhaustive']==False):
+                print('Searching foreground branch combinations.', flush=True)
+                g,id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
+                                                          check_attr='name')
+            else:
+                print('Exhaustively searching independent branch combinations.', flush=True)
+                if id_combinations is None:
+                    g,id_combinations = get_node_combinations(g=g, arity=current_arity, check_attr="name")
         elif (current_arity > 2):
             is_stat_enough = (cb.loc[:,g['target_stat']] >= g['min_stat']) | (cb.loc[:,g['target_stat']].isnull())
             is_combinat_sub_enough = ((cb.loc[:,'Nany2any']+cb.loc[:,'Nany2any']) >= g['min_combinat_sub'])
@@ -40,8 +44,8 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
                 end_flag = 1
                 break
             del cb
-            id_combinations = get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
-                                                    check_attr='name', foreground=True)
+            g,id_combinations = get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
+                                                    check_attr='name')
             if id_combinations.shape[0] == 0:
                 end_flag = 1
                 break
@@ -116,7 +120,7 @@ def csubst_main(g):
         sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
 
-    id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
+    id_combinations = None
 
     S_total = numpy.nan_to_num(S_tensor).sum(axis=(0, 1, 2, 3, 4))
     N_total = numpy.nan_to_num(N_tensor).sum(axis=(0, 1, 2, 3, 4))
@@ -179,6 +183,8 @@ def csubst_main(g):
     if (g['cs']):
         start = time.time()
         print("Making combinat-site table.", flush=True)
+        if id_combinations is None:
+            g,id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
         csS = get_cs(id_combinations, S_tensor, attr='S')
         csN = get_cs(id_combinations, N_tensor, attr='N')
         cs = merge_tables(csS, csN)
@@ -192,6 +198,8 @@ def csubst_main(g):
     if (g['cbs']):
         start = time.time()
         print("Making combinat-branch-site table.", flush=True)
+        if id_combinations is None:
+            g,id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
         cbsS = get_cbs(id_combinations, S_tensor, attr='S', g=g)
         cbsN = get_cbs(id_combinations, N_tensor, attr='N', g=g)
         cbs = merge_tables(cbsS, cbsN)

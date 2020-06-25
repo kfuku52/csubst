@@ -202,7 +202,7 @@ def get_rho(cb, b, g, N_tensor, S_tensor):
         subsampling_type = 'subsample'
         if id_combinations.shape[0] == 0:
             print('Recalculating cb to estimate rho from all combinations.')
-            id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
+            g,id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
             subsampling_type = 'all'
         cbS = get_cb(id_combinations, S_tensor, g, attr='S')
         cbN = get_cb(id_combinations, N_tensor, g, attr='N')

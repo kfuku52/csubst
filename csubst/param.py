@@ -36,7 +36,8 @@ def get_global_parameters(args):
 def get_dep_ids(g):
     dep_ids = list()
     for leaf in g['tree'].iter_leaves():
-        dep_id = [leaf.numerical_label,] + [ node.numerical_label for node in leaf.iter_ancestors() if not node.is_root() ]
+        ancestor_nn = [ node.numerical_label for node in leaf.iter_ancestors() if not node.is_root() ]
+        dep_id = [leaf.numerical_label,] + ancestor_nn
         dep_id = numpy.sort(numpy.array(dep_id))
         dep_ids.append(dep_id)
     if g['exclude_sisters']:
@@ -46,20 +47,24 @@ def get_dep_ids(g):
                 dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
                 dep_ids.append(dep_id)
     g['dep_ids'] = dep_ids
-    if (g['foreground'] is not None)&(g['exclude_wg']):
+    if (g['foreground'] is not None)&(g['fg_exclude_wg']):
         fg_dep_ids = list()
-        for node in g['tree'].traverse():
-            for i in numpy.arange(len(g['fg_leaf_name'])):
-                if all([ ln in g['fg_leaf_name'][i] for ln in node.get_leaf_names() ])&(len(node.get_leaf_names())>1):
-                    flag = 0
-                    if node.is_root():
-                        flag = 1
-                    elif not all([ ln in g['fg_leaf_name'][i] for ln in node.up.get_leaf_names() ]):
-                        flag = 1
-                    if flag:
-                        fg_dep_ids.append(numpy.array([node.numerical_label,] + [ n.numerical_label for n in node.get_descendants() ]))
+        for i in numpy.arange(len(g['fg_leaf_name'])):
+            tmp_fg_dep_ids = list()
+            for node in g['tree'].traverse():
+                is_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.get_leaf_names() ])
+                if is_all_leaf_lineage_fg:
+                    is_up_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.up.get_leaf_names() ])
+                    if not is_up_all_leaf_lineage_fg:
+                        if node.is_leaf():
+                            tmp_fg_dep_ids.append(node.numerical_label)
+                        else:
+                            descendant_nn = [ n.numerical_label for n in node.get_descendants() ]
+                            tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
+            if len(tmp_fg_dep_ids)>1:
+                fg_dep_ids.append(numpy.sort(numpy.array(tmp_fg_dep_ids)))
         if (g['fg_sister'])|(g['fg_parent']):
-            fg_dep_ids.append(numpy.array(g['marginal_id']))
+            fg_dep_ids.append(numpy.sort(numpy.array(g['marginal_id'])))
         g['fg_dep_ids'] = fg_dep_ids
     else:
         g['fg_dep_ids'] = numpy.array([])
@@ -264,8 +269,16 @@ def get_foreground_branch_num(cb, g):
         for i in cb.index:
             branch_id_set = set(cb.loc[i,bid_cols].values)
             cb.at[i,'fg_branch_num'] = arity - len(branch_id_set.difference(fg_id_set))
+    cb.loc[:,'is_foreground'] = 'N'
+    cb.loc[(cb.loc[:,'fg_branch_num']==arity),'is_foreground'] = 'Y'
+    if (g['fg_dependent_id_combinations'] is not None):
+        for i in numpy.arange(g['fg_dependent_id_combinations'].shape[0]):
+            is_dep = True
+            for i,bids in enumerate(g['fg_dependent_id_combinations'][i,:]):
+                is_dep = is_dep & (cb.loc[:,'branch_id_'+str(i+1)]==bids)
+            cb.loc[is_dep,'is_foreground'] = 'N'
+    is_foreground = (cb.loc[:,'is_foreground']=='Y')
     is_enough_stat = (cb.loc[:,g['target_stat']]>=g['min_stat'])
-    is_foreground = (cb.loc[:,'fg_branch_num']==arity)
     num_enough = is_enough_stat.sum()
     num_fg = is_foreground.sum()
     num_fg_enough = (is_enough_stat&is_foreground).sum()

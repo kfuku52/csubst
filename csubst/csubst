@@ -36,7 +36,7 @@ psr.add_argument('--foreground', metavar='PATH', default=None, type=str,
                  help='default=%(default)s: Foreground taxa for higher-order analysis. '
                       'The file should contain two columns separated by a tab: '
                       '1st column for lineage IDs and 2nd for regex-compatible leaf names.')
-psr.add_argument('--exclude_wg', metavar='yes|no', default='yes', type=strtobool,
+psr.add_argument('--fg_exclude_wg', metavar='yes|no', default='yes', type=strtobool,
                  help='default=%(default)s: Set "yes" to exclude branche combinations within individual foreground lineages.')
 psr.add_argument('--fg_stem_only', metavar='yes|no', default='no', type=strtobool,
                  help='default=%(default)s: Set "yes" to exclude non-stem branches of foreground lineages.')

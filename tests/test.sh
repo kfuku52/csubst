@@ -38,7 +38,7 @@ csubst \
 --exclude_sisters yes \
 --num_subsample 10000 \
 --omega_method permutation \
---exclude_wg no \
+--fg_exclude_wg no \
 --foreground ${file_fg}
 
 

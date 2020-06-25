@@ -16,7 +16,16 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             df_mmap[i, :] = node_union
             i += 1
 
-def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True, foreground=False):
+def nc_matrix2id_combinations(nc_matrix, arity):
+    rows,cols = numpy.where(nc_matrix==1)
+    unique_cols = numpy.unique(cols)
+    id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int)
+    for i,col in enumerate(unique_cols):
+        id_combinations[i,:] = rows[cols==col]
+    id_combinations.sort(axis=1)
+    return(id_combinations)
+
+def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True):
     tree = g['tree']
     all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
     if verbose:
@@ -51,11 +60,8 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         else:
             node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int)
     if verbose:
-        flat_fg_dep_ids = list(itertools.chain(*g['fg_dep_ids']))
         num_target_node = len(list(target_nodes.flat))
-        num_wg_node = len(set(list(target_nodes.flat)).intersection(set(flat_fg_dep_ids)))
         print("all target nodes: {:,}".format(num_target_node), flush=True)
-        print('within-lineage target nodes to be excluded: {:,}'.format(num_wg_node), flush=True)
         print("all node combinations: {:,}".format(len(node_combinations)), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=numpy.bool)
     for i in numpy.arange(node_combinations.shape[0]):
@@ -63,19 +69,30 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     is_dependent_col = False
     for dep_id in g['dep_ids']:
         is_dependent_col = (is_dependent_col)|(nc_matrix[dep_id,:].sum(axis=0)>1)
-    if (foreground)&(g['foreground'] is not None)&(len(g['fg_dep_ids']) > 0):
-        for fg_dep_id in g['fg_dep_ids']:
-            is_dependent_col = (is_dependent_col) | (nc_matrix[fg_dep_id, :].sum(axis=0) > 1)
+    if verbose:
+        print('removing {:,} dependent branch combinations.'.format(is_dependent_col.sum()), flush=True)
     nc_matrix = nc_matrix[:,~is_dependent_col]
-    rows,cols = numpy.where(nc_matrix==1)
-    unique_cols = numpy.unique(cols)
-    id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int)
-    for i in unique_cols:
-        id_combinations[i,:] = rows[cols==i]
-    id_combinations.sort(axis=1)
+    g['fg_dependent_id_combinations'] = None
+    if (g['foreground'] is not None)&(len(g['fg_dep_ids']) > 0):
+        is_fg_dependent_col = False
+        for fg_dep_id in g['fg_dep_ids']:
+            is_fg_dependent_col = (is_fg_dependent_col)|(nc_matrix[fg_dep_id, :].sum(axis=0) > 1)
+        if (g['fg_force_exhaustive']):
+            if verbose:
+                txt = 'detected {:,} (out of {:,}) foreground branch combinations to be treated as non-foreground.'
+                print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
+            fg_dep_nc_matrix = numpy.copy(nc_matrix)
+            fg_dep_nc_matrix[:,~is_fg_dependent_col] = False
+            g['fg_dependent_id_combinations'] = nc_matrix2id_combinations(fg_dep_nc_matrix, arity)
+        else:
+            if verbose:
+                txt = 'removing {:,} (out of {:,}) dependent foreground branch combinations.'
+                print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
+            nc_matrix = nc_matrix[:,~is_fg_dependent_col]
+    id_combinations = nc_matrix2id_combinations(nc_matrix, arity)
     if verbose:
         print("independent node combinations: {:,}".format(id_combinations.shape[0]), flush=True)
-    return(id_combinations)
+    return(g,id_combinations)
 
 def node_combination_subsamples_rifle(g, arity, rep):
     all_ids = [ n.numerical_label for n in g['tree'].traverse() ]
