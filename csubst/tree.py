@@ -130,16 +130,10 @@ def branch_category_layout(node):
     nstyle = ete3.NodeStyle()
     nstyle['size'] = 0
     nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-    if node.is_foreground:
-        branch_color = 'red'
-    elif node.is_marginal:
-        branch_color = 'blue'
-    else:
-        branch_color = 'black'
-    nstyle["hz_line_color"] = branch_color
-    nstyle["vt_line_color"] = branch_color
+    nstyle["hz_line_color"] = node.color
+    nstyle["vt_line_color"] = node.color
     nlabel = node.name+'|'+str(node.numerical_label)
-    nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor = branch_color)
+    nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor=node.color)
     ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
     node.set_style(nstyle)
 
