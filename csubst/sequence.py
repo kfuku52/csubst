@@ -27,7 +27,11 @@ def cdn2pep_state(state_cdn, g):
         state_pep[:, :, i] = state_cdn[:,:,g['synonymous_indices'][aa]].sum(axis=2)
     return state_pep
 
-def write_alignment(state, orders, outfile, g):
+def write_alignment(state, orders, outfile, mode, g):
+    if mode=='codon':
+        missing_state = '---'
+    else:
+        missing_state = '-'
     aln_out = ''
     for node in g['tree'].traverse():
         if node.is_root():
@@ -38,8 +42,8 @@ def write_alignment(state, orders, outfile, g):
             index = numpy.where(state[nlabel,i,:]==1)[0]
             if len(index)==1:
                 aln_tmp += orders[index[0]]
-            else:
-                aln_tmp += '---'
+            elif len(index)==0:
+                aln_tmp += missing_state
         aln_out += aln_tmp+'\n'
     with open(outfile, 'w') as f:
         print('Writing an alignment:', outfile, flush=True)

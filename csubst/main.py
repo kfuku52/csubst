@@ -104,8 +104,8 @@ def csubst_main(g):
             state_cdn = parser_iqtree.get_state_tensor(g)
             state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
 
-    write_alignment(state=state_cdn, orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', g=g)
-    write_alignment(state=state_pep, orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', g=g)
+    write_alignment(state=state_cdn, orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', mode='codon', g=g)
+    write_alignment(state=state_pep, orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', mode='aa', g=g)
 
     g = get_foreground_branch(g)
     g = get_marginal_branch(g)
