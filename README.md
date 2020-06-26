@@ -9,7 +9,7 @@
 * [PhyloBayes](http://www.atgc-montpellier.fr/phylobayes/)
 
 ## Dependencies
-**csubst** runs on python >3.5 and depends on the following python packages.
+**csubst** runs on python 3.5+ and depends on the following python packages.
 * [python 3](https://www.python.org/)
 * [ete3](https://github.com/etetoolkit/ete)
 * [numpy](https://github.com/numpy/numpy)
@@ -46,7 +46,7 @@ cd ./PGK
 #iqtree \
 #-s alignment.fa \
 #-te tree.nwk \
-#-m MG+F3X4+R3 \
+#-m GY+F3X4+R4 \
 #--seqtype CODON1 \
 #--threads-max 4 \
 #--ancestral \

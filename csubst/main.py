@@ -10,6 +10,15 @@ from csubst.table import *
 from csubst.tree import *
 from csubst.substitution import get_sub_sites
 
+def get_linear_regression(cb):
+    for prefix in ['S','N']:
+        x = cb.loc[:,prefix+'any2any'].values
+        y = cb.loc[:,prefix+'any2spe'].values
+        x = x[:,numpy.newaxis]
+        coef,residuals,rank,s = numpy.linalg.lstsq(x, y, rcond=None)
+        cb.loc[:,prefix+'_linreg_residual'] = y - (x[:,0]*coef[0])
+    return cb
+
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
     end_flag = 0
     g = initialize_df_cb_stats(g)
@@ -57,6 +66,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         cb = get_substitutions_per_branch(cb, b, g)
         cb = calc_substitution_patterns(cb)
         cb, g = calc_omega(cb, b, S_tensor, N_tensor, g)
+        cb = get_linear_regression(cb)
         cb, g = get_foreground_branch_num(cb, g)
         if write_cb:
             file_name = "csubst_cb_" + str(current_arity) + ".tsv"
