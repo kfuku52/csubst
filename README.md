@@ -22,7 +22,7 @@
 # Installation with pip
 pip install git+https://github.com/kfuku52/csubst
 
-# This should show complete options
+# Check the complete set of options
 csubst -h 
 ```
 
@@ -43,14 +43,14 @@ cd ./PGK
 # so you don't have to run IQ-TREE in this test.
 # tree.nwk should be rooted.
 
-#iqtree \
-#-s alignment.fa \
-#-te tree.nwk \
-#-m GY+F3X4+R4 \
-#--seqtype CODON1 \
-#--threads-max 4 \
-#--ancestral \
-#--rate
+iqtree \
+-s alignment.fa \
+-te tree.nwk \
+-m GY+F3X4+R4 \
+--seqtype CODON1 \
+--threads-max 4 \
+--ancestral \
+--rate
 
 # Run csubst
 csubst \

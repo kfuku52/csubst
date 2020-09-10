@@ -150,3 +150,48 @@ def plot_branch_category(g):
     ts.layout_fn = branch_category_layout
     file_name = 'csubst_branch_category.pdf'
     g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
+
+def branch_state_layout(node):
+    nstyle = ete3.NodeStyle()
+    nstyle['size'] = 0
+    nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
+    nstyle["hz_line_color"] = node.color
+    nstyle["vt_line_color"] = node.color
+    if node.is_leaf():
+        nlabel = str(node.state)+'|'+node.name
+    else:
+        nlabel = str(node.state)
+    nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor=node.color)
+    ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+    node.set_style(nstyle)
+
+def plot_state_tree(state, orders, mode, g):
+    print('Writing ancestral state trees: mode = {}, number of pdf files = {}'.format(mode, state.shape[1]), flush=True)
+    try:
+        from ete3 import TreeStyle
+        from ete3 import NodeStyle
+    except ImportError:
+        print('TreeStyle and/or NodeStyle are not available in installed ete3. Plotting is skipped.', flush=True)
+        return None
+    if mode=='codon':
+        missing_state = '---'
+    else:
+        missing_state = '-'
+    ts = ete3.TreeStyle()
+    ts.mode = 'r'
+    ts.show_leaf_name = False
+    ts.layout_fn = branch_state_layout
+    ndigit = int(numpy.log10(state.shape[1]))+1
+    for i in numpy.arange(state.shape[1]):
+        for node in g['tree'].traverse():
+            if node.is_root():
+                node.state = missing_state
+                continue
+            nlabel = node.numerical_label
+            index = numpy.where(state[nlabel,i,:]==1)[0]
+            if len(index)==1:
+                node.state = orders[index[0]]
+            elif len(index)==0:
+                node.state = missing_state
+        file_name = 'csubst_state_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
+        g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)

@@ -122,6 +122,10 @@ def csubst_main(g):
     g = get_dep_ids(g)
     write_tree(g['tree'])
     plot_branch_category(g)
+    if g['plot_state_aa']:
+        plot_state_tree(state=state_pep, orders=g['amino_acid_orders'], mode='aa', g=g)
+    if g['plot_state_codon']:
+        plot_state_tree(state=state_cdn, orders=g['codon_orders'], mode='codon', g=g)
 
     N_tensor = get_substitution_tensor(state_tensor=state_pep, mode='asis', g=g, mmap_attr='N')
     sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()

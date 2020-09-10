@@ -80,7 +80,7 @@ psr.add_argument('--min_combinat_sub', metavar='FLOAT', default=1.0, type=float,
                  help='default=%(default)s: Minimum combinatorial substitutions (Sany2any+Nany2any). '
                       'Branch combinations < min_combinat_sub are excluded from higher-order analyses.')
 
-# Outputs
+# Substitution outputs
 psr.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
                  help='default=%(default)s: Branch output. Set "yes" to generate the output.')
 psr.add_argument('--s', metavar='yes|no', default='no', type=strtobool,
@@ -94,11 +94,17 @@ psr.add_argument('--bs', metavar='yes|no', default='no', type=strtobool,
 psr.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
                  help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output.')
 
+# Plot outputs
+psr.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
+                 help='default=%(default)s: Tree plots with per-site ancestral amino acid states. This option will generate many pdfs')
+psr.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
+                 help='default=%(default)s: Tree plots with per-site ancestral codon states. This option will generate many pdfs')
+
 # Omega calculation
 psr.add_argument('--calc_omega', metavar='yes|no', default='yes', type=strtobool,
                  help='default=%(default)s: Calculate omega for convergence rate.')
-psr.add_argument('--calc_distribution', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Calculate omega for convergence rate.')
+psr.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
+                 help='default=%(default)s: Calculate permutation-based quantiles for combinatorial substitutions.')
 psr.add_argument('--omega_method', metavar='[ind|rho]', default='ind', type=str,
                  choices=['ind','rho'],
                  help='default=%(default)s: Method to calculate omega. '

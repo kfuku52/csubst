@@ -147,7 +147,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['ESspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', stat='mean', SN='S', g=g)
         cb['ENany2dif'] = cb['ENany2any'] - cb['ENany2spe']
         cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
-    if g['calc_distribution']:
+    if g['calc_quantile']:
         cb['QNany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='quantile', SN='N', g=g)
         cb['QSany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', stat='quantile', SN='S', g=g)
         #cb['QNspe2any'] = calc_E_stat(cb, N_tensor, mode='spe2any', stat='quantile', SN='N', g=g)
