@@ -36,4 +36,7 @@ setup(
     ),
     cmdclass         = {'build_ext': build_ext},
     include_dirs     = [get_include(),],
+    package_data     = {
+                            '':['substitution_matrix/*.dat'],
+    }
 )

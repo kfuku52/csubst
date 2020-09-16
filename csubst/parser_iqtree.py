@@ -1,16 +1,18 @@
 import os
+import re
 import ete3
 import pandas
 import itertools
 from csubst.tree import *
 from csubst.genetic_code import ambiguous_table
 
-def get_input_information(g):
+def read_treefile(g):
     files = os.listdir(g['infile_dir'])
     g['tree'] = ete3.PhyloNode(g['tre_file'], format=1)
     assert len(g['tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['tre_file'])
     g['tree'] = standardize_node_names(g['tree'])
     g['tree'] = add_numerical_node_labels(g['tree'])
+    g['num_node'] = len(list(g['tree'].traverse()))
     if not is_internal_node_labeled(g['tree']):
         tree_files = [ f for f in files if f.endswith('.treefile') ]
         txt = 'No IQ-TREE *.treefile file detected. This file is necessary to correctly label internal node names.'
@@ -30,7 +32,9 @@ def get_input_information(g):
         g['node_label_tree'] = standardize_node_names(g['node_label_tree'])
         g['node_label_tree'] = transfer_root(tree_to=g['node_label_tree'], tree_from=g['tree'], verbose=False)
         g['tree'] = transfer_internal_node_names(tree_to=g['tree'], tree_from=g['node_label_tree'])
-    g['num_node'] = len(list(g['tree'].traverse()))
+    return g
+
+def read_state(g):
     state_files = [ f for f in os.listdir(g['infile_dir']) if f.endswith('.state') ]
     assert (len(state_files)!=0), 'No IQ-TREE *.state file detected.'
     if (len(state_files)>1):
@@ -74,6 +78,52 @@ def get_input_information(g):
                     break
         g['synonymous_indices'] = synonymous_indices
         g['max_synonymous_size'] = max([ len(si) for si in synonymous_indices.values() ])
+    return g
+
+def read_rate(g):
+    if (g['asrv_file']=='infer'):
+        file_path = g['aln_file']+'.rate'
+    else:
+        file_path = g['asrv_file']
+    assert os.path.exists(file_path), 'IQ-TREE\'s .rate file was not detected. Please specify file PATH in --asrv_file.'
+    print('IQ-TREE\'s .rate file was detected. Loading.')
+    sub_sites = pandas.read_csv(file_path, sep='\t', header=0, comment='#')
+    sub_sites = sub_sites.loc[:,'C_Rate'].values
+    return sub_sites
+
+def read_iqtree(g):
+    file_path = g['aln_file']+'.iqtree'
+    if not os.path.exists(file_path):
+        print('File not found:', file_path)
+        return g
+    with open(file_path) as f:
+        lines = f.readlines()
+    for line in lines:
+        model = re.match(r'Model of substitution: (.+)', line)
+        if model is not None:
+            g['substitution_model'] = model.group(1)
+    with open(file_path) as f:
+        txt = f.read()
+    pi = pandas.DataFrame(index=g['codon_orders'], columns=['freq',])
+    for m in re.finditer(r'  pi\(([A-Z]+)\) = ([0-9.]+)', txt, re.MULTILINE):
+        pi.at[m.group(1),'freq'] = float(m.group(2))
+    g['equilibrium_frequency'] = pi
+    return g
+
+def read_log(g):
+    file_path = g['aln_file']+'.log'
+    if not os.path.exists(file_path):
+        print('File not found:', file_path)
+        return g
+    with open(file_path) as f:
+        lines = f.readlines()
+    for line in lines:
+        omega = re.match(r'Nonsynonymous/synonymous ratio \(omega\): ([0-9.]+)', line)
+        if omega is not None:
+            g['omega'] = float(omega.group(1))
+        kappa = re.match(r'Transition/transversion ratio \(kappa\): ([0-9.]+)', line)
+        if kappa is not None:
+            g['kappa'] = float(kappa.group(1))
     return g
 
 def get_state_index(state, input_state, ambiguous_table):
@@ -154,4 +204,15 @@ def get_state_tensor(g):
         del state_tensor2
     return(state_tensor)
 
-
+def get_input_information(g):
+    g = read_treefile(g)
+    g = read_state(g)
+    g = read_iqtree(g)
+    g = read_log(g)
+    if False: # TODO
+        if (g['omega_method']=='mat'):
+            from csubst.parser_misc import read_substitution_matrix
+            file_path = '../substitution_matrix/ECMunrest.dat'
+            smat = read_substitution_matrix(file=file_path)
+            g['substitution_matrix'] = smat
+    return g

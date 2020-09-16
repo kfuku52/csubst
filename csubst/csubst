@@ -105,13 +105,15 @@ psr.add_argument('--calc_omega', metavar='yes|no', default='yes', type=strtobool
                  help='default=%(default)s: Calculate omega for convergence rate.')
 psr.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
                  help='default=%(default)s: Calculate permutation-based quantiles for combinatorial substitutions.')
-psr.add_argument('--omega_method', metavar='[ind|rho]', default='ind', type=str,
-                 choices=['ind','rho'],
+psr.add_argument('--omega_method', metavar='[ind|rho|mat]', default='ind', type=str,
+                 choices=['ind','rho','mat'],
                  help='default=%(default)s: Method to calculate omega. '
                       '"ind" for substitution-type-based expectation in which '
                       'all EXany2any, EXspe2any, EXany2spe, and EXspe2spe substitutions are individually calculated.'
                       '"rho" for a method in which EXany2spe is derived from EXany2any and an estimated parameter rho, '
-                      'which represents any2spe/any2any ratio.')
+                      'which represents any2spe/any2any ratio.'
+                      '"mat" for substitution-matrix-based expectation similar to Zou and Zhang (2015).'
+                 )
 psr.add_argument('--num_subsample', metavar='INTEGER', default=10000, type=int,
                  help='default=%(default)s: Activated if "--omega_method rho". The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
 psr.add_argument('--cb_stats', metavar='PATH', default=None, type=str,

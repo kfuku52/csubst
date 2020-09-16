@@ -176,7 +176,7 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
             df[row_start:row_end,arity+2] += sub_tensor[ic,sg,:,:,:].sum(axis=3).prod(axis=0).sum(axis=1) #spe2any
             df[row_start:row_end,arity+3] += sub_tensor[ic,sg,:,:,:].sum(axis=2).prod(axis=0).sum(axis=1) #any2spe
             df[row_start:row_end,arity+4] += sub_tensor[ic,sg,:,:,:].prod(axis=0).sum(axis=(1,2)) #spe2spe
-        if node%1000==0:
+        if (node%1000==0):
             mmap_start = mmap_start
             mmap_end = mmap_start+id_combinations.shape[0]
             txt = 'cbs: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
@@ -226,14 +226,8 @@ def get_sub_sites(g, sS, sN, state_tensor):
     elif (g['asrv']=='pool'):
         sub_sites = sS['S_sub'].values + sN['N_sub'].values
     elif (g['asrv']=='file'):
-        if (g['asrv_file']=='infer'):
-            file_path = g['aln_file']+'.rate'
-        else:
-            file_path = g['asrv_file']
-        assert os.path.exists(file_path), 'IQ-TREE\'s .rate file was not detected. Please specify file PATH in --asrv_file.'
-        print('IQ-TREE\'s .rate file was detected. Loading.')
-        sub_sites = pandas.read_csv(file_path, sep='\t', header=0, comment='#')
-        sub_sites = sub_sites.loc[:,'C_Rate'].values
+        from csubst.parser_iqtree import read_rate
+        sub_sites = read_rate(g)
     if (g['asrv']=='sn'):
         for SN,df in zip(['S','N'],[sS,sN]):
             g['sub_sites'][SN] = numpy.zeros(shape=[num_branch, num_site], dtype=numpy.float64)
