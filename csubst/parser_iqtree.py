@@ -7,24 +7,13 @@ from csubst.tree import *
 from csubst.genetic_code import ambiguous_table
 
 def read_treefile(g):
-    files = os.listdir(g['infile_dir'])
     g['tree'] = ete3.PhyloNode(g['tre_file'], format=1)
     assert len(g['tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['tre_file'])
     g['tree'] = standardize_node_names(g['tree'])
     g['tree'] = add_numerical_node_labels(g['tree'])
     g['num_node'] = len(list(g['tree'].traverse()))
     if not is_internal_node_labeled(g['tree']):
-        tree_files = [ f for f in files if f.endswith('.treefile') ]
-        txt = 'No IQ-TREE *.treefile file detected. This file is necessary to correctly label internal node names.'
-        assert (len(tree_files)!=0), txt
-        if (len(tree_files)>1):
-            print('Multiple IQ-TREE *.treefile files detected: '+','.join(tree_files))
-            assumed_treefile_name = g['aln_file']+'.treefile'
-            assert assumed_treefile_name in tree_files, 'IQ-TREE *.treefile file was NOT detected: '+assumed_treefile_name
-            print('IQ-TREE *.treefile file was detected: '+assumed_treefile_name)
-            g['node_label_tree_file'] = assumed_treefile_name
-        else:
-            g['node_label_tree_file'] = g['infile_dir']+tree_files[0]
+        g['node_label_tree_file'] = g['iqtree_treefile']
         f = open(g['node_label_tree_file'])
         tree_string = f.readline()
         g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
@@ -35,18 +24,8 @@ def read_treefile(g):
     return g
 
 def read_state(g):
-    state_files = [ f for f in os.listdir(g['infile_dir']) if f.endswith('.state') ]
-    assert (len(state_files)!=0), 'No IQ-TREE *.state file detected.'
-    if (len(state_files)>1):
-        print('Multiple IQ-TREE *.state files were detected:', state_files, flush=True)
-        assumed_state_file_name = g['aln_file']+'.state'
-        assert assumed_state_file_name in state_files, 'IQ-TREE *.state file was NOT found:'+assumed_state_file_name
-        print('IQ-TREE *.state file was found:', assumed_state_file_name)
-        g['state_file'] = assumed_state_file_name
-    else:
-        g['state_file'] = state_files[0]
-    print('Reading the state file:', g['state_file'])
-    state_table = pandas.read_csv(g['infile_dir'] + g['state_file'], sep="\t", index_col=False, header=0, comment='#')
+    print('Reading the state file:', g['iqtree_state'])
+    state_table = pandas.read_csv(g['iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
     g['num_input_site'] = state_table['Site'].unique().shape[0]
     g['num_input_state'] = state_table.shape[1] - 3
     g['input_state'] = state_table.columns[3:].str.replace('p_','').tolist()
@@ -57,12 +36,7 @@ def read_state(g):
     elif g['num_input_state'] > 20:
         g['input_data_type'] = 'cdn'
         g['codon_orders'] = state_table.columns[3:].str.replace('p_','').tolist()
-    if (g['calc_omega'])&(g['input_data_type']=='nuc'):
-        g['state_columns'] = list(itertools.product(numpy.arange(len(g['input_state'])), repeat=3))
-        codon_orders = list(itertools.product(g['input_state'], repeat=3))
-        codon_orders = [ c[0]+c[1]+c[2] for c in codon_orders]
-        g['codon_orders'] = codon_orders
-    if (g['calc_omega'])|(g['input_data_type']=='cdn'):
+    if (g['input_data_type']=='cdn'):
         g['amino_acid_orders'] = sorted(list(set([ c[0] for c in g['codon_table'] if c[0]!='*' ])))
         matrix_groups = dict()
         for aa in list(set(g['amino_acid_orders'])):
@@ -158,8 +132,7 @@ def mask_missing_sites(state_tensor, tree):
 def get_state_tensor(g):
     g['tree'].link_to_alignment(alignment=g['aln_file'], alg_format='fasta')
     num_node = len(list(g['tree'].traverse()))
-    path_state_table = g['infile_dir'] + g['state_file']
-    state_table = pandas.read_csv(path_state_table, sep="\t", index_col=False, header=0, comment='#')
+    state_table = pandas.read_csv(g['iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = numpy.zeros(axis, dtype=numpy.float64)
     for node in g['tree'].traverse():

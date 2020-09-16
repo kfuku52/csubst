@@ -16,6 +16,7 @@
 * [pandas](https://github.com/pandas-dev/pandas)
 * [joblib](https://github.com/joblib/joblib)
 * [cython](https://cython.org/)
+* [pyvolve](https://github.com/sjspielman/pyvolve) (Optional: required for `csubst simulate`)
 
 ## Installation
 ```
@@ -46,23 +47,55 @@ cd ./PGK
 iqtree \
 -s alignment.fa \
 -te tree.nwk \
--m GY+F3X4+R4 \
+-m ECMK07+F3X4+R4 \
 --seqtype CODON1 \
 --threads-max 4 \
 --ancestral \
 --rate
 
-# Run csubst
-csubst \
+# Run csubst analyze
+csubst analyze \
 --ncbi_codon_table 1 \
 --aln_file alignment.fa \
 --tre_file tree.nwk \
---infile_dir ./ \
 --infile_type iqtree \
 --max_arity 2 \
 --nslots 4
 ```
-## Tips
+## Simulation of molecular convergence
+```
+# Run csubst simulate
+csubst analyze \
+--ncbi_codon_table 1 \
+--aln_file alignment.fa \
+--tre_file tree.nwk \
+--infile_type iqtree \
+--foreground foreground.txt \
+--tree_scaling_factor 1
+
+
+
+# Run IQ-TREE for 
+iqtree \
+-s alignment.fa \
+-te tree.nwk \
+-m ECMK07+F3X4+R4 \
+--seqtype CODON1 \
+--threads-max 4 \
+--ancestral \
+--rate
+
+# Run csubst analyze
+csubst analyze \
+--ncbi_codon_table 1 \
+--aln_file alignment.fa \
+--tre_file tree.nwk \
+--infile_type iqtree \
+--max_arity 2 \
+--nslots 4
+
+```
+
 
 ## Licensing
 **csubst** is BSD-licensed (3 clause). See [LICENSE](LICENSE) for details.

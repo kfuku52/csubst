@@ -195,3 +195,6 @@ def plot_state_tree(state, orders, mode, g):
                 node.state = missing_state
         file_name = 'csubst_state_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
         g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
+
+
+

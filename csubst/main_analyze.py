@@ -1,8 +1,8 @@
 import time
 
-from csubst import parser_iqtree
-from csubst import parser_phylobayes
-from csubst.genetic_code import *
+from csubst import parser_misc
+from csubst import genetic_code
+from csubst import foreground
 from csubst.omega import *
 from csubst.param import *
 from csubst.sequence import *
@@ -22,7 +22,7 @@ def get_linear_regression(cb):
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
     end_flag = 0
     g = initialize_df_cb_stats(g)
-    g['df_cb_stats'].loc[:, 'mode'] = mode
+    g['df_cb_stats'].loc[:,'mode'] = mode
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
         print("Making combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
@@ -67,7 +67,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         cb = calc_substitution_patterns(cb)
         cb, g = calc_omega(cb, b, S_tensor, N_tensor, g)
         cb = get_linear_regression(cb)
-        cb, g = get_foreground_branch_num(cb, g)
+        cb, g = foreground.get_foreground_branch_num(cb, g)
         if write_cb:
             file_name = "csubst_cb_" + str(current_arity) + ".tsv"
             cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
@@ -88,37 +88,19 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
     g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
     return g
 
-def csubst_main(g):
+def main_analyze(g):
     start = time.time()
     print("Reading and parsing input files.", flush=True)
     g['current_arity'] = 2
-    g['codon_table'] = get_codon_table(ncbi_id=g['ncbi_codon_table'])
-    if g['infile_type'] == 'phylobayes':
-        g = parser_phylobayes.get_input_information(g)
-        if g['input_data_type'] == 'nuc':
-            state_nuc = parser_phylobayes.get_state_tensor(g)
-            if (g['calc_omega']):
-                state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
-                state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
-        if g['input_data_type'] == 'cdn':
-            state_cdn = parser_phylobayes.get_state_tensor(g)
-            state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
-    elif g['infile_type'] == 'iqtree':
-        g = parser_iqtree.get_input_information(g)
-        if g['input_data_type'] == 'nuc':
-            state_nuc = parser_iqtree.get_state_tensor(g)
-            if (g['calc_omega']):
-                state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
-                state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
-        if g['input_data_type'] == 'cdn':
-            state_cdn = parser_iqtree.get_state_tensor(g)
-            state_pep = cdn2pep_state(state_cdn=state_cdn, g=g)
+    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['ncbi_codon_table'])
+    g = parser_misc.read_input(g)
+    g,state_nuc,state_cdn,state_pep = parser_misc.prep_state(g)
 
     write_alignment(state=state_cdn, orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', mode='codon', g=g)
     write_alignment(state=state_pep, orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', mode='aa', g=g)
 
-    g = get_foreground_branch(g)
-    g = get_marginal_branch(g)
+    g = foreground.get_foreground_branch(g)
+    g = foreground.get_marginal_branch(g)
     g = get_dep_ids(g)
     write_tree(g['tree'])
     plot_branch_category(g)
@@ -187,7 +169,7 @@ def csubst_main(g):
             p = b.loc[:, key].drop_duplicates().values
             print(txt.format(key, b.shape[0], p.shape[0], p.min(), p.max()), flush=True)
         del bS, bN
-        b = annotate_foreground(b, g)
+        b = foreground.annotate_foreground(b, g)
         if (g['b']):
             b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(b.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
@@ -230,9 +212,9 @@ def csubst_main(g):
         if (g['foreground'] is not None)&(g['fg_random']>0):
             for i in numpy.arange(0, g['fg_random']):
                 print('starting foreground randomization round {:,}'.format(i+1), flush=True)
-                g = get_foreground_branch(g)
-                g = randomize_foreground_branch(g)
-                g = get_marginal_branch(g)
+                g = foreground.get_foreground_branch(g)
+                g = foreground.randomize_foreground_branch(g)
+                g = foreground.get_marginal_branch(g)
                 g = cb_search(g, b, S_tensor, N_tensor, mode='randomization_'+str(i+1), write_cb=False)
                 print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
 

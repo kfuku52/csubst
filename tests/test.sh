@@ -19,7 +19,7 @@ csubst \
 --max_arity 2 \
 --nslots ${NSLOTS} \
 --ncbi_codon_table 1 \
---infile_dir ${dir_data}/${tree_name} \
+--phylobayes_dir ${dir_data}/${tree_name} \
 --infile_type iqtree \
 --aln_file ${file_aln} \
 --tre_file ${file_tree} \

@@ -12,131 +12,193 @@ import argparse
 import datetime
 import time
 from distutils.util import strtobool
-from csubst.main import *
+
 from csubst.__init__ import __version__
+from csubst.main_analyze import *
 
-psr = argparse.ArgumentParser()
-
-# Inputs
-psr.add_argument('--ncbi_codon_table', metavar='INTEGER', type=int, required=False, default=1,
-                 help='default=%(default)s: NCBI codon table ID. See here: '
-                      'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
-psr.add_argument('--infile_dir', metavar='PATH', type=str, required=True,
-                 help='default=%(default)s: PATH to the input file directory.')
-psr.add_argument('--infile_type', metavar='[phylobayes|iqtree]', default='iqtree', type=str,
-                 choices=['iqtree', 'phylobayes'],
-                 help='default=%(default)s: The input file format. PhyloBayes input may not work currently.')
-psr.add_argument('--aln_file', metavar='PATH', default='', type=str,
-                 help='default=%(default)s: Alignment fasta file. Specify if csubst cannot find it in the infile_dir.')
-psr.add_argument('--tre_file', metavar='PATH', default='', type=str,
-                 help='default=%(default)s: Rooted newick tree file. Specify if csubst cannot find it in the infile_dir.')
-
-# Foreground specification
-psr.add_argument('--foreground', metavar='PATH', default=None, type=str,
-                 help='default=%(default)s: Foreground taxa for higher-order analysis. '
-                      'The file should contain two columns separated by a tab: '
-                      '1st column for lineage IDs and 2nd for regex-compatible leaf names.')
-psr.add_argument('--fg_exclude_wg', metavar='yes|no', default='yes', type=strtobool,
-                 help='default=%(default)s: Set "yes" to exclude branche combinations within individual foreground lineages.')
-psr.add_argument('--fg_stem_only', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Set "yes" to exclude non-stem branches of foreground lineages.')
-psr.add_argument('--fg_parent', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Include the parent branches of the foreground stem branches. '
-                      'They may serve as "negative controls" relative to the foreground lineages.')
-psr.add_argument('--fg_sister', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Include the sister branches of the foreground stem branches. '
-                      'They may serve as "negative controls" relative to the foreground lineages.')
-psr.add_argument('--fg_sister_stem_only', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Set "yes" to exclude non-stem branches of sister lineages.')
-psr.add_argument('--fg_random', metavar='INT', default=0, type=int,
-                 help='default=%(default)s: Randomly select the same number and size of clades as foreground '
-                      'and run analysis N times. Larger numbers may take time.'
-                 )
-psr.add_argument('--fg_force_exhaustive', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Set "yes" to analyze all branch combinations even with foreground specification.')
-
-# branch combinations
-psr.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
-                 help='default=%(default)s: The maximum combinatorial number of branches. '
-                      'Set 2 for paired substitutions. 3 or larger for higher-order combinations.')
-psr.add_argument('--exclude_sisters', metavar='yes|no', default='yes', type=strtobool,
-                 help='default=%(default)s: Set "yes" to exclude sister branches in branch combination analysis.')
-
-# Thresholds
-psr.add_argument('--ml_anc', metavar='yes|no', default='yes', type=strtobool,
-                 help='default=%(default)s: Maximum-likelihood-like analysis by binarizing ancestral states.')
-psr.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,
-                 help='default=%(default)s: The minimum posterior probability of single substitutions to count. '
-                      'Set 0 for a full Bayesian counting without binarization. Omitted if --ml_anc is set to "yes".')
-psr.add_argument('--target_stat', metavar='[omega_any2spe|omega_any2any|QNany2spe...]', default='omega_any2spe', type=str,
-                 help='default=%(default)s: The statistics used to explore higher-order branch combinations.')
-psr.add_argument('--min_stat', metavar='FLOAT', default=1.0, type=float,
-                 help='default=%(default)s: If a branch combination has a target_stat value greater than this value, '
-                      'higher-order combinations are explored.')
-psr.add_argument('--min_branch_sub', metavar='FLOAT', default=1.0, type=float,
-                 help='default=%(default)s: Minimum substitutions in a branch. '
-                      'Branches < min_branch_sub are excluded from branch combination analyses.')
-psr.add_argument('--min_combinat_sub', metavar='FLOAT', default=1.0, type=float,
-                 help='default=%(default)s: Minimum combinatorial substitutions (Sany2any+Nany2any). '
-                      'Branch combinations < min_combinat_sub are excluded from higher-order analyses.')
-
-# Substitution outputs
-psr.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
-                 help='default=%(default)s: Branch output. Set "yes" to generate the output.')
-psr.add_argument('--s', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Site output. Set "yes" to generate the output.')
-psr.add_argument('--cs', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Combinatorial-site output. Set "yes" to generate the output.')
-psr.add_argument('--cb', metavar='yes|no', default='yes', type=strtobool,
-                 help='default=%(default)s: Combinatorial-branch output. Set "yes" to generate the output.')
-psr.add_argument('--bs', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Branch-site output. 0 or 1. Set "yes" to generate the output.')
-psr.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output.')
-
-# Plot outputs
-psr.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Tree plots with per-site ancestral amino acid states. This option will generate many pdfs')
-psr.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Tree plots with per-site ancestral codon states. This option will generate many pdfs')
-
-# Omega calculation
-psr.add_argument('--calc_omega', metavar='yes|no', default='yes', type=strtobool,
-                 help='default=%(default)s: Calculate omega for convergence rate.')
-psr.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
-                 help='default=%(default)s: Calculate permutation-based quantiles for combinatorial substitutions.')
-psr.add_argument('--omega_method', metavar='[ind|rho|mat]', default='ind', type=str,
-                 choices=['ind','rho','mat'],
-                 help='default=%(default)s: Method to calculate omega. '
-                      '"ind" for substitution-type-based expectation in which '
-                      'all EXany2any, EXspe2any, EXany2spe, and EXspe2spe substitutions are individually calculated.'
-                      '"rho" for a method in which EXany2spe is derived from EXany2any and an estimated parameter rho, '
-                      'which represents any2spe/any2any ratio.'
-                      '"mat" for substitution-matrix-based expectation similar to Zou and Zhang (2015).'
-                 )
-psr.add_argument('--num_subsample', metavar='INTEGER', default=10000, type=int,
-                 help='default=%(default)s: Activated if "--omega_method rho". The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
-psr.add_argument('--cb_stats', metavar='PATH', default=None, type=str,
-                 help='default=%(default)s: Activated if "--omega_method rho". PATH to csubst_cb_stats.tsv. Use precalculated rho parameters in branch combination analysis.')
-psr.add_argument('--cb_subsample', metavar='yes|no', default='yes', type=strtobool,
-                 help='default=%(default)s: Activated if "--omega_method rho". cb subsample output.')
-
-# Among-site rate variation
-psr.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str, choices=['no','pool','sn','each','file'],
-                 help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation.')
-psr.add_argument('--asrv_file', metavar='PATH', default='infer', type=str,
-                 help='default=%(default)s: Precalculated ASRV file. "infer" to automatically detect IQ-TREE\'s *.rate file.')
-
-# Misc
-psr.add_argument('--nslots', metavar='INTEGER', default=1, type=int,
-                 help='default=%(default)s: The number of processors for parallel computations.')
-psr.add_argument('--version', action='version', version='csubst version '+__version__)
-
-args = psr.parse_args()
-g = get_global_parameters(args)
+# Start time
 csubst_start = time.time()
 print('csubst start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
-csubst_main(g)
+
+def command_simulate(args):
+    print('csubst simulate start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    from csubst.main_simulate import main_simulate
+    g = get_global_parameters(args)
+    main_simulate(g)
+    print('csubst simulate: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst simulate end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
+def command_analyze(args):
+    print('csubst analyze start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    from csubst.main_analyze import main_analyze
+    g = get_global_parameters(args)
+    main_analyze(g)
+    print('csubst analyze: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst analyze end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
+def command_help(args):
+    print(parser.parse_args([args.command, '--help']))
+
+# Main parser
+parser = argparse.ArgumentParser(description='csubst - a program for molecular convergence detection')
+parser.add_argument('--version', action='version', version='csubst version ' + __version__)
+subparsers = parser.add_subparsers()
+
+# shared: common
+psr_co = argparse.ArgumentParser(add_help=False)
+psr_co.add_argument('--aln_file', metavar='PATH', default='', type=str,
+                   help='default=%(default)s: Alignment fasta file.')
+psr_co.add_argument('--tre_file', metavar='PATH', default='', type=str,
+                   help='default=%(default)s: Rooted newick tree file.')
+psr_co.add_argument('--ncbi_codon_table', metavar='INTEGER', type=int, required=False, default=1,
+                   help='default=%(default)s: NCBI codon table ID. See here: '
+                        'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
+psr_co.add_argument('--infile_type', metavar='[phylobayes|iqtree]', default='iqtree', type=str,
+                   choices=['iqtree', 'phylobayes'],
+                   help='default=%(default)s: The input file format. PhyloBayes input may not work currently.')
+psr_co.add_argument('--nslots', metavar='INTEGER', default=1, type=int, required=False,
+                   help='default=%(default)s: The number of processors for parallel computations.')
+
+# shared: IQ-TREE inputs
+psr_iq = argparse.ArgumentParser(add_help=False)
+psr_iq.add_argument('--iqtree_treefile', metavar='PATH', default='infer', type=str, required=False,
+                   help='default=%(default)s: PATH to the IQ-TREE\'s .treefile output. "infer" from --aln_file')
+psr_iq.add_argument('--iqtree_state', metavar='PATH', default='infer', type=str, required=False,
+                   help='default=%(default)s: PATH to the IQ-TREE\'s .state output. "infer" from --aln_file')
+psr_iq.add_argument('--iqtree_rate', metavar='PATH', default='infer', type=str, required=False,
+                   help='default=%(default)s: PATH to the IQ-TREE\'s .rate output. "infer" from --aln_file')
+psr_iq.add_argument('--iqtree_iqtree', metavar='PATH', default='infer', type=str, required=False,
+                   help='default=%(default)s: PATH to the IQ-TREE\'s .iqtree output. "infer" from --aln_file')
+
+# shared: PhyloBayes inputs
+psr_pb = argparse.ArgumentParser(add_help=False)
+psr_pb.add_argument('--phylobayes_dir', metavar='PATH', default='./', type=str, required=False,
+                   help='default=%(default)s: PATH to the PhyloBayes output directory.')
+
+# shared: foreground
+psr_fg = argparse.ArgumentParser(add_help=False)
+psr_fg.add_argument('--foreground', metavar='PATH', default=None, type=str, required=False,
+                help='default=%(default)s: Foreground taxa for higher-order analysis. '
+                     'The file should contain two columns separated by a tab: '
+                     '1st column for lineage IDs and 2nd for regex-compatible leaf names.')
+psr_fg.add_argument('--fg_exclude_wg', metavar='yes|no', default='yes', type=strtobool,
+                help='default=%(default)s: Set "yes" to exclude branche combinations within individual foreground lineages.')
+psr_fg.add_argument('--fg_stem_only', metavar='yes|no', default='no', type=strtobool,
+                help='default=%(default)s: Set "yes" to exclude non-stem branches of foreground lineages.')
+psr_fg.add_argument('--fg_parent', metavar='yes|no', default='no', type=strtobool,
+                help='default=%(default)s: Include the parent branches of the foreground stem branches. '
+                     'They may serve as "negative controls" relative to the foreground lineages.')
+psr_fg.add_argument('--fg_sister', metavar='yes|no', default='no', type=strtobool,
+                help='default=%(default)s: Include the sister branches of the foreground stem branches. '
+                     'They may serve as "negative controls" relative to the foreground lineages.')
+psr_fg.add_argument('--fg_sister_stem_only', metavar='yes|no', default='no', type=strtobool,
+                help='default=%(default)s: Set "yes" to exclude non-stem branches of sister lineages.')
+psr_fg.add_argument('--fg_random', metavar='INT', default=0, type=int,
+                help='default=%(default)s: Randomly select the same number and size of clades as foreground '
+                     'and run analysis N times. Larger numbers may take time.')
+
+# simulate
+simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg])
+simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=1, type=float,
+                      help='default=%(default)s: Branch lengths are multiplied by this value.')
+simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random2', type=str,
+                      help='default=%(default)s: Undelimited list of amino acids the sequence converges into. '
+                           'e.g, AQTS, ACQ, WDETS... '
+                      '"randomN" specifies randomly selected N amino acids.')
+simulate.add_argument('--convergence_intensity_factor', metavar='FLOAT', default=1000, type=float,
+                      help='default=%(default)s: Frequencies of the codons encoding the [--convergent_amino_acids] '
+                      'are multiplied by this factor before the mean frequency is rescaled.')
+simulate.set_defaults(handler=command_simulate)
+
+# analyze
+analyze = subparsers.add_parser('analyze', help='see `csubst analyze -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg])
+analyze.set_defaults(handler=command_analyze)
+# Foreground specification
+analyze.add_argument('--fg_force_exhaustive', metavar='yes|no', default='no', type=strtobool,
+                     help='default=%(default)s: Set "yes" to analyze all branch combinations even with foreground specification.')
+# branch combinations
+analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
+                     help='default=%(default)s: The maximum combinatorial number of branches. '
+                          'Set 2 for paired substitutions. 3 or larger for higher-order combinations.')
+analyze.add_argument('--exclude_sisters', metavar='yes|no', default='yes', type=strtobool,
+                     help='default=%(default)s: Set "yes" to exclude sister branches in branch combination analysis.')
+# Thresholds
+analyze.add_argument('--ml_anc', metavar='yes|no', default='yes', type=strtobool,
+                     help='default=%(default)s: Maximum-likelihood-like analysis by binarizing ancestral states.')
+analyze.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,
+                     help='default=%(default)s: The minimum posterior probability of single substitutions to count. '
+                          'Set 0 for a full Bayesian counting without binarization. Omitted if --ml_anc is set to "yes".')
+analyze.add_argument('--target_stat', metavar='[omega_any2spe|omega_any2any|QNany2spe...]', default='omega_any2spe',
+                     type=str,
+                     help='default=%(default)s: The statistics used to explore higher-order branch combinations.')
+analyze.add_argument('--min_stat', metavar='FLOAT', default=1.0, type=float,
+                     help='default=%(default)s: If a branch combination has a target_stat value greater than this value, '
+                          'higher-order combinations are explored.')
+analyze.add_argument('--min_branch_sub', metavar='FLOAT', default=1.0, type=float,
+                     help='default=%(default)s: Minimum substitutions in a branch. '
+                          'Branches < min_branch_sub are excluded from branch combination analyses.')
+analyze.add_argument('--min_combinat_sub', metavar='FLOAT', default=1.0, type=float,
+                     help='default=%(default)s: Minimum combinatorial substitutions (Sany2any+Nany2any). '
+                          'Branch combinations < min_combinat_sub are excluded from higher-order analyses.')
+# Substitution outputs
+analyze.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
+                     help='default=%(default)s: Branch output. Set "yes" to generate the output.')
+analyze.add_argument('--s', metavar='yes|no', default='no', type=strtobool,
+                     help='default=%(default)s: Site output. Set "yes" to generate the output.')
+analyze.add_argument('--cs', metavar='yes|no', default='no', type=strtobool,
+                     help='default=%(default)s: Combinatorial-site output. Set "yes" to generate the output.')
+analyze.add_argument('--cb', metavar='yes|no', default='yes', type=strtobool,
+                     help='default=%(default)s: Combinatorial-branch output. Set "yes" to generate the output.')
+analyze.add_argument('--bs', metavar='yes|no', default='no', type=strtobool,
+                     help='default=%(default)s: Branch-site output. 0 or 1. Set "yes" to generate the output.')
+analyze.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
+                     help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output.')
+# Plot outputs
+analyze.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
+                     help='default=%(default)s: Tree plots with per-site ancestral amino acid states. This option will generate many pdfs')
+analyze.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
+                     help='default=%(default)s: Tree plots with per-site ancestral codon states. This option will generate many pdfs')
+# Omega calculation
+analyze.add_argument('--calc_omega', metavar='yes|no', default='yes', type=strtobool,
+                     help='default=%(default)s: Calculate omega for convergence rate.')
+analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
+                     help='default=%(default)s: Calculate permutation-based quantiles for combinatorial substitutions.')
+analyze.add_argument('--omega_method', metavar='[ind|rho|mat]', default='ind', type=str,
+                     choices=['ind', 'rho', 'mat'],
+                     help='default=%(default)s: Method to calculate omega. '
+                          '"ind" for substitution-type-based expectation in which '
+                          'all EXany2any, EXspe2any, EXany2spe, and EXspe2spe substitutions are individually calculated.'
+                          '"rho" for a method in which EXany2spe is derived from EXany2any and an estimated parameter rho, '
+                          'which represents any2spe/any2any ratio.'
+                          '"mat" for substitution-matrix-based expectation similar to Zou and Zhang (2015).')
+analyze.add_argument('--num_subsample', metavar='INTEGER', default=10000, type=int,
+                     help='default=%(default)s: Activated if "--omega_method rho". The number of combinatorial branch resampling to estimate rho in higher-order analyses.')
+analyze.add_argument('--cb_stats', metavar='PATH', default=None, type=str,
+                     help='default=%(default)s: Activated if "--omega_method rho". PATH to csubst_cb_stats.tsv. Use precalculated rho parameters in branch combination analysis.')
+analyze.add_argument('--cb_subsample', metavar='yes|no', default='yes', type=strtobool,
+                     help='default=%(default)s: Activated if "--omega_method rho". cb subsample output.')
+# Among-site rate variation
+analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
+                     choices=['no', 'pool', 'sn', 'each', 'file'],
+                     help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation.')
+analyze.add_argument('--asrv_file', metavar='PATH', default='infer', type=str,
+                     help='default=%(default)s: Precalculated ASRV file. "infer" to automatically detect IQ-TREE\'s *.rate file.')
+
+# Sub parser: help
+parser_help = subparsers.add_parser('help', help='see `help -h`')
+parser_help.add_argument('command', help='command name which help is shown')
+parser_help.set_defaults(handler=command_help)
+
+# Handler
+args = parser.parse_args()
+if hasattr(args, 'handler'):
+    args.handler(args)
+else:
+    parser.print_help()
+
+# End time
 txt = "\ncsubst completed. Elapsed time = {:,} sec"
 print(txt.format(int(time.time() - csubst_start)), flush=True)
 print('csubst end:', datetime.datetime.now(datetime.timezone.utc), flush=True)

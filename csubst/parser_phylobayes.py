@@ -41,13 +41,13 @@ def get_pp_N(pp_cdn):
     return(pp_N)
 
 def get_input_information(g):
-    files = os.listdir(g['infile_dir'])
+    files = os.listdir(g['phylobayes_dir'])
     sample_labels = [file for file in files if "_sample.labels" in file][0]
-    g['tree'] = ete3.PhyloNode(g['infile_dir'] + sample_labels, format=1)
+    g['tree'] = ete3.PhyloNode(g['phylobayes_dir'] + sample_labels, format=1)
     g['tree'] = add_numerical_node_labels(g['tree'])
     g['num_node'] = len(list(g['tree'].traverse()))
     state_files = [ f for f in files if f.endswith('.ancstatepostprob') ]
-    state_table = pandas.read_csv(g['infile_dir'] + state_files[0], sep="\t", index_col=False, header=0)
+    state_table = pandas.read_csv(g['phylobayes_dir'] + state_files[0], sep="\t", index_col=False, header=0)
     g['num_input_site'] = state_table.shape[0]
     g['num_input_state'] = state_table.shape[1] - 2
     g['input_state'] = state_table.columns[2:].tolist()
@@ -83,7 +83,7 @@ def get_input_information(g):
 
 def get_state_tensor(g):
     num_node = len(list(g['tree'].traverse()))
-    state_files = [ f for f in os.listdir(g['infile_dir']) if f.endswith('.ancstatepostprob') ]
+    state_files = [ f for f in os.listdir(g['phylobayes_dir']) if f.endswith('.ancstatepostprob') ]
     print('The number of character states =', g['num_input_state'])
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = numpy.zeros(axis, dtype=numpy.float64)
@@ -91,7 +91,7 @@ def get_state_tensor(g):
         pp_file = get_node_phylobayes_out(node=node, files=state_files)
         if len(pp_file) == 1:
             pp_file = pp_file[0]
-            state_tensor[node.numerical_label,:,:] = get_pp_nuc(g['infile_dir'], pp_file)
+            state_tensor[node.numerical_label,:,:] = get_pp_nuc(g['phylobayes_dir'], pp_file)
         elif (len(pp_file) > 1)&(not isinstance(pp_file, str)):
             raise Exception('Multiple .ancstatepostprob files for the node.',
                   'node.name =', node.name, 'node.numerical_label =', node.numerical_label,
