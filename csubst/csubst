@@ -101,6 +101,8 @@ psr_fg.add_argument('--fg_random', metavar='INT', default=0, type=int,
 
 # simulate
 simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg])
+simulate.add_argument('--num_simulated_site', metavar='INT', default=0, type=float,
+                      help='default=%(default)s: Number of codon sites to simulate. 0 to set the size of input alignment.')
 simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=1, type=float,
                       help='default=%(default)s: Branch lengths are multiplied by this value.')
 simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random2', type=str,

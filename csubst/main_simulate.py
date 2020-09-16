@@ -93,7 +93,11 @@ def main_simulate(g):
             model = pyvolve.Model(model_type='custom', name=model_name, parameters=cmp2)
         models.append(model)
     del model,model_tmp,cmp,cmp2
-    partition = pyvolve.Partition(models=models, size=g['num_input_site'],  root_model_name='root')
+    if g['num_simulated_site']==0:
+        num_simulated_site = g['num_input_site']
+    else:
+        num_simulated_site = g['num_simulated_site']
+    partition = pyvolve.Partition(models=models, size=num_simulated_site,  root_model_name='root')
     evolver = pyvolve.Evolver(partition=partition, tree=tree)
     evolver(
         ratefile='simulate_ratefile.txt',

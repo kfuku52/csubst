@@ -65,19 +65,19 @@ csubst analyze \
 ## Simulation of molecular convergence
 ```
 # Run csubst simulate
-csubst analyze \
+csubst simulate \
 --ncbi_codon_table 1 \
 --aln_file alignment.fa \
 --tre_file tree.nwk \
 --infile_type iqtree \
 --foreground foreground.txt \
---tree_scaling_factor 1
+--fg_stem_only yes \
+--num_simulated_site 1000 \
+--tree_scaling_factor 5
 
-
-
-# Run IQ-TREE for 
+# Run IQ-TREE
 iqtree \
--s alignment.fa \
+-s simulate.fa \
 -te tree.nwk \
 -m ECMK07+F3X4+R4 \
 --seqtype CODON1 \
@@ -88,10 +88,13 @@ iqtree \
 # Run csubst analyze
 csubst analyze \
 --ncbi_codon_table 1 \
---aln_file alignment.fa \
+--aln_file simulate.fa \
 --tre_file tree.nwk \
 --infile_type iqtree \
 --max_arity 2 \
+--foreground foreground.txt \
+--fg_stem_only yes \
+--fg_force_exhaustive yes \
 --nslots 4
 
 ```
