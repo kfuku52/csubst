@@ -42,27 +42,39 @@ def get_convergent_codons(conv_aa, codon_table):
     conv_cdn = numpy.array(conv_cdn)
     return conv_cdn
 
-def get_convergent_codon_index(g):
+def get_convergent_nonsynonymous_codon_substitution_index(g):
     if g['convergent_amino_acids'].startswith('random'):
-        amino_acids = numpy.array(list(set([ item[0] for item in g['codon_table'] ])))
+        amino_acids = numpy.array(list(set([ item[0] for item in g['codon_table'] if item[0] is not '*' ])))
         num_random_aa = int(g['convergent_amino_acids'].replace('random',''))
-        aa_index = numpy.random.choice(a=numpy.arange(amino_acids.shape[0]), size=num_random_aa)
-        conv_aa = amino_acids[aa_index]
+        aa_index = numpy.random.choice(a=numpy.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
+        conv_aas = amino_acids[aa_index]
     else:
-        conv_aa = numpy.array(list(g['convergent_amino_acids']))
-    print('Convergent amino acids:', conv_aa, flush=True)
-    conv_cdn = get_convergent_codons(conv_aa=conv_aa, codon_table=g['codon_table'])
-    print('Convergent codons:', conv_cdn, flush=True)
+        conv_aas = numpy.array(list(g['convergent_amino_acids']))
     pyvolve_codon_order = get_pyvolve_codon_order()
-    index_bool = numpy.array([ pco in conv_cdn for pco in pyvolve_codon_order ])
-    conv_cdn_index = numpy.argwhere(index_bool==True)
+    num_codon = pyvolve_codon_order.shape[0]
+    row_index = numpy.arange(num_codon)
+    num_conv_codons = 0
+    conv_cdn_index = list()
+    for conv_aa in conv_aas:
+        conv_cdn = get_convergent_codons(conv_aa=conv_aa, codon_table=g['codon_table'])
+        index_bool = numpy.array([ pco in conv_cdn for pco in pyvolve_codon_order ])
+        conv_cdn_index0 = numpy.argwhere(index_bool==True)
+        conv_cdn_index0 = conv_cdn_index0.reshape(conv_cdn_index0.shape[0])
+        conv_cdn_iter = itertools.product(row_index, conv_cdn_index0)
+        conv_cdn_index1 = [ cci for cci in conv_cdn_iter if not ((cci[0] in conv_cdn_index0)&(cci[1] in conv_cdn_index0)) ]
+        conv_cdn_index = conv_cdn_index + conv_cdn_index1
+        num_conv_codons += conv_cdn_index0.shape[0]
+    conv_cdn_index = numpy.array(conv_cdn_index)
+    txt = 'Convergent amino acids = {}; # of codons = {}; # of nonsynonymous codon substitutions = {}/{}'
+    print(txt.format(conv_aas, num_conv_codons, conv_cdn_index.shape[0], num_codon*(num_codon-1)), flush=True)
     return conv_cdn_index
 
 def rescale_substitution_matrix(mat, conv_cdn_index, scaling_factor):
     diag_bool = numpy.eye(mat.shape[0], dtype=bool)
     mat[diag_bool] = 0
     sum_before = mat.sum()
-    mat[:,conv_cdn_index] *= scaling_factor
+    for i in numpy.arange(conv_cdn_index.shape[0]):
+        mat[conv_cdn_index[i,0],conv_cdn_index[i,1]] *= scaling_factor
     sum_after = mat.sum()
     mat = mat / sum_after * sum_before
     mat[diag_bool] = -mat.sum(axis=1)
@@ -73,7 +85,7 @@ def main_simulate(g):
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'])
-    conv_cdn_index = get_convergent_codon_index(g)
+    conv_cdn_index = get_convergent_nonsynonymous_codon_substitution_index(g)
     g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
     newick_txt = get_pyvolve_tree(tree=g['tree'])
     tree = pyvolve.read_tree(tree=newick_txt)
