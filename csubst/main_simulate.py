@@ -89,7 +89,7 @@ def main_simulate(g):
     g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
     newick_txt = get_pyvolve_tree(tree=g['tree'])
     tree = pyvolve.read_tree(tree=newick_txt)
-    cmp = {'omega':g['omega'], 'k_ti':1, 'k_tv':1} # TODO: Read IQ-TREE inputs
+    cmp = {'omega':g['simulated_omega'], 'k_ti':1, 'k_tv':1} # TODO: Read IQ-TREE inputs
     f = pyvolve.ReadFrequencies('codon', file=g['aln_file'])
     sf = f.compute_frequencies()
     model_names = ['root',] + [ 'm'+str(i+1) for i in range(num_fl) ]
@@ -105,7 +105,7 @@ def main_simulate(g):
             model = pyvolve.Model(model_type='custom', name=model_name, parameters=cmp2)
         models.append(model)
     del model,model_tmp,cmp,cmp2
-    if g['num_simulated_site']==0:
+    if g['num_simulated_site']==-1:
         num_simulated_site = g['num_input_site']
     else:
         num_simulated_site = g['num_simulated_site']

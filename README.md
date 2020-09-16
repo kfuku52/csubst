@@ -73,7 +73,8 @@ csubst simulate \
 --foreground foreground.txt \
 --fg_stem_only yes \
 --num_simulated_site 1000 \
---tree_scaling_factor 5
+--simulated_omega 0.1 \
+--tree_scaling_factor 3
 
 # Run IQ-TREE
 iqtree \
@@ -95,6 +96,7 @@ csubst analyze \
 --foreground foreground.txt \
 --fg_stem_only yes \
 --fg_force_exhaustive yes \
+--asrv file \
 --nslots 4
 
 ```
