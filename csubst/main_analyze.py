@@ -103,7 +103,7 @@ def main_analyze(g):
     g = foreground.get_marginal_branch(g)
     g = get_dep_ids(g)
     write_tree(g['tree'])
-    plot_branch_category(g)
+    plot_branch_category(g, file_name='csubst_branch_category.pdf')
     if g['plot_state_aa']:
         plot_state_tree(state=state_pep, orders=g['amino_acid_orders'], mode='aa', g=g)
     if g['plot_state_codon']:

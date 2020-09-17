@@ -163,7 +163,13 @@ def get_foreground_branch(g):
                 dif = len(lineage_fg_id) - num_id
             tmp = numpy.array(lineage_fg_id, dtype=numpy.int)
             g['target_id'] = numpy.concatenate([g['target_id'], tmp])
-        with open('csubst_target_branch.txt', 'w') as f:
+        if g['fg_stem_only']:
+            for node in g['tree'].traverse():
+                if node.numerical_label in g['target_id']:
+                    node.is_foreground = True
+                else:
+                    node.is_foreground = False
+    with open('csubst_target_branch.txt', 'w') as f:
             for x in g['target_id']:
                 f.write(str(x)+'\n')
     g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.

@@ -6,6 +6,7 @@ import re
 from csubst import parser_misc
 from csubst import genetic_code
 from csubst import foreground
+from csubst.tree import plot_branch_category
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
@@ -135,6 +136,7 @@ def main_simulate(g):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['ncbi_codon_table'])
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
+    plot_branch_category(g, file_name='simulate_branch_category.pdf')
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'])
     all_syn_cdn_index = get_synonymous_codon_substitution_index(g)
     all_nsy_cdn_index = get_nonsynonymous_codon_substitution_index(all_syn_cdn_index)
@@ -155,11 +157,11 @@ def main_simulate(g):
             model_tmp = pyvolve.Model(model_type='ECMrest', name=model_name, parameters=cmp, state_freqs=sf)
             mat = model_tmp.matrix
             dnds = get_total_freq(mat, all_nsy_cdn_index) / get_total_freq(mat, all_syn_cdn_index)
-            print('N/S freq before rescaling convergent nonsynonymous changes = {}'.format(dnds))
+            print('N/S freq ratio before rescaling convergent nonsynonymous changes = {}'.format(dnds))
             mat = rescale_substitution_matrix(mat, conv_nsy_cdn_index, all_nsy_cdn_index,
                                               scaling_factor=g['convergence_intensity_factor'])
             dnds = get_total_freq(mat, all_nsy_cdn_index) / get_total_freq(mat, all_syn_cdn_index)
-            print('N/S freq after rescaling convergent nonsynonymous changes = {}'.format(dnds))
+            print('N/S freq ratio after rescaling convergent nonsynonymous changes = {}'.format(dnds))
             cmp2 = {'matrix':mat}
             model = pyvolve.Model(model_type='custom', name=model_name, parameters=cmp2)
         models.append(model)

@@ -137,7 +137,7 @@ def branch_category_layout(node):
     ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
     node.set_style(nstyle)
 
-def plot_branch_category(g):
+def plot_branch_category(g, file_name):
     try:
         from ete3 import TreeStyle
         from ete3 import NodeStyle
@@ -148,7 +148,6 @@ def plot_branch_category(g):
     ts.mode = 'r'
     ts.show_leaf_name = False
     ts.layout_fn = branch_category_layout
-    file_name = 'csubst_branch_category.pdf'
     g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
 
 def branch_state_layout(node):

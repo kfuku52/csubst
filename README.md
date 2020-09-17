@@ -83,7 +83,7 @@ csubst simulate \
 iqtree \
 -s simulate.fa \
 -te tree.nwk \
--m ECMK07+F3X4+R4 \
+-m ECMK07 \
 --seqtype CODON1 \
 --threads-max 4 \
 --ancestral \
