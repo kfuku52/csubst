@@ -107,11 +107,12 @@ simulate.add_argument('--num_simulated_site', metavar='INT', default=-1, type=in
                       help='default=%(default)s: Number of codon sites to simulate. -1 to set the size of input alignment.')
 simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=1, type=float,
                       help='default=%(default)s: Branch lengths are multiplied by this value.')
+# TODO randomN should pick different amino acids in each partitions. Partitions should be introduced
 simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random2', type=str,
                       help='default=%(default)s: Undelimited list of amino acids the sequence converges into. '
                            'e.g, AQTS, ACQ, WDETS... '
                       '"randomN" specifies randomly selected N amino acids.')
-simulate.add_argument('--convergence_intensity_factor', metavar='FLOAT', default=1000, type=float,
+simulate.add_argument('--convergence_intensity_factor', metavar='FLOAT', default=100, type=float,
                       help='default=%(default)s: Frequencies of the codons encoding the [--convergent_amino_acids] '
                       'are multiplied by this factor before the mean frequency is rescaled.')
 simulate.set_defaults(handler=command_simulate)

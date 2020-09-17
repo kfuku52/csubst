@@ -51,7 +51,8 @@ iqtree \
 --seqtype CODON1 \
 --threads-max 4 \
 --ancestral \
---rate
+--rate \
+--redo
 
 # Run csubst analyze
 csubst analyze \
@@ -73,8 +74,10 @@ csubst simulate \
 --foreground foreground.txt \
 --fg_stem_only yes \
 --num_simulated_site 1000 \
+--convergence_intensity_factor 100 \
 --simulated_omega 0.1 \
---tree_scaling_factor 3
+--tree_scaling_factor 5 \
+--convergent_amino_acids L
 
 # Run IQ-TREE
 iqtree \
@@ -84,7 +87,8 @@ iqtree \
 --seqtype CODON1 \
 --threads-max 4 \
 --ancestral \
---rate
+--rate \
+--redo
 
 # Run csubst analyze
 csubst analyze \
@@ -96,7 +100,7 @@ csubst analyze \
 --foreground foreground.txt \
 --fg_stem_only yes \
 --fg_force_exhaustive yes \
---asrv file \
+--asrv no \
 --nslots 4
 
 ```
