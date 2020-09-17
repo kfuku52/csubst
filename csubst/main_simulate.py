@@ -132,46 +132,61 @@ def rescale_substitution_matrix(mat, target_index, all_index, scaling_factor):
     mat[diag_bool] = -mat.sum(axis=1)
     return mat
 
+def get_num_partition_site(g):
+    if g['num_simulated_site']==-1:
+        num_simulated_site = g['num_input_site']
+    else:
+        num_simulated_site = g['num_simulated_site']
+    min_partition_site = int(num_simulated_site/g['num_partition'])
+    num_partition_sites = numpy.repeat(min_partition_site, g['num_partition'])
+    remaining = num_simulated_site - num_partition_sites.sum()
+    while (remaining>0):
+        for i in numpy.arange(num_partition_sites.shape[0]):
+            num_partition_sites[i] += 1
+            remaining -= 1
+            if remaining==0:
+                break
+    return num_partition_sites
+
 def main_simulate(g):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['ncbi_codon_table'])
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
     plot_branch_category(g, file_name='simulate_branch_category.pdf')
+    num_partition_sites = get_num_partition_site(g)
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'])
     all_syn_cdn_index = get_synonymous_codon_substitution_index(g)
     all_nsy_cdn_index = get_nonsynonymous_codon_substitution_index(all_syn_cdn_index)
-    conv_nsy_cdn_index = get_convergent_nsyonymous_codon_substitution_index(g)
-    #cdn_index = numpy.concatenate(conv_nsy_cdn_index, all_syn_cdn_index) # Rescale both to maintain dN/dS
     g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
     newick_txt = get_pyvolve_tree(tree=g['tree'])
     tree = pyvolve.read_tree(tree=newick_txt)
-    cmp = {'omega':g['simulated_omega'], 'k_ti':1, 'k_tv':1} # TODO: Read IQ-TREE inputs
     f = pyvolve.ReadFrequencies('codon', file=g['aln_file'])
     sf = f.compute_frequencies()
     model_names = ['root',] + [ 'm'+str(i+1) for i in range(num_fl) ]
-    models = list()
-    for model_name in model_names:
-        if (model_name=='root'):
-            model = pyvolve.Model(model_type='ECMrest', name=model_name, parameters=cmp, state_freqs=sf)
-        else:
-            model_tmp = pyvolve.Model(model_type='ECMrest', name=model_name, parameters=cmp, state_freqs=sf)
-            mat = model_tmp.matrix
-            dnds = get_total_freq(mat, all_nsy_cdn_index) / get_total_freq(mat, all_syn_cdn_index)
-            print('N/S freq ratio before rescaling convergent nonsynonymous changes = {}'.format(dnds))
-            mat = rescale_substitution_matrix(mat, conv_nsy_cdn_index, all_nsy_cdn_index,
-                                              scaling_factor=g['convergence_intensity_factor'])
-            dnds = get_total_freq(mat, all_nsy_cdn_index) / get_total_freq(mat, all_syn_cdn_index)
-            print('N/S freq ratio after rescaling convergent nonsynonymous changes = {}'.format(dnds))
-            cmp2 = {'matrix':mat}
-            model = pyvolve.Model(model_type='custom', name=model_name, parameters=cmp2)
-        models.append(model)
-    del model,model_tmp,cmp,cmp2
-    if g['num_simulated_site']==-1:
-        num_simulated_site = g['num_input_site']
-    else:
-        num_simulated_site = g['num_simulated_site']
-    partition = pyvolve.Partition(models=models, size=num_simulated_site,  root_model_name='root')
-    evolver = pyvolve.Evolver(partition=partition, tree=tree)
+    partitions = list()
+    for partition_index in numpy.arange(g['num_partition']):
+        conv_nsy_cdn_index = get_convergent_nsyonymous_codon_substitution_index(g)
+        cmp = {'omega':g['simulated_omega'], 'k_ti':1, 'k_tv':1} # TODO: Read IQ-TREE inputs
+        models = list()
+        for model_name in model_names:
+            if (model_name=='root'):
+                model = pyvolve.Model(model_type='ECMrest', name=model_name, parameters=cmp, state_freqs=sf)
+            else:
+                model_tmp = pyvolve.Model(model_type='ECMrest', name=model_name, parameters=cmp, state_freqs=sf)
+                mat = model_tmp.matrix
+                dnds = get_total_freq(mat, all_nsy_cdn_index) / get_total_freq(mat, all_syn_cdn_index)
+                print('N/S freq ratio before rescaling convergent nonsynonymous changes = {}'.format(dnds))
+                mat = rescale_substitution_matrix(mat, conv_nsy_cdn_index, all_nsy_cdn_index,
+                                                  scaling_factor=g['convergence_intensity_factor'])
+                dnds = get_total_freq(mat, all_nsy_cdn_index) / get_total_freq(mat, all_syn_cdn_index)
+                print('N/S freq ratio after rescaling convergent nonsynonymous changes = {}'.format(dnds))
+                cmp2 = {'matrix':mat}
+                model = pyvolve.Model(model_type='custom', name=model_name, parameters=cmp2)
+            models.append(model)
+        del model,model_tmp,cmp,cmp2
+        partition = pyvolve.Partition(models=models, size=num_partition_sites[partition_index],  root_model_name='root')
+        partitions.append(partition)
+    evolver = pyvolve.Evolver(partitions=partitions, tree=tree)
     evolver(
         ratefile='simulate_ratefile.txt',
         infofile='simulate_infofile.txt',

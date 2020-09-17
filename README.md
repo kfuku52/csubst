@@ -77,7 +77,8 @@ csubst simulate \
 --convergence_intensity_factor 100 \
 --simulated_omega 0.1 \
 --tree_scaling_factor 5 \
---convergent_amino_acids L
+--convergent_amino_acids random1 \
+--num_partition 20
 
 # Run IQ-TREE
 iqtree \
@@ -100,7 +101,7 @@ csubst analyze \
 --foreground foreground.txt \
 --fg_stem_only yes \
 --fg_force_exhaustive yes \
---asrv no \
+--asrv each \
 --nslots 4
 
 ```

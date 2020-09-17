@@ -105,6 +105,9 @@ simulate.add_argument('--simulated_omega', metavar='FLOAT', default=0.1, type=fl
                       help='default=%(default)s: Nonsynonymous/synonymous substitution rate ratio  for simulation.')
 simulate.add_argument('--num_simulated_site', metavar='INT', default=-1, type=int,
                       help='default=%(default)s: Number of codon sites to simulate. -1 to set the size of input alignment.')
+simulate.add_argument('--num_partition', metavar='INT', default=1, type=int,
+                      help='default=%(default)s: Number of partitions to simulate. '
+                           'If --convergent_amino_acids randomN, Convergent amino acids are randomly selected within each partition. ')
 simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=1, type=float,
                       help='default=%(default)s: Branch lengths are multiplied by this value.')
 # TODO randomN should pick different amino acids in each partitions. Partitions should be introduced

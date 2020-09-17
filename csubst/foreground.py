@@ -169,6 +169,7 @@ def get_foreground_branch(g):
                     node.is_foreground = True
                 else:
                     node.is_foreground = False
+                    node.color = 'black'
     with open('csubst_target_branch.txt', 'w') as f:
             for x in g['target_id']:
                 f.write(str(x)+'\n')
