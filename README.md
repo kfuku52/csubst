@@ -78,7 +78,7 @@ csubst simulate \
 --background_omega 0.1 \
 --foreground_omega 0.1 \
 --tree_scaling_factor 5 \
---convergent_amino_acids random0 \
+--convergent_amino_acids random1 \
 --num_partition 100
 
 # Run IQ-TREE
@@ -87,7 +87,7 @@ iqtree \
 -te tree.nwk \
 -m ECMK07 \
 --seqtype CODON1 \
---threads-max 8 \
+--threads-max 4 \
 --ancestral \
 --rate \
 --redo
@@ -103,7 +103,7 @@ csubst analyze \
 --fg_stem_only yes \
 --fg_force_exhaustive yes \
 --asrv each \
---nslots 8
+--nslots 4
 
 ```
 

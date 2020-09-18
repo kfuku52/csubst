@@ -182,10 +182,10 @@ def get_input_information(g):
     g = read_state(g)
     g = read_iqtree(g)
     g = read_log(g)
-    if False: # TODO
-        if (g['omega_method']=='mat'):
-            from csubst.parser_misc import read_substitution_matrix
-            file_path = '../substitution_matrix/ECMunrest.dat'
-            smat = read_substitution_matrix(file=file_path)
-            g['substitution_matrix'] = smat
+    if (g['omega_method']=='mat'):
+        from csubst import parser_misc
+        file_path = '../substitution_matrix/ECMunrest.dat'
+        g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(file=file_path)
+        g['exchangeability_codon_order'] = parser_misc.get_exchangeability_codon_order()
+        g['exchangeability_eq_freq'] = parser_misc.get_exchangeability_eq_freq(file=file_path)
     return g

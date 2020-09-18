@@ -14,9 +14,9 @@ def read_input(g):
         g = parser_iqtree.read_log(g)
         if False: # TODO
             if (g['omega_method']=='mat'):
-                from csubst.parser_misc import read_substitution_matrix
+                from csubst.parser_misc import read_exchangeability_matrix
                 file_path = '../substitution_matrix/ECMunrest.dat'
-                smat = read_substitution_matrix(file=file_path)
+                smat = read_exchangeability_matrix(file=file_path)
                 g['substitution_matrix'] = smat
     return g
 
@@ -47,19 +47,23 @@ def prep_state(g):
     return g,state_nuc,state_cdn,state_pep
 
 
-def read_substitution_matrix(file):
+def read_exchangeability_matrix(file):
     import pkg_resources
     txt = pkg_resources.resource_string(__name__, file)
-    arr = numpy.fromstring(txt, sep=' ')
-    if (arr.shape[0]==1891): # for codon substitution matrix
-        num_state = 61
-    else:
-        raise Error('This is not a codon substitution matrix.')
-    sub_matrix = numpy.zeros(shape=(num_state,num_state))
-    ind = numpy.tril_indices_from(sub_matrix, k=0)
-    sub_matrix[ind] = arr
-    #sub_matrix += sub_matrix.T
-    codon_order = [
+    txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
+    txt_mat = txt[0:60]
+    txt_mat = ''.join(txt_mat).split(' ')
+    arr = numpy.array([ float(s) for s in txt_mat if s!='' ], dtype=float)
+    assert (arr.shape[0]==1830), 'This is not a codon substitution matrix.'
+    num_state = 61
+    mat_exchangeability = numpy.zeros(shape=(num_state,num_state))
+    ind = numpy.tril_indices_from(mat_exchangeability, k=-1)
+    mat_exchangeability[ind] = arr
+    mat_exchangeability += mat_exchangeability.T
+    return mat_exchangeability
+
+def get_exchangeability_codon_order():
+    exchangeability_codon_order = [
         'TTT', 'TTC', 'TTA', 'TTG', 'TCT', 'TCC', 'TCA', 'TCG',
         'TAT', 'TAC', 'TGT', 'TGC', 'TGG', 'CTT', 'CTC', 'CTA',
         'CTG', 'CCT', 'CCC', 'CCA', 'CCG', 'CAT', 'CAC', 'CAA',
@@ -67,7 +71,16 @@ def read_substitution_matrix(file):
         'ATG', 'ACT', 'ACC', 'ACA', 'ACG', 'AAT', 'AAC', 'AAA',
         'AAG', 'AGT', 'AGC', 'AGA', 'AGG', 'GTT', 'GTC', 'GTA',
         'GTG', 'GCT', 'GCC', 'GCA', 'GCG', 'GAT', 'GAC', 'GAA',
-        'GAG', 'GGT', 'GGC', 'GGA', 'GGG'
+        'GAG', 'GGT', 'GGC', 'GGA', 'GGG',
     ]
+    exchangeability_codon_order = numpy.array(exchangeability_codon_order)
+    return exchangeability_codon_order
 
-    return sub_matrix
+def get_exchangeability_eq_freq(file):
+    import pkg_resources
+    txt = pkg_resources.resource_string(__name__, file)
+    txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
+    freqs = txt[61].split(' ')
+    freqs = numpy.array([ float(s) for s in freqs if s!='' ], dtype=float)
+    assert freqs.shape[0]==61, 'Number of equilibrium frequencies ({}) should be 61.'.format(freqs.shape[0])
+    return freqs
