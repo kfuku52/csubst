@@ -101,8 +101,10 @@ psr_fg.add_argument('--fg_random', metavar='INT', default=0, type=int,
 
 # simulate
 simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg])
-simulate.add_argument('--simulated_omega', metavar='FLOAT', default=0.1, type=float,
-                      help='default=%(default)s: Nonsynonymous/synonymous substitution rate ratio  for simulation.')
+simulate.add_argument('--background_omega', metavar='FLOAT', default=0.1, type=float,
+                      help='default=%(default)s: dN/dS for background branches.')
+simulate.add_argument('--foreground_omega', metavar='FLOAT', default=0.1, type=float,
+                      help='default=%(default)s: dN/dS for foreground branches.')
 simulate.add_argument('--num_simulated_site', metavar='INT', default=-1, type=int,
                       help='default=%(default)s: Number of codon sites to simulate. -1 to set the size of input alignment.')
 simulate.add_argument('--num_partition', metavar='INT', default=1, type=int,

@@ -73,12 +73,13 @@ csubst simulate \
 --infile_type iqtree \
 --foreground foreground.txt \
 --fg_stem_only yes \
---num_simulated_site 1000 \
+--num_simulated_site 5000 \
 --convergence_intensity_factor 100 \
---simulated_omega 0.1 \
+--background_omega 0.1 \
+--foreground_omega 0.1 \
 --tree_scaling_factor 5 \
---convergent_amino_acids random1 \
---num_partition 20
+--convergent_amino_acids random0 \
+--num_partition 100
 
 # Run IQ-TREE
 iqtree \
@@ -86,7 +87,7 @@ iqtree \
 -te tree.nwk \
 -m ECMK07 \
 --seqtype CODON1 \
---threads-max 4 \
+--threads-max 8 \
 --ancestral \
 --rate \
 --redo
@@ -102,7 +103,7 @@ csubst analyze \
 --fg_stem_only yes \
 --fg_force_exhaustive yes \
 --asrv each \
---nslots 4
+--nslots 8
 
 ```
 
