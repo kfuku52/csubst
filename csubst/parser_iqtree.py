@@ -2,7 +2,6 @@ import os
 import re
 import ete3
 import pandas
-import itertools
 from csubst.tree import *
 from csubst.genetic_code import ambiguous_table
 
@@ -35,7 +34,7 @@ def read_state(g):
         g['input_data_type'] = 'pep'
     elif g['num_input_state'] > 20:
         g['input_data_type'] = 'cdn'
-        g['codon_orders'] = state_table.columns[3:].str.replace('p_','').tolist()
+        g['codon_orders'] = state_table.columns[3:].str.replace('p_','').values
     if (g['input_data_type']=='cdn'):
         g['amino_acid_orders'] = sorted(list(set([ c[0] for c in g['codon_table'] if c[0]!='*' ])))
         matrix_groups = dict()
@@ -81,7 +80,8 @@ def read_iqtree(g):
     pi = pandas.DataFrame(index=g['codon_orders'], columns=['freq',])
     for m in re.finditer(r'  pi\(([A-Z]+)\) = ([0-9.]+)', txt, re.MULTILINE):
         pi.at[m.group(1),'freq'] = float(m.group(2))
-    g['equilibrium_frequency'] = pi
+    g['equilibrium_frequency'] = pi.loc[:,'freq'].values
+    g['equilibrium_frequency'] /= g['equilibrium_frequency'].sum()
     return g
 
 def read_log(g):
@@ -101,6 +101,7 @@ def read_log(g):
     return g
 
 def get_state_index(state, input_state, ambiguous_table):
+    #input_state = pandas.Series(input_state)
     if isinstance(state, str):
         states = [state,]
     else:
@@ -111,7 +112,7 @@ def get_state_index(state, input_state, ambiguous_table):
         for amb in ambiguous_table.keys():
             vals = ambiguous_table[amb]
             states = [ s.replace(amb, val) for s in states for val in vals ]
-    state_index = [ input_state.index(s) for s in states ]
+    state_index = [ int(numpy.where(input_state==s)[0]) for s in states ]
     return state_index
 
 def mask_missing_sites(state_tensor, tree):
@@ -182,10 +183,4 @@ def get_input_information(g):
     g = read_state(g)
     g = read_iqtree(g)
     g = read_log(g)
-    if (g['omega_method']=='mat'):
-        from csubst import parser_misc
-        file_path = '../substitution_matrix/ECMunrest.dat'
-        g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(file=file_path)
-        g['exchangeability_codon_order'] = parser_misc.get_exchangeability_codon_order()
-        g['exchangeability_eq_freq'] = parser_misc.get_exchangeability_eq_freq(file=file_path)
     return g
