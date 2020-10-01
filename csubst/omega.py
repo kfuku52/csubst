@@ -3,9 +3,9 @@ from csubst.combination import *
 from csubst.omega_cy import *
 
 def get_Econv_unif_permutation(cb, sub_tensor):
-    num_site = sub_tensor.shape[2]
+    num_site = sub_tensor.shape[1]
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-    sub_bad = sub_tensor.sum(axis=2)  # branch, matrix_group, ancestral_state, derived_state
+    sub_bad = sub_tensor.sum(axis=1)  # branch, matrix_group, ancestral_state, derived_state
     E_conv_b = 0
     for sg in numpy.arange(sub_bad.shape[1]):
         for a in numpy.arange(sub_bad.shape[2]):
@@ -78,22 +78,22 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_co
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g={}):
     sub_tensor = numpy.nan_to_num(sub_tensor)
     if mode=='spe2spe':
-        sub_bad = sub_tensor.sum(axis=2)  # branch, matrix_group, ancestral_state, derived_state
+        sub_bad = sub_tensor.sum(axis=1)  # branch, matrix_group, ancestral_state, derived_state
         ancestral_states = numpy.arange(sub_bad.shape[2])
         derived_states = numpy.arange(sub_bad.shape[3])
         sub_sad = sub_tensor.sum(axis=0)
     elif mode=='spe2any':
-        sub_bad = sub_tensor.sum(axis=(2, 4))  # branch, matrix_group, ancestral_state
+        sub_bad = sub_tensor.sum(axis=(1, 4))  # branch, matrix_group, ancestral_state
         ancestral_states = numpy.arange(sub_bad.shape[2])
         derived_states = ['2any',] # dummy
         sub_sad = sub_tensor.sum(axis=(0, 4))
     elif mode=='any2spe':
-        sub_bad = sub_tensor.sum(axis=(2, 3))  # branch, matrix_group, derived_state
+        sub_bad = sub_tensor.sum(axis=(1, 3))  # branch, matrix_group, derived_state
         ancestral_states = ['any2',] # dummy
         derived_states = numpy.arange(sub_bad.shape[2])
         sub_sad = sub_tensor.sum(axis=(0, 3))
     elif mode=='any2any':
-        sub_bad = sub_tensor.sum(axis=(2, 3, 4))  # branch, matrix_group
+        sub_bad = sub_tensor.sum(axis=(1, 3, 4))  # branch, matrix_group
         ancestral_states = ['any2',] # dummy
         derived_states = ['2any',] # dummy
         sub_sad = sub_tensor.sum(axis=(0, 3, 4))

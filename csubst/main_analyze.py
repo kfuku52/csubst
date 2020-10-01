@@ -121,7 +121,7 @@ def main_analyze(g):
     S_total = numpy.nan_to_num(S_tensor).sum(axis=(0, 1, 2, 3, 4))
     N_total = numpy.nan_to_num(N_tensor).sum(axis=(0, 1, 2, 3, 4))
     num_branch = g['num_node'] - 1
-    num_site = S_tensor.shape[2]
+    num_site = S_tensor.shape[1]
     print('Synonymous substitutions / tree = {:,}'.format(S_total), flush=True)
     print('Nonsynonymous substitutions / tree = {:,}'.format(N_total), flush=True)
     print('Synonymous substitutions / branch =', S_total / num_branch, flush=True)
