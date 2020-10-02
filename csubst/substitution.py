@@ -6,13 +6,14 @@ import os
 from csubst.table import *
 from csubst.parallel import *
 
-def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
+def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None):
+    if dtype is None:
+        dtype = state_tensor.dtype
     num_branch = state_tensor.shape[0]
     num_site = state_tensor.shape[1]
     if mode=='asis':
         num_syngroup = 1
         num_state = state_tensor.shape[2]
-        diag_zero = numpy.diag([-1] * num_state) + 1
     elif mode=='syn':
         num_syngroup = len(g['amino_acid_orders'])
         num_state = g['max_synonymous_size']
@@ -21,9 +22,16 @@ def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
     if os.path.exists(mmap_tensor): os.unlink(mmap_tensor)
     txt = 'Memory map is generated. dtype={}, axis={}, path={}'
     print(txt.format(state_tensor.dtype, axis, mmap_tensor), flush=True)
-    sub_tensor = numpy.memmap(mmap_tensor, dtype=state_tensor.dtype, shape=axis, mode='w+')
+    sub_tensor = numpy.memmap(mmap_tensor, dtype=dtype, shape=axis, mode='w+')
+    return sub_tensor
+
+def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
+    sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
     if (g['ml_anc']=='no'):
         sub_tensor[:,:,:,:,:] = numpy.nan
+    if mode=='asis':
+        num_state = state_tensor.shape[2]
+        diag_zero = numpy.diag([-1] * num_state) + 1
     for node in g['tree'].traverse():
         if not node.is_root():
             child = node.numerical_label
@@ -228,7 +236,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
         sub_sites = sS['S_sub'].values + sN['N_sub'].values
     elif (g['asrv']=='file'):
         from csubst.parser_iqtree import read_rate
-        sub_sites = read_rate(g)
+        sub_sites = g['iqtree_rate_values']
     if (g['asrv']=='sn'):
         for SN,df in zip(['S','N'],[sS,sN]):
             g['sub_sites'][SN] = numpy.zeros(shape=[num_branch, num_site], dtype=numpy.float64)

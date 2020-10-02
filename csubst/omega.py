@@ -1,3 +1,4 @@
+import os
 from csubst.substitution import *
 from csubst.combination import *
 from csubst.omega_cy import *
@@ -148,8 +149,19 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['ENany2dif'] = cb['ENany2any'] - cb['ENany2spe']
         cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
     elif g['omega_method']=='mat':
-        print('hogehoge')
-
+        id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
+        SE_tensor = get_exp_tensor(g['state_cdn'], g['rate_syn_tensor'], g)
+        print('Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'.format(SE_tensor.sum()))
+        cbSE = get_cb(cb.loc[:,id_cols], SE_tensor, g, 'S')
+        os.remove([f for f in os.listdir() if f.startswith('tmp.csubst.SE')][0])
+        cb = merge_tables(cb, cbSE)
+        del cbSE
+        NE_tensor = get_exp_tensor(g['state_pep'], g['rate_aa_tensor'], g)
+        print('Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'.format(NE_tensor.sum()))
+        cbNE = get_cb(cb.loc[:,id_cols], NE_tensor, g, 'N')
+        os.remove([f for f in os.listdir() if f.startswith('tmp.csubst.NE')][0])
+        cb = merge_tables(cb, cbNE)
+        del cbNE
     if g['calc_quantile']:
         cb['QNany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='quantile', SN='N', g=g)
         cb['QSany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', stat='quantile', SN='S', g=g)
@@ -160,6 +172,50 @@ def get_E(cb, g, N_tensor, S_tensor):
         #cb['QNspe2spe'] = calc_E_stat(cb, N_tensor, mode='spe2spe', stat='quantile', SN='N', g=g)
         #cb['QSspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', stat='quantile', SN='S', g=g)
     return cb
+
+def get_exp_tensor(state_tensor, rate_tensor, g):
+    if rate_tensor.shape[0]==1:
+        mode = 'asis'
+        mmap_attr = 'NE'
+    else:
+        mode = 'syn'
+        mmap_attr = 'SE'
+    exp_tensor = initialize_substitution_tensor(state_tensor, mode=mode, g=g, mmap_attr=mmap_attr, dtype=rate_tensor.dtype)
+    for node in g['tree'].traverse():
+        if node.is_root():
+            continue
+        branch_length = node.dist
+        nl = node.numerical_label
+        parent_nl = node.up.numerical_label
+        if parent_nl>exp_tensor.shape[0]:
+            continue
+        exp_tensor[nl,:,:,:,:] = get_exp_1234(state_tensor[parent_nl,:,:], branch_length, rate_tensor, mode, g)
+    return exp_tensor
+
+def get_exp_1234(state_branch, branch_length, rate_tensor, mode, g):
+    num_s = state_branch.shape[0]
+    num_g = rate_tensor.shape[0]
+    num_state = rate_tensor.shape[1]
+    sub_sgad = numpy.zeros(shape=(num_s,num_g,num_state,num_state))
+    diag_zero = numpy.diag([-1] * num_state) + 1
+    sgad_ones = numpy.ones(shape=(num_s,num_g,num_state,num_state))
+    rate_tensor_sites = numpy.einsum('sgad,gad,ad->sgad', sgad_ones, rate_tensor, diag_zero)
+    exponential_factors = numpy.einsum("sgad,s->sgad", sgad_ones, g['iqtree_rate_values'])
+    exponential_factors *= branch_length
+    rate_tensor_sites **= exponential_factors
+    if mode=='asis':
+        sub_sgad[:,0,:,:] = numpy.einsum("sa,sad->sad", state_branch, rate_tensor_sites[:,0,:,:]) # s=site, a=ancestral, d=derived
+    elif mode=='syn':
+        for s,aa in enumerate(g['amino_acid_orders']):
+            ind = numpy.array(g['synonymous_indices'][aa])
+            size = len(ind)
+            state_aa_tmp = state_branch[:,ind]
+            state_aa = numpy.zeros(shape=(num_s,num_state))
+            state_aa[:,:size] = state_aa_tmp
+            exp_sad = numpy.einsum("sa,sad->sad", state_aa, rate_tensor_sites[:,s,:,:])
+            sub_sgad[:,s,:,:] = exp_sad
+    return sub_sgad
+
 
 def get_omega(cb):
     cb.loc[:,'omega_any2any'] = (cb.loc[:,'Nany2any'] / cb.loc[:,'ENany2any']) / (cb.loc[:,'Sany2any'] / cb.loc[:,'ESany2any'])

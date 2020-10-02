@@ -11,6 +11,7 @@ def read_treefile(g):
     g['tree'] = standardize_node_names(g['tree'])
     g['tree'] = add_numerical_node_labels(g['tree'])
     g['num_node'] = len(list(g['tree'].traverse()))
+    g['iqtree_rate_values'] = read_rate(g)
     if not is_internal_node_labeled(g['tree']):
         g['node_label_tree_file'] = g['iqtree_treefile']
         f = open(g['node_label_tree_file'])

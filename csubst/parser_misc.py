@@ -30,7 +30,6 @@ def get_rate_tensor(inst, mode, g):
         inst2 = numpy.copy(inst)
         numpy.fill_diagonal(inst2, 0)
         rate_tensor = numpy.expand_dims(inst2, axis=0)
-        return rate_tensor
     elif mode=='syn':
         num_syngroup = len(g['amino_acid_orders'])
         num_state = g['max_synonymous_size']
@@ -41,7 +40,8 @@ def get_rate_tensor(inst, mode, g):
             ind_tensor = numpy.arange(len(ind_cdn))
             for it1,it2 in itertools.permutations(ind_tensor, 2):
                 rate_tensor[s,it1,it2] = inst[ind_cdn[it1],ind_cdn[it2]]
-        return rate_tensor
+    rate_tensor = rate_tensor.astype(numpy.float64)
+    return rate_tensor
 
 def cdn2pep_matrix(inst_cdn, g):
     num_pep_state = len(g['amino_acid_orders'])

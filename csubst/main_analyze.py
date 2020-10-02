@@ -94,10 +94,10 @@ def main_analyze(g):
     g['current_arity'] = 2
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['ncbi_codon_table'])
     g = parser_misc.read_input(g)
-    g,state_nuc,state_cdn,state_pep = parser_misc.prep_state(g)
+    g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
 
-    write_alignment(state=state_cdn, orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', mode='codon', g=g)
-    write_alignment(state=state_pep, orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', mode='aa', g=g)
+    write_alignment(state=g['state_cdn'], orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', mode='codon', g=g)
+    write_alignment(state=g['state_pep'], orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', mode='aa', g=g)
 
     g = foreground.get_foreground_branch(g)
     g = foreground.get_marginal_branch(g)
@@ -105,14 +105,14 @@ def main_analyze(g):
     write_tree(g['tree'])
     plot_branch_category(g, file_name='csubst_branch_category.pdf')
     if g['plot_state_aa']:
-        plot_state_tree(state=state_pep, orders=g['amino_acid_orders'], mode='aa', g=g)
+        plot_state_tree(state=g['state_pep'], orders=g['amino_acid_orders'], mode='aa', g=g)
     if g['plot_state_codon']:
-        plot_state_tree(state=state_cdn, orders=g['codon_orders'], mode='codon', g=g)
+        plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)
 
-    N_tensor = get_substitution_tensor(state_tensor=state_pep, mode='asis', g=g, mmap_attr='N')
+    N_tensor = get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()
     if (g['calc_omega']):
-        S_tensor = get_substitution_tensor(state_tensor=state_cdn, mode='syn', g=g, mmap_attr='S')
+        S_tensor = get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
         sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
 
@@ -148,7 +148,7 @@ def main_analyze(g):
         sS = get_s(S_tensor, attr='S')
         sN = get_s(N_tensor, attr='N')
         s = merge_tables(sS, sN)
-        g = get_sub_sites(g, sS, sN, state_tensor=state_cdn)
+        g = get_sub_sites(g, sS, sN, state_tensor=g['state_cdn'])
         del sS, sN
         if (g['s']):
             s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
@@ -156,7 +156,9 @@ def main_analyze(g):
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 
-    del state_cdn, state_pep
+    if g['omega_method']!='mat':
+        g['state_cdn'] = None
+        g['state_pep'] = None
 
     if (g['b']) | (g['cb']):
         start = time.time()
