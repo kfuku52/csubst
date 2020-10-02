@@ -166,12 +166,16 @@ def main_analyze(g):
         bS = get_b(g, S_tensor, attr='S')
         bN = get_b(g, N_tensor, attr='N')
         b = merge_tables(bS, bN)
+        b.loc[:,'branch_length'] = numpy.nan
+        for node in g['tree'].traverse():
+            b.loc[node.numerical_label,'branch_length'] = node.dist
         txt = 'Number of {} patterns among {:,} branches={:,}, min={:,}, max={:,}'
         for key in ['S_sub', 'N_sub']:
             p = b.loc[:, key].drop_duplicates().values
             print(txt.format(key, b.shape[0], p.shape[0], p.min(), p.max()), flush=True)
         del bS, bN
         b = foreground.annotate_foreground(b, g)
+        g['branch_table'] = b
         if (g['b']):
             b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
         print(b.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)

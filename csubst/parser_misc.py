@@ -15,8 +15,8 @@ def read_input(g):
         g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=file_path, g=g)
         g['instantaneous_codon_rate_matrix'] = get_instantaneous_rate_matrix(g=g)
         g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
-        g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
         g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
+        g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
         sum_tensor_aa = g['rate_aa_tensor'].sum()
         sum_tensor_syn = g['rate_syn_tensor'].sum()
         sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
@@ -68,7 +68,7 @@ def cdn2pep_matrix(inst_cdn, g):
 def get_instantaneous_rate_matrix(g):
     ex = g['exchangeability_matrix']
     eq = get_equilibrium_frequency(g, mode='cdn')
-    inst = ex.dot(numpy.diag(eq))
+    inst = ex.dot(numpy.diag(eq)).astype(numpy.float64)
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     inst = scale_instantaneous_rate_matrix(inst, eq)
     return inst
@@ -98,8 +98,10 @@ def fill_instantaneous_rate_matrix_diagonal(inst):
     return inst
 
 def scale_instantaneous_rate_matrix(inst, eq):
-    scaling_factor = -(numpy.diag(inst) * eq).sum()
-    inst /= scaling_factor # Scaling to branch lengths (fixing −Σi πi qii = 1)
+    # scaling to satisfy Sum_i Sum_j!=i pi_i*q_ij, equals 1.
+    q_ijxpi_i = numpy.einsum('ad,a->ad', inst, eq)
+    scaling_factor = q_ijxpi_i.sum()-numpy.diag(q_ijxpi_i).sum()
+    inst /= scaling_factor
     return inst
 
 def prep_state(g):

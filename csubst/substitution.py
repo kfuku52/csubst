@@ -25,31 +25,37 @@ def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None)
     sub_tensor = numpy.memmap(mmap_tensor, dtype=dtype, shape=axis, mode='w+')
     return sub_tensor
 
-def get_substitution_tensor(state_tensor, mode, g, mmap_attr):
+def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, mmap_attr=''):
     sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
+    if state_tensor_anc is None:
+        state_tensor_anc = state_tensor
+    else:
+        state_tensor_anc = state_tensor_anc.astype(numpy.float64)
     if (g['ml_anc']=='no'):
         sub_tensor[:,:,:,:,:] = numpy.nan
     if mode=='asis':
         num_state = state_tensor.shape[2]
         diag_zero = numpy.diag([-1] * num_state) + 1
     for node in g['tree'].traverse():
-        if not node.is_root():
-            child = node.numerical_label
-            parent = node.up.numerical_label
-            if state_tensor[parent, :, :].sum()!=0:
-                if mode=='asis':
-                    sub_matrix = numpy.einsum("sa,sd,ad->sad", state_tensor[parent,:,:], state_tensor[child,:,:], diag_zero)
-                    # s=site, a=ancestral, d=derived
-                    sub_tensor[child, :, 0, :, :] = sub_matrix
-                elif mode=='syn':
-                    for s,aa in enumerate(g['amino_acid_orders']):
-                        ind = numpy.array(g['synonymous_indices'][aa])
-                        size = len(ind)
-                        diag_zero = numpy.diag([-1] * size) + 1
-                        parent_matrix = state_tensor[parent, :, ind] # axis is swapped, shape=[state,site]
-                        child_matrix = state_tensor[child, :, ind] # axis is swapped, shape=[state,site]
-                        sub_matrix = numpy.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
-                        sub_tensor[child, :, s, :size, :size] = sub_matrix
+        if node.is_root():
+            continue
+        child = node.numerical_label
+        parent = node.up.numerical_label
+        if state_tensor_anc[parent, :, :].sum()==0:
+            continue
+        if mode=='asis':
+            sub_matrix = numpy.einsum("sa,sd,ad->sad", state_tensor_anc[parent,:,:], state_tensor[child,:,:], diag_zero)
+            # s=site, a=ancestral, d=derived
+            sub_tensor[child, :, 0, :, :] = sub_matrix
+        elif mode=='syn':
+            for s,aa in enumerate(g['amino_acid_orders']):
+                ind = numpy.array(g['synonymous_indices'][aa])
+                size = len(ind)
+                diag_zero = numpy.diag([-1] * size) + 1
+                parent_matrix = state_tensor_anc[parent, :, ind] # axis is swapped, shape=[state,site]
+                child_matrix = state_tensor[child, :, ind] # axis is swapped, shape=[state,site]
+                sub_matrix = numpy.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
+                sub_tensor[child, :, s, :size, :size] = sub_matrix
     if g['min_sub_pp']!=0:
         if (g['ml_anc']):
             print('--ml_anc is set. --min_sub_pp is not applied.')
@@ -117,7 +123,11 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
     if mmap:
         df = df_mmap
     else:
-        df = numpy.zeros([id_combinations.shape[0], arity+4], dtype=numpy.int64)
+        if (sub_tensor.dtype==numpy.bool):
+            data_type = numpy.int32
+        else:
+            data_type = numpy.float64
+        df = numpy.zeros([id_combinations.shape[0], arity+4], dtype=data_type)
     start = mmap_start
     end = mmap_start + id_combinations.shape[0]
     df[start:end, :arity] = id_combinations[:, :]  # branch_ids
@@ -160,7 +170,8 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         if os.path.exists(mmap_out): os.unlink(mmap_out)
     df = sort_labels(df)
     df = df.dropna()
-    df = set_substitution_dtype(df=df)
+    if not attr.startswith('E'):
+        df = set_substitution_dtype(df=df)
     return df
 
 def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0):

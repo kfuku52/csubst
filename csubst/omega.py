@@ -150,18 +150,34 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
     elif g['omega_method']=='mat':
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
-        SE_tensor = get_exp_tensor(g['state_cdn'], g['rate_syn_tensor'], g)
-        print('Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'.format(SE_tensor.sum()))
-        cbSE = get_cb(cb.loc[:,id_cols], SE_tensor, g, 'S')
-        os.remove([f for f in os.listdir() if f.startswith('tmp.csubst.SE')][0])
-        cb = merge_tables(cb, cbSE)
-        del cbSE
-        NE_tensor = get_exp_tensor(g['state_pep'], g['rate_aa_tensor'], g)
-        print('Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'.format(NE_tensor.sum()))
-        cbNE = get_cb(cb.loc[:,id_cols], NE_tensor, g, 'N')
-        os.remove([f for f in os.listdir() if f.startswith('tmp.csubst.NE')][0])
-        cb = merge_tables(cb, cbNE)
-        del cbNE
+        state_pepE = get_exp_state(g=g, mode='pep')
+        EN_tensor = get_substitution_tensor(state_tensor=state_pepE, state_tensor_anc=g['state_pep'], mode='asis', g=g, mmap_attr='EN')
+        print('Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'.format(EN_tensor.sum()))
+        cbEN = get_cb(cb.loc[:,id_cols].values, EN_tensor, g, 'EN')
+        os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.EN.mmap') ][0])
+        cb = merge_tables(cb, cbEN)
+        del state_pepE,cbEN
+        state_cdnE = get_exp_state(g=g, mode='cdn')
+        ES_tensor = get_substitution_tensor(state_tensor=state_cdnE, state_tensor_anc=g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
+        print('Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'.format(ES_tensor.sum()))
+        cbES = get_cb(cb.loc[:,id_cols].values, ES_tensor, g, 'ES')
+        os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.ES.mmap') ][0])
+        cb = merge_tables(cb, cbES)
+        del state_cdnE,cbES
+        cb['ENany2dif'] = cb['ENany2any'] - cb['ENany2spe']
+        cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
+        E_cols = cb.columns[cb.columns.str.startswith('E')]
+        for node in g['tree'].traverse():
+            continue_flag = 1
+            if node.is_root():
+                continue_flag = 0
+            elif node.up.is_root():
+                continue_flag = 0
+            if continue_flag:
+                continue
+            for id_col in id_cols:
+                is_node = (cb.loc[:,id_col]==node.numerical_label)
+                cb.loc[is_node,E_cols] = numpy.nan
     if g['calc_quantile']:
         cb['QNany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='quantile', SN='N', g=g)
         cb['QSany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', stat='quantile', SN='S', g=g)
@@ -173,49 +189,46 @@ def get_E(cb, g, N_tensor, S_tensor):
         #cb['QSspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', stat='quantile', SN='S', g=g)
     return cb
 
-def get_exp_tensor(state_tensor, rate_tensor, g):
-    if rate_tensor.shape[0]==1:
-        mode = 'asis'
-        mmap_attr = 'NE'
-    else:
-        mode = 'syn'
-        mmap_attr = 'SE'
-    exp_tensor = initialize_substitution_tensor(state_tensor, mode=mode, g=g, mmap_attr=mmap_attr, dtype=rate_tensor.dtype)
+def get_exp_state(g, mode, bl='asis'):
+    from scipy.linalg import expm # TODO Add Scipy dependency
+    if mode=='cdn':
+        state = g['state_cdn'].astype(numpy.float64)
+        inst = g['instantaneous_codon_rate_matrix']
+        sub_col = 'S_sub'
+    elif mode=='pep':
+        state = g['state_pep'].astype(numpy.float64)
+        inst = g['instantaneous_aa_rate_matrix']
+        sub_col = 'N_sub'
+    stateE = numpy.zeros_like(state, dtype=numpy.float64)
     for node in g['tree'].traverse():
         if node.is_root():
             continue
-        branch_length = node.dist
+        if bl=='substitution':
+            num_site = state.shape[1]
+            branch_length = g['branch_table'].loc[node.numerical_label,sub_col] / num_site
+        elif bl=='asis':
+            branch_length = node.dist
+        branch_length = max(branch_length, 0)
         nl = node.numerical_label
         parent_nl = node.up.numerical_label
-        if parent_nl>exp_tensor.shape[0]:
+        if parent_nl>stateE.shape[0]:
             continue
-        exp_tensor[nl,:,:,:,:] = get_exp_1234(state_tensor[parent_nl,:,:], branch_length, rate_tensor, mode, g)
-    return exp_tensor
-
-def get_exp_1234(state_branch, branch_length, rate_tensor, mode, g):
-    num_s = state_branch.shape[0]
-    num_g = rate_tensor.shape[0]
-    num_state = rate_tensor.shape[1]
-    sub_sgad = numpy.zeros(shape=(num_s,num_g,num_state,num_state))
-    diag_zero = numpy.diag([-1] * num_state) + 1
-    sgad_ones = numpy.ones(shape=(num_s,num_g,num_state,num_state))
-    rate_tensor_sites = numpy.einsum('sgad,gad,ad->sgad', sgad_ones, rate_tensor, diag_zero)
-    exponential_factors = numpy.einsum("sgad,s->sgad", sgad_ones, g['iqtree_rate_values'])
-    exponential_factors *= branch_length
-    rate_tensor_sites **= exponential_factors
-    if mode=='asis':
-        sub_sgad[:,0,:,:] = numpy.einsum("sa,sad->sad", state_branch, rate_tensor_sites[:,0,:,:]) # s=site, a=ancestral, d=derived
-    elif mode=='syn':
-        for s,aa in enumerate(g['amino_acid_orders']):
-            ind = numpy.array(g['synonymous_indices'][aa])
-            size = len(ind)
-            state_aa_tmp = state_branch[:,ind]
-            state_aa = numpy.zeros(shape=(num_s,num_state))
-            state_aa[:,:size] = state_aa_tmp
-            exp_sad = numpy.einsum("sa,sad->sad", state_aa, rate_tensor_sites[:,s,:,:])
-            sub_sgad[:,s,:,:] = exp_sad
-    return sub_sgad
-
+        inst_bl = inst * branch_length
+        for site_rate in numpy.unique(g['iqtree_rate_values']):
+            if bl=='substitution':
+                inst_bl_site = numpy.copy(inst_bl)
+            elif bl=='asis':
+                inst_bl_site = inst_bl * site_rate # TODO is this valid when bl=='substitution'?
+            transition_prob = expm(inst_bl_site)
+            site_indices = numpy.where(g['iqtree_rate_values']==site_rate)[0]
+            for s in site_indices:
+                expected_transition_ad = numpy.einsum('a,ad->ad', state[parent_nl,s,:], transition_prob)
+                expected_derived_state = expected_transition_ad.sum(axis=0)
+                stateE[nl,s,:] = expected_derived_state
+                assert (expected_derived_state.sum()-1)<10**-9, 'Derived state should be equal to 1. ({})'.format(expected_derived_state.sum())
+    max_stateE = stateE.sum(axis=(2)).max()
+    assert (max_stateE-1)<10**-9, 'Total probability of expected states should not exceed 1. {}'.format(max_stateE)
+    return stateE
 
 def get_omega(cb):
     cb.loc[:,'omega_any2any'] = (cb.loc[:,'Nany2any'] / cb.loc[:,'ENany2any']) / (cb.loc[:,'Sany2any'] / cb.loc[:,'ESany2any'])

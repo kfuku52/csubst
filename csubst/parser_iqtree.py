@@ -81,7 +81,7 @@ def read_iqtree(g):
     pi = pandas.DataFrame(index=g['codon_orders'], columns=['freq',])
     for m in re.finditer(r'  pi\(([A-Z]+)\) = ([0-9.]+)', txt, re.MULTILINE):
         pi.at[m.group(1),'freq'] = float(m.group(2))
-    g['equilibrium_frequency'] = pi.loc[:,'freq'].values
+    g['equilibrium_frequency'] = pi.loc[:,'freq'].values.astype(numpy.float64)
     g['equilibrium_frequency'] /= g['equilibrium_frequency'].sum()
     return g
 
