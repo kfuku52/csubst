@@ -9,20 +9,21 @@ def read_input(g):
     elif (g['infile_type'] == 'iqtree'):
         from csubst import parser_iqtree
         g = parser_iqtree.get_input_information(g)
-    if (g['omega_method']=='mat'):
-        file_path = '../substitution_matrix/ECMunrest.dat'
-        g['exchangeability_matrix'] = read_exchangeability_matrix(file=file_path, g=g)
-        g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=file_path, g=g)
-        g['instantaneous_codon_rate_matrix'] = get_instantaneous_rate_matrix(g=g)
-        g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
-        g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
-        g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
-        sum_tensor_aa = g['rate_aa_tensor'].sum()
-        sum_tensor_syn = g['rate_syn_tensor'].sum()
-        sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
-        sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
-        assert (sum_tensor_aa-sum_matrix_aa)<10**-9, 'Sum of rates did not match.'
-        assert (sum_matrix_cdn-sum_tensor_syn-sum_tensor_aa)<10**-9, 'Sum of rates did not match.'
+    if ('omega_method' in g.keys()):
+        if (g['omega_method']=='mat'):
+            file_path = '../substitution_matrix/ECMunrest.dat'
+            g['exchangeability_matrix'] = read_exchangeability_matrix(file=file_path, g=g)
+            g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=file_path, g=g)
+            g['instantaneous_codon_rate_matrix'] = get_instantaneous_rate_matrix(g=g)
+            g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
+            g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
+            g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
+            sum_tensor_aa = g['rate_aa_tensor'].sum()
+            sum_tensor_syn = g['rate_syn_tensor'].sum()
+            sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
+            sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
+            assert (sum_tensor_aa-sum_matrix_aa)<10**-9, 'Sum of rates did not match.'
+            assert (sum_matrix_cdn-sum_tensor_syn-sum_tensor_aa)<10**-9, 'Sum of rates did not match.'
     return g
 
 def get_rate_tensor(inst, mode, g):
@@ -149,7 +150,7 @@ def read_exchangeability_matrix(file, g):
     return mat_exchangeability
 
 def get_codon_order_index(order_from, order_to):
-    assert len(order_from)==len(order_to), 'Codon order lengths should match.'
+    assert len(order_from)==len(order_to), 'Codon order lengths should match. Emprical codon substitution models are currently supported only for the Standard codon table.'
     out = list()
     for fr in order_from:
         for i,to in enumerate(order_to):

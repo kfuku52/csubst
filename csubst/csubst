@@ -42,7 +42,7 @@ def command_help(args):
     print(parser.parse_args([args.command, '--help']))
 
 # Main parser
-parser = argparse.ArgumentParser(description='csubst - a program for molecular convergence detection')
+parser = argparse.ArgumentParser(description='csubst - a toolkit for molecular convergence')
 parser.add_argument('--version', action='version', version='csubst version ' + __version__)
 subparsers = parser.add_subparsers()
 
@@ -193,8 +193,6 @@ analyze.add_argument('--cb_subsample', metavar='yes|no', default='yes', type=str
 analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
                      choices=['no', 'pool', 'sn', 'each', 'file'],
                      help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation.')
-analyze.add_argument('--asrv_file', metavar='PATH', default='infer', type=str,
-                     help='default=%(default)s: Precalculated ASRV file. "infer" to automatically detect IQ-TREE\'s *.rate file.')
 
 # Sub parser: help
 parser_help = subparsers.add_parser('help', help='see `help -h`')

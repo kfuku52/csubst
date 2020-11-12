@@ -55,11 +55,12 @@ def read_state(g):
     return g
 
 def read_rate(g):
-    if (g['asrv_file']=='infer'):
+    if (g['iqtree_rate']=='infer'):
         file_path = g['aln_file']+'.rate'
     else:
-        file_path = g['asrv_file']
-    assert os.path.exists(file_path), 'IQ-TREE\'s .rate file was not detected. Please specify file PATH in --asrv_file.'
+        file_path = g['iqtree_rate']
+    err_txt = 'IQ-TREE\'s .rate file was not found in {}. Please specify the correct file PATH by --iqtree_rate.'
+    assert os.path.exists(file_path), err_txt.format(file_path)
     print('IQ-TREE\'s .rate file was detected. Loading.')
     sub_sites = pandas.read_csv(file_path, sep='\t', header=0, comment='#')
     sub_sites = sub_sites.loc[:,'C_Rate'].values
