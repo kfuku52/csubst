@@ -1,5 +1,6 @@
 import numpy
 import itertools
+import pkg_resources
 from csubst import sequence
 
 def read_input(g):
@@ -11,9 +12,9 @@ def read_input(g):
         g = parser_iqtree.get_input_information(g)
     if ('omega_method' in g.keys()):
         if (g['omega_method']=='mat'):
-            file_path = '../substitution_matrix/ECMunrest.dat'
-            g['exchangeability_matrix'] = read_exchangeability_matrix(file=file_path, g=g)
-            g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=file_path, g=g)
+            matrix_file = 'substitution_matrix/ECMunrest.dat'
+            g['exchangeability_matrix'] = read_exchangeability_matrix(file=matrix_file, g=g)
+            g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
             g['instantaneous_codon_rate_matrix'] = get_instantaneous_rate_matrix(g=g)
             g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
             g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
@@ -75,7 +76,7 @@ def get_instantaneous_rate_matrix(g):
     return inst
 
 def get_equilibrium_frequency(g, mode):
-    if numpy.isnan(g['equilibrium_frequency'][0]):
+    if 'exchangeability_eq_freq' in g.keys():
         print('Applying empirical codon frequencies to obtain the instantaneous rate matrix.')
         eq = g['exchangeability_eq_freq']
     else:
@@ -132,7 +133,6 @@ def prep_state(g):
     return g,state_nuc,state_cdn,state_pep
 
 def read_exchangeability_matrix(file, g):
-    import pkg_resources
     txt = pkg_resources.resource_string(__name__, file)
     txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
     txt_mat = txt[0:60]
@@ -175,7 +175,6 @@ def get_exchangeability_codon_order():
     return exchangeability_codon_order
 
 def read_exchangeability_eq_freq(file, g):
-    import pkg_resources
     txt = pkg_resources.resource_string(__name__, file)
     txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
     freqs = txt[61].split(' ')
