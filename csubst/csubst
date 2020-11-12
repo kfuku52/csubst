@@ -71,6 +71,8 @@ psr_iq.add_argument('--iqtree_rate', metavar='PATH', default='infer', type=str, 
                    help='default=%(default)s: PATH to the IQ-TREE\'s .rate output. "infer" from --aln_file')
 psr_iq.add_argument('--iqtree_iqtree', metavar='PATH', default='infer', type=str, required=False,
                    help='default=%(default)s: PATH to the IQ-TREE\'s .iqtree output. "infer" from --aln_file')
+psr_iq.add_argument('--iqtree_log', metavar='PATH', default='infer', type=str, required=False,
+                    help='default=%(default)s: PATH to the IQ-TREE\'s .log output. "infer" from --aln_file')
 
 # shared: PhyloBayes inputs
 psr_pb = argparse.ArgumentParser(add_help=False)

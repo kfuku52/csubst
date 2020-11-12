@@ -76,12 +76,12 @@ def get_instantaneous_rate_matrix(g):
     return inst
 
 def get_equilibrium_frequency(g, mode):
-    if 'exchangeability_eq_freq' in g.keys():
-        print('Applying empirical codon frequencies to obtain the instantaneous rate matrix.')
-        eq = g['exchangeability_eq_freq']
-    else:
+    if 'equilibrium_frequency' in g.keys():
         print('Applying estimated codon frequencies to obtain the instantaneous rate matrix.')
         eq = g['equilibrium_frequency']
+    else:
+        print('Applying empirical codon frequencies to obtain the instantaneous rate matrix.')
+        eq = g['exchangeability_eq_freq']
     if mode=='cdn':
         return eq
     elif mode=='pep':

@@ -67,7 +67,10 @@ def read_rate(g):
     return sub_sites
 
 def read_iqtree(g):
-    file_path = g['aln_file']+'.iqtree'
+    if (g['iqtree_iqtree']=='infer'):
+        file_path = g['aln_file']+'.iqtree'
+    else:
+        file_path = g['iqtree_iqtree']
     if not os.path.exists(file_path):
         print('File not found:', file_path)
         return g
@@ -87,7 +90,10 @@ def read_iqtree(g):
     return g
 
 def read_log(g):
-    file_path = g['aln_file']+'.log'
+    if (g['iqtree_log']=='infer'):
+        file_path = g['aln_file']+'.log'
+    else:
+        file_path = g['iqtree_log']
     if not os.path.exists(file_path):
         print('File not found:', file_path)
         return g
