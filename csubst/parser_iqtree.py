@@ -90,6 +90,9 @@ def read_iqtree(g):
     return g
 
 def read_log(g):
+    g['omega'] = None
+    g['kappa'] = None
+    g['reconstruction_codon_table'] = None
     if (g['iqtree_log']=='infer'):
         file_path = g['aln_file']+'.log'
     else:
@@ -106,6 +109,9 @@ def read_log(g):
         kappa = re.match(r'Transition/transversion ratio \(kappa\): ([0-9.]+)', line)
         if kappa is not None:
             g['kappa'] = float(kappa.group(1))
+        rgc = re.match(r'Converting to codon sequences with genetic code ([0-9]+) \.\.\.', line)
+        if rgc is not None:
+            g['reconstruction_codon_table'] = int(rgc.group(1))
     return g
 
 def get_state_index(state, input_state, ambiguous_table):

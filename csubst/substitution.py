@@ -273,13 +273,13 @@ def get_sub_sites(g, sS, sN, state_tensor):
 def get_each_sub_sites(sub_sad, mode, sg, a, d, g):
     sub_sites = numpy.zeros(shape=g['is_site_nonmissing'].shape, dtype=numpy.float64)
     if mode == 'spe2spe':
-        nonadjusted_sub_sites = sub_sad[sg, :, a, d]
+        nonadjusted_sub_sites = sub_sad[:, sg, a, d]
     elif mode == 'spe2any':
-        nonadjusted_sub_sites = sub_sad[sg, :, a]
+        nonadjusted_sub_sites = sub_sad[:, sg, a]
     elif mode == 'any2spe':
-        nonadjusted_sub_sites = sub_sad[sg, :, d]
+        nonadjusted_sub_sites = sub_sad[:, sg, d]
     elif mode == 'any2any':
-        nonadjusted_sub_sites = sub_sad[sg, :]
+        nonadjusted_sub_sites = sub_sad[:, sg]
     for node in g['tree'].traverse():
         nl = node.numerical_label
         sub_sites[nl,:] = nonadjusted_sub_sites * g['is_site_nonmissing'][nl,:]

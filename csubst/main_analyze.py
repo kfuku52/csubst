@@ -156,7 +156,7 @@ def main_analyze(g):
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 
-    if g['omega_method']!='mat':
+    if g['omega_method']!='rec':
         g['state_cdn'] = None
         g['state_pep'] = None
 

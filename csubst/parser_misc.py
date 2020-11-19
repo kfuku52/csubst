@@ -1,6 +1,8 @@
+import pyvolve
 import numpy
 import itertools
 import pkg_resources
+import re
 from csubst import sequence
 
 def read_input(g):
@@ -11,21 +13,86 @@ def read_input(g):
         from csubst import parser_iqtree
         g = parser_iqtree.get_input_information(g)
     if ('omega_method' in g.keys()):
-        if (g['omega_method']=='mat'):
-            matrix_file = 'substitution_matrix/ECMunrest.dat'
-            g['exchangeability_matrix'] = read_exchangeability_matrix(file=matrix_file, g=g)
-            g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
-            g['instantaneous_codon_rate_matrix'] = get_instantaneous_rate_matrix(g=g)
-            g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
+        if (g['omega_method']=='rec'):
+            base_model = re.sub('\+G.*', '', g['substitution_model'])
+            base_model = re.sub('\+R.*', '', base_model)
+            print('Instantaneous substitution rate matrix will be generated using the base model:', base_model)
+            print('Transition matrix will be generated using the model in the ancestral state reconstruction:', g['substitution_model'])
+            if (g['substitution_model'].startswith('ECMK07')):
+                matrix_file = 'substitution_matrix/ECMunrest.dat'
+                g['exchangeability_matrix'] = read_exchangeability_matrix(file=matrix_file, g=g)
+                g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
+                g['instantaneous_codon_rate_matrix'] = exchangeability2instantaneous_rate_matrix(g=g)
+            if (g['substitution_model'].startswith('ECMrest')):
+                matrix_file = 'substitution_matrix/ECMrest.dat'
+                g['exchangeability_matrix'] = read_exchangeability_matrix(file=matrix_file, g=g)
+                g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
+                g['instantaneous_codon_rate_matrix'] = exchangeability2instantaneous_rate_matrix(g=g)
+            elif (g['substitution_model'].startswith('GY')):
+                assert (g['omega'] is not None), 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
+                assert (g['kappa'] is not None), 'Estimated kappa is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
+                g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
+            elif (g['substitution_model'].startswith('MG')):
+                assert (g['omega'] is not None), 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
+                g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
+            g['instantaneous_codon_aa_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
             g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
-            g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
+            g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_aa_matrix'], mode='asis', g=g)
             sum_tensor_aa = g['rate_aa_tensor'].sum()
             sum_tensor_syn = g['rate_syn_tensor'].sum()
-            sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
+            sum_matrix_aa = g['instantaneous_codon_aa_matrix'][g['instantaneous_codon_aa_matrix']>0].sum()
             sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
-            assert (sum_tensor_aa-sum_matrix_aa)<10**-9, 'Sum of rates did not match.'
-            assert (sum_matrix_cdn-sum_tensor_syn-sum_tensor_aa)<10**-9, 'Sum of rates did not match.'
+            assert (sum_tensor_aa - sum_matrix_aa)<10**-9, 'Sum of rates did not match.'
+            txt = 'Sum of rates did not match. Check if --ncbi_codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
+            txt = txt.format(g['ncbi_codon_table'], g['reconstruction_codon_table'])
+            assert (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa)<10**-9, txt
+            numpy.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
+            q_ij_x_pi_i = g['instantaneous_codon_rate_matrix'][0,1]*g['equilibrium_frequency'][0]
+            q_ji_x_pi_j = g['instantaneous_codon_rate_matrix'][1,0]*g['equilibrium_frequency'][1]
+            assert (q_ij_x_pi_i-q_ji_x_pi_j<10**-9), 'Instantaneous codon rate matrix (Q) is not time-reversible.'
     return g
+
+def get_mechanistic_instantaneous_rate_matrix(g):
+    num_codon = len(g['codon_orders'])
+    inst = numpy.ones(shape=(num_codon,num_codon))
+    for i1,c1 in enumerate(g['codon_orders']):
+        for i2,c2 in enumerate(g['codon_orders']):
+            num_diff_codon_position = sum([ cp1!=cp2 for cp1,cp2 in zip(c1,c2) ])
+            if (num_diff_codon_position!=1):
+                inst[i1,i2] = 0 # prohibit double substitutions
+    if g['omega'] is not None:
+        inst *= g['omega'] # multiply omega for all elements
+        for s,aa in enumerate(g['amino_acid_orders']):
+            ind_cdn = numpy.array(g['synonymous_indices'][aa])
+            for i1,i2 in itertools.permutations(ind_cdn, 2):
+                inst[i1,i2] /= g['omega'] # restore rate of synonymous substitutions = 1, so nonsynonymous substitutions are left multiplied by omega
+    if g['kappa'] is not None:
+        for i1,c1 in enumerate(g['codon_orders']):
+            for i2,c2 in enumerate(g['codon_orders']):
+                num_diff_codon_position = sum([ cp1!=cp2 for cp1,cp2 in zip(c1,c2) ])
+                if (num_diff_codon_position==1):
+                    diff_nucs = [ cp1+cp2 for cp1,cp2 in zip(c1,c2) if cp1!=cp2 ][0]
+                    if all([ (dn in ['A','G'])|(dn in ['C','T']) for dn in diff_nucs ]):
+                        inst[i1,i2] *= g['kappa'] # multiply kappa to transition substitutions
+    inst = inst.dot(numpy.diag(g['equilibrium_frequency'])).astype(numpy.float64) # pi_j * q_ij
+    inst = scale_instantaneous_rate_matrix(inst, g['equilibrium_frequency'])
+    inst = fill_instantaneous_rate_matrix_diagonal(inst)
+    return inst
+
+def fill_instantaneous_rate_matrix_diagonal(inst):
+    for i in numpy.arange(inst.shape[0]):
+        inst[i,i] = 0
+        inst[i,i] = -inst[i,:].sum()
+    return inst
+
+def scale_instantaneous_rate_matrix(inst, eq):
+    # scaling to satisfy Sum_i Sum_j!=i pi_i*q_ij, equals 1.
+    # See Kosiol et al. 2007. https://academic.oup.com/mbe/article/24/7/1464/986344
+    assert inst[0,0]==0, 'Diagonal elements should still be zeros.'
+    q_ijxpi_i = numpy.einsum('ad,a->ad', inst, eq)
+    scaling_factor = q_ijxpi_i.sum()
+    inst /= scaling_factor
+    return inst
 
 def get_rate_tensor(inst, mode, g):
     if mode=='asis':
@@ -60,19 +127,19 @@ def cdn2pep_matrix(inst_cdn, g):
                 val += inst_cdn[aa1_ind,aa2_ind]
             inst_pep[i,j] = val
     inst_pep = fill_instantaneous_rate_matrix_diagonal(inst_pep)
-    # Commented out because this shouldn't be readjusted.
+    # Following lines were commented out because this shouldn't be readjusted.
     # Branch lengths are subst/codon.
     # If readjusted, we have to provide subst/aa to calculate expected nonsynonymous convergence.
     #eq_pep = get_equilibrium_frequency(g, mode='pep')
     #inst_pep = scale_instantaneous_rate_matrix(inst_pep, eq_pep)
     return inst_pep
 
-def get_instantaneous_rate_matrix(g):
+def exchangeability2instantaneous_rate_matrix(g):
     ex = g['exchangeability_matrix']
     eq = get_equilibrium_frequency(g, mode='cdn')
-    inst = ex.dot(numpy.diag(eq)).astype(numpy.float64)
-    inst = fill_instantaneous_rate_matrix_diagonal(inst)
+    inst = ex.dot(numpy.diag(eq)).astype(numpy.float64) # pi_j * s_ij
     inst = scale_instantaneous_rate_matrix(inst, eq)
+    inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst
 
 def get_equilibrium_frequency(g, mode):
@@ -93,18 +160,6 @@ def get_equilibrium_frequency(g, mode):
         txt = 'Equilibrium amino acid frequency should sum to 1.'
         assert abs(eq_pep.sum()-1)<10**-9, txt
         return eq_pep
-
-def fill_instantaneous_rate_matrix_diagonal(inst):
-    for i in numpy.arange(inst.shape[0]):
-        inst[i,i] = -inst[i,:].sum()
-    return inst
-
-def scale_instantaneous_rate_matrix(inst, eq):
-    # scaling to satisfy Sum_i Sum_j!=i pi_i*q_ij, equals 1.
-    q_ijxpi_i = numpy.einsum('ad,a->ad', inst, eq)
-    scaling_factor = q_ijxpi_i.sum()-numpy.diag(q_ijxpi_i).sum()
-    inst /= scaling_factor
-    return inst
 
 def prep_state(g):
     state_nuc = None

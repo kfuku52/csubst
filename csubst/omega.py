@@ -137,7 +137,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['ENany2dif'] = cb['ENany2any'] * rhoNany2dif
         cb['ESany2spe'] = cb['ESany2any'] * rhoSany2spe
         cb['ESany2dif'] = cb['ESany2any'] * rhoSany2dif
-    elif g['omega_method']=='ind':
+    elif g['omega_method']=='pm':
         cb['ENany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='mean', SN='N', g=g)
         cb['ENspe2any'] = calc_E_stat(cb, N_tensor, mode='spe2any', stat='mean', SN='N', g=g)
         cb['ENany2spe'] = calc_E_stat(cb, N_tensor, mode='any2spe', stat='mean', SN='N', g=g)
@@ -148,7 +148,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb['ESspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', stat='mean', SN='S', g=g)
         cb['ENany2dif'] = cb['ENany2any'] - cb['ENany2spe']
         cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
-    elif g['omega_method']=='mat':
+    elif g['omega_method']=='rec':
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_pepE = get_exp_state(g=g, mode='pep')
         EN_tensor = get_substitution_tensor(state_tensor=state_pepE, state_tensor_anc=g['state_pep'], mode='asis', g=g, mmap_attr='EN')
@@ -197,7 +197,7 @@ def get_exp_state(g, mode, bl='asis'):
         sub_col = 'S_sub'
     elif mode=='pep':
         state = g['state_pep'].astype(numpy.float64)
-        inst = g['instantaneous_aa_rate_matrix']
+        inst = g['instantaneous_codon_aa_matrix']
         sub_col = 'N_sub'
     stateE = numpy.zeros_like(state, dtype=numpy.float64)
     for node in g['tree'].traverse():
