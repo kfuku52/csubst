@@ -1,4 +1,3 @@
-import pyvolve
 import numpy
 import itertools
 import pkg_resources

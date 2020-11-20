@@ -6,21 +6,24 @@ from csubst.tree import *
 from csubst.genetic_code import ambiguous_table
 
 def read_treefile(g):
-    g['tree'] = ete3.PhyloNode(g['tre_file'], format=1)
-    assert len(g['tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['tre_file'])
-    g['tree'] = standardize_node_names(g['tree'])
-    g['tree'] = add_numerical_node_labels(g['tree'])
-    g['num_node'] = len(list(g['tree'].traverse()))
+    g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
+    assert len(g['rooted_tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
+    g['rooted_tree'] = standardize_node_names(g['rooted_tree'])
+    g['rooted_tree'] = add_numerical_node_labels(g['rooted_tree'])
+    g['num_node'] = len(list(g['rooted_tree'].traverse()))
     g['iqtree_rate_values'] = read_rate(g)
-    if not is_internal_node_labeled(g['tree']):
-        g['node_label_tree_file'] = g['iqtree_treefile']
-        f = open(g['node_label_tree_file'])
-        tree_string = f.readline()
-        g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
-        f.close()
-        g['node_label_tree'] = standardize_node_names(g['node_label_tree'])
-        g['node_label_tree'] = transfer_root(tree_to=g['node_label_tree'], tree_from=g['tree'], verbose=False)
-        g['tree'] = transfer_internal_node_names(tree_to=g['tree'], tree_from=g['node_label_tree'])
+    print('Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.')
+    g['node_label_tree_file'] = g['iqtree_treefile']
+    f = open(g['node_label_tree_file'])
+    tree_string = f.readline()
+    g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
+    f.close()
+    g['node_label_tree'] = standardize_node_names(g['node_label_tree'])
+    g['tree'] = transfer_root_and_dist(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
+    g['tree'] = add_numerical_node_labels(g['tree'])
+    print('Total branch length of --rooted_tree_file:', sum([ n.dist for n in g['rooted_tree'].traverse() ]))
+    print('Total branch length of --iqtree_treefile:', sum([ n.dist for n in g['node_label_tree'].traverse() ]))
+    print('')
     return g
 
 def read_state(g):
@@ -52,6 +55,7 @@ def read_state(g):
                     break
         g['synonymous_indices'] = synonymous_indices
         g['max_synonymous_size'] = max([ len(si) for si in synonymous_indices.values() ])
+    print('')
     return g
 
 def read_rate(g):

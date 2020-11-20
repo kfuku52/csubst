@@ -127,10 +127,35 @@ def main_analyze(g):
 
     N_tensor = get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()
-    if (g['calc_omega']):
-        S_tensor = get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
-        sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
+    S_tensor = get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
+    sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
+
+    print('Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, '
+          'rather than nucleotide-substitutions/codon-site.')
+    print('Total branch length before rescaling: {:,.3f}'.format(sum([ n.dist for n in g['tree'].traverse() ])))
+    for node in g['tree'].traverse():
+        if node.is_root():
+            node.Sdist = 0
+            node.Ndist = 0
+            node.SNdist = 0
+            continue
+        nl = node.numerical_label
+        parent = node.up.numerical_label
+        num_nonmissing_codon = (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum()
+        if num_nonmissing_codon==0:
+            node.Sdist = 0
+            node.Ndist = 0
+            node.SNdist = 0
+            continue
+        num_S_sub = S_tensor[nl,:,:,:,:].sum()
+        num_N_sub = N_tensor[nl,:,:,:,:].sum()
+        node.Sdist = num_S_sub / num_nonmissing_codon
+        node.Ndist = num_N_sub / num_nonmissing_codon
+        node.SNdist = (num_S_sub + num_N_sub) / num_nonmissing_codon
+    print('Total S+N branch length after rescaling: {:,.3f}'.format(sum([ n.SNdist for n in g['tree'].traverse() ])))
+    print('Total S branch length after rescaling: {:,.3f}'.format(sum([ n.Sdist for n in g['tree'].traverse() ])))
+    print('Total N branch length after rescaling: {:,.3f}'.format(sum([ n.Ndist for n in g['tree'].traverse() ])))
 
     id_combinations = None
 

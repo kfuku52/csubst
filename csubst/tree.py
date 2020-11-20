@@ -22,7 +22,7 @@ def add_numerical_node_labels(tree):
         i+=1
     return(tree)
 
-def transfer_root(tree_to, tree_from, verbose=False):
+def transfer_root_and_dist(tree_to, tree_from, verbose=False):
     same_leaf_set = len(set(tree_to.get_leaf_names()) - set(tree_from.get_leaf_names())) == 0
     assert same_leaf_set, 'Input tree and iqtree\'s treefile did not have identical leaves.'
     subroot_leaves = [ n.get_leaf_names() for n in tree_from.get_children() ]

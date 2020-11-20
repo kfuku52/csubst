@@ -22,7 +22,7 @@ csubst \
 --phylobayes_dir ${dir_data}/${tree_name} \
 --infile_type iqtree \
 --aln_file ${file_aln} \
---tre_file ${file_tree} \
+--rooted_tree_file ${file_tree} \
 --calc_omega yes \
 --ml_anc yes \
 --b yes \

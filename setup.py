@@ -26,7 +26,7 @@ setup(
     url              = 'https://github.com/kfuku52/csubst.git',
     keywords         = 'molecular convergence',
     packages         = find_packages(),
-    install_requires = ['ete3','numpy','pandas','joblib','cython'],
+    install_requires = ['ete3','numpy','scipy','pandas','joblib','cython'],
     scripts          = ['csubst/csubst',],
     setup_requires   = ['setuptools>=18.0','cython'],
     ext_modules      = cythonize(

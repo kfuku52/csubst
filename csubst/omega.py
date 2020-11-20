@@ -1,3 +1,4 @@
+from scipy.linalg import expm
 import os
 from csubst.substitution import *
 from csubst.combination import *
@@ -193,7 +194,6 @@ def get_E(cb, g, N_tensor, S_tensor):
     return cb
 
 def get_exp_state(g, mode, bl='asis'):
-    from scipy.linalg import expm # TODO Add Scipy dependency
     if mode=='cdn':
         state = g['state_cdn'].astype(g['float_type'])
         inst = g['instantaneous_codon_rate_matrix']
@@ -210,7 +210,10 @@ def get_exp_state(g, mode, bl='asis'):
             num_site = state.shape[1]
             branch_length = g['branch_table'].loc[node.numerical_label,sub_col] / num_site
         elif bl=='asis':
-            branch_length = node.dist
+            if mode=='cdn':
+                branch_length = node.SNdist
+            elif mode=='pep':
+                branch_length = node.Ndist
         branch_length = max(branch_length, 0)
         nl = node.numerical_label
         parent_nl = node.up.numerical_label

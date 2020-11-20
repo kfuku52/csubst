@@ -29,8 +29,6 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
     sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
-    else:
-        state_tensor_anc = state_tensor_anc.astype(g['float_type'])
     if (g['ml_anc']=='no'):
         sub_tensor[:,:,:,:,:] = numpy.nan
     if mode=='asis':
@@ -118,7 +116,7 @@ def get_bs(S_tensor, N_tensor):
     df = set_substitution_dtype(df=df)
     return(df)
 
-def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0):
+def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64):
     arity = id_combinations.shape[1]
     if mmap:
         df = df_mmap
@@ -126,7 +124,7 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
         if (sub_tensor.dtype==numpy.bool):
             data_type = numpy.int32
         else:
-            data_type = g['float_type']
+            data_type = float_type
         df = numpy.zeros([id_combinations.shape[0], arity+4], dtype=data_type)
     start = mmap_start
     end = mmap_start + id_combinations.shape[0]
@@ -150,7 +148,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
     cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     if g['nslots']==1:
-        df = sub_tensor2cb(id_combinations, sub_tensor)
+        df = sub_tensor2cb(id_combinations, sub_tensor, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
     else:
         id_chunks,mmap_starts = get_chunks(id_combinations, g['nslots'])
@@ -163,7 +161,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(sub_tensor2cb)
-            (ids, sub_tensor, True, df_mmap, ms) for ids, ms in zip(id_chunks, mmap_starts)
+            (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids, ms in zip(id_chunks, mmap_starts)
         )
         df = pandas.DataFrame(df_mmap, columns=cn)
         if os.path.exists(mmap_out): os.unlink(mmap_out)

@@ -13,6 +13,7 @@
 * [python 3](https://www.python.org/)
 * [ete3](https://github.com/etetoolkit/ete)
 * [numpy](https://github.com/numpy/numpy)
+* [scipy](https://www.scipy.org/)
 * [pandas](https://github.com/pandas-dev/pandas)
 * [joblib](https://github.com/joblib/joblib)
 * [cython](https://cython.org/)
@@ -47,7 +48,7 @@ cd ./PGK
 iqtree \
 -s alignment.fa \
 -te tree.nwk \
--m ECMK07+F3X4+R4 \
+-m ECMK07+F+R4 \
 --seqtype CODON1 \
 --threads-max 4 \
 --ancestral \
@@ -58,7 +59,7 @@ iqtree \
 csubst analyze \
 --ncbi_codon_table 1 \
 --aln_file alignment.fa \
---tre_file tree.nwk \
+--rooted_tree_file tree.nwk \
 --infile_type iqtree \
 --max_arity 2 \
 --nslots 4
@@ -69,7 +70,7 @@ csubst analyze \
 csubst simulate \
 --ncbi_codon_table 1 \
 --aln_file alignment.fa \
---tre_file tree.nwk \
+--rooted_tree_file tree.nwk \
 --infile_type iqtree \
 --foreground foreground.txt \
 --fg_stem_only yes \
@@ -96,7 +97,7 @@ iqtree \
 csubst analyze \
 --ncbi_codon_table 1 \
 --aln_file simulate.fa \
---tre_file tree.nwk \
+--rooted_tree_file tree.nwk \
 --infile_type iqtree \
 --max_arity 2 \
 --foreground foreground.txt \
