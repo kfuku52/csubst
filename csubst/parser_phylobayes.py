@@ -86,7 +86,7 @@ def get_state_tensor(g):
     state_files = [ f for f in os.listdir(g['phylobayes_dir']) if f.endswith('.ancstatepostprob') ]
     print('The number of character states =', g['num_input_state'])
     axis = [num_node, g['num_input_site'], g['num_input_state']]
-    state_tensor = numpy.zeros(axis, dtype=numpy.float64)
+    state_tensor = numpy.zeros(axis, dtype=g['float_type'])
     for node in g['tree'].traverse():
         pp_file = get_node_phylobayes_out(node=node, files=state_files)
         if len(pp_file) == 1:

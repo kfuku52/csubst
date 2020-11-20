@@ -25,7 +25,7 @@ def get_Econv_unif_permutation(cb, sub_tensor):
     return E_conv_b
 
 def calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g):
-    E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
+    E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     for i,sg,a,d in sg_a_d:
         # TODO: nan in a and d can be skipped in S
@@ -41,7 +41,7 @@ def calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g):
         else:
             sub_sites = g['sub_sites'][g['asrv']]
         sub_branches = get_sub_branches(sub_bad, mode, sg, a, d)
-        tmp_E = numpy.ones(shape=(E_b.shape[0], sub_sites.shape[1]), dtype=numpy.float64)
+        tmp_E = numpy.ones(shape=(E_b.shape[0], sub_sites.shape[1]), dtype=g['float_type'])
         for bid in numpy.unique(cb.loc[:,bid_columns].values):
             is_b = False
             for bc in bid_columns:
@@ -108,14 +108,17 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     elif stat=='quantile':
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
-        dfq = numpy.memmap(filename=mmap_out, dtype=numpy.int32, shape=(cb.shape[0], quantile_niter), mode='w+')
+        my_dtype = sub_tensor.dtype
+        if 'bool' in str(my_dtype):
+            my_dtype = numpy.int32
+        dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0], quantile_niter), mode='w+')
         sgad_chunks,mmap_start_not_necessary_here = get_chunks(sg_a_d, g['nslots'])
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(joblib_calc_quantile)
             (mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk, g) for sgad_chunk in sgad_chunks
         )
         if os.path.exists(mmap_out): os.unlink(mmap_out)
-        E_b = numpy.zeros_like(cb.index, dtype=numpy.float64)
+        E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
         for i in cb.index:
             # TODO: poisson approximation
             obs_value = cb.loc[i,obs_col]
@@ -192,14 +195,14 @@ def get_E(cb, g, N_tensor, S_tensor):
 def get_exp_state(g, mode, bl='asis'):
     from scipy.linalg import expm # TODO Add Scipy dependency
     if mode=='cdn':
-        state = g['state_cdn'].astype(numpy.float64)
+        state = g['state_cdn'].astype(g['float_type'])
         inst = g['instantaneous_codon_rate_matrix']
         sub_col = 'S_sub'
     elif mode=='pep':
-        state = g['state_pep'].astype(numpy.float64)
-        inst = g['instantaneous_codon_aa_matrix']
+        state = g['state_pep'].astype(g['float_type'])
+        inst = g['instantaneous_aa_rate_matrix']
         sub_col = 'N_sub'
-    stateE = numpy.zeros_like(state, dtype=numpy.float64)
+    stateE = numpy.zeros_like(state, dtype=g['float_type'])
     for node in g['tree'].traverse():
         if node.is_root():
             continue
@@ -212,7 +215,7 @@ def get_exp_state(g, mode, bl='asis'):
         nl = node.numerical_label
         parent_nl = node.up.numerical_label
         if parent_nl>stateE.shape[0]:
-            continue
+            continue # Skip if parent is the root node
         inst_bl = inst * branch_length
         for site_rate in numpy.unique(g['iqtree_rate_values']):
             if bl=='substitution':
@@ -223,11 +226,13 @@ def get_exp_state(g, mode, bl='asis'):
             site_indices = numpy.where(g['iqtree_rate_values']==site_rate)[0]
             for s in site_indices:
                 expected_transition_ad = numpy.einsum('a,ad->ad', state[parent_nl,s,:], transition_prob)
+                if expected_transition_ad.sum()-1>g['float_tol']:
+                    expected_transition_ad /= expected_transition_ad.sum()
                 expected_derived_state = expected_transition_ad.sum(axis=0)
                 stateE[nl,s,:] = expected_derived_state
-                assert (expected_derived_state.sum()-1)<10**-9, 'Derived state should be equal to 1. ({})'.format(expected_derived_state.sum())
+                assert (expected_derived_state.sum()-1)<g['float_tol'], 'Derived state should be equal to 1. ({})'.format(expected_derived_state.sum())
     max_stateE = stateE.sum(axis=(2)).max()
-    assert (max_stateE-1)<10**-9, 'Total probability of expected states should not exceed 1. {}'.format(max_stateE)
+    assert (max_stateE-1)<g['float_tol'], 'Total probability of expected states should not exceed 1. {}'.format(max_stateE)
     return stateE
 
 def get_omega(cb):

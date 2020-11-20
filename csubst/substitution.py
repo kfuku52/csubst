@@ -30,7 +30,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
     else:
-        state_tensor_anc = state_tensor_anc.astype(numpy.float64)
+        state_tensor_anc = state_tensor_anc.astype(g['float_type'])
     if (g['ml_anc']=='no'):
         sub_tensor[:,:,:,:,:] = numpy.nan
     if mode=='asis':
@@ -126,7 +126,7 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
         if (sub_tensor.dtype==numpy.bool):
             data_type = numpy.int32
         else:
-            data_type = numpy.float64
+            data_type = g['float_type']
         df = numpy.zeros([id_combinations.shape[0], arity+4], dtype=data_type)
     start = mmap_start
     end = mmap_start + id_combinations.shape[0]
@@ -157,11 +157,10 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         axis = (id_combinations.shape[0], arity+4)
-        if (sub_tensor.dtype==numpy.bool):
-            data_type = numpy.int32
-        else:
-            data_type = numpy.float64
-        df_mmap = numpy.memmap(mmap_out, dtype=data_type, shape=axis, mode='w+')
+        my_dtype = sub_tensor.dtype
+        if 'bool' in str(my_dtype):
+            my_dtype = numpy.int32
+        df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(sub_tensor2cb)
             (ids, sub_tensor, True, df_mmap, ms) for ids, ms in zip(id_chunks, mmap_starts)
@@ -182,7 +181,10 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
         df = df_mmap
     else:
         shape = (int(id_combinations.shape[0]*num_site), arity+5)
-        df = numpy.zeros(shape=shape, dtype=numpy.int32)
+        my_dtype = sub_tensor.dtype
+        if 'bool' in str(my_dtype):
+            my_dtype = numpy.int32
+        df = numpy.zeros(shape=shape, dtype=my_dtype)
     node=0
     start_time = time.time()
     for i in numpy.arange(id_combinations.shape[0]):
@@ -219,7 +221,10 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cbs.out.mmap')
         if os.path.exists(mmap_out): os.remove(mmap_out)
         axis = (id_combinations.shape[0]*sub_tensor.shape[1], arity+5)
-        df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
+        my_dtype = sub_tensor.dtype
+        if 'bool' in str(my_dtype):
+            my_dtype = numpy.int32
+        df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(sub_tensor2cbs)
             (ids, sub_tensor, True, df_mmap, ms) for ids,ms in zip(id_chunks,mmap_starts)
@@ -229,7 +234,6 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     df = df.dropna()
     df = sort_labels(df)
     df = set_substitution_dtype(df=df)
-    print(type(df), flush=True)
     return(df)
 
 def get_sub_sites(g, sS, sN, state_tensor):
@@ -240,7 +244,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
         nl = node.numerical_label
         g['is_site_nonmissing'][nl,:] = (state_tensor[nl,:,:].sum(axis=1)!=0)
     g['sub_sites'] = dict()
-    g['sub_sites'][g['asrv']] = numpy.zeros(shape=[num_branch, num_site], dtype=numpy.float64)
+    g['sub_sites'][g['asrv']] = numpy.zeros(shape=[num_branch, num_site], dtype=g['float_type'])
     if (g['asrv']=='no'):
         sub_sites = numpy.ones(shape=[num_site,]) / num_site
     elif (g['asrv']=='pool'):
@@ -250,7 +254,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
         sub_sites = g['iqtree_rate_values']
     if (g['asrv']=='sn'):
         for SN,df in zip(['S','N'],[sS,sN]):
-            g['sub_sites'][SN] = numpy.zeros(shape=[num_branch, num_site], dtype=numpy.float64)
+            g['sub_sites'][SN] = numpy.zeros(shape=[num_branch, num_site], dtype=g['float_type'])
             sub_sites = df[SN+'_sub'].values
             for node in g['tree'].traverse():
                 nl = node.numerical_label
@@ -271,7 +275,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
     return g
 
 def get_each_sub_sites(sub_sad, mode, sg, a, d, g):
-    sub_sites = numpy.zeros(shape=g['is_site_nonmissing'].shape, dtype=numpy.float64)
+    sub_sites = numpy.zeros(shape=g['is_site_nonmissing'].shape, dtype=g['float_type'])
     if mode == 'spe2spe':
         nonadjusted_sub_sites = sub_sad[:, sg, a, d]
     elif mode == 'spe2any':

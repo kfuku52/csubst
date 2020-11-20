@@ -35,21 +35,21 @@ def read_input(g):
             elif (g['substitution_model'].startswith('MG')):
                 assert (g['omega'] is not None), 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
                 g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
-            g['instantaneous_codon_aa_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
+            g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
             g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
-            g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_aa_matrix'], mode='asis', g=g)
+            g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
             sum_tensor_aa = g['rate_aa_tensor'].sum()
             sum_tensor_syn = g['rate_syn_tensor'].sum()
-            sum_matrix_aa = g['instantaneous_codon_aa_matrix'][g['instantaneous_codon_aa_matrix']>0].sum()
+            sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
             sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
-            assert (sum_tensor_aa - sum_matrix_aa)<10**-9, 'Sum of rates did not match.'
+            assert (sum_tensor_aa - sum_matrix_aa)<g['float_tol'], 'Sum of rates did not match.'
             txt = 'Sum of rates did not match. Check if --ncbi_codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
             txt = txt.format(g['ncbi_codon_table'], g['reconstruction_codon_table'])
-            assert (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa)<10**-9, txt
+            assert (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa)<g['float_tol'], txt
             numpy.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
             q_ij_x_pi_i = g['instantaneous_codon_rate_matrix'][0,1]*g['equilibrium_frequency'][0]
             q_ji_x_pi_j = g['instantaneous_codon_rate_matrix'][1,0]*g['equilibrium_frequency'][1]
-            assert (q_ij_x_pi_i-q_ji_x_pi_j<10**-9), 'Instantaneous codon rate matrix (Q) is not time-reversible.'
+            assert (q_ij_x_pi_i-q_ji_x_pi_j<g['float_tol']), 'Instantaneous codon rate matrix (Q) is not time-reversible.'
     return g
 
 def get_mechanistic_instantaneous_rate_matrix(g):
@@ -74,7 +74,7 @@ def get_mechanistic_instantaneous_rate_matrix(g):
                     diff_nucs = [ cp1+cp2 for cp1,cp2 in zip(c1,c2) if cp1!=cp2 ][0]
                     if all([ (dn in ['A','G'])|(dn in ['C','T']) for dn in diff_nucs ]):
                         inst[i1,i2] *= g['kappa'] # multiply kappa to transition substitutions
-    inst = inst.dot(numpy.diag(g['equilibrium_frequency'])).astype(numpy.float64) # pi_j * q_ij
+    inst = inst.dot(numpy.diag(g['equilibrium_frequency'])).astype(g['float_type']) # pi_j * q_ij
     inst = scale_instantaneous_rate_matrix(inst, g['equilibrium_frequency'])
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst
@@ -109,7 +109,7 @@ def get_rate_tensor(inst, mode, g):
             ind_tensor = numpy.arange(len(ind_cdn))
             for it1,it2 in itertools.permutations(ind_tensor, 2):
                 rate_tensor[s,it1,it2] = inst[ind_cdn[it1],ind_cdn[it2]]
-    rate_tensor = rate_tensor.astype(numpy.float64)
+    rate_tensor = rate_tensor.astype(g['float_type'])
     return rate_tensor
 
 def cdn2pep_matrix(inst_cdn, g):
@@ -137,7 +137,7 @@ def cdn2pep_matrix(inst_cdn, g):
 def exchangeability2instantaneous_rate_matrix(g):
     ex = g['exchangeability_matrix']
     eq = get_equilibrium_frequency(g, mode='cdn')
-    inst = ex.dot(numpy.diag(eq)).astype(numpy.float64) # pi_j * s_ij
+    inst = ex.dot(numpy.diag(eq)).astype(g['float_type']) # pi_j * s_ij
     inst = scale_instantaneous_rate_matrix(inst, eq)
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst
@@ -158,7 +158,7 @@ def get_equilibrium_frequency(g, mode):
             aa_indices = g['synonymous_indices'][aa]
             eq_pep[i] = eq[aa_indices].sum()
         txt = 'Equilibrium amino acid frequency should sum to 1.'
-        assert abs(eq_pep.sum()-1)<10**-9, txt
+        assert abs(eq_pep.sum()-1)<g['float_tol'], txt
         return eq_pep
 
 def prep_state(g):

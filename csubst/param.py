@@ -14,6 +14,15 @@ def get_global_parameters(args):
         g['iqtree_rate'] = g['aln_file']+'.rate'
     if (g['iqtree_iqtree']=='infer'):
         g['iqtree_iqtree'] = g['aln_file']+'.iqtree'
+    if (g['float_type']==16):
+        g['float_type'] = numpy.float16
+        g['float_tol'] = 10**-2
+    elif (g['float_type']==32):
+        g['float_type'] = numpy.float32
+        g['float_tol'] = 10**-4
+    elif (g['float_type']==64):
+        g['float_type'] = numpy.float64
+        g['float_tol'] = 10**-9
     return g
 
 def get_dep_ids(g):

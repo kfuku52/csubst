@@ -85,7 +85,7 @@ def read_iqtree(g):
     pi = pandas.DataFrame(index=g['codon_orders'], columns=['freq',])
     for m in re.finditer(r'  pi\(([A-Z]+)\) = ([0-9.]+)', txt, re.MULTILINE):
         pi.at[m.group(1),'freq'] = float(m.group(2))
-    g['equilibrium_frequency'] = pi.loc[:,'freq'].values.astype(numpy.float64)
+    g['equilibrium_frequency'] = pi.loc[:,'freq'].values.astype(g['float_type'])
     g['equilibrium_frequency'] /= g['equilibrium_frequency'].sum()
     return g
 
@@ -149,13 +149,13 @@ def get_state_tensor(g):
     num_node = len(list(g['tree'].traverse()))
     state_table = pandas.read_csv(g['iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
     axis = [num_node, g['num_input_site'], g['num_input_state']]
-    state_tensor = numpy.zeros(axis, dtype=numpy.float64)
+    state_tensor = numpy.zeros(axis, dtype=g['float_type'])
     for node in g['tree'].traverse():
         if node.is_root():
             continue
         elif node.is_leaf():
             seq = node.sequence.upper()
-            state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=numpy.float64)
+            state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=g['float_type'])
             if g['input_data_type']=='cdn':
                 assert len(seq)%3==0, 'Sequence length is not multiple of 3. Node name = '+node.name
                 for s in numpy.arange(int(len(seq)/3)):

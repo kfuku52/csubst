@@ -1,5 +1,7 @@
 import time
 
+#from scipy.stats import chi2_contingency
+
 from csubst import parser_misc
 from csubst import genetic_code
 from csubst import foreground
@@ -18,6 +20,16 @@ def get_linear_regression(cb):
         coef,residuals,rank,s = numpy.linalg.lstsq(x, y, rcond=None)
         cb.loc[:,prefix+'_linreg_residual'] = y - (x[:,0]*coef[0])
     return cb
+
+
+def chisq_test(x, total_S, total_N):
+    obs = x.loc[['Sany2spe','Nany2spe']].values
+    if obs.sum()==0:
+        return 1
+    else:
+        contingency_table = numpy.array([obs, [total_S, total_N]])
+        out = chi2_contingency(contingency_table, lambda_="log-likelihood")
+        return out[1]
 
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
     end_flag = 0
@@ -67,11 +79,15 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         cb = calc_substitution_patterns(cb)
         cb, g = calc_omega(cb, b, S_tensor, N_tensor, g)
         cb = get_linear_regression(cb)
+        #total_S = cb.loc[:,'Sany2spe'].sum()
+        #total_N = cb.loc[:,'Nany2spe'].sum()
+        #cb.loc[:,'chisq_p'] = cb.apply(chisq_test, args=(total_S, total_N), axis=1)
         cb, g = foreground.get_foreground_branch_num(cb, g)
         if write_cb:
             file_name = "csubst_cb_" + str(current_arity) + ".tsv"
             cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
-            print(cb.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
+            txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
+            print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
         med_dist_bl = cb.loc[(cb.loc[:,'fg_branch_num']==current_arity),'dist_bl'].median()
         med_dist_node_num = cb.loc[(cb.loc[:,'fg_branch_num']==current_arity),'dist_node_num'].median()
@@ -137,7 +153,8 @@ def main_analyze(g):
         bs = get_bs(S_tensor, N_tensor)
         bs = sort_labels(df=bs)
         bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
-        print(bs.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
+        txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
+        print(txt.format(bs.values.nbytes/1024/1024, bs.values.dtype), flush=True)
         del bs
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
@@ -152,7 +169,8 @@ def main_analyze(g):
         del sS, sN
         if (g['s']):
             s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
-        print(s.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
+        txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
+        print(txt.format(s.values.nbytes/1024/1024, s.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 
@@ -178,7 +196,8 @@ def main_analyze(g):
         g['branch_table'] = b
         if (g['b']):
             b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
-        print(b.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
+        txt = 'Memory consumption of b table: {:,.1f} Mbytes (dtype={})'
+        print(txt.format(b.values.nbytes/1024/1024, b.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
 
@@ -192,7 +211,8 @@ def main_analyze(g):
         cs = merge_tables(csS, csN)
         del csS, csN
         cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
-        print(cs.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
+        txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
+        print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         del cs
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
@@ -207,7 +227,8 @@ def main_analyze(g):
         cbs = merge_tables(cbsS, cbsN)
         del cbsS, cbsN
         cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
-        print(cbs.info(verbose=False, max_cols=0, memory_usage=True, null_counts=False), flush=True)
+        txt = 'Memory consumption of cbs table: {:,.1f} Mbytes (dtype={})'
+        print(txt.format(cbs.values.nbytes/1024/1024, cbs.values.dtype), flush=True)
         del cbs
         elapsed_time = int(time.time() - start)
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
