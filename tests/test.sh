@@ -31,8 +31,8 @@ csubst \
 --cb yes \
 --bs yes \
 --cbs no \
---target_stat omega_any2spe_asrv \
---min_stat 3 \
+--cutoff_stat omega_any2spe_asrv \
+--cutoff_stat_min 3 \
 --min_branch_sub 1 \
 --min_Nany2spe 5 \
 --exclude_sisters yes \

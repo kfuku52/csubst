@@ -237,7 +237,7 @@ def get_foreground_branch_num(cb, g):
                 is_dep = is_dep & (cb.loc[:,'branch_id_'+str(i+1)]==bids)
             cb.loc[is_dep,'is_foreground'] = 'N'
     is_foreground = (cb.loc[:,'is_foreground']=='Y')
-    is_enough_stat = (cb.loc[:,g['target_stat']]>=g['min_stat'])
+    is_enough_stat = (cb.loc[:,g['cutoff_stat']]>=g['cutoff_stat_min'])
     num_enough = is_enough_stat.sum()
     num_fg = is_foreground.sum()
     num_fg_enough = (is_enough_stat&is_foreground).sum()
@@ -250,13 +250,13 @@ def get_foreground_branch_num(cb, g):
         conc_factor = (num_fg_enough/num_enough) / (num_fg/num_all)
     txt = 'arity={}, foreground branch combinations with {} >= {} = {:.0f}% ({:,}/{:,}, ' \
           'total examined = {:,}, concentration factor = {:.1f})'
-    txt = txt.format(arity, g['target_stat'], g['min_stat'], percent_fg_enough, num_fg_enough, num_enough, num_all, conc_factor)
+    txt = txt.format(arity, g['cutoff_stat'], g['cutoff_stat_min'], percent_fg_enough, num_fg_enough, num_enough, num_all, conc_factor)
     print(txt, flush=True)
     is_arity = (g['df_cb_stats'].loc[:,'arity']==arity)
-    g['df_cb_stats'].loc[is_arity,'num_examined'] = num_all
+    g['df_cb_stats'].loc[is_arity,'num_all'] = num_all
     g['df_cb_stats'].loc[is_arity,'num_fg'] = num_fg
-    g['df_cb_stats'].loc[is_arity,'num_qualified'] = num_enough
-    g['df_cb_stats'].loc[is_arity,'num_fg_qualified'] = num_fg_enough
+    g['df_cb_stats'].loc[is_arity,'num_qualified_all'] = num_enough
+    g['df_cb_stats'].loc[is_arity,'num_qualified_fg'] = num_fg_enough
     g['df_cb_stats'].loc[is_arity,'fg_conc_factor'] = conc_factor
     return cb, g
 

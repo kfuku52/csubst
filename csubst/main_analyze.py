@@ -49,7 +49,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
                 if id_combinations is None:
                     g,id_combinations = get_node_combinations(g=g, arity=current_arity, check_attr="name")
         elif (current_arity > 2):
-            is_stat_enough = (cb.loc[:,g['target_stat']] >= g['min_stat']) | (cb.loc[:,g['target_stat']].isnull())
+            is_stat_enough = (cb.loc[:,g['cutoff_stat']] >= g['cutoff_stat_min']) | (cb.loc[:,g['cutoff_stat']].isnull())
             is_combinat_sub_enough = ((cb.loc[:,'Nany2any']+cb.loc[:,'Nany2any']) >= g['min_combinat_sub'])
             is_branch_sub_enough = True
             for a in numpy.arange(current_arity - 1):
@@ -89,10 +89,14 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
-        med_dist_bl = cb.loc[(cb.loc[:,'fg_branch_num']==current_arity),'dist_bl'].median()
-        med_dist_node_num = cb.loc[(cb.loc[:,'fg_branch_num']==current_arity),'dist_node_num'].median()
-        g['df_cb_stats'].loc[is_arity,'fg_median_dist_bl'] = med_dist_bl
-        g['df_cb_stats'].loc[is_arity,'fg_median_dist_node_num'] = med_dist_node_num
+        is_fg = (cb.loc[:,'fg_branch_num']==current_arity)
+        median_stats = ['dist_bl','dist_node_num','omega_any2any','omega_any2spe','omega_any2dif']
+        for ms in median_stats:
+            col_all = 'median_'+ms+'_all'
+            g['df_cb_stats'].loc[is_arity,col_all] = cb.loc[:,ms].median()
+            if any(is_fg):
+                col_fg = 'median_'+ms+'_fg'
+                g['df_cb_stats'].loc[is_arity,col_fg] = cb.loc[is_fg,ms].median()
         elapsed_time = int(time.time() - start)
         g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
         print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)

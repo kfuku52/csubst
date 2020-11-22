@@ -65,12 +65,11 @@ def get_dep_ids(g):
 def initialize_df_cb_stats(g):
     if g['cb_stats'] is None:
         ind = numpy.arange(0, g['max_arity'])
-        cols = ['arity','elapsed_sec','fg_median_dist_bl','fg_median_dist_node_num',]
-        cols = cols + ['num_examined','num_fg','num_qualified','num_fg_qualified','fg_conc_factor',]
+        cols = ['arity','elapsed_sec','num_all','num_fg','num_qualified_all','num_qualified_fg','fg_conc_factor',]
         g['df_cb_stats'] = pandas.DataFrame(index=ind, columns=cols)
         g['df_cb_stats'].loc[:,'arity'] = ind + 1
-        g['df_cb_stats'].loc[:,'target_stat'] = g['target_stat']
-        g['df_cb_stats'].loc[:,'min_stat'] = g['min_stat']
+        g['df_cb_stats'].loc[:,'cutoff_stat'] = g['cutoff_stat']
+        g['df_cb_stats'].loc[:,'cutoff_stat_min'] = g['cutoff_stat_min']
     else:
         g['df_cb_stats'] = pandas.read_csv(g['cb_stats'], sep='\t', header=0)
     return(g)

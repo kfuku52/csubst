@@ -146,11 +146,11 @@ analyze.add_argument('--ml_anc', metavar='yes|no', default='no', type=strtobool,
 analyze.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,
                      help='default=%(default)s: The minimum posterior probability of single substitutions to count. '
                           'Set 0 for a counting without binarization. Omitted if --ml_anc is set to "yes".')
-analyze.add_argument('--target_stat', metavar='[omega_any2spe|omega_any2any|QNany2spe...]', default='omega_any2spe',
+analyze.add_argument('--cutoff_stat', metavar='[omega_any2spe|omega_any2any|QNany2spe...]', default='omega_any2spe',
                      type=str,
                      help='default=%(default)s: The statistics used to explore higher-order branch combinations.')
-analyze.add_argument('--min_stat', metavar='FLOAT', default=1.0, type=float,
-                     help='default=%(default)s: If a branch combination has a target_stat value greater than this value, '
+analyze.add_argument('--cutoff_stat_min', metavar='FLOAT', default=1.0, type=float,
+                     help='default=%(default)s: If a branch combination has a cutoff_stat value greater than this value, '
                           'higher-order combinations are explored.')
 analyze.add_argument('--min_branch_sub', metavar='FLOAT', default=1.0, type=float,
                      help='default=%(default)s: Minimum substitutions in a branch. '
