@@ -94,10 +94,10 @@ psr_fg.add_argument('--fg_exclude_wg', metavar='yes|no', default='yes', type=str
 psr_fg.add_argument('--fg_stem_only', metavar='yes|no', default='no', type=strtobool,
                 help='default=%(default)s: Set "yes" to exclude non-stem branches of foreground lineages.')
 psr_fg.add_argument('--fg_parent', metavar='yes|no', default='no', type=strtobool,
-                help='default=%(default)s: Include the parent branches of the foreground stem branches. '
+                help='default=%(default)s: Mark the parent branches of the foreground stem branches as "marginal". '
                      'They may serve as "negative controls" relative to the foreground lineages.')
-psr_fg.add_argument('--fg_sister', metavar='yes|no', default='no', type=strtobool,
-                help='default=%(default)s: Include the sister branches of the foreground stem branches. '
+psr_fg.add_argument('--fg_sister', metavar='yes|no', default='yes', type=strtobool,
+                help='default=%(default)s: Mark the sister branches of the foreground stem branches as "marginal". '
                      'They may serve as "negative controls" relative to the foreground lineages.')
 psr_fg.add_argument('--fg_sister_stem_only', metavar='yes|no', default='no', type=strtobool,
                 help='default=%(default)s: Set "yes" to exclude non-stem branches of sister lineages.')
@@ -118,7 +118,6 @@ simulate.add_argument('--num_partition', metavar='INT', default=1, type=int,
                            'If --convergent_amino_acids randomN, Convergent amino acids are randomly selected within each partition. ')
 simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=1, type=float,
                       help='default=%(default)s: Branch lengths are multiplied by this value.')
-# TODO randomN should pick different amino acids in each partitions. Partitions should be introduced
 simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random2', type=str,
                       help='default=%(default)s: Undelimited list of amino acids the sequence converges into. '
                            'e.g, AQTS, ACQ, WDETS... '
@@ -217,6 +216,6 @@ else:
     parser.print_help()
 
 # End time
-txt = "\ncsubst completed. Elapsed time = {:,} sec"
+txt = "\ncsubst completed. Elapsed time = {:,.1f} sec"
 print(txt.format(int(time.time() - csubst_start)), flush=True)
 print('csubst end:', datetime.datetime.now(datetime.timezone.utc), flush=True)

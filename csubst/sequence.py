@@ -46,5 +46,5 @@ def write_alignment(state, orders, outfile, mode, g):
                 aln_tmp += missing_state
         aln_out += aln_tmp+'\n'
     with open(outfile, 'w') as f:
-        print('Writing an alignment:', outfile, flush=True)
+        print('Writing alignment:', outfile, flush=True)
         f.write(aln_out)

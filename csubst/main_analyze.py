@@ -37,7 +37,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
     g['df_cb_stats'].loc[:,'mode'] = mode
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
-        print("Making combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
+        print("Generating combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
         g['current_arity'] = current_arity
         if (current_arity == 2):
             if (g['foreground'] is not None) & (g['fg_force_exhaustive']==False):
@@ -89,17 +89,25 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
-        is_fg = (cb.loc[:,'fg_branch_num']==current_arity)
+        suffices = list()
+        is_targets = list()
+        suffices.append('_all')
+        is_targets.append(numpy.ones(shape=cb.shape[0], dtype=numpy.bool))
+        target_cols = ['is_foreground','is_marginal','is_marginal_and_foreground']
+        suffix_candidates = ['_fg','_mg','_mf']
+        for target_col,sc in zip(target_cols,suffix_candidates):
+            if target_col in cb.columns:
+                suffices.append(sc)
+                is_targets.append(cb.loc[:,target_col]=='Y')
         median_stats = ['dist_bl','dist_node_num','omega_any2any','omega_any2spe','omega_any2dif']
-        for ms in median_stats:
-            col_all = 'median_'+ms+'_all'
-            g['df_cb_stats'].loc[is_arity,col_all] = cb.loc[:,ms].median()
-            if any(is_fg):
-                col_fg = 'median_'+ms+'_fg'
-                g['df_cb_stats'].loc[is_arity,col_fg] = cb.loc[is_fg,ms].median()
+        for suffix,is_target in zip(suffices,is_targets):
+            for ms in median_stats:
+                col = 'median_'+ms+suffix
+                g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
+            g['df_cb_stats'].loc[is_arity,'num_'+suffix] = is_target.sum()
         elapsed_time = int(time.time() - start)
         g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
-        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
         if end_flag:
             print('No combination satisfied phylogenetic independency. Ending branch combination analysis.')
             break
@@ -167,18 +175,18 @@ def main_analyze(g):
     N_total = numpy.nan_to_num(N_tensor).sum(axis=(0, 1, 2, 3, 4))
     num_branch = g['num_node'] - 1
     num_site = S_tensor.shape[1]
-    print('Synonymous substitutions / tree = {:,}'.format(S_total), flush=True)
-    print('Nonsynonymous substitutions / tree = {:,}'.format(N_total), flush=True)
-    print('Synonymous substitutions / branch =', S_total / num_branch, flush=True)
-    print('Nonsynonymous substitutions / branch =', N_total / num_branch, flush=True)
-    print('Synonymous substitutions / site =', S_total / num_site, flush=True)
-    print('Nonsynonymous substitutions / site =', N_total / num_site, flush=True)
+    print('Synonymous substitutions / tree = {:,.1f}'.format(S_total), flush=True)
+    print('Nonsynonymous substitutions / tree = {:,.1f}'.format(N_total), flush=True)
+    print('Synonymous substitutions / branch = {:,.1f}'.format(S_total / num_branch), flush=True)
+    print('Nonsynonymous substitutions / branch = {:,.1f}'.format(N_total / num_branch), flush=True)
+    print('Synonymous substitutions / site = {:,.1f}'.format(S_total / num_site), flush=True)
+    print('Nonsynonymous substitutions / site = {:,.1f}'.format(N_total / num_site), flush=True)
     elapsed_time = int(time.time() - start)
-    print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+    print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if (g['bs']):
         start = time.time()
-        print("Making branch-site table.", flush=True)
+        print("Generating branch-site table.", flush=True)
         bs = get_bs(S_tensor, N_tensor)
         bs = sort_labels(df=bs)
         bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
@@ -186,11 +194,11 @@ def main_analyze(g):
         print(txt.format(bs.values.nbytes/1024/1024, bs.values.dtype), flush=True)
         del bs
         elapsed_time = int(time.time() - start)
-        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if (g['s']) | (g['cb']):
         start = time.time()
-        print("Making site table.", flush=True)
+        print("Generating site table.", flush=True)
         sS = get_s(S_tensor, attr='S')
         sN = get_s(N_tensor, attr='N')
         s = merge_tables(sS, sN)
@@ -201,7 +209,7 @@ def main_analyze(g):
         txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(s.values.nbytes/1024/1024, s.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
-        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if g['omega_method']!='rec':
         g['state_cdn'] = None
@@ -209,7 +217,7 @@ def main_analyze(g):
 
     if (g['b']) | (g['cb']):
         start = time.time()
-        print("Making branch table.", flush=True)
+        print("Generating branch table.", flush=True)
         bS = get_b(g, S_tensor, attr='S')
         bN = get_b(g, N_tensor, attr='N')
         b = merge_tables(bS, bN)
@@ -228,11 +236,11 @@ def main_analyze(g):
         txt = 'Memory consumption of b table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(b.values.nbytes/1024/1024, b.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
-        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if (g['cs']):
         start = time.time()
-        print("Making combinat-site table.", flush=True)
+        print("Generating combinat-site table.", flush=True)
         if id_combinations is None:
             g,id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
         csS = get_cs(id_combinations, S_tensor, attr='S')
@@ -244,11 +252,11 @@ def main_analyze(g):
         print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         del cs
         elapsed_time = int(time.time() - start)
-        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if (g['cbs']):
         start = time.time()
-        print("Making combinat-branch-site table.", flush=True)
+        print("Generating combinat-branch-site table.", flush=True)
         if id_combinations is None:
             g,id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
         cbsS = get_cbs(id_combinations, S_tensor, attr='S', g=g)
@@ -260,7 +268,7 @@ def main_analyze(g):
         print(txt.format(cbs.values.nbytes/1024/1024, cbs.values.dtype), flush=True)
         del cbs
         elapsed_time = int(time.time() - start)
-        print(("elapsed_time: {0}".format(elapsed_time)) + "[sec]\n", flush=True)
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()

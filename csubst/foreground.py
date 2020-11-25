@@ -221,21 +221,31 @@ def get_foreground_branch_num(cb, g):
     bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
     arity = len(bid_cols)
     if g['foreground'] is None:
-        cb.loc[:,'fg_branch_num'] = arity
+        cb.loc[:,'foreground_branch_num'] = arity
+        cb.loc[:,'mg_branch_num'] = 0
     else:
-        fg_id_set = set(g['fg_id'])
-        cb.loc[:,'fg_branch_num'] = 0
-        for i in cb.index:
-            branch_id_set = set(cb.loc[i,bid_cols].values)
-            cb.at[i,'fg_branch_num'] = arity - len(branch_id_set.difference(fg_id_set))
+        for id_key,newcol in zip(['fg_id','marginal_id'],['foreground_branch_num','marginal_branch_num']):
+            if not id_key in g.keys():
+                continue
+            id_set = set(g[id_key])
+            cb.loc[:,newcol] = 0
+            for i in cb.index:
+                branch_id_set = set(cb.loc[i,bid_cols].values)
+                cb.at[i,newcol] = arity - len(branch_id_set.difference(id_set))
     cb.loc[:,'is_foreground'] = 'N'
-    cb.loc[(cb.loc[:,'fg_branch_num']==arity),'is_foreground'] = 'Y'
+    cb.loc[(cb.loc[:,'foreground_branch_num']==arity),'is_foreground'] = 'Y'
     if (g['fg_dependent_id_combinations'] is not None):
         for i in numpy.arange(g['fg_dependent_id_combinations'].shape[0]):
             is_dep = True
             for i,bids in enumerate(g['fg_dependent_id_combinations'][i,:]):
                 is_dep = is_dep & (cb.loc[:,'branch_id_'+str(i+1)]==bids)
             cb.loc[is_dep,'is_foreground'] = 'N'
+    cb.loc[:,'is_marginal'] = 'N'
+    cb.loc[(cb.loc[:,'marginal_branch_num']==arity),'is_marginal'] = 'Y'
+    cb.loc[:,'is_marginal_and_foreground'] = 'N'
+    is_mg = (cb.loc[:,'foreground_branch_num']>0)& (cb.loc[:,'marginal_branch_num']>0)
+    is_mg = (is_mg)&((cb.loc[:,'foreground_branch_num']+cb.loc[:,'marginal_branch_num'])==arity)
+    cb.loc[is_mg,'is_marginal_and_foreground'] = 'Y'
     is_foreground = (cb.loc[:,'is_foreground']=='Y')
     is_enough_stat = (cb.loc[:,g['cutoff_stat']]>=g['cutoff_stat_min'])
     num_enough = is_enough_stat.sum()
@@ -253,8 +263,6 @@ def get_foreground_branch_num(cb, g):
     txt = txt.format(arity, g['cutoff_stat'], g['cutoff_stat_min'], percent_fg_enough, num_fg_enough, num_enough, num_all, conc_factor)
     print(txt, flush=True)
     is_arity = (g['df_cb_stats'].loc[:,'arity']==arity)
-    g['df_cb_stats'].loc[is_arity,'num_all'] = num_all
-    g['df_cb_stats'].loc[is_arity,'num_fg'] = num_fg
     g['df_cb_stats'].loc[is_arity,'num_qualified_all'] = num_enough
     g['df_cb_stats'].loc[is_arity,'num_qualified_fg'] = num_fg_enough
     g['df_cb_stats'].loc[is_arity,'fg_conc_factor'] = conc_factor
