@@ -4,27 +4,6 @@ from csubst.substitution import *
 from csubst.combination import *
 from csubst.omega_cy import *
 
-def get_Econv_unif_permutation(cb, sub_tensor):
-    num_site = sub_tensor.shape[1]
-    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-    sub_bad = sub_tensor.sum(axis=1)  # branch, matrix_group, ancestral_state, derived_state
-    E_conv_b = 0
-    for sg in numpy.arange(sub_bad.shape[1]):
-        for a in numpy.arange(sub_bad.shape[2]):
-            for d in numpy.arange(sub_bad.shape[3]):
-                if a != d:
-                    df_sub_ad = pandas.DataFrame({
-                        'branch_id': numpy.arange(sub_bad.shape[0]),
-                        'sub_per_site': sub_bad[:, sg, a, d] / num_site,
-                    })
-                    tmp_E_conv = 1
-                    for bc in bid_columns:
-                        df_tmp = pandas.merge(cb.loc[:, [bc, ]], df_sub_ad, left_on=bc, right_on='branch_id',
-                                              how='left', sort=False)
-                        tmp_E_conv *= df_tmp['sub_per_site']
-                    E_conv_b += tmp_E_conv
-    return E_conv_b
-
 def calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g):
     E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]

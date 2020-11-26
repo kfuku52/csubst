@@ -35,7 +35,7 @@ csubst \
 --cutoff_stat_min 3 \
 --min_branch_sub 1 \
 --min_Nany2spe 5 \
---exclude_sisters yes \
+--exclude_sister_pair yes \
 --num_subsample 10000 \
 --omega_method permutation \
 --fg_exclude_wg no \

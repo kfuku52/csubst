@@ -32,7 +32,7 @@ def get_dep_ids(g):
         dep_id = [leaf.numerical_label,] + ancestor_nn
         dep_id = numpy.sort(numpy.array(dep_id))
         dep_ids.append(dep_id)
-    if g['exclude_sisters']:
+    if g['exclude_sister_pair']:
         for node in g['tree'].traverse():
             children = node.get_children()
             if len(children)>1:
@@ -55,8 +55,8 @@ def get_dep_ids(g):
                             tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
             if len(tmp_fg_dep_ids)>1:
                 fg_dep_ids.append(numpy.sort(numpy.array(tmp_fg_dep_ids)))
-        if (g['fg_sister'])|(g['fg_parent']):
-            fg_dep_ids.append(numpy.sort(numpy.array(g['marginal_id'])))
+        if (g['mg_sister'])|(g['mg_parent']):
+            fg_dep_ids.append(numpy.sort(numpy.array(g['mg_id'])))
         g['fg_dep_ids'] = fg_dep_ids
     else:
         g['fg_dep_ids'] = numpy.array([])
@@ -65,7 +65,7 @@ def get_dep_ids(g):
 def initialize_df_cb_stats(g):
     if g['cb_stats'] is None:
         ind = numpy.arange(0, g['max_arity'])
-        cols = ['arity','elapsed_sec','num_all','num_fg','num_qualified_all','num_qualified_fg','fg_conc_factor',]
+        cols = ['arity','elapsed_sec','fg_enrichment_factor',]
         g['df_cb_stats'] = pandas.DataFrame(index=ind, columns=cols)
         g['df_cb_stats'].loc[:,'arity'] = ind + 1
         g['df_cb_stats'].loc[:,'cutoff_stat'] = g['cutoff_stat']

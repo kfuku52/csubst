@@ -102,7 +102,7 @@ csubst analyze \
 --max_arity 2 \
 --foreground foreground.txt \
 --fg_stem_only yes \
---fg_force_exhaustive yes \
+--force_exhaustive yes \
 --asrv each \
 --nslots 4
 

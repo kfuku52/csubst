@@ -193,27 +193,27 @@ def get_marginal_branch(g):
     marginal_ids = list()
     for node in g['tree'].traverse():
         if (node.is_foreground==True)&(not node.is_root()):
-            if (g['fg_parent']):
+            if (g['mg_parent']):
                 if node.up.is_foreground==False:
                     marginal_ids.append(node.up.numerical_label)
-            if (g['fg_sister']):
+            if (g['mg_sister']):
                 sisters = node.get_sisters()
                 for sister in sisters:
-                    if (g['fg_sister_stem_only']):
+                    if (g['mg_sister_stem_only']):
                         if sister.is_foreground==False:
                             marginal_ids.append(sister.numerical_label)
                     else:
                         for sister_des in sister.traverse():
                             if sister_des.is_foreground==False:
                                 marginal_ids.append(sister_des.numerical_label)
-    g['marginal_id'] = numpy.array(list(set(marginal_ids)-set(g['target_id'])), dtype=numpy.int)
-    g['target_id'] = numpy.concatenate([g['target_id'], g['marginal_id']])
+    g['mg_id'] = numpy.array(list(set(marginal_ids)-set(g['target_id'])), dtype=numpy.int)
+    g['target_id'] = numpy.concatenate([g['target_id'], g['mg_id']])
     for node in g['tree'].traverse():
         node.is_marginal = False # initializing
-        if node.numerical_label in g['marginal_id']:
+        if node.numerical_label in g['mg_id']:
             node.is_marginal = True
     with open('csubst_marginal_branch.txt', 'w') as f:
-        for x in g['marginal_id']:
+        for x in g['mg_id']:
             f.write(str(x)+'\n')
     return g
 
@@ -221,10 +221,10 @@ def get_foreground_branch_num(cb, g):
     bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
     arity = len(bid_cols)
     if g['foreground'] is None:
-        cb.loc[:,'foreground_branch_num'] = arity
-        cb.loc[:,'mg_branch_num'] = 0
+        cb.loc[:,'branch_num_fg'] = arity
+        cb.loc[:,'branch_num_mg'] = 0
     else:
-        for id_key,newcol in zip(['fg_id','marginal_id'],['foreground_branch_num','marginal_branch_num']):
+        for id_key,newcol in zip(['fg_id','mg_id'],['branch_num_fg','branch_num_mg']):
             if not id_key in g.keys():
                 continue
             id_set = set(g[id_key])
@@ -232,21 +232,21 @@ def get_foreground_branch_num(cb, g):
             for i in cb.index:
                 branch_id_set = set(cb.loc[i,bid_cols].values)
                 cb.at[i,newcol] = arity - len(branch_id_set.difference(id_set))
-    cb.loc[:,'is_foreground'] = 'N'
-    cb.loc[(cb.loc[:,'foreground_branch_num']==arity),'is_foreground'] = 'Y'
+    cb.loc[:,'is_fg'] = 'N'
+    cb.loc[(cb.loc[:,'branch_num_fg']==arity),'is_fg'] = 'Y'
     if (g['fg_dependent_id_combinations'] is not None):
         for i in numpy.arange(g['fg_dependent_id_combinations'].shape[0]):
             is_dep = True
             for i,bids in enumerate(g['fg_dependent_id_combinations'][i,:]):
                 is_dep = is_dep & (cb.loc[:,'branch_id_'+str(i+1)]==bids)
-            cb.loc[is_dep,'is_foreground'] = 'N'
-    cb.loc[:,'is_marginal'] = 'N'
-    cb.loc[(cb.loc[:,'marginal_branch_num']==arity),'is_marginal'] = 'Y'
-    cb.loc[:,'is_marginal_and_foreground'] = 'N'
-    is_mg = (cb.loc[:,'foreground_branch_num']>0)& (cb.loc[:,'marginal_branch_num']>0)
-    is_mg = (is_mg)&((cb.loc[:,'foreground_branch_num']+cb.loc[:,'marginal_branch_num'])==arity)
-    cb.loc[is_mg,'is_marginal_and_foreground'] = 'Y'
-    is_foreground = (cb.loc[:,'is_foreground']=='Y')
+            cb.loc[is_dep,'is_fg'] = 'N'
+    cb.loc[:,'is_mg'] = 'N'
+    cb.loc[(cb.loc[:,'branch_num_mg']==arity),'is_mg'] = 'Y'
+    cb.loc[:,'is_mf'] = 'N'
+    is_mg = (cb.loc[:,'branch_num_fg']>0)& (cb.loc[:,'branch_num_mg']>0)
+    is_mg = (is_mg)&((cb.loc[:,'branch_num_fg']+cb.loc[:,'branch_num_mg'])==arity)
+    cb.loc[is_mg,'is_mf'] = 'Y'
+    is_foreground = (cb.loc[:,'is_fg']=='Y')
     is_enough_stat = (cb.loc[:,g['cutoff_stat']]>=g['cutoff_stat_min'])
     num_enough = is_enough_stat.sum()
     num_fg = is_foreground.sum()
@@ -254,31 +254,32 @@ def get_foreground_branch_num(cb, g):
     num_all = cb.shape[0]
     if (num_enough==0)|(num_fg==0):
         percent_fg_enough = 0
-        conc_factor = 0
+        enrichment_factor = 0
     else:
         percent_fg_enough = num_fg_enough / num_enough * 100
-        conc_factor = (num_fg_enough/num_enough) / (num_fg/num_all)
+        enrichment_factor = (num_fg_enough/num_enough) / (num_fg/num_all)
     txt = 'arity={}, foreground branch combinations with {} >= {} = {:.0f}% ({:,}/{:,}, ' \
           'total examined = {:,}, concentration factor = {:.1f})'
-    txt = txt.format(arity, g['cutoff_stat'], g['cutoff_stat_min'], percent_fg_enough, num_fg_enough, num_enough, num_all, conc_factor)
+    txt = txt.format(arity, g['cutoff_stat'], g['cutoff_stat_min'], percent_fg_enough, num_fg_enough, num_enough,
+                     num_all, enrichment_factor)
     print(txt, flush=True)
     is_arity = (g['df_cb_stats'].loc[:,'arity']==arity)
-    g['df_cb_stats'].loc[is_arity,'num_qualified_all'] = num_enough
-    g['df_cb_stats'].loc[is_arity,'num_qualified_fg'] = num_fg_enough
-    g['df_cb_stats'].loc[is_arity,'fg_conc_factor'] = conc_factor
+    #g['df_cb_stats'].loc[is_arity,'num_qualified_all'] = num_enough
+    #g['df_cb_stats'].loc[is_arity,'num_qualified_fg'] = num_fg_enough
+    g['df_cb_stats'].loc[is_arity,'fg_enrichment_factor'] = enrichment_factor
     return cb, g
 
 def annotate_foreground(b, g):
     if len(g['fg_id']):
-        b.loc[:,'is_foreground'] = 'no'
-        b.loc[g['fg_id'],'is_foreground'] = 'yes'
+        b.loc[:,'is_fg'] = 'no'
+        b.loc[g['fg_id'],'is_fg'] = 'yes'
     else:
-        b.loc[:,'is_foreground'] = 'yes'
-    if len(g['marginal_id']):
-        b.loc[:,'is_marginal'] = 'no'
-        b.loc[g['marginal_id'],'is_marginal'] = 'yes'
+        b.loc[:,'is_fg'] = 'yes'
+    if len(g['mg_id']):
+        b.loc[:,'is_mg'] = 'no'
+        b.loc[g['mg_id'],'is_mg'] = 'yes'
     else:
-        b.loc[:,'is_marginal'] = 'no'
+        b.loc[:,'is_mg'] = 'no'
     return b
 
 def get_num_foreground_lineages(tree):

@@ -40,7 +40,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         print("Generating combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
         g['current_arity'] = current_arity
         if (current_arity == 2):
-            if (g['foreground'] is not None) & (g['fg_force_exhaustive']==False):
+            if (g['foreground'] is not None) & (g['force_exhaustive']==False):
                 print('Searching foreground branch combinations.', flush=True)
                 g,id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
                                                           check_attr='name')
@@ -93,7 +93,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         is_targets = list()
         suffices.append('_all')
         is_targets.append(numpy.ones(shape=cb.shape[0], dtype=numpy.bool))
-        target_cols = ['is_foreground','is_marginal','is_marginal_and_foreground']
+        target_cols = ['is_fg','is_mg','is_mf']
         suffix_candidates = ['_fg','_mg','_mf']
         for target_col,sc in zip(target_cols,suffix_candidates):
             if target_col in cb.columns:
@@ -104,7 +104,9 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             for ms in median_stats:
                 col = 'median_'+ms+suffix
                 g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
-            g['df_cb_stats'].loc[is_arity,'num_'+suffix] = is_target.sum()
+            g['df_cb_stats'].loc[is_arity,'num'+suffix] = is_target.sum()
+            num_qualified = (cb.loc[is_target,g['cutoff_stat']]>=g['cutoff_stat_min']).sum()
+            g['df_cb_stats'].loc[is_arity,'num_qualified'+suffix] = num_qualified
         elapsed_time = int(time.time() - start)
         g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
