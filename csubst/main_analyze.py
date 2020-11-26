@@ -21,7 +21,6 @@ def get_linear_regression(cb):
         cb.loc[:,prefix+'_linreg_residual'] = y - (x[:,0]*coef[0])
     return cb
 
-
 def chisq_test(x, total_S, total_N):
     obs = x.loc[['Sany2spe','Nany2spe']].values
     if obs.sum()==0:
@@ -111,7 +110,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
         if end_flag:
-            print('No combination satisfied phylogenetic independency. Ending branch combination analysis.')
+            print('No combination satisfied phylogenetic independence. Ending branch combination analysis.')
             break
     g['df_cb_stats'] = g['df_cb_stats'].loc[(~g['df_cb_stats'].loc[:,'elapsed_sec'].isnull()),:]
     g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
@@ -122,7 +121,7 @@ def main_analyze(g):
     start = time.time()
     print("Reading and parsing input files.", flush=True)
     g['current_arity'] = 2
-    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['ncbi_codon_table'])
+    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['codon_table'])
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
 

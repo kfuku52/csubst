@@ -6,23 +6,28 @@ def get_global_parameters(args):
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:
         g[attr] = getattr(args, attr)
-    if (g['iqtree_treefile']=='infer'):
-        g['iqtree_treefile'] = g['aln_file']+'.treefile'
-    if (g['iqtree_state']=='infer'):
-        g['iqtree_state'] = g['aln_file']+'.state'
-    if (g['iqtree_rate']=='infer'):
-        g['iqtree_rate'] = g['aln_file']+'.rate'
-    if (g['iqtree_iqtree']=='infer'):
-        g['iqtree_iqtree'] = g['aln_file']+'.iqtree'
-    if (g['float_type']==16):
-        g['float_type'] = numpy.float16
-        g['float_tol'] = 10**-2
-    elif (g['float_type']==32):
-        g['float_type'] = numpy.float32
-        g['float_tol'] = 10**-4
-    elif (g['float_type']==64):
-        g['float_type'] = numpy.float64
-        g['float_tol'] = 10**-9
+    if 'iqtree_treefile' in g.keys():
+        if (g['iqtree_treefile']=='infer'):
+            g['iqtree_treefile'] = g['alignment_file']+'.treefile'
+    if 'iqtree_state' in g.keys():
+        if (g['iqtree_state']=='infer'):
+            g['iqtree_state'] = g['alignment_file']+'.state'
+    if 'iqtree_rate' in g.keys():
+        if (g['iqtree_rate']=='infer'):
+            g['iqtree_rate'] = g['alignment_file']+'.rate'
+    if 'iqtree_iqtree' in g.keys():
+        if (g['iqtree_iqtree']=='infer'):
+            g['iqtree_iqtree'] = g['alignment_file']+'.iqtree'
+    if 'float_type' in g.keys():
+        if (g['float_type']==16):
+            g['float_type'] = numpy.float16
+            g['float_tol'] = 10**-2
+        elif (g['float_type']==32):
+            g['float_type'] = numpy.float32
+            g['float_tol'] = 10**-4
+        elif (g['float_type']==64):
+            g['float_type'] = numpy.float64
+            g['float_tol'] = 10**-9
     return g
 
 def get_dep_ids(g):

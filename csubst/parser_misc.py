@@ -42,8 +42,8 @@ def read_input(g):
             sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
             sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
             assert (sum_tensor_aa - sum_matrix_aa)<g['float_tol'], 'Sum of rates did not match.'
-            txt = 'Sum of rates did not match. Check if --ncbi_codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
-            txt = txt.format(g['ncbi_codon_table'], g['reconstruction_codon_table'])
+            txt = 'Sum of rates did not match. Check if --codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
+            txt = txt.format(g['codon_table'], g['reconstruction_codon_table'])
             assert (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa)<g['float_tol'], txt
             numpy.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
             q_ij_x_pi_i = g['instantaneous_codon_rate_matrix'][0,1]*g['equilibrium_frequency'][0]

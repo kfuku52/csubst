@@ -38,6 +38,8 @@ setup(
     include_dirs     = [get_include(),],
     include_package_data = True,
     package_data     = {
-                            '':['substitution_matrix/*.dat'],
+                            '':['substitution_matrix/*.dat',
+                                'test_dataset/*',
+                                ],
     }
 )

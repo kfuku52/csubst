@@ -12,6 +12,15 @@ from csubst.main_analyze import *
 csubst_start = time.time()
 print('csubst start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
+def command_dataset(args):
+    print('csubst dataset start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    from csubst.main_dataset import main_dataset
+    g = get_global_parameters(args)
+    main_dataset(g)
+    print('csubst dataset: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst dataset end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
 def command_simulate(args):
     print('csubst simulate start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
@@ -40,16 +49,16 @@ subparsers = parser.add_subparsers()
 
 # shared: common
 psr_co = argparse.ArgumentParser(add_help=False)
-psr_co.add_argument('--aln_file', metavar='PATH', default='', type=str,
+psr_co.add_argument('--alignment_file', metavar='PATH', default='', type=str,
                    help='default=%(default)s: Alignment fasta file.')
 psr_co.add_argument('--rooted_tree_file', metavar='PATH', default='', type=str,
                    help='default=%(default)s: Rooted newick tree file.')
-psr_co.add_argument('--ncbi_codon_table', metavar='INTEGER', type=int, required=False, default=1,
+psr_co.add_argument('--codon_table', metavar='INTEGER', type=int, required=False, default=1,
                    help='default=%(default)s: NCBI codon table ID. See here: '
                         'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
-psr_co.add_argument('--infile_type', metavar='[phylobayes|iqtree]', default='iqtree', type=str,
-                   choices=['iqtree', 'phylobayes'],
-                   help='default=%(default)s: The input file format. PhyloBayes input may not work currently.')
+psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=str,
+                   choices=['iqtree',],
+                   help='default=%(default)s: The input file format.')
 psr_co.add_argument('--nslots', metavar='INTEGER', default=1, type=int, required=False,
                    help='default=%(default)s: The number of processors for parallel computations.')
 psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
@@ -58,20 +67,20 @@ psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, re
 # shared: IQ-TREE inputs
 psr_iq = argparse.ArgumentParser(add_help=False)
 psr_iq.add_argument('--iqtree_treefile', metavar='PATH', default='infer', type=str, required=False,
-                   help='default=%(default)s: PATH to the IQ-TREE\'s .treefile output. "infer" from --aln_file')
+                   help='default=%(default)s: PATH to the IQ-TREE\'s .treefile output. "infer" from --alignment_file')
 psr_iq.add_argument('--iqtree_state', metavar='PATH', default='infer', type=str, required=False,
-                   help='default=%(default)s: PATH to the IQ-TREE\'s .state output. "infer" from --aln_file')
+                   help='default=%(default)s: PATH to the IQ-TREE\'s .state output. "infer" from --alignment_file')
 psr_iq.add_argument('--iqtree_rate', metavar='PATH', default='infer', type=str, required=False,
-                   help='default=%(default)s: PATH to the IQ-TREE\'s .rate output. "infer" from --aln_file')
+                   help='default=%(default)s: PATH to the IQ-TREE\'s .rate output. "infer" from --alignment_file')
 psr_iq.add_argument('--iqtree_iqtree', metavar='PATH', default='infer', type=str, required=False,
-                   help='default=%(default)s: PATH to the IQ-TREE\'s .iqtree output. "infer" from --aln_file')
+                   help='default=%(default)s: PATH to the IQ-TREE\'s .iqtree output. "infer" from --alignment_file')
 psr_iq.add_argument('--iqtree_log', metavar='PATH', default='infer', type=str, required=False,
-                    help='default=%(default)s: PATH to the IQ-TREE\'s .log output. "infer" from --aln_file')
+                    help='default=%(default)s: PATH to the IQ-TREE\'s .log output. "infer" from --alignment_file')
 
 # shared: PhyloBayes inputs
 psr_pb = argparse.ArgumentParser(add_help=False)
-psr_pb.add_argument('--phylobayes_dir', metavar='PATH', default='./', type=str, required=False,
-                   help='default=%(default)s: PATH to the PhyloBayes output directory.')
+#psr_pb.add_argument('--phylobayes_dir', metavar='PATH', default='./', type=str, required=False,
+#                   help='default=%(default)s: PATH to the PhyloBayes output directory.')
 
 # shared: foreground
 psr_fg = argparse.ArgumentParser(add_help=False)
@@ -94,6 +103,14 @@ psr_fg.add_argument('--mg_sister_stem_only', metavar='yes|no', default='no', typ
 psr_fg.add_argument('--fg_random', metavar='INT', default=0, type=int,
                 help='default=%(default)s: Randomly select the same number and size of clades as foreground '
                      'and run analysis N times. Larger numbers may take time.')
+
+
+# data
+dataset = subparsers.add_parser('dataset', help='see `csubst dataset -h`', parents=[])
+dataset.add_argument('--name', metavar='STR', default='PGK', type=str, choices=['PGK',],
+                     help='default=%(default)s: Name of dataset to generate.')
+dataset.set_defaults(handler=command_dataset)
+
 
 # simulate
 simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg])

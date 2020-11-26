@@ -259,7 +259,7 @@ def get_foreground_branch_num(cb, g):
         percent_fg_enough = num_fg_enough / num_enough * 100
         enrichment_factor = (num_fg_enough/num_enough) / (num_fg/num_all)
     txt = 'arity={}, foreground branch combinations with {} >= {} = {:.0f}% ({:,}/{:,}, ' \
-          'total examined = {:,}, concentration factor = {:.1f})'
+          'total examined = {:,}, enrichment factor = {:.1f})'
     txt = txt.format(arity, g['cutoff_stat'], g['cutoff_stat_min'], percent_fg_enough, num_fg_enough, num_enough,
                      num_all, enrichment_factor)
     print(txt, flush=True)

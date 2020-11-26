@@ -60,7 +60,7 @@ def read_state(g):
 
 def read_rate(g):
     if (g['iqtree_rate']=='infer'):
-        file_path = g['aln_file']+'.rate'
+        file_path = g['alignment_file']+'.rate'
     else:
         file_path = g['iqtree_rate']
     err_txt = 'IQ-TREE\'s .rate file was not found in {}. Please specify the correct file PATH by --iqtree_rate.'
@@ -72,7 +72,7 @@ def read_rate(g):
 
 def read_iqtree(g):
     if (g['iqtree_iqtree']=='infer'):
-        file_path = g['aln_file']+'.iqtree'
+        file_path = g['alignment_file']+'.iqtree'
     else:
         file_path = g['iqtree_iqtree']
     if not os.path.exists(file_path):
@@ -98,7 +98,7 @@ def read_log(g):
     g['kappa'] = None
     g['reconstruction_codon_table'] = None
     if (g['iqtree_log']=='infer'):
-        file_path = g['aln_file']+'.log'
+        file_path = g['alignment_file']+'.log'
     else:
         file_path = g['iqtree_log']
     if not os.path.exists(file_path):
@@ -149,7 +149,7 @@ def mask_missing_sites(state_tensor, tree):
     return state_tensor
 
 def get_state_tensor(g):
-    g['tree'].link_to_alignment(alignment=g['aln_file'], alg_format='fasta')
+    g['tree'].link_to_alignment(alignment=g['alignment_file'], alg_format='fasta')
     num_node = len(list(g['tree'].traverse()))
     state_table = pandas.read_csv(g['iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
     axis = [num_node, g['num_input_site'], g['num_input_state']]

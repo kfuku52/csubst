@@ -150,7 +150,7 @@ def get_num_partition_site(g):
     return num_partition_sites
 
 def main_simulate(g):
-    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['ncbi_codon_table'])
+    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['codon_table'])
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
     plot_branch_category(g, file_name='simulate_branch_category.pdf')
@@ -162,7 +162,7 @@ def main_simulate(g):
     g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
     newick_txt = get_pyvolve_tree(tree=g['tree'])
     tree = pyvolve.read_tree(tree=newick_txt)
-    f = pyvolve.ReadFrequencies('codon', file=g['aln_file'])
+    f = pyvolve.ReadFrequencies('codon', file=g['alignment_file'])
     sf = f.compute_frequencies()
     cmp = {'omega':g['background_omega'], 'k_ti':1, 'k_tv':1} # TODO: Why background_omega have to be readjusted?
     model = pyvolve.Model(model_type='ECMunrest', name='placeholder', parameters=cmp, state_freqs=sf)
