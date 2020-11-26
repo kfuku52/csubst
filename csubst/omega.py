@@ -109,18 +109,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     return E_b
 
 def get_E(cb, g, N_tensor, S_tensor):
-    if g['omega_method']=='rho':
-        rhoNany2spe = g['df_cb_stats'].loc[(g['df_cb_stats']['arity'] == g['current_arity']), 'rhoNany2spe'].values
-        rhoSany2spe = g['df_cb_stats'].loc[(g['df_cb_stats']['arity'] == g['current_arity']), 'rhoSany2spe'].values
-        rhoNany2dif = 1 - rhoNany2spe
-        rhoSany2dif = 1 - rhoSany2spe
-        cb['ENany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='mean', SN='N', g=g)
-        cb['ESany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', stat='mean', SN='S', g=g)
-        cb['ENany2spe'] = cb['ENany2any'] * rhoNany2spe
-        cb['ENany2dif'] = cb['ENany2any'] * rhoNany2dif
-        cb['ESany2spe'] = cb['ESany2any'] * rhoSany2spe
-        cb['ESany2dif'] = cb['ESany2any'] * rhoSany2dif
-    elif g['omega_method']=='pm':
+    if g['omega_method']=='pm':
         cb['ENany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='mean', SN='N', g=g)
         cb['ENspe2any'] = calc_E_stat(cb, N_tensor, mode='spe2any', stat='mean', SN='N', g=g)
         cb['ENany2spe'] = calc_E_stat(cb, N_tensor, mode='any2spe', stat='mean', SN='N', g=g)
@@ -238,71 +227,6 @@ def print_cb_stats(cb, prefix):
     print(hd, 'median omega_any2spe =', numpy.round(cb['omega_any2spe'].median(), decimals=3), flush=True)
     print(hd, 'median omega_any2dif  =', numpy.round(cb['omega_any2dif'].median(), decimals=3), flush=True)
 
-def get_rho(cb, b, g, N_tensor, S_tensor):
-    if g['cb_stats'] is not None:
-        print('Retrieving pre-calculated rho')
-        rhoSany2spe = g['df_cb_stats'].loc[g['df_cb_stats']['arity'] == g['current_arity'], 'rhoSany2spe'].values
-        rhoNany2spe = g['df_cb_stats'].loc[g['df_cb_stats']['arity'] == g['current_arity'], 'rhoNany2spe'].values
-        flat_cb_stats = False
-    elif g['current_arity'] == 2:
-        print('Estimating rho from all combinations in cb table')
-        cb_subsample = cb.copy()
-        rhoNany2spe = cb_subsample['Nany2spe'].sum() / cb_subsample['Nany2any'].sum()
-        rhoSany2spe = cb_subsample['Sany2spe'].sum() / cb_subsample['Sany2any'].sum()
-        subsampling_type = 'all'
-        flat_cb_stats = True
-    else:
-        print('Estimating rho from', str(g['num_subsample']), 'subsampled combinations')
-        method = 'shotgun'  # 'shotgun' is approx. 2 times faster than 'rifle'
-        if method == 'shotgun':
-            id_combinations = node_combination_subsamples_shotgun(g=g, arity=g['current_arity'], rep=g['num_subsample'])
-        elif method == 'rifle':
-            id_combinations = node_combination_subsamples_rifle(g=g, arity=g['current_arity'], rep=g['num_subsample'])
-        subsampling_type = 'subsample'
-        if id_combinations.shape[0] == 0:
-            print('Recalculating cb to estimate rho from all combinations.')
-            g,id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
-            subsampling_type = 'all'
-        cbS = get_cb(id_combinations, S_tensor, g, attr='S')
-        cbN = get_cb(id_combinations, N_tensor, g, attr='N')
-        cb_subsample = merge_tables(cbS, cbN)
-        del cbS, cbN
-        rhoNany2spe = cb_subsample['Nany2spe'].sum() / cb_subsample['Nany2any'].sum()
-        rhoSany2spe = cb_subsample['Sany2spe'].sum() / cb_subsample['Sany2any'].sum()
-        flat_cb_stats = True
-    if flat_cb_stats:
-        g['df_cb_stats'] = g['df_cb_stats'].append({
-            'arity': g['current_arity'],
-            'rhoNany2spe': rhoNany2spe,
-            'rhoSany2spe': rhoSany2spe,
-            'method': subsampling_type,
-            'num_processor': g['nslots'],
-            }, ignore_index=True)
-        if not 'S_sub_1' in cb.columns:
-            cb_subsample = get_substitutions_per_branch(cb, b, g)
-        cb_subsample = get_E(cb_subsample, g, N_tensor, S_tensor)
-        cb_subsample = get_omega(cb_subsample)
-        print_cb_stats(cb=cb_subsample, prefix='cb_subsample')
-        column_names = ['num_combinat','Sany2any','Sany2spe','Nany2any','Nany2spe',
-                        'ENany2any','ESany2any','ENany2spe','ESany2spe',]
-        for col in column_names:
-            if not col in g['df_cb_stats'].columns:
-                g['df_cb_stats'][col] = numpy.nan
-        cond = (g['df_cb_stats']['arity'] == g['current_arity'])
-        g['df_cb_stats'].loc[cond,'num_combinat'] = cb_subsample.shape[0]
-        g['df_cb_stats'].loc[cond,'Sany2any'] = cb_subsample['Sany2any'].sum()
-        g['df_cb_stats'].loc[cond,'Sany2spe'] = cb_subsample['Sany2spe'].sum()
-        g['df_cb_stats'].loc[cond,'Nany2any'] = cb_subsample['Nany2any'].sum()
-        g['df_cb_stats'].loc[cond,'Nany2spe'] = cb_subsample['Nany2spe'].sum()
-        g['df_cb_stats'].loc[cond,'ENany2any'] = cb_subsample['ENany2any'].sum()
-        g['df_cb_stats'].loc[cond,'ESany2any'] = cb_subsample['ESany2any'].sum()
-        g['df_cb_stats']['ENany2spe'] = g['df_cb_stats']['ENany2any'] * g['df_cb_stats']['rhoNany2spe']
-        g['df_cb_stats']['ESany2spe'] = g['df_cb_stats']['ESany2any'] * g['df_cb_stats']['rhoSany2spe']
-    if (g['cb_subsample'])&(g['df_cb_stats'].loc[(g['df_cb_stats']['arity']==g['current_arity']),'method'].values=='subsample'):
-        file_name = "csubst_cb_subsample_" + str(g['current_arity']) + ".tsv"
-        cb_subsample.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
-    return g
-
 def get_substitutions_per_branch(cb, b, g):
     for a in numpy.arange(g['current_arity']):
         b_tmp = b.loc[:,['branch_id','S_sub','N_sub']]
@@ -311,9 +235,7 @@ def get_substitutions_per_branch(cb, b, g):
         del b_tmp
     return(cb)
 
-def calc_omega(cb, b, S_tensor, N_tensor, g):
-    if (g['omega_method']=='rho')&(g['cb_subsample']):
-        g = get_rho(cb, b, g, N_tensor, S_tensor)
+def calc_omega(cb, S_tensor, N_tensor, g):
     cb = get_E(cb, g, N_tensor, S_tensor)
     cb = get_omega(cb)
     cb = get_CoD(cb)
