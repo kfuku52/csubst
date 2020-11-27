@@ -1,38 +1,23 @@
+import numpy
+import pandas
+
+import os
 import time
 
-#from scipy.stats import chi2_contingency
-
-from csubst import parser_misc
-from csubst import genetic_code
+from csubst import combination
 from csubst import foreground
-from csubst.omega import *
-from csubst.param import *
-from csubst.sequence import *
-from csubst.table import *
-from csubst.tree import *
-from csubst.substitution import get_sub_sites
-
-def get_linear_regression(cb):
-    for prefix in ['S','N']:
-        x = cb.loc[:,prefix+'any2any'].values
-        y = cb.loc[:,prefix+'any2spe'].values
-        x = x[:,numpy.newaxis]
-        coef,residuals,rank,s = numpy.linalg.lstsq(x, y, rcond=None)
-        cb.loc[:,prefix+'_linreg_residual'] = y - (x[:,0]*coef[0])
-    return cb
-
-def chisq_test(x, total_S, total_N):
-    obs = x.loc[['Sany2spe','Nany2spe']].values
-    if obs.sum()==0:
-        return 1
-    else:
-        contingency_table = numpy.array([obs, [total_S, total_N]])
-        out = chi2_contingency(contingency_table, lambda_="log-likelihood")
-        return out[1]
+from csubst import genetic_code
+from csubst import omega
+from csubst import param
+from csubst import parser_misc
+from csubst import sequence
+from csubst import substitution
+from csubst import table
+from csubst import tree
 
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
     end_flag = 0
-    g = initialize_df_cb_stats(g)
+    g = param.initialize_df_cb_stats(g)
     g['df_cb_stats'].loc[:,'mode'] = mode
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
@@ -41,12 +26,12 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         if (current_arity == 2):
             if (g['foreground'] is not None) & (g['force_exhaustive']==False):
                 print('Searching foreground branch combinations.', flush=True)
-                g,id_combinations = get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
+                g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
                                                           check_attr='name')
             else:
                 print('Exhaustively searching independent branch combinations.', flush=True)
                 if id_combinations is None:
-                    g,id_combinations = get_node_combinations(g=g, arity=current_arity, check_attr="name")
+                    g,id_combinations = combination.get_node_combinations(g=g, arity=current_arity, check_attr="name")
         elif (current_arity > 2):
             is_stat_enough = (cb.loc[:,g['cutoff_stat']] >= g['cutoff_stat_min']) | (cb.loc[:,g['cutoff_stat']].isnull())
             is_combinat_sub_enough = ((cb.loc[:,'Nany2any']+cb.loc[:,'Nany2any']) >= g['min_combinat_sub'])
@@ -64,23 +49,23 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
                 end_flag = 1
                 break
             del cb
-            g,id_combinations = get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
+            g,id_combinations = combination.get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
                                                     check_attr='name')
             if id_combinations.shape[0] == 0:
                 end_flag = 1
                 break
-        cbS = get_cb(id_combinations, S_tensor, g, 'S')
-        cbN = get_cb(id_combinations, N_tensor, g, 'N')
-        cb = merge_tables(cbS, cbN)
+        cbS = substitution.get_cb(id_combinations, S_tensor, g, 'S')
+        cbN = substitution.get_cb(id_combinations, N_tensor, g, 'N')
+        cb = table.merge_tables(cbS, cbN)
         del cbS, cbN
-        cb = get_node_distance(g['tree'], cb)
-        cb = get_substitutions_per_branch(cb, b, g)
-        cb = calc_substitution_patterns(cb)
-        cb, g = calc_omega(cb, S_tensor, N_tensor, g)
-        cb = get_linear_regression(cb)
+        cb = tree.get_node_distance(g['tree'], cb)
+        cb = substitution.get_substitutions_per_branch(cb, b, g)
+        cb = combination.calc_substitution_patterns(cb)
+        cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
+        cb = table.get_linear_regression(cb)
         #total_S = cb.loc[:,'Sany2spe'].sum()
         #total_N = cb.loc[:,'Nany2spe'].sum()
-        #cb.loc[:,'chisq_p'] = cb.apply(chisq_test, args=(total_S, total_N), axis=1)
+        #cb.loc[:,'chisq_p'] = cb.apply(table.chisq_test, args=(total_S, total_N), axis=1)
         cb, g = foreground.get_foreground_branch_num(cb, g)
         if write_cb:
             file_name = "csubst_cb_" + str(current_arity) + ".tsv"
@@ -125,22 +110,22 @@ def main_analyze(g):
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
 
-    write_alignment(state=g['state_cdn'], orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', mode='codon', g=g)
-    write_alignment(state=g['state_pep'], orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', mode='aa', g=g)
+    sequence.write_alignment(state=g['state_cdn'], orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', mode='codon', g=g)
+    sequence.write_alignment(state=g['state_pep'], orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', mode='aa', g=g)
 
     g = foreground.get_foreground_branch(g)
     g = foreground.get_marginal_branch(g)
-    g = get_dep_ids(g)
-    write_tree(g['tree'])
-    plot_branch_category(g, file_name='csubst_branch_category.pdf')
+    g = combination.get_dep_ids(g)
+    tree.write_tree(g['tree'])
+    tree.plot_branch_category(g, file_name='csubst_branch_category.pdf')
     if g['plot_state_aa']:
         plot_state_tree(state=g['state_pep'], orders=g['amino_acid_orders'], mode='aa', g=g)
     if g['plot_state_codon']:
         plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)
 
-    N_tensor = get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
+    N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()
-    S_tensor = get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
+    S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
 
@@ -188,8 +173,8 @@ def main_analyze(g):
     if (g['bs']):
         start = time.time()
         print("Generating branch-site table.", flush=True)
-        bs = get_bs(S_tensor, N_tensor)
-        bs = sort_labels(df=bs)
+        bs = substitution.get_bs(S_tensor, N_tensor)
+        bs = table.sort_labels(df=bs)
         bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(bs.values.nbytes/1024/1024, bs.values.dtype), flush=True)
@@ -200,10 +185,10 @@ def main_analyze(g):
     if (g['s']) | (g['cb']):
         start = time.time()
         print("Generating site table.", flush=True)
-        sS = get_s(S_tensor, attr='S')
-        sN = get_s(N_tensor, attr='N')
-        s = merge_tables(sS, sN)
-        g = get_sub_sites(g, sS, sN, state_tensor=g['state_cdn'])
+        sS = substitution.get_s(S_tensor, attr='S')
+        sN = substitution.get_s(N_tensor, attr='N')
+        s = table.merge_tables(sS, sN)
+        g = substitution.get_sub_sites(g, sS, sN, state_tensor=g['state_cdn'])
         del sS, sN
         if (g['s']):
             s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
@@ -219,9 +204,9 @@ def main_analyze(g):
     if (g['b']) | (g['cb']):
         start = time.time()
         print("Generating branch table.", flush=True)
-        bS = get_b(g, S_tensor, attr='S')
-        bN = get_b(g, N_tensor, attr='N')
-        b = merge_tables(bS, bN)
+        bS = substitution.get_b(g, S_tensor, attr='S')
+        bN = substitution.get_b(g, N_tensor, attr='N')
+        b = table.merge_tables(bS, bN)
         b.loc[:,'branch_length'] = numpy.nan
         for node in g['tree'].traverse():
             b.loc[node.numerical_label,'branch_length'] = node.dist
@@ -243,10 +228,10 @@ def main_analyze(g):
         start = time.time()
         print("Generating combinat-site table.", flush=True)
         if id_combinations is None:
-            g,id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
+            g,id_combinations = combination.get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
         csS = get_cs(id_combinations, S_tensor, attr='S')
         csN = get_cs(id_combinations, N_tensor, attr='N')
-        cs = merge_tables(csS, csN)
+        cs = table.merge_tables(csS, csN)
         del csS, csN
         cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
         txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
@@ -259,10 +244,10 @@ def main_analyze(g):
         start = time.time()
         print("Generating combinat-branch-site table.", flush=True)
         if id_combinations is None:
-            g,id_combinations = get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
+            g,id_combinations = combination.get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
         cbsS = get_cbs(id_combinations, S_tensor, attr='S', g=g)
         cbsN = get_cbs(id_combinations, N_tensor, attr='N', g=g)
-        cbs = merge_tables(cbsS, cbsN)
+        cbs = table.merge_tables(cbsS, cbsN)
         del cbsS, cbsN
         cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
         txt = 'Memory consumption of cbs table: {:,.1f} Mbytes (dtype={})'

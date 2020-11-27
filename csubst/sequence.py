@@ -1,5 +1,7 @@
 import numpy
 
+import re
+
 def calc_omega_state(state_nuc, g): # TODO, implement, exclude stop codon freq
     num_node = state_nuc.shape[0]
     num_nuc_site = state_nuc.shape[1]
@@ -39,12 +41,37 @@ def write_alignment(state, orders, outfile, mode, g):
         nlabel = node.numerical_label
         aln_tmp = '>'+node.name+'|'+str(nlabel)+'\n'
         for i in numpy.arange(state.shape[1]):
-            index = numpy.where(state[nlabel,i,:]==1)[0]
-            if len(index)==1:
-                aln_tmp += orders[index[0]]
-            elif len(index)==0:
+            if state[nlabel,i,:].max()==0:
                 aln_tmp += missing_state
+            else:
+                index = state[nlabel,i,:].argmax()
+                aln_tmp += orders[index]
         aln_out += aln_tmp+'\n'
     with open(outfile, 'w') as f:
         print('Writing alignment:', outfile, flush=True)
         f.write(aln_out)
+
+def get_state_index(state, input_state, ambiguous_table):
+    if isinstance(state, str):
+        states = [state,]
+    else:
+        print('state should be str instance.')
+    state_set = set(list(state))
+    key_set = set(ambiguous_table.keys())
+    if (len(state_set.intersection(key_set))>0):
+        for amb in ambiguous_table.keys():
+            vals = ambiguous_table[amb]
+            states = [ s.replace(amb, val) for s in states for val in vals ]
+    state_index = [ int(numpy.where(input_state==s)[0]) for s in states ]
+    return state_index
+
+def read_fasta(path):
+    with open(path, mode='r') as f:
+        txt = f.read()
+    seqs = [ t for t in txt.split('>') if not t=='' ]
+    seqs = [ s.split('\n', 1) for s in seqs ]
+    seqs = [ s.replace('\n','') for seq in seqs for s in seq ]
+    seq_dict = dict()
+    for i in range(int(len(seqs)/2)):
+        seq_dict[seqs[i*2]] = seqs[i*2+1]
+    return seq_dict

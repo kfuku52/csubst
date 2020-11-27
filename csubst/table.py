@@ -1,4 +1,7 @@
+import numpy
 import pandas
+
+#from scipy.stats import chi2_contingency
 
 def sort_labels(df):
     swap_columns = df.columns[df.columns.str.startswith('branch_id')].tolist()
@@ -31,3 +34,21 @@ def set_substitution_dtype(df):
         if (df[sc]%1).sum()==0:
             df.loc[:,sc] = df[sc].astype(int)
     return df
+
+def get_linear_regression(cb):
+    for prefix in ['S','N']:
+        x = cb.loc[:,prefix+'any2any'].values
+        y = cb.loc[:,prefix+'any2spe'].values
+        x = x[:,numpy.newaxis]
+        coef,residuals,rank,s = numpy.linalg.lstsq(x, y, rcond=None)
+        cb.loc[:,prefix+'_linreg_residual'] = y - (x[:,0]*coef[0])
+    return cb
+
+def chisq_test(x, total_S, total_N):
+    obs = x.loc[['Sany2spe','Nany2spe']].values
+    if obs.sum()==0:
+        return 1
+    else:
+        contingency_table = numpy.array([obs, [total_S, total_N]])
+        out = chi2_contingency(contingency_table, lambda_="log-likelihood")
+        return out[1]

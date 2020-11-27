@@ -1,11 +1,11 @@
-import os
 import joblib
-import itertools
 import numpy
 import pandas
-from csubst.parallel import *
 
-# TODO: dep_id may be more efficient in bool matrix?
+import itertools
+import os
+
+from csubst import parallel
 
 def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
     arity = target_nodes.shape[1] + 1
@@ -49,7 +49,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
-        chunks,starts = get_chunks(index_combinations, g['nslots'])
+        chunks,starts = parallel.get_chunks(index_combinations, g['nslots'])
         joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(node_union)
             (ids, target_nodes, df_mmap, ms) for ids, ms in zip(chunks, starts)
@@ -182,3 +182,40 @@ def calc_substitution_patterns(cb):
         sub_patterns4 = sub_patterns4.sort_values(axis=0, by='index2', ascending=True).reset_index()
         cb.loc[:,key+'_pattern_id'] = sub_patterns4.loc[:,'sub_pattern_id']
     return cb
+
+def get_dep_ids(g):
+    dep_ids = list()
+    for leaf in g['tree'].iter_leaves():
+        ancestor_nn = [ node.numerical_label for node in leaf.iter_ancestors() if not node.is_root() ]
+        dep_id = [leaf.numerical_label,] + ancestor_nn
+        dep_id = numpy.sort(numpy.array(dep_id))
+        dep_ids.append(dep_id)
+    if g['exclude_sister_pair']:
+        for node in g['tree'].traverse():
+            children = node.get_children()
+            if len(children)>1:
+                dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
+                dep_ids.append(dep_id)
+    g['dep_ids'] = dep_ids
+    if (g['foreground'] is not None)&(g['fg_exclude_wg']):
+        fg_dep_ids = list()
+        for i in numpy.arange(len(g['fg_leaf_name'])):
+            tmp_fg_dep_ids = list()
+            for node in g['tree'].traverse():
+                is_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.get_leaf_names() ])
+                if is_all_leaf_lineage_fg:
+                    is_up_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.up.get_leaf_names() ])
+                    if not is_up_all_leaf_lineage_fg:
+                        if node.is_leaf():
+                            tmp_fg_dep_ids.append(node.numerical_label)
+                        else:
+                            descendant_nn = [ n.numerical_label for n in node.get_descendants() ]
+                            tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
+            if len(tmp_fg_dep_ids)>1:
+                fg_dep_ids.append(numpy.sort(numpy.array(tmp_fg_dep_ids)))
+        if (g['mg_sister'])|(g['mg_parent']):
+            fg_dep_ids.append(numpy.sort(numpy.array(g['mg_id'])))
+        g['fg_dep_ids'] = fg_dep_ids
+    else:
+        g['fg_dep_ids'] = numpy.array([])
+    return g

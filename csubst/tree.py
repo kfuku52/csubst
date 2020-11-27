@@ -1,8 +1,9 @@
+import ete3
 import numpy
+
+import copy
 import itertools
 import re
-import copy
-import ete3
 
 def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
@@ -64,7 +65,7 @@ def rerooting_by_topology_matching(tree_from, tree_to):
     tree_to.set_outgroup(non_outgroup_leaf)
     outgroup_ancestor = tree_to.get_common_ancestor(outgroup_labels)
     tree_to.set_outgroup(outgroup_ancestor)
-    tree_to = add_numerical_node_labels(tree_to)
+    tree_to = tree.add_numerical_node_labels(tree_to)
     tree_to.ladderize()
     print('After rerooting, Robinson-Foulds distance =', tree_from.robinson_foulds(tree_to, unrooted_trees=False)[0])
     return tree_to
@@ -82,7 +83,7 @@ def transfer_internal_node_names(tree_to, tree_from):
 
 def get_node_distance(tree, cb):
     if not 'numerical_label' in dir(tree):
-        tree = add_numerical_node_labels(tree)
+        tree = tree.add_numerical_node_labels(tree)
     tree_dict = dict()
     for node in tree.traverse():
         tree_dict[node.numerical_label] = node

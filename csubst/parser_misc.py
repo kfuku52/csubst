@@ -1,7 +1,9 @@
 import numpy
+
 import itertools
 import pkg_resources
 import re
+
 from csubst import sequence
 
 def read_input(g):

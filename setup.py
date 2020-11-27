@@ -19,14 +19,14 @@ version = str(ast.literal_eval(match.group(1)))
 setup(
     name             = 'csubst',
     version          = version,
-    description      = 'Tools for molecular convergence detection in DNA/codon/protein sequences',
+    description      = 'Tools for molecular convergence detection in codon sequences',
     license          = "BSD 3-clause License",
     author           = "Kenji Fukushima",
     author_email     = 'kfuku52@gmail.com',
     url              = 'https://github.com/kfuku52/csubst.git',
     keywords         = 'molecular convergence',
     packages         = find_packages(),
-    install_requires = ['ete3','numpy','scipy','pandas','joblib','cython'],
+    install_requires = ['ete3','numpy','scipy','pandas','joblib','cython','matplotlib',],
     scripts          = ['csubst/csubst',],
     setup_requires   = ['setuptools>=18.0','cython'],
     ext_modules      = cythonize(

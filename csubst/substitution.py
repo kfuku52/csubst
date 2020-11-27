@@ -1,10 +1,12 @@
-import time
+import joblib
 import numpy
 import pandas
-import joblib
+
 import os
-from csubst.table import *
-from csubst.parallel import *
+import time
+
+from csubst import table
+from csubst import parallel
 
 def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None):
     if dtype is None:
@@ -56,7 +58,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
                 sub_tensor[child, :, s, :size, :size] = sub_matrix
     if g['min_sub_pp']!=0:
         if (g['ml_anc']):
-            print('--ml_anc is set. --min_sub_pp is not applied.')
+            print('--ml_anc is set. --min_sub_pp will not be applied.')
         else:
             sub_tensor = (numpy.nan_to_num(sub_tensor)>=g['min_sub_pp'])
     return sub_tensor
@@ -73,7 +75,7 @@ def get_b(g, sub_tensor, attr):
     df = df.dropna(axis=0)
     df['branch_id'] = df['branch_id'].astype(int)
     df = df.sort_values(by='branch_id')
-    df = set_substitution_dtype(df=df)
+    df = table.set_substitution_dtype(df=df)
     return(df)
 
 def get_s(sub_tensor, attr):
@@ -84,7 +86,7 @@ def get_s(sub_tensor, attr):
     df[attr+'_sub'] = numpy.nan_to_num(sub_tensor).sum(axis=4).sum(axis=3).sum(axis=2).sum(axis=0)
     df['site'] = df['site'].astype(int)
     df = df.sort_values(by='site')
-    df = set_substitution_dtype(df=df)
+    df = table.set_substitution_dtype(df=df)
     return(df)
 
 def get_cs(id_combinations, sub_tensor, attr):
@@ -99,7 +101,7 @@ def get_cs(id_combinations, sub_tensor, attr):
             df[:, 4] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], :, sg, :, :].prod(axis=0).sum(axis=(1, 2)))  # spe2spe
     cn = ['site',] + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     df = pandas.DataFrame(df, columns=cn)
-    df = set_substitution_dtype(df=df)
+    df = table.set_substitution_dtype(df=df)
     return (df)
 
 def get_bs(S_tensor, N_tensor):
@@ -113,7 +115,7 @@ def get_bs(S_tensor, N_tensor):
         df.loc[ind, 'branch_id'] = i
         df.loc[ind, 'S_sub'] = numpy.nan_to_num(S_tensor[i, :, :, :, :]).sum(axis=(1,2,3))
         df.loc[ind, 'N_sub'] = numpy.nan_to_num(N_tensor[i, :, :, :, :]).sum(axis=(1,2,3))
-    df = set_substitution_dtype(df=df)
+    df = table.set_substitution_dtype(df=df)
     return(df)
 
 def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64):
@@ -151,7 +153,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         df = sub_tensor2cb(id_combinations, sub_tensor, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
     else:
-        id_chunks,mmap_starts = get_chunks(id_combinations, g['nslots'])
+        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['nslots'])
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         axis = (id_combinations.shape[0], arity+4)
@@ -165,10 +167,10 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         )
         df = pandas.DataFrame(df_mmap, columns=cn)
         if os.path.exists(mmap_out): os.unlink(mmap_out)
-    df = sort_labels(df)
+    df = table.sort_labels(df)
     df = df.dropna()
     if not attr.startswith('E'):
-        df = set_substitution_dtype(df=df)
+        df = table.set_substitution_dtype(df=df)
     return df
 
 def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0):
@@ -215,7 +217,7 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         df = sub_tensor2cbs(id_combinations, sub_tensor)
         df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)
     else:
-        id_chunks,mmap_starts = get_chunks(id_combinations, g['nslots'])
+        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['nslots'])
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cbs.out.mmap')
         if os.path.exists(mmap_out): os.remove(mmap_out)
         axis = (id_combinations.shape[0]*sub_tensor.shape[1], arity+5)
@@ -230,8 +232,8 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         df = pandas.DataFrame(df_mmap, columns=cn1 + cn2 + cn3)
         if os.path.exists(mmap_out): os.remove(mmap_out)
     df = df.dropna()
-    df = sort_labels(df)
-    df = set_substitution_dtype(df=df)
+    df = table.sort_labels(df)
+    df = table.set_substitution_dtype(df=df)
     return(df)
 
 def get_sub_sites(g, sS, sN, state_tensor):
@@ -300,3 +302,11 @@ def get_sub_branches(sub_bad, mode, sg, a, d):
     elif mode == 'any2any':
         sub_branches = sub_bad[:, sg]
     return sub_branches
+
+def get_substitutions_per_branch(cb, b, g):
+    for a in numpy.arange(g['current_arity']):
+        b_tmp = b.loc[:,['branch_id','S_sub','N_sub']]
+        b_tmp.columns = [ c+'_'+str(a+1) for c in b_tmp.columns ]
+        cb = pandas.merge(cb, b_tmp, on='branch_id_'+str(a+1), how='left')
+        del b_tmp
+    return(cb)

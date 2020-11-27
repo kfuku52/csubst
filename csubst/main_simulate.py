@@ -1,13 +1,14 @@
 import pyvolve
 import numpy
-import itertools
-import re
-import copy
 
-from csubst import parser_misc
-from csubst import genetic_code
+import copy
+import itertools
+import os
+import re
+
 from csubst import foreground
-from csubst.tree import plot_branch_category
+from csubst import genetic_code
+from csubst import parser_misc
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
@@ -153,7 +154,7 @@ def main_simulate(g):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['codon_table'])
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
-    plot_branch_category(g, file_name='simulate_branch_category.pdf')
+    tree.plot_branch_category(g, file_name='simulate_branch_category.pdf')
     num_partition_sites = get_num_partition_site(g)
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'])
     all_syn_cdn_index = get_synonymous_codon_substitution_index(g)
@@ -200,3 +201,6 @@ def main_simulate(g):
         seqfile='simulate.fa',
         write_anc=False
     )
+
+    tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
+    _ = [os.remove(ts) for ts in tmp_files]

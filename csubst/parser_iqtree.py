@@ -1,15 +1,19 @@
+import ete3
+import numpy
+import pandas
+
 import os
 import re
-import ete3
-import pandas
-from csubst.tree import *
-from csubst.genetic_code import ambiguous_table
+
+from csubst import tree
+from csubst import genetic_code
+from csubst import sequence
 
 def read_treefile(g):
     g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
     assert len(g['rooted_tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
-    g['rooted_tree'] = standardize_node_names(g['rooted_tree'])
-    g['rooted_tree'] = add_numerical_node_labels(g['rooted_tree'])
+    g['rooted_tree'] = tree.standardize_node_names(g['rooted_tree'])
+    g['rooted_tree'] = tree.add_numerical_node_labels(g['rooted_tree'])
     g['num_node'] = len(list(g['rooted_tree'].traverse()))
     g['iqtree_rate_values'] = read_rate(g)
     print('Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.')
@@ -18,9 +22,9 @@ def read_treefile(g):
     tree_string = f.readline()
     g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
     f.close()
-    g['node_label_tree'] = standardize_node_names(g['node_label_tree'])
-    g['tree'] = transfer_root_and_dist(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
-    g['tree'] = add_numerical_node_labels(g['tree'])
+    g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
+    g['tree'] = tree.transfer_root_and_dist(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
+    g['tree'] = tree.add_numerical_node_labels(g['tree'])
     print('Total branch length of --rooted_tree_file:', sum([ n.dist for n in g['rooted_tree'].traverse() ]))
     print('Total branch length of --iqtree_treefile:', sum([ n.dist for n in g['node_label_tree'].traverse() ]))
     print('')
@@ -118,21 +122,6 @@ def read_log(g):
             g['reconstruction_codon_table'] = int(rgc.group(1))
     return g
 
-def get_state_index(state, input_state, ambiguous_table):
-    #input_state = pandas.Series(input_state)
-    if isinstance(state, str):
-        states = [state,]
-    else:
-        print('state should be str instance.')
-    state_set = set(list(state))
-    key_set = set(ambiguous_table.keys())
-    if (len(state_set.intersection(key_set))>0):
-        for amb in ambiguous_table.keys():
-            vals = ambiguous_table[amb]
-            states = [ s.replace(amb, val) for s in states for val in vals ]
-    state_index = [ int(numpy.where(input_state==s)[0]) for s in states ]
-    return state_index
-
 def mask_missing_sites(state_tensor, tree):
     for node in tree.traverse():
         if (node.is_root())|(node.is_leaf()):
@@ -165,17 +154,17 @@ def get_state_tensor(g):
                 for s in numpy.arange(int(len(seq)/3)):
                     codon = seq[(s*3):((s+1)*3)]
                     if (not '-' in codon)&(codon!='NNN'):
-                        codon_index = get_state_index(state=codon, input_state=g['codon_orders'], ambiguous_table=ambiguous_table)
+                        codon_index = sequence.get_state_index(state=codon, input_state=g['codon_orders'], ambiguous_table=genetic_code.ambiguous_table)
                         for ci in codon_index:
                             state_matrix[s,ci] = 1/len(codon_index)
             elif g['input_data_type']=='nuc':
                 for s in numpy.arange(len(seq)):
                     if seq[s]!='-':
-                        nuc_index = get_state_index(state=seq[s], input_state=g['input_state'], ambiguous_table=ambiguous_table)
+                        nuc_index = sequence.get_state_index(state=seq[s], input_state=g['input_state'], ambiguous_table=genetic_code.ambiguous_table)
                         for ni in nuc_index:
                             state_matrix[s, ni] = 1/len(nuc_index)
             state_tensor[node.numerical_label,:,:] = state_matrix
-        else:
+        else: # Internal nodes
             state_matrix = state_table.loc[(state_table['Node']==node.name),:].iloc[:,3:]
             is_missing = (state_table.loc[:,'State']=='???') | (state_table.loc[:,'State']=='?')
             state_matrix.loc[is_missing,:] = 0

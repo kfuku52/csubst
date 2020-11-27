@@ -1,10 +1,11 @@
-import os
-import sys
-import itertools
+import ete3
 import numpy
 import pandas
-import ete3
-from csubst.tree import *
+
+import os
+import itertools
+
+from csubst import tree
 
 def get_node_phylobayes_out(node, files):
     if node.is_leaf():
@@ -44,7 +45,7 @@ def get_input_information(g):
     files = os.listdir(g['phylobayes_dir'])
     sample_labels = [file for file in files if "_sample.labels" in file][0]
     g['tree'] = ete3.PhyloNode(g['phylobayes_dir'] + sample_labels, format=1)
-    g['tree'] = add_numerical_node_labels(g['tree'])
+    g['tree'] = tree.add_numerical_node_labels(g['tree'])
     g['num_node'] = len(list(g['tree'].traverse()))
     state_files = [ f for f in files if f.endswith('.ancstatepostprob') ]
     state_table = pandas.read_csv(g['phylobayes_dir'] + state_files[0], sep="\t", index_col=False, header=0)
