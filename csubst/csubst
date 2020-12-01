@@ -157,12 +157,12 @@ site = subparsers.add_parser('site', help='see `csubst site -h`', parents=[psr_c
 site.add_argument('--branch_id', metavar='INT,INT,INT...', default=None, required=True, type=str,
                   help='default=%(default)s: Comma-delimited list of branch_ids to characterize.'
                   'Run `csubst analyze` first and select branches of interest.')
-site.add_argument('--untrimmed_seq', metavar='PATH', default=None, required=False, type=str,
+site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,
                   help='default=%(default)s: PATH to fasta file containing untrimmed CDS sequence(s).'
                        'Codon positions along the sequence(s) appear in the output tsv.')
 site.add_argument('--export2chimera', metavar='yes|no', default='no', required=False, type=strtobool,
                   help='default=%(default)s: Set "yes" to export files for the visualization of '
-                       'convergence/divergence probabilities with UCSF Chimera. --untrimmed_seq is required.')
+                       'convergence/divergence probabilities with UCSF Chimera. --untrimmed_cds is required.')
 site.set_defaults(handler=command_site)
 
 

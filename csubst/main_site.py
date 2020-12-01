@@ -92,7 +92,7 @@ def get_gapsite_rate(state_tensor):
     return gapsite_rate
 
 def add_gene_index(df, g):
-    seqs = sequence.read_fasta(path=g['untrimmed_seq'])
+    seqs = sequence.read_fasta(path=g['untrimmed_cds'])
     num_site = g['state_cdn'].shape[1]
     for leaf in g['tree'].get_leaves():
         leaf_nn = leaf.numerical_label
@@ -141,7 +141,7 @@ def translate(seq, g):
 
 def export2chimera(df, g):
     header='attribute: condivPP\nmatch mode: 1-to-1\nrecipient: residues\nnone handling: None\n'
-    seqs = sequence.read_fasta(path=g['untrimmed_seq'])
+    seqs = sequence.read_fasta(path=g['untrimmed_cds'])
     for seq_key in seqs.keys():
         seq = seqs[seq_key]
         seq_num_site = int(len(seq)/3)
@@ -226,13 +226,13 @@ def main_site(g):
                     ml_anc_state = g[order_key][anc_states.argmax()]
                     df.at[i,anc_col] = ml_anc_state
 
-    if (g['untrimmed_seq'] is not None):
+    if (g['untrimmed_cds'] is not None):
         df = add_gene_index(df, g)
 
     is_site_col = df.columns.str.startswith('codon_site_')
     df.loc[:,is_site_col] += 1
 
-    if (g['untrimmed_seq'] is not None)|(g['export2chimera']):
+    if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
         export2chimera(df, g)
 
     plot_barchart(df)
