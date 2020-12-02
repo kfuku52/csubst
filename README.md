@@ -30,6 +30,7 @@
 **csubst** can be installed by the following command. **IQ-TREE** should also be installed in the same environment; See [here](http://www.iqtree.org/doc/Quickstart#installation) for instruction.
 ```
 # Installation with pip
+pip install numpy cython # NumPy and Cython should be available upon csubst installation
 pip install git+https://github.com/kfuku52/csubst
 
 # Check the complete set of options
