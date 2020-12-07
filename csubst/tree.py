@@ -3,6 +3,7 @@ import numpy
 
 import copy
 import itertools
+import os
 import re
 
 def add_numerical_node_labels(tree):
@@ -138,12 +139,20 @@ def branch_category_layout(node):
     ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
     node.set_style(nstyle)
 
-def plot_branch_category(g, file_name):
+def is_ete_plottable():
     try:
         from ete3 import TreeStyle
         from ete3 import NodeStyle
     except ImportError:
         print('TreeStyle and/or NodeStyle are not available in installed ete3. Plotting is skipped.', flush=True)
+        return False
+    if ('DISPLAY' not in os.environ):
+        print('DISPLAY is not available. Plotting is skipped.', flush=True)
+        return False
+    return True
+
+def plot_branch_category(g, file_name):
+    if not is_ete_plottable():
         return None
     ts = ete3.TreeStyle()
     ts.mode = 'r'
@@ -167,11 +176,7 @@ def branch_state_layout(node):
 
 def plot_state_tree(state, orders, mode, g):
     print('Writing ancestral state trees: mode = {}, number of pdf files = {}'.format(mode, state.shape[1]), flush=True)
-    try:
-        from ete3 import TreeStyle
-        from ete3 import NodeStyle
-    except ImportError:
-        print('TreeStyle and/or NodeStyle are not available in installed ete3. Plotting is skipped.', flush=True)
+    if not is_ete_plottable():
         return None
     if mode=='codon':
         missing_state = '---'
