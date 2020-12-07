@@ -9,6 +9,7 @@ import re
 from csubst import foreground
 from csubst import genetic_code
 from csubst import parser_misc
+from csubst.tree import plot_branch_category # This cannot be "from csubst import tree" because of conflicting name "tree"
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
@@ -154,7 +155,7 @@ def main_simulate(g):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['codon_table'])
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
-    tree.plot_branch_category(g, file_name='simulate_branch_category.pdf')
+    plot_branch_category(g, file_name='simulate_branch_category.pdf')
     num_partition_sites = get_num_partition_site(g)
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'])
     all_syn_cdn_index = get_synonymous_codon_substitution_index(g)
