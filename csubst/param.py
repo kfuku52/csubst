@@ -20,10 +20,10 @@ def get_global_parameters(args):
     if 'float_type' in g.keys():
         if (g['float_type']==16):
             g['float_type'] = numpy.float16
-            g['float_tol'] = 10**-2
+            g['float_tol'] = 10**-1
         elif (g['float_type']==32):
             g['float_type'] = numpy.float32
-            g['float_tol'] = 10**-4
+            g['float_tol'] = 10**-3
         elif (g['float_type']==64):
             g['float_type'] = numpy.float64
             g['float_tol'] = 10**-9

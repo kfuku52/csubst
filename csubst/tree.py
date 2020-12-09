@@ -146,7 +146,7 @@ def is_ete_plottable():
     except ImportError:
         print('TreeStyle and/or NodeStyle are not available in installed ete3. Plotting is skipped.', flush=True)
         return False
-    if ('DISPLAY' not in os.environ):
+    if ('DISPLAY' not in os.environ.keys()):
         print('DISPLAY is not available. Plotting is skipped.', flush=True)
         return False
     return True
