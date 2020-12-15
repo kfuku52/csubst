@@ -62,7 +62,10 @@ def get_state_index(state, input_state, ambiguous_table):
         for amb in ambiguous_table.keys():
             vals = ambiguous_table[amb]
             states = [ s.replace(amb, val) for s in states for val in vals ]
-    state_index = [ int(numpy.where(input_state==s)[0]) for s in states ]
+    state_index0 = [ numpy.where(input_state==s)[0] for s in states ]
+    if state_index0[0].shape[0]==0:
+        return None
+    state_index = [ int(si) for si in state_index0 ]
     return state_index
 
 def read_fasta(path):

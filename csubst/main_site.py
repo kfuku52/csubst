@@ -110,6 +110,8 @@ def add_gene_index(df, g):
                     continue
                 codon_index = sequence.get_state_index(state=codon, input_state=g['codon_orders'],
                                                        ambiguous_table=genetic_code.ambiguous_table)
+                if codon_index is None:
+                    continue
                 ci = codon_index[0] # Take the first codon if ambiguous
                 if g['state_cdn'][leaf_nn,aln_site,ci]!=0:
                     aln_gene_match.append([aln_site,cgs])
@@ -143,6 +145,10 @@ def export2chimera(df, g):
     header='attribute: condivPP\nmatch mode: 1-to-1\nrecipient: residues\nnone handling: None\n'
     seqs = sequence.read_fasta(path=g['untrimmed_cds'])
     for seq_key in seqs.keys():
+        codon_site_col = 'codon_site_'+seq_key
+        if codon_site_col not in df.columns:
+            print('Sequence not be found in csubst inputs. Skipping: {}'.format(seq_key))
+            continue
         seq = seqs[seq_key]
         seq_num_site = int(len(seq)/3)
         seq_sites = numpy.arange(1, seq_num_site+1)
@@ -150,7 +156,7 @@ def export2chimera(df, g):
         with open(file_name, 'w') as f:
             f.write(header)
             for seq_site in seq_sites:
-                is_site = (df.loc[:,'codon_site_'+seq_key]==seq_site)
+                is_site = (df.loc[:,codon_site_col]==seq_site)
                 if is_site.sum()==0:
                     Nvalue = 'None'
                     line = '	:{}	{}\n'.format(seq_site, Nvalue)
