@@ -170,11 +170,11 @@ def get_foreground_branch(g):
                 else:
                     node.is_foreground = False
                     node.color = 'black'
-    with open('csubst_target_branch.txt', 'w') as f:
-            for x in g['target_id']:
-                f.write(str(x)+'\n')
-    g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
-    return g
+        with open('csubst_target_branch.txt', 'w') as f:
+                for x in g['target_id']:
+                    f.write(str(x)+'\n')
+        g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
+        return g
 
 def randomize_foreground_branch(g):
     g['fg_id_original'] = copy.deepcopy(g['fg_id'])
@@ -192,20 +192,23 @@ def randomize_foreground_branch(g):
 def get_marginal_branch(g):
     marginal_ids = list()
     for node in g['tree'].traverse():
-        if (node.is_foreground==True)&(not node.is_root()):
-            if (g['mg_parent']):
-                if node.up.is_foreground==False:
-                    marginal_ids.append(node.up.numerical_label)
-            if (g['mg_sister']):
-                sisters = node.get_sisters()
-                for sister in sisters:
-                    if (g['mg_sister_stem_only']):
-                        if sister.is_foreground==False:
-                            marginal_ids.append(sister.numerical_label)
-                    else:
-                        for sister_des in sister.traverse():
-                            if sister_des.is_foreground==False:
-                                marginal_ids.append(sister_des.numerical_label)
+        if (node.is_root()):
+            continue
+        if (node.is_foreground==False):
+            continue
+        if (g['mg_parent']):
+            if (node.up.is_foreground==False):
+                marginal_ids.append(node.up.numerical_label)
+        if (g['mg_sister']):
+            sisters = node.get_sisters()
+            for sister in sisters:
+                if (g['mg_sister_stem_only']):
+                    if sister.is_foreground==False:
+                        marginal_ids.append(sister.numerical_label)
+                else:
+                    for sister_des in sister.traverse():
+                        if sister_des.is_foreground==False:
+                            marginal_ids.append(sister_des.numerical_label)
     g['mg_id'] = numpy.array(list(set(marginal_ids)-set(g['target_id'])), dtype=numpy.int)
     g['target_id'] = numpy.concatenate([g['target_id'], g['mg_id']])
     for node in g['tree'].traverse():

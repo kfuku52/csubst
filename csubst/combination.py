@@ -186,8 +186,8 @@ def calc_substitution_patterns(cb):
 def get_dep_ids(g):
     dep_ids = list()
     for leaf in g['tree'].iter_leaves():
-        ancestor_nn = [ node.numerical_label for node in leaf.iter_ancestors() if not node.is_root() ]
-        dep_id = [leaf.numerical_label,] + ancestor_nn
+        ancestor_nns = [ node.numerical_label for node in leaf.iter_ancestors() if not node.is_root() ]
+        dep_id = [leaf.numerical_label,] + ancestor_nns
         dep_id = numpy.sort(numpy.array(dep_id))
         dep_ids.append(dep_id)
     if g['exclude_sister_pair']:
@@ -196,6 +196,20 @@ def get_dep_ids(g):
             if len(children)>1:
                 dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
                 dep_ids.append(dep_id)
+    root_nn = g['tree'].numerical_label
+    root_state_sum = g['state_cdn'][root_nn,:,:].sum()
+    if (root_state_sum==0):
+        subroot_nns = [ node.numerical_label for node in g['tree'].get_children() ]
+        for subroot_nn in subroot_nns:
+            for node in g['tree'].traverse():
+                if node.is_root():
+                    continue
+                if subroot_nn==node.numerical_label:
+                    continue
+                ancestor_nns = [ node.numerical_label for node in leaf.iter_ancestors() ]
+                if subroot_nn in ancestor_nns:
+                    continue
+                dep_ids.append(numpy.array([subroot_nn, node.numerical_label]))
     g['dep_ids'] = dep_ids
     if (g['foreground'] is not None)&(g['fg_exclude_wg']):
         fg_dep_ids = list()

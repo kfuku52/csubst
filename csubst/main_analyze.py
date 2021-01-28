@@ -157,8 +157,8 @@ def main_analyze(g):
 
     id_combinations = None
 
-    S_total = numpy.nan_to_num(S_tensor).sum(axis=(0, 1, 2, 3, 4))
-    N_total = numpy.nan_to_num(N_tensor).sum(axis=(0, 1, 2, 3, 4))
+    S_total = S_tensor.sum(axis=(0, 1, 2, 3, 4))
+    N_total = N_tensor.sum(axis=(0, 1, 2, 3, 4))
     num_branch = g['num_node'] - 1
     num_site = S_tensor.shape[1]
     print('Synonymous substitutions / tree = {:,.1f}'.format(S_total), flush=True)
