@@ -114,36 +114,37 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             E_b[i] = corrected_rank / quantile_niter
     return E_b
 
-def get_E(cb, g, N_tensor, S_tensor):
-    if g['omega_method']=='pm':
-        cb['ENany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='mean', SN='N', g=g)
-        cb['ENspe2any'] = calc_E_stat(cb, N_tensor, mode='spe2any', stat='mean', SN='N', g=g)
-        cb['ENany2spe'] = calc_E_stat(cb, N_tensor, mode='any2spe', stat='mean', SN='N', g=g)
-        cb['ENspe2spe'] = calc_E_stat(cb, N_tensor, mode='spe2spe', stat='mean', SN='N', g=g)
-        cb['ESany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', stat='mean', SN='S', g=g)
-        cb['ESspe2any'] = calc_E_stat(cb, S_tensor, mode='spe2any', stat='mean', SN='S', g=g)
-        cb['ESany2spe'] = calc_E_stat(cb, S_tensor, mode='any2spe', stat='mean', SN='S', g=g)
-        cb['ESspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', stat='mean', SN='S', g=g)
+def get_any2dif(cb):
+    if (('ENany2any' in cb.columns)&('ENany2spe' in cb.columns)):
         cb['ENany2dif'] = cb['ENany2any'] - cb['ENany2spe']
+    if (('ESany2any' in cb.columns)&('ESany2spe' in cb.columns)):
         cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
-    elif g['omega_method']=='rec':
+    return cb
+
+def get_E(cb, g, N_tensor, S_tensor):
+    if (g['omega_method']=='pm'):
+        sub_types = g['substitution_types'].split(',')
+        for st in sub_types:
+            cb['EN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
+            cb['ES'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='mean', SN='S', g=g)
+        cb = get_any2dif(cb)
+    if (g['omega_method']=='rec'):
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_pepE = get_exp_state(g=g, mode='pep')
-        EN_tensor = substitution.get_substitution_tensor(state_tensor=state_pepE, state_tensor_anc=g['state_pep'], mode='asis', g=g, mmap_attr='EN')
+        EN_tensor = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
         print('Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'.format(EN_tensor.sum()))
         cbEN = substitution.get_cb(cb.loc[:,id_cols].values, EN_tensor, g, 'EN')
         os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.EN.mmap') ][0])
         cb = table.merge_tables(cb, cbEN)
         del state_pepE,cbEN
         state_cdnE = get_exp_state(g=g, mode='cdn')
-        ES_tensor = substitution.get_substitution_tensor(state_tensor=state_cdnE, state_tensor_anc=g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
+        ES_tensor = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
         print('Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'.format(ES_tensor.sum()))
         cbES = substitution.get_cb(cb.loc[:,id_cols].values, ES_tensor, g, 'ES')
         os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.ES.mmap') ][0])
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
-        cb['ENany2dif'] = cb['ENany2any'] - cb['ENany2spe']
-        cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
+        cb = get_any2dif(cb)
         E_cols = cb.columns[cb.columns.str.startswith('E')]
         for node in g['tree'].traverse():
             continue_flag = 1
@@ -157,14 +158,10 @@ def get_E(cb, g, N_tensor, S_tensor):
                 is_node = (cb.loc[:,id_col]==node.numerical_label)
                 cb.loc[is_node,E_cols] = numpy.nan
     if g['calc_quantile']:
-        cb['QNany2any'] = calc_E_stat(cb, N_tensor, mode='any2any', stat='quantile', SN='N', g=g)
-        cb['QSany2any'] = calc_E_stat(cb, S_tensor, mode='any2any', stat='quantile', SN='S', g=g)
-        #cb['QNspe2any'] = calc_E_stat(cb, N_tensor, mode='spe2any', stat='quantile', SN='N', g=g)
-        #cb['QSspe2any'] = calc_E_stat(cb, S_tensor, mode='spe2any', stat='quantile', SN='S', g=g)
-        cb['QNany2spe'] = calc_E_stat(cb, N_tensor, mode='any2spe', stat='quantile', SN='N', g=g)
-        cb['QSany2spe'] = calc_E_stat(cb, S_tensor, mode='any2spe', stat='quantile', SN='S', g=g)
-        #cb['QNspe2spe'] = calc_E_stat(cb, N_tensor, mode='spe2spe', stat='quantile', SN='N', g=g)
-        #cb['QSspe2spe'] = calc_E_stat(cb, S_tensor, mode='spe2spe', stat='quantile', SN='S', g=g)
+        sub_types = g['substitution_types'].split(',')
+        for st in sub_types:
+            cb['QN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='quantile', SN='N', g=g)
+            cb['QS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='quantile', SN='S', g=g)
     return cb
 
 def get_exp_state(g, mode, bl='asis'):

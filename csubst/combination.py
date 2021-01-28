@@ -199,6 +199,7 @@ def get_dep_ids(g):
     root_nn = g['tree'].numerical_label
     root_state_sum = g['state_cdn'][root_nn,:,:].sum()
     if (root_state_sum==0):
+        print('Ancestral states were not estimated on the root node. Excluding sub-root nodes from the analysis.')
         subroot_nns = [ node.numerical_label for node in g['tree'].get_children() ]
         for subroot_nn in subroot_nns:
             for node in g['tree'].traverse():
@@ -206,7 +207,7 @@ def get_dep_ids(g):
                     continue
                 if subroot_nn==node.numerical_label:
                     continue
-                ancestor_nns = [ node.numerical_label for node in leaf.iter_ancestors() ]
+                ancestor_nns = [ anc.numerical_label for anc in node.iter_ancestors() ]
                 if subroot_nn in ancestor_nns:
                     continue
                 dep_ids.append(numpy.array([subroot_nn, node.numerical_label]))
@@ -217,14 +218,16 @@ def get_dep_ids(g):
             tmp_fg_dep_ids = list()
             for node in g['tree'].traverse():
                 is_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.get_leaf_names() ])
-                if is_all_leaf_lineage_fg:
-                    is_up_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.up.get_leaf_names() ])
-                    if not is_up_all_leaf_lineage_fg:
-                        if node.is_leaf():
-                            tmp_fg_dep_ids.append(node.numerical_label)
-                        else:
-                            descendant_nn = [ n.numerical_label for n in node.get_descendants() ]
-                            tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
+                if not is_all_leaf_lineage_fg:
+                    continue
+                is_up_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.up.get_leaf_names() ])
+                if is_up_all_leaf_lineage_fg:
+                    continue
+                if node.is_leaf():
+                    tmp_fg_dep_ids.append(node.numerical_label)
+                else:
+                    descendant_nn = [ n.numerical_label for n in node.get_descendants() ]
+                    tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
             if len(tmp_fg_dep_ids)>1:
                 fg_dep_ids.append(numpy.sort(numpy.array(tmp_fg_dep_ids)))
         if (g['mg_sister'])|(g['mg_parent']):

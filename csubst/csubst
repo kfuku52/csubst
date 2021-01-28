@@ -63,7 +63,7 @@ psr_co.add_argument('--alignment_file', metavar='PATH', default='', type=str,
 psr_co.add_argument('--rooted_tree_file', metavar='PATH', default='', type=str,
                    help='default=%(default)s: Rooted newick tree file.')
 psr_co.add_argument('--codon_table', metavar='INTEGER', type=int, required=False, default=1,
-                   help='default=%(default)s: NCBI codon table ID. See here: '
+                   help='default=%(default)s: NCBI codon table ID. 1 = "Standard". See here: '
                         'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
 psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=str,
                    choices=['iqtree',],
@@ -221,6 +221,9 @@ analyze.add_argument('--omega_method', metavar='[pm|rec]', default='pm', type=st
                           'In addition to the base substitution models above, codon frequencies and '
                           'among-site rate heterogeneity are taken into account. '
                           'See here for details: http://www.iqtree.org/doc/Substitution-Models')
+analyze.add_argument('--substitution_types', metavar='STR', default='any2any,any2spe,spe2spe', type=str,
+                     help='default=%(default)s: Comma-delimited types of substitutions to be analyzed.'
+                          'One or more from any2any, any2spe, spe2any, spe2spe')
 analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
                      help='default=%(default)s: Calculate permutation-based quantiles for combinatorial substitutions.')
 # Among-site rate variation
