@@ -64,7 +64,6 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_co
         print(txt.format(obs_col, i+1, num_sgad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g={}):
-    sub_tensor = numpy.nan_to_num(sub_tensor)
     if mode=='spe2spe':
         sub_bad = sub_tensor.sum(axis=1)  # branch, matrix_group, ancestral_state, derived_state
         ancestral_states = numpy.arange(sub_bad.shape[2])

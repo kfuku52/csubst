@@ -154,13 +154,13 @@ def get_state_tensor(g):
                 for s in numpy.arange(int(len(seq)/3)):
                     codon = seq[(s*3):((s+1)*3)]
                     if (not '-' in codon)&(codon!='NNN'):
-                        codon_index = sequence.get_state_index(state=codon, input_state=g['codon_orders'], ambiguous_table=genetic_code.ambiguous_table)
+                        codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
                         for ci in codon_index:
                             state_matrix[s,ci] = 1/len(codon_index)
             elif g['input_data_type']=='nuc':
                 for s in numpy.arange(len(seq)):
                     if seq[s]!='-':
-                        nuc_index = sequence.get_state_index(state=seq[s], input_state=g['input_state'], ambiguous_table=genetic_code.ambiguous_table)
+                        nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)
                         for ni in nuc_index:
                             state_matrix[s, ni] = 1/len(nuc_index)
             state_tensor[node.numerical_label,:,:] = state_matrix
@@ -172,6 +172,7 @@ def get_state_tensor(g):
                 print('Node name not found in .state file:', node.name)
             else:
                 state_tensor[node.numerical_label,:,:] = state_matrix
+    state_tensor = numpy.nan_to_num(state_tensor)
     state_tensor = mask_missing_sites(state_tensor, g['tree'])
     if (g['ml_anc']):
         print('Ancestral state frequency is converted to the ML-like binary states.')
