@@ -1,4 +1,4 @@
-![](logo/logo_csubst.svg)
+![](logo/logo_csubst_large.svg)
 
 ## Overview
 **csubst** is a tool for analyzing combinatorial substitutions of codon sequences in phylogenetic trees. Main features include:
