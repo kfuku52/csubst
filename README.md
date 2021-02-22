@@ -18,6 +18,7 @@
 
 ## Dependency
 **csubst** runs on python 3 (tested with >3.5.0) and depends on the following python packages. **csubst** installation with `pip install` will automatically install them except for **pyvolve** and **matplotlib**.
+* [IQ-TREE](http://www.iqtree.org/) (version 2.0.0 or later)
 * [python 3](https://www.python.org/)
 * [ete3](https://github.com/etetoolkit/ete)
 * [numpy](https://github.com/numpy/numpy)
@@ -27,7 +28,6 @@
 * [cython](https://cython.org/)
 * [pyvolve](https://github.com/sjspielman/pyvolve) (Optional: required for `csubst simulate`)
 * [matplotlib](https://matplotlib.org/3.1.1/index.html) (Optional: required for `csubst site`)
-* [IQ-TREE](http://www.iqtree.org/) (version 2.0.0 or later)
 
 ## Installation
 **csubst** can be installed by the following command. **IQ-TREE** should also be installed in the same environment; See [here](http://www.iqtree.org/doc/Quickstart#installation) for instruction. Try `conda install -c bioconda iqtree` if you are familiar with `conda`.
@@ -37,13 +37,12 @@
 pip install numpy cython # NumPy and Cython should be available upon csubst installation
 pip install git+https://github.com/kfuku52/csubst
 
-# Check the complete set of options
+# Installation if successful if this command shows help messages
 csubst -h 
 ```
 
 ## Getting started
-**csubst** contains datasets that can be used for test runs with the commands below.
-See [csubst wiki](https://github.com/kfuku52/csubst/wiki) for details. Specification of the IQ-TREE's substitution models is described [here](http://www.iqtree.org/doc/Substitution-Models).
+**csubst** contains out-of-the-box datasets. It may take a couple of minutes to complete the test run below, which will be successful if output files like `csubst_cb_2.tsv` are produced. See [csubst wiki](https://github.com/kfuku52/csubst/wiki) for detailed usage and interpretation of output files.
 
 ```
 # Generate a test dataset
