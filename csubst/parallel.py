@@ -1,8 +1,8 @@
-def get_chunks(input, nslots):
+def get_chunks(input, threads):
     if 'shape' in dir(input):
-        chunks = [(input.shape[0] + i) // nslots for i in range(nslots)]
+        chunks = [(input.shape[0] + i) // threads for i in range(threads)]
     else:
-        chunks = [(len(input) + i) // nslots for i in range(nslots)]
+        chunks = [(len(input) + i) // threads for i in range(threads)]
     i = 0
     out_chunks = list()
     starts = list()

@@ -49,8 +49,8 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
-        chunks,starts = parallel.get_chunks(index_combinations, g['nslots'])
-        joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
+        chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
+        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(node_union)
             (ids, target_nodes, df_mmap, ms) for ids, ms in zip(chunks, starts)
         )

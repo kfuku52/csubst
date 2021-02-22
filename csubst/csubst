@@ -62,19 +62,26 @@ psr_co.add_argument('--alignment_file', metavar='PATH', default='', type=str,
                    help='default=%(default)s: Alignment fasta file.')
 psr_co.add_argument('--rooted_tree_file', metavar='PATH', default='', type=str,
                    help='default=%(default)s: Rooted newick tree file.')
-psr_co.add_argument('--codon_table', metavar='INTEGER', type=int, required=False, default=1,
+psr_co.add_argument('--genetic_code', metavar='INTEGER', type=int, required=False, default=1,
                    help='default=%(default)s: NCBI codon table ID. 1 = "Standard". See here: '
                         'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
 psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=str,
                    choices=['iqtree',],
                    help='default=%(default)s: The input file format.')
-psr_co.add_argument('--nslots', metavar='INTEGER', default=1, type=int, required=False,
+psr_co.add_argument('--threads', metavar='INTEGER', default=1, type=int, required=False,
                    help='default=%(default)s: The number of processors for parallel computations.')
 psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
                     help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
 
 # shared: IQ-TREE inputs
 psr_iq = argparse.ArgumentParser(add_help=False)
+psr_iq.add_argument('--iqtree_exe', metavar='PATH', default='iqtree', type=str, required=False,
+                    help='default=%(default)s: PATH to the IQ-TREE executable')
+psr_iq.add_argument('--iqtree_model', metavar='STR', default='ECMK07+F+R4', type=str, required=False,
+                    help='default=%(default)s: Codon substitution model. '
+                         'Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. '
+                         'Among-site rate heterogeneity and codon frequencies can be specified. '
+                         'See here for details: http://www.iqtree.org/doc/Substitution-Models')
 psr_iq.add_argument('--iqtree_treefile', metavar='PATH', default='infer', type=str, required=False,
                    help='default=%(default)s: PATH to the IQ-TREE\'s .treefile output. "infer" from --alignment_file')
 psr_iq.add_argument('--iqtree_state', metavar='PATH', default='infer', type=str, required=False,
@@ -212,15 +219,14 @@ analyze.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=
 # Omega calculation
 analyze.add_argument('--calc_omega', metavar='yes|no', default='yes', type=strtobool,
                      help='default=%(default)s: Calculate omega for convergence rate.')
-analyze.add_argument('--omega_method', metavar='[pm|rec]', default='pm', type=str, choices=['pm','rec'],
+analyze.add_argument('--omega_method', metavar='[modelfree|submodel]', default='submodel', type=str, choices=['modelfree','submodel'],
                      help='default=%(default)s: Method to calculate omega. '
-                          '"pm" for expected values from among-site randomized substitutions in which '
-                          'all EXany2any, EXspe2any, EXany2spe, and EXspe2spe substitutions are individually calculated.'
-                          '"rec" for a method similar to Zou and Zhang (2015) using a codon substitution model used in '
-                          'ancestral state reconstruction by IQ-TREE. "MG", "GY", "ECMK07", and "ECMrest" are supported. '
-                          'In addition to the base substitution models above, codon frequencies and '
-                          'among-site rate heterogeneity are taken into account. '
-                          'See here for details: http://www.iqtree.org/doc/Substitution-Models')
+                          '"modelfree" for expected values from among-site randomization of substitutions. '
+                          'All EXany2any, EXspe2any, EXany2spe, and EXspe2spe substitutions are individually calculated.'
+                          '"submodel" for a method similar to Zou and Zhang (2015) using a codon substitution model used in '
+                          'ancestral state reconstruction. '
+                          'In addition to the base substitution models, codon frequencies and '
+                          'among-site rate heterogeneity are taken into account.')
 analyze.add_argument('--substitution_types', metavar='STR', default='any2any,any2spe,spe2spe', type=str,
                      help='default=%(default)s: Comma-delimited types of substitutions to be analyzed.'
                           'One or more from any2any, any2spe, spe2any, spe2spe')
@@ -229,8 +235,13 @@ analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=str
 # Among-site rate variation
 analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
                      choices=['no', 'pool', 'sn', 'each', 'file'],
-                     help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation.'
-                          'This option is used only when --omega_method pm')
+                     help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation. '
+                          '"no", No ASRV, meaning the uniform rate among sites. '
+                          '"pool", All categories of substitutions are pooled to calculate ASRV. '
+                          '"sn", Synonymous and nonsynonymous substitutions are processed individually to calculate their respective ASRVs.'
+                          '"each", Each of 61x60 patterns of substitutions are processed individually to calculate their respective ASRVs.'
+                          '"file", ASRV is obtained from the IQ-TREE\'s .rate file.'
+                          'This option is used if --omega_method modelfree')
 
 # Sub parser: help
 parser_help = subparsers.add_parser('help', help='see `help -h`')

@@ -150,11 +150,11 @@ def get_cb(id_combinations, sub_tensor, g, attr):
     arity = id_combinations.shape[1]
     cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
-    if g['nslots']==1:
+    if g['threads']==1:
         df = sub_tensor2cb(id_combinations, sub_tensor, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
     else:
-        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['nslots'])
+        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['threads'])
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         axis = (id_combinations.shape[0], arity+4)
@@ -162,7 +162,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
+        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(sub_tensor2cb)
             (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids, ms in zip(id_chunks, mmap_starts)
         )
@@ -214,11 +214,11 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     cn1 = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn2 = ["site",]
     cn3 = [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
-    if g['nslots']==1:
+    if g['threads']==1:
         df = sub_tensor2cbs(id_combinations, sub_tensor)
         df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)
     else:
-        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['nslots'])
+        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['threads'])
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cbs.out.mmap')
         if os.path.exists(mmap_out): os.remove(mmap_out)
         axis = (id_combinations.shape[0]*sub_tensor.shape[1], arity+5)
@@ -226,7 +226,7 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
+        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(sub_tensor2cbs)
             (ids, sub_tensor, True, df_mmap, ms) for ids,ms in zip(id_chunks,mmap_starts)
         )

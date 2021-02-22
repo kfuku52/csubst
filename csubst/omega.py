@@ -98,8 +98,8 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0], quantile_niter), mode='w+')
-        sgad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(sg_a_d, g['nslots'])
-        joblib.Parallel(n_jobs=g['nslots'], max_nbytes=None, backend='multiprocessing')(
+        sgad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(sg_a_d, g['threads'])
+        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(joblib_calc_quantile)
             (mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk, g) for sgad_chunk in sgad_chunks
         )
@@ -122,13 +122,13 @@ def get_any2dif(cb):
     return cb
 
 def get_E(cb, g, N_tensor, S_tensor):
-    if (g['omega_method']=='pm'):
+    if (g['omega_method']=='modelfree'):
         sub_types = g['substitution_types'].split(',')
         for st in sub_types:
             cb['EN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
             cb['ES'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='mean', SN='S', g=g)
         cb = get_any2dif(cb)
-    if (g['omega_method']=='rec'):
+    if (g['omega_method']=='submodel'):
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_pepE = get_exp_state(g=g, mode='pep')
         EN_tensor = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')

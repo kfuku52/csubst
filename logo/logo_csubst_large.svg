@@ -23,9 +23,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.30958458"
-     inkscape:cx="767.06304"
-     inkscape:cy="202.71258"
+     inkscape:zoom="0.31082292"
+     inkscape:cx="541.85442"
+     inkscape:cy="196.27805"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -34,7 +34,7 @@
      inkscape:window-width="1268"
      inkscape:window-height="923"
      inkscape:window-x="277"
-     inkscape:window-y="105"
+     inkscape:window-y="83"
      inkscape:window-maximized="0"
      fit-margin-top="0"
      fit-margin-left="0"
@@ -49,7 +49,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -239,19 +239,19 @@
       <text
          xml:space="preserve"
          style="font-size:22.5778px;line-height:1;font-family:sans-serif;stroke-width:0.264583"
-         x="104.19424"
+         x="101.01926"
          y="225.67473"
          id="text904-7"><tspan
            sodipodi:role="line"
-           x="104.19424"
+           x="101.01926"
            y="225.67473"
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:22.5778px;font-family:Copperplate;-inkscape-font-specification:Copperplate;stroke-width:0.264583"
-           id="tspan906-6">The toolkit for molecular </tspan><tspan
+           id="tspan906-6">The Toolkit for Molecular </tspan><tspan
            sodipodi:role="line"
-           x="104.19424"
+           x="101.01926"
            y="249.02293"
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:22.5778px;font-family:Copperplate;-inkscape-font-specification:Copperplate;stroke-width:0.264583"
-           id="tspan910-8">convergence analysis</tspan></text>
+           id="tspan910-8">Convergence Analysis</tspan></text>
     </g>
   </g>
 </svg>

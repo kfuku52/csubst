@@ -152,7 +152,7 @@ def get_num_partition_site(g):
     return num_partition_sites
 
 def main_simulate(g):
-    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['codon_table'])
+    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
     plot_branch_category(g, file_name='simulate_branch_category.pdf')

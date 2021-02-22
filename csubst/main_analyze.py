@@ -106,7 +106,8 @@ def main_analyze(g):
     start = time.time()
     print("Reading and parsing input files.", flush=True)
     g['current_arity'] = 2
-    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['codon_table'])
+    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
+    g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
 
@@ -197,7 +198,7 @@ def main_analyze(g):
         elapsed_time = int(time.time() - start)
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
-    if g['omega_method']!='rec':
+    if g['omega_method']!='submodel':
         g['state_cdn'] = None
         g['state_pep'] = None
 

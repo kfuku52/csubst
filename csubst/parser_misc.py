@@ -5,16 +5,29 @@ import pkg_resources
 import re
 
 from csubst import sequence
+from csubst import parser_phylobayes
+from csubst import parser_iqtree
+
+def generate_intermediate_files(g):
+    if (g['infile_type'] == 'phylobayes'):
+        print("PhyloBayes is not supported.")
+    elif (g['infile_type'] == 'iqtree'):
+        g,all_exist = parser_iqtree.check_intermediate_files(g)
+        if all_exist:
+            print('IQ-TREE\'s intermediate files exist.')
+        else:
+            print('Starting IQ-TREE to estimate parameters and ancestral states.')
+            parser_iqtree.check_iqtree_dependency(g)
+            parser_iqtree.run_ancestral(g)
+    return g
 
 def read_input(g):
     if (g['infile_type'] == 'phylobayes'):
-        from csubst import parser_phylobayes
         g = parser_phylobayes.get_input_information(g)
     elif (g['infile_type'] == 'iqtree'):
-        from csubst import parser_iqtree
         g = parser_iqtree.get_input_information(g)
     if ('omega_method' in g.keys()):
-        if (g['omega_method']=='rec'):
+        if (g['omega_method']=='submodel'):
             base_model = re.sub('\+G.*', '', g['substitution_model'])
             base_model = re.sub('\+R.*', '', base_model)
             print('Instantaneous substitution rate matrix will be generated using the base model:', base_model)

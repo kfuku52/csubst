@@ -4,10 +4,46 @@ import pandas
 
 import os
 import re
+import subprocess
+import sys
+from distutils.version import LooseVersion
 
 from csubst import tree
 from csubst import genetic_code
 from csubst import sequence
+
+def check_iqtree_dependency(g):
+    test_iqtree = subprocess.run([g['iqtree_exe'], '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert (test_iqtree.returncode==0), "iqtree PATH cannot be found: "+g['iqtree_exe']
+    version_iqtree = test_iqtree.stdout.decode('utf8')
+    version_iqtree = version_iqtree.replace('\n','')
+    version_iqtree = re.sub('.*version ', '', version_iqtree)
+    version_iqtree = re.sub(' for.*', '', version_iqtree)
+    is_satisfied_version = LooseVersion(version_iqtree) >= LooseVersion('2.0.0')
+    assert is_satisfied_version, 'IQ-TREE version ({}) should be 2.0.0 or greater.'.format(version_iqtree)
+    print("IQ-TREE's version: {}, PATH: {}".format(version_iqtree, g['iqtree_exe']))
+    return None
+
+def check_intermediate_files(g):
+    all_exist = True
+    extensions = ['iqtree','log','rate','state','treefile']
+    for ext in extensions:
+        if (g['iqtree_'+ext]=='infer'):
+            g['path_iqtree_'+ext] = g['alignment_file']+'.'+ext
+        else:
+            g['path_iqtree_'+ext] = g['iqtree_'+ext]
+        if not os.path.exists(g['path_iqtree_iqtree']):
+            print('Intermediate file is missing: {}'.format(g['path_iqtree_'+ext]))
+            all_exist = False
+    return g,all_exist
+
+def run_ancestral(g):
+    run_iqtree = subprocess.run([g['iqtree_exe'], '-s', g['alignment_file'], '-te', g['rooted_tree_file'],
+                                 '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
+                                 '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo'],
+                                stdout=sys.stdout, stderr=sys.stderr)
+    assert (run_iqtree.returncode==0), "IQ-TREE did not finish safely: {}".format(run_iqtree.stdout.decode('utf8'))
+    return None
 
 def read_treefile(g):
     g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
@@ -63,32 +99,18 @@ def read_state(g):
     return g
 
 def read_rate(g):
-    if (g['iqtree_rate']=='infer'):
-        file_path = g['alignment_file']+'.rate'
-    else:
-        file_path = g['iqtree_rate']
-    err_txt = 'IQ-TREE\'s .rate file was not found in {}. Please specify the correct file PATH by --iqtree_rate.'
-    assert os.path.exists(file_path), err_txt.format(file_path)
-    print('IQ-TREE\'s .rate file was detected. Loading.')
-    sub_sites = pandas.read_csv(file_path, sep='\t', header=0, comment='#')
-    sub_sites = sub_sites.loc[:,'C_Rate'].values
-    return sub_sites
+    rate_sites = pandas.read_csv(g['path_iqtree_rate'], sep='\t', header=0, comment='#')
+    rate_sites = rate_sites.loc[:,'C_Rate'].values
+    return rate_sites
 
 def read_iqtree(g):
-    if (g['iqtree_iqtree']=='infer'):
-        file_path = g['alignment_file']+'.iqtree'
-    else:
-        file_path = g['iqtree_iqtree']
-    if not os.path.exists(file_path):
-        print('File not found:', file_path)
-        return g
-    with open(file_path) as f:
+    with open(g['path_iqtree_iqtree']) as f:
         lines = f.readlines()
     for line in lines:
         model = re.match(r'Model of substitution: (.+)', line)
         if model is not None:
             g['substitution_model'] = model.group(1)
-    with open(file_path) as f:
+    with open(g['path_iqtree_iqtree']) as f:
         txt = f.read()
     pi = pandas.DataFrame(index=g['codon_orders'], columns=['freq',])
     for m in re.finditer(r'  pi\(([A-Z]+)\) = ([0-9.]+)', txt, re.MULTILINE):
@@ -101,14 +123,7 @@ def read_log(g):
     g['omega'] = None
     g['kappa'] = None
     g['reconstruction_codon_table'] = None
-    if (g['iqtree_log']=='infer'):
-        file_path = g['alignment_file']+'.log'
-    else:
-        file_path = g['iqtree_log']
-    if not os.path.exists(file_path):
-        print('File not found:', file_path)
-        return g
-    with open(file_path) as f:
+    with open(g['path_iqtree_log']) as f:
         lines = f.readlines()
     for line in lines:
         omega = re.match(r'Nonsynonymous/synonymous ratio \(omega\): ([0-9.]+)', line)
@@ -140,7 +155,7 @@ def mask_missing_sites(state_tensor, tree):
 def get_state_tensor(g):
     g['tree'].link_to_alignment(alignment=g['alignment_file'], alg_format='fasta')
     num_node = len(list(g['tree'].traverse()))
-    state_table = pandas.read_csv(g['iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
+    state_table = pandas.read_csv(g['path_iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = numpy.zeros(axis, dtype=g['float_type'])
     for node in g['tree'].traverse():

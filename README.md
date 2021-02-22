@@ -42,36 +42,18 @@ csubst -h
 See [csubst wiki](https://github.com/kfuku52/csubst/wiki) for details. Specification of the IQ-TREE's substitution models is described [here](http://www.iqtree.org/doc/Substitution-Models).
 
 ```
-# Generate a directory and enter
-mkdir ./PGK
-cd ./PGK
-
 # Generate a test dataset
 csubst dataset --name PGK
-
-# Run IQ-TREE (version >=2.0.0) to get required files 
-# (.state, .rate, .log, .iqtree and .treefile)
-iqtree \
--s alignment.fa \
--te tree.nwk \
--m ECMK07+F+R4 \
---seqtype CODON1 \
---threads-max 4 \
---ancestral \
---rate \
---redo
 
 # Run csubst analyze
 csubst analyze \
 --alignment_file alignment.fa \
 --rooted_tree_file tree.nwk \
---codon_table 1 \
 --omega_method rec \
 --foreground foreground.txt \
 --force_exhaustive yes \
 --max_arity 2 \
---nslots 4
-
+--threads 4
 ```
 
 ## Licensing
