@@ -201,5 +201,76 @@ def plot_state_tree(state, orders, mode, g):
         file_name = 'csubst_state_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
         g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
 
+def get_num_adjusted_sites(g, node):
+    nl = node.numerical_label
+    parent = node.up.numerical_label
+    child_states = g['state_cdn'][nl,:,:]
+    parent_states = g['state_cdn'][parent,:,:]
+    is_child_present = numpy.expand_dims(child_states.sum(axis=1)!=0, axis=1)
+    parent_states *= is_child_present
+    codon_counts = parent_states.sum(axis=0)
+    scaled_Q = numpy.copy(g['instantaneous_codon_rate_matrix'])
+    numpy.fill_diagonal(scaled_Q, 0)
+    scaled_Q = scaled_Q / numpy.expand_dims(scaled_Q.sum(axis=1), axis=1)
+    adjusted_site_S = 0
+    adjusted_site_N = 0
+    for i in numpy.arange(codon_counts.shape[0]):
+        codon = g['codon_orders'][i]
+        amino_acid = [ val[0] for val in g['codon_table'] if val[1]==codon ][0]
+        synonymous_codons = [ val[1] for val in g['codon_table'] if val[0]==amino_acid ]
+        synonymous_codon_index = [ j for j,cdn in enumerate(g['codon_orders']) if cdn in synonymous_codons ]
+        prop_S = scaled_Q[i,synonymous_codon_index].sum()
+        prop_N = 1 - prop_S
+        adjusted_site_S += prop_S * codon_counts[i]
+        adjusted_site_N += prop_N * codon_counts[i]
+    return adjusted_site_S,adjusted_site_N
 
+def rescale_branch_length(g, S_tensor, N_tensor, denominator='L'):
+    print('Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, '
+          'rather than nucleotide-substitutions/codon-site.')
+    print('Total branch length before rescaling: {:,.3f} nucleotide substitutions / codon site'.format(sum([ n.dist for n in g['tree'].traverse() ])))
+    for node in g['tree'].traverse():
+        if node.is_root():
+            node.Sdist = 0
+            node.Ndist = 0
+            node.SNdist = 0
+            continue
+        nl = node.numerical_label
+        parent = node.up.numerical_label
+        num_nonmissing_codon = (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum()
+        if num_nonmissing_codon==0:
+            node.Sdist = 0
+            node.Ndist = 0
+            node.SNdist = 0
+            continue
+        num_S_sub = S_tensor[nl,:,:,:,:].sum()
+        num_N_sub = N_tensor[nl,:,:,:,:].sum()
+        is_S_zero = (num_S_sub==0)
+        is_N_zero = (num_N_sub==0)
+        if (denominator=='L'):
+            node.Sdist = num_S_sub / num_nonmissing_codon
+            node.Ndist = num_N_sub / num_nonmissing_codon
+            node.SNdist = node.Sdist + node.Ndist
+        elif (denominator=='adjusted_site'): # This option overestimated EN and ES compared with "L"
+            adjusted_site_S,adjusted_site_N = get_num_adjusted_sites(g, node)
+            node.adjusted_site_S = adjusted_site_S
+            node.adjusted_site_N = adjusted_site_N
+            #prop_S = adjusted_site_S / (adjusted_site_S + adjusted_site_N)
+            #prop_N = adjusted_site_N / (adjusted_site_S + adjusted_site_N)
+            #node.prop_S = prop_S
+            #node.prop_N = prop_N
+            if num_S_sub==0:
+                node.Sdist = 0
+            else:
+                node.Sdist = num_S_sub / adjusted_site_S
+            if num_S_sub==0:
+                node.Ndist = 0
+            else:
+                node.Ndist = num_N_sub / adjusted_site_N
+            node.SNdist = node.Sdist + node.Ndist
+
+    print('Total S+N branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(sum([ n.SNdist for n in g['tree'].traverse() ])))
+    print('Total S branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(sum([ n.Sdist for n in g['tree'].traverse() ])))
+    print('Total N branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(sum([ n.Ndist for n in g['tree'].traverse() ])))
+    return g
 

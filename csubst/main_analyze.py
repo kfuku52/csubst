@@ -130,31 +130,7 @@ def main_analyze(g):
     sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
 
-    print('Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, '
-          'rather than nucleotide-substitutions/codon-site.')
-    print('Total branch length before rescaling: {:,.3f}'.format(sum([ n.dist for n in g['tree'].traverse() ])))
-    for node in g['tree'].traverse():
-        if node.is_root():
-            node.Sdist = 0
-            node.Ndist = 0
-            node.SNdist = 0
-            continue
-        nl = node.numerical_label
-        parent = node.up.numerical_label
-        num_nonmissing_codon = (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum()
-        if num_nonmissing_codon==0:
-            node.Sdist = 0
-            node.Ndist = 0
-            node.SNdist = 0
-            continue
-        num_S_sub = S_tensor[nl,:,:,:,:].sum()
-        num_N_sub = N_tensor[nl,:,:,:,:].sum()
-        node.Sdist = num_S_sub / num_nonmissing_codon
-        node.Ndist = num_N_sub / num_nonmissing_codon
-        node.SNdist = (num_S_sub + num_N_sub) / num_nonmissing_codon
-    print('Total S+N branch length after rescaling: {:,.3f}'.format(sum([ n.SNdist for n in g['tree'].traverse() ])))
-    print('Total S branch length after rescaling: {:,.3f}'.format(sum([ n.Sdist for n in g['tree'].traverse() ])))
-    print('Total N branch length after rescaling: {:,.3f}'.format(sum([ n.Ndist for n in g['tree'].traverse() ])))
+    g = tree.rescale_branch_length(g, S_tensor, N_tensor)
 
     id_combinations = None
 
@@ -198,7 +174,7 @@ def main_analyze(g):
         elapsed_time = int(time.time() - start)
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
-    if g['omega_method']!='submodel':
+    if (g['omega_method']!='submodel'):
         g['state_cdn'] = None
         g['state_pep'] = None
 
