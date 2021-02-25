@@ -37,6 +37,36 @@ def calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g):
         E_b += tmp_E.sum(axis=1)
     return E_b
 
+def joblib_calc_E_mean(mode, cb, sub_sad, sub_bad, dfEb, obs_col, num_sgad_combinat, sgad_chunk, g):
+    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
+    iter_start = time.time()
+    if (sgad_chunk==[]):
+        return None # This happens when the number of iteration is smaller than --threads
+    i_start = sgad_chunk[0][0]
+    for i,sg,a,d in sgad_chunk:
+        # TODO: nan in a and d can be skipped in S
+        if (a==d):
+            continue
+        if (g['asrv']=='each'):
+            sub_sites = substitution.get_each_sub_sites(sub_sad, mode, sg, a, d, g)
+        elif (g['asrv']=='sn'):
+            if (obs_col.startswith('S')):
+                sub_sites = g['sub_sites']['S']
+            elif (obs_col.startswith('N')):
+                sub_sites = g['sub_sites']['N']
+        else:
+            sub_sites = g['sub_sites'][g['asrv']]
+        sub_branches = substitution.get_sub_branches(sub_bad, mode, sg, a, d)
+        tmp_E = numpy.ones(shape=(dfEb.shape[0], sub_sites.shape[1]), dtype=g['float_type'])
+        for bid in numpy.unique(cb.loc[:,bid_columns].values):
+            is_b = False
+            for bc in bid_columns:
+                is_b = (is_b)|(cb.loc[:,bc]==bid)
+            tmp_E[is_b,:] *= sub_sites[bid,:] * sub_branches[bid]
+        dfEb += tmp_E.sum(axis=1)
+    txt = 'E{}: {}-{}th of {} matrix_group/ancestral_state/derived_state combinations. Time elapsed: {:,} [sec]'
+    print(txt.format(obs_col, i_start, i, num_sgad_combinat, int(time.time()-iter_start)), flush=True)
+
 def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk, g):
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     for i,sg,a,d in sgad_chunk:
@@ -88,17 +118,29 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     num_sgad_combinat = len(sg_a_d)
     sg_a_d = [ [i,]+list(items) for i,items in zip(range(num_sgad_combinat), sg_a_d) ]
     obs_col = SN+mode
+    if (g['threads']>1):
+        sgad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(sg_a_d, g['threads'])
     if stat=='mean':
-        # TODO, parallel computation
-        E_b = calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g)
+        if (g['threads']==1):
+            E_b = calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g)
+        else:
+            mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
+            if os.path.exists(mmap_out): os.unlink(mmap_out)
+            my_dtype = sub_tensor.dtype
+            if 'bool' in str(my_dtype): my_dtype = numpy.int32
+            dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0]), mode='w+')
+            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+                joblib.delayed(joblib_calc_E_mean)
+                (mode, cb, sub_sad, sub_bad, dfEb, obs_col, num_sgad_combinat, sgad_chunk, g) for sgad_chunk in sgad_chunks
+            )
+            E_b = dfEb
+            if os.path.exists(mmap_out): os.unlink(mmap_out)
     elif stat=='quantile':
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         my_dtype = sub_tensor.dtype
-        if 'bool' in str(my_dtype):
-            my_dtype = numpy.int32
+        if 'bool' in str(my_dtype): my_dtype = numpy.int32
         dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0], quantile_niter), mode='w+')
-        sgad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(sg_a_d, g['threads'])
         joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(joblib_calc_quantile)
             (mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk, g) for sgad_chunk in sgad_chunks

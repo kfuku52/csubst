@@ -251,7 +251,6 @@ def get_sub_sites(g, sS, sN, state_tensor):
     elif (g['asrv']=='pool'):
         sub_sites = sS['S_sub'].values + sN['N_sub'].values
     elif (g['asrv']=='file'):
-        from csubst.parser_iqtree import read_rate
         sub_sites = g['iqtree_rate_values']
     if (g['asrv']=='sn'):
         for SN,df in zip(['S','N'],[sS,sN]):
@@ -264,7 +263,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
                 total_sub_sites = 1 if (total_sub_sites==0) else total_sub_sites
                 adjusted_sub_sites = adjusted_sub_sites/total_sub_sites
                 g['sub_sites'][SN][nl,:] = adjusted_sub_sites
-    elif (g['asrv']!='each'):
+    elif (g['asrv']!='each'): # if 'each', Defined later in get_each_sub_sites()
         for node in g['tree'].traverse():
             nl = node.numerical_label
             is_site_nonmissing = (state_tensor[nl,:,:].sum(axis=1)!=0)
@@ -275,7 +274,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
             g['sub_sites'][g['asrv']][nl,:] = adjusted_sub_sites
     return g
 
-def get_each_sub_sites(sub_sad, mode, sg, a, d, g):
+def get_each_sub_sites(sub_sad, mode, sg, a, d, g): # sub_sites for each "sg" group
     sub_sites = numpy.zeros(shape=g['is_site_nonmissing'].shape, dtype=g['float_type'])
     if mode == 'spe2spe':
         nonadjusted_sub_sites = sub_sad[:, sg, a, d]
