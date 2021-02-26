@@ -274,16 +274,16 @@ def get_sub_sites(g, sS, sN, state_tensor):
             g['sub_sites'][g['asrv']][nl,:] = adjusted_sub_sites
     return g
 
-def get_each_sub_sites(sub_sad, mode, sg, a, d, g): # sub_sites for each "sg" group
+def get_each_sub_sites(sub_sg, mode, sg, a, d, g): # sub_sites for each "sg" group
     sub_sites = numpy.zeros(shape=g['is_site_nonmissing'].shape, dtype=g['float_type'])
     if mode == 'spe2spe':
-        nonadjusted_sub_sites = sub_sad[:, sg, a, d]
+        nonadjusted_sub_sites = sub_sg[:, sg, a, d]
     elif mode == 'spe2any':
-        nonadjusted_sub_sites = sub_sad[:, sg, a]
+        nonadjusted_sub_sites = sub_sg[:, sg, a]
     elif mode == 'any2spe':
-        nonadjusted_sub_sites = sub_sad[:, sg, d]
+        nonadjusted_sub_sites = sub_sg[:, sg, d]
     elif mode == 'any2any':
-        nonadjusted_sub_sites = sub_sad[:, sg]
+        nonadjusted_sub_sites = sub_sg[:, sg]
     for node in g['tree'].traverse():
         nl = node.numerical_label
         sub_sites[nl,:] = nonadjusted_sub_sites * g['is_site_nonmissing'][nl,:]
@@ -292,15 +292,15 @@ def get_each_sub_sites(sub_sad, mode, sg, a, d, g): # sub_sites for each "sg" gr
         sub_sites[nl,:] = sub_sites[nl,:] / total_sub_sites
     return sub_sites
 
-def get_sub_branches(sub_bad, mode, sg, a, d):
+def get_sub_branches(sub_bg, mode, sg, a, d):
     if mode == 'spe2spe':
-        sub_branches = sub_bad[:, sg, a, d]
+        sub_branches = sub_bg[:, sg, a, d]
     elif mode == 'spe2any':
-        sub_branches = sub_bad[:, sg, a]
+        sub_branches = sub_bg[:, sg, a]
     elif mode == 'any2spe':
-        sub_branches = sub_bad[:, sg, d]
+        sub_branches = sub_bg[:, sg, d]
     elif mode == 'any2any':
-        sub_branches = sub_bad[:, sg]
+        sub_branches = sub_bg[:, sg]
     return sub_branches
 
 def get_substitutions_per_branch(cb, b, g):

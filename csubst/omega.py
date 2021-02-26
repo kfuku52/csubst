@@ -11,15 +11,14 @@ from csubst import parallel
 from csubst import substitution
 from csubst import table
 
-def calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g):
+def calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g):
     E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-    for i,sg,a,d in sg_a_d:
-        # TODO: nan in a and d can be skipped in S
+    for i,sg,a,d in list_igad:
         if (a==d):
             continue
         if (g['asrv']=='each'):
-            sub_sites = substitution.get_each_sub_sites(sub_sad, mode, sg, a, d, g)
+            sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
         elif (g['asrv']=='sn'):
             if (obs_col.startswith('S')):
                 sub_sites = g['sub_sites']['S']
@@ -27,7 +26,7 @@ def calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g):
                 sub_sites = g['sub_sites']['N']
         else:
             sub_sites = g['sub_sites'][g['asrv']]
-        sub_branches = substitution.get_sub_branches(sub_bad, mode, sg, a, d)
+        sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
         tmp_E = numpy.ones(shape=(E_b.shape[0], sub_sites.shape[1]), dtype=g['float_type'])
         for bid in numpy.unique(cb.loc[:,bid_columns].values):
             is_b = False
@@ -37,18 +36,17 @@ def calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g):
         E_b += tmp_E.sum(axis=1)
     return E_b
 
-def joblib_calc_E_mean(mode, cb, sub_sad, sub_bad, dfEb, obs_col, num_sgad_combinat, sgad_chunk, g):
+def joblib_calc_E_mean(mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g):
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     iter_start = time.time()
-    if (sgad_chunk==[]):
+    if (igad_chunk==[]):
         return None # This happens when the number of iteration is smaller than --threads
-    i_start = sgad_chunk[0][0]
-    for i,sg,a,d in sgad_chunk:
-        # TODO: nan in a and d can be skipped in S
+    i_start = igad_chunk[0][0]
+    for i,sg,a,d in igad_chunk:
         if (a==d):
             continue
         if (g['asrv']=='each'):
-            sub_sites = substitution.get_each_sub_sites(sub_sad, mode, sg, a, d, g)
+            sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
         elif (g['asrv']=='sn'):
             if (obs_col.startswith('S')):
                 sub_sites = g['sub_sites']['S']
@@ -56,7 +54,7 @@ def joblib_calc_E_mean(mode, cb, sub_sad, sub_bad, dfEb, obs_col, num_sgad_combi
                 sub_sites = g['sub_sites']['N']
         else:
             sub_sites = g['sub_sites'][g['asrv']]
-        sub_branches = substitution.get_sub_branches(sub_bad, mode, sg, a, d)
+        sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
         tmp_E = numpy.ones(shape=(dfEb.shape[0], sub_sites.shape[1]), dtype=g['float_type'])
         for bid in numpy.unique(cb.loc[:,bid_columns].values):
             is_b = False
@@ -65,16 +63,15 @@ def joblib_calc_E_mean(mode, cb, sub_sad, sub_bad, dfEb, obs_col, num_sgad_combi
             tmp_E[is_b,:] *= sub_sites[bid,:] * sub_branches[bid]
         dfEb += tmp_E.sum(axis=1)
     txt = 'E{}: {}-{}th of {} matrix_group/ancestral_state/derived_state combinations. Time elapsed: {:,} [sec]'
-    print(txt.format(obs_col, i_start, i, num_sgad_combinat, int(time.time()-iter_start)), flush=True)
+    print(txt.format(obs_col, i_start, i, num_gad_combinat, int(time.time()-iter_start)), flush=True)
 
-def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk, g):
+def joblib_calc_quantile(mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-    for i,sg,a,d in sgad_chunk:
-        # TODO: nan in a and d can be skipped in S
+    for i,sg,a,d in igad_chunk:
         if (a==d):
             continue
         if (g['asrv']=='each'):
-            sub_sites = substitution.get_each_sub_sites(sub_sad, mode, sg, a, d, g)
+            sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
         elif (g['asrv']=='sn'):
                 if (obs_col.startswith('S')):
                     sub_sites = g['sub_sites']['S']
@@ -82,7 +79,7 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_co
                     sub_sites = g['sub_sites']['N']
         else:
             sub_sites = g['sub_sites'][g['asrv']]
-        sub_branches = substitution.get_sub_branches(sub_bad, mode, sg, a, d)
+        sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
         p = sub_sites[0]
         if p.sum()==0:
             continue
@@ -91,38 +88,35 @@ def joblib_calc_quantile(mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_co
         cb_ids = cb.loc[:,bid_columns].values
         dfq[:,:] += omega_cy.get_permutations(cb_ids, array_site, sub_branches, p, quantile_niter)
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
-        print(txt.format(obs_col, i+1, num_sgad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
+        print(txt.format(obs_col, i+1, num_gad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g={}):
     if mode=='spe2spe':
-        sub_bad = sub_tensor.sum(axis=1)  # branch, matrix_group, ancestral_state, derived_state
-        ancestral_states = numpy.arange(sub_bad.shape[2])
-        derived_states = numpy.arange(sub_bad.shape[3])
-        sub_sad = sub_tensor.sum(axis=0)
+        sub_bg = sub_tensor.sum(axis=1) # branch, matrix_group, ancestral_state, derived_state
+        sub_sg = sub_tensor.sum(axis=0) # site, matrix_group, ancestral_state, derived_state
+        list_gad = [ [g,a,d] for g,a,d in itertools.zip_longest(*g[SN+'_ind_nomissing_gad']) ]
     elif mode=='spe2any':
-        sub_bad = sub_tensor.sum(axis=(1, 4))  # branch, matrix_group, ancestral_state
-        ancestral_states = numpy.arange(sub_bad.shape[2])
-        derived_states = ['2any',] # dummy
-        sub_sad = sub_tensor.sum(axis=(0, 4))
+        sub_bg = sub_tensor.sum(axis=(1, 4)) # branch, matrix_group, ancestral_state
+        sub_sg = sub_tensor.sum(axis=(0, 4)) # site, matrix_group, ancestral_state
+        list_gad = [ [g,a,'2any'] for g,a in itertools.zip_longest(*g[SN+'_ind_nomissing_ga']) ]
     elif mode=='any2spe':
-        sub_bad = sub_tensor.sum(axis=(1, 3))  # branch, matrix_group, derived_state
-        ancestral_states = ['any2',] # dummy
-        derived_states = numpy.arange(sub_bad.shape[2])
-        sub_sad = sub_tensor.sum(axis=(0, 3))
+        sub_bg = sub_tensor.sum(axis=(1, 3)) # branch, matrix_group, derived_state
+        sub_sg = sub_tensor.sum(axis=(0, 3)) # site, matrix_group, derived_state
+        list_gad = [ [g,'any2',d] for g,d in itertools.zip_longest(*g[SN+'_ind_nomissing_gd']) ]
     elif mode=='any2any':
-        sub_bad = sub_tensor.sum(axis=(1, 3, 4))  # branch, matrix_group
-        ancestral_states = ['any2',] # dummy
-        derived_states = ['2any',] # dummy
-        sub_sad = sub_tensor.sum(axis=(0, 3, 4))
-    sg_a_d = list(itertools.product(numpy.arange(sub_bad.shape[1]), ancestral_states, derived_states))
-    num_sgad_combinat = len(sg_a_d)
-    sg_a_d = [ [i,]+list(items) for i,items in zip(range(num_sgad_combinat), sg_a_d) ]
+        sub_bg = sub_tensor.sum(axis=(1, 3, 4)) # branch, matrix_group
+        sub_sg = sub_tensor.sum(axis=(0, 3, 4)) # site, matrix_group
+        list_gad = list(itertools.product(numpy.arange(sub_tensor.shape[2]), ['any2',], ['2any',]))
+    num_gad_combinat = len(list_gad)
+    txt = 'E{}{}: Total number of substitution categories after NaN removals: {}'
+    print(txt.format(SN, mode, num_gad_combinat))
+    list_igad = [ [i,]+list(items) for i,items in zip(range(num_gad_combinat), list_gad) ]
     obs_col = SN+mode
     if (g['threads']>1):
-        sgad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(sg_a_d, g['threads'])
+        igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, g['threads'])
     if stat=='mean':
         if (g['threads']==1):
-            E_b = calc_E_mean(mode, cb, sub_sad, sub_bad, obs_col, sg_a_d, g)
+            E_b = calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g)
         else:
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
@@ -131,7 +125,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0]), mode='w+')
             joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
                 joblib.delayed(joblib_calc_E_mean)
-                (mode, cb, sub_sad, sub_bad, dfEb, obs_col, num_sgad_combinat, sgad_chunk, g) for sgad_chunk in sgad_chunks
+                (mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
             )
             E_b = dfEb
             if os.path.exists(mmap_out): os.unlink(mmap_out)
@@ -143,7 +137,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0], quantile_niter), mode='w+')
         joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(joblib_calc_quantile)
-            (mode, cb, sub_sad, sub_bad, dfq, quantile_niter, obs_col, num_sgad_combinat, sgad_chunk, g) for sgad_chunk in sgad_chunks
+            (mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
         )
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
@@ -164,6 +158,13 @@ def get_any2dif(cb):
     return cb
 
 def get_E(cb, g, N_tensor, S_tensor):
+    if (g['omega_method']=='modelfree')|(g['calc_quantile']):
+        g['N_ind_nomissing_gad'] = numpy.where(N_tensor.sum(axis=(0,1))!=0)
+        g['N_ind_nomissing_ga'] = numpy.where(N_tensor.sum(axis=(0,1,4))!=0)
+        g['N_ind_nomissing_gd'] = numpy.where(N_tensor.sum(axis=(0,1,3))!=0)
+        g['S_ind_nomissing_gad'] = numpy.where(S_tensor.sum(axis=(0,1))!=0)
+        g['S_ind_nomissing_ga'] = numpy.where(S_tensor.sum(axis=(0,1,4))!=0)
+        g['S_ind_nomissing_gd'] = numpy.where(S_tensor.sum(axis=(0,1,3))!=0)
     if (g['omega_method']=='modelfree'):
         sub_types = g['substitution_types'].split(',')
         for st in sub_types:
@@ -174,14 +175,16 @@ def get_E(cb, g, N_tensor, S_tensor):
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_pepE = get_exp_state(g=g, mode='pep')
         EN_tensor = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
-        print('Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'.format(EN_tensor.sum()))
+        txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
+        print(txt.format(EN_tensor.sum()))
         cbEN = substitution.get_cb(cb.loc[:,id_cols].values, EN_tensor, g, 'EN')
         os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.EN.mmap') ][0])
         cb = table.merge_tables(cb, cbEN)
         del state_pepE,cbEN
         state_cdnE = get_exp_state(g=g, mode='cdn')
         ES_tensor = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
-        print('Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'.format(ES_tensor.sum()))
+        txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
+        print(txt.format(ES_tensor.sum()))
         cbES = substitution.get_cb(cb.loc[:,id_cols].values, ES_tensor, g, 'ES')
         os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.ES.mmap') ][0])
         cb = table.merge_tables(cb, cbES)
