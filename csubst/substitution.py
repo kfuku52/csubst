@@ -95,7 +95,7 @@ def get_cs(id_combinations, sub_tensor, attr):
     df = numpy.zeros([num_site, 5])
     df[:, 0] = numpy.arange(num_site)
     for i in numpy.arange(id_combinations.shape[0]):
-        for sg in numpy.arange(sub_tensor.shape[2]): # TODO: Couldn't this sg included in the matrix calc using .sum()?
+        for sg in numpy.arange(sub_tensor.shape[2]): # Couldn't this sg included in the matrix calc using .sum()?
             df[:, 1] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], :, sg, :, :].sum(axis=(2, 3)).prod(axis=0))  # any2any
             df[:, 2] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], :, sg, :, :].sum(axis=3).prod(axis=0).sum(axis=1))  # spe2any
             df[:, 3] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], :, sg, :, :].sum(axis=2).prod(axis=0).sum(axis=1))  # any2spe

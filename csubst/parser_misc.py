@@ -181,7 +181,7 @@ def prep_state(g):
     state_pep = None
     if (g['infile_type'] == 'phylobayes'):
         from csubst import parser_phylobayes
-        if g['input_data_type'] == 'nuc':
+        if g['input_data_type'] == 'nuc': # obsoleted
             state_nuc = parser_phylobayes.get_state_tensor(g)
             if (g['calc_omega']):
                 state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
@@ -191,7 +191,7 @@ def prep_state(g):
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
     elif (g['infile_type'] == 'iqtree'):
         from csubst import parser_iqtree
-        if g['input_data_type'] == 'nuc':
+        if g['input_data_type'] == 'nuc': # obsoleted
             state_nuc = parser_iqtree.get_state_tensor(g)
             if (g['calc_omega']):
                 state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)

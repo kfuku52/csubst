@@ -1,8 +1,6 @@
 import numpy
 
-import re
-
-def calc_omega_state(state_nuc, g): # TODO, implement, exclude stop codon freq
+def calc_omega_state(state_nuc, g): # implement exclude stop codon freq
     num_node = state_nuc.shape[0]
     num_nuc_site = state_nuc.shape[1]
     if num_nuc_site%3 != 0:

@@ -142,7 +142,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
         for i in cb.index:
-            # TODO: poisson approximation
+            # num_gad_combinat: poisson approximation
             obs_value = cb.loc[i,obs_col]
             gt_rank = (dfq[i,:]<obs_value).sum()
             ge_rank = (dfq[i,:]<=obs_value).sum()
@@ -240,7 +240,7 @@ def get_exp_state(g, mode, bl='asis'):
             if bl=='substitution':
                 inst_bl_site = numpy.copy(inst_bl)
             elif bl=='asis':
-                inst_bl_site = inst_bl * site_rate # TODO is this valid when bl=='substitution'?
+                inst_bl_site = inst_bl * site_rate
             transition_prob = expm(inst_bl_site)
             site_indices = numpy.where(g['iqtree_rate_values']==site_rate)[0]
             for s in site_indices:
