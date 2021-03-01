@@ -4,6 +4,8 @@ import copy
 import numpy
 import pandas
 
+from csubst import combination
+
 def combinations_count(n, r):
     # https://github.com/nkmk/python-snippets/blob/05a53ae96736577906a8805b38bce6cc210fe11f/notebook/combinations_count.py#L1-L14
     from operator import mul
@@ -290,3 +292,14 @@ def get_num_foreground_lineages(tree):
     for node in tree.traverse():
         num_fl = max(num_fl, node.foreground_lineage_id)
     return num_fl
+
+def set_random_foreground_branch(g):
+    for i in numpy.arange(100):
+        g = get_foreground_branch(g)
+        g = randomize_foreground_branch(g)
+        g = get_marginal_branch(g)
+        g,rid_combinations = combination.get_node_combinations(g, target_nodes=g['target_id'],
+                                                               arity=g['current_arity'], check_attr="name")
+        if rid_combinations.shape[0]!=0:
+            return g,rid_combinations
+    raise Exception('Foreground branch randomization failed 10 times. There may not be enough numbers of "similar" clades.')

@@ -24,7 +24,7 @@ def add_numerical_node_labels(tree):
         i+=1
     return(tree)
 
-def transfer_root_and_dist(tree_to, tree_from, verbose=False):
+def transfer_root(tree_to, tree_from, verbose=False):
     same_leaf_set = len(set(tree_to.get_leaf_names()) - set(tree_from.get_leaf_names())) == 0
     assert same_leaf_set, 'Input tree and iqtree\'s treefile did not have identical leaves.'
     subroot_leaves = [ n.get_leaf_names() for n in tree_from.get_children() ]
@@ -46,7 +46,7 @@ def transfer_root_and_dist(tree_to, tree_from, verbose=False):
     for n_to in subroot_to:
         for n_from in subroot_from:
             if (set(n_to.get_leaf_names()) == set(n_from.get_leaf_names())):
-                n_to.dist = (n_from.dist / total_subroot_length_from) * total_subroot_length_to
+                n_to.dist = total_subroot_length_to * (n_from.dist / total_subroot_length_from)
     for n_to in tree_to.traverse():
         if n_to.name == '':
             n_to.name = tree_to.name
@@ -245,28 +245,32 @@ def rescale_branch_length(g, S_tensor, N_tensor, denominator='L'):
             continue
         num_S_sub = S_tensor[nl,:,:,:,:].sum()
         num_N_sub = N_tensor[nl,:,:,:,:].sum()
-        is_S_zero = (num_S_sub==0)
-        is_N_zero = (num_N_sub==0)
+        # is_S_zero = (num_S_sub==0)
+        # is_N_zero = (num_N_sub==0)
         if (denominator=='L'):
             node.Sdist = num_S_sub / num_nonmissing_codon
             node.Ndist = num_N_sub / num_nonmissing_codon
             node.SNdist = node.Sdist + node.Ndist
         elif (denominator=='adjusted_site'): # This option overestimated EN and ES compared with "L"
             adjusted_site_S,adjusted_site_N = get_num_adjusted_sites(g, node)
-            node.adjusted_site_S = adjusted_site_S
-            node.adjusted_site_N = adjusted_site_N
             #prop_S = adjusted_site_S / (adjusted_site_S + adjusted_site_N)
             #prop_N = adjusted_site_N / (adjusted_site_S + adjusted_site_N)
-            #node.prop_S = prop_S
-            #node.prop_N = prop_N
+            #prop_S = num_S_sub / (num_S_sub + num_N_sub)
+            #prop_N = num_N_sub / (num_S_sub + num_N_sub)
+            adjusted_num_S_sub = num_S_sub / adjusted_site_S
+            adjusted_num_N_sub = num_N_sub / adjusted_site_N
+            prop_S = adjusted_num_S_sub / (adjusted_num_S_sub + adjusted_num_N_sub)
+            prop_N = adjusted_num_N_sub / (adjusted_num_S_sub + adjusted_num_N_sub)
             if num_S_sub==0:
                 node.Sdist = 0
             else:
-                node.Sdist = num_S_sub / adjusted_site_S
+                node.Sdist = node.dist * prop_S
+                #node.Sdist = adjusted_site_S / prop_S
             if num_S_sub==0:
                 node.Ndist = 0
             else:
-                node.Ndist = num_N_sub / adjusted_site_N
+                node.Ndist = node.dist * prop_N
+                #node.Ndist = adjusted_site_N / prop_N
             node.SNdist = node.Sdist + node.Ndist
 
     print('Total S+N branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(sum([ n.SNdist for n in g['tree'].traverse() ])))

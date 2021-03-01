@@ -37,8 +37,8 @@ def calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g):
     return E_b
 
 def joblib_calc_E_mean(mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g):
-    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     iter_start = time.time()
+    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     if (igad_chunk==[]):
         return None # This happens when the number of iteration is smaller than --threads
     i_start = igad_chunk[0][0]
@@ -118,10 +118,10 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         if (g['threads']==1):
             E_b = calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g)
         else:
+            my_dtype = sub_tensor.dtype
+            if 'bool' in str(my_dtype): my_dtype = g['float_type']
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
-            my_dtype = sub_tensor.dtype
-            if 'bool' in str(my_dtype): my_dtype = numpy.int32
             dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0]), mode='w+')
             joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
                 joblib.delayed(joblib_calc_E_mean)
@@ -208,38 +208,33 @@ def get_E(cb, g, N_tensor, S_tensor):
             cb['QS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='quantile', SN='S', g=g)
     return cb
 
-def get_exp_state(g, mode, bl='asis'):
+def get_exp_state(g, mode):
     if mode=='cdn':
         state = g['state_cdn'].astype(g['float_type'])
         inst = g['instantaneous_codon_rate_matrix']
-        sub_col = 'S_sub'
     elif mode=='pep':
         state = g['state_pep'].astype(g['float_type'])
         inst = g['instantaneous_aa_rate_matrix']
-        sub_col = 'N_sub'
     stateE = numpy.zeros_like(state, dtype=g['float_type'])
     for node in g['tree'].traverse():
         if node.is_root():
             continue
-        if bl=='substitution':
-            num_site = state.shape[1]
-            branch_length = g['branch_table'].loc[node.numerical_label,sub_col] / num_site
-        elif bl=='asis':
-            if mode=='cdn':
-                branch_length = node.SNdist
-            elif mode=='pep':
-                branch_length = node.Ndist
+        if mode=='cdn':
+            branch_length = node.SNdist
+        elif mode=='pep':
+            branch_length = node.Ndist
         branch_length = max(branch_length, 0)
+        if branch_length==0:
+            continue # Skip if no substitution
         nl = node.numerical_label
         parent_nl = node.up.numerical_label
         if parent_nl>stateE.shape[0]:
             continue # Skip if parent is the root node
         inst_bl = inst * branch_length
         for site_rate in numpy.unique(g['iqtree_rate_values']):
-            if bl=='substitution':
-                inst_bl_site = numpy.copy(inst_bl)
-            elif bl=='asis':
-                inst_bl_site = inst_bl * site_rate
+            inst_bl_site = inst_bl * site_rate
+            # Confirmed this implementation (with expm) correctly replicated the example in this instruction (Huelsenbeck, 2012)
+            # https://molevolworkshop.github.io/faculty/huelsenbeck/pdf/WoodsHoleHandout.pdf
             transition_prob = expm(inst_bl_site)
             site_indices = numpy.where(g['iqtree_rate_values']==site_rate)[0]
             for s in site_indices:
@@ -248,7 +243,6 @@ def get_exp_state(g, mode, bl='asis'):
                     expected_transition_ad /= expected_transition_ad.sum()
                 expected_derived_state = expected_transition_ad.sum(axis=0)
                 stateE[nl,s,:] = expected_derived_state
-                assert (expected_derived_state.sum()-1)<g['float_tol'], 'Derived state should be equal to 1. ({})'.format(expected_derived_state.sum())
     max_stateE = stateE.sum(axis=(2)).max()
     assert (max_stateE-1)<g['float_tol'], 'Total probability of expected states should not exceed 1. {}'.format(max_stateE)
     return stateE

@@ -15,6 +15,47 @@ from csubst import substitution
 from csubst import table
 from csubst import tree
 
+def add_median_cb_stats(g, cb, current_arity, start):
+    is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
+    suffices = list()
+    is_targets = list()
+    suffices.append('_all')
+    is_targets.append(numpy.ones(shape=cb.shape[0], dtype=numpy.bool))
+    target_cols = ['is_fg','is_mg','is_mf','dummy']
+    suffix_candidates = ['_fg','_mg','_mf']
+    if g['force_exhaustive']:
+        suffix_candidates.append('_all')
+    for target_col,sc in zip(target_cols,suffix_candidates):
+        if target_col in cb.columns:
+            suffices.append(sc)
+            if sc=='_all':
+                is_targets.append(True)
+            else:
+                is_targets.append(cb.loc[:,target_col]=='Y')
+    stats = dict()
+    stats['median'] = ['dist_bl','dist_node_num','omega_any2any','omega_any2spe','omega_any2dif']
+    stats['total'] = ['Nany2any','ENany2any','Sany2any','ESany2any','Nany2spe','ENany2spe','Sany2spe','ESany2spe',]
+    for stat in stats.keys():
+        for suffix,is_target in zip(suffices,is_targets):
+            for ms in stats[stat]:
+                col = stat+'_'+ms+suffix
+                if stat=='median':
+                    g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
+                elif stat=='total':
+                    g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
+            g['df_cb_stats'].loc[is_arity,'num'+suffix] = is_target.sum()
+            num_qualified = (cb.loc[is_target,g['cutoff_stat']]>=g['cutoff_stat_min']).sum()
+            g['df_cb_stats'].loc[is_arity,'num_qualified'+suffix] = num_qualified
+    for key in ['Nany2any','Sany2any','Nany2spe','Sany2spe',]:
+        totalN = g['df_cb_stats'].loc[is_arity, 'total_'+key+'_all'].values[0]
+        totalEN = g['df_cb_stats'].loc[is_arity, 'total_E'+key+'_all'].values[0]
+        txt = 'Total {}/E{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation)'
+        print(txt.format(key, key, totalN, totalEN, totalEN/totalN*100))
+    elapsed_time = int(time.time() - start)
+    g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
+    print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
+    return g
+
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
     end_flag = 0
     g = param.initialize_df_cb_stats(g)
@@ -72,28 +113,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
             txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
-        is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
-        suffices = list()
-        is_targets = list()
-        suffices.append('_all')
-        is_targets.append(numpy.ones(shape=cb.shape[0], dtype=numpy.bool))
-        target_cols = ['is_fg','is_mg','is_mf']
-        suffix_candidates = ['_fg','_mg','_mf']
-        for target_col,sc in zip(target_cols,suffix_candidates):
-            if target_col in cb.columns:
-                suffices.append(sc)
-                is_targets.append(cb.loc[:,target_col]=='Y')
-        median_stats = ['dist_bl','dist_node_num','omega_any2any','omega_any2spe','omega_any2dif']
-        for suffix,is_target in zip(suffices,is_targets):
-            for ms in median_stats:
-                col = 'median_'+ms+suffix
-                g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
-            g['df_cb_stats'].loc[is_arity,'num'+suffix] = is_target.sum()
-            num_qualified = (cb.loc[is_target,g['cutoff_stat']]>=g['cutoff_stat_min']).sum()
-            g['df_cb_stats'].loc[is_arity,'num_qualified'+suffix] = num_qualified
-        elapsed_time = int(time.time() - start)
-        g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
-        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
+        g = add_median_cb_stats(g, cb, current_arity, start)
         if end_flag:
             print('No combination satisfied phylogenetic independence. Ending branch combination analysis.')
             break
@@ -125,8 +145,10 @@ def main_analyze(g):
         plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)
 
     N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
+    N_tensor = substitution.apply_min_sub_pp(g, N_tensor)
     sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()
     S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
+    S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
     sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
 
@@ -236,13 +258,12 @@ def main_analyze(g):
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()
         g = cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='foreground', write_cb=True)
-        if (g['foreground'] is not None)&(g['fg_random']>0):
+        if (g['fg_random']>0):
             for i in numpy.arange(0, g['fg_random']):
                 print('starting foreground randomization round {:,}'.format(i+1), flush=True)
-                g = foreground.get_foreground_branch(g)
-                g = foreground.randomize_foreground_branch(g)
-                g = foreground.get_marginal_branch(g)
-                g = cb_search(g, b, S_tensor, N_tensor, mode='randomization_'+str(i+1), write_cb=False)
+                g,rid_combinations = foreground.set_random_foreground_branch(g)
+                print('rid_combinations.shape', rid_combinations.shape)
+                g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode='randomization_'+str(i+1), write_cb=False)
                 print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
 
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)

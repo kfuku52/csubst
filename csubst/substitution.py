@@ -57,11 +57,15 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
                 sub_matrix = numpy.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
                 sub_tensor[child, :, s, :size, :size] = sub_matrix
     sub_tensor = numpy.nan_to_num(sub_tensor, nan=0)
-    if g['min_sub_pp']!=0:
-        if (g['ml_anc']):
-            print('--ml_anc is set. --min_sub_pp will not be applied.')
-        else:
-            sub_tensor = (sub_tensor>=g['min_sub_pp'])
+    return sub_tensor
+
+def apply_min_sub_pp(g, sub_tensor):
+    if g['min_sub_pp']==0:
+        return sub_tensor
+    if (g['ml_anc']):
+        print('--ml_anc is set. --min_sub_pp will not be applied.')
+    else:
+        sub_tensor[(sub_tensor<g['min_sub_pp'])] = 0
     return sub_tensor
 
 def get_b(g, sub_tensor, attr):

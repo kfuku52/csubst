@@ -176,7 +176,9 @@ def main_site(g):
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
     N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
+    N_tensor = substitution.apply_min_sub_pp(g, N_tensor)
     S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
+    S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
 
     branch_ids = numpy.array([ int(s) for s in g['branch_id'].split(',')])
     num_site = N_tensor.shape[1]

@@ -59,10 +59,11 @@ def read_treefile(g):
     g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
     f.close()
     g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
-    g['tree'] = tree.transfer_root_and_dist(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
+    g['tree'] = tree.transfer_root(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
     print('Total branch length of --rooted_tree_file:', sum([ n.dist for n in g['rooted_tree'].traverse() ]))
     print('Total branch length of --iqtree_treefile:', sum([ n.dist for n in g['node_label_tree'].traverse() ]))
+    print('Total branch length of the internally used tree:', sum([ n.dist for n in g['tree'].traverse() ]))
     print('')
     return g
 
