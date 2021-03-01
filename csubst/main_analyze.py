@@ -206,13 +206,13 @@ def main_analyze(g):
         print("Generating combinat-site table.", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
-        csS = get_cs(id_combinations, S_tensor, attr='S')
-        csN = get_cs(id_combinations, N_tensor, attr='N')
+        csS = substitution.get_cs(id_combinations, S_tensor, attr='S')
+        csN = substitution.get_cs(id_combinations, N_tensor, attr='N')
         cs = table.merge_tables(csS, csN)
         del csS, csN
         cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
-        txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
-        print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
+        txt = 'Memory consumption of cs table: {:,.1f} Mbytes (dtype={})'
+        print(txt.format(cs.values.nbytes/1024/1024, cs.values.dtype), flush=True)
         del cs
         elapsed_time = int(time.time() - start)
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
@@ -222,8 +222,8 @@ def main_analyze(g):
         print("Generating combinat-branch-site table.", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
-        cbsS = get_cbs(id_combinations, S_tensor, attr='S', g=g)
-        cbsN = get_cbs(id_combinations, N_tensor, attr='N', g=g)
+        cbsS = substitution.get_cbs(id_combinations, S_tensor, attr='S', g=g)
+        cbsN = substitution.get_cbs(id_combinations, N_tensor, attr='N', g=g)
         cbs = table.merge_tables(cbsS, cbsN)
         del cbsS, cbsN
         cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)

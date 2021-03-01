@@ -5,6 +5,8 @@ def get_global_parameters(args):
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:
         g[attr] = getattr(args, attr)
+    if g['calc_quantile']:
+        assert g['omega_method']=='modelfree', '--calc_quantile "yes" should be used with --omega_method "modelfree".'
     if 'iqtree_treefile' in g.keys():
         if (g['iqtree_treefile']=='infer'):
             g['iqtree_treefile'] = g['alignment_file']+'.treefile'

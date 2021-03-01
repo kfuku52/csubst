@@ -231,7 +231,9 @@ analyze.add_argument('--substitution_types', metavar='STR', default='any2any,any
                      help='default=%(default)s: Comma-delimited types of substitutions to be analyzed.'
                           'One or more from any2any, any2spe, spe2any, spe2spe')
 analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
-                     help='default=%(default)s: Calculate permutation-based quantiles for combinatorial substitutions.')
+                     help='default=%(default)s: Calculate resampling-based quantiles in '
+                          'Wallenius\' noncentral hypergeometric distribution for combinatorial substitutions. '
+                          'This option should be used with --omega method "modelfree".')
 # Among-site rate variation
 analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
                      choices=['no', 'pool', 'sn', 'each', 'file'],

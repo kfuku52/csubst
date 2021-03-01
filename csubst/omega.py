@@ -158,14 +158,13 @@ def get_any2dif(cb):
     return cb
 
 def get_E(cb, g, N_tensor, S_tensor):
-    if (g['omega_method']=='modelfree')|(g['calc_quantile']):
+    if (g['omega_method']=='modelfree'):
         g['N_ind_nomissing_gad'] = numpy.where(N_tensor.sum(axis=(0,1))!=0)
         g['N_ind_nomissing_ga'] = numpy.where(N_tensor.sum(axis=(0,1,4))!=0)
         g['N_ind_nomissing_gd'] = numpy.where(N_tensor.sum(axis=(0,1,3))!=0)
         g['S_ind_nomissing_gad'] = numpy.where(S_tensor.sum(axis=(0,1))!=0)
         g['S_ind_nomissing_ga'] = numpy.where(S_tensor.sum(axis=(0,1,4))!=0)
         g['S_ind_nomissing_gd'] = numpy.where(S_tensor.sum(axis=(0,1,3))!=0)
-    if (g['omega_method']=='modelfree'):
         sub_types = g['substitution_types'].split(',')
         for st in sub_types:
             cb['EN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
