@@ -138,9 +138,9 @@ dataset.set_defaults(handler=command_dataset)
 
 # simulate
 simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg])
-simulate.add_argument('--background_omega', metavar='FLOAT', default=1, type=float,
+simulate.add_argument('--background_omega', metavar='FLOAT', default=0.2, type=float,
                       help='default=%(default)s: dN/dS for background branches.')
-simulate.add_argument('--foreground_omega', metavar='FLOAT', default=1, type=float,
+simulate.add_argument('--foreground_omega', metavar='FLOAT', default=0.2, type=float,
                       help='default=%(default)s: dN/dS for foreground branches.')
 simulate.add_argument('--num_simulated_site', metavar='INT', default=-1, type=int,
                       help='default=%(default)s: Number of codon sites to simulate. '
@@ -159,8 +159,10 @@ simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random
                            'e.g, AQTS, ACQ, WDETS... '
                            '"randomN" specifies randomly selected N amino acids. '
                            '"random0" does not cause convergence.')
-simulate.add_argument('--convergence_intensity_factor', metavar='FLOAT', default=10000, type=float,
-                      help='default=%(default)s: Frequencies of the codons encoding the [--convergent_amino_acids] '
+simulate.add_argument('--percent_biased_sub', metavar='FLOAT', default=95, type=float,
+                      help='default=%(default)s: Approximately this percentage of nonsynonymous substitutions '
+                           'in the foreground branches/sites are biased toward amino acids specified by '
+                           '--convergent_amino_acids, while preserving the original codon frequencies as much as possible.'
                       'are multiplied by this factor before the mean frequency is rescaled.')
 simulate.set_defaults(handler=command_simulate)
 
@@ -219,13 +221,16 @@ analyze.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
                      help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output.')
 # Plot outputs
 analyze.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
-                     help='default=%(default)s: Tree plots with per-site ancestral amino acid states. This option will generate many pdfs')
+                     help='default=%(default)s: Tree plots with per-site ancestral amino acid states. '
+                          'This option will generate many pdfs')
 analyze.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
-                     help='default=%(default)s: Tree plots with per-site ancestral codon states. This option will generate many pdfs')
+                     help='default=%(default)s: Tree plots with per-site ancestral codon states. '
+                          'This option will generate many pdfs')
 # Omega calculation
 analyze.add_argument('--calc_omega', metavar='yes|no', default='yes', type=strtobool,
                      help='default=%(default)s: Calculate omega for convergence rate.')
-analyze.add_argument('--omega_method', metavar='[modelfree|submodel]', default='submodel', type=str, choices=['modelfree','submodel'],
+analyze.add_argument('--omega_method', metavar='[modelfree|submodel]', default='submodel', type=str,
+                     choices=['modelfree','submodel'],
                      help='default=%(default)s: Method to calculate omega. '
                           '"modelfree" for expected values from among-site randomization of substitutions. '
                           'All EXany2any, EXspe2any, EXany2spe, and EXspe2spe substitutions are individually calculated.'
@@ -246,8 +251,10 @@ analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', t
                      help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation. '
                           '"no", No ASRV, meaning the uniform rate among sites. '
                           '"pool", All categories of substitutions are pooled to calculate ASRV. '
-                          '"sn", Synonymous and nonsynonymous substitutions are processed individually to calculate their respective ASRVs.'
-                          '"each", Each of 61x60 patterns of substitutions are processed individually to calculate their respective ASRVs.'
+                          '"sn", Synonymous and nonsynonymous substitutions are processed individually '
+                          'to calculate their respective ASRVs.'
+                          '"each", Each of 61x60 patterns of substitutions are processed individually '
+                          'to calculate their respective ASRVs.'
                           '"file", ASRV is obtained from the IQ-TREE\'s .rate file.'
                           'This option is used if --omega_method modelfree')
 

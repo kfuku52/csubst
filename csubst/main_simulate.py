@@ -200,6 +200,20 @@ def get_total_biased_Q(mat, biased_aas, codon_table, codon_order):
         total_biased_Q += mat[biased_nsy_cdn_index[i,0],biased_nsy_cdn_index[i,1]]
     return total_biased_Q
 
+def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, codon_table, codon_orders,
+                             all_nsy_cdn_index, all_syn_cdn_index, foreground_omega):
+    mat = copy.copy(mat)
+    diag_bool = numpy.eye(mat.shape[0], dtype=bool)
+    mat[diag_bool] = 0
+    total_biased_Q_before = get_total_biased_Q(mat, biased_aas, codon_table, codon_orders)
+    total_nsy_Q_before = get_total_Q(mat, all_nsy_cdn_index)
+    scaling_factor = total_nsy_Q_before / total_biased_Q_before / (1-(percent_biased_sub/100))
+    mat = rescale_substitution_matrix(mat, target_index, scaling_factor)
+    dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
+    omega_scaling_factor = foreground_omega/dnds
+    mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor)
+    return mat
+
 def main_simulate(g, Q_method='csubst'):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = parser_misc.generate_intermediate_files(g)
@@ -249,20 +263,26 @@ def main_simulate(g, Q_method='csubst'):
             biased_aas = get_biased_amino_acids(g['convergent_amino_acids'], g['codon_table'])
             print('Codon site {}; Biased amino acids = {}; '.format(current_site, ''.join(biased_aas)), end='')
             biased_nsy_sub_index = get_biased_nonsynonymous_substitution_index(biased_aas, g['codon_table'], pyvolve_codon_orders)
-            biased_Q = rescale_substitution_matrix(background_Q, biased_nsy_sub_index, g['convergence_intensity_factor'])
-            dnds = get_total_Q(biased_Q, all_nsy_cdn_index) / get_total_Q(biased_Q, all_syn_cdn_index)
-            scaling_factor = g['foreground_omega']/dnds
-            biased_Q = rescale_substitution_matrix(biased_Q, all_nsy_cdn_index, scaling_factor)
-            total_Q = biased_Q.sum() - biased_Q.trace()
+            biased_Q = apply_percent_biased_sub(mat=background_Q,
+                                                percent_biased_sub=g['percent_biased_sub'],
+                                                target_index=biased_nsy_sub_index,
+                                                biased_aas=biased_aas,
+                                                codon_table=g['codon_table'],
+                                                codon_orders=pyvolve_codon_orders,
+                                                all_nsy_cdn_index=all_nsy_cdn_index,
+                                                all_syn_cdn_index=all_syn_cdn_index,
+                                                foreground_omega=g['foreground_omega'],
+                                                )
+            total_nsy_Q = get_total_Q(biased_Q, all_nsy_cdn_index)
             total_biased_Q = get_total_biased_Q(biased_Q, biased_aas, g['codon_table'], pyvolve_codon_orders)
-            fraction_biased_Q = total_biased_Q / total_Q
-            bg_total_Q = background_Q.sum() - background_Q.trace()
+            fraction_biased_Q = total_biased_Q / total_nsy_Q
+            bg_total_nsy_Q = get_total_Q(background_Q, all_nsy_cdn_index)
             bg_total_biased_Q = get_total_biased_Q(background_Q, biased_aas, g['codon_table'], pyvolve_codon_orders)
-            bg_fraction_biased_Q = bg_total_biased_Q / bg_total_Q
+            bg_fraction_biased_Q = bg_total_biased_Q / bg_total_nsy_Q
             txt = 'Total in Q toward the codons before and after the bias introduction = ' \
                   '{:,.1f}% ({:,.1f}/{:,.1f}) and {:,.1f}% ({:,.1f}/{:,.1f})'
-            print(txt.format(bg_fraction_biased_Q*100, bg_total_biased_Q, bg_total_Q,
-                             fraction_biased_Q*100, total_biased_Q, total_Q))
+            print(txt.format(bg_fraction_biased_Q*100, bg_total_biased_Q, bg_total_nsy_Q,
+                             fraction_biased_Q*100, total_biased_Q, total_nsy_Q))
             biased_substitution_fractions.append(fraction_biased_Q)
         else:
             print('Codon site {}-{}; No convergent amino acid'.format(prev_site+1, current_site))

@@ -35,6 +35,8 @@ def get_global_parameters(args):
         elif (g['float_type']==64):
             g['float_type'] = numpy.float64
             g['float_tol'] = 10**-9
+    if 'percent_biased_sub' in g.keys():
+        assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
     return g
 
 def initialize_df_cb_stats(g):
