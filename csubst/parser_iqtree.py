@@ -37,12 +37,13 @@ def check_intermediate_files(g):
             all_exist = False
     return g,all_exist
 
-def run_ancestral(g):
+def run_iqtree_ancestral(g):
     run_iqtree = subprocess.run([g['iqtree_exe'], '-s', g['alignment_file'], '-te', g['rooted_tree_file'],
                                  '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
                                  '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo'],
                                 stdout=sys.stdout, stderr=sys.stderr)
     assert (run_iqtree.returncode==0), "IQ-TREE did not finish safely: {}".format(run_iqtree.stdout.decode('utf8'))
+    os.remove(g['alignment_file']+'.ckp.gz')
     return None
 
 def read_treefile(g):
@@ -63,7 +64,6 @@ def read_treefile(g):
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
     print('Total branch length of --rooted_tree_file:', sum([ n.dist for n in g['rooted_tree'].traverse() ]))
     print('Total branch length of --iqtree_treefile:', sum([ n.dist for n in g['node_label_tree'].traverse() ]))
-    print('Total branch length of the internally used tree:', sum([ n.dist for n in g['tree'].traverse() ]))
     print('')
     return g
 
@@ -155,6 +155,10 @@ def mask_missing_sites(state_tensor, tree):
 
 def get_state_tensor(g):
     g['tree'].link_to_alignment(alignment=g['alignment_file'], alg_format='fasta')
+    num_codon_alignment = int(len(g['tree'].get_leaves()[0].sequence)/3)
+    err_txt = 'The number of codon sites did not match between the alignment and ancestral states. ' \
+              'Delete intermediate files and rerun.'
+    assert num_codon_alignment==g['num_input_site'], err_txt
     num_node = len(list(g['tree'].traverse()))
     state_table = pandas.read_csv(g['path_iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
     axis = [num_node, g['num_input_site'], g['num_input_state']]

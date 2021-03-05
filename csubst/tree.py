@@ -151,14 +151,14 @@ def is_ete_plottable():
         return False
     return True
 
-def plot_branch_category(g, file_name):
+def plot_branch_category(tree, file_name):
     if not is_ete_plottable():
         return None
     ts = ete3.TreeStyle()
     ts.mode = 'r'
     ts.show_leaf_name = False
     ts.layout_fn = branch_category_layout
-    g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
+    tree.render(file_name=file_name, tree_style=ts, units='px', dpi=300)
 
 def branch_state_layout(node):
     nstyle = ete3.NodeStyle()

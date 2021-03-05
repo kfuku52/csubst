@@ -1,15 +1,48 @@
 import pyvolve
 import numpy
 
+import contextlib
 import copy
+import io
 import itertools
 import os
 import re
+import sys
 
 from csubst import foreground
 from csubst import genetic_code
 from csubst import parser_misc
 from csubst.tree import plot_branch_category # This cannot be "from csubst import tree" because of conflicting name "tree"
+
+class suppress_stdout_stderr(object):
+    # https://www.semicolonworld.com/question/57657/suppress-stdout-stderr-print-from-python-functions
+    '''
+    A context manager for doing a "deep suppression" of stdout and stderr in
+    Python, i.e. will suppress all print, even if the print originates in a
+    compiled C/Fortran sub-function.
+       This will not suppress raised exceptions, since exceptions are printed
+    to stderr just before a script exits, and after the context manager has
+    exited (at least, I think that is why it lets exceptions through).
+
+    '''
+    def __init__(self):
+        # Open a pair of null files
+        self.null_fds =  [os.open(os.devnull,os.O_RDWR) for x in range(2)]
+        # Save the actual stdout (1) and stderr (2) file descriptors.
+        self.save_fds = [os.dup(1), os.dup(2)]
+
+    def __enter__(self):
+        # Assign the null pointers to stdout and stderr.
+        os.dup2(self.null_fds[0],1)
+        os.dup2(self.null_fds[1],2)
+
+    def __exit__(self, *_):
+        # Re-assign the real stdout/stderr back to (1) and (2)
+        os.dup2(self.save_fds[0],1)
+        os.dup2(self.save_fds[1],2)
+        # Close all file descriptors
+        for fd in self.null_fds + self.save_fds:
+            os.close(fd)
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
@@ -29,6 +62,9 @@ def get_pyvolve_tree(tree):
             sub_to = str(node.dist2)
         newick_txt = re.sub(':'+sub_from+',', ':'+sub_to+',', newick_txt)
         newick_txt = re.sub(':'+sub_from+'\)', ':'+sub_to+')', newick_txt)
+    for node in tree.traverse():
+        node.dist = node.dist2
+        node.dist2 = None
     return newick_txt
 
 def get_pyvolve_codon_order():
@@ -46,44 +82,53 @@ def get_codons(amino_acids, codon_table):
     cdn = numpy.array(cdn)
     return cdn
 
-def get_convergent_nsyonymous_codon_substitution_index(g):
-    if g['convergent_amino_acids'].startswith('random'):
-        amino_acids = numpy.array(list(set([ item[0] for item in g['codon_table'] if item[0] is not '*' ])))
-        num_random_aa = int(g['convergent_amino_acids'].replace('random',''))
-        aa_index = numpy.random.choice(a=numpy.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
-        conv_aas = amino_acids[aa_index]
-    else:
-        conv_aas = numpy.array(list(g['convergent_amino_acids']))
-    pyvolve_codon_order = get_pyvolve_codon_order()
-    num_codon = pyvolve_codon_order.shape[0]
+def get_biased_nonsynonymous_substitution_index(biased_aas, codon_table, codon_order):
+    num_codon = codon_order.shape[0]
     row_index = numpy.arange(num_codon)
     num_conv_codons = 0
-    conv_cdn_index = list()
-    for conv_aa in conv_aas:
-        conv_cdn = get_codons(amino_acids=conv_aa, codon_table=g['codon_table'])
-        index_bool = numpy.array([ pco in conv_cdn for pco in pyvolve_codon_order ])
-        conv_cdn_index0 = numpy.argwhere(index_bool==True)
-        conv_cdn_index0 = conv_cdn_index0.reshape(conv_cdn_index0.shape[0])
-        conv_cdn_iter = itertools.product(row_index, conv_cdn_index0)
-        conv_cdn_index1 = [ cci for cci in conv_cdn_iter if not ((cci[0] in conv_cdn_index0)&(cci[1] in conv_cdn_index0)) ]
-        conv_cdn_index = conv_cdn_index + conv_cdn_index1
-        num_conv_codons += conv_cdn_index0.shape[0]
-    conv_cdn_index = numpy.array(conv_cdn_index)
-    txt = 'Convergent amino acids = {}; # of codons = {}; # of nsyonymous codon substitutions = {}/{}'
-    print(txt.format(conv_aas, num_conv_codons, conv_cdn_index.shape[0], num_codon*(num_codon-1)), flush=True)
-    return conv_cdn_index
+    biased_cdn_index = list()
+    for conv_aa in biased_aas:
+        conv_cdn = get_codons(amino_acids=conv_aa, codon_table=codon_table)
+        index_bool = numpy.array([ pco in conv_cdn for pco in codon_order ])
+        biased_cdn_index0 = numpy.argwhere(index_bool==True)
+        biased_cdn_index0 = biased_cdn_index0.reshape(biased_cdn_index0.shape[0])
+        conv_cdn_iter = itertools.product(row_index, biased_cdn_index0)
+        biased_cdn_index1 = [ cci for cci in conv_cdn_iter if not ((cci[0] in biased_cdn_index0)&(cci[1] in biased_cdn_index0)) ]
+        biased_cdn_index = biased_cdn_index + biased_cdn_index1
+        num_conv_codons += biased_cdn_index0.shape[0]
+    biased_cdn_index = numpy.array(biased_cdn_index)
+    return biased_cdn_index
 
-def get_synonymous_codon_substitution_index(g):
+def get_biased_amino_acids(convergent_amino_acids, codon_table):
+    if convergent_amino_acids.startswith('random'):
+        amino_acids = numpy.array(list(set([ item[0] for item in codon_table if item[0] is not '*' ])))
+        num_random_aa = int(convergent_amino_acids.replace('random',''))
+        aa_index = numpy.random.choice(a=numpy.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
+        biased_aas = amino_acids[aa_index]
+    else:
+        biased_aas = numpy.array(list(convergent_amino_acids))
+    return biased_aas
+
+def get_biased_codon_index(biased_aas, codon_table, codon_order):
+    biased_cdn_index = list()
+    for conv_aa in biased_aas:
+        conv_cdn = get_codons(amino_acids=conv_aa, codon_table=codon_table)
+        index_bool = numpy.array([ pco in conv_cdn for pco in codon_order ])
+        biased_cdn_index0 = numpy.argwhere(index_bool==True).tolist()
+        biased_cdn_index = biased_cdn_index + biased_cdn_index0
+    biased_cdn_index = numpy.array(biased_cdn_index)
+    return biased_cdn_index
+
+def get_synonymous_codon_substitution_index(g, codon_order):
     amino_acids = numpy.array(list(set([ item[0] for item in g['codon_table'] if item[0] is not '*' ])))
-    pyvolve_codon_order = get_pyvolve_codon_order()
-    num_codon = pyvolve_codon_order.shape[0]
+    num_codon = codon_order.shape[0]
     num_syn_codons = 0
     cdn_index = list()
     for aa in amino_acids:
         codons = get_codons(amino_acids=aa, codon_table=g['codon_table'])
         if len(codons)==1:
             continue
-        index_bool = numpy.array([ pco in codons for pco in pyvolve_codon_order ])
+        index_bool = numpy.array([ pco in codons for pco in codon_order ])
         cdn_index0 = numpy.argwhere(index_bool==True)
         cdn_index0 = cdn_index0.reshape(cdn_index0.shape[0])
         cdn_index1 = list(itertools.permutations(cdn_index0, 2))
@@ -113,7 +158,7 @@ def get_nonsynonymous_codon_substitution_index(all_syn_cdn_index):
     print(txt.format(nsy_index.shape[0], num_codon*(num_codon-1)), flush=True)
     return nsy_index
 
-def get_total_freq(mat, cdn_index):
+def get_total_Q(mat, cdn_index):
     total = 0
     for ci in numpy.arange(cdn_index.shape[0]):
         row = cdn_index[ci,0]
@@ -121,81 +166,126 @@ def get_total_freq(mat, cdn_index):
         total += mat[row,col]
     return total
 
-def rescale_substitution_matrix(mat, target_index, all_index, scaling_factor):
+def rescale_substitution_matrix(mat, target_index, scaling_factor):
+    mat = copy.copy(mat)
     diag_bool = numpy.eye(mat.shape[0], dtype=bool)
     mat[diag_bool] = 0
-    sum_before = get_total_freq(mat, all_index)
+    sum_before = mat.sum()
     for i in numpy.arange(target_index.shape[0]):
         mat[target_index[i,0],target_index[i,1]] *= scaling_factor
-    sum_after = get_total_freq(mat, all_index)
-    for ai in numpy.arange(all_index.shape[0]):
-        row = all_index[ai,0]
-        col = all_index[ai,1]
-        mat[row,col] = mat[row,col] / sum_after * sum_before
+    sum_after = mat.sum()
+    mat = mat / sum_after * sum_before
     mat[diag_bool] = -mat.sum(axis=1)
     return mat
 
-def get_num_partition_site(g):
-    if g['num_simulated_site']==-1:
-        num_simulated_site = g['num_input_site']
-    else:
-        num_simulated_site = g['num_simulated_site']
-    min_partition_site = int(num_simulated_site/g['num_partition'])
-    num_partition_sites = numpy.repeat(min_partition_site, g['num_partition'])
-    remaining = num_simulated_site - num_partition_sites.sum()
-    while (remaining>0):
-        for i in numpy.arange(num_partition_sites.shape[0]):
-            num_partition_sites[i] += 1
-            remaining -= 1
-            if remaining==0:
-                break
-    return num_partition_sites
+def generate_Q_matrix(eq_freq, omega, all_nsy_cdn_index, all_syn_cdn_index):
+    all_cdn_index = numpy.concatenate([all_syn_cdn_index, all_nsy_cdn_index])
+    cmp = {'omega':omega, 'k_ti':1, 'k_tv':1} # background_omega have to be readjusted.
+    model = pyvolve.Model(model_type='ECMunrest', name='placeholder', parameters=cmp, state_freqs=eq_freq)
+    mat = model.matrix
+    dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
+    mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, scaling_factor=omega/dnds)
+    return mat
 
-def main_simulate(g):
+def bias_eq_freq(eq_freq, biased_cdn_index, convergence_intensity_factor):
+    eq_freq = numpy.array(eq_freq)
+    eq_freq[biased_cdn_index] *= convergence_intensity_factor
+    eq_freq /= eq_freq.sum()
+    return eq_freq
+
+def get_total_biased_Q(mat, biased_aas, codon_table, codon_order):
+    biased_nsy_cdn_index = get_biased_nonsynonymous_substitution_index(biased_aas, codon_table, codon_order)
+    total_biased_Q = 0
+    for i in numpy.arange(biased_nsy_cdn_index.shape[0]):
+        total_biased_Q += mat[biased_nsy_cdn_index[i,0],biased_nsy_cdn_index[i,1]]
+    return total_biased_Q
+
+def main_simulate(g, Q_method='csubst'):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
-    plot_branch_category(g, file_name='simulate_branch_category.pdf')
-    num_partition_sites = get_num_partition_site(g)
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'])
-    all_syn_cdn_index = get_synonymous_codon_substitution_index(g)
+    all_syn_cdn_index = get_synonymous_codon_substitution_index(g, get_pyvolve_codon_order())
     all_nsy_cdn_index = get_nonsynonymous_codon_substitution_index(all_syn_cdn_index)
-    all_cdn_index = numpy.concatenate([all_syn_cdn_index, all_nsy_cdn_index])
-    g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
-    newick_txt = get_pyvolve_tree(tree=g['tree'])
+    if g['optimized_branch_length']:
+        g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
+        newick_txt = get_pyvolve_tree(tree=g['tree'])
+        plot_branch_category(g['tree'], file_name='simulate_branch_category.pdf')
+    else:
+        g['rooted_tree'] = scale_tree(tree=g['rooted_tree'], scaling_factor=g['tree_scaling_factor'])
+        g['rooted_tree'] = foreground.initialize_foreground_annotation(tree=g['rooted_tree'])
+        g['rooted_tree'],_,_ = foreground.annotate_foreground_branch(g['rooted_tree'], g['fg_df'], g['fg_stem_only'])
+        newick_txt = get_pyvolve_tree(tree=g['rooted_tree'])
+        plot_branch_category(g['rooted_tree'], file_name='simulate_branch_category.pdf')
     tree = pyvolve.read_tree(tree=newick_txt)
     f = pyvolve.ReadFrequencies('codon', file=g['alignment_file'])
-    sf = f.compute_frequencies()
-    cmp = {'omega':g['background_omega'], 'k_ti':1, 'k_tv':1} # Background_omega have to be readjusted.
-    model = pyvolve.Model(model_type='ECMunrest', name='placeholder', parameters=cmp, state_freqs=sf)
-    background_mat = model.matrix
-    dnds = get_total_freq(background_mat, all_nsy_cdn_index) / get_total_freq(background_mat, all_syn_cdn_index)
-    print('dN/dS upon model initialization = {}'.format(dnds))
-    background_mat = rescale_substitution_matrix(background_mat, all_nsy_cdn_index, all_cdn_index,
-                                                 scaling_factor=g['background_omega']/dnds)
+    eq_freq = f.compute_frequencies()
+    pyvolve_codon_orders = get_pyvolve_codon_order()
+    if (Q_method=='csubst'):
+        matrix_file = 'substitution_matrix/ECMunrest.dat'
+        g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(matrix_file, pyvolve_codon_orders)
+        unscaled_mat = parser_misc.exchangeability2Q(g['exchangeability_matrix'], eq_freq, g['float_type'])
+        dnds = get_total_Q(unscaled_mat, all_nsy_cdn_index) / get_total_Q(unscaled_mat, all_syn_cdn_index)
+        scaling_factor = g['background_omega']/dnds
+        background_Q = rescale_substitution_matrix(unscaled_mat, all_nsy_cdn_index, scaling_factor)
+    elif (Q_method=='pyvolve'):
+        background_Q = generate_Q_matrix(eq_freq, g['background_omega'], all_nsy_cdn_index, all_syn_cdn_index)
     model_names = ['root',] + [ 'm'+str(i+1) for i in range(num_fl) ]
+    num_convergent_site = int(g['num_simulated_site'] * g['percent_convergent_site'] / 100)
+    num_no_conv_site = int(g['num_simulated_site'] - num_convergent_site)
+    txt = '{:,} out of {:,} sites ({:.1f}%) will evolve convergently in the foreground lineages.'
+    print(txt.format(num_convergent_site, g['num_simulated_site'], g['percent_convergent_site']))
+    num_partition = num_convergent_site + 1 if (g['percent_convergent_site']!=100) else num_convergent_site
     partitions = list()
-    for partition_index in numpy.arange(g['num_partition']):
-        conv_nsy_cdn_index = get_convergent_nsyonymous_codon_substitution_index(g)
+    biased_substitution_fractions = list()
+    current_site = 0
+    for partition_index in numpy.arange(num_partition):
+        is_convergent_partition = (partition_index<num_convergent_site)
+        size = num_no_conv_site if not is_convergent_partition else 1
+        prev_site = current_site
+        current_site += size
+        if is_convergent_partition:
+            biased_aas = get_biased_amino_acids(g['convergent_amino_acids'], g['codon_table'])
+            print('Codon site {}; Biased amino acids = {}; '.format(current_site, ''.join(biased_aas)), end='')
+            biased_nsy_sub_index = get_biased_nonsynonymous_substitution_index(biased_aas, g['codon_table'], pyvolve_codon_orders)
+            biased_Q = rescale_substitution_matrix(background_Q, biased_nsy_sub_index, g['convergence_intensity_factor'])
+            dnds = get_total_Q(biased_Q, all_nsy_cdn_index) / get_total_Q(biased_Q, all_syn_cdn_index)
+            scaling_factor = g['foreground_omega']/dnds
+            biased_Q = rescale_substitution_matrix(biased_Q, all_nsy_cdn_index, scaling_factor)
+            total_Q = biased_Q.sum() - biased_Q.trace()
+            total_biased_Q = get_total_biased_Q(biased_Q, biased_aas, g['codon_table'], pyvolve_codon_orders)
+            fraction_biased_Q = total_biased_Q / total_Q
+            bg_total_Q = background_Q.sum() - background_Q.trace()
+            bg_total_biased_Q = get_total_biased_Q(background_Q, biased_aas, g['codon_table'], pyvolve_codon_orders)
+            bg_fraction_biased_Q = bg_total_biased_Q / bg_total_Q
+            txt = 'Total in Q toward the codons before and after the bias introduction = ' \
+                  '{:,.1f}% ({:,.1f}/{:,.1f}) and {:,.1f}% ({:,.1f}/{:,.1f})'
+            print(txt.format(bg_fraction_biased_Q*100, bg_total_biased_Q, bg_total_Q,
+                             fraction_biased_Q*100, total_biased_Q, total_Q))
+            biased_substitution_fractions.append(fraction_biased_Q)
+        else:
+            print('Codon site {}-{}; No convergent amino acid'.format(prev_site+1, current_site))
         models = list()
         for model_name in model_names:
-            if (model_name=='root'):
-                model = pyvolve.Model(model_type='custom', name=model_name, parameters={'matrix':background_mat})
+            is_nonroot_model = (model_name!='root')
+            if (is_nonroot_model & is_convergent_partition):
+                q_matrix = copy.copy(biased_Q)
             else:
-                mat = copy.copy(background_mat)
-                dnds = get_total_freq(mat, all_nsy_cdn_index) / get_total_freq(mat, all_syn_cdn_index)
-                print('dN/dS before rescaling convergent nonsynonymous changes = {}'.format(dnds))
-                mat = rescale_substitution_matrix(mat, conv_nsy_cdn_index, all_nsy_cdn_index,
-                                                  scaling_factor=g['convergence_intensity_factor'])
-                mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, all_cdn_index,
-                                                  scaling_factor=g['foreground_omega']/dnds)
-                dnds = get_total_freq(mat, all_nsy_cdn_index) / get_total_freq(mat, all_syn_cdn_index)
-                print('dN/dS freq ratio after rescaling convergent nonsynonymous changes = {}'.format(dnds))
-                model = pyvolve.Model(model_type='custom', name=model_name, parameters={'matrix':mat})
+                q_matrix = copy.copy(background_Q)
+            with suppress_stdout_stderr():
+                model = pyvolve.Model(model_type='custom', name=model_name, parameters={'matrix':q_matrix})
             models.append(model)
-        partition = pyvolve.Partition(models=models, size=num_partition_sites[partition_index],  root_model_name='root')
+        partition = pyvolve.Partition(models=models, size=size,  root_model_name='root')
         partitions.append(partition)
+    mean_biased_substitution_fraction = numpy.array(biased_substitution_fractions).mean() if len(biased_substitution_fractions) else 0
+    txt = '{:,.2f}% of substitutions in {} sites in the foreground branches are ' \
+          'expected to result from the introduced bias in Q matrix.'
+    fraction_convergent_site = num_convergent_site / g['num_simulated_site']
+    print(txt.format(mean_biased_substitution_fraction*fraction_convergent_site*100, g['num_simulated_site']))
+    txt = '{:,.2f}% of substitutions in {} convergent sites in the foreground branches are ' \
+          'expected to result from the introduced bias in Q matrix.'
+    print(txt.format(mean_biased_substitution_fraction*100, num_convergent_site))
     evolver = pyvolve.Evolver(partitions=partitions, tree=tree)
     evolver(
         ratefile='simulate_ratefile.txt',

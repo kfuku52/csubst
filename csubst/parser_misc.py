@@ -10,7 +10,7 @@ from csubst import parser_iqtree
 
 def generate_intermediate_files(g):
     if (g['infile_type'] == 'phylobayes'):
-        print("PhyloBayes is not supported.")
+        raise Exception("PhyloBayes is not supported.")
     elif (g['infile_type'] == 'iqtree'):
         g,all_exist = parser_iqtree.check_intermediate_files(g)
         if all_exist:
@@ -18,7 +18,7 @@ def generate_intermediate_files(g):
         else:
             print('Starting IQ-TREE to estimate parameters and ancestral states.')
             parser_iqtree.check_iqtree_dependency(g)
-            parser_iqtree.run_ancestral(g)
+            parser_iqtree.run_iqtree_ancestral(g)
     return g
 
 def read_input(g):
@@ -34,14 +34,16 @@ def read_input(g):
             print('Transition matrix will be generated using the model in the ancestral state reconstruction:', g['substitution_model'])
             if (g['substitution_model'].startswith('ECMK07')):
                 matrix_file = 'substitution_matrix/ECMunrest.dat'
-                g['exchangeability_matrix'] = read_exchangeability_matrix(file=matrix_file, g=g)
+                g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
                 g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
-                g['instantaneous_codon_rate_matrix'] = exchangeability2instantaneous_rate_matrix(g=g)
+                g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
+                g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'], g['float_type'])
             if (g['substitution_model'].startswith('ECMrest')):
                 matrix_file = 'substitution_matrix/ECMrest.dat'
-                g['exchangeability_matrix'] = read_exchangeability_matrix(file=matrix_file, g=g)
+                g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
                 g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
-                g['instantaneous_codon_rate_matrix'] = exchangeability2instantaneous_rate_matrix(g=g)
+                g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
+                g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'], g['float_type'])
             elif (g['substitution_model'].startswith('GY')):
                 assert (g['omega'] is not None), 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
                 assert (g['kappa'] is not None), 'Estimated kappa is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
@@ -148,10 +150,8 @@ def cdn2pep_matrix(inst_cdn, g):
     #inst_pep = scale_instantaneous_rate_matrix(inst_pep, eq_pep)
     return inst_pep
 
-def exchangeability2instantaneous_rate_matrix(g):
-    ex = g['exchangeability_matrix']
-    eq = get_equilibrium_frequency(g, mode='cdn')
-    inst = ex.dot(numpy.diag(eq)).astype(g['float_type']) # pi_j * s_ij
+def exchangeability2Q(ex, eq, float_type):
+    inst = ex.dot(numpy.diag(eq)).astype(float_type) # pi_j * s_ij
     inst = scale_instantaneous_rate_matrix(inst, eq)
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst
@@ -201,7 +201,7 @@ def prep_state(g):
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
     return g,state_nuc,state_cdn,state_pep
 
-def read_exchangeability_matrix(file, g):
+def read_exchangeability_matrix(file, codon_orders):
     txt = pkg_resources.resource_string(__name__, file)
     txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
     txt_mat = txt[0:60]
@@ -214,7 +214,7 @@ def read_exchangeability_matrix(file, g):
     mat_exchangeability[ind] = arr
     mat_exchangeability += mat_exchangeability.T
     ex_codon_order = get_exchangeability_codon_order()
-    codon_order_index = get_codon_order_index(order_from=g['codon_orders'], order_to=ex_codon_order)
+    codon_order_index = get_codon_order_index(order_from=codon_orders, order_to=ex_codon_order)
     mat_exchangeability = mat_exchangeability[codon_order_index,:][:,codon_order_index] # Index matches to g['codon_orders']
     return mat_exchangeability
 

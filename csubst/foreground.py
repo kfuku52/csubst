@@ -94,89 +94,98 @@ def get_new_foreground_ids(df_clade_size, g):
     new_fg_ids = numpy.array(new_fg_ids, dtype=numpy.int)
     return new_fg_ids
 
-def get_foreground_branch(g):
-    for node in g['tree'].traverse(): # initializing
+def annotate_foreground_branch(tree, fg_df, fg_stem_only):
+    target_id = numpy.zeros(shape=(0,), dtype=numpy.int)
+    fg_leaf_name = []
+    leaf_names = [ leaf.name for leaf in tree.get_leaves() ]
+    lineages = fg_df.iloc[:,0].unique()
+    lineage_colors = [
+        'red',
+        'blue',
+        'darkorange',
+        'brown',
+        'mediumseagreen',
+        'purple',
+        'hotpink',
+        'olive',
+        'darkturquoise',
+        'green',
+        'darkorchid',
+    ]
+    for i in numpy.arange(len(lineages)):
+        fg_leaf_name.append([])
+        is_lineage = (fg_df.iloc[:,0]==lineages[i])
+        lineage_regex_names = fg_df.loc[is_lineage,:].iloc[:,1].unique().tolist()
+        iter = itertools.product(leaf_names, lineage_regex_names)
+        lineage_leaf_names = [ ln for ln,lr in iter if re.match('^'+lr+'$', ln) ]
+        lineage_fg_id = list()
+        for lln in lineage_leaf_names:
+            match_leaves = [ ln for ln in leaf_names if lln==ln ]
+            if len(match_leaves)==1:
+                fg_leaf_name[i].append(match_leaves[0])
+            else:
+                print('The foreground leaf name cannot be identified:', lln, match_leaves)
+        fg_leaf_name_set = set(fg_leaf_name[i])
+        for node in tree.traverse():
+            node.is_lineage_foreground = False # initializing
+        for node in tree.traverse():
+            node_leaf_name_set = set(node.get_leaf_names())
+            if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
+                node.is_lineage_foreground = True
+                node.is_foreground = True
+                node.foreground_lineage_id = i+1
+                node.color = lineage_colors[i%len(lineage_colors)]
+        for node in tree.traverse():
+            node_leaf_name_set = set(node.get_leaf_names())
+            if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
+                if fg_stem_only:
+                    if (node.is_lineage_foreground==True)&(node.up.is_lineage_foreground==False):
+                        lineage_fg_id.append(node.numerical_label)
+                else:
+                    lineage_fg_id.append(node.numerical_label)
+        dif = 1
+        while dif:
+            num_id = len(lineage_fg_id)
+            for node in tree.traverse():
+                child_ids = [ child.numerical_label for child in node.get_children() ]
+                if all([ id in lineage_fg_id for id in child_ids ])&(len(child_ids)!=0):
+                    if node.numerical_label not in lineage_fg_id:
+                        lineage_fg_id.append(node.numerical_label)
+            dif = len(lineage_fg_id) - num_id
+        tmp = numpy.array(lineage_fg_id, dtype=numpy.int)
+        target_id = numpy.concatenate([target_id, tmp])
+    if fg_stem_only:
+        for node in tree.traverse():
+            if node.numerical_label in target_id:
+                node.is_foreground = True
+            else:
+                node.is_foreground = False
+                node.color = 'black'
+    with open('csubst_target_branch.txt', 'w') as f:
+        for x in target_id:
+            f.write(str(x)+'\n')
+    return tree,fg_leaf_name,target_id
+
+def initialize_foreground_annotation(tree):
+    for node in tree.traverse():
         node.is_foreground = False
         node.foreground_lineage_id = 0
         node.color = 'black'
-    g['fg_leaf_name'] = list()
-    # numerical_label for leaves in --foreground as well as their ancestors
-    g['target_id'] = numpy.zeros(shape=(0,), dtype=numpy.int)
+    return tree
+
+def get_foreground_branch(g):
+    g['tree'] = initialize_foreground_annotation(tree=g['tree'])
     if g['foreground'] is None:
         g['fg_df'] = pandas.DataFrame()
         g['fg_id'] = list()
-        return g
+        g['fg_leaf_name'] = list()
+        g['target_id'] = numpy.zeros(shape=(0,), dtype=numpy.int)
     else:
         g['fg_df'] = pandas.read_csv(g['foreground'], sep='\t', comment='#', skip_blank_lines=True, header=None)
-        leaf_names = [ leaf.name for leaf in g['tree'].get_leaves() ]
-        lineages = g['fg_df'].iloc[:,0].unique()
-        lineage_colors = [
-            'red',
-            'blue',
-            'darkorange',
-            'brown',
-            'mediumseagreen',
-            'purple',
-            'hotpink',
-            'olive',
-            'darkturquoise',
-            'green',
-            'darkorchid',
-        ]
-        for i in numpy.arange(len(lineages)):
-            g['fg_leaf_name'].append([])
-            is_lineage = (g['fg_df'].iloc[:,0]==lineages[i])
-            lineage_regex_names = g['fg_df'].loc[is_lineage,:].iloc[:,1].unique().tolist()
-            iter = itertools.product(leaf_names, lineage_regex_names)
-            lineage_leaf_names = [ ln for ln,lr in iter if re.match(lr, ln) ]
-            lineage_fg_id = list()
-            for lln in lineage_leaf_names:
-                match_leaves = [ ln for ln in leaf_names if lln==ln ]
-                if len(match_leaves)==1:
-                    g['fg_leaf_name'][i].append(match_leaves[0])
-                else:
-                    print('The foreground leaf name cannot be identified:', lln, match_leaves)
-            fg_leaf_name_set = set(g['fg_leaf_name'][i])
-            for node in g['tree'].traverse():
-                node.is_lineage_foreground = False # initializing
-            for node in g['tree'].traverse():
-                node_leaf_name_set = set(node.get_leaf_names())
-                if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
-                    node.is_lineage_foreground = True
-                    node.is_foreground = True
-                    node.foreground_lineage_id = i+1
-                    node.color = lineage_colors[i%len(lineage_colors)]
-            for node in g['tree'].traverse():
-                node_leaf_name_set = set(node.get_leaf_names())
-                if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
-                    if g['fg_stem_only']:
-                        if (node.is_lineage_foreground==True)&(node.up.is_lineage_foreground==False):
-                            lineage_fg_id.append(node.numerical_label)
-                    else:
-                        lineage_fg_id.append(node.numerical_label)
-            dif = 1
-            while dif:
-                num_id = len(lineage_fg_id)
-                for node in g['tree'].traverse():
-                    child_ids = [ child.numerical_label for child in node.get_children() ]
-                    if all([ id in lineage_fg_id for id in child_ids ])&(len(child_ids)!=0):
-                        if node.numerical_label not in lineage_fg_id:
-                            lineage_fg_id.append(node.numerical_label)
-                dif = len(lineage_fg_id) - num_id
-            tmp = numpy.array(lineage_fg_id, dtype=numpy.int)
-            g['target_id'] = numpy.concatenate([g['target_id'], tmp])
-        if g['fg_stem_only']:
-            for node in g['tree'].traverse():
-                if node.numerical_label in g['target_id']:
-                    node.is_foreground = True
-                else:
-                    node.is_foreground = False
-                    node.color = 'black'
-        with open('csubst_target_branch.txt', 'w') as f:
-                for x in g['target_id']:
-                    f.write(str(x)+'\n')
+        # target_id is numerical_label for leaves in --foreground as well as their ancestors
+        g['tree'],g['fg_leaf_name'],g['target_id'] = annotate_foreground_branch(g['tree'], g['fg_df'], g['fg_stem_only'])
         g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
-        return g
+    return g
 
 def randomize_foreground_branch(g):
     g['fg_id_original'] = copy.deepcopy(g['fg_id'])

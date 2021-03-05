@@ -138,22 +138,28 @@ dataset.set_defaults(handler=command_dataset)
 
 # simulate
 simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg])
-simulate.add_argument('--background_omega', metavar='FLOAT', default=0.1, type=float,
+simulate.add_argument('--background_omega', metavar='FLOAT', default=1, type=float,
                       help='default=%(default)s: dN/dS for background branches.')
-simulate.add_argument('--foreground_omega', metavar='FLOAT', default=0.1, type=float,
+simulate.add_argument('--foreground_omega', metavar='FLOAT', default=1, type=float,
                       help='default=%(default)s: dN/dS for foreground branches.')
 simulate.add_argument('--num_simulated_site', metavar='INT', default=-1, type=int,
-                      help='default=%(default)s: Number of codon sites to simulate. -1 to set the size of input alignment.')
-simulate.add_argument('--num_partition', metavar='INT', default=1, type=int,
-                      help='default=%(default)s: Number of partitions to simulate. '
-                           'If --convergent_amino_acids randomN, Convergent amino acids are randomly selected within each partition. ')
+                      help='default=%(default)s: Number of codon sites to simulate. '
+                           '-1 to set the size of input alignment.')
+simulate.add_argument('--percent_convergent_site', metavar='FLOAT', default=100, type=float,
+                      help='default=%(default)s: Percentage of codon sites to evolve convergently.'
+                           'If --convergent_amino_acids randomN, '
+                           'Convergent amino acids are randomly selected within each partition. ')
+simulate.add_argument('--optimized_branch_length', metavar='yes|no', default='no', type=strtobool,
+                      help='default=%(default)s: Whether to use the branch lengths optimized by IQ-TREE. '
+                           'If "no", the branch lengths in the input tree are used.')
 simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=1, type=float,
                       help='default=%(default)s: Branch lengths are multiplied by this value.')
-simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random2', type=str,
+simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random1', type=str,
                       help='default=%(default)s: Non-delimited list of amino acids the sequences converge into. '
                            'e.g, AQTS, ACQ, WDETS... '
-                      '"randomN" specifies randomly selected N amino acids.')
-simulate.add_argument('--convergence_intensity_factor', metavar='FLOAT', default=100, type=float,
+                           '"randomN" specifies randomly selected N amino acids. '
+                           '"random0" does not cause convergence.')
+simulate.add_argument('--convergence_intensity_factor', metavar='FLOAT', default=10000, type=float,
                       help='default=%(default)s: Frequencies of the codons encoding the [--convergent_amino_acids] '
                       'are multiplied by this factor before the mean frequency is rescaled.')
 simulate.set_defaults(handler=command_simulate)
