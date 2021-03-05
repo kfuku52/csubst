@@ -19,7 +19,7 @@ def generate_intermediate_files(g):
         else:
             if (all_exist)&(g['iqtree_redo']):
                 print('--iqtree_redo is set.')
-            print('Starting IQ-TREE to estimate parameters and ancestral states.')
+            print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)
             parser_iqtree.check_iqtree_dependency(g)
             parser_iqtree.run_iqtree_ancestral(g)
     return g

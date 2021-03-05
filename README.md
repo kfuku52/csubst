@@ -4,9 +4,8 @@
 **csubst** is a tool for analyzing combinatorial substitutions of codon sequences in phylogenetic trees. Main features include:
 
 - Accurate detection of the rate of molecular convergence with null expectation obtained by:
-    - Among-site substitution randomization
-    - Empirical codon substitution model
-    - Mechanistic codon substitution model
+    - Empirical or mechanistic codon substitution model
+    - Urn sampling from site-wise substitution frequencies
 - Analysis of higher-order convergence involving more than two branches
 - Simulated sequence evolution under specified scenarios of convergent evolution
 - Flexible specification of "foreground" lineages and its comparison with neighboring branches

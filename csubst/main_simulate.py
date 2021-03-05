@@ -222,6 +222,8 @@ def main_simulate(g, Q_method='csubst'):
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'])
     all_syn_cdn_index = get_synonymous_codon_substitution_index(g, get_pyvolve_codon_order())
     all_nsy_cdn_index = get_nonsynonymous_codon_substitution_index(all_syn_cdn_index)
+    if (g['num_simulated_site']==-1):
+        g['num_simulated_site'] = g['num_input_site']
     if g['optimized_branch_length']:
         g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
         newick_txt = get_pyvolve_tree(tree=g['tree'])

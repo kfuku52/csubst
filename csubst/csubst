@@ -161,7 +161,7 @@ simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random
                            'e.g, AQTS, ACQ, WDETS... '
                            '"randomN" specifies randomly selected N amino acids. '
                            '"random0" does not cause convergence.')
-simulate.add_argument('--percent_biased_sub', metavar='FLOAT', default=95, type=float,
+simulate.add_argument('--percent_biased_sub', metavar='FLOAT', default=90, type=float,
                       help='default=%(default)s: Approximately this percentage of nonsynonymous substitutions '
                            'in the foreground branches/sites are biased toward amino acids specified by '
                            '--convergent_amino_acids, while preserving the original codon frequencies as much as possible.'

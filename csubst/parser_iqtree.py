@@ -21,7 +21,7 @@ def check_iqtree_dependency(g):
     version_iqtree = re.sub(' for.*', '', version_iqtree)
     is_satisfied_version = LooseVersion(version_iqtree) >= LooseVersion('2.0.0')
     assert is_satisfied_version, 'IQ-TREE version ({}) should be 2.0.0 or greater.'.format(version_iqtree)
-    print("IQ-TREE's version: {}, PATH: {}".format(version_iqtree, g['iqtree_exe']))
+    print("IQ-TREE's version: {}, PATH: {}".format(version_iqtree, g['iqtree_exe']), flush=True)
     return None
 
 def check_intermediate_files(g):
