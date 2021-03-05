@@ -314,3 +314,14 @@ def get_substitutions_per_branch(cb, b, g):
         cb = pandas.merge(cb, b_tmp, on='branch_id_'+str(a+1), how='left')
         del b_tmp
     return(cb)
+
+def get_any2dif(cb, tol, prefix):
+    for SN in ['S','N']:
+        col_Eany2any = prefix+SN+'any2any'
+        col_Eany2spe = prefix+SN+'any2spe'
+        col_Eany2dif = prefix+SN+'any2dif'
+        if ((col_Eany2any in cb.columns)&(col_Eany2spe in cb.columns)):
+            cb.loc[:,col_Eany2dif] = cb[col_Eany2any] - cb[col_Eany2spe]
+            is_almost_zero = (cb[col_Eany2dif]<tol)
+            cb.loc[is_almost_zero,col_Eany2dif] = 0
+    return cb

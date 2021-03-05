@@ -101,13 +101,12 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         del cbS, cbN
         cb = tree.get_node_distance(g['tree'], cb)
         cb = substitution.get_substitutions_per_branch(cb, b, g)
-        cb = combination.calc_substitution_patterns(cb)
+        #cb = combination.calc_substitution_patterns(cb)
+        cb = substitution.get_any2dif(cb, g['float_tol'], prefix='')
         cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
         cb = table.get_linear_regression(cb)
-        #total_S = cb.loc[:,'Sany2spe'].sum()
-        #total_N = cb.loc[:,'Nany2spe'].sum()
-        #cb.loc[:,'chisq_p'] = cb.apply(table.chisq_test, args=(total_S, total_N), axis=1)
         cb, g = foreground.get_foreground_branch_num(cb, g)
+        cb = table.sort_cb(cb)
         if write_cb:
             file_name = "csubst_cb_" + str(current_arity) + ".tsv"
             cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
@@ -131,8 +130,8 @@ def main_analyze(g):
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
 
-    sequence.write_alignment(state=g['state_cdn'], orders=g['codon_orders'], outfile='csubst_alignment_codon.fa', mode='codon', g=g)
-    sequence.write_alignment(state=g['state_pep'], orders=g['amino_acid_orders'], outfile='csubst_alignment_aa.fa', mode='aa', g=g)
+    sequence.write_alignment(g['state_cdn'], g['codon_orders'], 'csubst_alignment_codon.fa', mode='codon', g=g)
+    sequence.write_alignment(g['state_pep'], g['amino_acid_orders'], 'csubst_alignment_aa.fa', mode='aa', g=g)
 
     g = foreground.get_foreground_branch(g)
     g = foreground.get_marginal_branch(g)

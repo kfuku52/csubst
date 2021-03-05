@@ -150,11 +150,22 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             E_b[i] = corrected_rank / quantile_niter
     return E_b
 
-def get_any2dif(cb):
-    if (('ENany2any' in cb.columns)&('ENany2spe' in cb.columns)):
-        cb['ENany2dif'] = cb['ENany2any'] - cb['ENany2spe']
-    if (('ESany2any' in cb.columns)&('ESany2spe' in cb.columns)):
-        cb['ESany2dif'] = cb['ESany2any'] - cb['ESany2spe']
+def subroot_E2nan(cb, tree):
+    id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
+    E_cols = cb.columns[cb.columns.str.startswith('E')]
+    if (E_cols.shape[0]==0):
+        return cb
+    for node in tree.traverse():
+        continue_flag = 1
+        if node.is_root():
+            continue_flag = 0
+        elif node.up.is_root():
+            continue_flag = 0
+        if continue_flag:
+            continue
+        for id_col in id_cols:
+            is_node = (cb.loc[:,id_col]==node.numerical_label)
+            cb.loc[is_node,E_cols] = numpy.nan
     return cb
 
 def get_E(cb, g, N_tensor, S_tensor):
@@ -169,7 +180,6 @@ def get_E(cb, g, N_tensor, S_tensor):
         for st in sub_types:
             cb['EN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
             cb['ES'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='mean', SN='S', g=g)
-        cb = get_any2dif(cb)
     if (g['omega_method']=='submodel'):
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_pepE = get_exp_state(g=g, mode='pep')
@@ -188,24 +198,13 @@ def get_E(cb, g, N_tensor, S_tensor):
         os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.ES.mmap') ][0])
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
-        cb = get_any2dif(cb)
-        E_cols = cb.columns[cb.columns.str.startswith('E')]
-        for node in g['tree'].traverse():
-            continue_flag = 1
-            if node.is_root():
-                continue_flag = 0
-            elif node.up.is_root():
-                continue_flag = 0
-            if continue_flag:
-                continue
-            for id_col in id_cols:
-                is_node = (cb.loc[:,id_col]==node.numerical_label)
-                cb.loc[is_node,E_cols] = numpy.nan
     if g['calc_quantile']:
         sub_types = g['substitution_types'].split(',')
         for st in sub_types:
             cb['QN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='quantile', SN='N', g=g)
             cb['QS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='quantile', SN='S', g=g)
+    cb = substitution.get_any2dif(cb, g['float_tol'], prefix='E')
+    cb = subroot_E2nan(cb, tree=g['tree'])
     return cb
 
 def get_exp_state(g, mode):
@@ -248,16 +247,20 @@ def get_exp_state(g, mode):
     return stateE
 
 def get_omega(cb):
-    cb.loc[:,'omega_any2any'] = (cb.loc[:,'Nany2any'] / cb.loc[:,'ENany2any']) / (cb.loc[:,'Sany2any'] / cb.loc[:,'ESany2any'])
-    cb.loc[:,'omega_any2spe'] = (cb.loc[:,'Nany2spe'] / cb.loc[:,'ENany2spe']) / (cb.loc[:,'Sany2spe'] / cb.loc[:,'ESany2spe'])
-    dNdif = ((cb.loc[:,'Nany2any']-cb.loc[:,'Nany2spe'])/cb.loc[:,'ENany2dif'])
-    dSdif = ((cb.loc[:,'Sany2any']-cb.loc[:,'Sany2spe'])/cb['ESany2dif'])
-    cb.loc[:,'omega_any2dif'] = dNdif / dSdif
+    combinatorial_substitutions = ['any2any','any2spe','any2dif']
+    for sub in combinatorial_substitutions:
+        col_omega = 'omega_'+sub
+        col_N = 'N'+sub
+        col_EN = 'EN'+sub
+        col_S = 'S'+sub
+        col_ES = 'ES'+sub
+        if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
+            cb.loc[:,col_omega] = (cb.loc[:,col_N] / cb.loc[:,col_EN]) / (cb.loc[:,col_S] / cb.loc[:,col_ES])
     return cb
 
 def get_CoD(cb):
-    cb['NCoD'] = cb['Nany2spe'] / (cb['Nany2any'] - cb['Nany2spe'])
-    cb['SCoD'] = cb['Sany2spe'] / (cb['Sany2any'] - cb['Sany2spe'])
+    cb['NCoD'] = cb['Nany2spe'] / cb['Nany2dif']
+    cb['SCoD'] = cb['Sany2spe'] / cb['Sany2dif']
     cb['NCoDoSCoD'] = cb['NCoD'] / cb['SCoD']
     return cb
 
