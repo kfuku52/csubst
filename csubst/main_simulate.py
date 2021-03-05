@@ -248,7 +248,10 @@ def main_simulate(g, Q_method='csubst'):
     elif (Q_method=='pyvolve'):
         background_Q = generate_Q_matrix(eq_freq, g['background_omega'], all_nsy_cdn_index, all_syn_cdn_index)
     model_names = ['root',] + [ 'm'+str(i+1) for i in range(num_fl) ]
-    num_convergent_site = int(g['num_simulated_site'] * g['percent_convergent_site'] / 100)
+    if g['foreground'] is None:
+        num_convergent_site = 0
+    else:
+        num_convergent_site = int(g['num_simulated_site'] * g['percent_convergent_site'] / 100)
     num_no_conv_site = int(g['num_simulated_site'] - num_convergent_site)
     txt = '{:,} out of {:,} sites ({:.1f}%) will evolve convergently in the foreground lineages.'
     print(txt.format(num_convergent_site, g['num_simulated_site'], g['percent_convergent_site']))
