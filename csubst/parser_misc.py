@@ -13,9 +13,12 @@ def generate_intermediate_files(g):
         raise Exception("PhyloBayes is not supported.")
     elif (g['infile_type'] == 'iqtree'):
         g,all_exist = parser_iqtree.check_intermediate_files(g)
-        if all_exist:
+        if (all_exist)&(not g['iqtree_redo']):
             print('IQ-TREE\'s intermediate files exist.')
+            return g
         else:
+            if (all_exist)&(g['iqtree_redo']):
+                print('--iqtree_redo is set.')
             print('Starting IQ-TREE to estimate parameters and ancestral states.')
             parser_iqtree.check_iqtree_dependency(g)
             parser_iqtree.run_iqtree_ancestral(g)

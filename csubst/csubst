@@ -82,6 +82,8 @@ psr_iq.add_argument('--iqtree_model', metavar='STR', default='ECMK07+F+R4', type
                          'Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. '
                          'Among-site rate heterogeneity and codon frequencies can be specified. '
                          'See here for details: http://www.iqtree.org/doc/Substitution-Models')
+psr_iq.add_argument('--iqtree_redo', metavar='yes|no', default='yes', type=strtobool,
+                    help='default=%(default)s: Whether to rerun IQ-TREE even if all intermediate files exist.')
 psr_iq.add_argument('--iqtree_treefile', metavar='PATH', default='infer', type=str, required=False,
                    help='default=%(default)s: PATH to the IQ-TREE\'s .treefile output. "infer" from --alignment_file')
 psr_iq.add_argument('--iqtree_state', metavar='PATH', default='infer', type=str, required=False,

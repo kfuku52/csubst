@@ -38,10 +38,10 @@ def check_intermediate_files(g):
     return g,all_exist
 
 def run_iqtree_ancestral(g):
-    run_iqtree = subprocess.run([g['iqtree_exe'], '-s', g['alignment_file'], '-te', g['rooted_tree_file'],
-                                 '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
-                                 '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo'],
-                                stdout=sys.stdout, stderr=sys.stderr)
+    command = [g['iqtree_exe'], '-s', g['alignment_file'], '-te', g['rooted_tree_file'],
+               '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
+               '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
+    run_iqtree = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr)
     assert (run_iqtree.returncode==0), "IQ-TREE did not finish safely: {}".format(run_iqtree.stdout.decode('utf8'))
     os.remove(g['alignment_file']+'.ckp.gz')
     return None
