@@ -249,6 +249,7 @@ def main_simulate(g, Q_method='csubst'):
         background_Q = generate_Q_matrix(eq_freq, g['background_omega'], all_nsy_cdn_index, all_syn_cdn_index)
     model_names = ['root',] + [ 'm'+str(i+1) for i in range(num_fl) ]
     if g['foreground'] is None:
+        print('--foreground was not provided. --percent_convergent_site will be set to 0.')
         num_convergent_site = 0
     else:
         num_convergent_site = int(g['num_simulated_site'] * g['percent_convergent_site'] / 100)
@@ -256,6 +257,7 @@ def main_simulate(g, Q_method='csubst'):
     txt = '{:,} out of {:,} sites ({:.1f}%) will evolve convergently in the foreground lineages.'
     print(txt.format(num_convergent_site, g['num_simulated_site'], g['percent_convergent_site']))
     num_partition = num_convergent_site + 1 if (g['percent_convergent_site']!=100) else num_convergent_site
+    num_partition = 1 if (num_partition==0) else num_partition
     partitions = list()
     biased_substitution_fractions = list()
     current_site = 0
@@ -267,7 +269,9 @@ def main_simulate(g, Q_method='csubst'):
         if is_convergent_partition:
             biased_aas = get_biased_amino_acids(g['convergent_amino_acids'], g['codon_table'])
             print('Codon site {}; Biased amino acids = {}; '.format(current_site, ''.join(biased_aas)), end='')
-            biased_nsy_sub_index = get_biased_nonsynonymous_substitution_index(biased_aas, g['codon_table'], pyvolve_codon_orders)
+            biased_nsy_sub_index = get_biased_nonsynonymous_substitution_index(biased_aas,
+                                                                               g['codon_table'],
+                                                                               pyvolve_codon_orders)
             biased_Q = apply_percent_biased_sub(mat=background_Q,
                                                 percent_biased_sub=g['percent_biased_sub'],
                                                 target_index=biased_nsy_sub_index,
