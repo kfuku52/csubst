@@ -95,7 +95,9 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             if id_combinations.shape[0] == 0:
                 end_flag = 1
                 break
+        print('Preparing the cbOS table with {:,} thread(s).'.format(g['threads']), flush=True)
         cbS = substitution.get_cb(id_combinations, S_tensor, g, 'S')
+        print('Preparing the cbON table with {:,} thread(s).'.format(g['threads']), flush=True)
         cbN = substitution.get_cb(id_combinations, N_tensor, g, 'N')
         cb = table.merge_tables(cbS, cbN)
         del cbS, cbN
@@ -126,6 +128,7 @@ def main_analyze(g):
     print("Reading and parsing input files.", flush=True)
     g['current_arity'] = 2
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
+    g = parser_misc.read_treefile(g)
     g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)

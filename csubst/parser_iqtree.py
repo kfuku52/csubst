@@ -1,4 +1,3 @@
-import ete3
 import numpy
 import pandas
 
@@ -8,9 +7,9 @@ import subprocess
 import sys
 from distutils.version import LooseVersion
 
-from csubst import tree
 from csubst import genetic_code
 from csubst import sequence
+from csubst import tree
 
 def check_iqtree_dependency(g):
     test_iqtree = subprocess.run([g['iqtree_exe'], '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -38,34 +37,16 @@ def check_intermediate_files(g):
     return g,all_exist
 
 def run_iqtree_ancestral(g):
-    command = [g['iqtree_exe'], '-s', g['alignment_file'], '-te', g['rooted_tree_file'],
+    file_tree = 'tmp.csubst.nwk'
+    tree.write_tree(g['tree'], outfile=file_tree, add_numerical_label=False)
+    command = [g['iqtree_exe'], '-s', g['alignment_file'], '-te', file_tree,
                '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
                '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
     run_iqtree = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr)
     assert (run_iqtree.returncode==0), "IQ-TREE did not finish safely: {}".format(run_iqtree.stdout.decode('utf8'))
     os.remove(g['alignment_file']+'.ckp.gz')
+    os.remove(file_tree)
     return None
-
-def read_treefile(g):
-    g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
-    assert len(g['rooted_tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
-    g['rooted_tree'] = tree.standardize_node_names(g['rooted_tree'])
-    g['rooted_tree'] = tree.add_numerical_node_labels(g['rooted_tree'])
-    g['num_node'] = len(list(g['rooted_tree'].traverse()))
-    g['iqtree_rate_values'] = read_rate(g)
-    print('Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.')
-    g['node_label_tree_file'] = g['iqtree_treefile']
-    f = open(g['node_label_tree_file'])
-    tree_string = f.readline()
-    g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
-    f.close()
-    g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
-    g['tree'] = tree.transfer_root(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
-    g['tree'] = tree.add_numerical_node_labels(g['tree'])
-    print('Total branch length of --rooted_tree_file:', sum([ n.dist for n in g['rooted_tree'].traverse() ]))
-    print('Total branch length of --iqtree_treefile:', sum([ n.dist for n in g['node_label_tree'].traverse() ]))
-    print('')
-    return g
 
 def read_state(g):
     print('Reading the state file:', g['iqtree_state'])
@@ -207,8 +188,8 @@ def get_state_tensor(g):
     return(state_tensor)
 
 def get_input_information(g):
-    g = read_treefile(g)
     g = read_state(g)
     g = read_iqtree(g)
     g = read_log(g)
+    g['iqtree_rate_values'] = read_rate(g)
     return g

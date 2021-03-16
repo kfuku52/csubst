@@ -347,6 +347,7 @@ def concatenate_alignment(in1, in2, out):
 
 def main_simulate(g, Q_method='csubst'):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
+    g = parser_misc.read_treefile(g)
     g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)

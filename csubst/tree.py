@@ -122,11 +122,12 @@ def is_internal_node_labeled(tree):
                 is_labeled = False
     return is_labeled
 
-def write_tree(tree):
+def write_tree(tree, outfile='csubst_tree.nwk', add_numerical_label=True):
     tree2 = copy.deepcopy(tree)
-    for node in tree2.traverse():
-        node.name = node.name + '|' + str(node.numerical_label)
-    tree2.write(format=1, outfile='csubst_tree.nwk')
+    if add_numerical_label:
+        for node in tree2.traverse():
+            node.name = node.name + '|' + str(node.numerical_label)
+    tree2.write(format=1, outfile=outfile)
 
 def branch_category_layout(node):
     nstyle = ete3.NodeStyle()

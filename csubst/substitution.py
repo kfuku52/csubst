@@ -154,8 +154,9 @@ def get_cb(id_combinations, sub_tensor, g, attr):
     arity = id_combinations.shape[1]
     cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
-    if g['threads']==1:
-        df = sub_tensor2cb(id_combinations, sub_tensor, float_type=g['float_type'])
+    if (g['threads']==1):
+        df = sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None,
+                           mmap_start=0, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
     else:
         id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['threads'])
@@ -168,7 +169,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(sub_tensor2cb)
-            (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids, ms in zip(id_chunks, mmap_starts)
+            (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids,ms in zip(id_chunks, mmap_starts)
         )
         df = pandas.DataFrame(df_mmap, columns=cn)
         if os.path.exists(mmap_out): os.unlink(mmap_out)

@@ -173,6 +173,7 @@ def export2chimera(df, g):
 def main_site(g):
     print("Reading and parsing input files.", flush=True)
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
+    g = parser_misc.read_treefile(g)
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
     N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
