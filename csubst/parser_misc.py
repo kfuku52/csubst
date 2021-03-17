@@ -17,13 +17,21 @@ def generate_intermediate_files(g):
         g,all_exist = parser_iqtree.check_intermediate_files(g)
         if (all_exist)&(not g['iqtree_redo']):
             print('IQ-TREE\'s intermediate files exist.')
-            return g
-        else:
-            if (all_exist)&(g['iqtree_redo']):
-                print('--iqtree_redo is set.')
-            print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)
-            parser_iqtree.check_iqtree_dependency(g)
-            parser_iqtree.run_iqtree_ancestral(g)
+            g = parser_iqtree.read_iqtree(g, eq=False)
+            iqtree_model = g['substitution_model']
+            g['substitution_model'] = None
+            if (iqtree_model==g['iqtree_model']):
+                txt = 'The model in the IQ-TREE\'s output ({}) matched --iqtree_model ({}). Skipping IQ-TREE.'
+                print(txt.format(iqtree_model, g['iqtree_model']))
+                return g
+            else:
+                txt = 'The model in the IQ-TREE\'s output ({}) did not match --iqtree_model ({}). Redoing IQ-TREE.'
+                print(txt.format(iqtree_model, g['iqtree_model']))
+        if (all_exist)&(g['iqtree_redo']):
+            print('--iqtree_redo is set.')
+        print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)
+        parser_iqtree.check_iqtree_dependency(g)
+        parser_iqtree.run_iqtree_ancestral(g)
     return g
 
 def read_input(g):

@@ -85,20 +85,21 @@ def read_rate(g):
     rate_sites = rate_sites.loc[:,'C_Rate'].values
     return rate_sites
 
-def read_iqtree(g):
+def read_iqtree(g, eq=True):
     with open(g['path_iqtree_iqtree']) as f:
         lines = f.readlines()
     for line in lines:
         model = re.match(r'Model of substitution: (.+)', line)
         if model is not None:
             g['substitution_model'] = model.group(1)
-    with open(g['path_iqtree_iqtree']) as f:
-        txt = f.read()
-    pi = pandas.DataFrame(index=g['codon_orders'], columns=['freq',])
-    for m in re.finditer(r'  pi\(([A-Z]+)\) = ([0-9.]+)', txt, re.MULTILINE):
-        pi.at[m.group(1),'freq'] = float(m.group(2))
-    g['equilibrium_frequency'] = pi.loc[:,'freq'].values.astype(g['float_type'])
-    g['equilibrium_frequency'] /= g['equilibrium_frequency'].sum()
+    if eq:
+        with open(g['path_iqtree_iqtree']) as f:
+            txt = f.read()
+        pi = pandas.DataFrame(index=g['codon_orders'], columns=['freq',])
+        for m in re.finditer(r'  pi\(([A-Z]+)\) = ([0-9.]+)', txt, re.MULTILINE):
+            pi.at[m.group(1),'freq'] = float(m.group(2))
+        g['equilibrium_frequency'] = pi.loc[:,'freq'].values.astype(g['float_type'])
+        g['equilibrium_frequency'] /= g['equilibrium_frequency'].sum()
     return g
 
 def read_log(g):
