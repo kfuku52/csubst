@@ -251,7 +251,6 @@ analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=str
                      help='default=%(default)s: Calculate resampling-based quantiles in '
                           'Wallenius\' noncentral hypergeometric distribution for combinatorial substitutions. '
                           'This option should be used with --omega method "modelfree".')
-# Among-site rate variation
 analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
                      choices=['no', 'pool', 'sn', 'each', 'file'],
                      help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation. '
@@ -263,7 +262,13 @@ analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', t
                           'to calculate their respective ASRVs.'
                           '"file", ASRV is obtained from the IQ-TREE\'s .rate file.'
                           'This option is used if --omega_method modelfree')
-
+analyze.add_argument('--calibrate_ratediff', metavar='yes|no', default='yes', type=strtobool,
+                     help='default=%(default)s: Calibrate dSc to follow the distribution of dNc. '
+                          'This quantile-based transformation accounts for diminishing convergence over time '
+                          '(Goldstein et al., 2015; Zou and Zhang, 2015; Mendes et al., 2016).')
+analyze.add_argument('--min_ratediff_combinat_sub', metavar='FLOAT', default=0, type=float,
+                     help='default=%(default)s: Minimum number of combinatorial nonsynonymous substitutions (ONc) '
+                          'to be included in the quantile-based transformation.')
 # Sub parser: help
 parser_help = subparsers.add_parser('help', help='see `help -h`')
 parser_help.add_argument('command', help='command name which help is shown')
@@ -271,6 +276,7 @@ parser_help.set_defaults(handler=command_help)
 
 # Handler
 args = parser.parse_args()
+param.set_num_thread_variables(num_thread=args.threads)
 if hasattr(args, 'handler'):
     args.handler(args)
 else:

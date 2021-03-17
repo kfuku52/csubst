@@ -6,6 +6,7 @@ import itertools
 import os
 
 from csubst import parallel
+from csubst import param
 
 def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
     arity = target_nodes.shape[1] + 1
@@ -50,10 +51,12 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
         chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
-        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-            joblib.delayed(node_union)
-            (ids, target_nodes, df_mmap, ms) for ids, ms in zip(chunks, starts)
-        )
+        from threadpoolctl import threadpool_limits
+        with threadpool_limits(limits=1, user_api='blas'):
+            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+                joblib.delayed(node_union)
+                (ids, target_nodes, df_mmap, ms) for ids, ms in zip(chunks, starts)
+            )
         is_valid_combination = (df_mmap.sum(axis=1)!=0)
         if (is_valid_combination.sum()>0):
             node_combinations = numpy.unique(df_mmap[is_valid_combination,:], axis=0)

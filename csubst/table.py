@@ -17,17 +17,24 @@ def sort_labels(df):
     return df
 
 def sort_cb(cb):
+    is_omega = cb.columns.str.contains('^omega_')
+    is_d = cb.columns.str.contains('^d[NS]')
+    is_nocalib = cb.columns.str.contains('_nocalib$')
     col_order = []
     col_order += cb.columns[cb.columns.str.contains('^branch_id_')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^dist_')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^branch_num_')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^is_')].sort_values().tolist()
-    col_order += cb.columns[cb.columns.str.contains('^omega_')].sort_values().tolist()
-    col_order += cb.columns[cb.columns.str.contains('^[NS]CoD$')].sort_values().tolist() + ['NCoDoSCoD',]
+    col_order += cb.columns[(is_omega)&(~is_nocalib)].sort_values().tolist()
+    col_order += cb.columns[(is_d)&(~is_nocalib)].sort_values().tolist()
+    col_order += cb.columns[cb.columns.str.contains('^[NS]CoD$')].sort_values().tolist()
+    col_order += ['NCoDoSCoD',]
     col_order += cb.columns[cb.columns.str.contains('^[NS]_linreg_residual$')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^[NS]_sub_')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^[NS][any|dif|spe]')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^E[NS][any|dif|spe]')].sort_values().tolist()
+    col_order += cb.columns[(is_omega)&(is_nocalib)].sort_values().tolist()
+    col_order += cb.columns[(is_d)&(is_nocalib)].sort_values().tolist()
     if (len(col_order) < cb.columns.shape[0]):
         col_order += [ col for col in cb.columns if col not in col_order ]
     cb = cb.loc[:,col_order]

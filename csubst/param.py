@@ -1,6 +1,8 @@
 import numpy
 import pandas
 
+import os
+
 def get_global_parameters(args):
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:
@@ -47,3 +49,13 @@ def initialize_df_cb_stats(g):
     g['df_cb_stats'].loc[:,'cutoff_stat'] = g['cutoff_stat']
     g['df_cb_stats'].loc[:,'cutoff_stat_min'] = g['cutoff_stat_min']
     return(g)
+
+def set_num_thread_variables(num_thread=1):
+    # https://stackoverflow.com/questions/30791550/limit-number-of-threads-in-numpy
+    # TODO Not sure yet if this really accelerate the computation.
+    os.environ["OMP_NUM_THREADS"] = str(num_thread)
+    os.environ["OPENBLAS_NUM_THREADS"] = str(num_thread)
+    os.environ["MKL_NUM_THREADS"] = str(num_thread)
+    os.environ["VECLIB_NUM_THREADS"] = str(num_thread)
+    os.environ["NUMEXPR_NUM_THREADS"] = str(num_thread)
+    return None

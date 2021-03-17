@@ -106,6 +106,8 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         #cb = combination.calc_substitution_patterns(cb)
         cb = substitution.get_any2dif(cb, g['float_tol'], prefix='')
         cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
+        if (g['calibrate_ratediff']):
+            cb = omega.calibrate_dsc(cb, min_combinat_sub=g['min_ratediff_combinat_sub'])
         cb = table.get_linear_regression(cb)
         cb, g = foreground.get_foreground_branch_num(cb, g)
         cb = table.sort_cb(cb)

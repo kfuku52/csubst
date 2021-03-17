@@ -82,7 +82,7 @@ def transfer_internal_node_names(tree_to, tree_from):
                         to.name = fr.name
     return tree_to
 
-def get_node_distance(tree, cb):
+def get_node_distance(tree, cb): # TODO parallel
     if not 'numerical_label' in dir(tree):
         tree = tree.add_numerical_node_labels(tree)
     tree_dict = dict()
@@ -100,8 +100,8 @@ def get_node_distance(tree, cb):
             node_dist = nds[0].get_distance(target=nds[1], topology_only=False)
             node_dists.append(node_dist - nds[1].dist)
             node_nums.append(nds[0].get_distance(target=nds[1], topology_only=True))
-        node_dist = max(node_dists) # Maximum number among pairwise distances
-        node_num = max(node_nums) # Maximum number among pairwise distances
+        node_dist = max(node_dists) # Maximum value among pairwise distances
+        node_num = max(node_nums) # Maximum value among pairwise distances
         cb.loc[i,"dist_node_num"] = node_num
         cb.loc[i,"dist_bl"] = node_dist
     return(cb)
