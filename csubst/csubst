@@ -65,11 +65,13 @@ psr_co.add_argument('--rooted_tree_file', metavar='PATH', default='', type=str,
 psr_co.add_argument('--genetic_code', metavar='INTEGER', type=int, required=False, default=1,
                    help='default=%(default)s: NCBI codon table ID. 1 = "Standard". See here: '
                         'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
-psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=str,
-                   choices=['iqtree',],
+psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=str, choices=['iqtree',],
                    help='default=%(default)s: The input file format.')
 psr_co.add_argument('--threads', metavar='INTEGER', default=1, type=int, required=False,
                    help='default=%(default)s: The number of processors for parallel computations.')
+psr_co.add_argument('--parallel_mode', metavar='thread|process', default='process', type=str,
+                    choices=['thread','process'],
+                    help='default=%(default)s: Mode of parallel computation.')
 psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
                     help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
 

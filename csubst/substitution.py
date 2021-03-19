@@ -155,7 +155,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
     arity = id_combinations.shape[1]
     cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
-    if (g['threads']==1):
+    if (g['threads']==1)|(g['parallel_mode']=='thread'):
         df = sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None,
                            mmap_start=0, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
@@ -222,7 +222,7 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     cn1 = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn2 = ["site",]
     cn3 = [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
-    if g['threads']==1:
+    if (g['threads']==1)|(g['parallel_mode']=='thread'):
         df = sub_tensor2cbs(id_combinations, sub_tensor)
         df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)
     else:
