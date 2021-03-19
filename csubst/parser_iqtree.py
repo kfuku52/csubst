@@ -38,7 +38,7 @@ def check_intermediate_files(g):
 
 def run_iqtree_ancestral(g):
     file_tree = 'tmp.csubst.nwk'
-    tree.write_tree(g['tree'], outfile=file_tree, add_numerical_label=False)
+    tree.write_tree(g['rooted_tree'], outfile=file_tree, add_numerical_label=False)
     command = [g['iqtree_exe'], '-s', g['alignment_file'], '-te', file_tree,
                '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
                '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
