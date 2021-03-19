@@ -1,4 +1,3 @@
-import ete3
 import numpy
 import pandas
 
@@ -131,9 +130,9 @@ def main_analyze(g):
     print("Reading and parsing input files.", flush=True)
     g['current_arity'] = 2
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
-    g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
-    g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.read_treefile(g)
+    g = parser_misc.generate_intermediate_files(g)
+    g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
 

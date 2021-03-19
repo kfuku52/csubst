@@ -270,14 +270,16 @@ def read_exchangeability_eq_freq(file, g):
     return freqs
 
 def read_treefile(g):
-    if 'rooted_tree' not in g.keys():
-        g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
+    g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
     assert len(g['rooted_tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
     g['rooted_tree'] = tree.standardize_node_names(g['rooted_tree'])
     g['rooted_tree'] = tree.add_numerical_node_labels(g['rooted_tree'])
     g['num_node'] = len(list(g['rooted_tree'].traverse()))
     print('Using internal node names and branch lengths in --iqtree_treefile '
           'and the root position in --rooted_tree_file.')
+    return g
+
+def annotate_tree(g):
     g['node_label_tree_file'] = g['iqtree_treefile']
     f = open(g['node_label_tree_file'])
     tree_string = f.readline()

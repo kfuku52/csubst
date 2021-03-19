@@ -1,4 +1,3 @@
-import ete3
 import pyvolve
 import numpy
 
@@ -345,9 +344,9 @@ def concatenate_alignment(in1, in2, out):
 
 def main_simulate(g, Q_method='csubst'):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
-    g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
-    g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.read_treefile(g)
+    g = parser_misc.generate_intermediate_files(g)
+    g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
     g['all_syn_cdn_index'] = get_synonymous_codon_substitution_index(g, get_pyvolve_codon_order())
