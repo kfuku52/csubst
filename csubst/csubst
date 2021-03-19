@@ -117,7 +117,7 @@ psr_fg.add_argument('--foreground', metavar='PATH', default=None, type=str, requ
 psr_fg.add_argument('--fg_exclude_wg', metavar='yes|no', default='yes', type=strtobool,
                 help='default=%(default)s: Set "yes" to exclude branch combinations '
                      'within individual foreground lineages.')
-psr_fg.add_argument('--fg_stem_only', metavar='yes|no', default='no', type=strtobool,
+psr_fg.add_argument('--fg_stem_only', metavar='yes|no', default='yes', type=strtobool,
                 help='default=%(default)s: Set "yes" to exclude non-stem branches of foreground lineages.')
 psr_fg.add_argument('--mg_parent', metavar='yes|no', default='no', type=strtobool,
                 help='default=%(default)s: Mark the parent branches of the foreground stem branches as "marginal". '

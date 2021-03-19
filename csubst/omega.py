@@ -322,6 +322,6 @@ def calibrate_dsc(cb, min_combinat_sub=0, transformation='quantile'):
         cb.loc[:,col_omega] = numpy.nan
         cb.loc[has_enough_sub,col_omega] = cb.loc[has_enough_sub,col_dN] / cb.loc[has_enough_sub,col_dS]
         median_value = numpy.round(cb.loc[:,col_omega].median(), decimals=3)
-        txt = '{}, median {} (calibrated with inter-branch distance) = {}'
+        txt = '{} median {} (calibrated with rate differences between dNc and dSc) = {}'
         print(txt.format(hd, col_omega, median_value), flush=True)
     return cb
