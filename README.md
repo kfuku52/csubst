@@ -16,15 +16,8 @@
 - a [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
 
 ## Dependency
-**csubst** runs on python 3 (tested with >3.5.0) and depends on the following python packages. **csubst** installation with `pip install` will automatically install them except for **pyvolve** and **matplotlib**.
+**csubst** runs on python 3 (tested with >3.5.0) and depends on several python packages. **csubst** installation with `pip install` will automatically install them except for the following packages and stand-alone programs.
 * [IQ-TREE](http://www.iqtree.org/) (version 2.0.0 or later)
-* [python 3](https://www.python.org/)
-* [ete3](https://github.com/etetoolkit/ete)
-* [numpy](https://github.com/numpy/numpy)
-* [scipy](https://www.scipy.org/)
-* [pandas](https://github.com/pandas-dev/pandas)
-* [joblib](https://github.com/joblib/joblib)
-* [cython](https://cython.org/)
 * [pyvolve](https://github.com/sjspielman/pyvolve) (Optional: required for `csubst simulate`)
 * [matplotlib](https://matplotlib.org/3.1.1/index.html) (Optional: required for `csubst site`)
 
