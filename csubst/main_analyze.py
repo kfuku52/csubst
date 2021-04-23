@@ -145,9 +145,15 @@ def main_analyze(g):
     tree.write_tree(g['tree'])
     tree.plot_branch_category(g['tree'], file_name='csubst_branch_category.pdf')
     if g['plot_state_aa']:
-        plot_state_tree(state=g['state_pep'], orders=g['amino_acid_orders'], mode='aa', g=g)
+        os.mkdir('csubst_plot_state_aa')
+        os.chdir('csubst_plot_state_aa')
+        tree.plot_state_tree(state=g['state_pep'], orders=g['amino_acid_orders'], mode='aa', g=g)
+        os.chdir('..')
     if g['plot_state_codon']:
-        plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)
+        os.mkdir('csubst_plot_state_codon')
+        os.chdir('csubst_plot_state_codon')
+        tree.plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)
+        os.chdir('..')
 
     N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     N_tensor = substitution.apply_min_sub_pp(g, N_tensor)

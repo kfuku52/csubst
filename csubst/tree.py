@@ -194,7 +194,7 @@ def plot_state_tree(state, orders, mode, g):
                 node.state = missing_state
                 continue
             nlabel = node.numerical_label
-            index = numpy.where(state[nlabel,i,:]==1)[0]
+            index = numpy.where(state[nlabel,i,:]==max(state[nlabel,i,:]))[0]
             if len(index)==1:
                 node.state = orders[index[0]]
             elif len(index)==0:

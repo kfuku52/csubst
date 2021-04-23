@@ -242,8 +242,8 @@ analyze.add_argument('--omega_method', metavar='[modelfree|submodel]', default='
                      help='default=%(default)s: Method to calculate omega. '
                           '"modelfree" for expected values from among-site randomization of substitutions. '
                           'All EXany2any, EXspe2any, EXany2spe, and EXspe2spe substitutions are individually calculated.'
-                          '"submodel" for a method similar to Zou and Zhang (2015) using a codon substitution model used in '
-                          'ancestral state reconstruction. '
+                          '"submodel" for a method similar to Zou and Zhang (2015) using a codon substitution model '
+                          'used in ancestral state reconstruction. '
                           'In addition to the base substitution models, codon frequencies and '
                           'among-site rate heterogeneity are taken into account.')
 analyze.add_argument('--substitution_types', metavar='STR', default='any2any,any2spe,spe2spe', type=str,
