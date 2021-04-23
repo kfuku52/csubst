@@ -266,6 +266,8 @@ def get_omega(cb):
             cb.loc[:,col_dN] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
             cb.loc[:,col_dS] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
             cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
+            is_dN_zero = (cb.loc[:,col_dN]==0)
+            cb.loc[is_dN_zero,col_omega] = 0
     return cb
 
 def get_CoD(cb):

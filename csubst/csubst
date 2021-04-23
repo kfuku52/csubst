@@ -70,7 +70,7 @@ psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=
 psr_co.add_argument('--threads', metavar='INTEGER', default=1, type=int, required=False,
                    help='default=%(default)s: The number of processors for parallel computations.')
 psr_co.add_argument('--parallel_mode', metavar='thread|process', default='process', type=str,
-                    choices=['thread','process'],
+                    choices=['thread','process'], # 'thread' does not use CPUs efficiently.
                     help='default=%(default)s: Mode of parallel computation.')
 psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
                     help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
