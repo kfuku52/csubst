@@ -31,7 +31,7 @@ def check_intermediate_files(g):
             g['path_iqtree_'+ext] = g['alignment_file']+'.'+ext
         else:
             g['path_iqtree_'+ext] = g['iqtree_'+ext]
-        if not os.path.exists(g['path_iqtree_iqtree']):
+        if not os.path.exists(g['path_iqtree_'+ext]):
             print('Intermediate file is missing: {}'.format(g['path_iqtree_'+ext]))
             all_exist = False
     return g,all_exist
