@@ -68,7 +68,7 @@ psr_co.add_argument('--genetic_code', metavar='INTEGER', type=int, required=Fals
 psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=str, choices=['iqtree',],
                    help='default=%(default)s: The input file format.')
 psr_co.add_argument('--threads', metavar='INTEGER', default=1, type=int, required=False,
-                   help='default=%(default)s: The number of processors for parallel computations.')
+                   help='default=%(default)s: The number of processors for parallel computations. Experimental.')
 psr_co.add_argument('--parallel_mode', metavar='thread|process', default='process', type=str,
                     choices=['thread','process'], # 'thread' does not use CPUs efficiently.
                     help='default=%(default)s: Mode of parallel computation.')

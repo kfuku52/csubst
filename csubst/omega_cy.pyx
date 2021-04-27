@@ -43,4 +43,3 @@ cpdef get_permutations(long[:,:] cb_ids, long[:] sites, long[:] sub_branches, do
 
 
 
-
