@@ -2,6 +2,7 @@ import numpy
 import pandas
 
 import os
+import sys
 
 def get_global_parameters(args):
     g = dict()
@@ -41,8 +42,8 @@ def get_global_parameters(args):
         assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
     if 'calibrate_ratediff' in g.keys():
         if (g['calibrate_ratediff'])&(~g['force_exhaustive']):
-            os.stderr.write('--calibrate_ratediff "yes" and --force_exhaustive "no" are not compatible.\n')
-            os.stderr.write('--force_exhaustive is activated.\n')
+            sys.stderr.write('--calibrate_ratediff "yes" and --force_exhaustive "no" are not compatible.\n')
+            sys.stderr.write('--force_exhaustive is activated.\n')
             g['force_exhaustive'] = True
     return g
 
