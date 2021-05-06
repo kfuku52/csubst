@@ -39,10 +39,11 @@ def get_global_parameters(args):
             g['float_tol'] = 10**-9
     if 'percent_biased_sub' in g.keys():
         assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
-    if (g['calibrate_ratediff'])&(~g['force_exhaustive']):
-        os.stderr.write('--calibrate_ratediff "yes" and --force_exhaustive "no" are not compatible.\n')
-        os.stderr.write('--force_exhaustive is activated.\n')
-        g['force_exhaustive'] = True
+    if 'calibrate_ratediff' in g.keys():
+        if (g['calibrate_ratediff'])&(~g['force_exhaustive']):
+            os.stderr.write('--calibrate_ratediff "yes" and --force_exhaustive "no" are not compatible.\n')
+            os.stderr.write('--force_exhaustive is activated.\n')
+            g['force_exhaustive'] = True
     return g
 
 def initialize_df_cb_stats(g):

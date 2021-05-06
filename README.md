@@ -44,7 +44,7 @@ csubst dataset --name PGK
 csubst analyze \
 --alignment_file alignment.fa \
 --rooted_tree_file tree.nwk \
---omega_method rec \
+--omega_method submodel \
 --foreground foreground.txt \
 --force_exhaustive yes \
 --max_arity 2 \
