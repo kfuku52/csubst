@@ -322,6 +322,9 @@ def calibrate_dsc(cb, min_combinat_sub=0, transformation='quantile'):
             cb.loc[:,col_dS] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
         elif (transformation=='quantile'):
             cb.loc[:,col_dS] = numpy.quantile(x, quantiles)
+        noncalibrated_dS_values = cb.loc[has_enough_sub,col_noncalibrated_dS].values
+        is_nocalib_higher = (noncalibrated_dS_values>cb.loc[:,col_dS]).fillna(False)
+        cb.loc[is_nocalib_higher,col_dS] = noncalibrated_dS_values[is_nocalib_higher]
         cb.loc[:,col_omega] = numpy.nan
         cb.loc[has_enough_sub,col_omega] = cb.loc[has_enough_sub,col_dN] / cb.loc[has_enough_sub,col_dS]
         median_value = numpy.round(cb.loc[:,col_omega].median(), decimals=3)
