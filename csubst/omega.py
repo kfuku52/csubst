@@ -267,7 +267,11 @@ def get_omega(cb):
         col_dS = 'dS'+sub
         if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
             cb.loc[:,col_dN] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
+            is_N_zero = (cb.loc[:,col_N]==0)
+            cb.loc[is_N_zero,col_dN] = 0
             cb.loc[:,col_dS] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
+            is_S_zero = (cb.loc[:,col_S]==0)
+            cb.loc[is_S_zero,col_dS] = 0
             cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
             is_dN_zero = (cb.loc[:,col_dN]==0)
             cb.loc[is_dN_zero,col_omega] = 0
