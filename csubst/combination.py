@@ -72,7 +72,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     for dep_id in g['dep_ids']:
         is_dependent_col = (is_dependent_col)|(nc_matrix[dep_id,:].sum(axis=0)>1)
     if verbose:
-        print('removing {:,} dependent branch combinations.'.format(is_dependent_col.sum()), flush=True)
+        print('removing {:,} non-independent branch combinations.'.format(is_dependent_col.sum()), flush=True)
     nc_matrix = nc_matrix[:,~is_dependent_col]
     g['fg_dependent_id_combinations'] = None
     if (g['foreground'] is not None)&(len(g['fg_dep_ids']) > 0):

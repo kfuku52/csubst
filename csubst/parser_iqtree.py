@@ -155,16 +155,14 @@ def get_state_tensor(g):
                 assert len(seq)%3==0, 'Sequence length is not multiple of 3. Node name = '+node.name
                 for s in numpy.arange(int(len(seq)/3)):
                     codon = seq[(s*3):((s+1)*3)]
-                    if (not '-' in codon)&(codon!='NNN'):
-                        codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
-                        for ci in codon_index:
-                            state_matrix[s,ci] = 1/len(codon_index)
+                    codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
+                    for ci in codon_index:
+                        state_matrix[s,ci] = 1/len(codon_index)
             elif g['input_data_type']=='nuc':
                 for s in numpy.arange(len(seq)):
-                    if seq[s]!='-':
-                        nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)
-                        for ni in nuc_index:
-                            state_matrix[s, ni] = 1/len(nuc_index)
+                    nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)
+                    for ni in nuc_index:
+                        state_matrix[s, ni] = 1/len(nuc_index)
             state_tensor[node.numerical_label,:,:] = state_matrix
         else: # Internal nodes
             state_matrix = state_table.loc[(state_table['Node']==node.name),:].iloc[:,3:]

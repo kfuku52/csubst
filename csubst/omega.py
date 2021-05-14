@@ -7,7 +7,6 @@ import itertools
 import os
 import time
 
-from csubst import omega_cy
 from csubst import parallel
 from csubst import substitution
 from csubst import table
@@ -136,6 +135,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             E_b = dfEb
             if os.path.exists(mmap_out): os.unlink(mmap_out)
     elif stat=='quantile':
+        from csubst import omega_cy
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         my_dtype = sub_tensor.dtype

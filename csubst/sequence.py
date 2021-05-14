@@ -50,10 +50,9 @@ def write_alignment(state, orders, outfile, mode, g):
         f.write(aln_out)
 
 def get_state_index(state, input_state, ambiguous_table):
-    if isinstance(state, str):
-        states = [state,]
-    else:
-        print('state should be str instance.')
+    if ('-' in state)|(state=='NNN')|(state=='N'):
+        return []
+    states = [state,]
     state_set = set(list(state))
     key_set = set(ambiguous_table.keys())
     if (len(state_set.intersection(key_set))>0):
@@ -61,8 +60,9 @@ def get_state_index(state, input_state, ambiguous_table):
             vals = ambiguous_table[amb]
             states = [ s.replace(amb, val) for s in states for val in vals ]
     state_index0 = [ numpy.where(input_state==s)[0] for s in states ]
-    if state_index0[0].shape[0]==0:
-        return None
+    state_index0 = [ s for s in state_index0 if s.shape[0]!=0 ]
+    if len(state_index0)==0:
+        return []
     state_index = [ int(si) for si in state_index0 ]
     return state_index
 

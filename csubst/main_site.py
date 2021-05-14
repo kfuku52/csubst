@@ -30,10 +30,9 @@ def get_state(node, g):
     state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=g['float_type'])
     for s in numpy.arange(g['num_input_site']):
         codon = seq[(s*3):((s+1)*3)]
-        if (not '-' in codon)&(codon!='NNN'):
-            codon_index = sequence.get_state_index(state=codon, input_state=g['codon_orders'], ambiguous_table=genetic_code.ambiguous_table)
-            for ci in codon_index:
-                state_matrix[s,ci] = 1/len(codon_index)
+        codon_index = sequence.get_state_index(state=codon, input_state=g['codon_orders'], ambiguous_table=genetic_code.ambiguous_table)
+        for ci in codon_index:
+            state_matrix[s,ci] = 1/len(codon_index)
     return(state_matrix)
 
 def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
@@ -106,11 +105,9 @@ def add_gene_index(df, g):
             missing_site_flag = True
             for cgs in numpy.arange(current_gene_site, num_site):
                 codon = seq[(cgs*3):((cgs+1)*3)]
-                if ('-' in codon)|(codon=='NNN'):
-                    continue
                 codon_index = sequence.get_state_index(state=codon, input_state=g['codon_orders'],
                                                        ambiguous_table=genetic_code.ambiguous_table)
-                if codon_index is None:
+                if len(codon_index)==0:
                     continue
                 ci = codon_index[0] # Take the first codon if ambiguous
                 if g['state_cdn'][leaf_nn,aln_site,ci]!=0:
