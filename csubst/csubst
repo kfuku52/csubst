@@ -257,20 +257,16 @@ analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', t
                      choices=['no', 'pool', 'sn', 'each', 'file'],
                      help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation. '
                           '"no", No ASRV, meaning the uniform rate among sites. '
-                          '"pool", All categories of substitutions are pooled to calculate ASRV. '
+                          '"pool", All categories of substitutions are pooled to calculate a single set of ASRV. '
                           '"sn", Synonymous and nonsynonymous substitutions are processed individually '
-                          'to calculate their respective ASRVs.'
+                          'to calculate their respective ASRVs (2 sets). '
                           '"each", Each of 61x60 patterns of substitutions are processed individually '
-                          'to calculate their respective ASRVs.'
-                          '"file", ASRV is obtained from the IQ-TREE\'s .rate file.'
-                          'This option is used if --omega_method modelfree')
-analyze.add_argument('--calibrate_ratediff', metavar='yes|no', default='yes', type=strtobool,
-                     help='default=%(default)s: Calibrate dSc to follow the distribution of dNc. '
-                          'This quantile-based transformation accounts for diminishing convergence over time '
-                          '(Goldstein et al., 2015; Zou and Zhang, 2015; Mendes et al., 2016).')
-analyze.add_argument('--min_ratediff_combinat_sub', metavar='FLOAT', default=0, type=float,
-                     help='default=%(default)s: Minimum number of combinatorial nonsynonymous substitutions (ONc) '
-                          'to be included in the quantile-based transformation.')
+                          'to calculate their respective ASRVs. '
+                          '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
+                          'This option is used in --omega_method modelfree but not with --omega_method submodel.')
+analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
+                     help='default=%(default)s: Calibrate dSc to match the long tails in dSc and dNc '
+                          'by quantile-based transformation.')
 # Sub parser: help
 parser_help = subparsers.add_parser('help', help='see `help -h`')
 parser_help.add_argument('command', help='command name which help is shown')

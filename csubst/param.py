@@ -40,9 +40,9 @@ def get_global_parameters(args):
             g['float_tol'] = 10**-9
     if 'percent_biased_sub' in g.keys():
         assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
-    if 'calibrate_ratediff' in g.keys():
-        if (g['calibrate_ratediff'])&(~g['force_exhaustive']):
-            sys.stderr.write('--calibrate_ratediff "yes" and --force_exhaustive "no" are not compatible.\n')
+    if 'calibrate_longtail' in g.keys():
+        if (g['calibrate_longtail'])&(~g['force_exhaustive']):
+            sys.stderr.write('--calibrate_longtail "yes" and --force_exhaustive "no" are not compatible.\n')
             sys.stderr.write('--force_exhaustive is activated.\n')
             g['force_exhaustive'] = True
     return g

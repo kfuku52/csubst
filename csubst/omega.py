@@ -297,13 +297,12 @@ def calc_omega(cb, S_tensor, N_tensor, g):
     print_cb_stats(cb=cb, prefix='cb')
     return(cb, g)
 
-def calibrate_dsc(cb, min_combinat_sub=0, transformation='quantile'):
+def calibrate_dsc(cb, transformation='quantile'):
     prefix='cb'
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'arity='+str(arity)+', '+prefix+':'
     combinatorial_substitutions = ['any2any','any2spe','any2dif']
     for sub in combinatorial_substitutions:
-        col_N = 'N'+sub
         col_dN = 'dN'+sub
         col_dS = 'dS'+sub
         col_omega = 'omega_'+sub
@@ -311,13 +310,7 @@ def calibrate_dsc(cb, min_combinat_sub=0, transformation='quantile'):
         col_noncalibrated_omega = 'omega_'+sub+'_nocalib'
         cb.columns = cb.columns.str.replace(col_dS, col_noncalibrated_dS)
         cb.columns = cb.columns.str.replace(col_omega, col_noncalibrated_omega)
-        has_enough_sub = (cb.loc[:,col_N]>=min_combinat_sub).fillna(False)
-        if (has_enough_sub.sum()==0):
-            txt = 'No branch combination satisfies --min_ratediff_combinat_sub ({:,.1f}) for {} at arity {}.'
-            print(txt.format(min_combinat_sub, sub, arity))
-            cb.loc[:,col_omega] = numpy.nan
-            continue
-        x = cb.loc[has_enough_sub,col_dN]
+        x = cb.loc[:,col_dN]
         x = x.replace([numpy.inf, -numpy.inf], numpy.nan).dropna()
         ranks = stats.rankdata(cb.loc[:,col_noncalibrated_dS])
         quantiles = ranks / ranks.max()
@@ -326,11 +319,11 @@ def calibrate_dsc(cb, min_combinat_sub=0, transformation='quantile'):
             cb.loc[:,col_dS] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
         elif (transformation=='quantile'):
             cb.loc[:,col_dS] = numpy.quantile(x, quantiles)
-        noncalibrated_dS_values = cb.loc[has_enough_sub,col_noncalibrated_dS].values
+        noncalibrated_dS_values = cb.loc[:,col_noncalibrated_dS].values
         is_nocalib_higher = (noncalibrated_dS_values>cb.loc[:,col_dS]).fillna(False)
         cb.loc[is_nocalib_higher,col_dS] = noncalibrated_dS_values[is_nocalib_higher]
         cb.loc[:,col_omega] = numpy.nan
-        cb.loc[has_enough_sub,col_omega] = cb.loc[has_enough_sub,col_dN] / cb.loc[has_enough_sub,col_dS]
+        cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
         median_value = numpy.round(cb.loc[:,col_omega].median(), decimals=3)
         txt = '{} median {} (calibrated with rate differences between dNc and dSc) = {}'
         print(txt.format(hd, col_omega, median_value), flush=True)
