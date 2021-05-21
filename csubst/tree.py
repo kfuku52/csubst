@@ -262,12 +262,12 @@ def rescale_branch_length(g, S_tensor, N_tensor, denominator='L'):
             adjusted_num_N_sub = num_N_sub / adjusted_site_N
             prop_S = adjusted_num_S_sub / (adjusted_num_S_sub + adjusted_num_N_sub)
             prop_N = adjusted_num_N_sub / (adjusted_num_S_sub + adjusted_num_N_sub)
-            if num_S_sub==0:
+            if num_S_sub<g['float_tol']:
                 node.Sdist = 0
             else:
                 node.Sdist = node.dist * prop_S
                 #node.Sdist = adjusted_site_S / prop_S
-            if num_S_sub==0:
+            if num_S_sub<g['float_tol']:
                 node.Ndist = 0
             else:
                 node.Ndist = node.dist * prop_N

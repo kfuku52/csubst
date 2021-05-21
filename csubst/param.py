@@ -42,9 +42,11 @@ def get_global_parameters(args):
         assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
     if 'calibrate_longtail' in g.keys():
         if (g['calibrate_longtail'])&(~g['force_exhaustive']):
-            sys.stderr.write('--calibrate_longtail "yes" and --force_exhaustive "no" are not compatible.\n')
+            sys.stderr.write('--calibrate_longtail "yes" and --force_exhaustive "no" are not compatible.\nf')
             sys.stderr.write('--force_exhaustive is activated.\n')
             g['force_exhaustive'] = True
+    if 'float_digit' in g.keys():
+        g['float_format'] = '%.'+str(g['float_digit'])+'f'
     return g
 
 def initialize_df_cb_stats(g):

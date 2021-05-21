@@ -39,7 +39,7 @@ def write_alignment(state, orders, outfile, mode, g):
         nlabel = node.numerical_label
         aln_tmp = '>'+node.name+'|'+str(nlabel)+'\n'
         for i in numpy.arange(state.shape[1]):
-            if state[nlabel,i,:].max()==0:
+            if state[nlabel,i,:].max()<g['float_tol']:
                 aln_tmp += missing_state
             else:
                 index = state[nlabel,i,:].argmax()

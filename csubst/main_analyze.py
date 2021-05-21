@@ -113,7 +113,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         cb = table.sort_cb(cb)
         if write_cb:
             file_name = "csubst_cb_" + str(current_arity) + ".tsv"
-            cb.to_csv(file_name, sep="\t", index=False, float_format='%.4f', chunksize=10000)
+            cb.to_csv(file_name, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
             txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         g = add_median_cb_stats(g, cb, current_arity, start)
@@ -185,7 +185,7 @@ def main_analyze(g):
         print("Generating branch-site table.", flush=True)
         bs = substitution.get_bs(S_tensor, N_tensor)
         bs = table.sort_labels(df=bs)
-        bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
+        bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(bs.values.nbytes/1024/1024, bs.values.dtype), flush=True)
         del bs
@@ -201,7 +201,7 @@ def main_analyze(g):
         g = substitution.get_sub_sites(g, sS, sN, state_tensor=g['state_cdn'])
         del sS, sN
         if (g['s']):
-            s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
+            s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(s.values.nbytes/1024/1024, s.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
@@ -228,7 +228,7 @@ def main_analyze(g):
         b = foreground.annotate_foreground(b, g)
         g['branch_table'] = b
         if (g['b']):
-            b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
+            b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of b table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(b.values.nbytes/1024/1024, b.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
@@ -243,7 +243,7 @@ def main_analyze(g):
         csN = substitution.get_cs(id_combinations, N_tensor, attr='N')
         cs = table.merge_tables(csS, csN)
         del csS, csN
-        cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
+        cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of cs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cs.values.nbytes/1024/1024, cs.values.dtype), flush=True)
         del cs
@@ -259,7 +259,7 @@ def main_analyze(g):
         cbsN = substitution.get_cbs(id_combinations, N_tensor, attr='N', g=g)
         cbs = table.merge_tables(cbsS, cbsN)
         del cbsS, cbsN
-        cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format='%.4f', chunksize=10000)
+        cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of cbs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cbs.values.nbytes/1024/1024, cbs.values.dtype), flush=True)
         del cbs
@@ -277,7 +277,7 @@ def main_analyze(g):
                 g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode='randomization_'+str(i+1), write_cb=False)
                 print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
 
-        g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
+        g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]

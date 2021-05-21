@@ -232,7 +232,7 @@ def get_exp_state(g, mode):
         elif mode=='pep':
             branch_length = node.Ndist
         branch_length = max(branch_length, 0)
-        if branch_length==0:
+        if branch_length<g['float_tol']:
             continue # Skip if no substitution
         nl = node.numerical_label
         parent_nl = node.up.numerical_label
@@ -255,7 +255,7 @@ def get_exp_state(g, mode):
     assert (max_stateE-1)<g['float_tol'], 'Total probability of expected states should not exceed 1. {}'.format(max_stateE)
     return stateE
 
-def get_omega(cb):
+def get_omega(cb, g):
     combinatorial_substitutions = ['any2any','any2spe','any2dif']
     for sub in combinatorial_substitutions:
         col_omega = 'omega_'+sub
@@ -267,13 +267,13 @@ def get_omega(cb):
         col_dS = 'dS'+sub
         if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
             cb.loc[:,col_dN] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
-            is_N_zero = (cb.loc[:,col_N]==0)
+            is_N_zero = (cb.loc[:,col_N]<(0.1**g['float_digit']))
             cb.loc[is_N_zero,col_dN] = 0
             cb.loc[:,col_dS] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
-            is_S_zero = (cb.loc[:,col_S]==0)
+            is_S_zero = (cb.loc[:,col_S]<(0.1**g['float_digit']))
             cb.loc[is_S_zero,col_dS] = 0
             cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
-            is_dN_zero = (cb.loc[:,col_dN]==0)
+            is_dN_zero = (cb.loc[:,col_dN]<(0.1**g['float_digit']))
             cb.loc[is_dN_zero,col_omega] = 0
     return cb
 
@@ -292,7 +292,7 @@ def print_cb_stats(cb, prefix):
 
 def calc_omega(cb, S_tensor, N_tensor, g):
     cb = get_E(cb, g, N_tensor, S_tensor)
-    cb = get_omega(cb)
+    cb = get_omega(cb, g)
     cb = get_CoD(cb)
     print_cb_stats(cb=cb, prefix='cb')
     return(cb, g)

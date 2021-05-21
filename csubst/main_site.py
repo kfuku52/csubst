@@ -242,7 +242,7 @@ def main_site(g):
         export2chimera(df, g)
 
     plot_barchart(df)
-    df.to_csv('csubst_site.tsv', sep="\t", index=False, float_format='%.4f', chunksize=10000)
+    df.to_csv('csubst_site.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]

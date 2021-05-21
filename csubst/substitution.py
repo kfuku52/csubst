@@ -42,7 +42,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
             continue
         child = node.numerical_label
         parent = node.up.numerical_label
-        if state_tensor_anc[parent, :, :].sum()==0:
+        if state_tensor_anc[parent, :, :].sum()<g['float_tol']:
             continue
         if mode=='asis':
             sub_matrix = numpy.einsum("sa,sd,ad->sad", state_tensor_anc[parent,:,:], state_tensor[child,:,:], diag_zero)
