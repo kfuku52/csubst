@@ -136,8 +136,28 @@ def branch_category_layout(node):
     nstyle["hz_line_color"] = node.color
     nstyle["vt_line_color"] = node.color
     nlabel = node.name+'|'+str(node.numerical_label)
-    nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor=node.color)
+    nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=node.color)
     ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+    node.set_style(nstyle)
+
+def branch_category_layout_leafonly(node):
+    nstyle = ete3.NodeStyle()
+    nstyle['size'] = 0
+    nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
+    nstyle["hz_line_color"] = node.color
+    nstyle["vt_line_color"] = node.color
+    if node.is_leaf():
+        nlabel = node.name+'|'+str(node.numerical_label)
+        nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=node.color)
+        ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+    node.set_style(nstyle)
+
+def branch_category_layout_nolabel(node):
+    nstyle = ete3.NodeStyle()
+    nstyle['size'] = 0
+    nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
+    nstyle["hz_line_color"] = node.color
+    nstyle["vt_line_color"] = node.color
     node.set_style(nstyle)
 
 def is_ete_plottable():
@@ -152,14 +172,22 @@ def is_ete_plottable():
         return False
     return True
 
-def plot_branch_category(tree, file_name):
+def plot_branch_category(tree, file_name, label='all'):
     if not is_ete_plottable():
         return None
     ts = ete3.TreeStyle()
     ts.mode = 'r'
     ts.show_leaf_name = False
-    ts.layout_fn = branch_category_layout
-    tree.render(file_name=file_name, tree_style=ts, units='px', dpi=300)
+    if label=='all':
+        ts.layout_fn = branch_category_layout
+        ts.branch_vertical_margin = 0
+    elif label=='leaf':
+        ts.layout_fn = branch_category_layout_leafonly
+        ts.branch_vertical_margin = 0
+    elif label=='no':
+        ts.layout_fn = branch_category_layout_nolabel
+        ts.branch_vertical_margin = 1
+    tree.render(file_name=file_name, tree_style=ts, units='mm', w=172)
 
 def branch_state_layout(node):
     nstyle = ete3.NodeStyle()

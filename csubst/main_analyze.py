@@ -143,7 +143,9 @@ def main_analyze(g):
     g = foreground.get_marginal_branch(g)
     g = combination.get_dep_ids(g)
     tree.write_tree(g['tree'])
-    tree.plot_branch_category(g['tree'], file_name='csubst_branch_category.pdf')
+    tree.plot_branch_category(g['tree'], file_name='csubst_branch_id.pdf', label='all')
+    tree.plot_branch_category(g['tree'], file_name='csubst_branch_id_leaf.pdf', label='leaf')
+    tree.plot_branch_category(g['tree'], file_name='csubst_branch_id_nolabel.pdf', label='no')
     if g['plot_state_aa']:
         os.mkdir('csubst_plot_state_aa')
         os.chdir('csubst_plot_state_aa')
