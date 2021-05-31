@@ -84,6 +84,7 @@ def plot_barchart(df):
     outbase = 'csubst_site'
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
     fig.savefig(outbase+".svg", format='svg', transparent=True)
+    print("Alignment gap sites are indicated by gray scale (100% missing = black).", flush=True)
 
 def get_gapsite_rate(state_tensor):
     num_gapsite = (state_tensor.sum(axis=2)==0).sum(axis=0)
@@ -150,6 +151,8 @@ def export2chimera(df, g):
         seq_num_site = int(len(seq)/3)
         seq_sites = numpy.arange(1, seq_num_site+1)
         file_name = 'csubst_site_'+seq_key+'.chimera.txt'
+        txt = 'Writing a file that can be loaded to UCSF Chimera from "Tools -> Structure Analysis -> Define Attribute"'
+        print(txt.format(file_name))
         with open(file_name, 'w') as f:
             f.write(header)
             for seq_site in seq_sites:
@@ -165,12 +168,16 @@ def export2chimera(df, g):
                 f.write(line)
         translated_seq = translate(seq, g)
         file_fasta = 'csubst_site_'+seq_key+'.fasta'
+        txt = "Writing amino acid fasta that may be used as a query for homology modeling to obtain .pdb file (e.g., with SWISS-MODEL): {}"
+        print(txt.format(file_fasta))
         write_fasta(file=file_fasta, label=seq_key, seq=translated_seq)
 
 def main_site(g):
     print("Reading and parsing input files.", flush=True)
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = parser_misc.read_treefile(g)
+    g = parser_misc.generate_intermediate_files(g)
+    g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
     N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
@@ -243,6 +250,9 @@ def main_site(g):
 
     plot_barchart(df)
     df.to_csv('csubst_site.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+    print('To visualize the convergence probability on protein structure, please see:')
+    print('https://github.com/kfuku52/csubst/wiki/Visualizing-convergence-probabilities-on-protein-structures')
+    print('')
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]
