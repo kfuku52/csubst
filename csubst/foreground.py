@@ -120,6 +120,7 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
         node.is_foreground = False
         node.foreground_lineage_id = 0
         node.color = 'black'
+        node.labelcolor = 'black'
     for i in numpy.arange(len(lineages)):
         fg_leaf_name.append([])
         is_lineage = (fg_df.iloc[:,0]==lineages[i])
@@ -135,7 +136,7 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
                 print('The foreground leaf name cannot be identified:', lln, match_leaves)
         fg_leaf_name_set = set(fg_leaf_name[i])
         for node in tree.traverse():
-            node.is_lineage_foreground = False # initializing
+            node.is_lineage_foreground = False # re-initializing
         for node in tree.traverse():
             node_leaf_name_set = set(node.get_leaf_names())
             if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
@@ -143,6 +144,9 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
                 node.is_foreground = True
                 node.foreground_lineage_id = i+1
                 node.color = lineage_colors[i%len(lineage_colors)]
+                node.labelcolor = lineage_colors[i%len(lineage_colors)]
+            if node.name in fg_leaf_name_set:
+                node.labelcolor = lineage_colors[i%len(lineage_colors)]
         for node in tree.traverse():
             node_leaf_name_set = set(node.get_leaf_names())
             if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:

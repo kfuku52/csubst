@@ -136,7 +136,7 @@ def branch_category_layout(node):
     nstyle["hz_line_color"] = node.color
     nstyle["vt_line_color"] = node.color
     nlabel = node.name+'|'+str(node.numerical_label)
-    nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=node.color)
+    nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=node.labelcolor)
     ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
     node.set_style(nstyle)
 
@@ -148,7 +148,7 @@ def branch_category_layout_leafonly(node):
     nstyle["vt_line_color"] = node.color
     if node.is_leaf():
         nlabel = node.name+'|'+str(node.numerical_label)
-        nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=node.color)
+        nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=node.labelcolor)
         ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
     node.set_style(nstyle)
 
@@ -199,7 +199,7 @@ def branch_state_layout(node):
         nlabel = str(node.state)+'|'+node.name
     else:
         nlabel = str(node.state)
-    nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor=node.color)
+    nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor=node.labelcolor)
     ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
     node.set_style(nstyle)
 
