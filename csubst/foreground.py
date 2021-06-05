@@ -194,6 +194,10 @@ def get_foreground_branch(g):
         g['target_id'] = numpy.zeros(shape=(0,), dtype=numpy.int)
     else:
         g['fg_df'] = pandas.read_csv(g['foreground'], sep='\t', comment='#', skip_blank_lines=True, header=None)
+        if g['fg_df'].shape[1]!=2:
+            txt = '--foreground file should have a tab-separated two-column table without header. ' \
+                  'First column = lineage id; Second column = Sequence name'
+            raise Exception(txt)
         # target_id is numerical_label for leaves in --foreground as well as their ancestors
         g['tree'],g['fg_leaf_name'],g['target_id'] = annotate_foreground_branch(g['tree'], g['fg_df'], g['fg_stem_only'])
         g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
