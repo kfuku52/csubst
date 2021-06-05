@@ -3,6 +3,7 @@ import matplotlib.pyplot
 import pandas
 
 import os
+import sys
 
 from csubst import genetic_code
 from csubst import parser_misc
@@ -151,7 +152,8 @@ def export2chimera(df, g):
         seq_num_site = int(len(seq)/3)
         seq_sites = numpy.arange(1, seq_num_site+1)
         file_name = 'csubst_site_'+seq_key+'.chimera.txt'
-        txt = 'Writing a file that can be loaded to UCSF Chimera from "Tools -> Structure Analysis -> Define Attribute"'
+        txt = 'Writing a file that can be loaded to UCSF Chimera from ' \
+              '"Tools -> Structure Analysis -> Define Attribute"'
         print(txt.format(file_name))
         with open(file_name, 'w') as f:
             f.write(header)
@@ -168,9 +170,127 @@ def export2chimera(df, g):
                 f.write(line)
         translated_seq = translate(seq, g)
         file_fasta = 'csubst_site_'+seq_key+'.fasta'
-        txt = "Writing amino acid fasta that may be used as a query for homology modeling to obtain .pdb file (e.g., with SWISS-MODEL): {}"
+        txt = "Writing amino acid fasta that may be used as a query for homology modeling " \
+              "to obtain .pdb file (e.g., with SWISS-MODEL): {}"
         print(txt.format(file_fasta))
         write_fasta(file=file_fasta, label=seq_key, seq=translated_seq)
+
+def get_parent_branch_ids(branch_ids, g):
+    parent_branch_ids = dict()
+    for node in g['tree'].traverse():
+        if node.numerical_label in branch_ids:
+            parent_branch_ids[node.numerical_label] = node.up.numerical_label
+    return parent_branch_ids
+
+def add_states(df, branch_ids, g):
+    parent_branch_ids = get_parent_branch_ids(branch_ids, g)
+    seqtypes = ['cdn','pep']
+    seqtypes2 = ['cdn','aa']
+    order_keys = ['codon_orders','amino_acid_orders']
+    for seqtype,seqtype2,order_key in zip(seqtypes,seqtypes2,order_keys):
+        for bid in branch_ids:
+            col = seqtype2+'_'+str(bid)
+            df.loc[:,col] = ''
+            for i in df.index:
+                states = g['state_'+seqtype][bid,i,:]
+                if not states.max()==0:
+                    ml_state = g[order_key][states.argmax()]
+                    df.at[i,col] = ml_state
+        for bid in branch_ids:
+            anc_col = seqtype2+'_'+str(bid)+'_anc'
+            df.loc[:,anc_col] = ''
+            for i in df.index:
+                anc_states = g['state_'+seqtype][parent_branch_ids[bid],i,:]
+                if not anc_states.max()==0:
+                    ml_anc_state = g[order_key][anc_states.argmax()]
+                    df.at[i,anc_col] = ml_anc_state
+    return df
+
+def get_state_orders(g, mode):
+    if mode=='nsy':
+        state_orders = {'nsy':g['amino_acid_orders']}
+    elif mode=='syn':
+        state_orders = g['matrix_groups']
+    state_keys = list(state_orders.keys())
+    return state_orders,state_keys
+
+def get_df_ad(sub_tensor, g, mode):
+    state_orders,state_keys = get_state_orders(g, mode)
+    gad = sub_tensor.sum(axis=(0,1))
+    cols = ['group','state_from','state_to','value']
+    nrow = sum([ len(v)**2-len(v) for v in state_orders.values() ])
+    df_ad = pandas.DataFrame(numpy.zeros(shape=(nrow, len(cols))))
+    df_ad.columns = cols
+    current_row = 0
+    for g in numpy.arange(gad.shape[0]):
+        state_key = state_keys[g]
+        for i1,state1 in enumerate(state_orders[state_key]):
+            for i2,state2 in enumerate(state_orders[state_key]):
+                if (i1==i2):
+                    continue
+                total_prob = gad[g,i1,i2]
+                if (numpy.isnan(total_prob)):
+                    txt = 'Total probability should not be NaN: {}-to-{} substitutions\n'
+                    sys.stderr.write(txt.format(state1, state2))
+                df_ad.loc[current_row,:] = [state_key, state1, state2, total_prob]
+                current_row += 1
+    return df_ad
+
+def add_site_stats(df_ad, sub_tensor, g, mode, method='tau'):
+    # method = {'tau', 'hg', 'tsi'}
+    # https://academic.oup.com/bib/article/18/2/205/2562739
+    state_orders,state_keys = get_state_orders(g, mode)
+    outcol = 'site_'+method
+    df_ad.loc[:,outcol] = numpy.nan
+    sgad = sub_tensor.sum(axis=0)
+    current_row = 0
+    for g in numpy.arange(sgad.shape[1]):
+        state_key = state_keys[g]
+        for i1,state1 in enumerate(state_orders[state_key]):
+            for i2,state2 in enumerate(state_orders[state_key]):
+                if (i1==i2):
+                    continue
+                x_values = sgad[:,g,i1,i2]
+                if (x_values.sum()==0):
+                    current_row += 1
+                    continue
+                if (method=='tau'):
+                    x_max = x_values.max()
+                    x_hat = x_values / x_max
+                    value = (1-x_hat).sum() / (x_values.shape[0] - 1)
+                elif (method=='hg'):
+                    pi = x_values / x_values.sum()
+                    value = - (pi * numpy.log2(pi)).sum()
+                elif (method=='tsi'):
+                    value = x_values.max() / x_values.sum()
+                elif (method.startswith('rank')):
+                    rank_no = int(method.replace('rank', ''))
+                    temp = x_values.argsort()
+                    ranks = numpy.empty_like(temp)
+                    ranks[temp] = numpy.arange(len(x_values))
+                    ranks = numpy.abs(ranks - ranks.max())+1
+                    value = x_values[ranks==rank_no]
+                df_ad.loc[current_row,outcol] = value
+                current_row += 1
+    return df_ad
+
+def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
+    state_orders,state_keys = get_state_orders(g, mode)
+    outcol = 'has_target_high_combinat_prob_site'
+    df_ad.loc[:,outcol] = False
+    sgad = sub_tensor.sum(axis=0)
+    current_row = 0
+    for g in numpy.arange(sgad.shape[1]):
+        state_key = state_keys[g]
+        for i1,state1 in enumerate(state_orders[state_key]):
+            for i2,state2 in enumerate(state_orders[state_key]):
+                if (i1==i2):
+                    continue
+                x_values = sgad[:,g,i1,i2]
+                if (x_values >= 0.5).any():
+                    df_ad.at[current_row,outcol] = True
+                current_row += 1
+    return df_ad
 
 def main_site(g):
     print("Reading and parsing input files.", flush=True)
@@ -187,10 +307,6 @@ def main_site(g):
 
     branch_ids = numpy.array([ int(s) for s in g['branch_id'].split(',')])
     num_site = N_tensor.shape[1]
-    parent_branch_ids = dict()
-    for node in g['tree'].traverse():
-        if node.numerical_label in branch_ids:
-            parent_branch_ids[node.numerical_label] = node.up.numerical_label
 
     df = pandas.DataFrame()
     df.loc[:,'codon_site_alignment'] = numpy.arange(num_site)
@@ -217,42 +333,60 @@ def main_site(g):
     s.columns = s.columns.str.replace('site','codon_site_alignment')
     df = pandas.merge(df, s, on='codon_site_alignment')
     del s
-
-    seqtypes = ['cdn','pep']
-    seqtypes2 = ['cdn','aa']
-    order_keys = ['codon_orders','amino_acid_orders']
-    for seqtype,seqtype2,order_key in zip(seqtypes,seqtypes2,order_keys):
-        for bid in branch_ids:
-            col = seqtype2+'_'+str(bid)
-            df.loc[:,col] = ''
-            for i in df.index:
-                states = g['state_'+seqtype][bid,i,:]
-                if not states.max()==0:
-                    ml_state = g[order_key][states.argmax()]
-                    df.at[i,col] = ml_state
-        for bid in branch_ids:
-            anc_col = seqtype2+'_'+str(bid)+'_anc'
-            df.loc[:,anc_col] = ''
-            for i in df.index:
-                anc_states = g['state_'+seqtype][parent_branch_ids[bid],i,:]
-                if not anc_states.max()==0:
-                    ml_anc_state = g[order_key][anc_states.argmax()]
-                    df.at[i,anc_col] = ml_anc_state
-
+    df = add_states(df, branch_ids, g)
     if (g['untrimmed_cds'] is not None):
         df = add_gene_index(df, g)
-
     is_site_col = df.columns.str.startswith('codon_site_')
     df.loc[:,is_site_col] += 1
-
     if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
         export2chimera(df, g)
-
     plot_barchart(df)
     df.to_csv('csubst_site.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
     print('To visualize the convergence probability on protein structure, please see:')
     print('https://github.com/kfuku52/csubst/wiki/Visualizing-convergence-probabilities-on-protein-structures')
     print('')
+
+    fig,axes = matplotlib.pyplot.subplots(nrows=2, ncols=2, figsize=(7.2, 4.8), sharex=False)
+    outfiles = ['csubst_state_N.tsv', 'csubst_state_S.tsv']
+    colors = ['red','blue']
+    ax_cols = [0,1]
+    titles = ['Nonsynonymous substitution','Synonymous substitution']
+    iter_items = zip(ax_cols,['nsy','syn'],[N_tensor,S_tensor],outfiles,colors,titles)
+    for ax_col,mode,sub_tensor,outfile,color,title in iter_items:
+        sub_target = sub_tensor[branch_ids,:,:,:,:]
+        sub_target_combinat = numpy.expand_dims(sub_target.prod(axis=0), axis=0)
+        df_ad = get_df_ad(sub_tensor=sub_tensor, g=g, mode=mode)
+        df_ad_target = get_df_ad(sub_tensor=sub_target, g=g, mode=mode)
+        df_ad_combinat = get_df_ad(sub_tensor=sub_target_combinat, g=g, mode=mode)
+        df_ad.columns = df_ad.columns.str.replace('value', 'all')
+        df_ad.loc[:,'target'] = df_ad_target.loc[:,'value']
+        df_ad.loc[:,'target_combinat'] = df_ad_combinat.loc[:,'value']
+        df_ad = add_has_target_high_combinat_prob_site(df_ad, sub_target_combinat, g, mode)
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='tsi')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank1')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank2')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank3')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank4')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
+        df_ad.to_csv(outfile, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '→' + df_ad.loc[:,'state_to']
+        ax = axes[0,ax_col]
+        ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'all'], color='black')
+        ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'target'], color=color)
+        ax.get_xaxis().set_ticks([])
+        ax.set_xlabel('Substitution category (e.g., {})'.format(df_ad.at[0,'xlabel']), fontsize=font_size)
+        ax.set_ylabel('Total substitution\nprobabilities', fontsize=font_size)
+        ax.set_title(title, fontsize=font_size)
+        ax = axes[1,ax_col]
+        bins = numpy.arange(21)/20
+        ax.hist(x=df_ad.loc[:,'site_tsi'], bins=bins, color='black')
+        ax.hist(x=df_ad.loc[(df_ad.loc[:,'has_target_high_combinat_prob_site']),'site_tsi'], bins=bins, color=color)
+        ax.set_xlabel('Site specificity index', fontsize=font_size)
+        ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
+    fig.tight_layout(h_pad=0.5, w_pad=1)
+    outbase = 'csubst_state'
+    fig.savefig(outbase+".pdf", format='pdf', transparent=True)
+    fig.savefig(outbase+".svg", format='svg', transparent=True)
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]

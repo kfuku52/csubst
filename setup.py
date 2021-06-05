@@ -25,6 +25,7 @@ setup(
     author_email     = 'kfuku52@gmail.com',
     url              = 'https://github.com/kfuku52/csubst.git',
     keywords         = 'molecular convergence',
+    python_requires  = '>=3.1',
     packages         = find_packages(),
     install_requires = ['ete3','numpy','scipy','pandas','joblib','cython','matplotlib','threadpoolctl'],
     scripts          = ['csubst/csubst',],

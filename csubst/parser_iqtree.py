@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import OrderedDict
 from distutils.version import LooseVersion
 
 from csubst import genetic_code
@@ -63,8 +64,8 @@ def read_state(g):
         g['codon_orders'] = state_table.columns[3:].str.replace('p_','').values
     if (g['input_data_type']=='cdn'):
         g['amino_acid_orders'] = sorted(list(set([ c[0] for c in g['codon_table'] if c[0]!='*' ])))
-        matrix_groups = dict()
-        for aa in list(set(g['amino_acid_orders'])):
+        matrix_groups = OrderedDict()
+        for aa in g['amino_acid_orders']:
             matrix_groups[aa] = [ c[1] for c in g['codon_table'] if c[0]==aa ]
         g['matrix_groups'] = matrix_groups
         synonymous_indices = dict()

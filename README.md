@@ -16,7 +16,7 @@
 - a [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
 
 ## Dependency
-**CSUBST** runs on python 3 (tested with >3.5.0) and depends on several python packages. **CSUBST** installation with `pip install` will automatically install them except for the following packages and stand-alone programs.
+**CSUBST** runs on python 3 (tested with >=3.6.0). **CSUBST** installation with `pip install` will automatically install required packages except for the followings.
 * [IQ-TREE](http://www.iqtree.org/) (version 2.0.0 or later)
 * [pyvolve](https://github.com/sjspielman/pyvolve) (Optional: required for `csubst simulate`)
 * [matplotlib](https://matplotlib.org/3.1.1/index.html) (Optional: required for `csubst site`)
