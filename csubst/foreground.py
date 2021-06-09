@@ -115,12 +115,6 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
         'green',
         'darkorchid',
     ]
-    for node in tree.traverse(): # initializing
-        node.is_lineage_foreground = False
-        node.is_foreground = False
-        node.foreground_lineage_id = 0
-        node.color = 'black'
-        node.labelcolor = 'black'
     for i in numpy.arange(len(lineages)):
         fg_leaf_name.append([])
         is_lineage = (fg_df.iloc[:,0]==lineages[i])
@@ -180,9 +174,11 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
 
 def initialize_foreground_annotation(tree):
     for node in tree.traverse():
+        node.is_lineage_foreground = False
         node.is_foreground = False
         node.foreground_lineage_id = 0
         node.color = 'black'
+        node.labelcolor = 'black'
     return tree
 
 def get_foreground_branch(g):
