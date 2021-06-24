@@ -308,10 +308,13 @@ def calibrate_dsc(cb, transformation='quantile'):
         col_omega = 'omega_'+sub
         col_noncalibrated_dS = 'dS'+sub+'_nocalib'
         col_noncalibrated_omega = 'omega_'+sub+'_nocalib'
-        cb.columns = cb.columns.str.replace(col_dS, col_noncalibrated_dS)
-        cb.columns = cb.columns.str.replace(col_omega, col_noncalibrated_omega)
         x = cb.loc[:,col_dN]
         x = x.replace([numpy.inf, -numpy.inf], numpy.nan).dropna()
+        if (x.shape[0]==0):
+            print('dSc calibration could not be applied: {}'.format(sub), flush=True)
+            continue
+        cb.columns = cb.columns.str.replace(col_dS, col_noncalibrated_dS)
+        cb.columns = cb.columns.str.replace(col_omega, col_noncalibrated_omega)
         ranks = stats.rankdata(cb.loc[:,col_noncalibrated_dS])
         quantiles = ranks / ranks.max()
         if (transformation=='gamma'):

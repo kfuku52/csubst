@@ -81,7 +81,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             is_fg_dependent_col = (is_fg_dependent_col)|(nc_matrix[fg_dep_id, :].sum(axis=0) > 1)
         if (g['force_exhaustive']):
             if verbose:
-                txt = 'detected {:,} (out of {:,}) foreground branch combinations to be treated as non-foreground.'
+                txt = 'detected {:,} (out of {:,}) foreground branch combinations to be treated as non-foreground (e.g., parent-child pairs).'
                 print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
             fg_dep_nc_matrix = numpy.copy(nc_matrix)
             fg_dep_nc_matrix[:,~is_fg_dependent_col] = False

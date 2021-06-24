@@ -39,48 +39,53 @@ def read_input(g):
         g = parser_phylobayes.get_input_information(g)
     elif (g['infile_type'] == 'iqtree'):
         g = parser_iqtree.get_input_information(g)
-    if ('omega_method' in g.keys()):
-        if (g['omega_method']=='submodel'):
-            base_model = re.sub('\+G.*', '', g['substitution_model'])
-            base_model = re.sub('\+R.*', '', base_model)
-            txt = 'Instantaneous substitution rate matrix will be generated using the base model: {}'
-            print(txt.format(base_model))
-            txt = 'Transition matrix will be generated using the model in the ancestral state reconstruction:'
-            print(txt.format(g['substitution_model']))
-            if (g['substitution_model'].startswith('ECMK07')):
-                matrix_file = 'substitution_matrix/ECMunrest.dat'
-                g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
-                g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
-                g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
-                g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'], g['float_type'])
-            if (g['substitution_model'].startswith('ECMrest')):
-                matrix_file = 'substitution_matrix/ECMrest.dat'
-                g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
-                g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
-                g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
-                g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'], g['float_type'])
-            elif (g['substitution_model'].startswith('GY')):
-                assert (g['omega'] is not None), 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
-                assert (g['kappa'] is not None), 'Estimated kappa is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
-                g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
-            elif (g['substitution_model'].startswith('MG')):
-                assert (g['omega'] is not None), 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
-                g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
-            g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
-            g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
-            g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
-            sum_tensor_aa = g['rate_aa_tensor'].sum()
-            sum_tensor_syn = g['rate_syn_tensor'].sum()
-            sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
-            sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
-            assert (sum_tensor_aa - sum_matrix_aa)<g['float_tol'], 'Sum of rates did not match.'
-            txt = 'Sum of rates did not match. Check if --codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
-            txt = txt.format(g['codon_table'], g['reconstruction_codon_table'])
-            assert (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa)<g['float_tol'], txt
-            numpy.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
-            q_ij_x_pi_i = g['instantaneous_codon_rate_matrix'][0,1]*g['equilibrium_frequency'][0]
-            q_ji_x_pi_j = g['instantaneous_codon_rate_matrix'][1,0]*g['equilibrium_frequency'][1]
-            assert (q_ij_x_pi_i-q_ji_x_pi_j<g['float_tol']), 'Instantaneous codon rate matrix (Q) is not time-reversible.'
+    if ('omega_method' not in g.keys()):
+        return g
+    if (g['omega_method']!='submodel'):
+        return g
+    base_model = re.sub('\+G.*', '', g['substitution_model'])
+    base_model = re.sub('\+R.*', '', base_model)
+    txt = 'Instantaneous substitution rate matrix will be generated using the base model: {}'
+    print(txt.format(base_model))
+    txt = 'Transition matrix will be generated using the model in the ancestral state reconstruction:'
+    print(txt.format(g['substitution_model']))
+    if (g['substitution_model'].startswith('ECMK07')):
+        matrix_file = 'substitution_matrix/ECMunrest.dat'
+        g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
+        g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
+        g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
+        g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'], g['float_type'])
+    elif (g['substitution_model'].startswith('ECMrest')):
+        matrix_file = 'substitution_matrix/ECMrest.dat'
+        g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
+        g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
+        g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
+        g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'], g['float_type'])
+    elif (g['substitution_model'].startswith('GY')):
+        txt = 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
+        assert (g['omega'] is not None), txt
+        txt = 'Estimated kappa is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
+        assert (g['kappa'] is not None), txt
+        g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
+    elif (g['substitution_model'].startswith('MG')):
+        txt = 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
+        assert (g['omega'] is not None), txt
+        g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
+    g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
+    g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
+    g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
+    sum_tensor_aa = g['rate_aa_tensor'].sum()
+    sum_tensor_syn = g['rate_syn_tensor'].sum()
+    sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
+    sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
+    assert (sum_tensor_aa - sum_matrix_aa)<g['float_tol'], 'Sum of rates did not match.'
+    txt = 'Sum of rates did not match. Check if --codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
+    txt = txt.format(g['codon_table'], g['reconstruction_codon_table'])
+    assert (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa)<g['float_tol'], txt
+    numpy.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
+    q_ij_x_pi_i = g['instantaneous_codon_rate_matrix'][0,1]*g['equilibrium_frequency'][0]
+    q_ji_x_pi_j = g['instantaneous_codon_rate_matrix'][1,0]*g['equilibrium_frequency'][1]
+    assert (q_ij_x_pi_i-q_ji_x_pi_j<g['float_tol']), 'Instantaneous codon rate matrix (Q) is not time-reversible.'
     return g
 
 def get_mechanistic_instantaneous_rate_matrix(g):

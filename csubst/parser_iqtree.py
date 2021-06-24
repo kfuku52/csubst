@@ -84,6 +84,8 @@ def read_state(g):
 def read_rate(g):
     rate_sites = pandas.read_csv(g['path_iqtree_rate'], sep='\t', header=0, comment='#')
     rate_sites = rate_sites.loc[:,'C_Rate'].values
+    if rate_sites.shape[0]==0:
+        rate_sites = numpy.ones(g['num_input_site'])
     return rate_sites
 
 def read_iqtree(g, eq=True):

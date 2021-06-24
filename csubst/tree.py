@@ -54,23 +54,6 @@ def transfer_root(tree_to, tree_from, verbose=False):
             break
     return tree_to
 
-def rerooting_by_topology_matching(tree_from, tree_to):
-    tree_from.ladderize()
-    tree_to.ladderize()
-    print('Before rerooting, Robinson-Foulds distance =', tree_from.robinson_foulds(tree_to, unrooted_trees=True)[0])
-    outgroup_labels = tree_from.get_descendants()[0].get_leaf_names()
-    for node in tree_to.traverse():
-        if (node.is_leaf())&(not node.name in outgroup_labels):
-            non_outgroup_leaf = node
-            break
-    tree_to.set_outgroup(non_outgroup_leaf)
-    outgroup_ancestor = tree_to.get_common_ancestor(outgroup_labels)
-    tree_to.set_outgroup(outgroup_ancestor)
-    tree_to = tree.add_numerical_node_labels(tree_to)
-    tree_to.ladderize()
-    print('After rerooting, Robinson-Foulds distance =', tree_from.robinson_foulds(tree_to, unrooted_trees=False)[0])
-    return tree_to
-
 def transfer_internal_node_names(tree_to, tree_from):
     rf_dist = tree_to.robinson_foulds(tree_from, expand_polytomies=True)[0]
     assert rf_dist==0, 'tree topologies are different. RF distance = {}'.format(rf_dist)

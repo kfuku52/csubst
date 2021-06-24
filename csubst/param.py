@@ -14,7 +14,7 @@ def get_global_parameters(args):
     if 'fg_random' in g.keys():
         if g['fg_random']>0:
             if g['force_exhaustive']:
-                raise Exception('To enable --fg_random, set --force_exhaustive "no"')
+                raise Exception('To enable --fg_random, set --force_exhaustive "no"') # TODO make it compatible with --force_exhaustive
             if (g['foreground'] is not None):
                 raise Exception('To enable --fg_random, set --foreground')
     if 'iqtree_treefile' in g.keys():
@@ -43,7 +43,7 @@ def get_global_parameters(args):
         assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
     if 'calibrate_longtail' in g.keys():
         if (g['calibrate_longtail'])&(~g['force_exhaustive']):
-            sys.stderr.write('--calibrate_longtail "yes" and --force_exhaustive "no" are not compatible.\nf')
+            sys.stderr.write('--calibrate_longtail "yes" and --force_exhaustive "no" are not compatible.\n')
             sys.stderr.write('--force_exhaustive is activated.\n')
             g['force_exhaustive'] = True
     if 'float_digit' in g.keys():
