@@ -292,9 +292,17 @@ def get_CoD(cb):
 def print_cb_stats(cb, prefix):
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'arity='+str(arity)+', '+prefix+':'
-    print(hd, 'median omega_any2any =', numpy.round(cb['omega_any2any'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_any2spe =', numpy.round(cb['omega_any2spe'].median(), decimals=3), flush=True)
-    print(hd, 'median omega_any2dif  =', numpy.round(cb['omega_any2dif'].median(), decimals=3), flush=True)
+    combinatorial_substitutions = ['any2any','any2spe','any2dif',
+                                   'dif2any','dif2spe','dif2dif',
+                                   'spe2any','spe2spe','spe2dif',
+                                   ]
+    for sub in combinatorial_substitutions:
+        col_omega = 'omega_'+sub
+        if not col_omega in cb.columns:
+            continue
+        median_value = cb.loc[:,col_omega].median()
+        txt = '{} median {} (non-calibrated) = {:.3f}'
+        print(txt.format(hd, col_omega, median_value), flush=True)
 
 def calc_omega(cb, S_tensor, N_tensor, g):
     cb = get_E(cb, g, N_tensor, S_tensor)
@@ -336,7 +344,7 @@ def calibrate_dsc(cb, transformation='quantile'):
         cb.loc[is_nocalib_higher,col_dS] = noncalibrated_dS_values[is_nocalib_higher]
         cb.loc[:,col_omega] = numpy.nan
         cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
-        median_value = numpy.round(cb.loc[:,col_omega].median(), decimals=3)
-        txt = '{} median {} (calibrated with rate differences between dNc and dSc) = {}'
+        median_value = cb.loc[:,col_omega].median()
+        txt = '{} median {} (calibrated for different distribution ranges in dNc and dSc) = {:.3f}'
         print(txt.format(hd, col_omega, median_value), flush=True)
     return cb
