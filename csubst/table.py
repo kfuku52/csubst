@@ -28,7 +28,6 @@ def sort_cb(cb):
     col_order += cb.columns[(is_omega)&(~is_nocalib)].sort_values().tolist()
     col_order += cb.columns[(is_d)&(~is_nocalib)].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^[NS]CoD$')].sort_values().tolist()
-    col_order += ['NCoDoSCoD',]
     col_order += cb.columns[cb.columns.str.contains('^[NS]_linreg_residual$')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^[NS]_sub_')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^[NS][any|dif|spe]')].sort_values().tolist()

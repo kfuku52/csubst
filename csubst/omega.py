@@ -1,3 +1,9 @@
+if __name__ == '__main__':
+    mp.set_start_method('spawn')
+    my_class = MyClass(1)
+    my_class.mp_simple_method()
+    my_class.wait()
+
 import joblib
 import numpy
 import scipy.stats as stats
@@ -183,8 +189,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         g['S_ind_nomissing_gad'] = numpy.where(S_tensor.sum(axis=(0,1))!=0)
         g['S_ind_nomissing_ga'] = numpy.where(S_tensor.sum(axis=(0,1,4))!=0)
         g['S_ind_nomissing_gd'] = numpy.where(S_tensor.sum(axis=(0,1,3))!=0)
-        sub_types = g['substitution_types'].split(',')
-        for st in sub_types:
+        for st in ['any2any','any2spe','spe2any','spe2spe']:
             cb['EN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
             cb['ES'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='mean', SN='S', g=g)
     if (g['omega_method']=='submodel'):
@@ -208,8 +213,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
     if g['calc_quantile']:
-        sub_types = g['substitution_types'].split(',')
-        for st in sub_types:
+        for st in ['any2any','any2spe','spe2any','spe2spe']:
             cb['QN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='quantile', SN='N', g=g)
             cb['QS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='quantile', SN='S', g=g)
     cb = substitution.get_any2dif(cb, g['float_tol'], prefix='E')
@@ -256,7 +260,10 @@ def get_exp_state(g, mode):
     return stateE
 
 def get_omega(cb, g):
-    combinatorial_substitutions = ['any2any','any2spe','any2dif']
+    combinatorial_substitutions = ['any2any','any2spe','any2dif',
+                                   'dif2any','dif2spe','dif2dif',
+                                   'spe2any','spe2spe','spe2dif',
+                                   ]
     for sub in combinatorial_substitutions:
         col_omega = 'omega_'+sub
         col_N = 'N'+sub
@@ -280,7 +287,6 @@ def get_omega(cb, g):
 def get_CoD(cb):
     cb['NCoD'] = cb['Nany2spe'] / cb['Nany2dif']
     cb['SCoD'] = cb['Sany2spe'] / cb['Sany2dif']
-    cb['NCoDoSCoD'] = cb['NCoD'] / cb['SCoD']
     return cb
 
 def print_cb_stats(cb, prefix):
@@ -301,7 +307,10 @@ def calibrate_dsc(cb, transformation='quantile'):
     prefix='cb'
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'arity='+str(arity)+', '+prefix+':'
-    combinatorial_substitutions = ['any2any','any2spe','any2dif']
+    combinatorial_substitutions = ['any2any','any2spe','any2dif',
+                                   'dif2any','dif2spe','dif2dif',
+                                   'spe2any','spe2spe','spe2dif',
+                                   ]
     for sub in combinatorial_substitutions:
         col_dN = 'dN'+sub
         col_dS = 'dS'+sub

@@ -33,8 +33,17 @@ def add_median_cb_stats(g, cb, current_arity, start):
             else:
                 is_targets.append(cb.loc[:,target_col]=='Y')
     stats = dict()
-    stats['median'] = ['dist_bl','dist_node_num','omega_any2any','omega_any2spe','omega_any2dif']
-    stats['total'] = ['Nany2any','ENany2any','Sany2any','ESany2any','Nany2spe','ENany2spe','Sany2spe','ESany2spe',]
+    omega_cols = cb.columns[cb.columns.str.startswith('omega_')].tolist()
+    is_ON = cb.columns.str.startswith('Nany') | cb.columns.str.startswith('Ndif') | cb.columns.str.startswith('Nspe')
+    is_OS = cb.columns.str.startswith('Sany') | cb.columns.str.startswith('Sdif') | cb.columns.str.startswith('Sspe')
+    is_EN = cb.columns.str.startswith('ENany') | cb.columns.str.startswith('ENdif') | cb.columns.str.startswith('ENspe')
+    is_ES = cb.columns.str.startswith('ESany') | cb.columns.str.startswith('ESdif') | cb.columns.str.startswith('ESspe')
+    ON_cols = cb.columns[is_ON].tolist()
+    OS_cols = cb.columns[is_OS].tolist()
+    EN_cols = cb.columns[is_EN].tolist()
+    ES_cols = cb.columns[is_ES].tolist()
+    stats['median'] = ['dist_bl','dist_node_num',] + omega_cols
+    stats['total'] = ON_cols + OS_cols + EN_cols + ES_cols
     for stat in stats.keys():
         for suffix,is_target in zip(suffices,is_targets):
             for ms in stats[stat]:

@@ -57,7 +57,8 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
                 child_matrix = state_tensor[child, :, ind] # axis is swapped, shape=[state,site]
                 sub_matrix = numpy.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
                 sub_tensor[child, :, s, :size, :size] = sub_matrix
-    sub_tensor = numpy.nan_to_num(sub_tensor, nan=0)
+    sub_tensor = numpy.nan_to_num(sub_tensor, nan=0, copy=False)
+    #numpy.nan_to_num(sub_tensor, nan=0, copy=False)
     return sub_tensor
 
 def apply_min_sub_pp(g, sub_tensor):
@@ -323,11 +324,27 @@ def get_substitutions_per_branch(cb, b, g):
 
 def get_any2dif(cb, tol, prefix):
     for SN in ['S','N']:
-        col_Eany2any = prefix+SN+'any2any'
-        col_Eany2spe = prefix+SN+'any2spe'
-        col_Eany2dif = prefix+SN+'any2dif'
-        if ((col_Eany2any in cb.columns)&(col_Eany2spe in cb.columns)):
-            cb.loc[:,col_Eany2dif] = cb[col_Eany2any] - cb[col_Eany2spe]
-            is_almost_zero = (cb[col_Eany2dif]<tol)
-            cb.loc[is_almost_zero,col_Eany2dif] = 0
+        for anc in ['any','spe']:
+            col_any = prefix+SN+anc+'2any'
+            col_spe = prefix+SN+anc+'2spe'
+            col_dif = prefix+SN+anc+'2dif'
+            if ((col_any in cb.columns)&(col_spe in cb.columns)):
+                cb.loc[:,col_dif] = cb[col_any] - cb[col_spe]
+                is_almost_zero = (cb[col_dif]<tol)
+                cb.loc[is_almost_zero,col_dif] = 0
+        for des in ['any','spe']:
+            col_any = prefix+SN+'any2'+des
+            col_spe = prefix+SN+'spe2'+des
+            col_dif = prefix+SN+'dif2'+des
+            if ((col_any in cb.columns)&(col_spe in cb.columns)):
+                cb.loc[:,col_dif] = cb[col_any] - cb[col_spe]
+                is_almost_zero = (cb[col_dif]<tol)
+                cb.loc[is_almost_zero,col_dif] = 0
+        col_any = prefix+SN+'any2dif'
+        col_spe = prefix+SN+'spe2dif'
+        col_dif = prefix+SN+'dif2dif'
+        if ((col_any in cb.columns)&(col_spe in cb.columns)):
+            cb.loc[:,col_dif] = cb[col_any] - cb[col_spe]
+            is_almost_zero = (cb[col_dif]<tol)
+            cb.loc[is_almost_zero,col_dif] = 0
     return cb
