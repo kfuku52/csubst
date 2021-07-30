@@ -92,37 +92,94 @@ def get_gapsite_rate(state_tensor):
     gapsite_rate = num_gapsite / state_tensor.shape[0]
     return gapsite_rate
 
+def extend_site_index_edge(sites, num_extend):
+    new_sites = sites.copy()
+    to_append_base = pandas.Series(-1 - numpy.arange(num_extend))
+    for i in sites.index[1:]:
+        if sites.loc[i]-1 == sites.loc[i-1]:
+            continue
+        to_append = to_append_base + sites.loc[i]
+        new_sites = new_sites.append(to_append, ignore_index=True)
+    new_sites = new_sites.loc[new_sites>=0]
+    new_sites = new_sites.drop_duplicates().sort_values().reset_index(drop=True)
+    return new_sites
+
 def add_gene_index(df, g):
     seqs = sequence.read_fasta(path=g['untrimmed_cds'])
     num_site = g['state_cdn'].shape[1]
-    for leaf in g['tree'].get_leaves():
+    for leaf in g['tree'].iter_leaves():
         leaf_nn = leaf.numerical_label
         if leaf.name not in seqs.keys():
             continue
+        print('Matching untrimmed CDS sequence: {}'.format(leaf.name))
         seq = seqs[leaf.name]
+        num_gene_site = int(len(seq)/3)
+        gene_sites = numpy.arange(num_gene_site)
         aln_sites = numpy.arange(num_site)
-        aln_gene_match = list()
-        current_gene_site = 0
-        for aln_site in aln_sites:
-            missing_site_flag = True
-            for cgs in numpy.arange(current_gene_site, num_site):
-                codon = seq[(cgs*3):((cgs+1)*3)]
-                codon_index = sequence.get_state_index(state=codon, input_state=g['codon_orders'],
-                                                       ambiguous_table=genetic_code.ambiguous_table)
-                if len(codon_index)==0:
-                    continue
-                ci = codon_index[0] # Take the first codon if ambiguous
-                if g['state_cdn'][leaf_nn,aln_site,ci]!=0:
-                    aln_gene_match.append([aln_site,cgs])
-                    current_gene_site = cgs + 1
-                    missing_site_flag = False
+        col_leaf = 'codon_site_'+leaf.name
+        cols = ['codon_site_alignment',col_leaf]
+        aln_gene_match = pandas.DataFrame(-1, index=aln_sites, columns=cols)
+        aln_gene_match.loc[:,'codon_site_alignment'] = aln_sites
+        window_sizes = [100,50,10,5,4,3,2,1]
+        window_sizes = [ w for w in window_sizes if (w<num_gene_site)&(w<num_site) ]
+        for window_size in window_sizes:
+            is_unassigned = (aln_gene_match.loc[:,col_leaf]==-1)
+            unassigned_aln_sites = aln_gene_match.loc[is_unassigned,'codon_site_alignment']
+            assigned_gene_sites = aln_gene_match.loc[~is_unassigned,col_leaf]
+            unassinged_gene_sites = set(gene_sites) - set(assigned_gene_sites)
+            unassinged_gene_sites = pandas.Series(sorted(list(unassinged_gene_sites)))
+            extended_unassinged_gene_sites = extend_site_index_edge(unassinged_gene_sites, window_size)
+            txt = 'Window size = {:,}, Number of unassigned alignment site = {:,}'
+            print(txt.format(window_size, unassigned_aln_sites.shape[0]))
+            for uas in unassigned_aln_sites:
+                if (uas+window_size>num_site):
                     break
-            if missing_site_flag:
-                aln_gene_match.append([aln_site,-1])
-        aln_gene_match = pandas.DataFrame(aln_gene_match)
-        aln_gene_match.columns = ['codon_site_alignment','codon_site_'+leaf.name]
-        df = pandas.merge(df, aln_gene_match, on='codon_site_alignment')
+                for ugs in extended_unassinged_gene_sites:
+                    if (ugs+window_size>num_gene_site):
+                        break
+                    window_match_flag = True
+                    for window_index in numpy.arange(window_size):
+                        codon = seq[((ugs+window_index)*3):((ugs+window_index+1)*3)]
+                        codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
+                        if len(codon_index)==0:
+                            window_match_flag = False # codon may be a stop.
+                            break
+                        ci = codon_index[0] # Take the first codon if ambiguous
+                        if g['state_cdn'][leaf_nn,uas+window_index,ci]!=0:
+                            continue
+                        else:
+                            window_match_flag = False
+                            break
+                    if window_match_flag:
+                        window_aln_index = numpy.arange(uas, uas+window_size)
+                        window_gene_index = numpy.arange(ugs, ugs+window_size)
+                        following_gene_index = aln_gene_match.loc[window_aln_index.max():,col_leaf]
+                        min_following_gene_index = following_gene_index.loc[following_gene_index!=-1].min()
+                        does_smaller_gene_index_follow = (min_following_gene_index<window_gene_index.max())
+                        if does_smaller_gene_index_follow:
+                            continue
+                        aln_gene_match.loc[window_aln_index,col_leaf] = window_gene_index
+                        break
+        has_gene_site_in_aln_value = (g['state_cdn'][leaf_nn,:,:].sum(axis=1)>0)
+        num_gene_site_in_aln = has_gene_site_in_aln_value.sum()
+        is_unassigned = (aln_gene_match.loc[:,col_leaf]==-1)
+        txt = 'End. Unassigned alignment site = {:,}, Assigned alignment site = {:,}, '
+        txt += 'Alignment site with non-missing gene states: {:,}'
+        print(txt.format(is_unassigned.sum(), (~is_unassigned).sum(), num_gene_site_in_aln))
+        if (~is_unassigned).sum()!=num_gene_site_in_aln:
+            gene_site_in_aln = set(aln_sites[has_gene_site_in_aln_value])
+            gene_site_assigned = set(aln_gene_match.loc[~is_unassigned,'codon_site_alignment'])
+            only_in_aln = sorted(list(gene_site_in_aln - gene_site_assigned))
+            only_in_assigned = sorted(list(gene_site_assigned - gene_site_in_aln))
+            txt_base = 'Sites only present in '
+            print(txt_base+'input alignment: {}'.format(','.join([str(v) for v in only_in_aln])))
+            print(txt_base+'untrimmed CDS: {}'.format(','.join([str(v) for v in only_in_assigned])))
+        df = pandas.merge(df, aln_gene_match, on='codon_site_alignment', how='left')
+        print('')
     return df
+
+
+
 
 def write_fasta(file, label, seq):
     with open(file, 'w') as f:
@@ -292,6 +349,49 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
                 current_row += 1
     return df_ad
 
+def plot_state(N_tensor, S_tensor, branch_ids, g):
+    fig,axes = matplotlib.pyplot.subplots(nrows=2, ncols=2, figsize=(7.2, 4.8), sharex=False)
+    outfiles = ['csubst_state_N.tsv', 'csubst_state_S.tsv']
+    colors = ['red','blue']
+    ax_cols = [0,1]
+    titles = ['Nonsynonymous substitution','Synonymous substitution']
+    iter_items = zip(ax_cols,['nsy','syn'],[N_tensor,S_tensor],outfiles,colors,titles)
+    for ax_col,mode,sub_tensor,outfile,color,title in iter_items:
+        sub_target = sub_tensor[branch_ids,:,:,:,:]
+        sub_target_combinat = numpy.expand_dims(sub_target.prod(axis=0), axis=0)
+        df_ad = get_df_ad(sub_tensor=sub_tensor, g=g, mode=mode)
+        df_ad_target = get_df_ad(sub_tensor=sub_target, g=g, mode=mode)
+        df_ad_combinat = get_df_ad(sub_tensor=sub_target_combinat, g=g, mode=mode)
+        df_ad.columns = df_ad.columns.str.replace('value', 'all')
+        df_ad.loc[:,'target'] = df_ad_target.loc[:,'value']
+        df_ad.loc[:,'target_combinat'] = df_ad_combinat.loc[:,'value']
+        df_ad = add_has_target_high_combinat_prob_site(df_ad, sub_target_combinat, g, mode)
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='tsi')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank1')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank2')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank3')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank4')
+        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
+        df_ad.to_csv(outfile, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '→' + df_ad.loc[:,'state_to']
+        ax = axes[0,ax_col]
+        ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'all'], color='black')
+        ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'target'], color=color)
+        ax.get_xaxis().set_ticks([])
+        ax.set_xlabel('Substitution category (e.g., {})'.format(df_ad.at[0,'xlabel']), fontsize=font_size)
+        ax.set_ylabel('Total substitution\nprobabilities', fontsize=font_size)
+        ax.set_title(title, fontsize=font_size)
+        ax = axes[1,ax_col]
+        bins = numpy.arange(21)/20
+        ax.hist(x=df_ad.loc[:,'site_tsi'], bins=bins, color='black')
+        ax.hist(x=df_ad.loc[(df_ad.loc[:,'has_target_high_combinat_prob_site']),'site_tsi'], bins=bins, color=color)
+        ax.set_xlabel('Site specificity index', fontsize=font_size)
+        ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
+    fig.tight_layout(h_pad=0.5, w_pad=1)
+    outbase = 'csubst_state'
+    fig.savefig(outbase+".pdf", format='pdf', transparent=True)
+    fig.savefig(outbase+".svg", format='svg', transparent=True)
+
 def main_site(g):
     print("Reading and parsing input files.", flush=True)
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
@@ -341,52 +441,13 @@ def main_site(g):
     if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
         export2chimera(df, g)
     plot_barchart(df)
+    plot_state(N_tensor, S_tensor, branch_ids, g)
     df.to_csv('csubst_site.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
     print('To visualize the convergence probability on protein structure, please see:')
     print('https://github.com/kfuku52/csubst/wiki/Visualizing-convergence-probabilities-on-protein-structures')
     print('')
 
-    fig,axes = matplotlib.pyplot.subplots(nrows=2, ncols=2, figsize=(7.2, 4.8), sharex=False)
-    outfiles = ['csubst_state_N.tsv', 'csubst_state_S.tsv']
-    colors = ['red','blue']
-    ax_cols = [0,1]
-    titles = ['Nonsynonymous substitution','Synonymous substitution']
-    iter_items = zip(ax_cols,['nsy','syn'],[N_tensor,S_tensor],outfiles,colors,titles)
-    for ax_col,mode,sub_tensor,outfile,color,title in iter_items:
-        sub_target = sub_tensor[branch_ids,:,:,:,:]
-        sub_target_combinat = numpy.expand_dims(sub_target.prod(axis=0), axis=0)
-        df_ad = get_df_ad(sub_tensor=sub_tensor, g=g, mode=mode)
-        df_ad_target = get_df_ad(sub_tensor=sub_target, g=g, mode=mode)
-        df_ad_combinat = get_df_ad(sub_tensor=sub_target_combinat, g=g, mode=mode)
-        df_ad.columns = df_ad.columns.str.replace('value', 'all')
-        df_ad.loc[:,'target'] = df_ad_target.loc[:,'value']
-        df_ad.loc[:,'target_combinat'] = df_ad_combinat.loc[:,'value']
-        df_ad = add_has_target_high_combinat_prob_site(df_ad, sub_target_combinat, g, mode)
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='tsi')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank1')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank2')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank3')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank4')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
-        df_ad.to_csv(outfile, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
-        df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '→' + df_ad.loc[:,'state_to']
-        ax = axes[0,ax_col]
-        ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'all'], color='black')
-        ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'target'], color=color)
-        ax.get_xaxis().set_ticks([])
-        ax.set_xlabel('Substitution category (e.g., {})'.format(df_ad.at[0,'xlabel']), fontsize=font_size)
-        ax.set_ylabel('Total substitution\nprobabilities', fontsize=font_size)
-        ax.set_title(title, fontsize=font_size)
-        ax = axes[1,ax_col]
-        bins = numpy.arange(21)/20
-        ax.hist(x=df_ad.loc[:,'site_tsi'], bins=bins, color='black')
-        ax.hist(x=df_ad.loc[(df_ad.loc[:,'has_target_high_combinat_prob_site']),'site_tsi'], bins=bins, color=color)
-        ax.set_xlabel('Site specificity index', fontsize=font_size)
-        ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
-    fig.tight_layout(h_pad=0.5, w_pad=1)
-    outbase = 'csubst_state'
-    fig.savefig(outbase+".pdf", format='pdf', transparent=True)
-    fig.savefig(outbase+".svg", format='svg', transparent=True)
+
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]
