@@ -111,8 +111,9 @@ def add_gene_index(df, g):
         leaf_nn = leaf.numerical_label
         if leaf.name not in seqs.keys():
             continue
-        print('Matching untrimmed CDS sequence: {}'.format(leaf.name))
+        print('Matching untrimmed CDS sequence: {}'.format(leaf.name), flush=True)
         seq = seqs[leaf.name]
+        seq = seq.replace('-','')
         num_gene_site = int(len(seq)/3)
         gene_sites = numpy.arange(num_gene_site)
         aln_sites = numpy.arange(num_site)
@@ -130,7 +131,7 @@ def add_gene_index(df, g):
             unassinged_gene_sites = pandas.Series(sorted(list(unassinged_gene_sites)))
             extended_unassinged_gene_sites = extend_site_index_edge(unassinged_gene_sites, window_size)
             txt = 'Window size = {:,}, Number of unassigned alignment site = {:,}'
-            print(txt.format(window_size, unassigned_aln_sites.shape[0]))
+            print(txt.format(window_size, unassigned_aln_sites.shape[0]), flush=True)
             for uas in unassigned_aln_sites:
                 if (uas+window_size>num_site):
                     break
@@ -165,21 +166,18 @@ def add_gene_index(df, g):
         is_unassigned = (aln_gene_match.loc[:,col_leaf]==-1)
         txt = 'End. Unassigned alignment site = {:,}, Assigned alignment site = {:,}, '
         txt += 'Alignment site with non-missing gene states: {:,}'
-        print(txt.format(is_unassigned.sum(), (~is_unassigned).sum(), num_gene_site_in_aln))
+        print(txt.format(is_unassigned.sum(), (~is_unassigned).sum(), num_gene_site_in_aln), flush=True)
         if (~is_unassigned).sum()!=num_gene_site_in_aln:
             gene_site_in_aln = set(aln_sites[has_gene_site_in_aln_value])
             gene_site_assigned = set(aln_gene_match.loc[~is_unassigned,'codon_site_alignment'])
             only_in_aln = sorted(list(gene_site_in_aln - gene_site_assigned))
             only_in_assigned = sorted(list(gene_site_assigned - gene_site_in_aln))
             txt_base = 'Sites only present in '
-            print(txt_base+'input alignment: {}'.format(','.join([str(v) for v in only_in_aln])))
-            print(txt_base+'untrimmed CDS: {}'.format(','.join([str(v) for v in only_in_assigned])))
+            print(txt_base+'input alignment: {}'.format(','.join([str(v) for v in only_in_aln])), flush=True)
+            print(txt_base+'untrimmed CDS: {}'.format(','.join([str(v) for v in only_in_assigned])), flush=True)
         df = pandas.merge(df, aln_gene_match, on='codon_site_alignment', how='left')
-        print('')
+        print('', flush=True)
     return df
-
-
-
 
 def write_fasta(file, label, seq):
     with open(file, 'w') as f:
