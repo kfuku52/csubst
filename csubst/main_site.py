@@ -124,6 +124,7 @@ def add_gene_index(df, g):
         window_sizes = [100,50,10,5,4,3,2,1]
         window_sizes = [ w for w in window_sizes if (w<num_gene_site)&(w<num_site) ]
         for window_size in window_sizes:
+            step_size = max([int(window_size/5),1])
             is_unassigned = (aln_gene_match.loc[:,col_leaf]==-1)
             unassigned_aln_sites = aln_gene_match.loc[is_unassigned,'codon_site_alignment']
             assigned_gene_sites = aln_gene_match.loc[~is_unassigned,col_leaf]
@@ -132,7 +133,10 @@ def add_gene_index(df, g):
             extended_unassinged_gene_sites = extend_site_index_edge(unassinged_gene_sites, window_size)
             txt = 'Window size = {:,}, Number of unassigned alignment site = {:,}'
             print(txt.format(window_size, unassigned_aln_sites.shape[0]), flush=True)
-            for uas in unassigned_aln_sites:
+            for k,uas in enumerate(unassigned_aln_sites):
+                if k!=0:
+                    if uas < unassigned_aln_sites.iloc[k-1]+step_size:
+                        continue
                 if (uas+window_size>num_site):
                     break
                 for ugs in extended_unassinged_gene_sites:
