@@ -3,6 +3,7 @@ import matplotlib.pyplot
 import pandas
 
 import os
+import re
 import sys
 
 from csubst import genetic_code
@@ -48,7 +49,7 @@ def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
     lc.set_linewidth(lw)
     ax.add_collection(lc)
 
-def plot_barchart(df):
+def plot_barchart(df, g):
     sub_types = ['_sub','any2spe','any2dif','any2any','spe2spe']
     num_row = len(sub_types)*2
     fig,axes = matplotlib.pyplot.subplots(nrows=num_row, ncols=1, figsize=(7.2, 9.6), sharex=True)
@@ -82,10 +83,10 @@ def plot_barchart(df):
             ax.set_xlim(df.loc[:,'codon_site_alignment'].min()-0.5, df.loc[:,'codon_site_alignment'].max()+0.5)
             i += 1
     fig.tight_layout(h_pad=0.5, w_pad=1)
-    outbase = 'csubst_site'
+    outbase = os.path.join(g['site_outdir'], 'csubst_site')
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
     fig.savefig(outbase+".svg", format='svg', transparent=True)
-    print("Alignment gap sites are indicated by gray scale (100% missing = black).", flush=True)
+    print("Alignment gap sites are indicated by gray scale (0% missing = white, 100% missing = black).", flush=True)
 
 def get_gapsite_rate(state_tensor):
     num_gapsite = (state_tensor.sum(axis=2)==0).sum(axis=0)
@@ -210,7 +211,7 @@ def export2chimera(df, g):
         seq = seqs[seq_key]
         seq_num_site = int(len(seq)/3)
         seq_sites = numpy.arange(1, seq_num_site+1)
-        file_name = 'csubst_site_'+seq_key+'.chimera.txt'
+        file_name = os.path.join(g['site_outdir'], 'csubst_site_'+seq_key+'.chimera.txt')
         txt = 'Writing a file that can be loaded to UCSF Chimera from ' \
               '"Tools -> Structure Analysis -> Define Attribute"'
         print(txt.format(file_name))
@@ -228,7 +229,7 @@ def export2chimera(df, g):
                     line = '	:{}	{:.4f}\n'.format(seq_site, Nvalue)
                 f.write(line)
         translated_seq = translate(seq, g)
-        file_fasta = 'csubst_site_'+seq_key+'.fasta'
+        file_fasta = os.path.join(g['site_outdir'], 'csubst_site_'+seq_key+'.fasta')
         txt = "Writing amino acid fasta that may be used as a query for homology modeling " \
               "to obtain .pdb file (e.g., with SWISS-MODEL): {}"
         print(txt.format(file_fasta))
@@ -353,7 +354,7 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
 
 def plot_state(N_tensor, S_tensor, branch_ids, g):
     fig,axes = matplotlib.pyplot.subplots(nrows=2, ncols=2, figsize=(7.2, 4.8), sharex=False)
-    outfiles = ['csubst_state_N.tsv', 'csubst_state_S.tsv']
+    outfiles = ['csubst_site.state_N.tsv', 'csubst_site.state_S.tsv']
     colors = ['red','blue']
     ax_cols = [0,1]
     titles = ['Nonsynonymous substitution','Synonymous substitution']
@@ -374,7 +375,8 @@ def plot_state(N_tensor, S_tensor, branch_ids, g):
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank3')
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank4')
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
-        df_ad.to_csv(outfile, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        out_path = os.path.join(g['site_outdir'], outfile)
+        df_ad.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '→' + df_ad.loc[:,'state_to']
         ax = axes[0,ax_col]
         ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'all'], color='black')
@@ -390,12 +392,40 @@ def plot_state(N_tensor, S_tensor, branch_ids, g):
         ax.set_xlabel('Site specificity index', fontsize=font_size)
         ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
     fig.tight_layout(h_pad=0.5, w_pad=1)
-    outbase = 'csubst_state'
+    outbase = os.path.join(g['site_outdir'], 'csubst_site.state')
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
-    fig.savefig(outbase+".svg", format='svg', transparent=True)
+    #fig.savefig(outbase+".svg", format='svg', transparent=True)
+
+def initialize_site_df(num_site):
+    df = pandas.DataFrame()
+    df.loc[:,'codon_site_alignment'] = numpy.arange(num_site)
+    df.loc[:,'nuc_site_alignment'] = ((df.loc[:,'codon_site_alignment']+1) * 3) - 2
+    return df
+
+def add_cs_info(df, branch_ids, sub_tensor, attr):
+    cs = substitution.get_cs(id_combinations=branch_ids[numpy.newaxis,:], sub_tensor=sub_tensor, attr=attr)
+    cs.columns = cs.columns.str.replace('site','codon_site_alignment')
+    df = pandas.merge(df, cs, on='codon_site_alignment')
+    df.loc[:,attr+'any2dif'] = df.loc[:,attr+'any2any'] - df.loc[:,attr+'any2spe']
+    return df
+
+def add_site_info(df, sub_tensor, attr):
+    s = substitution.get_s(sub_tensor, attr=attr)
+    s.columns = s.columns.str.replace('site','codon_site_alignment')
+    df = pandas.merge(df, s, on='codon_site_alignment')
+    return df
+
+def add_branch_sub_prob(df, branch_ids, sub_tensor, attr):
+    for branch_id in branch_ids:
+        sub_probs = sub_tensor[branch_id,:,:,:,:].sum(axis=(1,2,3))
+        df.loc[:,attr+'_sub_'+str(branch_id)] = sub_probs
+    return df
 
 def main_site(g):
     print("Reading and parsing input files.", flush=True)
+    g['site_outdir'] = './csubst_site.branch_id'+g['branch_id']
+    if not os.path.exists(g['site_outdir']):
+        os.makedirs(g['site_outdir'])
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = parser_misc.read_treefile(g)
     g = parser_misc.generate_intermediate_files(g)
@@ -407,49 +437,43 @@ def main_site(g):
     S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
 
-    branch_ids = numpy.array([ int(s) for s in g['branch_id'].split(',')])
+    g['branch_ids'] = numpy.array([ int(s) for s in g['branch_id'].split(',')])
+    leaf_nn = [ n.numerical_label for n in g['tree'].traverse() if n.is_leaf() ]
     num_site = N_tensor.shape[1]
 
-    df = pandas.DataFrame()
-    df.loc[:,'codon_site_alignment'] = numpy.arange(num_site)
-    df.loc[:,'nuc_site_alignment'] = ((df.loc[:,'codon_site_alignment']+1) * 3) - 2
-
-    cs = substitution.get_cs(id_combinations=branch_ids[numpy.newaxis,:], sub_tensor=S_tensor, attr='S')
-    cs.columns = cs.columns.str.replace('site','codon_site_alignment')
-    df = pandas.merge(df, cs, on='codon_site_alignment')
-    df.loc[:,'Sany2dif'] = df.loc[:,'Sany2any'] - df.loc[:,'Sany2spe']
-    cs = substitution.get_cs(id_combinations=branch_ids[numpy.newaxis,:], sub_tensor=N_tensor, attr='N')
-    cs.columns = cs.columns.str.replace('site','codon_site_alignment')
-    df = pandas.merge(df, cs, on='codon_site_alignment')
-    df.loc[:,'Nany2dif'] = df.loc[:,'Nany2any'] - df.loc[:,'Nany2spe']
-    del cs
-
-    leaf_nn = [ n.numerical_label for n in g['tree'].traverse() if n.is_leaf() ]
+    df = initialize_site_df(num_site)
+    df = add_cs_info(df, g['branch_ids'], sub_tensor=S_tensor, attr='S')
+    df = add_cs_info(df, g['branch_ids'], sub_tensor=N_tensor, attr='N')
     df.loc[:,'gap_rate_all'] = get_gapsite_rate(state_tensor=g['state_cdn'][leaf_nn,:,:])
-    df.loc[:,'gap_rate_target'] = get_gapsite_rate(state_tensor=g['state_cdn'][branch_ids,:,:])
-
-    s = substitution.get_s(S_tensor, attr='S')
-    s.columns = s.columns.str.replace('site','codon_site_alignment')
-    df = pandas.merge(df, s, on='codon_site_alignment')
-    s = substitution.get_s(N_tensor, attr='N')
-    s.columns = s.columns.str.replace('site','codon_site_alignment')
-    df = pandas.merge(df, s, on='codon_site_alignment')
-    del s
-    df = add_states(df, branch_ids, g)
+    df.loc[:,'gap_rate_target'] = get_gapsite_rate(state_tensor=g['state_cdn'][g['branch_ids'],:,:])
+    df = add_site_info(df, sub_tensor=S_tensor, attr='S')
+    df = add_site_info(df, sub_tensor=N_tensor, attr='N')
+    df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=S_tensor, attr='S')
+    df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=N_tensor, attr='N')
+    df = add_states(df, g['branch_ids'], g)
     if (g['untrimmed_cds'] is not None):
         df = add_gene_index(df, g)
     is_site_col = df.columns.str.startswith('codon_site_')
     df.loc[:,is_site_col] += 1
     if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
         export2chimera(df, g)
-    plot_barchart(df)
-    plot_state(N_tensor, S_tensor, branch_ids, g)
-    df.to_csv('csubst_site.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+    if (g['pdb'] is not None):
+        from csubst import parser_pymol
+        parser_pymol.initialize_pymol(g=g)
+        mafft_add_fasta = os.path.join(g['site_outdir'], 'csubst_site.pdb_add.aa.fa')
+        parser_pymol.write_mafft_map(g=g, mafft_add_fasta=mafft_add_fasta)
+        df = parser_pymol.add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
+        df = parser_pymol.add_pdb_residue_numbering(df=df)
+        session_file_name = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.pymol.pse'
+        session_file_path = os.path.join(g['site_outdir'], session_file_name)
+        parser_pymol.write_pymol_session(df=df, session_file=session_file_path, g=g)
+    plot_barchart(df, g)
+    plot_state(N_tensor, S_tensor, g['branch_ids'], g)
+    out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
+    df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
     print('To visualize the convergence probability on protein structure, please see:')
     print('https://github.com/kfuku52/csubst/wiki/Visualizing-convergence-probabilities-on-protein-structures')
     print('')
-
-
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]

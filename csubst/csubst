@@ -182,14 +182,29 @@ simulate.set_defaults(handler=command_simulate)
 # site
 site = subparsers.add_parser('site', help='see `csubst site -h`', parents=[psr_co,psr_iq,psr_as])
 site.add_argument('--branch_id', metavar='INT,INT,INT...', default=None, required=True, type=str,
-                  help='default=%(default)s: Comma-delimited list of branch_ids to characterize.'
+                  help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
                   'Run `csubst analyze` first and select branches of interest.')
 site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,
-                  help='default=%(default)s: PATH to fasta file containing untrimmed CDS sequence(s).'
+                  help='default=%(default)s: PATH to fasta file containing untrimmed CDS sequence(s). '
                        'Codon positions along the sequence(s) appear in the output tsv.')
+site.add_argument('--pdb', metavar='PATH/PDB_CODE', default=None, required=False, type=str,
+                  help='default=%(default)s: PATH to downloaded pdb file or PDB CODE (e.g., 3SV0). '
+                       'If the latter, PDB file will be fetched from the database. '
+                       'The protein sequence will be aligned with mafft, '
+                       'and a pymol session visualizing convergence and divergence will be generated.')
+site.add_argument('--remove_solvent', metavar='yes|no', default='yes', type=strtobool,
+                  help='default=%(default)s: Whether to remove solvent and small non-specific ligands. '
+                       'Used only with --pdb.')
+site.add_argument('--mafft_exe', metavar='PATH', default='mafft', required=False, type=str,
+                  help='default=%(default)s: PATH to mafft executable.')
+site.add_argument('--pymol_min_combinat_prob', metavar='FLOAT', default=0.5, required=False, type=float,
+                  help='default=%(default)s: Minimum probability of combinatorial substitutions to visualize.')
+site.add_argument('--pymol_min_single_prob', metavar='FLOAT', default=0.8, required=False, type=float,
+                  help='default=%(default)s: Minimum probability of single substitutions to visualize.')
 site.add_argument('--export2chimera', metavar='yes|no', default='no', required=False, type=strtobool,
                   help='default=%(default)s: Set "yes" to export files for the visualization of '
-                       'convergence/divergence probabilities with UCSF Chimera. --untrimmed_cds is required.')
+                       'convergence/divergence probabilities with UCSF Chimera. '
+                       '--untrimmed_cds is required.')
 site.set_defaults(handler=command_site)
 
 

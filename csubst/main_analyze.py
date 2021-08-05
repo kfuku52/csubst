@@ -145,8 +145,8 @@ def main_analyze(g):
     g = parser_misc.read_input(g)
     g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
 
-    sequence.write_alignment(g['state_cdn'], g['codon_orders'], 'csubst_alignment_codon.fa', mode='codon', g=g)
-    sequence.write_alignment(g['state_pep'], g['amino_acid_orders'], 'csubst_alignment_aa.fa', mode='aa', g=g)
+    sequence.write_alignment('csubst_alignment_codon.fa', mode='codon', g=g)
+    sequence.write_alignment('csubst_alignment_aa.fa', mode='aa', g=g)
 
     g = foreground.get_foreground_branch(g)
     g = foreground.get_marginal_branch(g)

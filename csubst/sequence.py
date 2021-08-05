@@ -27,23 +27,36 @@ def cdn2pep_state(state_cdn, g):
         state_pep[:, :, i] = state_cdn[:,:,g['synonymous_indices'][aa]].sum(axis=2)
     return state_pep
 
-def write_alignment(state, orders, outfile, mode, g):
+def translate_state(nlabel, mode, g):
     if mode=='codon':
         missing_state = '---'
-    else:
+        state = g['state_cdn']
+        orders = g['codon_orders']
+    elif mode=='aa':
         missing_state = '-'
+        state = g['state_pep']
+        orders = g['amino_acid_orders']
+    seq_out = ''
+    for i in numpy.arange(state.shape[1]):
+        if state[nlabel,i,:].max()<g['float_tol']:
+            seq_out += missing_state
+        else:
+            index = state[nlabel,i,:].argmax()
+            seq_out += orders[index]
+    return seq_out
+
+def write_alignment(outfile, mode, g, leaf_only=False):
     aln_out = ''
-    for node in g['tree'].traverse():
+    if leaf_only:
+        nodes = g['tree'].iter_leaves()
+    else:
+        nodes = g['tree'].traverse()
+    for node in nodes:
         if node.is_root():
             continue
         nlabel = node.numerical_label
         aln_tmp = '>'+node.name+'|'+str(nlabel)+'\n'
-        for i in numpy.arange(state.shape[1]):
-            if state[nlabel,i,:].max()<g['float_tol']:
-                aln_tmp += missing_state
-            else:
-                index = state[nlabel,i,:].argmax()
-                aln_tmp += orders[index]
+        aln_tmp += translate_state(nlabel, mode, g)
         aln_out += aln_tmp+'\n'
     with open(outfile, 'w') as f:
         print('Writing alignment:', outfile, flush=True)
