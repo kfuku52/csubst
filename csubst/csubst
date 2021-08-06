@@ -181,9 +181,12 @@ simulate.set_defaults(handler=command_simulate)
 
 # site
 site = subparsers.add_parser('site', help='see `csubst site -h`', parents=[psr_co,psr_iq,psr_as])
-site.add_argument('--branch_id', metavar='INT,INT,INT...', default=None, required=True, type=str,
+site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default=None, required=True, type=str,
                   help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
-                  'Run `csubst analyze` first and select branches of interest.')
+                  'Run `csubst analyze` first and select branches of interest. '
+                  'If "fg", all foreground branch pairs will be analyzed.')
+site.add_argument('--cb2', metavar='PATH', default='csubst_cb_2.tsv', required=False, type=str,
+                  help='default=%(default)s: PATH to csubst_cb_2.tsv output of csubst analyze.')
 site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,
                   help='default=%(default)s: PATH to fasta file containing untrimmed CDS sequence(s). '
                        'Codon positions along the sequence(s) appear in the output tsv.')

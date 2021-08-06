@@ -1,3 +1,8 @@
 1	Cephalotus_follicularis_Cfol-v3-22778
 2	Nepenthes_alata_comp52811-c0
 2	Nepenthes_alata_comp58763-c0
+2	Aldrovanda_vesiculosa_Av-00004848-RA
+2	Aldrovanda_vesiculosa_Av-00009634-RA
+2	Dionaea_muscipula_Dm-00020493-RA
+2	Drosera_adelae_comp8069-c0-seq2
+2	Drosera_spatulata_Ds-00006553-RA

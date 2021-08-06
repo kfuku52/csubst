@@ -85,7 +85,7 @@ def plot_barchart(df, g):
     fig.tight_layout(h_pad=0.5, w_pad=1)
     outbase = os.path.join(g['site_outdir'], 'csubst_site')
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
-    fig.savefig(outbase+".svg", format='svg', transparent=True)
+    #fig.savefig(outbase+".svg", format='svg', transparent=True)
     print("Alignment gap sites are indicated by gray scale (0% missing = white, 100% missing = black).", flush=True)
 
 def get_gapsite_rate(state_tensor):
@@ -421,11 +421,21 @@ def add_branch_sub_prob(df, branch_ids, sub_tensor, attr):
         df.loc[:,attr+'_sub_'+str(branch_id)] = sub_probs
     return df
 
+def add_branch_id_list(g):
+    if g['branch_id']=='fg':
+        g['branch_id_list'] = []
+        cb2 = pandas.read_csv(g['cb2'], sep="\t", index_col=False, header=0)
+        bid_cols = cb2.columns[cb2.columns.str.startswith('branch_id_')]
+        cb2_fg = cb2.loc[(cb2.loc[:,'is_fg']=='Y'),:]
+        for i in cb2_fg.index:
+            bids = cb2_fg.loc[i,bid_cols].values.astype(int)
+            g['branch_id_list'].append(bids)
+    else:
+        g['branch_id_list'] = [numpy.array([ int(s) for s in g['branch_id'].split(',')]),]
+    return g
+
 def main_site(g):
     print("Reading and parsing input files.", flush=True)
-    g['site_outdir'] = './csubst_site.branch_id'+g['branch_id']
-    if not os.path.exists(g['site_outdir']):
-        os.makedirs(g['site_outdir'])
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = parser_misc.read_treefile(g)
     g = parser_misc.generate_intermediate_files(g)
@@ -436,44 +446,51 @@ def main_site(g):
     N_tensor = substitution.apply_min_sub_pp(g, N_tensor)
     S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
+    g = add_branch_id_list(g)
+    for branch_ids in g['branch_id_list']:
+        print('\nProcessing branch_ids: {}'.format(','.join([ str(bid) for bid in branch_ids ])), flush=True)
+        g['branch_ids'] = branch_ids
+        g['site_outdir'] = './csubst_site.branch_id'+','.join([ str(bid) for bid in branch_ids ])
+        if not os.path.exists(g['site_outdir']):
+            os.makedirs(g['site_outdir'])
 
-    g['branch_ids'] = numpy.array([ int(s) for s in g['branch_id'].split(',')])
-    leaf_nn = [ n.numerical_label for n in g['tree'].traverse() if n.is_leaf() ]
-    num_site = N_tensor.shape[1]
+        leaf_nn = [ n.numerical_label for n in g['tree'].traverse() if n.is_leaf() ]
+        num_site = N_tensor.shape[1]
 
-    df = initialize_site_df(num_site)
-    df = add_cs_info(df, g['branch_ids'], sub_tensor=S_tensor, attr='S')
-    df = add_cs_info(df, g['branch_ids'], sub_tensor=N_tensor, attr='N')
-    df.loc[:,'gap_rate_all'] = get_gapsite_rate(state_tensor=g['state_cdn'][leaf_nn,:,:])
-    df.loc[:,'gap_rate_target'] = get_gapsite_rate(state_tensor=g['state_cdn'][g['branch_ids'],:,:])
-    df = add_site_info(df, sub_tensor=S_tensor, attr='S')
-    df = add_site_info(df, sub_tensor=N_tensor, attr='N')
-    df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=S_tensor, attr='S')
-    df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=N_tensor, attr='N')
-    df = add_states(df, g['branch_ids'], g)
-    if (g['untrimmed_cds'] is not None):
-        df = add_gene_index(df, g)
-    is_site_col = df.columns.str.startswith('codon_site_')
-    df.loc[:,is_site_col] += 1
-    if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
-        export2chimera(df, g)
+        df = initialize_site_df(num_site)
+        df = add_cs_info(df, g['branch_ids'], sub_tensor=S_tensor, attr='S')
+        df = add_cs_info(df, g['branch_ids'], sub_tensor=N_tensor, attr='N')
+        df.loc[:,'gap_rate_all'] = get_gapsite_rate(state_tensor=g['state_cdn'][leaf_nn,:,:])
+        df.loc[:,'gap_rate_target'] = get_gapsite_rate(state_tensor=g['state_cdn'][g['branch_ids'],:,:])
+        df = add_site_info(df, sub_tensor=S_tensor, attr='S')
+        df = add_site_info(df, sub_tensor=N_tensor, attr='N')
+        df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=S_tensor, attr='S')
+        df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=N_tensor, attr='N')
+        df = add_states(df, g['branch_ids'], g)
+        if (g['untrimmed_cds'] is not None):
+            df = add_gene_index(df, g)
+        is_site_col = df.columns.str.startswith('codon_site_')
+        df.loc[:,is_site_col] += 1
+        if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
+            export2chimera(df, g)
+        if (g['pdb'] is not None):
+            from csubst import parser_pymol
+            parser_pymol.initialize_pymol(g=g)
+            mafft_add_fasta = os.path.join(g['site_outdir'], 'csubst_site.pdb_add.aa.fa')
+            parser_pymol.write_mafft_map(g=g, mafft_add_fasta=mafft_add_fasta)
+            df = parser_pymol.add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
+            df = parser_pymol.add_pdb_residue_numbering(df=df)
+            session_file_name = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.pymol.pse'
+            session_file_path = os.path.join(g['site_outdir'], session_file_name)
+            parser_pymol.write_pymol_session(df=df, session_file=session_file_path, g=g)
+        plot_barchart(df, g)
+        plot_state(N_tensor, S_tensor, g['branch_ids'], g)
+        out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
+        df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
     if (g['pdb'] is not None):
-        from csubst import parser_pymol
-        parser_pymol.initialize_pymol(g=g)
-        mafft_add_fasta = os.path.join(g['site_outdir'], 'csubst_site.pdb_add.aa.fa')
-        parser_pymol.write_mafft_map(g=g, mafft_add_fasta=mafft_add_fasta)
-        df = parser_pymol.add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
-        df = parser_pymol.add_pdb_residue_numbering(df=df)
-        session_file_name = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.pymol.pse'
-        session_file_path = os.path.join(g['site_outdir'], session_file_name)
-        parser_pymol.write_pymol_session(df=df, session_file=session_file_path, g=g)
-    plot_barchart(df, g)
-    plot_state(N_tensor, S_tensor, g['branch_ids'], g)
-    out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
-    df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        parser_pymol.quit_pymol()
     print('To visualize the convergence probability on protein structure, please see:')
     print('https://github.com/kfuku52/csubst/wiki/Visualizing-convergence-probabilities-on-protein-structures')
     print('')
-
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]

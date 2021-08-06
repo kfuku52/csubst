@@ -6,6 +6,7 @@ from io import StringIO
 import os
 import re
 import subprocess
+import sys
 import time
 
 from csubst import sequence
@@ -47,6 +48,9 @@ def write_mafft_map(g, mafft_add_fasta='csubst_site.pdb_add.aa.fa'):
         else:
             print('mafft map file not detected. Waiting {:} sec'.format(i+1), flush=True)
             time.sleep(1)
+    txt = 'CSUBST does not exclude poorly aligned regions. ' \
+          'Please carefully check {} before biological interpretation of substitution events.'
+    print(txt.format(mafft_add_fasta), flush=True)
 
 def get_residue_numberings():
     out = dict()
@@ -74,6 +78,9 @@ def add_pdb_residue_numbering(df):
     for object_name in object_names:
         for ch in pymol.cmd.get_chains(object_name):
             key = object_name+'_'+ch
+            if residue_numberings[key].shape[0]==0:
+                sys.stderr.write('PDB protein sequence is unavailable: {}\n'.format(key))
+                continue
             df = pandas.merge(df, residue_numberings[key], on='codon_site_'+key, how='left')
             df.loc[:,'codon_site_pdb_'+key] = df.loc[:,'codon_site_pdb_'+key].fillna(0).astype(int)
     return df
@@ -108,6 +115,7 @@ def write_pymol_session(df, session_file, g):
     if g['remove_solvent']:
         pymol.cmd.do("remove solvent")
         pymol.cmd.do("remove resn so4")
+        pymol.cmd.do("remove resn po4")
         pymol.cmd.do("remove resn bme")
         pymol.cmd.do("remove resn edo")
         pymol.cmd.do("remove resn dyd")
@@ -137,6 +145,8 @@ def write_pymol_session(df, session_file, g):
             continue
         for ch in pymol.cmd.get_chains(object_name):
             codon_site_col = 'codon_site_pdb_'+object_name+'_'+ch
+            if not codon_site_col in df.columns:
+                continue
             color_sites = dict()
             color_sites['Nany2spe'] = []
             color_sites['Nany2dif'] = []
@@ -171,4 +181,6 @@ def write_pymol_session(df, session_file, g):
     pymol.cmd.do('zoom')
     pymol.cmd.deselect()
     pymol.cmd.save(session_file)
+
+def quit_pymol():
     pymol.cmd.quit(code=0)
