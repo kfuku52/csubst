@@ -216,7 +216,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         for st in ['any2any','any2spe','spe2any','spe2spe']:
             cb['QN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='quantile', SN='N', g=g)
             cb['QS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='quantile', SN='S', g=g)
-    cb = substitution.get_any2dif(cb, g['float_tol'], prefix='E')
+    cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='E')
     cb = subroot_E2nan(cb, tree=g['tree'])
     return cb
 

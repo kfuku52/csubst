@@ -113,7 +113,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         cb = tree.get_node_distance(g['tree'], cb)
         cb = substitution.get_substitutions_per_branch(cb, b, g)
         #cb = combination.calc_substitution_patterns(cb)
-        cb = substitution.get_any2dif(cb, g['float_tol'], prefix='')
+        cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='')
         cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
         if (g['calibrate_longtail']):
             cb = omega.calibrate_dsc(cb)

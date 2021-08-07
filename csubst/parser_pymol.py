@@ -12,8 +12,8 @@ import time
 from csubst import sequence
 
 def initialize_pymol(g):
-    pymol.pymol_argv = ['pymol','-qc']
-    pymol.finish_launching()
+    #pymol.pymol_argv = ['pymol','-qc']
+    #pymol.finish_launching()
     pymol.cmd.do('delete all')
     is_old_pdb_code = bool(re.search('[0-9][A-Za-z0-9]{3}', g['pdb']))
     is_new_pdb_code = bool(re.search('pdb_[0-9]{5}[A-Za-z0-9]{3}', g['pdb']))

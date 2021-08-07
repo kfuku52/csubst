@@ -7,7 +7,6 @@ import time
 
 from csubst import table
 from csubst import parallel
-from csubst import param
 
 def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None):
     if dtype is None:
@@ -322,29 +321,25 @@ def get_substitutions_per_branch(cb, b, g):
         del b_tmp
     return(cb)
 
-def get_any2dif(cb, tol, prefix):
+def add_dif_column(cb, col_dif, col_any, col_spe, tol):
+    if ((col_any in cb.columns) & (col_spe in cb.columns)):
+        cb.loc[:, col_dif] = cb[col_any] - cb[col_spe]
+        is_negative = (cb[col_dif] < -tol)
+        is_almost_zero = (~is_negative)&(cb[col_dif] < tol)
+        cb.loc[is_negative, col_dif] = numpy.nan
+        cb.loc[is_almost_zero, col_dif] = 0
+    return cb
+
+def add_dif_stats(cb, tol, prefix):
     for SN in ['S','N']:
         for anc in ['any','spe']:
             col_any = prefix+SN+anc+'2any'
             col_spe = prefix+SN+anc+'2spe'
             col_dif = prefix+SN+anc+'2dif'
-            if ((col_any in cb.columns)&(col_spe in cb.columns)):
-                cb.loc[:,col_dif] = cb[col_any] - cb[col_spe]
-                is_almost_zero = (cb[col_dif]<tol)
-                cb.loc[is_almost_zero,col_dif] = 0
-        for des in ['any','spe']:
+            cb = add_dif_column(cb, col_dif, col_any, col_spe, tol)
+        for des in ['any','spe','dif']:
             col_any = prefix+SN+'any2'+des
             col_spe = prefix+SN+'spe2'+des
             col_dif = prefix+SN+'dif2'+des
-            if ((col_any in cb.columns)&(col_spe in cb.columns)):
-                cb.loc[:,col_dif] = cb[col_any] - cb[col_spe]
-                is_almost_zero = (cb[col_dif]<tol)
-                cb.loc[is_almost_zero,col_dif] = 0
-        col_any = prefix+SN+'any2dif'
-        col_spe = prefix+SN+'spe2dif'
-        col_dif = prefix+SN+'dif2dif'
-        if ((col_any in cb.columns)&(col_spe in cb.columns)):
-            cb.loc[:,col_dif] = cb[col_any] - cb[col_spe]
-            is_almost_zero = (cb[col_dif]<tol)
-            cb.loc[is_almost_zero,col_dif] = 0
+            cb = add_dif_column(cb, col_dif, col_any, col_spe, tol)
     return cb
