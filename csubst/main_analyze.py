@@ -1,8 +1,10 @@
 import numpy
 import pandas
 
+import itertools
 import os
 import time
+import warnings
 
 from csubst import combination
 from csubst import foreground
@@ -48,17 +50,23 @@ def add_median_cb_stats(g, cb, current_arity, start):
         for suffix,is_target in zip(suffices,is_targets):
             for ms in stats[stat]:
                 col = stat+'_'+ms+suffix
-                if stat=='median':
-                    g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
-                elif stat=='total':
-                    g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
+                if not col in g['df_cb_stats'].columns:
+                    newcol = pandas.DataFrame({col:numpy.zeros(shape=(g['df_cb_stats'].shape[0]))})
+                    g['df_cb_stats'] = pandas.concat([g['df_cb_stats'], newcol], axis=1)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    if stat=='median':
+                        g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
+                    elif stat=='total':
+                        g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
             g['df_cb_stats'].loc[is_arity,'num'+suffix] = is_target.sum()
             num_qualified = (cb.loc[is_target,g['cutoff_stat']]>=g['cutoff_stat_min']).sum()
             g['df_cb_stats'].loc[is_arity,'num_qualified'+suffix] = num_qualified
-    for key in ['Nany2any','Sany2any','Nany2spe','Sany2spe',]:
+    for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
+        key = SN+anc+'2'+des
         totalN = g['df_cb_stats'].loc[is_arity, 'total_'+key+'_all'].values[0]
         totalEN = g['df_cb_stats'].loc[is_arity, 'total_E'+key+'_all'].values[0]
-        txt = 'Total {}/E{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation)'
+        txt = 'Total O{}/E{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation)'
         print(txt.format(key, key, totalN, totalEN, totalEN/totalN*100))
     elapsed_time = int(time.time() - start)
     g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
