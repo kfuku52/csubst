@@ -3,6 +3,7 @@ import pandas
 
 import itertools
 import os
+import shutil
 import time
 import warnings
 
@@ -164,11 +165,15 @@ def main_analyze(g):
     tree.plot_branch_category(g['tree'], file_name='csubst_branch_id_leaf.pdf', label='leaf')
     tree.plot_branch_category(g['tree'], file_name='csubst_branch_id_nolabel.pdf', label='no')
     if g['plot_state_aa']:
+        if os.path.exists('csubst_plot_state_aa'):
+            shutil.rmtree('csubst_plot_state_aa')
         os.mkdir('csubst_plot_state_aa')
         os.chdir('csubst_plot_state_aa')
         tree.plot_state_tree(state=g['state_pep'], orders=g['amino_acid_orders'], mode='aa', g=g)
         os.chdir('..')
     if g['plot_state_codon']:
+        if os.path.exists('csubst_plot_state_codon'):
+            shutil.rmtree('csubst_plot_state_codon')
         os.mkdir('csubst_plot_state_codon')
         os.chdir('csubst_plot_state_codon')
         tree.plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)

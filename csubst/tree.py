@@ -205,10 +205,11 @@ def plot_state_tree(state, orders, mode, g):
                 node.state = missing_state
                 continue
             nlabel = node.numerical_label
-            index = numpy.where(state[nlabel,i,:]==max(state[nlabel,i,:]))[0]
+            max_prob = max(state[nlabel,i,:])
+            index = numpy.where(state[nlabel,i,:]==max_prob)[0]
             if len(index)==1:
                 node.state = orders[index[0]]
-            elif len(index)==0:
+            elif (len(index)==0)|(max_prob==0):
                 node.state = missing_state
         file_name = 'csubst_state_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
         g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)

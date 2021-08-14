@@ -476,7 +476,8 @@ def main_site(g):
         if (g['pdb'] is not None):
             from csubst import parser_pymol
             parser_pymol.initialize_pymol(g=g)
-            mafft_add_fasta = os.path.join(g['site_outdir'], 'csubst_site.pdb_add.aa.fa')
+            pdb_base = re.sub('.*/', '', g['pdb'])
+            mafft_add_fasta = os.path.join(g['site_outdir'], 'csubst_site.'+pdb_base+'.fa')
             parser_pymol.write_mafft_map(g=g, mafft_add_fasta=mafft_add_fasta)
             df = parser_pymol.add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
             df = parser_pymol.add_pdb_residue_numbering(df=df)
