@@ -1,6 +1,8 @@
 import numpy
 import pandas
 
+import sys
+
 #from scipy.stats import chi2_contingency
 
 def sort_labels(df):
@@ -75,3 +77,19 @@ def chisq_test(x, total_S, total_N):
         contingency_table = numpy.array([obs, [total_S, total_N]])
         out = chi2_contingency(contingency_table, lambda_="log-likelihood")
         return out[1]
+
+def get_cutoff_stat_bool_array(cb, cutoff_stat_str):
+    is_enough_stat = True
+    cutoff_stat_list = cutoff_stat_str.split('|')
+    for cutoff_stat in cutoff_stat_list:
+        cutoff_stat_list2 = cutoff_stat.split(',')
+        cutoff_stat_exp = cutoff_stat_list2[0]
+        cutoff_stat_value = float(cutoff_stat_list2[1])
+        is_col = cb.columns.str.fullmatch(cutoff_stat_exp, na=False)
+        if is_col.sum()==0:
+            sys.stderr.write('--cutoff_stat specification "{}" is omitted. Check the format carefully.\n')
+            continue
+        cutoff_stat_cols = cb.columns[is_col]
+        for cutoff_stat_col in cutoff_stat_cols:
+            is_enough_stat &= (cb.loc[:,cutoff_stat_col] >= cutoff_stat_value).fillna(False)
+    return is_enough_stat

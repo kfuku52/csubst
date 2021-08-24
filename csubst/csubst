@@ -224,18 +224,14 @@ if __name__ == "__main__":
     analyze.add_argument('--exclude_sister_pair', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Set "yes" to exclude sister branches in branch combination analysis.')
     # Thresholds
-    analyze.add_argument('--cutoff_stat', metavar='[omega_any2spe|omega_any2any|QNany2spe...]', default='omega_any2spe',
-                         type=str,
-                         help='default=%(default)s: The statistics used to explore higher-order branch combinations.')
-    analyze.add_argument('--cutoff_stat_min', metavar='FLOAT', default=1.0, type=float,
-                         help='default=%(default)s: If a branch combination has a cutoff_stat value greater than this value, '
-                              'higher-order combinations are explored.')
-    analyze.add_argument('--min_branch_sub', metavar='FLOAT', default=1.0, type=float,
-                         help='default=%(default)s: Minimum substitutions in a branch. '
-                              'Branches < min_branch_sub are excluded from branch combination analyses.')
-    analyze.add_argument('--min_combinat_sub', metavar='FLOAT', default=1.0, type=float,
-                         help='default=%(default)s: Minimum combinatorial substitutions (Sany2any+Nany2any). '
-                              'Branch combinations < min_combinat_sub are excluded from higher-order analyses.')
+    analyze.add_argument('--cutoff_stat', metavar='[STAT1,VALUE1|STAT2,VALUE2|...]',
+                         default='omega_any2spe,5.0|Nany2spe,2.0', type=str,
+                         help='default=%(default)s: Cutoff statistics for searching higher-order branch combinations. '
+                              'STAT is a column in csubst_cb_N.tsv. Regular expressions are supported. '
+                              'e.g., "N_sub_[0-9]+" to specify the number of branch-wise nonsynonymous substitutions '
+                              'in all branches. '
+                              'VALUE is the minimum value, and branch combinations with smaller values will be excluded.　'
+                              '')
     # Substitution outputs
     analyze.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Branch output. Set "yes" to generate the output.')

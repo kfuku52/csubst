@@ -5,6 +5,7 @@ import numpy
 import pandas
 
 from csubst import combination
+from csubst import table
 
 def combinations_count(n, r):
     # https://github.com/nkmk/python-snippets/blob/05a53ae96736577906a8805b38bce6cc210fe11f/notebook/combinations_count.py#L1-L14
@@ -273,7 +274,7 @@ def get_foreground_branch_num(cb, g):
     is_mg = (is_mg)&((cb.loc[:,'branch_num_fg']+cb.loc[:,'branch_num_mg'])==arity)
     cb.loc[is_mg,'is_mf'] = 'Y'
     is_foreground = (cb.loc[:,'is_fg']=='Y')
-    is_enough_stat = (cb.loc[:,g['cutoff_stat']]>=g['cutoff_stat_min'])
+    is_enough_stat = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
     num_enough = is_enough_stat.sum()
     num_fg = is_foreground.sum()
     num_fg_enough = (is_enough_stat&is_foreground).sum()
@@ -284,9 +285,9 @@ def get_foreground_branch_num(cb, g):
     else:
         percent_fg_enough = num_fg_enough / num_enough * 100
         enrichment_factor = (num_fg_enough/num_enough) / (num_fg/num_all)
-    txt = 'arity={}, foreground branch combinations with {} >= {} = {:.0f}% ({:,}/{:,}, ' \
+    txt = 'arity={}, foreground branch combinations with cutoff conditions {} = {:.0f}% ({:,}/{:,}, ' \
           'total examined = {:,}, enrichment factor = {:.1f})'
-    txt = txt.format(arity, g['cutoff_stat'], g['cutoff_stat_min'], percent_fg_enough, num_fg_enough, num_enough,
+    txt = txt.format(arity, g['cutoff_stat'], percent_fg_enough, num_fg_enough, num_enough,
                      num_all, enrichment_factor)
     print(txt, flush=True)
     is_arity = (g['df_cb_stats'].loc[:,'arity']==arity)

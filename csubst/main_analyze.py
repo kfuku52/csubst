@@ -4,6 +4,7 @@ import pandas
 import itertools
 import os
 import shutil
+import sys
 import time
 import warnings
 
@@ -61,14 +62,18 @@ def add_median_cb_stats(g, cb, current_arity, start):
                     elif stat=='total':
                         g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
             g['df_cb_stats'].loc[is_arity,'num'+suffix] = is_target.sum()
-            num_qualified = (cb.loc[is_target,g['cutoff_stat']]>=g['cutoff_stat_min']).sum()
+            num_qualified = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat']).sum()
             g['df_cb_stats'].loc[is_arity,'num_qualified'+suffix] = num_qualified
     for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
         key = SN+anc+'2'+des
         totalN = g['df_cb_stats'].loc[is_arity, 'total_'+key+'_all'].values[0]
         totalEN = g['df_cb_stats'].loc[is_arity, 'total_E'+key+'_all'].values[0]
+        if totalN==0:
+            percent_value = numpy.nan
+        else:
+            percent_value = totalEN / totalN * 100
         txt = 'Total O{}/E{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation)'
-        print(txt.format(key, key, totalN, totalEN, totalEN/totalN*100))
+        print(txt.format(key, key, totalN, totalEN, percent_value))
     elapsed_time = int(time.time() - start)
     g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
     print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
@@ -92,18 +97,12 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
                 if id_combinations is None:
                     g,id_combinations = combination.get_node_combinations(g=g, arity=current_arity, check_attr="name")
         elif (current_arity > 2):
-            is_stat_enough = (cb.loc[:,g['cutoff_stat']] >= g['cutoff_stat_min']) | (cb.loc[:,g['cutoff_stat']].isnull())
-            is_combinat_sub_enough = ((cb.loc[:,'Nany2any']+cb.loc[:,'Nany2any']) >= g['min_combinat_sub'])
-            is_branch_sub_enough = True
-            for a in numpy.arange(current_arity - 1):
-                target_columns = ['S_sub_' + str(a + 1), 'N_sub_' + str(a + 1)]
-                is_branch_sub_enough = is_branch_sub_enough & (
-                        cb.loc[:, target_columns].sum(axis=1) >= g['min_branch_sub'])
-            num_branch_ids = (is_stat_enough).sum()
-            print('Arity = {:,}: qualified combinations = {:,}'.format(current_arity, num_branch_ids), flush=True)
+            is_stat_enough = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
+            num_branch_ids = is_stat_enough.sum()
+            txt = 'Arity = {:,}: Branch combinations that passed cutoff stats {} = {:,}'
+            print(txt.format(current_arity, g['cutoff_stat'], num_branch_ids), flush=True)
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-            conditions = (is_stat_enough) & (is_branch_sub_enough) & (is_combinat_sub_enough)
-            branch_ids = cb.loc[conditions, id_columns].values
+            branch_ids = cb.loc[is_stat_enough, id_columns].values
             if len(set(branch_ids.ravel().tolist())) < current_arity:
                 end_flag = 1
                 break
@@ -125,7 +124,10 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='')
         cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
         if (g['calibrate_longtail']):
-            cb = omega.calibrate_dsc(cb)
+            if (current_arity == 2):
+                cb = omega.calibrate_dsc(cb)
+            else:
+                sys.stderr.write('--calibrate_longtail is activated only for arity = 2.\n')
         cb = table.get_linear_regression(cb)
         cb, g = foreground.get_foreground_branch_num(cb, g)
         cb = table.sort_cb(cb)
@@ -300,7 +302,6 @@ def main_analyze(g):
                 print('rid_combinations.shape', rid_combinations.shape)
                 g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode='randomization_'+str(i+1), write_cb=False)
                 print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
-
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
