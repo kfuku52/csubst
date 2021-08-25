@@ -59,7 +59,7 @@ def get_input_information(g):
         g['input_data_type'] = 'pep'
     elif g['num_input_state'] > 20:
         g['input_data_type'] = 'cdn'
-    if (g['input_data_type']=='nuc')&(g['calc_omega']):
+    if (g['input_data_type']=='nuc'):
         g['state_columns'] = list(itertools.product(numpy.arange(len(g['input_state'])), repeat=3))
         codon_orders = list(itertools.product(g['input_state'], repeat=3))
         codon_orders = [ c[0]+c[1]+c[2] for c in codon_orders]

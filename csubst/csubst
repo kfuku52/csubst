@@ -253,8 +253,6 @@ if __name__ == "__main__":
                          help='default=%(default)s: Tree plots with per-site ancestral codon states. '
                               'This option will generate many pdfs')
     # Omega calculation
-    analyze.add_argument('--calc_omega', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Calculate omega for convergence rate.')
     analyze.add_argument('--omega_method', metavar='[modelfree|submodel]', default='submodel', type=str,
                          choices=['modelfree','submodel'],
                          help='default=%(default)s: Method to calculate omega. '
