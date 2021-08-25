@@ -214,16 +214,16 @@ if __name__ == "__main__":
     # analyze
     analyze = subparsers.add_parser('analyze', help='see `csubst analyze -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as])
     analyze.set_defaults(handler=command_analyze)
-    # Foreground specification
-    analyze.add_argument('--force_exhaustive', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Set "yes" to analyze all branch combinations even with foreground specification.')
     # branch combinations
     analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
                          help='default=%(default)s: The maximum combinatorial number of branches. '
                               'Set 2 for paired substitutions. 3 or larger for higher-order combinations.')
+    analyze.add_argument('--exhaustive_until', metavar='INTEGER', default=2, type=int,
+                         help='default=%(default)s: Analyze all independent branch combinations until specified arity. '
+                              'Be careful of combinatorial explosion if set to 3 or higher. '
+                              'Set 1 for foreground-only analysis.')
     analyze.add_argument('--exclude_sister_pair', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Set "yes" to exclude sister branches in branch combination analysis.')
-    # Thresholds
     analyze.add_argument('--cutoff_stat', metavar='[STAT1,VALUE1|STAT2,VALUE2|...]',
                          default='omega_any2spe,5.0|Nany2spe,2.0', type=str,
                          help='default=%(default)s: Cutoff statistics for searching higher-order branch combinations. '

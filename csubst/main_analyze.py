@@ -27,7 +27,7 @@ def add_median_cb_stats(g, cb, current_arity, start):
     is_targets.append(numpy.ones(shape=cb.shape[0], dtype=numpy.bool))
     target_cols = ['is_fg','is_mg','is_mf','dummy']
     suffix_candidates = ['_fg','_mg','_mf']
-    if g['force_exhaustive']:
+    if g['exhaustive_until']>=current_arity:
         suffix_candidates.append('_all')
     for target_col,sc in zip(target_cols,suffix_candidates):
         if target_col in cb.columns:
@@ -72,7 +72,7 @@ def add_median_cb_stats(g, cb, current_arity, start):
             percent_value = numpy.nan
         else:
             percent_value = totalEN / totalN * 100
-        txt = 'Total O{}/E{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation)'
+        txt = 'Total O{}/E{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation; large deviation may be observed in non-exhaustive analysis.)'
         print(txt.format(key, key, totalN, totalEN, percent_value))
     elapsed_time = int(time.time() - start)
     g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
@@ -87,16 +87,14 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         start = time.time()
         print("Generating combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
         g['current_arity'] = current_arity
-        if (current_arity == 2):
-            if (g['foreground'] is not None) & (g['force_exhaustive']==False):
-                print('Searching foreground branch combinations.', flush=True)
-                g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'], arity=current_arity,
-                                                          check_attr='name')
-            else:
-                print('Exhaustively searching independent branch combinations.', flush=True)
-                if id_combinations is None:
-                    g,id_combinations = combination.get_node_combinations(g=g, arity=current_arity, check_attr="name")
-        elif (current_arity > 2):
+        if (g['exhaustive_until'] >= current_arity)|((current_arity==2)&(g['foreground'] is None)):
+            print('Exhaustively searching independent branch combinations.', flush=True)
+            g, id_combinations = combination.get_node_combinations(g=g, arity=current_arity, check_attr="name")
+        elif (current_arity==2)&(g['foreground'] is not None):
+            print('Searching foreground branch combinations only.', flush=True)
+            g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'],
+                                                                  arity=current_arity, check_attr='name')
+        else:
             is_stat_enough = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
             num_branch_ids = is_stat_enough.sum()
             txt = 'Arity = {:,}: Branch combinations that passed cutoff stats {} = {:,}'
@@ -124,10 +122,12 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='')
         cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
         if (g['calibrate_longtail']):
-            if (current_arity == 2):
+            if (g['exhaustive_until'] >= current_arity):
                 cb = omega.calibrate_dsc(cb)
             else:
-                sys.stderr.write('--calibrate_longtail is activated only for arity = 2.\n')
+                txt = '--calibrate_longtail is deactivated for arity = {}. '
+                txt += 'This option is effective for the arity range specified by --exhaustive_until.\n'
+                sys.stderr.write(txt.format(current_arity))
         cb = table.get_linear_regression(cb)
         cb, g = foreground.get_foreground_branch_num(cb, g)
         cb = table.sort_cb(cb)
