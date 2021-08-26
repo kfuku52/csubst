@@ -45,7 +45,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         if (target_nodes.shape.__len__()==1):
             target_nodes = numpy.expand_dims(target_nodes, axis=1)
         index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
-        print('# combinations for unions =', len(index_combinations))
+        print('Number of combinations for unions = {:,}'.format(len(index_combinations)), flush=True)
         axis = (len(index_combinations), arity)
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
@@ -62,9 +62,9 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         else:
             node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int)
     if verbose:
-        num_target_node = len(list(target_nodes.flat))
-        print("all target nodes: {:,}".format(num_target_node), flush=True)
-        print("all node combinations: {:,}".format(len(node_combinations)), flush=True)
+        num_target_node = target_nodes.flat.unique().shape[0]
+        print("Number of target nodes: {:,}".format(num_target_node), flush=True)
+        print("Number of node combinations: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=numpy.bool)
     for i in numpy.arange(node_combinations.shape[0]):
         nc_matrix[node_combinations[i,:],i] = 1
@@ -72,7 +72,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     for dep_id in g['dep_ids']:
         is_dependent_col = (is_dependent_col)|(nc_matrix[dep_id,:].sum(axis=0)>1)
     if verbose:
-        print('removing {:,} non-independent branch combinations.'.format(is_dependent_col.sum()), flush=True)
+        print('Removing {:,} non-independent branch combinations.'.format(is_dependent_col.sum()), flush=True)
     nc_matrix = nc_matrix[:,~is_dependent_col]
     g['fg_dependent_id_combinations'] = None
     if (g['foreground'] is not None)&(len(g['fg_dep_ids']) > 0):

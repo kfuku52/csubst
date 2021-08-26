@@ -87,9 +87,10 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         start = time.time()
         print("Generating combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
         g['current_arity'] = current_arity
-        if (g['exhaustive_until'] >= current_arity)|((current_arity==2)&(g['foreground'] is None)):
+        if (g['exhaustive_until']>=current_arity)|((current_arity==2)&(g['foreground'] is None)):
             print('Exhaustively searching independent branch combinations.', flush=True)
-            g, id_combinations = combination.get_node_combinations(g=g, arity=current_arity, check_attr="name")
+            g,id_combinations = combination.get_node_combinations(g=g, target_nodes=None,
+                                                                  arity=current_arity, check_attr="name")
         elif (current_arity==2)&(g['foreground'] is not None):
             print('Searching foreground branch combinations only.', flush=True)
             g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'],
@@ -100,13 +101,26 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             txt = 'Arity = {:,}: Branch combinations that passed cutoff stats {} = {:,}'
             print(txt.format(current_arity, g['cutoff_stat'], num_branch_ids), flush=True)
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-            branch_ids = cb.loc[is_stat_enough, id_columns].values
+            if is_stat_enough.sum()>g['max_combination']:
+                txt = 'Only {:,} of {:,} branch combinations at arity={} will be used to search arity={}'
+                txt = txt.format(g['max_combination'], is_stat_enough.sum(), current_arity-1, current_arity)
+                print(txt, flush=True)
+                cutoff_stat_exp = [ item.split(',')[0] for item in g['cutoff_stat'].split('|') ]
+                is_col = False
+                for cse in cutoff_stat_exp:
+                    is_col |= cb.columns.str.fullmatch(cse, na=False)
+                cols = cb.columns[is_col].tolist()
+                branch_ids_all = cb.loc[is_stat_enough,:].sort_values(by=cols, ascending=False).loc[:,id_columns].values
+                branch_ids = branch_ids_all[0:g['max_combination'],:]
+                del branch_ids_all
+            else:
+                branch_ids = cb.loc[is_stat_enough, id_columns].values
             if len(set(branch_ids.ravel().tolist())) < current_arity:
                 end_flag = 1
                 break
             del cb
             g,id_combinations = combination.get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
-                                                    check_attr='name')
+                                                                  check_attr='name')
             if id_combinations.shape[0] == 0:
                 end_flag = 1
                 break
