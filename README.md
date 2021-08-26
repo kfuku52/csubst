@@ -1,7 +1,7 @@
 ![](logo/logo_csubst_large.svg)
 
 ## Overview
-**CSUBST** is a tool for analyzing **C**ombinatorial **SUBST**itutions of codon sequences in phylogenetic trees. Main features include:
+**CSUBST** ([/si:sʌbst/](http://ipa-reader.xyz/?text=si:s%CA%8Cbst&voice=Salli)) is a tool for analyzing **C**ombinatorial **SUBST**itutions of codon sequences in phylogenetic trees. Main features include:
 
 - Accurate detection of the rate of molecular convergence with null expectation obtained by:
     - Empirical or mechanistic codon substitution model
@@ -12,14 +12,15 @@
 
 ## Input files
 **CSUBST** takes as inputs: 
-- a [Newick](https://en.wikipedia.org/wiki/Newick_format) file for the rooted tree
-- a [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
+- [Newick](https://en.wikipedia.org/wiki/Newick_format) file for the rooted tree
+- [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
 
 ## Dependency
 **CSUBST** runs on python 3 (tested with >=3.6.0). **CSUBST** installation with `pip install` will automatically install required packages except for the followings.
 * [IQ-TREE](http://www.iqtree.org/) (version 2.0.0 or later)
 * [pyvolve](https://github.com/sjspielman/pyvolve) (Optional: required for `csubst simulate`)
 * [matplotlib](https://matplotlib.org/3.1.1/index.html) (Optional: required for `csubst site`)
+* [PyMOL](https://pymol.org/2/) (Optional: used in `csubst site`; Open-source version can be installed by [conda](https://anaconda.org/conda-forge/pymol-open-source) or [brew](https://github.com/brewsci/homebrew-bio))
 
 ## Installation
 **CSUBST** can be installed by the following command. **IQ-TREE** should also be installed in the same environment; See [here](http://www.iqtree.org/doc/Quickstart#installation) for instruction. Try `conda install -c bioconda iqtree` if you are familiar with `conda`.

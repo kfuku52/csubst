@@ -50,42 +50,64 @@ def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
     ax.add_collection(lc)
 
 def plot_barchart(df, g):
-    sub_types = ['_sub','any2spe','any2dif','any2any','spe2spe']
-    num_row = len(sub_types)*2
-    fig,axes = matplotlib.pyplot.subplots(nrows=num_row, ncols=1, figsize=(7.2, 9.6), sharex=True)
+    sub_types = {
+        '_sub':'Branch-wise\nsubstitutions\nin the entire tree',
+        '_sub_':'Branch-wise\nsubstitutions\nin the targets',
+        'any2spe':'Posterior prob.\nof any2spe',
+        'any2dif':'Posterior prob.\nof any2dif',
+    }
+    num_row = len(sub_types)
+    fig,axes = matplotlib.pyplot.subplots(nrows=num_row, ncols=1, figsize=(7.2, 4.8), sharex=True)
     axes = axes.flat
     i = 0
-    NS_ymax = df.loc[:,['N_sub','S_sub']].max().max() + 0.5
+    NS_ymax = df.loc[:,['N_sub','S_sub']].sum(axis=1).max() + 0.5
     SN_colors = {'N':'red', 'S':'blue'}
-    for sub_type in sub_types:
-        for SN in ['N','S']:
-            ax = axes[i]
+    for sub_type in sub_types.keys():
+        ylabel = sub_types[sub_type]
+        ax = axes[i]
+        for SN in ['S','N']:
             col = SN+sub_type
-            yvalues = df.loc[:,col].values
-            if col in ['N_sub','S_sub']:
-                if col=='N_sub':
-                    ylabel = 'Nonsyn. subst.\nin the tree'
-                elif col=='S_sub':
-                    ylabel = 'Syn. subst.\nin the tree'
-                ax.set_ylabel(ylabel, fontsize=font_size)
+            if sub_type=='_sub':
+                if SN=='S':
+                    yvalues = df.loc[:,['N'+sub_type,'S'+sub_type]].sum(axis=1).values
+                elif SN=='N':
+                    yvalues = df.loc[:, col].values
                 ax.set_ylim(0, NS_ymax)
                 add_gapline(df=df, gapcol='gap_rate_all', xcol='codon_site_alignment', yvalue=NS_ymax*0.95, lw=3, ax=ax)
+            elif sub_type=='_sub_':
+                if SN == 'S':
+                    is_y_cols = False
+                    is_y_cols |= df.columns.str.startswith('N_sub_')
+                    is_y_cols |= df.columns.str.startswith('S_sub_')
+                    y_cols = df.columns[is_y_cols]
+                    yvalues = df.loc[:, y_cols].sum(axis=1).values
+                elif SN == 'N':
+                    y_cols = df.columns[df.columns.str.startswith(col)]
+                    yvalues = df.loc[:, y_cols].sum(axis=1).values
+                ymax = df.columns.str.startswith('N_sub_').sum()
+                ax.set_ylim(0, ymax)
+                add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=ymax*0.95, lw=3, ax=ax)
             else:
+                if SN=='S':
+                    yvalues = df.loc[:,['N'+sub_type,'S'+sub_type]].sum(axis=1).values
+                elif SN=='N':
+                    yvalues = df.loc[:, col].values
                 ax.set_ylim(0, 1)
-                ax.set_ylabel(col, fontsize=font_size)
                 ax.axhline(y=0.5, linestyle='--', linewidth=0.5, color='black', zorder=0)
                 add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
+            ax.set_ylabel(ylabel, fontsize=font_size)
             ax.bar(df.loc[:,'codon_site_alignment'], yvalues, color=SN_colors[SN])
             if (i==num_row-1):
                 ax.set_xlabel('Codon site', fontsize=font_size)
             else:
                 ax.set_xlabel('', fontsize=font_size)
             ax.set_xlim(df.loc[:,'codon_site_alignment'].min()-0.5, df.loc[:,'codon_site_alignment'].max()+0.5)
-            i += 1
+        i += 1
     fig.tight_layout(h_pad=0.5, w_pad=1)
     outbase = os.path.join(g['site_outdir'], 'csubst_site')
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
     #fig.savefig(outbase+".svg", format='svg', transparent=True)
+    print("Nonsynonymous and synonymous substitutions are shown in red and blue, respectively.", flush=True)
     print("Alignment gap sites are indicated by gray scale (0% missing = white, 100% missing = black).", flush=True)
 
 def get_gapsite_rate(state_tensor):
