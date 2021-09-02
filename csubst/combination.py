@@ -62,7 +62,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         else:
             node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int)
     if verbose:
-        num_target_node = target_nodes.flat.unique().shape[0]
+        num_target_node = numpy.unique(target_nodes.flatten()).shape[0]
         print("Number of target nodes: {:,}".format(num_target_node), flush=True)
         print("Number of node combinations: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=numpy.bool)
