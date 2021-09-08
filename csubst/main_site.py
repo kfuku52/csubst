@@ -510,10 +510,11 @@ def main_site(g):
         plot_state(N_tensor, S_tensor, g['branch_ids'], g)
         out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
         df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
-    if (g['pdb'] is not None):
-        parser_pymol.quit_pymol()
     print('To visualize the convergence probability on protein structure, please see:')
     print('https://github.com/kfuku52/csubst/wiki/Visualizing-convergence-probabilities-on-protein-structures')
     print('')
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]
+    if (g['pdb'] is not None):
+        # This should be executed at the very end, otherwise csubst's main process is killed.
+        parser_pymol.quit_pymol()
