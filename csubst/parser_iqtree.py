@@ -45,7 +45,8 @@ def run_iqtree_ancestral(g):
                '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
     run_iqtree = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr)
     assert (run_iqtree.returncode==0), "IQ-TREE did not finish safely: {}".format(run_iqtree.stdout.decode('utf8'))
-    os.remove(g['alignment_file']+'.ckp.gz')
+    if os.path.exists(g['alignment_file']+'.ckp.gz'):
+        os.remove(g['alignment_file']+'.ckp.gz')
     os.remove(file_tree)
     return None
 
