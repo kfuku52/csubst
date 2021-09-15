@@ -6,6 +6,8 @@ import itertools
 import os
 import re
 
+from csubst import sequence
+
 def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
     all_leaf_names.sort()
@@ -22,11 +24,13 @@ def add_numerical_node_labels(tree):
     for node in tree.traverse():
         node.numerical_label = short_labels[argsort_labels==i][0]
         i+=1
-    return(tree)
+    return tree
+
+def is_inconsistent_tree(tree1, tree2):
+    is_inconsistent_tree = len(set(tree1.get_leaf_names()) - set(tree2.get_leaf_names())) == 0
+    return is_inconsistent_tree
 
 def transfer_root(tree_to, tree_from, verbose=False):
-    same_leaf_set = len(set(tree_to.get_leaf_names()) - set(tree_from.get_leaf_names())) == 0
-    assert same_leaf_set, 'Input tree and iqtree\'s treefile did not have identical leaves.'
     subroot_leaves = [ n.get_leaf_names() for n in tree_from.get_children() ]
     is_n0_bigger_than_n1 = (len(subroot_leaves[0]) > len(subroot_leaves[1]))
     ingroups = subroot_leaves[0] if is_n0_bigger_than_n1 else subroot_leaves[1]
@@ -291,3 +295,19 @@ def rescale_branch_length(g, S_tensor, N_tensor, denominator='L'):
     print('Total N branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(sum([ n.Ndist for n in g['tree'].traverse() ])))
     return g
 
+def read_treefile(g):
+    g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
+    assert len(g['rooted_tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
+    g['rooted_tree'] = standardize_node_names(g['rooted_tree'])
+    g['rooted_tree'] = add_numerical_node_labels(g['rooted_tree'])
+    g['num_node'] = len(list(g['rooted_tree'].traverse()))
+    print('Using internal node names and branch lengths in --iqtree_treefile '
+          'and the root position in --rooted_tree_file.')
+    return g
+
+def is_consistent_tree_and_aln(g):
+    leaf_names = [ l.name for l in g['rooted_tree'].get_leaves() ]
+    fasta_dict = sequence.read_fasta(path=g['alignment_file'])
+    seq_names = list(fasta_dict.keys())
+    is_consistent = set(leaf_names) == set(seq_names)
+    return is_consistent

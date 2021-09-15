@@ -164,7 +164,7 @@ def main_analyze(g):
     print("Reading and parsing input files.", flush=True)
     g['current_arity'] = 2
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
-    g = parser_misc.read_treefile(g)
+    g = tree.read_treefile(g)
     g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)

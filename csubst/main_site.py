@@ -10,6 +10,7 @@ from csubst import genetic_code
 from csubst import parser_misc
 from csubst import sequence
 from csubst import substitution
+from csubst import tree
 
 font_size = 8
 matplotlib.rcParams['font.size'] = font_size
@@ -459,7 +460,7 @@ def add_branch_id_list(g):
 def main_site(g):
     print("Reading and parsing input files.", flush=True)
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
-    g = parser_misc.read_treefile(g)
+    g = tree.read_treefile(g)
     g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)

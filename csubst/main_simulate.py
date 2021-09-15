@@ -9,7 +9,7 @@ import re
 from csubst import foreground
 from csubst import genetic_code
 from csubst import parser_misc
-from csubst.tree import plot_branch_category # This cannot be "from csubst import tree" because of conflicting name "tree"
+from csubst import tree
 
 class suppress_stdout_stderr(object):
     # https://www.semicolonworld.com/question/57657/suppress-stdout-stderr-print-from-python-functions
@@ -98,7 +98,7 @@ def get_biased_nonsynonymous_substitution_index(biased_aas, codon_table, codon_o
 
 def get_biased_amino_acids(convergent_amino_acids, codon_table):
     if convergent_amino_acids.startswith('random'):
-        amino_acids = numpy.array(list(set([ item[0] for item in codon_table if item[0] is not '*' ])))
+        amino_acids = numpy.array(list(set([ item[0] for item in codon_table if item[0]!='*' ])))
         num_random_aa = int(convergent_amino_acids.replace('random',''))
         aa_index = numpy.random.choice(a=numpy.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
         biased_aas = amino_acids[aa_index]
@@ -117,7 +117,7 @@ def get_biased_codon_index(biased_aas, codon_table, codon_order):
     return biased_cdn_index
 
 def get_synonymous_codon_substitution_index(g, codon_order):
-    amino_acids = numpy.array(list(set([ item[0] for item in g['codon_table'] if item[0] is not '*' ])))
+    amino_acids = numpy.array(list(set([ item[0] for item in g['codon_table'] if item[0]!='*' ])))
     num_codon = codon_order.shape[0]
     num_syn_codons = 0
     cdn_index = list()
@@ -344,9 +344,9 @@ def concatenate_alignment(in1, in2, out):
 
 def main_simulate(g, Q_method='csubst'):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
-    g = parser_misc.read_treefile(g)
-    g = parser_misc.generate_intermediate_files(g)
-    g = parser_misc.annotate_tree(g)
+    g = tree.read_treefile(g)
+    g = parser_misc.generate_intermediate_files(g, force_notree_run=True)
+    g = parser_misc.annotate_tree(g, ignore_tree_inconsistency=True)
     g = parser_misc.read_input(g)
     g = foreground.get_foreground_branch(g)
     g['all_syn_cdn_index'] = get_synonymous_codon_substitution_index(g, get_pyvolve_codon_order())
@@ -361,7 +361,7 @@ def main_simulate(g, Q_method='csubst'):
     g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
     g['tree'] = foreground.initialize_foreground_annotation(tree=g['tree'])
     g['tree'],_,_ = foreground.annotate_foreground_branch(g['tree'], g['fg_df'], g['fg_stem_only'])
-    plot_branch_category(g['tree'], file_name='simulate_branch_category.pdf')
+    tree.plot_branch_category(g['tree'], file_name='simulate_branch_category.pdf')
     g['background_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=1)
     g['foreground_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=g['foreground_scaling_factor'])
     f = pyvolve.ReadFrequencies('codon', file=g['alignment_file'])

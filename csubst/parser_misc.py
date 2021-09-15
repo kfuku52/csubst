@@ -4,13 +4,14 @@ import numpy
 import itertools
 import pkg_resources
 import re
+import sys
 
 from csubst import sequence
 from csubst import parser_phylobayes
 from csubst import parser_iqtree
 from csubst import tree
 
-def generate_intermediate_files(g):
+def generate_intermediate_files(g, force_notree_run=False):
     if (g['infile_type'] == 'phylobayes'):
         raise Exception("PhyloBayes is not supported.")
     elif (g['infile_type'] == 'iqtree'):
@@ -31,7 +32,7 @@ def generate_intermediate_files(g):
             print('--iqtree_redo is set.')
         print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)
         parser_iqtree.check_iqtree_dependency(g)
-        parser_iqtree.run_iqtree_ancestral(g)
+        parser_iqtree.run_iqtree_ancestral(g, force_notree_run=force_notree_run)
     return g
 
 def read_input(g):
@@ -272,24 +273,25 @@ def read_exchangeability_eq_freq(file, g):
     freqs = freqs[codon_order_index]
     return freqs
 
-def read_treefile(g):
-    g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
-    assert len(g['rooted_tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
-    g['rooted_tree'] = tree.standardize_node_names(g['rooted_tree'])
-    g['rooted_tree'] = tree.add_numerical_node_labels(g['rooted_tree'])
-    g['num_node'] = len(list(g['rooted_tree'].traverse()))
-    print('Using internal node names and branch lengths in --iqtree_treefile '
-          'and the root position in --rooted_tree_file.')
-    return g
-
-def annotate_tree(g):
+def annotate_tree(g, ignore_tree_inconsistency=False):
     g['node_label_tree_file'] = g['iqtree_treefile']
     f = open(g['node_label_tree_file'])
     tree_string = f.readline()
     g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
     f.close()
     g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
-    g['tree'] = tree.transfer_root(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
+
+    is_inconsistent_tree = tree.is_inconsistent_tree(tree1=g['node_label_tree'], tree2=g['rooted_tree'])
+    if is_inconsistent_tree:
+        sys.stderr.write('Input tree and iqtree\'s treefile did not have identical leaves.\n')
+        if ignore_tree_inconsistency:
+            sys.stderr.write('--rooted_tree will be used.\n')
+            g['tree'] = g['rooted_tree']
+        else:
+            sys.stderr.write('Exiting.\n')
+            sys.exit(1)
+    else:
+        g['tree'] = tree.transfer_root(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
     print('Total branch length of --rooted_tree_file:', sum([ n.dist for n in g['rooted_tree'].traverse() ]))
     print('Total branch length of --iqtree_treefile:', sum([ n.dist for n in g['node_label_tree'].traverse() ]))

@@ -37,12 +37,24 @@ def check_intermediate_files(g):
             all_exist = False
     return g,all_exist
 
-def run_iqtree_ancestral(g):
+def run_iqtree_ancestral(g, force_notree_run=False):
     file_tree = 'tmp.csubst.nwk'
     tree.write_tree(g['rooted_tree'], outfile=file_tree, add_numerical_label=False)
-    command = [g['iqtree_exe'], '-s', g['alignment_file'], '-te', file_tree,
-               '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
-               '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
+    is_consistent = tree.is_consistent_tree_and_aln(g=g)
+    if is_consistent:
+        command = [g['iqtree_exe'], '-s', g['alignment_file'], '-te', file_tree,
+                   '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
+                   '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
+    else:
+        sys.stderr.write('--rooted_tree and --alignment_file are not consistent.\n')
+        if force_notree_run:
+            sys.stderr.write('Running iqtree without tree input to estimate simulation parameters.\n')
+            command = [g['iqtree_exe'], '-s', g['alignment_file'],
+                       '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
+                       '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
+        else:
+            sys.stderr.write('Exiting.\n')
+            sys.exit(1)
     run_iqtree = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr)
     assert (run_iqtree.returncode==0), "IQ-TREE did not finish safely: {}".format(run_iqtree.stdout.decode('utf8'))
     if os.path.exists(g['alignment_file']+'.ckp.gz'):
