@@ -26,9 +26,9 @@ def add_numerical_node_labels(tree):
         i+=1
     return tree
 
-def is_inconsistent_tree(tree1, tree2):
-    is_inconsistent_tree = len(set(tree1.get_leaf_names()) - set(tree2.get_leaf_names())) == 0
-    return is_inconsistent_tree
+def is_consistent_tree(tree1, tree2):
+    is_consistent_tree = set(tree1.get_leaf_names()) == set(tree2.get_leaf_names())
+    return is_consistent_tree
 
 def transfer_root(tree_to, tree_from, verbose=False):
     subroot_leaves = [ n.get_leaf_names() for n in tree_from.get_children() ]

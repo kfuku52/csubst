@@ -281,8 +281,10 @@ def annotate_tree(g, ignore_tree_inconsistency=False):
     f.close()
     g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
 
-    is_inconsistent_tree = tree.is_inconsistent_tree(tree1=g['node_label_tree'], tree2=g['rooted_tree'])
-    if is_inconsistent_tree:
+    is_consistent_tree = tree.is_consistent_tree(tree1=g['node_label_tree'], tree2=g['rooted_tree'])
+    if is_consistent_tree:
+        g['tree'] = tree.transfer_root(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
+    else:
         sys.stderr.write('Input tree and iqtree\'s treefile did not have identical leaves.\n')
         if ignore_tree_inconsistency:
             sys.stderr.write('--rooted_tree will be used.\n')
@@ -290,8 +292,6 @@ def annotate_tree(g, ignore_tree_inconsistency=False):
         else:
             sys.stderr.write('Exiting.\n')
             sys.exit(1)
-    else:
-        g['tree'] = tree.transfer_root(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
     print('Total branch length of --rooted_tree_file:', sum([ n.dist for n in g['rooted_tree'].traverse() ]))
     print('Total branch length of --iqtree_treefile:', sum([ n.dist for n in g['node_label_tree'].traverse() ]))
