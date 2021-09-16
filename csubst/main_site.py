@@ -39,16 +39,42 @@ def get_state(node, g):
     return(state_matrix)
 
 def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
-    cmap = 'Greys'
-    x_values = df.loc[:,xcol] - 0.5
+    x_values = df.loc[:,xcol].values - 0.5
     y_values = numpy.ones(x_values.shape) * yvalue
-    gap_values = df.loc[:,gapcol]
-    points = numpy.array([x_values, y_values]).T.reshape(-1, 1, 2)
-    segments = numpy.concatenate([points[:-1], points[1:]], axis=1)
-    lc = matplotlib.collections.LineCollection(segments, cmap=cmap, zorder=0)
-    lc.set_array(gap_values)
-    lc.set_linewidth(lw)
-    ax.add_collection(lc)
+    gap_values = df.loc[:,gapcol].values
+    bars = dict()
+    bars['x_start'] = list()
+    bars['x_end'] = list()
+    bars['y'] = list()
+    bars['gap'] = list()
+    bars['color'] = list()
+    current_x = x_values[0]
+    current_y = y_values[0]
+    current_gap = gap_values[0]
+    i_ranges = numpy.arange(len(x_values))
+    i_end = i_ranges[-1]
+    for i in i_ranges:
+        x_value = x_values[i]
+        y_value = y_values[i]
+        gap_value = gap_values[i]
+        if (i == i_end):
+            x_value += 1
+        if (gap_value!=current_gap)|(i == i_end):
+            bars['x_start'].append(current_x)
+            bars['x_end'].append(x_value)
+            bars['y'].append(current_y)
+            bars['gap'].append(current_gap)
+            cval = 1 - current_gap
+            bars['color'].append((cval,cval,cval,))
+            current_x = x_value
+            current_y = y_value
+            current_gap = gap_value
+    for i in numpy.arange(len(bars['x_start'])):
+        y = bars['y'][i]
+        x_start = bars['x_start'][i]
+        x_end = bars['x_end'][i]
+        color = bars['color'][i]
+        ax.hlines(y=y, xmin=x_start, xmax=x_end, linewidth=lw, color=color, zorder=0)
 
 def plot_barchart(df, g):
     sub_types = {

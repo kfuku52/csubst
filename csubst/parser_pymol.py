@@ -10,6 +10,7 @@ import sys
 import time
 
 from csubst import sequence
+from csubst import utility
 
 def initialize_pymol(g):
     #pymol.pymol_argv = ['pymol','-qc']
@@ -102,14 +103,6 @@ def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
         df.loc[:,'aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
     return df
 
-def rgb_to_hex(r,g,b):
-    rgb = [r,g,b]
-    for i in range(len(rgb)):
-        assert rgb[i]<=1
-        rgb[i] = int(numpy.round(rgb[i]*255, decimals=0))
-    hex_color = '0x%02X%02X%02X' % (rgb[0],rgb[1],rgb[2])
-    return hex_color
-
 def write_pymol_session(df, session_file, g):
     pymol.cmd.do('set seq_view, 1')
     if g['remove_solvent']:
@@ -166,11 +159,11 @@ def write_pymol_session(df, session_file, g):
                     color_sites['single_sub'].append(codon_site)
             for key in color_sites.keys():
                 if key=='Nany2spe':
-                    hex_value = rgb_to_hex(r=1, g=0, b=0)
+                    hex_value = utility.rgb_to_hex(r=1, g=0, b=0)
                 elif key=='Nany2dif':
-                    hex_value = rgb_to_hex(r=0, g=0, b=1)
+                    hex_value = utility.rgb_to_hex(r=0, g=0, b=1)
                 elif key=='single_sub':
-                    hex_value = rgb_to_hex(r=0.4, g=0.4, b=0.4)
+                    hex_value = utility.rgb_to_hex(r=0.4, g=0.4, b=0.4)
                 print('Amino acid sites with {} will be painted with {}.'.format(key, hex_value), flush=True)
                 txt_resi = '+'.join([str(site) for site in color_sites[key]])
                 cmd_color = "color {}, {} and chain {} and resi {}"
