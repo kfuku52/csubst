@@ -123,7 +123,9 @@ def plot_barchart(df, g):
                 ax.axhline(y=0.5, linestyle='--', linewidth=0.5, color='black', zorder=0)
                 add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
             ax.set_ylabel(ylabel, fontsize=font_size)
-            ax.bar(df.loc[:,'codon_site_alignment'], yvalues, color=SN_colors[SN])
+            xy = pandas.DataFrame({'x':df.loc[:, 'codon_site_alignment'].values, 'y':yvalues})
+            xy2 = xy.loc[(xy['y']>0.01),:]
+            ax.bar(xy2['x'], xy2['y'], color=SN_colors[SN])
             if (i==num_row-1):
                 ax.set_xlabel('Codon site', fontsize=font_size)
             else:
