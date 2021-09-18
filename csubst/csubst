@@ -198,6 +198,13 @@ if __name__ == "__main__":
     site.add_argument('--remove_solvent', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to remove solvent and small non-specific ligands. '
                            'Used only with --pdb.')
+    site.add_argument('--remove_ligand', metavar='CODE1,CODE2,CODE3,...', type=str,
+                      default='so4,po4,bme,edo,dyd,pt,bgc,mg,ce1,17f,1ds,1at,clr,peg,pge,fe,flc,na,cl',
+                      help='default=%(default)s: Comma-delimited list of PDB ligand codes to be removed. '
+                           'Used only with --pdb.')
+    site.add_argument('--mask_subunit', metavar='yes|no', default='yes', type=strtobool,
+                      help='default=%(default)s: Whether to mask unrelated subunits. '
+                           'Used only with --pdb.')
     site.add_argument('--mafft_exe', metavar='PATH', default='mafft', required=False, type=str,
                       help='default=%(default)s: PATH to mafft executable.')
     site.add_argument('--pymol_min_combinat_prob', metavar='FLOAT', default=0.5, required=False, type=float,
@@ -261,7 +268,6 @@ if __name__ == "__main__":
                          choices=['modelfree','submodel'],
                          help='default=%(default)s: Method to calculate omega. '
                               '"modelfree" for expected values from among-site randomization of substitutions. '
-                              'EXany2any, EXspe2any, EXany2spe, and EXspe2spe substitutions are individually calculated.'
                               '"submodel" for a method similar to Zou and Zhang (2015) using a codon substitution model '
                               'used in ancestral state reconstruction. '
                               'In addition to the base substitution models, codon frequencies and '

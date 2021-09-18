@@ -528,13 +528,13 @@ def main_site(g):
             from csubst import parser_pymol
             parser_pymol.initialize_pymol(g=g)
             pdb_base = re.sub('.*/', '', g['pdb'])
-            mafft_add_fasta = os.path.join(g['site_outdir'], 'csubst_site.'+pdb_base+'.fa')
-            parser_pymol.write_mafft_map(g=g, mafft_add_fasta=mafft_add_fasta)
+            g['mafft_add_fasta'] = os.path.join(g['site_outdir'], 'csubst_site.'+pdb_base+'.fa')
+            parser_pymol.write_mafft_map(g=g)
             df = parser_pymol.add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
             df = parser_pymol.add_pdb_residue_numbering(df=df)
             session_file_name = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.pymol.pse'
-            session_file_path = os.path.join(g['site_outdir'], session_file_name)
-            parser_pymol.write_pymol_session(df=df, session_file=session_file_path, g=g)
+            g['session_file_path'] = os.path.join(g['site_outdir'], session_file_name)
+            parser_pymol.write_pymol_session(df=df, g=g)
         plot_barchart(df, g)
         plot_state(N_tensor, S_tensor, g['branch_ids'], g)
         out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')

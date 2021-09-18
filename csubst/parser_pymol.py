@@ -3,6 +3,7 @@ import pandas
 import pymol
 
 from io import StringIO
+import itertools
 import os
 import re
 import subprocess
@@ -25,7 +26,7 @@ def initialize_pymol(g):
         print('Loading PDB file: {}'.format(g['pdb']), flush=True)
         pymol.cmd.load(g['pdb'])
 
-def write_mafft_map(g, mafft_add_fasta='csubst_site.pdb_add.aa.fa'):
+def write_mafft_map(g):
     tmp_pdb_fasta = 'tmp.csubst.pdb_seq.fa'
     mafft_map_file = tmp_pdb_fasta+'.map'
     if os.path.exists(mafft_map_file):
@@ -40,7 +41,7 @@ def write_mafft_map(g, mafft_add_fasta='csubst_site.pdb_add.aa.fa'):
                  'tmp.csubst.leaf.aa.fa',
                  ]
     out_mafft = subprocess.run(cmd_mafft, stdout=subprocess.PIPE)
-    with open(mafft_add_fasta, 'w') as f:
+    with open(g['mafft_add_fasta'], 'w') as f:
         f.write(out_mafft.stdout.decode('utf8'))
     for i in range(10):
         if os.path.exists(mafft_map_file):
@@ -51,7 +52,7 @@ def write_mafft_map(g, mafft_add_fasta='csubst_site.pdb_add.aa.fa'):
             time.sleep(1)
     txt = 'CSUBST does not exclude poorly aligned regions. ' \
           'Please carefully check {} before biological interpretation of substitution events.'
-    print(txt.format(mafft_add_fasta), flush=True)
+    print(txt.format(g['mafft_add_fasta']), flush=True)
 
 def get_residue_numberings():
     out = dict()
@@ -103,15 +104,39 @@ def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
         df.loc[:,'aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
     return df
 
-def write_pymol_session(df, session_file, g):
+def mask_subunit(g):
+    colors = ['wheat','slate','salmon','brightorange','violet','olive','firebrick','pink','marine','density','cyan','chocolate','teal',]
+    seqs = sequence.read_fasta(path=g['mafft_add_fasta'])
+    seqnames = list(seqs.keys())
+    pdb_seqnames = [ sn for sn in seqnames if sn.startswith(g['pdb']) ]
+    other_seqnames = [ sn for sn in seqnames if not sn.startswith(g['pdb']) ]
+    aa_identity_values = dict()
+    for pdb_seqname in pdb_seqnames:
+        aa_identity_values[pdb_seqname] = []
+        for other_seqname in other_seqnames:
+            aa_identity = sequence.calc_identity(seq1=seqs[pdb_seqname], seq2=seqs[other_seqname])
+            aa_identity_values[pdb_seqname].append(aa_identity)
+        aa_identity_values[pdb_seqname] = numpy.array(aa_identity_values[pdb_seqname])
+    aa_identity_means = dict()
+    for pdb_seqname in pdb_seqnames:
+        aa_identity_means[pdb_seqname] = aa_identity_values[pdb_seqname].mean()
+    ranksorted_identity_means = sorted(set(aa_identity_means.values()), reverse=True)
+    for i,identity_value in enumerate(ranksorted_identity_means):
+        hit_seqnames = [ pdb_seqnames[j] for j,m in enumerate(aa_identity_means.values()) if m==identity_value ]
+        if (i==0)&(len(hit_seqnames)>1):
+            hit_seqnames = hit_seqnames[1::]
+        chains = [ h.replace(g['pdb']+'_', '') for h in hit_seqnames ]
+        for chain in chains:
+            pymol.cmd.do('color {}, chain {}'.format(colors[i], chain))
+
+def write_pymol_session(df, g):
     pymol.cmd.do('set seq_view, 1')
     if g['remove_solvent']:
         pymol.cmd.do("remove solvent")
-        pymol.cmd.do("remove resn so4")
-        pymol.cmd.do("remove resn po4")
-        pymol.cmd.do("remove resn bme")
-        pymol.cmd.do("remove resn edo")
-        pymol.cmd.do("remove resn dyd")
+    if g['remove_ligand']:
+        molecule_codes = g['remove_ligand'].split(',')
+        for molecule_code in molecule_codes:
+            pymol.cmd.do("remove resn "+molecule_code)
     pymol.cmd.do("preset.ligand_sites_trans_hq(selection='all')")
     pymol.cmd.do("hide wire")
     pymol.cmd.do("hide ribbon")
@@ -171,9 +196,11 @@ def write_pymol_session(df, session_file, g):
                 if key in ['Nany2spe','Nany2dif']:
                     cmd_tp = "set transparency, 0.3, {} and chain {} and resi {:}"
                     pymol.cmd.do(cmd_tp.format(object_name, ch, txt_resi))
+    if g['mask_subunit']:
+        mask_subunit(g)
     pymol.cmd.do('zoom')
     pymol.cmd.deselect()
-    pymol.cmd.save(session_file)
+    pymol.cmd.save(g['session_file_path'])
 
 def quit_pymol():
     pymol.cmd.quit(code=0)

@@ -89,3 +89,12 @@ def read_fasta(path):
     for i in range(int(len(seqs)/2)):
         seq_dict[seqs[i*2]] = seqs[i*2+1]
     return seq_dict
+
+def calc_identity(seq1, seq2):
+    assert len(seq1)==len(seq2), 'Sequence lengths should be identical.'
+    num_same_site = 0
+    for s1,s2 in zip(seq1,seq2):
+        if s1==s2:
+            num_same_site += 1
+    identity_value = num_same_site / len(seq1)
+    return identity_value
