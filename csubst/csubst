@@ -199,7 +199,7 @@ if __name__ == "__main__":
                       help='default=%(default)s: Whether to remove solvent and small non-specific ligands. '
                            'Used only with --pdb.')
     site.add_argument('--remove_ligand', metavar='CODE1,CODE2,CODE3,...', type=str,
-                      default='so4,po4,bme,edo,dyd,pt,bgc,mg,ce1,17f,1ds,1at,clr,peg,pge,fe,flc,na,cl',
+                      default='so4,po4,bme,edo,dyd,pt,bgc,mg,ce1,17f,1ds,1at,clr,peg,pge,fe,flc,na,cl,gol',
                       help='default=%(default)s: Comma-delimited list of PDB ligand codes to be removed. '
                            'Used only with --pdb.')
     site.add_argument('--mask_subunit', metavar='yes|no', default='yes', type=strtobool,
