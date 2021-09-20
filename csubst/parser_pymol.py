@@ -127,24 +127,9 @@ def mask_subunit(g):
             hit_seqnames = hit_seqnames[1::]
         chains = [ h.replace(g['pdb']+'_', '') for h in hit_seqnames ]
         for chain in chains:
-            pymol.cmd.do('color {}, chain {}'.format(colors[i], chain))
+            pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
 
-def write_pymol_session(df, g):
-    pymol.cmd.do('set seq_view, 1')
-    if g['remove_solvent']:
-        pymol.cmd.do("remove solvent")
-    if g['remove_ligand']:
-        molecule_codes = g['remove_ligand'].split(',')
-        for molecule_code in molecule_codes:
-            pymol.cmd.do("remove resn "+molecule_code)
-    pymol.cmd.do("preset.ligand_sites_trans_hq(selection='all')")
-    pymol.cmd.do("hide wire")
-    pymol.cmd.do("hide ribbon")
-    pymol.cmd.do("show cartoon")
-    pymol.cmd.do("show surface")
-    pymol.cmd.do("set transparency, 0.65")
-    residue_numberings = get_residue_numberings()
-    object_names = pymol.cmd.get_names()
+def set_color_gray(object_names, residue_numberings):
     for object_name in object_names:
         if object_name.endswith('_pol_conts'):
             continue
@@ -156,8 +141,8 @@ def write_pymol_session(df, g):
             residue_end = codon_site_pdb.loc[is_nonzero].max()
             cmd_color = "color gray80, {} and chain {} and resi {:}-{:}"
             pymol.cmd.do(cmd_color.format(object_name, ch, residue_start, residue_end))
-    df = df.reset_index(drop=True)
-    N_sub_cols = df.columns[df.columns.str.startswith('N_sub_')]
+
+def set_substitution_colors(df, g, object_names, N_sub_cols):
     for object_name in object_names:
         if object_name.endswith('_pol_conts'):
             continue
@@ -196,6 +181,29 @@ def write_pymol_session(df, g):
                 if key in ['Nany2spe','Nany2dif']:
                     cmd_tp = "set transparency, 0.3, {} and chain {} and resi {:}"
                     pymol.cmd.do(cmd_tp.format(object_name, ch, txt_resi))
+
+def write_pymol_session(df, g):
+    df = df.reset_index(drop=True)
+    pymol.cmd.do('set seq_view, 1')
+    if g['remove_solvent']:
+        pymol.cmd.do("remove solvent")
+    if g['remove_ligand']:
+        molecule_codes = g['remove_ligand'].split(',')
+        for molecule_code in molecule_codes:
+            pymol.cmd.do("remove resn "+molecule_code)
+    pymol.cmd.do("preset.ligand_sites_trans_hq(selection='all')")
+    pymol.cmd.do("hide wire")
+    pymol.cmd.do("hide ribbon")
+    pymol.cmd.do("show cartoon")
+    pymol.cmd.do("show surface")
+    pymol.cmd.do("set transparency, 0.65")
+    object_names = pymol.cmd.get_names()
+    #residue_numberings = get_residue_numberings()
+    #set_color_gray(object_names, residue_numberings)
+    pymol.cmd.do("color gray80, polymer.protein")
+    pymol.cmd.do('util.cbag organic')
+    N_sub_cols = df.columns[df.columns.str.startswith('N_sub_')]
+    set_substitution_colors(df, g, object_names, N_sub_cols)
     if g['mask_subunit']:
         mask_subunit(g)
     pymol.cmd.do('zoom')
