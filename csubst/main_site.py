@@ -83,31 +83,41 @@ def plot_barchart(df, g):
         'any2spe':'Posterior prob.\nof any2spe',
         'any2dif':'Posterior prob.\nof any2dif',
     }
+    SN_color_all = {
+        '_sub': {'N':'black', 'S':'gray'},
+        '_sub_': {'N':'black', 'S':'gray'},
+        'any2spe': {'N':'red', 'S':'gray'},
+        'any2dif': {'N':'blue', 'S':'gray'},
+    }
     num_row = len(sub_types)
     fig,axes = matplotlib.pyplot.subplots(nrows=num_row, ncols=1, figsize=(7.2, 4.8), sharex=True)
     axes = axes.flat
     i = 0
     NS_ymax = df.loc[:,['N_sub','S_sub']].sum(axis=1).max() + 0.5
-    SN_colors = {'N':'red', 'S':'blue'}
     for sub_type in sub_types.keys():
+        SN_colors = SN_color_all[sub_type]
         ylabel = sub_types[sub_type]
         ax = axes[i]
         for SN in ['S','N']:
             col = SN+sub_type
             if sub_type=='_sub':
                 if SN=='S':
-                    yvalues = df.loc[:,['N'+sub_type,'S'+sub_type]].sum(axis=1).values
+                    yvalues = df.loc[:,'S'+sub_type].values
+                    is_enough_value = (yvalues>0.01)
+                    yvalues[is_enough_value] = df.loc[is_enough_value,['N'+sub_type,'S'+sub_type]].sum(axis=1).values
                 elif SN=='N':
                     yvalues = df.loc[:, col].values
                 ax.set_ylim(0, NS_ymax)
                 add_gapline(df=df, gapcol='gap_rate_all', xcol='codon_site_alignment', yvalue=NS_ymax*0.95, lw=3, ax=ax)
             elif sub_type=='_sub_':
                 if SN == 'S':
-                    is_y_cols = False
-                    is_y_cols |= df.columns.str.startswith('N_sub_')
-                    is_y_cols |= df.columns.str.startswith('S_sub_')
+                    is_S_cols = df.columns.str.startswith('S_sub_')
+                    S_cols = df.columns[is_S_cols]
+                    is_y_cols = is_S_cols | df.columns.str.startswith('N_sub_')
                     y_cols = df.columns[is_y_cols]
-                    yvalues = df.loc[:, y_cols].sum(axis=1).values
+                    yvalues = df.loc[:, S_cols].sum(axis=1).values
+                    is_enough_value = (yvalues>0.01)
+                    yvalues[is_enough_value] = df.loc[is_enough_value,y_cols].sum(axis=1).values
                 elif SN == 'N':
                     y_cols = df.columns[df.columns.str.startswith(col)]
                     yvalues = df.loc[:, y_cols].sum(axis=1).values
@@ -136,7 +146,7 @@ def plot_barchart(df, g):
     outbase = os.path.join(g['site_outdir'], 'csubst_site')
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
     #fig.savefig(outbase+".svg", format='svg', transparent=True)
-    print("Nonsynonymous and synonymous substitutions are shown in red and blue, respectively.", flush=True)
+    print("Nonsynonymous and synonymous substitutions are shown in color and gray, respectively.", flush=True)
     print("Alignment gap sites are indicated by gray scale (0% missing = white, 100% missing = black).", flush=True)
 
 def get_gapsite_rate(state_tensor):
@@ -528,7 +538,7 @@ def main_site(g):
             from csubst import parser_pymol
             parser_pymol.initialize_pymol(g=g)
             pdb_base = re.sub('.*/', '', g['pdb'])
-            g['mafft_add_fasta'] = os.path.join(g['site_outdir'], 'csubst_site.'+pdb_base+'.fa')
+            g['mafft_add_fasta'] = os.path.join(g['site_outdir'], 'csubst_site.' + pdb_base + '.fa')
             parser_pymol.write_mafft_map(g=g)
             df = parser_pymol.add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
             df = parser_pymol.add_pdb_residue_numbering(df=df)
