@@ -8,6 +8,7 @@ import sys
 
 from csubst import genetic_code
 from csubst import parser_misc
+from csubst import parser_pymol
 from csubst import sequence
 from csubst import substitution
 from csubst import tree
@@ -76,6 +77,65 @@ def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
         color = bars['color'][i]
         ax.hlines(y=y, xmin=x_start, xmax=x_end, linewidth=lw, color=color, zorder=0)
 
+def get_yvalues(df, sub_type, SN):
+    col = SN + sub_type
+    if sub_type == '_sub':
+        if SN == 'S':
+            yvalues = df.loc[:, 'S' + sub_type].values
+            is_enough_value = (yvalues > 0.01)
+            yvalues[is_enough_value] = df.loc[is_enough_value, ['N' + sub_type, 'S' + sub_type]].sum(axis=1).values
+        elif SN == 'N':
+            yvalues = df.loc[:, col].values
+    elif sub_type=='_sub_':
+        if SN == 'S':
+            is_S_cols = df.columns.str.startswith('S_sub_')
+            S_cols = df.columns[is_S_cols]
+            is_y_cols = is_S_cols | df.columns.str.startswith('N_sub_')
+            y_cols = df.columns[is_y_cols]
+            yvalues = df.loc[:, S_cols].sum(axis=1).values
+            is_enough_value = (yvalues>0.01)
+            yvalues[is_enough_value] = df.loc[is_enough_value,y_cols].sum(axis=1).values
+        elif SN == 'N':
+            y_cols = df.columns[df.columns.str.startswith(col)]
+            yvalues = df.loc[:, y_cols].sum(axis=1).values
+    else:
+        if SN=='S':
+            yvalues = df.loc[:,['N'+sub_type,'S'+sub_type]].sum(axis=1).values
+        elif SN=='N':
+            yvalues = df.loc[:, col].values
+    return yvalues
+
+def get_highest_identity_chain_name(g):
+    if 'aa_identity_means' not in g.keys():
+        g = parser_pymol.calc_aa_identity(g)
+    mean_keys = numpy.array(list(g['aa_identity_means'].keys()))
+    mean_values = numpy.array(list(g['aa_identity_means'].values()))
+    g['highest_identity_chain_name'] = mean_keys[numpy.argmax(mean_values)]
+    return g
+
+def add_substitution_labels(df, SN, sub_type, SN_colors, ax, g):
+    col = SN + sub_type
+    df_sub = df.loc[(df[col] >= g['pymol_min_combinat_prob']), :].reset_index()
+    anc_cols = df_sub.columns[df_sub.columns.str.startswith('aa_')&df_sub.columns.str.endswith('_anc')]
+    des_cols = anc_cols.str.replace('_anc', '')
+    x_min_dist = (df_sub.loc[:,'codon_site_alignment'].max()+1) / 35
+    x_offset = (df_sub.loc[:,'codon_site_alignment'].max()+1) / 300
+    for i in df_sub.index:
+        x_value = df_sub.at[i,'codon_site_alignment']
+        g = get_highest_identity_chain_name(g)
+        chain_site = df_sub.at[i,'codon_site_pdb_'+g['highest_identity_chain_name']]
+        anc_state = '/'.join(df_sub.loc[i,anc_cols].unique())
+        des_state = '/'.join(df_sub.loc[i,des_cols].unique())
+        sub_text = anc_state+str(chain_site)+des_state
+        ha = 'right'
+        x_value2 = x_value
+        if (i != 0):
+            if ((x_value - df_sub.at[i-1,'codon_site_alignment'])<x_min_dist):
+                x_value2 = x_value + x_offset
+                ha = 'left'
+        ax.text(x=x_value2, y=0.98, s=sub_text, color=SN_colors[SN], fontsize=8, rotation='vertical', ha=ha, va='top')
+    return ax
+
 def plot_barchart(df, g):
     sub_types = {
         '_sub':'Branch-wise\nsubstitutions\nin the entire tree',
@@ -84,10 +144,10 @@ def plot_barchart(df, g):
         'any2dif':'Posterior prob.\nof any2dif',
     }
     SN_color_all = {
-        '_sub': {'N':'black', 'S':'gray'},
-        '_sub_': {'N':'black', 'S':'gray'},
-        'any2spe': {'N':'red', 'S':'gray'},
-        'any2dif': {'N':'blue', 'S':'gray'},
+        '_sub': {'N':'black', 'S':'gainsboro'},
+        '_sub_': {'N':'black', 'S':'gainsboro'},
+        'any2spe': {'N':'red', 'S':'gainsboro'},
+        'any2dif': {'N':'blue', 'S':'gainsboro'},
     }
     num_row = len(sub_types)
     fig,axes = matplotlib.pyplot.subplots(nrows=num_row, ncols=1, figsize=(7.2, 4.8), sharex=True)
@@ -99,39 +159,22 @@ def plot_barchart(df, g):
         ylabel = sub_types[sub_type]
         ax = axes[i]
         for SN in ['S','N']:
-            col = SN+sub_type
             if sub_type=='_sub':
-                if SN=='S':
-                    yvalues = df.loc[:,'S'+sub_type].values
-                    is_enough_value = (yvalues>0.01)
-                    yvalues[is_enough_value] = df.loc[is_enough_value,['N'+sub_type,'S'+sub_type]].sum(axis=1).values
-                elif SN=='N':
-                    yvalues = df.loc[:, col].values
+                yvalues = get_yvalues(df, sub_type, SN)
                 ax.set_ylim(0, NS_ymax)
                 add_gapline(df=df, gapcol='gap_rate_all', xcol='codon_site_alignment', yvalue=NS_ymax*0.95, lw=3, ax=ax)
             elif sub_type=='_sub_':
-                if SN == 'S':
-                    is_S_cols = df.columns.str.startswith('S_sub_')
-                    S_cols = df.columns[is_S_cols]
-                    is_y_cols = is_S_cols | df.columns.str.startswith('N_sub_')
-                    y_cols = df.columns[is_y_cols]
-                    yvalues = df.loc[:, S_cols].sum(axis=1).values
-                    is_enough_value = (yvalues>0.01)
-                    yvalues[is_enough_value] = df.loc[is_enough_value,y_cols].sum(axis=1).values
-                elif SN == 'N':
-                    y_cols = df.columns[df.columns.str.startswith(col)]
-                    yvalues = df.loc[:, y_cols].sum(axis=1).values
+                yvalues = get_yvalues(df, sub_type, SN)
                 ymax = df.columns.str.startswith('N_sub_').sum()
                 ax.set_ylim(0, ymax)
                 add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=ymax*0.95, lw=3, ax=ax)
             else:
-                if SN=='S':
-                    yvalues = df.loc[:,['N'+sub_type,'S'+sub_type]].sum(axis=1).values
-                elif SN=='N':
-                    yvalues = df.loc[:, col].values
+                yvalues = get_yvalues(df, sub_type, SN)
                 ax.set_ylim(0, 1)
                 ax.axhline(y=0.5, linestyle='--', linewidth=0.5, color='black', zorder=0)
                 add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
+                if (SN=='N')&(g['pdb'] is not None):
+                    ax = add_substitution_labels(df, SN, sub_type, SN_colors, ax, g)
             ax.set_ylabel(ylabel, fontsize=font_size)
             xy = pandas.DataFrame({'x':df.loc[:, 'codon_site_alignment'].values, 'y':yvalues})
             xy2 = xy.loc[(xy['y']>0.01),:]
@@ -535,7 +578,6 @@ def main_site(g):
         if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
             export2chimera(df, g)
         if (g['pdb'] is not None):
-            from csubst import parser_pymol
             parser_pymol.initialize_pymol(g=g)
             pdb_base = re.sub('.*/', '', g['pdb'])
             g['mafft_add_fasta'] = os.path.join(g['site_outdir'], 'csubst_site.' + pdb_base + '.fa')

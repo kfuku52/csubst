@@ -104,8 +104,7 @@ def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
         df.loc[:,'aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
     return df
 
-def mask_subunit(g):
-    colors = ['wheat','slate','salmon','brightorange','violet','olive','firebrick','pink','marine','density','cyan','chocolate','teal',]
+def calc_aa_identity(g):
     seqs = sequence.read_fasta(path=g['mafft_add_fasta'])
     seqnames = list(seqs.keys())
     pdb_seqnames = [ sn for sn in seqnames if sn.startswith(g['pdb']) ]
@@ -120,9 +119,18 @@ def mask_subunit(g):
     aa_identity_means = dict()
     for pdb_seqname in pdb_seqnames:
         aa_identity_means[pdb_seqname] = aa_identity_values[pdb_seqname].mean()
-    ranksorted_identity_means = sorted(set(aa_identity_means.values()), reverse=True)
+    g['aa_identity_values'] = aa_identity_values
+    g['aa_identity_means'] = aa_identity_means
+    return g
+
+def mask_subunit(g):
+    colors = ['wheat','slate','salmon','brightorange','violet','olive',
+              'firebrick','pink','marine','density','cyan','chocolate','teal',]
+    g = calc_aa_identity(g)
+    pdb_seqnames = list(g['aa_identity_means'].keys())
+    ranksorted_identity_means = sorted(set(g['aa_identity_means'].values()), reverse=True)
     for i,identity_value in enumerate(ranksorted_identity_means):
-        hit_seqnames = [ pdb_seqnames[j] for j,m in enumerate(aa_identity_means.values()) if m==identity_value ]
+        hit_seqnames = [ pdb_seqnames[j] for j,m in enumerate(g['aa_identity_means'].values()) if m==identity_value ]
         if (i==0)&(len(hit_seqnames)>1):
             hit_seqnames = hit_seqnames[1::]
         chains = [ h.replace(g['pdb']+'_', '') for h in hit_seqnames ]
