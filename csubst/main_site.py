@@ -8,7 +8,6 @@ import sys
 
 from csubst import genetic_code
 from csubst import parser_misc
-from csubst import parser_pymol
 from csubst import sequence
 from csubst import substitution
 from csubst import tree
@@ -180,7 +179,7 @@ def plot_barchart(df, g):
             xy2 = xy.loc[(xy['y']>0.01),:]
             ax.bar(xy2['x'], xy2['y'], color=SN_colors[SN])
             if (i==num_row-1):
-                ax.set_xlabel('Codon site', fontsize=font_size)
+                ax.set_xlabel('Aligned codon site', fontsize=font_size)
             else:
                 ax.set_xlabel('', fontsize=font_size)
             ax.set_xlim(df.loc[:,'codon_site_alignment'].min()-0.5, df.loc[:,'codon_site_alignment'].max()+0.5)
@@ -539,6 +538,8 @@ def add_branch_id_list(g):
     return g
 
 def main_site(g):
+    if g['pdb'] is not None:
+        from csubst import parser_pymol
     print("Reading and parsing input files.", flush=True)
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = tree.read_treefile(g)
@@ -557,10 +558,8 @@ def main_site(g):
         g['site_outdir'] = './csubst_site.branch_id'+','.join([ str(bid) for bid in branch_ids ])
         if not os.path.exists(g['site_outdir']):
             os.makedirs(g['site_outdir'])
-
         leaf_nn = [ n.numerical_label for n in g['tree'].traverse() if n.is_leaf() ]
         num_site = N_tensor.shape[1]
-
         df = initialize_site_df(num_site)
         df = add_cs_info(df, g['branch_ids'], sub_tensor=S_tensor, attr='S')
         df = add_cs_info(df, g['branch_ids'], sub_tensor=N_tensor, attr='N')

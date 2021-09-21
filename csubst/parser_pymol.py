@@ -3,7 +3,7 @@ import pandas
 import pymol
 
 from io import StringIO
-import itertools
+#import itertools
 import os
 import re
 import subprocess
@@ -53,6 +53,10 @@ def write_mafft_map(g):
     txt = 'CSUBST does not exclude poorly aligned regions. ' \
           'Please carefully check {} before biological interpretation of substitution events.'
     print(txt.format(g['mafft_add_fasta']), flush=True)
+    if os.path.getsize(g['mafft_add_fasta'])==0:
+        sys.stderr.write('File size of {} is 0. A wrong ID might be specified in --pdb.\n'.format(g['mafft_add_fasta']))
+        sys.stderr.write('Exiting.\n')
+        sys.exit(1)
 
 def get_residue_numberings():
     out = dict()
@@ -128,6 +132,8 @@ def mask_subunit(g):
               'firebrick','pink','marine','density','cyan','chocolate','teal',]
     g = calc_aa_identity(g)
     pdb_seqnames = list(g['aa_identity_means'].keys())
+    if len(pdb_seqnames)==1:
+        return None
     ranksorted_identity_means = sorted(set(g['aa_identity_means'].values()), reverse=True)
     for i,identity_value in enumerate(ranksorted_identity_means):
         hit_seqnames = [ pdb_seqnames[j] for j,m in enumerate(g['aa_identity_means'].values()) if m==identity_value ]
@@ -135,6 +141,7 @@ def mask_subunit(g):
             hit_seqnames = hit_seqnames[1::]
         chains = [ h.replace(g['pdb']+'_', '') for h in hit_seqnames ]
         for chain in chains:
+            print('Masking chain {}'.format(chain), flush=True)
             pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
 
 def set_color_gray(object_names, residue_numberings):
