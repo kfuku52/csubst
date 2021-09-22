@@ -2,6 +2,7 @@ import numpy
 import matplotlib.pyplot
 import pandas
 
+import itertools
 import os
 import re
 import sys
@@ -455,8 +456,48 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
                 current_row += 1
     return df_ad
 
+def get_df_dist(sub_tensor, g, mode):
+    tree_dict = dict()
+    for node in g['tree'].traverse():
+        tree_dict[node.numerical_label] = node
+    state_orders, state_keys = get_state_orders(g, mode)
+    cols = ['group','state_from','state_to','max_dist_bl']
+    inds = numpy.arange(numpy.array(sub_tensor.shape[2:]).prod()-sub_tensor.shape[4])
+    df_dist = pandas.DataFrame(columns=cols, index=inds)
+    bgad = sub_tensor.sum(axis=1)
+    b_index = numpy.arange(bgad.shape[0])
+    g_index = numpy.arange(bgad.shape[1])
+    a_index = numpy.arange(bgad.shape[2])
+    d_index = numpy.arange(bgad.shape[3])
+    current_row = 0
+    for g,a,d in itertools.product(g_index, a_index, d_index):
+        if (a==d):
+            continue
+        state_key = state_keys[g]
+        if (len(state_orders[state_key])<(a+1))|(len(state_orders[state_key])<(d+1)):
+            continue
+        state_from = state_orders[state_key][a]
+        state_to = state_orders[state_key][d]
+        has_enough_sub = (bgad[:,g,a,d] >= 0.5)
+        branch_ids = b_index[has_enough_sub]
+        if branch_ids.shape[0]==0:
+            interbranch_dist = numpy.nan
+        elif branch_ids.shape[0]==1:
+            interbranch_dist = numpy.nan
+        elif branch_ids.shape[0]>2:
+            node_dists = list()
+            nodes = [ tree_dict[n] for n in branch_ids ]
+            for nds in list(itertools.combinations(nodes, 2)):
+                node_dist = nds[0].get_distance(target=nds[1], topology_only=False)
+                node_dists.append(node_dist - nds[1].dist)
+            interbranch_dist = max(node_dists)  # Maximum value among pairwise distances
+        df_dist.loc[current_row, :] = [state_key, state_from, state_to, interbranch_dist]
+        current_row += 1
+    df_dist = df_dist.loc[~df_dist['group'].isnull(),:]
+    return df_dist
+
 def plot_state(N_tensor, S_tensor, branch_ids, g):
-    fig,axes = matplotlib.pyplot.subplots(nrows=2, ncols=2, figsize=(7.2, 4.8), sharex=False)
+    fig,axes = matplotlib.pyplot.subplots(nrows=3, ncols=2, figsize=(7.2, 7.2), sharex=False)
     outfiles = ['csubst_site.state_N.tsv', 'csubst_site.state_S.tsv']
     colors = ['red','blue']
     ax_cols = [0,1]
@@ -478,6 +519,8 @@ def plot_state(N_tensor, S_tensor, branch_ids, g):
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank3')
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank4')
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
+        df_dist = get_df_dist(sub_tensor=sub_tensor, g=g, mode=mode)
+        df_ad = pandas.merge(df_ad, df_dist, on=['group','state_from','state_to'])
         out_path = os.path.join(g['site_outdir'], outfile)
         df_ad.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '→' + df_ad.loc[:,'state_to']
@@ -490,9 +533,16 @@ def plot_state(N_tensor, S_tensor, branch_ids, g):
         ax.set_title(title, fontsize=font_size)
         ax = axes[1,ax_col]
         bins = numpy.arange(21)/20
-        ax.hist(x=df_ad.loc[:,'site_tsi'], bins=bins, color='black')
-        ax.hist(x=df_ad.loc[(df_ad.loc[:,'has_target_high_combinat_prob_site']),'site_tsi'], bins=bins, color=color)
+        ax.hist(x=df_ad.loc[:,'site_tsi'].dropna(), bins=bins, color='black')
+        is_it = (df_ad.loc[:,'has_target_high_combinat_prob_site'])
+        ax.hist(x=df_ad.loc[is_it,'site_tsi'].dropna(), bins=bins, color=color)
         ax.set_xlabel('Site specificity index', fontsize=font_size)
+        ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
+        ax = axes[2,ax_col]
+        bins = numpy.arange(21) / 20 * df_dist.loc[:,'max_dist_bl'].max()
+        ax.hist(x=df_dist.loc[:, 'max_dist_bl'].dropna(), bins=bins, color='black')
+        #ax.hist(x=df_ad.loc[(df_ad.loc[:, 'has_target_high_combinat_prob_site']), 'site_tsi'], bins=bins, color=color)
+        ax.set_xlabel('Max inter-branch distance of substitution category', fontsize=font_size)
         ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
     fig.tight_layout(h_pad=0.5, w_pad=1)
     outbase = os.path.join(g['site_outdir'], 'csubst_site.state')
