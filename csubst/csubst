@@ -207,6 +207,10 @@ if __name__ == "__main__":
                            'Used only with --pdb.')
     site.add_argument('--mafft_exe', metavar='PATH', default='mafft', required=False, type=str,
                       help='default=%(default)s: PATH to mafft executable.')
+    site.add_argument('--mafft_op', metavar='FLOAT', default=20, required=False, type=float,
+                      help='default=%(default)s: mafft --op parameter.')
+    site.add_argument('--mafft_ep', metavar='FLOAT', default=0, required=False, type=float,
+                      help='default=%(default)s: mafft --ep parameter.')
     site.add_argument('--pymol_min_combinat_prob', metavar='FLOAT', default=0.5, required=False, type=float,
                       help='default=%(default)s: Minimum probability of combinatorial substitutions to visualize.')
     site.add_argument('--pymol_min_single_prob', metavar='FLOAT', default=0.8, required=False, type=float,

@@ -37,6 +37,8 @@ def write_mafft_map(g):
     sequence.write_alignment(outfile='tmp.csubst.leaf.aa.fa', mode='aa', g=g, leaf_only=True)
     cmd_mafft = [g['mafft_exe'], '--keeplength', '--mapout', '--quiet',
                  '--thread', '1',
+                 '--op', str(g['mafft_op']),
+                 '--ep', str(g['mafft_ep']),
                  '--add', tmp_pdb_fasta,
                  'tmp.csubst.leaf.aa.fa',
                  ]
