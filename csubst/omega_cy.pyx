@@ -1,7 +1,7 @@
 import numpy
 cimport numpy as cnumpy
 cimport cython
-from cython.parallel import prange
+#from cython.parallel import prange
 
 
 @cython.nonecheck(False)

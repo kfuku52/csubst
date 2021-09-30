@@ -1,8 +1,8 @@
-if __name__ == '__main__':
-    mp.set_start_method('spawn')
-    my_class = MyClass(1)
-    my_class.mp_simple_method()
-    my_class.wait()
+#if __name__ == '__main__':
+#    mp.set_start_method('spawn')
+#    my_class = MyClass(1)
+#    my_class.mp_simple_method()
+#    my_class.wait()
 
 import joblib
 import numpy
@@ -16,6 +16,7 @@ import time
 from csubst import parallel
 from csubst import substitution
 from csubst import table
+from csubst import omega_cy
 
 def calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g):
     E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
@@ -141,7 +142,6 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             E_b = dfEb
             if os.path.exists(mmap_out): os.unlink(mmap_out)
     elif stat=='quantile':
-        from csubst import omega_cy
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         my_dtype = sub_tensor.dtype
