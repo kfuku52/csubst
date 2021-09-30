@@ -7,6 +7,7 @@ import time
 
 from csubst import table
 from csubst import parallel
+from csubst import substitution_cy
 
 def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None):
     if dtype is None:
@@ -125,29 +126,33 @@ def get_bs(S_tensor, N_tensor):
     return(df)
 
 def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64):
-    arity = id_combinations.shape[1]
-    if mmap:
-        df = df_mmap
+    if False:
+        # Experimental. Currently this function does not speed up the analysis.
+        df = substitution_cy.calc_combinatorial_sub_float32(id_combinations, mmap_start, sub_tensor, mmap, df_mmap)
     else:
-        if (sub_tensor.dtype==numpy.bool):
-            data_type = numpy.int32
+        arity = id_combinations.shape[1]
+        if mmap:
+            df = df_mmap
         else:
-            data_type = float_type
-        df = numpy.zeros([id_combinations.shape[0], arity+4], dtype=data_type)
-    start = mmap_start
-    end = mmap_start + id_combinations.shape[0]
-    df[start:end, :arity] = id_combinations[:, :]  # branch_ids
-    start_time = time.time()
-    for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
-        for sg in numpy.arange(sub_tensor.shape[2]):
-            df[i, arity+0] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=(2, 3)).prod(axis=0).sum(axis=0)  # any2any
-            df[i, arity+1] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=3).prod(axis=0).sum(axis=1).sum(axis=0)  # spe2any
-            df[i, arity+2] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=2).prod(axis=0).sum(axis=1).sum(axis=0)  # any2spe
-            df[i, arity+3] += sub_tensor[id_combinations[j,:], :, sg, :, :].prod(axis=0).sum(axis=(1, 2)).sum(axis=0)  # spe2spe
-        if j % 1000 == 0:
-            mmap_end = mmap_start + id_combinations.shape[0]
-            txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
-            print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
+            if (sub_tensor.dtype == numpy.bool):
+                data_type = numpy.int32
+            else:
+                data_type = float_type
+            df = numpy.zeros([id_combinations.shape[0], arity + 4], dtype=data_type)
+        start_time = time.time()
+        start = mmap_start
+        end = mmap_start + id_combinations.shape[0]
+        df[start:end, :arity] = id_combinations[:, :]  # branch_ids
+        for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
+            for sg in numpy.arange(sub_tensor.shape[2]):
+                df[i, arity+0] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=(2, 3)).prod(axis=0).sum(axis=0) # any2any
+                df[i, arity+1] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=3).prod(axis=0).sum(axis=1).sum(axis=0) # spe2any
+                df[i, arity+2] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=2).prod(axis=0).sum(axis=1).sum(axis=0) # any2spe
+                df[i, arity+3] += sub_tensor[id_combinations[j,:], :, sg, :, :].prod(axis=0).sum(axis=(1, 2)).sum(axis=0) # spe2spe
+            if j % 1000 == 0:
+                mmap_end = mmap_start + id_combinations.shape[0]
+                txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
+                print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
     if not mmap:
         return (df)
 
