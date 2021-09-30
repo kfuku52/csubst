@@ -124,9 +124,9 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             if id_combinations.shape[0] == 0:
                 end_flag = 1
                 break
-        print('Preparing the cbOS table with {:,} thread(s).'.format(g['threads']), flush=True)
+        print('Preparing the cbOS table with {:,} process(es).'.format(g['threads']), flush=True)
         cbS = substitution.get_cb(id_combinations, S_tensor, g, 'S')
-        print('Preparing the cbON table with {:,} thread(s).'.format(g['threads']), flush=True)
+        print('Preparing the cbON table with {:,} process(es).'.format(g['threads']), flush=True)
         cbN = substitution.get_cb(id_combinations, N_tensor, g, 'N')
         cb = table.merge_tables(cbS, cbN)
         del cbS, cbN

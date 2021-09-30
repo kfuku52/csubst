@@ -19,7 +19,7 @@ version = str(ast.literal_eval(match.group(1)))
 setup(
     name             = 'csubst',
     version          = version,
-    description      = 'Tools for molecular convergence detection in codon sequences',
+    description      = 'Tools for molecular convergence detection in coding sequences',
     license          = "BSD 3-clause License",
     author           = "Kenji Fukushima",
     author_email     = 'kfuku52@gmail.com',
