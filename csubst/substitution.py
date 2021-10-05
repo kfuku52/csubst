@@ -149,7 +149,7 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
                 df[i, arity+1] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=3).prod(axis=0).sum(axis=1).sum(axis=0) # spe2any
                 df[i, arity+2] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=2).prod(axis=0).sum(axis=1).sum(axis=0) # any2spe
                 df[i, arity+3] += sub_tensor[id_combinations[j,:], :, sg, :, :].prod(axis=0).sum(axis=(1, 2)).sum(axis=0) # spe2spe
-            if j % 1000 == 0:
+            if j % 10000 == 0:
                 mmap_end = mmap_start + id_combinations.shape[0]
                 txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
                 print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
@@ -212,7 +212,7 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
             df[row_start:row_end,arity+2] += sub_tensor[ic,:,sg,:,:].sum(axis=3).prod(axis=0).sum(axis=1) #spe2any
             df[row_start:row_end,arity+3] += sub_tensor[ic,:,sg,:,:].sum(axis=2).prod(axis=0).sum(axis=1) #any2spe
             df[row_start:row_end,arity+4] += sub_tensor[ic,:,sg,:,:].prod(axis=0).sum(axis=(1,2)) #spe2spe
-        if (node%1000==0):
+        if (node%10000==0):
             mmap_start = mmap_start
             mmap_end = mmap_start+id_combinations.shape[0]
             txt = 'cbs: {:,}th in the id range {:,}-{:,}: {:,} [sec]'

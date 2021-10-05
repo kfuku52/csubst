@@ -1,12 +1,15 @@
 import ete3
+import joblib
 import numpy
 
 import copy
 import itertools
 import os
 import re
+import time
 
 from csubst import sequence
+from csubst import parallel
 
 def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
@@ -69,18 +72,13 @@ def transfer_internal_node_names(tree_to, tree_from):
                         to.name = fr.name
     return tree_to
 
-def get_node_distance(tree, cb): # TODO parallel
-    if not 'numerical_label' in dir(tree):
-        tree = tree.add_numerical_node_labels(tree)
-    tree_dict = dict()
-    for node in tree.traverse():
-        tree_dict[node.numerical_label] = node
-    cn1 = cb.columns[cb.columns.str.startswith('branch_id_')]
-    cn2 = ["dist_node_num", "dist_bl"]
-    for cn2_item in cn2:
-        cb.loc[:,cn2_item] = numpy.nan
-    for i in cb.index:
-        nodes = [ tree_dict[n] for n in cb.loc[i,cn1].tolist() ]
+def calc_node_dist_chunk(chunk, start, tree_dict, float_type):
+    start_time = time.time()
+    nrow = chunk.shape[0]
+    arr_dist = numpy.zeros(shape=(nrow, 3), dtype=float_type)
+    arr_dist[:,0] = numpy.arange(nrow) + start
+    for i in numpy.arange(nrow):
+        nodes = [ tree_dict[n] for n in chunk[i,:] ]
         node_dists = list()
         node_nums = list()
         for nds in list(itertools.combinations(nodes, 2)):
@@ -89,8 +87,37 @@ def get_node_distance(tree, cb): # TODO parallel
             node_nums.append(nds[0].get_distance(target=nds[1], topology_only=True))
         node_dist = max(node_dists) # Maximum value among pairwise distances
         node_num = max(node_nums) # Maximum value among pairwise distances
-        cb.loc[i,"dist_node_num"] = node_num
-        cb.loc[i,"dist_bl"] = node_dist
+        arr_dist[i,1] = node_num
+        arr_dist[i,2] = node_dist
+        if i % 10000 == 0:
+            end = start + nrow
+            txt = 'Inter-branch distance: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
+            print(txt.format(i, start, end, int(time.time() - start_time)), flush=True)
+    return arr_dist
+
+def get_node_distance(tree, cb, ncpu, float_type):
+    txt = 'Starting node distance calculation. If it takes too long, disable this step by --branch_dist no'
+    print(txt, flush=True)
+    start_time = time.time()
+    if not 'numerical_label' in dir(tree):
+        tree = tree.add_numerical_node_labels(tree)
+    tree_dict = dict()
+    for node in tree.traverse():
+        tree_dict[node.numerical_label] = node
+    cn1 = cb.columns[cb.columns.str.startswith('branch_id_')]
+    id_combinations = cb.loc[:,cn1].values
+    chunks, starts = parallel.get_chunks(id_combinations, ncpu)
+    out_list = joblib.Parallel(n_jobs=ncpu, max_nbytes=None, backend='multiprocessing')(
+        joblib.delayed(calc_node_dist_chunk)
+        (chunk, start, tree_dict, float_type) for chunk, start in zip(chunks, starts)
+    )
+    cb.loc[:, 'dist_node_num'] = -1
+    cb.loc[:, 'dist_bl'] = numpy.nan
+    for arr_dist in out_list:
+        ind = arr_dist[:,0].astype(int)
+        cb.loc[ind,'dist_node_num'] = arr_dist[:,1]
+        cb.loc[ind,'dist_bl'] = arr_dist[:,2]
+    print('Time elapsed for calculating inter-branch distances: {:,} sec'.format(int(time.time() - start_time)))
     return(cb)
 
 def standardize_node_names(tree):

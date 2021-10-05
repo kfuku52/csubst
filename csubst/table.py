@@ -2,8 +2,7 @@ import numpy
 import pandas
 
 import sys
-
-#from scipy.stats import chi2_contingency
+import time
 
 def sort_labels(df):
     swap_columns = df.columns[df.columns.str.startswith('branch_id')].tolist()
@@ -19,6 +18,7 @@ def sort_labels(df):
     return df
 
 def sort_cb(cb):
+    start = time.time()
     is_omega = cb.columns.str.contains('^omega_')
     is_d = cb.columns.str.contains('^d[NS]')
     is_nocalib = cb.columns.str.contains('_nocalib$')
@@ -39,15 +39,18 @@ def sort_cb(cb):
     if (len(col_order) < cb.columns.shape[0]):
         col_order += [ col for col in cb.columns if col not in col_order ]
     cb = cb.loc[:,col_order]
+    print('Time elapsed for sorting cb table: {:,} sec'.format(int(time.time() - start)))
     return cb
 
 def merge_tables(df1, df2):
+    start = time.time()
     columns = []
     columns = columns + df1.columns[df1.columns.str.startswith('branch_name')].tolist()
     columns = columns + df1.columns[df1.columns.str.startswith('branch_id')].tolist()
     columns = columns + df1.columns[df1.columns.str.startswith('site')].tolist()
     df = pandas.merge(df1, df2, on=columns)
     df = sort_labels(df=df)
+    print('Time elapsed for merging tables: {:,} sec'.format(int(time.time() - start)))
     return df
 
 def set_substitution_dtype(df):
@@ -61,12 +64,14 @@ def set_substitution_dtype(df):
     return df
 
 def get_linear_regression(cb):
+    start = time.time()
     for prefix in ['S','N']:
         x = cb.loc[:,prefix+'any2any'].values
         y = cb.loc[:,prefix+'any2spe'].values
         x = x[:,numpy.newaxis]
         coef,residuals,rank,s = numpy.linalg.lstsq(x, y, rcond=None)
         cb.loc[:,prefix+'_linreg_residual'] = y - (x[:,0]*coef[0])
+    print('Time elapsed for the linear regression of C ~ D: {:,} sec'.format(int(time.time() - start)))
     return cb
 
 def chisq_test(x, total_S, total_N):

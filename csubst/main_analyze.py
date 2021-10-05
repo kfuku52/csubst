@@ -130,9 +130,6 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         cbN = substitution.get_cb(id_combinations, N_tensor, g, 'N')
         cb = table.merge_tables(cbS, cbN)
         del cbS, cbN
-        cb = tree.get_node_distance(g['tree'], cb)
-        cb = substitution.get_substitutions_per_branch(cb, b, g)
-        #cb = combination.calc_substitution_patterns(cb)
         cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='')
         cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
         if (g['calibrate_longtail']):
@@ -142,6 +139,10 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
                 txt = '--calibrate_longtail is deactivated for arity = {}. '
                 txt += 'This option is effective for the arity range specified by --exhaustive_until.\n'
                 sys.stderr.write(txt.format(current_arity))
+        if g['branch_dist']:
+            cb = tree.get_node_distance(tree=g['tree'], cb=cb, ncpu=g['threads'], float_type=g['float_type'])
+        cb = substitution.get_substitutions_per_branch(cb, b, g)
+        #cb = combination.calc_substitution_patterns(cb)
         cb = table.get_linear_regression(cb)
         cb, g = foreground.get_foreground_branch_num(cb, g)
         cb = table.sort_cb(cb)

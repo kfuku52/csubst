@@ -1,8 +1,10 @@
-import itertools
-import re
-import copy
 import numpy
 import pandas
+
+import copy
+import itertools
+import re
+import time
 
 from csubst import combination
 from csubst import table
@@ -245,6 +247,7 @@ def get_marginal_branch(g):
     return g
 
 def get_foreground_branch_num(cb, g):
+    start_time = time.time()
     bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
     arity = len(bid_cols)
     if g['foreground'] is None:
@@ -294,6 +297,7 @@ def get_foreground_branch_num(cb, g):
     #g['df_cb_stats'].loc[is_arity,'num_qualified_all'] = num_enough
     #g['df_cb_stats'].loc[is_arity,'num_qualified_fg'] = num_fg_enough
     g['df_cb_stats'].loc[is_arity,'fg_enrichment_factor'] = enrichment_factor
+    print('Time elapsed for obtaining foreground branch numbers: {:,} sec'.format(int(time.time() - start_time)))
     return cb, g
 
 def annotate_foreground(b, g):

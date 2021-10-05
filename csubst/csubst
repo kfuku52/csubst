@@ -244,9 +244,10 @@ if __name__ == "__main__":
                          help='default=%(default)s: Cutoff statistics for searching higher-order branch combinations. '
                               'STAT is a column in csubst_cb_N.tsv. Regular expressions are supported. '
                               'e.g., "N_sub_[0-9]+" to specify the number of branch-wise nonsynonymous substitutions '
-                              'in all branches. '
-                              'VALUE is the minimum value, and branch combinations with smaller values will be excluded.　'
-                              '')
+                              'in all branches. VALUE is the minimum value, '
+                              'and branch combinations with smaller values will be excluded.')
+    analyze.add_argument('--branch_dist', metavar='yes|no', default='yes', type=strtobool,
+                         help='default=%(default)s: Set "yes" to calculate inter-branch distance.')
     # Substitution outputs
     analyze.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Branch output. Set "yes" to generate the output.')
