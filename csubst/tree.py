@@ -6,6 +6,7 @@ import copy
 import itertools
 import os
 import re
+import sys
 import time
 
 from csubst import sequence
@@ -337,4 +338,11 @@ def is_consistent_tree_and_aln(g):
     fasta_dict = sequence.read_fasta(path=g['alignment_file'])
     seq_names = list(fasta_dict.keys())
     is_consistent = set(leaf_names) == set(seq_names)
+    if not is_consistent:
+        dif1 = set(leaf_names) - set(seq_names)
+        dif2 = set(seq_names) - set(leaf_names)
+        if len(dif1):
+            sys.stderr.write('Taxa that are present in tree but not in alignment: {}\n'.format(', '.join(dif1)))
+        if len(dif2):
+            sys.stderr.write('Taxa that are present in alignment but not in tree: {}\n'.format(', '.join(dif2)))
     return is_consistent
