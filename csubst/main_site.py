@@ -484,7 +484,7 @@ def get_df_dist(sub_tensor, g, mode):
             interbranch_dist = numpy.nan
         elif branch_ids.shape[0]==1:
             interbranch_dist = numpy.nan
-        elif branch_ids.shape[0]>2:
+        elif branch_ids.shape[0]>=2:
             node_dists = list()
             nodes = [ tree_dict[n] for n in branch_ids ]
             for nds in list(itertools.combinations(nodes, 2)):
@@ -587,9 +587,37 @@ def add_branch_id_list(g):
         g['branch_id_list'] = [numpy.array([ int(s) for s in g['branch_id'].split(',')]),]
     return g
 
+def pdb_sequence_search(g):
+    from pypdb import Query
+    print('')
+    representative_branch_id = g['branch_ids'][0]
+    for node in g['tree'].traverse():
+        if (node.numerical_label==representative_branch_id):
+            representative_leaf = node.get_leaves()[0]
+            nlabel = representative_leaf.numerical_label
+            aa_query = sequence.translate_state(nlabel=nlabel, mode='aa', g=g)
+            aa_query = aa_query.replace('-', '')
+            break
+    q = Query(aa_query, query_type='sequence', return_type='polymer_entity')
+    mmseqs2_out = q.search()
+    best_hit = mmseqs2_out['result_set'][0]
+    best_hit_mc = best_hit['services'][0]['nodes'][0]['match_context'][0]
+    print('MMseqs2 search against PDB: Query = {}'.format(representative_leaf.name))
+    print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
+    print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
+    for key in best_hit_mc.keys():
+        print('MMseqs2 search against PDB: Best hit {} = {}'.format(key, best_hit_mc[key]))
+    print('')
+    pdb_id = re.sub('_.*', '', best_hit['identifier'])
+    return pdb_id
+
 def main_site(g):
     if g['pdb'] is not None:
         from csubst import parser_pymol
+    if g['pdb'] =='besthit':
+        g['run_pdb_sequence_search'] = True
+    else:
+        g['run_pdb_sequence_search'] = False
     print("Reading and parsing input files.", flush=True)
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = tree.read_treefile(g)
@@ -626,6 +654,8 @@ def main_site(g):
         df.loc[:,is_site_col] += 1
         if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
             export2chimera(df, g)
+        if g['run_pdb_sequence_search']:
+            g['pdb'] = pdb_sequence_search(g)
         if (g['pdb'] is not None):
             parser_pymol.initialize_pymol(g=g)
             pdb_base = re.sub('.*/', '', g['pdb'])

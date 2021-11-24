@@ -190,11 +190,13 @@ if __name__ == "__main__":
     site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,
                       help='default=%(default)s: PATH to fasta file containing untrimmed CDS sequence(s). '
                            'Codon positions along the sequence(s) appear in the output tsv.')
-    site.add_argument('--pdb', metavar='PATH/PDB_CODE', default=None, required=False, type=str,
-                      help='default=%(default)s: PATH to downloaded pdb file or PDB CODE (e.g., 3SV0). '
-                           'If the latter, PDB file will be fetched from the database. '
-                           'The protein sequence will be aligned with mafft, '
-                           'and a pymol session visualizing convergence and divergence will be generated.')
+    site.add_argument('--pdb', metavar='PATH/PDB_CODE/besthit', default=None, required=False, type=str,
+                      help='default=%(default)s: '
+                           'PATH: PATH to downloaded pdb file. '
+                           'PDB CODE: e.g. 3SV0. PDB file will be fetched from the database. '
+                           'The PDB protein sequence will be aligned with mafft, '
+                           'and a pymol session visualizing convergence and divergence will be generated. '
+                           'besthit: Run online MMseqs2 and automatically fetch the best hit PDB model. ')
     site.add_argument('--remove_solvent', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to remove solvent and small non-specific ligands. '
                            'Used only with --pdb.')
