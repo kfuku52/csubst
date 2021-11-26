@@ -17,8 +17,8 @@ def initialize_pymol(g):
     #pymol.pymol_argv = ['pymol','-qc']
     #pymol.finish_launching()
     pymol.cmd.do('delete all')
-    is_old_pdb_code = bool(re.search('[0-9][A-Za-z0-9]{3}', g['pdb']))
-    is_new_pdb_code = bool(re.search('pdb_[0-9]{5}[A-Za-z0-9]{3}', g['pdb']))
+    is_old_pdb_code = bool(re.fullmatch('[0-9][A-Za-z0-9]{3}', g['pdb']))
+    is_new_pdb_code = bool(re.fullmatch('pdb_[0-9]{5}[A-Za-z0-9]{3}', g['pdb']))
     if is_old_pdb_code|is_new_pdb_code:
         print('Fetching PDB code {}. Internet connection is needed.'.format(g['pdb']), flush=True)
         pymol.cmd.do('fetch {}'.format(g['pdb']))
@@ -113,8 +113,9 @@ def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
 def calc_aa_identity(g):
     seqs = sequence.read_fasta(path=g['mafft_add_fasta'])
     seqnames = list(seqs.keys())
-    pdb_seqnames = [ sn for sn in seqnames if sn.startswith(g['pdb']) ]
-    other_seqnames = [ sn for sn in seqnames if not sn.startswith(g['pdb']) ]
+    pdb_base = re.sub('\..*', '', os.path.basename(g['pdb']))
+    pdb_seqnames = [ sn for sn in seqnames if sn.startswith(pdb_base) ]
+    other_seqnames = [ sn for sn in seqnames if not sn.startswith(pdb_base) ]
     aa_identity_values = dict()
     for pdb_seqname in pdb_seqnames:
         aa_identity_values[pdb_seqname] = []
