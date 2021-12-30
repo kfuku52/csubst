@@ -31,7 +31,7 @@ def write_mafft_map(g):
     mafft_map_file = tmp_pdb_fasta+'.map'
     if os.path.exists(mafft_map_file):
         os.remove(mafft_map_file)
-    pdb_seq = pymol.cmd.get_fastastr(selection='all', state=-1, quiet=1)
+    pdb_seq = pymol.cmd.get_fastastr(selection='polymer.protein', state=-1, quiet=1)
     with open(tmp_pdb_fasta, 'w') as f:
         f.write(pdb_seq)
     sequence.write_alignment(outfile='tmp.csubst.leaf.aa.fa', mode='aa', g=g, leaf_only=True)
@@ -100,14 +100,18 @@ def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
     for map_item in map_list:
         seq_name = re.sub('\n.*', '', map_item)
         seq_csv = re.sub(seq_name+'\n', '', map_item)
-        df_tmp = pandas.read_csv(StringIO(seq_csv), comment='#', header=None)
-        df_tmp.columns = ['aa_'+seq_name, 'codon_site_'+seq_name, 'codon_site_alignment']
-        is_missing_in_aln = (df_tmp.loc[:,'codon_site_alignment']==' -')
-        df_tmp = df_tmp.loc[~is_missing_in_aln,:]
-        df_tmp.loc[:,'codon_site_alignment'] = df_tmp.loc[:,'codon_site_alignment'].astype(int)
-        df = pandas.merge(df, df_tmp, on='codon_site_alignment', how='left')
-        df.loc[:,'codon_site_'+seq_name] = df.loc[:,'codon_site_'+seq_name].fillna(0).astype(int)
-        df.loc[:,'aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
+        if seq_csv.count('\n')==1: # empty data
+            df.loc[:,'codon_site_'+seq_name] = 0
+            df.loc[:,'aa_'+seq_name] = 0
+        else:
+            df_tmp = pandas.read_csv(StringIO(seq_csv), comment='#', header=None)
+            df_tmp.columns = ['aa_'+seq_name, 'codon_site_'+seq_name, 'codon_site_alignment']
+            is_missing_in_aln = (df_tmp.loc[:,'codon_site_alignment']==' -')
+            df_tmp = df_tmp.loc[~is_missing_in_aln,:]
+            df_tmp.loc[:,'codon_site_alignment'] = df_tmp.loc[:,'codon_site_alignment'].astype(int)
+            df = pandas.merge(df, df_tmp, on='codon_site_alignment', how='left')
+            df.loc[:,'codon_site_'+seq_name] = df.loc[:,'codon_site_'+seq_name].fillna(0).astype(int)
+            df.loc[:,'aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
     return df
 
 def calc_aa_identity(g):
@@ -133,6 +137,7 @@ def calc_aa_identity(g):
 def mask_subunit(g):
     colors = ['wheat','slate','salmon','brightorange','violet','olive',
               'firebrick','pink','marine','density','cyan','chocolate','teal',]
+    colors *= 10 # for supercomplex
     g = calc_aa_identity(g)
     pdb_seqnames = list(g['aa_identity_means'].keys())
     if len(pdb_seqnames)==1:
