@@ -70,7 +70,7 @@ def get_residue_numberings():
             pymol.stored.residues = []
             txt_selection = '{} and chain {} and name ca'.format(object_name, ch)
             pymol.cmd.iterate(selection=txt_selection, expression='stored.residues.append(resi)')
-            residue_numbers = [ int(x) for x in pymol.stored.residues ]
+            residue_numbers = [ int(x) for x in pymol.stored.residues if not bool(re.search('[a-zA-Z]', x)) ]
             residue_numbers = sorted(list(set(residue_numbers))) # Drop occasionally observed duplications
             residue_iloc = numpy.arange(len(residue_numbers)) + 1
             col1 = 'codon_site_'+object_name+'_'+ch
@@ -130,8 +130,15 @@ def calc_aa_identity(g):
     aa_identity_means = dict()
     for pdb_seqname in pdb_seqnames:
         aa_identity_means[pdb_seqname] = aa_identity_values[pdb_seqname].mean()
+    aa_ranges = dict()
+    for pdb_seqname in pdb_seqnames:
+        alphabet_sites = [ m.start() for m in re.finditer('[a-zA-Z]', seqs[pdb_seqname]) ]
+        aa_start = min(alphabet_sites)
+        aa_end = max(alphabet_sites)
+        aa_ranges[pdb_seqname] = [aa_start, aa_end]
     g['aa_identity_values'] = aa_identity_values
     g['aa_identity_means'] = aa_identity_means
+    g['aa_spans'] = aa_ranges
     return g
 
 def mask_subunit(g):
@@ -142,15 +149,24 @@ def mask_subunit(g):
     pdb_seqnames = list(g['aa_identity_means'].keys())
     if len(pdb_seqnames)==1:
         return None
-    ranksorted_identity_means = sorted(set(g['aa_identity_means'].values()), reverse=True)
-    for i,identity_value in enumerate(ranksorted_identity_means):
-        hit_seqnames = [ pdb_seqnames[j] for j,m in enumerate(g['aa_identity_means'].values()) if m==identity_value ]
-        if (i==0)&(len(hit_seqnames)>1):
-            hit_seqnames = hit_seqnames[1::]
-        chains = [ h.replace(g['pdb']+'_', '') for h in hit_seqnames ]
-        for chain in chains:
-            print('Masking chain {}'.format(chain), flush=True)
-            pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
+    max_aa_identity_mean = max(g['aa_identity_means'].values())
+    for pdb_seqname in pdb_seqnames:
+        aa_identity_mean = g['aa_identity_means'][pdb_seqname]
+        if abs(max_aa_identity_mean-aa_identity_mean)<g['float_tol']:
+            max_spans = g['aa_spans'][pdb_seqname]
+            break
+    i = 0
+    for pdb_seqname in pdb_seqnames:
+        aa_identity_mean = g['aa_identity_means'][pdb_seqname]
+        if abs(max_aa_identity_mean-aa_identity_mean)<g['float_tol']:
+            continue
+        spans = g['aa_spans'][pdb_seqname]
+        if (max_spans[0] > spans[1])|(max_spans[1] < spans[0]):
+            continue
+        chain = pdb_seqname.replace(g['pdb']+'_', '')
+        print('Masking chain {}'.format(chain), flush=True)
+        pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
+        i += 1
 
 def set_color_gray(object_names, residue_numberings):
     for object_name in object_names:
