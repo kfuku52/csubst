@@ -153,15 +153,17 @@ def mask_subunit(g):
     for pdb_seqname in pdb_seqnames:
         aa_identity_mean = g['aa_identity_means'][pdb_seqname]
         if abs(max_aa_identity_mean-aa_identity_mean)<g['float_tol']:
+            max_pdb_seqname = pdb_seqname
             max_spans = g['aa_spans'][pdb_seqname]
             break
     i = 0
     for pdb_seqname in pdb_seqnames:
-        aa_identity_mean = g['aa_identity_means'][pdb_seqname]
-        if abs(max_aa_identity_mean-aa_identity_mean)<g['float_tol']:
+        if pdb_seqname==max_pdb_seqname:
             continue
         spans = g['aa_spans'][pdb_seqname]
-        if (max_spans[0] > spans[1])|(max_spans[1] < spans[0]):
+        is_nonoverlapping_N_side = (max_spans[1] < spans[0])
+        is_nonoverlapping_C_side = (max_spans[0] > spans[1])
+        if (is_nonoverlapping_N_side|is_nonoverlapping_C_side):
             continue
         chain = pdb_seqname.replace(g['pdb']+'_', '')
         print('Masking chain {}'.format(chain), flush=True)
