@@ -587,13 +587,21 @@ def add_branch_id_list(g):
         g['branch_id_list'] = [numpy.array([ int(s) for s in g['branch_id'].split(',')]),]
     return g
 
+def get_representative_leaf(node, size='median'):
+    leaves = node.get_leaves()
+    leaf_seqlens = [ len(l.sequence.replace('-', '')) for l in leaves ]
+    if size=='median':
+        ind = numpy.argsort(leaf_seqlens)[len(leaf_seqlens) // 2]
+    representative_leaf = leaves[ind]
+    return representative_leaf
+
 def pdb_sequence_search(g):
     from pypdb import Query
     print('')
     representative_branch_id = g['branch_ids'][0]
     for node in g['tree'].traverse():
         if (node.numerical_label==representative_branch_id):
-            representative_leaf = node.get_leaves()[0]
+            representative_leaf = get_representative_leaf(node, size='median')
             nlabel = representative_leaf.numerical_label
             aa_query = sequence.translate_state(nlabel=nlabel, mode='aa', g=g)
             aa_query = aa_query.replace('-', '')
