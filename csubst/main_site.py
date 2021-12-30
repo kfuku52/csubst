@@ -598,17 +598,21 @@ def pdb_sequence_search(g):
             aa_query = sequence.translate_state(nlabel=nlabel, mode='aa', g=g)
             aa_query = aa_query.replace('-', '')
             break
-    q = Query(aa_query, query_type='sequence', return_type='polymer_entity')
-    mmseqs2_out = q.search()
-    best_hit = mmseqs2_out['result_set'][0]
-    best_hit_mc = best_hit['services'][0]['nodes'][0]['match_context'][0]
     print('MMseqs2 search against PDB: Query = {}'.format(representative_leaf.name))
     print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
-    print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
-    for key in best_hit_mc.keys():
-        print('MMseqs2 search against PDB: Best hit {} = {}'.format(key, best_hit_mc[key]))
-    print('')
-    pdb_id = re.sub('_.*', '', best_hit['identifier'])
+    q = Query(aa_query, query_type='sequence', return_type='polymer_entity')
+    mmseqs2_out = q.search()
+    if mmseqs2_out is None:
+        sys.stderr.write('No hit in MMseqs2 search against the PDB database. PyMol session will not be generated\n')
+        pdb_id = None
+    else:
+        best_hit = mmseqs2_out['result_set'][0]
+        best_hit_mc = best_hit['services'][0]['nodes'][0]['match_context'][0]
+        print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
+        for key in best_hit_mc.keys():
+            print('MMseqs2 search against PDB: Best hit {} = {}'.format(key, best_hit_mc[key]))
+        print('')
+        pdb_id = re.sub('_.*', '', best_hit['identifier'])
     return pdb_id
 
 def main_site(g):
