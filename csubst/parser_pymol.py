@@ -169,6 +169,10 @@ def mask_subunit(g):
         print('Masking chain {}'.format(chain), flush=True)
         pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
         i += 1
+    for chain in pymol.cmd.get_chains(selection='polymer.nucleic'):
+        print('Masking chain {}'.format(chain), flush=True)
+        pymol.cmd.do('color {}, chain {} and polymer.nucleic'.format(colors[i], chain))
+        i += 1
 
 def set_color_gray(object_names, residue_numberings):
     for object_name in object_names:
