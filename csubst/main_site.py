@@ -6,6 +6,7 @@ import itertools
 import os
 import re
 import sys
+import urllib
 
 from csubst import genetic_code
 from csubst import parser_misc
@@ -595,6 +596,13 @@ def get_representative_leaf(node, size='median'):
     representative_leaf = leaves[ind]
     return representative_leaf
 
+def get_top_hit_id(my_hits):
+    top_hit_title = my_hits.descriptions[0].title
+    top_hit_id = re.findall('\|.*\|', top_hit_title)[0]
+    top_hit_id = re.sub('\|', '', top_hit_id)
+    top_hit_id = re.sub('\..*', '', top_hit_id)
+    return top_hit_id
+
 def pdb_sequence_search(g):
     from pypdb import Query
     print('')
@@ -609,11 +617,8 @@ def pdb_sequence_search(g):
     print('MMseqs2 search against PDB: Query = {}'.format(representative_leaf.name))
     print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
     q = Query(aa_query, query_type='sequence', return_type='polymer_entity')
-    mmseqs2_out = q.search()
-    if mmseqs2_out is None:
-        sys.stderr.write('No hit in MMseqs2 search against the PDB database. PyMol session will not be generated\n')
-        pdb_id = None
-    else:
+    try:
+        mmseqs2_out = q.search()
         best_hit = mmseqs2_out['result_set'][0]
         best_hit_mc = best_hit['services'][0]['nodes'][0]['match_context'][0]
         print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
@@ -621,6 +626,30 @@ def pdb_sequence_search(g):
             print('MMseqs2 search against PDB: Best hit {} = {}'.format(key, best_hit_mc[key]))
         print('')
         pdb_id = re.sub('_.*', '', best_hit['identifier'])
+    except:
+        from Bio.Blast import NCBIWWW
+        from Bio.Blast import NCBIXML
+        print('MMseqs2 search against PDB was unsuccessful.')
+        print('Running NCBI BLAST against UniProtKB/SwissProt. This step may take hours depending on the NCBI server conditions.')
+        my_search = NCBIWWW.qblast(program='blastp', database='swissprot', sequence=aa_query, expect=10)
+        my_hits = NCBIXML.read(my_search)
+        my_search.close()
+        if my_hits.descriptions is None:
+            print('No hit found.')
+            pdb_id = None
+            return pdb_id
+        print('Top hits (up to 10 displayed)')
+        for i,description in enumerate(my_hits.descriptions):
+            if i>=10:
+                break
+            print(description.title)
+        top_hit_id = get_top_hit_id(my_hits)
+        download_url = 'https://alphafold.ebi.ac.uk/files/AF-'+top_hit_id+'-F1-model_v2.pdb'
+        alphafold_pdb = urllib.request.urlopen(download_url).read()
+        alphafold_pdb_path = os.path.basename(download_url)
+        with open(alphafold_pdb_path, mode='wb') as f:
+            f.write(alphafold_pdb)
+        pdb_id = alphafold_pdb_path
     return pdb_id
 
 def main_site(g):

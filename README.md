@@ -22,6 +22,7 @@
 * [matplotlib](https://matplotlib.org/3.1.1/index.html) (Optional: required for `csubst site`)
 * [PyMOL](https://pymol.org/2/) (Optional: required for `csubst site --pdb`; Open-source version can be installed by [conda](https://anaconda.org/conda-forge/pymol-open-source) or [brew](https://github.com/brewsci/homebrew-bio))
 * [pypdb](https://github.com/williamgilpin/pypdb) (Optional: required for `csubst site -pdb besthit`)
+* [biopython](https://biopython.org/) (Optional: required for `csubst site -pdb besthit`)
 
 ## Installation
 **CSUBST** can be installed by the following command. **IQ-TREE** should also be installed in the same environment; See [here](http://www.iqtree.org/doc/Quickstart#installation) for instruction. Try `conda install -c bioconda iqtree` if you are familiar with `conda`.
