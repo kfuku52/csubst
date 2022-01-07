@@ -603,6 +603,15 @@ def get_top_hit_id(my_hits):
     top_hit_id = re.sub('\..*', '', top_hit_id)
     return top_hit_id
 
+def is_url_valid(url):
+    request = urllib.request.Request(url)
+    request.get_method = lambda: 'HEAD'
+    try:
+        urllib.request.urlopen(request)
+        return True
+    except urllib.request.HTTPError:
+        return False
+
 def pdb_sequence_search(g):
     from pypdb import Query
     print('')
@@ -630,7 +639,7 @@ def pdb_sequence_search(g):
         from Bio.Blast import NCBIWWW
         from Bio.Blast import NCBIXML
         print('MMseqs2 search against PDB was unsuccessful.')
-        print('Running NCBI BLAST against UniProtKB/SwissProt. This step may take hours depending on the NCBI server conditions.')
+        print('Running NCBI BLAST against UniProtKB/SwissProt. This step may take hours depending on the NCBI QBLAST server conditions.')
         my_search = NCBIWWW.qblast(program='blastp', database='swissprot', sequence=aa_query, expect=10)
         my_hits = NCBIXML.read(my_search)
         my_search.close()
@@ -645,11 +654,15 @@ def pdb_sequence_search(g):
             print(description.title)
         top_hit_id = get_top_hit_id(my_hits)
         download_url = 'https://alphafold.ebi.ac.uk/files/AF-'+top_hit_id+'-F1-model_v2.pdb'
-        alphafold_pdb = urllib.request.urlopen(download_url).read()
-        alphafold_pdb_path = os.path.basename(download_url)
-        with open(alphafold_pdb_path, mode='wb') as f:
-            f.write(alphafold_pdb)
-        pdb_id = alphafold_pdb_path
+        if is_url_valid(url=download_url):
+            alphafold_pdb = urllib.request.urlopen(download_url).read()
+            alphafold_pdb_path = os.path.basename(download_url)
+            with open(alphafold_pdb_path, mode='wb') as f:
+                f.write(alphafold_pdb)
+            pdb_id = alphafold_pdb_path
+        else:
+            print('AlphaFold download URL not found: {}'.format(download_url))
+            pdb_id = None
     return pdb_id
 
 def main_site(g):
