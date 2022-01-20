@@ -274,19 +274,23 @@ def get_omega(cb, g):
         col_dS = 'dS'+sub
         if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
             cb.loc[:,col_dN] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
-            is_N_zero = (cb.loc[:,col_N]<(0.1**g['float_digit']))
+            is_N_zero = (cb.loc[:,col_N]<g['float_tol'])
             cb.loc[is_N_zero,col_dN] = 0
             cb.loc[:,col_dS] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
-            is_S_zero = (cb.loc[:,col_S]<(0.1**g['float_digit']))
+            is_S_zero = (cb.loc[:,col_S]<g['float_tol'])
             cb.loc[is_S_zero,col_dS] = 0
             cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
-            is_dN_zero = (cb.loc[:,col_dN]<(0.1**g['float_digit']))
+            is_dN_zero = (cb.loc[:,col_dN]<g['float_tol'])
             cb.loc[is_dN_zero,col_omega] = 0
     return cb
 
-def get_CoD(cb):
-    cb['NCoD'] = cb['Nany2spe'] / cb['Nany2dif']
-    cb['SCoD'] = cb['Sany2spe'] / cb['Sany2dif']
+def get_CoD(cb, g):
+    for NS in ['N','S']:
+        cb.loc[:,NS+'CoD'] = cb[NS+'any2spe'] / cb[NS+'any2dif']
+        is_Nzero = (cb[NS+'any2spe']<g['float_tol'])
+        is_inf = numpy.isinf(cb.loc[:,NS+'CoD'])
+        if (is_Nzero&is_inf).sum():
+            cb.loc[(is_Nzero&is_inf), NS + 'CoD'] = numpy.nan
     return cb
 
 def print_cb_stats(cb, prefix):
@@ -307,7 +311,7 @@ def print_cb_stats(cb, prefix):
 def calc_omega(cb, S_tensor, N_tensor, g):
     cb = get_E(cb, g, N_tensor, S_tensor)
     cb = get_omega(cb, g)
-    cb = get_CoD(cb)
+    cb = get_CoD(cb, g)
     print_cb_stats(cb=cb, prefix='cb')
     return(cb, g)
 
