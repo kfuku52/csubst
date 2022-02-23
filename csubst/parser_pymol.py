@@ -241,7 +241,7 @@ def write_pymol_session(df, g):
     pymol.cmd.do("hide ribbon")
     pymol.cmd.do("show cartoon")
     pymol.cmd.do("show surface")
-    pymol.cmd.do("set transparency, {}".format(g['pymol_transparency']))
+    pymol.cmd.do("set transparency, {}, polymer.protein".format(g['pymol_transparency']))
     object_names = pymol.cmd.get_names()
     #residue_numberings = get_residue_numberings()
     #set_color_gray(object_names, residue_numberings, gray_value=g['pymol_gray'])
