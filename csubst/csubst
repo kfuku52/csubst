@@ -217,6 +217,10 @@ if __name__ == "__main__":
                       help='default=%(default)s: Minimum probability of combinatorial substitutions to visualize.')
     site.add_argument('--pymol_min_single_prob', metavar='FLOAT', default=0.8, required=False, type=float,
                       help='default=%(default)s: Minimum probability of single substitutions to visualize.')
+    site.add_argument('--pymol_gray', metavar='INT', default=80, required=False, type=int,
+                      help='default=%(default)s: Gray value for no-substitution sites. 0=black, 100=white')
+    site.add_argument('--pymol_transparency', metavar='FLOAT', default=0.65, required=False, type=float,
+                      help='default=%(default)s: Surface transparency. 0=non-transparent, 1=completely transparent')
     site.add_argument('--export2chimera', metavar='yes|no', default='no', required=False, type=strtobool,
                       help='default=%(default)s: Set "yes" to export files for the visualization of '
                            'convergence/divergence probabilities with UCSF Chimera. '

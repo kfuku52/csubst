@@ -174,7 +174,7 @@ def mask_subunit(g):
         pymol.cmd.do('color {}, chain {} and polymer.nucleic'.format(colors[i], chain))
         i += 1
 
-def set_color_gray(object_names, residue_numberings):
+def set_color_gray(object_names, residue_numberings, gray_value):
     for object_name in object_names:
         if object_name.endswith('_pol_conts'):
             continue
@@ -184,8 +184,8 @@ def set_color_gray(object_names, residue_numberings):
             is_nonzero = (codon_site_pdb!=0)
             residue_start = codon_site_pdb.loc[is_nonzero].min()
             residue_end = codon_site_pdb.loc[is_nonzero].max()
-            cmd_color = "color gray80, {} and chain {} and resi {:}-{:}"
-            pymol.cmd.do(cmd_color.format(object_name, ch, residue_start, residue_end))
+            cmd_color = "color gray{}, {} and chain {} and resi {:}-{:}"
+            pymol.cmd.do(cmd_color.format(gray_value, object_name, ch, residue_start, residue_end))
 
 def set_substitution_colors(df, g, object_names, N_sub_cols):
     for object_name in object_names:
@@ -241,11 +241,11 @@ def write_pymol_session(df, g):
     pymol.cmd.do("hide ribbon")
     pymol.cmd.do("show cartoon")
     pymol.cmd.do("show surface")
-    pymol.cmd.do("set transparency, 0.65")
+    pymol.cmd.do("set transparency, {}".format(g['pymol_transparency']))
     object_names = pymol.cmd.get_names()
     #residue_numberings = get_residue_numberings()
-    #set_color_gray(object_names, residue_numberings)
-    pymol.cmd.do("color gray80, polymer.protein")
+    #set_color_gray(object_names, residue_numberings, gray_value=g['pymol_gray'])
+    pymol.cmd.do("color gray{}, polymer.protein".format(g['pymol_gray']))
     pymol.cmd.do('util.cbag organic')
     N_sub_cols = df.columns[df.columns.str.startswith('N_sub_')]
     set_substitution_colors(df, g, object_names, N_sub_cols)
