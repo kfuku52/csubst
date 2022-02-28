@@ -347,7 +347,7 @@ def get_parent_branch_ids(branch_ids, g):
             parent_branch_ids[node.numerical_label] = node.up.numerical_label
     return parent_branch_ids
 
-def add_states(df, branch_ids, g):
+def add_states(df, branch_ids, g, add_hydrophobicity=True):
     parent_branch_ids = get_parent_branch_ids(branch_ids, g)
     seqtypes = ['cdn','pep']
     seqtypes2 = ['cdn','aa']
@@ -369,6 +369,25 @@ def add_states(df, branch_ids, g):
                 if not anc_states.max()==0:
                     ml_anc_state = g[order_key][anc_states.argmax()]
                     df.at[i,anc_col] = ml_anc_state
+    if add_hydrophobicity:
+        # https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0080635
+        aa_hydrophobicity_empirical = {
+            'A':129.0, 'R':274.0, 'N':195.0, 'D':193.0, 'C':167.0,
+            'E':223.0, 'Q':225.0, 'G':104.0, 'H':224.0, 'I':197.0,
+            'L':201.0, 'K':236.0, 'M':224.0, 'F':240.0, 'P':159.0,
+            'S':155.0, 'T':172.0, 'W':285.0, 'Y':263.0, 'V':174.0,
+            '':numpy.nan,
+        }
+        df_aa_hydrophobicity_empirical = pandas.DataFrame({
+            'aa':aa_hydrophobicity_empirical.keys(),
+            'hydrophobicity': aa_hydrophobicity_empirical.values(),
+        })
+        aa_cols = df.columns[df.columns.str.startswith('aa_')]
+        for aa_col in aa_cols:
+            hp_col = aa_col+'_'+'hydrophobicity'
+            df_aa_hydrophobicity_empirical.columns = [aa_col, hp_col]
+            df = pandas.merge(df, df_aa_hydrophobicity_empirical, on=aa_col, how='left', sort=False)
+        print('')
     return df
 
 def get_state_orders(g, mode):
