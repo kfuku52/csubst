@@ -187,7 +187,10 @@ def plot_barchart(df, g):
             ax.set_xlim(df.loc[:,'codon_site_alignment'].min()-0.5, df.loc[:,'codon_site_alignment'].max()+0.5)
         i += 1
     fig.tight_layout(h_pad=0.5, w_pad=1)
-    outbase = os.path.join(g['site_outdir'], 'csubst_site')
+    if g['pdb'] is None:
+        outbase = os.path.join(g['site_outdir'], 'csubst_site')
+    else:
+        outbase = os.path.join(g['site_outdir'], 'csubst_site.' + re.sub('.pdb$', '', os.path.basename(g['pdb'])))
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
     #fig.savefig(outbase+".svg", format='svg', transparent=True)
     print("Nonsynonymous and synonymous substitutions are shown in color and gray, respectively.", flush=True)
@@ -741,7 +744,11 @@ def main_site(g):
             parser_pymol.write_pymol_session(df=df, g=g)
         plot_barchart(df, g)
         plot_state(N_tensor, S_tensor, g['branch_ids'], g)
-        out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
+        if g['pdb'] is None:
+            out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
+        else:
+            out_file = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.tsv'
+            out_path = os.path.join(g['site_outdir'], out_file)
         df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
     print('To visualize the convergence probability on protein structure, please see:')
     print('https://github.com/kfuku52/csubst/wiki/Visualizing-convergence-probabilities-on-protein-structures')
