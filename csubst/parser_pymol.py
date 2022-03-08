@@ -147,6 +147,8 @@ def mask_subunit(g):
     colors *= 10 # for supercomplex
     g = calc_aa_identity(g)
     pdb_seqnames = list(g['aa_identity_means'].keys())
+    for nucleotide in ['DG','DT','DA','DC']: # DNA
+        pymol.cmd.do('color pink, resn '+nucleotide)
     if len(pdb_seqnames)==1:
         return None
     max_aa_identity_mean = max(g['aa_identity_means'].values())
