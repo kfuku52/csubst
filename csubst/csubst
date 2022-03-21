@@ -74,7 +74,7 @@ if __name__ == "__main__":
     psr_co.add_argument('--parallel_mode', metavar='thread|process', default='process', type=str,
                         choices=['thread','process'], # 'thread' does not use CPUs efficiently.
                         help='default=%(default)s: Mode of parallel computation.')
-    psr_co.add_argument('--float_type', metavar='16|32|64', default=32, type=int, required=False,
+    psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
                         help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
     psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')
