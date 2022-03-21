@@ -308,7 +308,7 @@ if __name__ == "__main__":
 
     # Handler
     args = parser.parse_args()
-    param.set_num_thread_variables(num_thread=args.threads)
+    #param.set_num_thread_variables(num_thread=args.threads)
     if hasattr(args, 'handler'):
         args.handler(args)
     else:

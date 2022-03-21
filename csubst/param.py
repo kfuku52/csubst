@@ -43,6 +43,8 @@ def get_global_parameters(args):
         assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
     if 'float_digit' in g.keys():
         g['float_format'] = '%.'+str(g['float_digit'])+'f'
+    if 'threads' in g.keys():
+        set_num_thread_variables(num_thread=g['threads'])
     return g
 
 def initialize_df_cb_stats(g):
