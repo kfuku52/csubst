@@ -294,8 +294,6 @@ def get_foreground_branch_num(cb, g):
                      num_all, enrichment_factor)
     print(txt, flush=True)
     is_arity = (g['df_cb_stats'].loc[:,'arity']==arity)
-    #g['df_cb_stats'].loc[is_arity,'num_qualified_all'] = num_enough
-    #g['df_cb_stats'].loc[is_arity,'num_qualified_fg'] = num_fg_enough
     g['df_cb_stats'].loc[is_arity,'fg_enrichment_factor'] = enrichment_factor
     print('Time elapsed for obtaining foreground branch numbers: {:,} sec'.format(int(time.time() - start_time)))
     return cb, g

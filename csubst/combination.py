@@ -46,8 +46,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     tree = g['tree']
     all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
     if verbose:
-        print("Arity:", arity, flush=True)
-        print("All nodes: {:,}".format(len(all_nodes)), flush=True)
+        print("All branches: {:,}".format(len(all_nodes)), flush=True)
     if (target_nodes is None):
         target_nodes = list()
         for node in all_nodes:
@@ -61,7 +60,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         if (target_nodes.shape.__len__()==1):
             target_nodes = numpy.expand_dims(target_nodes, axis=1)
         index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
-        print('Number of combinations for unions = {:,}'.format(len(index_combinations)), flush=True)
+        print('Number of branch combination unions (redundant) = {:,}'.format(len(index_combinations)), flush=True)
         axis = (len(index_combinations), arity)
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
@@ -79,8 +78,8 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int)
     if verbose:
         num_target_node = numpy.unique(target_nodes.flatten()).shape[0]
-        print("Number of target nodes: {:,}".format(num_target_node), flush=True)
-        print("Number of node combinations: {:,}".format(node_combinations.shape[0]), flush=True)
+        print("Number of target branches: {:,}".format(num_target_node), flush=True)
+        print("Number of independent and non-independent branch combinations: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=numpy.bool)
     for i in numpy.arange(node_combinations.shape[0]):
         nc_matrix[node_combinations[i,:],i] = 1

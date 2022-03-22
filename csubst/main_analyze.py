@@ -48,6 +48,10 @@ def add_median_cb_stats(g, cb, current_arity, start):
     ES_cols = cb.columns[is_ES].tolist()
     stats['median'] = ['dist_bl','dist_node_num',] + omega_cols
     stats['total'] = ON_cols + OS_cols + EN_cols + ES_cols
+    is_qualified = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
+    for suffix, is_target in zip(suffices, is_targets):
+        g['df_cb_stats'].loc[is_arity, 'num' + suffix] = is_target.sum()
+        g['df_cb_stats'].loc[is_arity, 'num_qualified' + suffix] = (is_target&is_qualified).sum()
     for stat in stats.keys():
         for suffix,is_target in zip(suffices,is_targets):
             for ms in stats[stat]:
@@ -61,9 +65,6 @@ def add_median_cb_stats(g, cb, current_arity, start):
                         g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
                     elif stat=='total':
                         g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
-            g['df_cb_stats'].loc[is_arity,'num'+suffix] = is_target.sum()
-            num_qualified = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat']).sum()
-            g['df_cb_stats'].loc[is_arity,'num_qualified'+suffix] = num_qualified
     for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
         key = SN+anc+'2'+des
         totalN = g['df_cb_stats'].loc[is_arity, 'total_'+key+'_all'].values[0]
@@ -82,24 +83,33 @@ def add_median_cb_stats(g, cb, current_arity, start):
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
     end_flag = 0
     g = param.initialize_df_cb_stats(g)
-    g['df_cb_stats'].loc[:,'mode'] = mode
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
         print("Generating combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
         g['current_arity'] = current_arity
-        if (g['exhaustive_until']>=current_arity)|((current_arity==2)&(g['foreground'] is None)):
-            print('Exhaustively searching independent branch combinations.', flush=True)
-            g,id_combinations = combination.get_node_combinations(g=g, target_nodes=None,
-                                                                  arity=current_arity, check_attr="name")
-        elif (current_arity==2)&(g['foreground'] is not None):
-            print('Searching foreground branch combinations only.', flush=True)
-            g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'],
-                                                                  arity=current_arity, check_attr='name')
+        if (current_arity==2):
+            if (g['exhaustive_until']<current_arity)&(g['foreground'] is not None):
+                print('Searching foreground branch combinations only.', flush=True)
+                g['df_cb_stats'].loc[current_arity-1, 'mode'] = 'foreground'
+                g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'],
+                                                                      arity=current_arity, check_attr='name')
+            else:
+                print('Exhaustively searching independent branch combinations.', flush=True)
+                g['df_cb_stats'].loc[current_arity-1, 'mode'] = 'exhaustive'
+                g,id_combinations = combination.get_node_combinations(g=g, target_nodes=None,
+                                                                      arity=current_arity, check_attr="name")
         else:
-            is_stat_enough = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
-            num_branch_ids = is_stat_enough.sum()
-            txt = 'Arity = {:,}: Branch combinations that passed cutoff stats {} = {:,}'
-            print(txt.format(current_arity, g['cutoff_stat'], num_branch_ids), flush=True)
+            if (g['exhaustive_until'] < current_arity):
+                is_stat_enough = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
+                num_branch_ids = is_stat_enough.sum()
+                txt = 'Arity = {:,}: Branch combinations at K-1 that passed cutoff stats {} = {:,}'
+                print(txt.format(current_arity, g['cutoff_stat'], num_branch_ids), flush=True)
+                g['df_cb_stats'].loc[current_arity - 1, 'mode'] = 'branch_and_bound'
+            else:
+                is_stat_enough = numpy.ones(shape=cb.shape[0], dtype=bool)
+                txt = 'Arity = {:,}: Exhaustive search from {:,} branch combinations at K-1.'
+                print(txt.format(current_arity, cb.shape[0]))
+                g['df_cb_stats'].loc[current_arity - 1, 'mode'] = 'exhaustive'
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
             if is_stat_enough.sum()>g['max_combination']:
                 txt = 'Only {:,} of {:,} branch combinations at arity={} will be used to search arity={}'
@@ -135,10 +145,14 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         if (g['calibrate_longtail']):
             if (g['exhaustive_until'] >= current_arity):
                 cb = omega.calibrate_dsc(cb)
+                g['df_cb_stats'].loc[current_arity - 1, 'dSc_calibration'] = 'Y'
             else:
                 txt = '--calibrate_longtail is deactivated for arity = {}. '
                 txt += 'This option is effective for the arity range specified by --exhaustive_until.\n'
                 sys.stderr.write(txt.format(current_arity))
+                g['df_cb_stats'].loc[current_arity - 1, 'dSc_calibration'] = 'N'
+        else:
+            g['df_cb_stats'].loc[current_arity - 1, 'dSc_calibration'] = 'N'
         if g['branch_dist']:
             cb = tree.get_node_distance(tree=g['tree'], cb=cb, ncpu=g['threads'], float_type=g['float_type'])
         cb = substitution.get_substitutions_per_branch(cb, b, g)
@@ -317,6 +331,7 @@ def main_analyze(g):
                 print('rid_combinations.shape', rid_combinations.shape)
                 g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode='randomization_'+str(i+1), write_cb=False)
                 print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
+        g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]

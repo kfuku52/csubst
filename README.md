@@ -1,14 +1,20 @@
 ![](logo/logo_csubst_large.svg)
 
 ## Overview
-**CSUBST** ([/si:sʌbst/](http://ipa-reader.xyz/?text=si:s%CA%8Cbst&voice=Salli)) is a tool for analyzing **C**ombinatorial **SUBST**itutions of codon sequences in phylogenetic trees. Main features include:
+**CSUBST** ([/si:sʌbst/](http://ipa-reader.xyz/?text=si:s%CA%8Cbst&voice=Salli)) is a tool for analyzing **C**ombinatorial **SUBST**itutions of codon sequences in phylogenetic trees. 
+Main features include:
 
 - Accurate detection of the rate of molecular convergence with null expectation obtained by:
     - Empirical or mechanistic codon substitution model
-    - Urn sampling from site-wise substitution frequencies
+    - Urn sampling from site-wise substitution frequencies (**experimental**)
+- Flexible specification of "foreground" lineages and its comparison with neighboring branches
 - Analysis of higher-order convergence involving more than two branches
 - Simulated sequence evolution under specified scenarios of convergent evolution
-- Flexible specification of "foreground" lineages and its comparison with neighboring branches
+- Mapping 
+
+## Combinatorial substitutions
+Here, we mean combinatorial substitutions by substitutions occurring at the same protein site in multiple independent branches.
+If the substitutions result in the same amino acid, they are considered convergent amino acid substitutions.
 
 ## Input files
 **CSUBST** takes as inputs: 

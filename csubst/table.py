@@ -42,6 +42,14 @@ def sort_cb(cb):
     print('Time elapsed for sorting cb table: {:,} sec'.format(int(time.time() - start)))
     return cb
 
+def sort_cb_stats(cb_stats):
+    col_order = ['arity', 'elapsed_sec', 'cutoff_stat', 'fg_enrichment_factor', 'mode', 'dSc_calibration', ]
+    col_order += cb_stats.columns[cb_stats.columns.str.contains('^num_')].tolist()
+    if (len(col_order) < cb_stats.columns.shape[0]):
+        col_order += [ col for col in cb_stats.columns if col not in col_order ]
+    cb_stats = cb_stats.loc[:,col_order]
+    return cb_stats
+
 def merge_tables(df1, df2):
     start = time.time()
     columns = []

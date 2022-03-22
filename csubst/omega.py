@@ -195,21 +195,21 @@ def get_E(cb, g, N_tensor, S_tensor):
     if (g['omega_method']=='submodel'):
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_pepE = get_exp_state(g=g, mode='pep')
-        EN_tensor = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
+        if (g['current_arity']==2):
+            g['EN_tensor'] = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(EN_tensor.sum()))
+        print(txt.format(g['EN_tensor'].sum()))
         print('Preparing the cbEN table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbEN = substitution.get_cb(cb.loc[:,id_cols].values, EN_tensor, g, 'EN')
-        os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.EN.mmap') ][0])
+        cbEN = substitution.get_cb(cb.loc[:,id_cols].values, g['EN_tensor'], g, 'EN')
         cb = table.merge_tables(cb, cbEN)
         del state_pepE,cbEN
         state_cdnE = get_exp_state(g=g, mode='cdn')
-        ES_tensor = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
+        if (g['current_arity'] == 2):
+            g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(ES_tensor.sum()))
+        print(txt.format(g['ES_tensor'].sum()))
         print('Preparing the cbES table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbES = substitution.get_cb(cb.loc[:,id_cols].values, ES_tensor, g, 'ES')
-        os.remove( [f for f in os.listdir() if f.startswith('tmp.csubst.')&f.endswith('.ES.mmap') ][0])
+        cbES = substitution.get_cb(cb.loc[:,id_cols].values, g['ES_tensor'], g, 'ES')
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
     if g['calc_quantile']:

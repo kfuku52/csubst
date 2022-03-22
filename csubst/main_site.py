@@ -750,8 +750,7 @@ def main_site(g):
             out_file = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.tsv'
             out_path = os.path.join(g['site_outdir'], out_file)
         df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
-    print('To visualize the convergence probability on protein structure, please see:')
-    print('https://github.com/kfuku52/csubst/wiki/Visualizing-convergence-probabilities-on-protein-structures')
+    print('To visualize the convergence probability on protein structure, please see: https://github.com/kfuku52/csubst/wiki')
     print('')
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]

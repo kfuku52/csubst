@@ -1,0 +1,12 @@
+1	Alternanthera_pungens_AY950665
+1	Amaranthus_hypochondriacus_Z68125
+1	Bienertia_sinuspersici_DQ538352
+1	Cyperus_sanguinolentus_FM208046
+1	Eleocharis_vivipara_AB085948
+1	Fimbristylis_littoralis_FM208037
+1	Flaveria_australasica_Z25853
+1	Setaria_italica_AF495586
+1	Sorghum_bicolor_X17379
+1	Suaeda_aralocaspica_DQ538353
+1	Suaeda_eltonica_DQ538354
+1	Zea_mays_X15239

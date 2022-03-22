@@ -5,8 +5,11 @@ def main_dataset(g):
     extensions = ['.fa','.nwk','.txt','.untrimmed_cds.fa']
     outfiles = ['alignment.fa','tree.nwk','foreground.txt','untrimmed_cds.fa']
     for ext,outfile in zip(extensions,outfiles):
-        print('Writing {} for the dataset {}'.format(outfile, g['name']))
         file_path = dataset_base+ext
-        binary_obj = pkg_resources.resource_string(__name__, file_path)
+        try:
+            binary_obj = pkg_resources.resource_string(__name__, file_path)
+        except:
+            continue
+        print('Writing {} for the dataset {}'.format(outfile, g['name']))
         with open(outfile, mode='wb') as f:
             f.write(binary_obj)

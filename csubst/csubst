@@ -140,7 +140,7 @@ if __name__ == "__main__":
 
     # dataset
     dataset = subparsers.add_parser('dataset', help='see `csubst dataset -h`', parents=[])
-    dataset.add_argument('--name', metavar='STR', default='PGK', type=str, choices=['PGK',],
+    dataset.add_argument('--name', metavar='STR', default='PGK', type=str, choices=['PGK','PEPC'],
                          help='default=%(default)s: Name of dataset to generate.')
     dataset.set_defaults(handler=command_dataset)
 
@@ -278,11 +278,11 @@ if __name__ == "__main__":
     analyze.add_argument('--omega_method', metavar='[modelfree|submodel]', default='submodel', type=str,
                          choices=['modelfree','submodel'],
                          help='default=%(default)s: Method to calculate omega. '
-                              '"modelfree" for expected values from among-site randomization of substitutions. '
-                              '"submodel" for a method similar to Zou and Zhang (2015) using a codon substitution model '
-                              'used in ancestral state reconstruction. '
+                              '"submodel" utilizes a codon substitution model in the ancestral state reconstruction. '
                               'In addition to the base substitution models, codon frequencies and '
-                              'among-site rate heterogeneity are taken into account.')
+                              'among-site rate heterogeneity are taken into account. '
+                              '"modelfree" (experimental) for expected values from among-site randomization '
+                              '(urn sampling) of substitutions. ')
     analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Calculate resampling-based quantiles in '
                               'Wallenius\' noncentral hypergeometric distribution for combinatorial substitutions. '
