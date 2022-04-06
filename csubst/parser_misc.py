@@ -40,9 +40,9 @@ def read_input(g):
         g = parser_phylobayes.get_input_information(g)
     elif (g['infile_type'] == 'iqtree'):
         g = parser_iqtree.get_input_information(g)
-    if ('omega_method' not in g.keys()):
+    if ('omegaC_method' not in g.keys()):
         return g
-    if (g['omega_method']!='submodel'):
+    if (g['omegaC_method']!='submodel'):
         return g
     base_model = re.sub('\+G.*', '', g['substitution_model'])
     base_model = re.sub('\+R.*', '', base_model)

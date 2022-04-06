@@ -246,7 +246,7 @@ if __name__ == "__main__":
     analyze.add_argument('--exclude_sister_pair', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Set "yes" to exclude sister branches in branch combination analysis.')
     analyze.add_argument('--cutoff_stat', metavar='[STAT1,VALUE1|STAT2,VALUE2|...]',
-                         default='Nany2spe,2.0|omega_any2spe,5.0', type=str,
+                         default='OCNany2spe,2.0|omegaCany2spe,5.0', type=str,
                          help='default=%(default)s: Cutoff statistics for searching higher-order branch combinations. '
                               'STAT is a column in csubst_cb_N.tsv. Regular expressions are supported. '
                               'e.g., "N_sub_[0-9]+" to specify the number of branch-wise nonsynonymous substitutions '
@@ -275,7 +275,7 @@ if __name__ == "__main__":
                          help='default=%(default)s: Tree plots with per-site ancestral codon states. '
                               'This option will generate many pdfs')
     # Omega calculation
-    analyze.add_argument('--omega_method', metavar='[modelfree|submodel]', default='submodel', type=str,
+    analyze.add_argument('--omegaC_method', metavar='[modelfree|submodel]', default='submodel', type=str,
                          choices=['modelfree','submodel'],
                          help='default=%(default)s: Method to calculate omega. '
                               '"submodel" utilizes a codon substitution model in the ancestral state reconstruction. '
@@ -297,7 +297,7 @@ if __name__ == "__main__":
                               '"each", Each of 61x60 patterns of substitutions are processed individually '
                               'to calculate their respective ASRVs. '
                               '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
-                              'This option is used in --omega_method modelfree but not with --omega_method submodel.')
+                              'This option is used in --omegaC_method modelfree but not with --omegaC_method submodel.')
     analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Calibrate dSc to match the distribution range of dSc with dNc '
                               'by quantile-based transformation.')

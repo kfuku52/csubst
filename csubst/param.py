@@ -10,7 +10,7 @@ def get_global_parameters(args):
         g[attr] = getattr(args, attr)
     if 'calc_quantile' in g.keys():
         if g['calc_quantile']:
-            assert g['omega_method']=='modelfree', '--calc_quantile "yes" should be used with --omega_method "modelfree".'
+            assert g['omegaC_method']=='modelfree', '--calc_quantile "yes" should be used with --omegaC_method "modelfree".'
     if 'fg_random' in g.keys():
         if g['fg_random']>0:
             if g['exhaustive_until']>=2:
@@ -49,7 +49,7 @@ def get_global_parameters(args):
 
 def initialize_df_cb_stats(g):
     ind = numpy.arange(0, g['max_arity'])
-    cols = ['arity','elapsed_sec','fg_enrichment_factor','mode','dSc_calibration',]
+    cols = ['arity','elapsed_sec','fg_enrichment_factor','mode','dSC_calibration',]
     g['df_cb_stats'] = pandas.DataFrame(index=ind, columns=cols)
     g['df_cb_stats'].loc[:,'arity'] = ind + 1
     g['df_cb_stats'].loc[:,'cutoff_stat'] = g['cutoff_stat']
