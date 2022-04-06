@@ -27,6 +27,7 @@ For a quick installation and test run, try:
 ```angular2html
 # IQ-TREE installation with conda
 conda install iqtree
+
 # Installation with pip
 pip install numpy cython # NumPy and Cython should be available upon csubst installation
 pip install git+https://github.com/kfuku52/csubst
