@@ -101,9 +101,9 @@ def get_yvalues(df, sub_type, SN):
             yvalues = df.loc[:, y_cols].sum(axis=1).values
     else:
         if SN=='S':
-            yvalues = df.loc[:,['N'+sub_type,'S'+sub_type]].sum(axis=1).values
+            yvalues = df.loc[:,['OCN'+sub_type,'OCS'+sub_type]].sum(axis=1).values
         elif SN=='N':
-            yvalues = df.loc[:, col].values
+            yvalues = df.loc[:, 'OC'+col].values
     return yvalues
 
 def get_highest_identity_chain_name(g):
@@ -115,7 +115,7 @@ def get_highest_identity_chain_name(g):
     return g
 
 def add_substitution_labels(df, SN, sub_type, SN_colors, ax, g):
-    col = SN + sub_type
+    col = 'OC'+ SN + sub_type
     df_sub = df.loc[(df[col] >= g['pymol_min_combinat_prob']), :].reset_index()
     anc_cols = df_sub.columns[df_sub.columns.str.startswith('aa_')&df_sub.columns.str.endswith('_anc')]
     des_cols = anc_cols.str.replace('_anc', '')
@@ -331,8 +331,8 @@ def export2chimera(df, g):
                     Nvalue = 'None'
                     line = '	:{}	{}\n'.format(seq_site, Nvalue)
                 else:
-                    Nany2spe = df.loc[is_site,'Nany2spe'].values[0]
-                    Nany2dif = df.loc[is_site,'Nany2dif'].values[0]
+                    Nany2spe = df.loc[is_site,'OCNany2spe'].values[0]
+                    Nany2dif = df.loc[is_site,'OCNany2dif'].values[0]
                     Nvalue = Nany2spe if (Nany2spe>=Nany2dif) else -Nany2dif
                     line = '	:{}	{:.4f}\n'.format(seq_site, Nvalue)
                 f.write(line)
@@ -582,7 +582,7 @@ def add_cs_info(df, branch_ids, sub_tensor, attr):
     cs = substitution.get_cs(id_combinations=branch_ids[numpy.newaxis,:], sub_tensor=sub_tensor, attr=attr)
     cs.columns = cs.columns.str.replace('site','codon_site_alignment')
     df = pandas.merge(df, cs, on='codon_site_alignment')
-    df.loc[:,attr+'any2dif'] = df.loc[:,attr+'any2any'] - df.loc[:,attr+'any2spe']
+    df.loc[:,'OC'+attr+'any2dif'] = df.loc[:,'OC'+attr+'any2any'] - df.loc[:,'OC'+attr+'any2spe']
     return df
 
 def add_site_info(df, sub_tensor, attr):

@@ -37,11 +37,11 @@ def add_median_cb_stats(g, cb, current_arity, start):
             else:
                 is_targets.append(cb.loc[:,target_col]=='Y')
     stats = dict()
-    omega_cols = cb.columns[cb.columns.str.startswith('omega_')].tolist()
-    is_ON = cb.columns.str.startswith('Nany') | cb.columns.str.startswith('Ndif') | cb.columns.str.startswith('Nspe')
-    is_OS = cb.columns.str.startswith('Sany') | cb.columns.str.startswith('Sdif') | cb.columns.str.startswith('Sspe')
-    is_EN = cb.columns.str.startswith('ENany') | cb.columns.str.startswith('ENdif') | cb.columns.str.startswith('ENspe')
-    is_ES = cb.columns.str.startswith('ESany') | cb.columns.str.startswith('ESdif') | cb.columns.str.startswith('ESspe')
+    omega_cols = cb.columns[cb.columns.str.startswith('omegaC')].tolist()
+    is_ON = cb.columns.str.startswith('OCNany') | cb.columns.str.startswith('OCNdif') | cb.columns.str.startswith('OCNspe')
+    is_OS = cb.columns.str.startswith('OCSany') | cb.columns.str.startswith('OCSdif') | cb.columns.str.startswith('OCSspe')
+    is_EN = cb.columns.str.startswith('ECNany') | cb.columns.str.startswith('ECNdif') | cb.columns.str.startswith('ECNspe')
+    is_ES = cb.columns.str.startswith('ECSany') | cb.columns.str.startswith('ECSdif') | cb.columns.str.startswith('ECSspe')
     ON_cols = cb.columns[is_ON].tolist()
     OS_cols = cb.columns[is_OS].tolist()
     EN_cols = cb.columns[is_EN].tolist()
@@ -67,14 +67,14 @@ def add_median_cb_stats(g, cb, current_arity, start):
                         g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
     for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
         key = SN+anc+'2'+des
-        totalN = g['df_cb_stats'].loc[is_arity, 'total_'+key+'_all'].values[0]
-        totalEN = g['df_cb_stats'].loc[is_arity, 'total_E'+key+'_all'].values[0]
-        if totalN==0:
+        totalON = g['df_cb_stats'].loc[is_arity, 'total_OC'+key+'_all'].values[0]
+        totalEN = g['df_cb_stats'].loc[is_arity, 'total_EC'+key+'_all'].values[0]
+        if totalON==0:
             percent_value = numpy.nan
         else:
-            percent_value = totalEN / totalN * 100
-        txt = 'Total O{}/E{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation; large deviation may be observed in non-exhaustive analysis.)'
-        print(txt.format(key, key, totalN, totalEN, percent_value))
+            percent_value = totalEN / totalON * 100
+        txt = 'Total OC{}/EC{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation.)'
+        print(txt.format(key, key, totalON, totalEN, percent_value))
     elapsed_time = int(time.time() - start)
     g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
     print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
@@ -102,7 +102,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             if (g['exhaustive_until'] < current_arity):
                 is_stat_enough = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
                 num_branch_ids = is_stat_enough.sum()
-                txt = 'Arity = {:,}: Branch combinations at K-1 that passed cutoff stats {} = {:,}'
+                txt = 'Arity = {:,}: Branch combinations at K-1 that passed cutoff stats ({}): {:,}'
                 print(txt.format(current_arity, g['cutoff_stat'], num_branch_ids), flush=True)
                 g['df_cb_stats'].loc[current_arity - 1, 'mode'] = 'branch_and_bound'
             else:
@@ -134,25 +134,25 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             if id_combinations.shape[0] == 0:
                 end_flag = 1
                 break
-        print('Preparing the cbOS table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbS = substitution.get_cb(id_combinations, S_tensor, g, 'S')
-        print('Preparing the cbON table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbN = substitution.get_cb(id_combinations, N_tensor, g, 'N')
+        print('Preparing the OCS table with {:,} process(es).'.format(g['threads']), flush=True)
+        cbS = substitution.get_cb(id_combinations, S_tensor, g, 'OCS')
+        print('Preparing the OCN table with {:,} process(es).'.format(g['threads']), flush=True)
+        cbN = substitution.get_cb(id_combinations, N_tensor, g, 'OCN')
         cb = table.merge_tables(cbS, cbN)
         del cbS, cbN
-        cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='')
+        cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='OC')
         cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
         if (g['calibrate_longtail']):
             if (g['exhaustive_until'] >= current_arity):
                 cb = omega.calibrate_dsc(cb)
-                g['df_cb_stats'].loc[current_arity - 1, 'dSc_calibration'] = 'Y'
+                g['df_cb_stats'].loc[current_arity - 1, 'dSC_calibration'] = 'Y'
             else:
                 txt = '--calibrate_longtail is deactivated for arity = {}. '
                 txt += 'This option is effective for the arity range specified by --exhaustive_until.\n'
                 sys.stderr.write(txt.format(current_arity))
-                g['df_cb_stats'].loc[current_arity - 1, 'dSc_calibration'] = 'N'
+                g['df_cb_stats'].loc[current_arity - 1, 'dSC_calibration'] = 'N'
         else:
-            g['df_cb_stats'].loc[current_arity - 1, 'dSc_calibration'] = 'N'
+            g['df_cb_stats'].loc[current_arity - 1, 'dSC_calibration'] = 'N'
         if g['branch_dist']:
             cb = tree.get_node_distance(tree=g['tree'], cb=cb, ncpu=g['threads'], float_type=g['float_type'])
         cb = substitution.get_substitutions_per_branch(cb, b, g)
@@ -262,7 +262,7 @@ def main_analyze(g):
         elapsed_time = int(time.time() - start)
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
-    if (g['omega_method']!='submodel'):
+    if (g['omegaC_method']!='submodel'):
         g['state_cdn'] = None
         g['state_pep'] = None
 

@@ -106,7 +106,7 @@ def get_cs(id_combinations, sub_tensor, attr):
             df[:, 2] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], :, sg, :, :].sum(axis=3).prod(axis=0).sum(axis=1))  # spe2any
             df[:, 3] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], :, sg, :, :].sum(axis=2).prod(axis=0).sum(axis=1))  # any2spe
             df[:, 4] += numpy.nan_to_num(sub_tensor[id_combinations[i,:], :, sg, :, :].prod(axis=0).sum(axis=(1, 2)))  # spe2spe
-    cn = ['site',] + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
+    cn = ['site',] + [ 'OC'+attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     df = pandas.DataFrame(df, columns=cn)
     df = table.set_substitution_dtype(df=df)
     return (df)
@@ -183,7 +183,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         if os.path.exists(mmap_out): os.unlink(mmap_out)
     df = table.sort_labels(df)
     df = df.dropna()
-    if not attr.startswith('E'):
+    if not attr.startswith('EC'):
         df = table.set_substitution_dtype(df=df)
     return df
 
@@ -226,7 +226,7 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     arity = id_combinations.shape[1]
     cn1 = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn2 = ["site",]
-    cn3 = [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
+    cn3 = [ 'OC'+attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     if (g['threads']==1)|(g['parallel_mode']=='thread'):
         df = sub_tensor2cbs(id_combinations, sub_tensor)
         df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)

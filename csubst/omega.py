@@ -27,9 +27,9 @@ def calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g):
         if (g['asrv']=='each'):
             sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
         elif (g['asrv']=='sn'):
-            if (obs_col.startswith('S')):
+            if (obs_col.startswith('OCS')):
                 sub_sites = g['sub_sites']['S']
-            elif (obs_col.startswith('N')):
+            elif (obs_col.startswith('OCN')):
                 sub_sites = g['sub_sites']['N']
         else:
             sub_sites = g['sub_sites'][g['asrv']]
@@ -55,9 +55,9 @@ def joblib_calc_E_mean(mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat
         if (g['asrv']=='each'):
             sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
         elif (g['asrv']=='sn'):
-            if (obs_col.startswith('S')):
+            if (obs_col.startswith('OCS')):
                 sub_sites = g['sub_sites']['S']
-            elif (obs_col.startswith('N')):
+            elif (obs_col.startswith('OCN')):
                 sub_sites = g['sub_sites']['N']
         else:
             sub_sites = g['sub_sites'][g['asrv']]
@@ -80,9 +80,9 @@ def joblib_calc_quantile(mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col,
         if (g['asrv']=='each'):
             sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
         elif (g['asrv']=='sn'):
-                if (obs_col.startswith('S')):
+                if (obs_col.startswith('OCS')):
                     sub_sites = g['sub_sites']['S']
-                elif (obs_col.startswith('N')):
+                elif (obs_col.startswith('OCN')):
                     sub_sites = g['sub_sites']['N']
         else:
             sub_sites = g['sub_sites'][g['asrv']]
@@ -121,7 +121,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     txt = 'E{}{}: Total number of substitution categories after NaN removals: {}'
     print(txt.format(SN, mode, num_gad_combinat))
     list_igad = [ [i,]+list(items) for i,items in zip(range(num_gad_combinat), list_gad) ]
-    obs_col = SN+mode
+    obs_col = 'OC'+SN+mode
     if (g['threads']>1):
         igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, g['threads'])
     if stat=='mean':
@@ -182,7 +182,7 @@ def subroot_E2nan(cb, tree):
     return cb
 
 def get_E(cb, g, N_tensor, S_tensor):
-    if (g['omega_method']=='modelfree'):
+    if (g['omegaC_method']=='modelfree'):
         g['N_ind_nomissing_gad'] = numpy.where(N_tensor.sum(axis=(0,1))!=0)
         g['N_ind_nomissing_ga'] = numpy.where(N_tensor.sum(axis=(0,1,4))!=0)
         g['N_ind_nomissing_gd'] = numpy.where(N_tensor.sum(axis=(0,1,3))!=0)
@@ -190,33 +190,33 @@ def get_E(cb, g, N_tensor, S_tensor):
         g['S_ind_nomissing_ga'] = numpy.where(S_tensor.sum(axis=(0,1,4))!=0)
         g['S_ind_nomissing_gd'] = numpy.where(S_tensor.sum(axis=(0,1,3))!=0)
         for st in ['any2any','any2spe','spe2any','spe2spe']:
-            cb['EN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
-            cb['ES'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='mean', SN='S', g=g)
-    if (g['omega_method']=='submodel'):
+            cb['ECN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
+            cb['ECS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='mean', SN='S', g=g)
+    if (g['omegaC_method']=='submodel'):
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_pepE = get_exp_state(g=g, mode='pep')
         if (g['current_arity']==2):
-            g['EN_tensor'] = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
+            g['ECN_tensor'] = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(g['EN_tensor'].sum()))
-        print('Preparing the cbEN table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbEN = substitution.get_cb(cb.loc[:,id_cols].values, g['EN_tensor'], g, 'EN')
+        print(txt.format(g['ECN_tensor'].sum()))
+        print('Preparing the ECN table with {:,} process(es).'.format(g['threads']), flush=True)
+        cbEN = substitution.get_cb(cb.loc[:,id_cols].values, g['ECN_tensor'], g, 'ECN')
         cb = table.merge_tables(cb, cbEN)
         del state_pepE,cbEN
         state_cdnE = get_exp_state(g=g, mode='cdn')
         if (g['current_arity'] == 2):
-            g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
+            g['ECS_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(g['ES_tensor'].sum()))
-        print('Preparing the cbES table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbES = substitution.get_cb(cb.loc[:,id_cols].values, g['ES_tensor'], g, 'ES')
+        print(txt.format(g['ECS_tensor'].sum()))
+        print('Preparing the ECS table with {:,} process(es).'.format(g['threads']), flush=True)
+        cbES = substitution.get_cb(cb.loc[:,id_cols].values, g['ECS_tensor'], g, 'ECS')
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
     if g['calc_quantile']:
         for st in ['any2any','any2spe','spe2any','spe2spe']:
-            cb['QN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='quantile', SN='N', g=g)
-            cb['QS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='quantile', SN='S', g=g)
-    cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='E')
+            cb['QCN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='quantile', SN='N', g=g)
+            cb['QCS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='quantile', SN='S', g=g)
+    cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC')
     cb = subroot_E2nan(cb, tree=g['tree'])
     return cb
 
@@ -265,13 +265,13 @@ def get_omega(cb, g):
                                    'spe2any','spe2spe','spe2dif',
                                    ]
     for sub in combinatorial_substitutions:
-        col_omega = 'omega_'+sub
-        col_N = 'N'+sub
-        col_EN = 'EN'+sub
-        col_dN = 'dN'+sub
-        col_S = 'S'+sub
-        col_ES = 'ES'+sub
-        col_dS = 'dS'+sub
+        col_omega = 'omegaC'+sub
+        col_N = 'OCN'+sub
+        col_EN = 'ECN'+sub
+        col_dN = 'dNC'+sub
+        col_S = 'OCS'+sub
+        col_ES = 'ECS'+sub
+        col_dS = 'dSC'+sub
         if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
             cb.loc[:,col_dN] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
             is_N_zero = (cb.loc[:,col_N]<g['float_tol'])
@@ -285,7 +285,7 @@ def get_omega(cb, g):
     return cb
 
 def get_CoD(cb, g):
-    for NS in ['N','S']:
+    for NS in ['OCN','OCS']:
         cb.loc[:,NS+'CoD'] = cb[NS+'any2spe'] / cb[NS+'any2dif']
         is_Nzero = (cb[NS+'any2spe']<g['float_tol'])
         is_inf = numpy.isinf(cb.loc[:,NS+'CoD'])
@@ -301,7 +301,7 @@ def print_cb_stats(cb, prefix):
                                    'spe2any','spe2spe','spe2dif',
                                    ]
     for sub in combinatorial_substitutions:
-        col_omega = 'omega_'+sub
+        col_omega = 'omegaC'+sub
         if not col_omega in cb.columns:
             continue
         median_value = cb.loc[:,col_omega].median()
@@ -324,11 +324,11 @@ def calibrate_dsc(cb, transformation='quantile'):
                                    'spe2any','spe2spe','spe2dif',
                                    ]
     for sub in combinatorial_substitutions:
-        col_dN = 'dN'+sub
-        col_dS = 'dS'+sub
-        col_omega = 'omega_'+sub
-        col_noncalibrated_dS = 'dS'+sub+'_nocalib'
-        col_noncalibrated_omega = 'omega_'+sub+'_nocalib'
+        col_dN = 'dNC'+sub
+        col_dS = 'dSC'+sub
+        col_omega = 'omegaC'+sub
+        col_noncalibrated_dS = 'dSC'+sub+'_nocalib'
+        col_noncalibrated_omega = 'omegaC'+sub+'_nocalib'
         x = cb.loc[:,col_dN]
         x = x.replace([numpy.inf, -numpy.inf], numpy.nan).dropna()
         if (x.shape[0]==0):

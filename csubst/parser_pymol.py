@@ -198,26 +198,26 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             if not codon_site_col in df.columns:
                 continue
             color_sites = dict()
-            color_sites['Nany2spe'] = []
-            color_sites['Nany2dif'] = []
+            color_sites['OCNany2spe'] = []
+            color_sites['OCNany2dif'] = []
             color_sites['single_sub'] = []
             for i in df.index:
                 codon_site = df.at[i,codon_site_col]
-                prob_Nany2spe = df.at[i,'Nany2spe']
-                prob_Nany2dif = df.at[i,'Nany2dif']
+                prob_Nany2spe = df.at[i,'OCNany2spe']
+                prob_Nany2dif = df.at[i,'OCNany2dif']
                 prob_single_sub = df.loc[i,N_sub_cols].max()
                 if codon_site==0:
                     continue
                 elif (prob_Nany2spe>=g['pymol_min_combinat_prob'])&(prob_Nany2dif<=prob_Nany2spe):
-                    color_sites['Nany2spe'].append(codon_site)
+                    color_sites['OCNany2spe'].append(codon_site)
                 elif (prob_Nany2dif>=g['pymol_min_combinat_prob'])&(prob_Nany2dif>prob_Nany2spe):
-                    color_sites['Nany2dif'].append(codon_site)
+                    color_sites['OCNany2dif'].append(codon_site)
                 elif (prob_single_sub>=g['pymol_min_single_prob']):
                     color_sites['single_sub'].append(codon_site)
             for key in color_sites.keys():
-                if key=='Nany2spe':
+                if key=='OCNany2spe':
                     hex_value = utility.rgb_to_hex(r=1, g=0, b=0)
-                elif key=='Nany2dif':
+                elif key=='OCNany2dif':
                     hex_value = utility.rgb_to_hex(r=0, g=0, b=1)
                 elif key=='single_sub':
                     hex_value = utility.rgb_to_hex(r=0.4, g=0.4, b=0.4)
@@ -225,7 +225,7 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 txt_resi = '+'.join([str(site) for site in color_sites[key]])
                 cmd_color = "color {}, {} and chain {} and resi {}"
                 pymol.cmd.do(cmd_color.format(hex_value, object_name, ch, txt_resi))
-                if key in ['Nany2spe','Nany2dif']:
+                if key in ['OCNany2spe','OCNany2dif']:
                     cmd_tp = "set transparency, 0.3, {} and chain {} and resi {:}"
                     pymol.cmd.do(cmd_tp.format(object_name, ch, txt_resi))
 

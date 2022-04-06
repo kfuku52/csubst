@@ -19,8 +19,8 @@ def sort_labels(df):
 
 def sort_cb(cb):
     start = time.time()
-    is_omega = cb.columns.str.contains('^omega_')
-    is_d = cb.columns.str.contains('^d[NS]')
+    is_omega = cb.columns.str.contains('^omegaC')
+    is_d = cb.columns.str.contains('^d[NS]C')
     is_nocalib = cb.columns.str.contains('_nocalib$')
     col_order = []
     col_order += cb.columns[cb.columns.str.contains('^branch_id_')].sort_values().tolist()
@@ -29,11 +29,11 @@ def sort_cb(cb):
     col_order += cb.columns[cb.columns.str.contains('^is_')].sort_values().tolist()
     col_order += cb.columns[(is_omega)&(~is_nocalib)].sort_values().tolist()
     col_order += cb.columns[(is_d)&(~is_nocalib)].sort_values().tolist()
-    col_order += cb.columns[cb.columns.str.contains('^[NS]CoD$')].sort_values().tolist()
-    col_order += cb.columns[cb.columns.str.contains('^[NS]_linreg_residual$')].sort_values().tolist()
+    col_order += cb.columns[cb.columns.str.contains('^OC[NS]CoD$')].sort_values().tolist()
+    col_order += cb.columns[cb.columns.str.contains('^OC[NS]_linreg_residual$')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^[NS]_sub_')].sort_values().tolist()
-    col_order += cb.columns[cb.columns.str.contains('^[NS][any|dif|spe]')].sort_values().tolist()
-    col_order += cb.columns[cb.columns.str.contains('^E[NS][any|dif|spe]')].sort_values().tolist()
+    col_order += cb.columns[cb.columns.str.contains('^OC[NS][any|dif|spe]')].sort_values().tolist()
+    col_order += cb.columns[cb.columns.str.contains('^EC[NS][any|dif|spe]')].sort_values().tolist()
     col_order += cb.columns[(is_omega)&(is_nocalib)].sort_values().tolist()
     col_order += cb.columns[(is_d)&(is_nocalib)].sort_values().tolist()
     if (len(col_order) < cb.columns.shape[0]):
@@ -43,7 +43,7 @@ def sort_cb(cb):
     return cb
 
 def sort_cb_stats(cb_stats):
-    col_order = ['arity', 'elapsed_sec', 'cutoff_stat', 'fg_enrichment_factor', 'mode', 'dSc_calibration', ]
+    col_order = ['arity', 'elapsed_sec', 'cutoff_stat', 'fg_enrichment_factor', 'mode', 'dSC_calibration', ]
     col_order += cb_stats.columns[cb_stats.columns.str.contains('^num_')].tolist()
     if (len(col_order) < cb_stats.columns.shape[0]):
         col_order += [ col for col in cb_stats.columns if col not in col_order ]
@@ -73,7 +73,7 @@ def set_substitution_dtype(df):
 
 def get_linear_regression(cb):
     start = time.time()
-    for prefix in ['S','N']:
+    for prefix in ['OCS','OCN']:
         x = cb.loc[:,prefix+'any2any'].values
         y = cb.loc[:,prefix+'any2spe'].values
         x = x[:,numpy.newaxis]
@@ -83,7 +83,7 @@ def get_linear_regression(cb):
     return cb
 
 def chisq_test(x, total_S, total_N):
-    obs = x.loc[['Sany2spe','Nany2spe']].values
+    obs = x.loc[['OCSany2spe','OCNany2spe']].values
     if obs.sum()==0:
         return 1
     else:
