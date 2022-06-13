@@ -21,8 +21,8 @@ The main features of **CSUBST** include:
 - [Newick](https://en.wikipedia.org/wiki/Newick_format) file for the rooted tree
 - [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
 
-## Installation and usage
-**CSUBST** runs on python 3 (tested with >=3.6.0). See [CSUBST wiki](https://github.com/kfuku52/csubst/wiki) for detailed usage.
+## Installation and test run
+**CSUBST** runs on python 3 (tested with >=3.6.0). 
 For a quick installation and test run, try:
 ```angular2html
 # IQ-TREE installation with conda
@@ -41,6 +41,32 @@ csubst analyze \
 --rooted_tree_file tree.nwk \
 --foreground foreground.txt
 ```
+
+## Basic usage
+CSUBST is composed of several subcommands. 
+`csubst -h` shows the list of subcommands, and the complete set of subcommand options are available from `csubst SUBCOMMAND -h` (e.g., `csubst analyze -h`). 
+Many options are available, but those used by a typical user would be as follows. 
+More advanced usage is available in [CSUBST wiki](https://github.com/kfuku52/csubst/wiki). 
+
+- `csubst dataset` returns an out-of-the-box test datasets.
+  - `--name`: Name of dataset. For a small test dataset, try `PGK` (vertebrate phosphoglycerate kinase genes).
+- `csubst analyze` is the main function of CSUBST. This subcommand returns various files including a table for ω<sub>C</sub>, dN<sub>C</sub>, and dS<sub>C</sub>.
+  - `--alignment_file`: PATH to input in-frame codon alignment.
+  - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
+  - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
+  - `--threads`: The number of CPUs for parallel computations (e.g., `1` or `4`).
+  - `--foreground`: Optional. A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
+- `csubst site` maps combinatorial substitutions onto protein structure.
+  - `--alignment_file`: PATH to input in-frame codon alignment.
+  - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
+  - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
+- `csubst simulate` generates a simulated sequence alignment under a convergent evolutionary scenario.
+  - `--alignment_file`: PATH to input in-frame codon alignment.
+  - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
+  - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
+  - `--foreground`: A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
+
+### csubst 
 
 ## Citation
 Fukushima K, Pollock DD. 2022. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. bioRxiv 487346 [DOI: 10.1101/2022.04.06.487346](https://doi.org/10.1101/2022.04.06.487346)

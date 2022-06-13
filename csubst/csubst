@@ -54,26 +54,26 @@ if __name__ == "__main__":
     print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
     # Main parser
-    parser = argparse.ArgumentParser(description='csubst - a toolkit for molecular convergence')
+    parser = argparse.ArgumentParser(description='csubst - a toolkit for molecular convergence. For details, see https://github.com/kfuku52/csubst/wiki')
     parser.add_argument('--version', action='version', version='csubst version ' + __version__)
     subparsers = parser.add_subparsers()
 
     # shared: common
     psr_co = argparse.ArgumentParser(add_help=False)
     psr_co.add_argument('--alignment_file', metavar='PATH', default='', type=str,
-                       help='default=%(default)s: Alignment fasta file.')
+                       help='default=%(default)s: PATH to input in-frame codon alignment.')
     psr_co.add_argument('--rooted_tree_file', metavar='PATH', default='', type=str,
-                       help='default=%(default)s: Rooted newick tree file.')
+                       help='default=%(default)s: PATH to input rooted tree. Tip labels should be consistent with --alignment_file.')
     psr_co.add_argument('--genetic_code', metavar='INTEGER', type=int, required=False, default=1,
                        help='default=%(default)s: NCBI codon table ID. 1 = "Standard". See here: '
                             'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
     psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=str, choices=['iqtree',],
                        help='default=%(default)s: The input file format.')
     psr_co.add_argument('--threads', metavar='INTEGER', default=1, type=int, required=False,
-                       help='default=%(default)s: The number of processors for parallel computations. Experimental.')
+                       help='default=%(default)s: The number of CPUs for parallel computations.')
     psr_co.add_argument('--parallel_mode', metavar='thread|process', default='process', type=str,
                         choices=['thread','process'], # 'thread' does not use CPUs efficiently.
-                        help='default=%(default)s: Mode of parallel computation.')
+                        help='default=%(default)s: Mode of parallel computation. Soon to be obsoleted.')
     psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
                         help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
     psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     # shared: foreground
     psr_fg = argparse.ArgumentParser(add_help=False)
     psr_fg.add_argument('--foreground', metavar='PATH', default=None, type=str, required=False,
-                    help='default=%(default)s: Foreground taxa for higher-order analysis. '
+                    help='default=%(default)s: A text file to specify the foreground lineages. '
                          'The file should contain two columns separated by a tab: '
                          '1st column for lineage IDs and 2nd for regex-compatible leaf names.')
     psr_fg.add_argument('--fg_exclude_wg', metavar='yes|no', default='yes', type=strtobool,
@@ -139,14 +139,14 @@ if __name__ == "__main__":
 
 
     # dataset
-    dataset = subparsers.add_parser('dataset', help='see `csubst dataset -h`', parents=[])
+    dataset = subparsers.add_parser('dataset', help='see `csubst dataset -h` or https://github.com/kfuku52/csubst/wiki', parents=[])
     dataset.add_argument('--name', metavar='STR', default='PGK', type=str, choices=['PGK','PEPC'],
                          help='default=%(default)s: Name of dataset to generate.')
     dataset.set_defaults(handler=command_dataset)
 
 
     # simulate
-    simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg])
+    simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h` or https://github.com/kfuku52/csubst/wiki', parents=[psr_co,psr_iq,psr_pb,psr_fg])
     simulate.add_argument('--background_omega', metavar='FLOAT', default=0.2, type=float,
                           help='default=%(default)s: dN/dS for background branches.')
     simulate.add_argument('--foreground_omega', metavar='FLOAT', default=0.2, type=float,
@@ -180,7 +180,7 @@ if __name__ == "__main__":
 
 
     # site
-    site = subparsers.add_parser('site', help='see `csubst site -h`', parents=[psr_co,psr_iq,psr_as])
+    site = subparsers.add_parser('site', help='see `csubst site -h` or https://github.com/kfuku52/csubst/wiki', parents=[psr_co,psr_iq,psr_as])
     site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default=None, required=True, type=str,
                       help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
                       'Run `csubst analyze` first and select branches of interest. '
@@ -229,7 +229,7 @@ if __name__ == "__main__":
 
 
     # analyze
-    analyze = subparsers.add_parser('analyze', help='see `csubst analyze -h`', parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as])
+    analyze = subparsers.add_parser('analyze', help='see `csubst analyze -h` or https://github.com/kfuku52/csubst/wiki', parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as])
     analyze.set_defaults(handler=command_analyze)
     # branch combinations
     analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
@@ -256,17 +256,17 @@ if __name__ == "__main__":
                          help='default=%(default)s: Set "yes" to calculate inter-branch distance.')
     # Substitution outputs
     analyze.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Branch output. Set "yes" to generate the output.')
+                         help='default=%(default)s: Branch output. Set "yes" to generate the output tsv.')
     analyze.add_argument('--s', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Site output. Set "yes" to generate the output.')
+                         help='default=%(default)s: Site output. Set "yes" to generate the output tsv.')
     analyze.add_argument('--cs', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Combinatorial-site output. Set "yes" to generate the output.')
+                         help='default=%(default)s: Combinatorial-site output. Set "yes" to generate the output tsv.')
     analyze.add_argument('--cb', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Combinatorial-branch output. Set "yes" to generate the output.')
+                         help='default=%(default)s: Combinatorial-branch output. Set "yes" to generate the output tsv.')
     analyze.add_argument('--bs', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Branch-site output. 0 or 1. Set "yes" to generate the output.')
+                         help='default=%(default)s: Branch-site output. Set "yes" to generate the output tsv.')
     analyze.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output.')
+                         help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output tsv.')
     # Plot outputs
     analyze.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Tree plots with per-site ancestral amino acid states. '
@@ -277,16 +277,17 @@ if __name__ == "__main__":
     # Omega calculation
     analyze.add_argument('--omegaC_method', metavar='[modelfree|submodel]', default='submodel', type=str,
                          choices=['modelfree','submodel'],
-                         help='default=%(default)s: Method to calculate omega. '
+                         help='default=%(default)s: Method to calculate omega_C. '
                               '"submodel" utilizes a codon substitution model in the ancestral state reconstruction. '
                               'In addition to the base substitution models, codon frequencies and '
                               'among-site rate heterogeneity are taken into account. '
+                              'Described in Fukushima and Pollock (2022). '
                               '"modelfree" (experimental) for expected values from among-site randomization '
                               '(urn sampling) of substitutions. ')
     analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Calculate resampling-based quantiles in '
+                         help='default=%(default)s: Experimental. Calculate resampling-based quantiles in '
                               'Wallenius\' noncentral hypergeometric distribution for combinatorial substitutions. '
-                              'This option should be used with --omega method "modelfree".')
+                              'This option should be used with --omegaC_method "modelfree".')
     analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
                          choices=['no', 'pool', 'sn', 'each', 'file'],
                          help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation. '
@@ -299,7 +300,7 @@ if __name__ == "__main__":
                               '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
                               'This option is used in --omegaC_method modelfree but not with --omegaC_method submodel.')
     analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Calibrate dSc to match the distribution range of dSc with dNc '
+                         help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
                               'by quantile-based transformation.')
     # Sub parser: help
     parser_help = subparsers.add_parser('help', help='see `help -h`')
