@@ -90,7 +90,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         if (current_arity==2):
             if (g['exhaustive_until']<current_arity)&(g['foreground'] is not None):
                 print('Searching foreground branch combinations only.', flush=True)
-                g['df_cb_stats'].loc[current_arity-1, 'mode'] = 'foreground'
+                g['df_cb_stats'].loc[current_arity-1, 'mode'] = mode
                 g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'],
                                                                       arity=current_arity, check_attr='name')
             else:
@@ -325,11 +325,12 @@ def main_analyze(g):
         g['df_cb_stats_main'] = pandas.DataFrame()
         g = cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='foreground', write_cb=True)
         if (g['fg_random']>0):
-            for i in numpy.arange(0, g['fg_random']):
+            for i in numpy.arange(g['fg_random']):
                 print('starting foreground randomization round {:,}'.format(i+1), flush=True)
                 g,rid_combinations = foreground.set_random_foreground_branch(g)
                 print('rid_combinations.shape', rid_combinations.shape)
-                g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode='randomization_'+str(i+1), write_cb=False)
+                random_mode = 'randomization_iter'+str(i+1)+'_bid'+','.join(g['fg_id'].astype(str))
+                g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode=random_mode, write_cb=False)
                 print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)

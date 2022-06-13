@@ -84,7 +84,7 @@ if __name__ == "__main__":
     psr_iq.add_argument('--iqtree_exe', metavar='PATH', default='iqtree', type=str, required=False,
                         help='default=%(default)s: PATH to the IQ-TREE executable')
     psr_iq.add_argument('--iqtree_model', metavar='STR', default='ECMK07+F+R4', type=str, required=False,
-                        help='default=%(default)s: Codon substitution model. '
+                        help='default=%(default)s: Codon substitution model for ancestral state reconstruction. '
                              'Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. '
                              'Among-site rate heterogeneity and codon frequencies can be specified. '
                              'See here for details: http://www.iqtree.org/doc/Substitution-Models')

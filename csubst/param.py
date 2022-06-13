@@ -15,7 +15,7 @@ def get_global_parameters(args):
         if g['fg_random']>0:
             if g['exhaustive_until']>=2:
                 raise Exception('To enable --fg_random, set --exhaustive_until 1') # TODO make it compatible with --exhaustive_until
-            if (g['foreground'] is not None):
+            if (g['foreground'] is None):
                 raise Exception('To enable --fg_random, set --foreground')
     if 'iqtree_treefile' in g.keys():
         if (g['iqtree_treefile']=='infer'):

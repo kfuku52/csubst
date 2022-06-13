@@ -326,4 +326,4 @@ def set_random_foreground_branch(g):
                                                                arity=g['current_arity'], check_attr="name")
         if rid_combinations.shape[0]!=0:
             return g,rid_combinations
-    raise Exception('Foreground branch randomization failed 10 times. There may not be enough numbers of "similar" clades.')
+    raise Exception('Foreground branch randomization failed 100 times. There may not be enough numbers of "similar" clades.')

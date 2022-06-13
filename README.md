@@ -54,16 +54,19 @@ More advanced usage is available in [CSUBST wiki](https://github.com/kfuku52/csu
   - `--alignment_file`: PATH to input in-frame codon alignment.
   - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
   - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
+  - `--iqtree_model`: Codon substitution model for ancestral state reconstruction. Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. Among-site rate heterogeneity and codon frequencies can be specified. See [IQTREE's website](http://www.iqtree.org/doc/Substitution-Models) for details.
   - `--threads`: The number of CPUs for parallel computations (e.g., `1` or `4`).
   - `--foreground`: Optional. A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
 - `csubst site` maps combinatorial substitutions onto protein structure.
   - `--alignment_file`: PATH to input in-frame codon alignment.
   - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
   - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
+  - `--iqtree_model`: Codon substitution model for ancestral state reconstruction. Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. Among-site rate heterogeneity and codon frequencies can be specified. See [IQTREE's website](http://www.iqtree.org/doc/Substitution-Models) for details.
 - `csubst simulate` generates a simulated sequence alignment under a convergent evolutionary scenario.
   - `--alignment_file`: PATH to input in-frame codon alignment.
   - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
   - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
+  - `--iqtree_model`: Codon substitution model for ancestral state reconstruction. Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. Among-site rate heterogeneity and codon frequencies can be specified. See [IQTREE's website](http://www.iqtree.org/doc/Substitution-Models) for details.
   - `--foreground`: A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
 
 ### csubst 
