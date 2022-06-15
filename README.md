@@ -69,8 +69,6 @@ More advanced usage is available in [CSUBST wiki](https://github.com/kfuku52/csu
   - `--iqtree_model`: Codon substitution model for ancestral state reconstruction. Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. Among-site rate heterogeneity and codon frequencies can be specified. See [IQTREE's website](http://www.iqtree.org/doc/Substitution-Models) for details.
   - `--foreground`: A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
 
-### csubst 
-
 ## Citation
 Fukushima K, Pollock DD. 2022. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. bioRxiv 487346 [DOI: 10.1101/2022.04.06.487346](https://doi.org/10.1101/2022.04.06.487346)
 

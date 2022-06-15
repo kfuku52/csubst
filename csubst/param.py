@@ -13,8 +13,6 @@ def get_global_parameters(args):
             assert g['omegaC_method']=='modelfree', '--calc_quantile "yes" should be used with --omegaC_method "modelfree".'
     if 'fg_random' in g.keys():
         if g['fg_random']>0:
-            if g['exhaustive_until']>=2:
-                raise Exception('To enable --fg_random, set --exhaustive_until 1') # TODO make it compatible with --exhaustive_until
             if (g['foreground'] is None):
                 raise Exception('To enable --fg_random, set --foreground')
     if 'iqtree_treefile' in g.keys():

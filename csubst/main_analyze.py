@@ -57,8 +57,7 @@ def add_median_cb_stats(g, cb, current_arity, start):
             for ms in stats[stat]:
                 col = stat+'_'+ms+suffix
                 if not col in g['df_cb_stats'].columns:
-                    newcol = pandas.DataFrame({col:numpy.zeros(shape=(g['df_cb_stats'].shape[0]))})
-                    g['df_cb_stats'] = pandas.concat([g['df_cb_stats'], newcol], axis=1)
+                    g['df_cb_stats'].loc[:,col] = numpy.nan
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", category=RuntimeWarning)
                     if stat=='median':
@@ -90,7 +89,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
         if (current_arity==2):
             if (g['exhaustive_until']<current_arity)&(g['foreground'] is not None):
                 print('Searching foreground branch combinations only.', flush=True)
-                g['df_cb_stats'].loc[current_arity-1, 'mode'] = mode
+                g['df_cb_stats'].loc[current_arity-1, 'mode'] = 'foreground'
                 g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'],
                                                                       arity=current_arity, check_attr='name')
             else:
@@ -172,7 +171,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
     g['df_cb_stats'] = g['df_cb_stats'].loc[(~g['df_cb_stats'].loc[:,'elapsed_sec'].isnull()),:]
     g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
     g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
-    return g
+    return g,cb
 
 def main_analyze(g):
     start = time.time()
@@ -323,14 +322,33 @@ def main_analyze(g):
 
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()
-        g = cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='foreground', write_cb=True)
-        if (g['fg_random']>0):
+        g,cb = cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='foreground', write_cb=True)
+        if (g['fg_random']==0):
+            del cb
+        else:
             for i in numpy.arange(g['fg_random']):
-                print('starting foreground randomization round {:,}'.format(i+1), flush=True)
+                start = time.time()
+                print('Starting foreground randomization round {:,}'.format(i+1), flush=True)
+                print('--fg_random works with --arity 2.')
+                g = param.initialize_df_cb_stats(g)
+                g['df_cb_stats'] = g['df_cb_stats'].loc[(g['df_cb_stats'].loc[:,'arity']==2),:]
                 g,rid_combinations = foreground.set_random_foreground_branch(g)
-                print('rid_combinations.shape', rid_combinations.shape)
+                print('rid_combinations.shape:', rid_combinations.shape)
                 random_mode = 'randomization_iter'+str(i+1)+'_bid'+','.join(g['fg_id'].astype(str))
-                g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode=random_mode, write_cb=False)
+                bid_columns = [ 'branch_id_'+str(k+1) for k in numpy.arange(rid_combinations.shape[1]) ]
+                rid_combinations = pandas.DataFrame(rid_combinations)
+                rid_combinations.columns = bid_columns
+                rcb = pandas.merge(rid_combinations, cb, how='left', on=bid_columns)
+                rcb.loc[:,'is_fg'] = 'Y'
+                rcb.loc[:,'is_mg'] = 'N'
+                rcb.loc[:,'is_mf'] = 'N'
+                g = add_median_cb_stats(g, rcb, 2, start)
+                g['df_cb_stats'].loc[:,'mode'] = random_mode
+                g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+
+
+
+                #g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode=random_mode, write_cb=False)
                 print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
