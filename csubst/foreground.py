@@ -34,21 +34,28 @@ def get_df_clade_size(g):
             df_clade_size.at[bid,'is_foreground_stem'] = True
     return df_clade_size
 
-def foreground_clade_randomization(df_clade_size, g, min_bin_count=10, sample_original_foreground=False):
+def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=False):
     size_array = df_clade_size.loc[:,'size'].values.astype(numpy.int)
     size_min = size_array.min()
     size_max = size_array.max()
     sizes = numpy.unique(size_array)[::-1] # To start counting from rarer (larger) clades
     bins = numpy.array([size_max+1,], dtype=numpy.int)
     count = 0
+    counts = []
     for size in sizes:
-        is_size = (size_array==size)
+        if sample_original_foreground:
+            is_size = (size_array==size)
+        else:
+            is_size = ((size_array==size)&(~df_clade_size.loc[:,'is_foreground_stem']))
         count += is_size.sum()
-        if (count >= min_bin_count):
+        if (count >= g['min_clade_bin_count']):
             bins = numpy.append(bins, size)
+            counts.append(count)
             count = 0
     if len(bins)<2:
         bins = numpy.array([size_min, size_max], dtype=numpy.int)
+    txt = 'Number of clade permutation bins = {:,} (bins = {}, count = {})'
+    print(txt.format(bins.shape[0]-1, ', '.join([ str(s) for s in bins ]), ', '.join([ str(s) for s in counts ])))
     bins = bins[::-1]
     df_clade_size.loc[:,'bin'] = numpy.digitize(size_array, bins, right=False)
     is_fg = (df_clade_size.loc[:,'is_foreground_stem']==True)
@@ -212,7 +219,7 @@ def get_foreground_branch(g):
 
 def print_num_possible_permuted_combinations(df_clade_size, sample_original_foreground):
     import scipy
-    num_possible_permutation_combination = 0
+    num_possible_permutation_combination = 1
     is_fg_stem = df_clade_size.loc[:, 'is_foreground_stem'].values
     for bin_no in df_clade_size.loc[:, 'bin'].unique():
         is_bin = (df_clade_size.loc[:, 'bin'] == bin_no)
@@ -224,14 +231,14 @@ def print_num_possible_permuted_combinations(df_clade_size, sample_original_fore
         else:
             num_bin_choice = (is_bin & ~is_fg_stem).sum()
         num_possible_permutation_combination_bin = scipy.special.comb(N=num_bin_choice, k=num_bin_fg, repetition=False)
-        num_possible_permutation_combination += num_possible_permutation_combination_bin
+        num_possible_permutation_combination *= num_possible_permutation_combination_bin
     print('Number of possible clade-permuted combinations = {:,}'.format(int(num_possible_permutation_combination)))
 
-def randomize_foreground_branch(g, min_bin_count=10, sample_original_foreground=False):
+def randomize_foreground_branch(g, sample_original_foreground=False):
     g['fg_id_original'] = copy.deepcopy(g['fg_id'])
     g['fg_leaf_name_original'] = copy.deepcopy(g['fg_leaf_name'])
     df_clade_size = get_df_clade_size(g)
-    df_clade_size = foreground_clade_randomization(df_clade_size, g, min_bin_count, sample_original_foreground)
+    df_clade_size = foreground_clade_randomization(df_clade_size, g, sample_original_foreground)
     print_num_possible_permuted_combinations(df_clade_size, sample_original_foreground)
     g['target_id'] = get_new_foreground_ids(df_clade_size, g)
     g['fg_id'] = copy.deepcopy(g['target_id'])

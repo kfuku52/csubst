@@ -133,10 +133,12 @@ if __name__ == "__main__":
                          'They may serve as "negative controls" relative to the foreground lineages.')
     psr_fg.add_argument('--mg_sister_stem_only', metavar='yes|no', default='yes', type=strtobool,
                     help='default=%(default)s: Set "yes" to exclude non-stem branches of sister lineages.')
-    psr_fg.add_argument('--fg_random', metavar='INT', default=0, type=int,
-                    help='default=%(default)s: Randomly select the same number and size of clades as foreground '
-                         'and run analysis N times. Larger numbers may take time.')
-
+    psr_fg.add_argument('--fg_clade_permutation', metavar='INT', default=0, type=int,
+                    help='default=%(default)s: Randomly select the same/similar number and size of clades as foreground '
+                         'and run analysis N times to obtain a permutation-based P value of convergence. '
+                         'At least 1000 is recommended.')
+    psr_fg.add_argument('--min_clade_bin_count', metavar='INT', default=10, type=int,
+                    help='default=%(default)s: Minimum number of branches per bin for foreground clade permutation.')
 
     # dataset
     dataset = subparsers.add_parser('dataset', help='see `csubst dataset -h` or https://github.com/kfuku52/csubst/wiki', parents=[])

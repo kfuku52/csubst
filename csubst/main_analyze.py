@@ -177,10 +177,10 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
     return g,cb
 
 def clade_permutation(cb, g):
-    print('Starting clade permutation. Note that --fg_random examine the arity of 2.')
-    for i in numpy.arange(g['fg_random']):
+    print('Starting foreground clade permutation. Note that --fg_clade_permutation examine the arity of 2.')
+    for i in numpy.arange(g['fg_clade_permutation']):
         start = time.time()
-        print('Starting foreground randomization round {:,}'.format(i+1), flush=True)
+        print('Starting foreground clade permutation round {:,}'.format(i+1), flush=True)
         g = param.initialize_df_cb_stats(g)
         g['df_cb_stats'] = g['df_cb_stats'].loc[(g['df_cb_stats'].loc[:,'arity']==2),:].reset_index(drop=True)
         g,rid_combinations = foreground.set_random_foreground_branch(g)
@@ -195,7 +195,7 @@ def clade_permutation(cb, g):
         g = add_median_cb_stats(g, rcb, 2, start, verbose=False)
         g['df_cb_stats'].loc[:,'mode'] = random_mode
         g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
-        print('Ending foreground randomization round {:,}\n'.format(i+1), flush=True)
+        print('')
     is_arity2 = (g['df_cb_stats_main'].loc[:,'arity']==2)
     is_stat_fg = ~g['df_cb_stats_main'].loc[:,'mode'].str.startswith('randomization_')
     is_stat_permutation = g['df_cb_stats_main'].loc[:,'mode'].str.startswith('randomization_')
@@ -366,7 +366,7 @@ def main_analyze(g):
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()
         g,cb = cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='foreground', write_cb=True)
-        if (g['fg_random']>0):
+        if (g['fg_clade_permutation']>0):
             g = clade_permutation(cb, g)
         del cb
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
