@@ -34,7 +34,7 @@ def get_df_clade_size(g):
             df_clade_size.at[bid,'is_foreground_stem'] = True
     return df_clade_size
 
-def foreground_clade_randomization(df_clade_size, g, min_bin_count=10):
+def foreground_clade_randomization(df_clade_size, g, min_bin_count=10, sample_original_foreground=False):
     size_array = df_clade_size.loc[:,'size'].values.astype(numpy.int)
     size_min = size_array.min()
     size_max = size_array.max()
@@ -55,7 +55,8 @@ def foreground_clade_randomization(df_clade_size, g, min_bin_count=10):
     fg_bins = df_clade_size.loc[is_fg,'bin']
     df_clade_size.loc[:,'is_foreground_stem_randomized'] = df_clade_size.loc[:,'is_foreground_stem']
     df_clade_size.loc[:,'is_blocked'] = False
-    for bin in df_clade_size.loc[:,'bin'].unique()[::-1]:
+    #for bin in df_clade_size.loc[:,'bin'].unique()[::-1]:
+    for bin in fg_bins.unique():
         is_bin = (df_clade_size.loc[:,'bin']==bin)
         is_blocked = df_clade_size.loc[:,'is_blocked'].values
         min_bin_size = df_clade_size.loc[is_bin,'size'].min()
@@ -70,7 +71,14 @@ def foreground_clade_randomization(df_clade_size, g, min_bin_count=10):
               'randomization complexity with/without considering branch independency = {:,}/{:,}'
         print(txt.format(bin, num_fg_bin, num_bin, min_bin_size, max_bin_size, cc_w, cc_wo), flush=True)
         before_randomization = df_clade_size.loc[is_bin&~is_blocked,'is_foreground_stem_randomized'].values
-        after_randomization = numpy.random.permutation(before_randomization)
+        if sample_original_foreground:
+            after_randomization = numpy.random.permutation(before_randomization)
+        else:
+            ind_fg = numpy.where(before_randomization==True)[0]
+            ind_nonfg = numpy.where(before_randomization==False)[0]
+            ind_rfg = numpy.random.choice(ind_nonfg, ind_fg.shape[0])
+            after_randomization = numpy.zeros_like(before_randomization, dtype=bool)
+            after_randomization[ind_rfg] = True
         df_clade_size.loc[is_bin&~is_blocked,'is_foreground_stem_randomized'] = after_randomization
         is_new_fg = is_bin&~is_blocked&(df_clade_size.loc[:,'is_foreground_stem_randomized']==True)
         new_fg_bids = df_clade_size.loc[is_new_fg,'branch_id'].values
@@ -202,11 +210,29 @@ def get_foreground_branch(g):
         g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
     return g
 
-def randomize_foreground_branch(g):
+def print_num_possible_permuted_combinations(df_clade_size, sample_original_foreground):
+    import scipy
+    num_possible_permutation_combination = 0
+    is_fg_stem = df_clade_size.loc[:, 'is_foreground_stem'].values
+    for bin_no in df_clade_size.loc[:, 'bin'].unique():
+        is_bin = (df_clade_size.loc[:, 'bin'] == bin_no)
+        num_bin_fg = (is_bin & is_fg_stem).sum()
+        if num_bin_fg == 0:
+            continue
+        if sample_original_foreground:
+            num_bin_choice = is_bin.sum()
+        else:
+            num_bin_choice = (is_bin & ~is_fg_stem).sum()
+        num_possible_permutation_combination_bin = scipy.special.comb(N=num_bin_choice, k=num_bin_fg, repetition=False)
+        num_possible_permutation_combination += num_possible_permutation_combination_bin
+    print('Number of possible clade-permuted combinations = {:,}'.format(int(num_possible_permutation_combination)))
+
+def randomize_foreground_branch(g, min_bin_count=10, sample_original_foreground=False):
     g['fg_id_original'] = copy.deepcopy(g['fg_id'])
     g['fg_leaf_name_original'] = copy.deepcopy(g['fg_leaf_name'])
     df_clade_size = get_df_clade_size(g)
-    df_clade_size = foreground_clade_randomization(df_clade_size, g, min_bin_count=10)
+    df_clade_size = foreground_clade_randomization(df_clade_size, g, min_bin_count, sample_original_foreground)
+    print_num_possible_permuted_combinations(df_clade_size, sample_original_foreground)
     g['target_id'] = get_new_foreground_ids(df_clade_size, g)
     g['fg_id'] = copy.deepcopy(g['target_id'])
     new_fg_leaf_names = [ n.get_leaf_names() for n in g['tree'].traverse() if n.numerical_label in g['fg_id'] ]
@@ -321,8 +347,8 @@ def set_random_foreground_branch(g, num_trial=100):
     for i in numpy.arange(num_trial):
         g = get_foreground_branch(g)
         g = randomize_foreground_branch(g)
-        g,rid_combinations = combination.get_node_combinations(g, target_nodes=g['target_id'],
-                                                               arity=g['current_arity'], check_attr="name")
+        g,rid_combinations = combination.get_node_combinations(g, target_nodes=g['target_id'], arity=g['current_arity'],
+                                                               check_attr="name", verbose=False)
         if rid_combinations.shape[0]!=0:
             return g,rid_combinations
     txt = 'Foreground branch randomization failed {} times. There may not be enough numbers of "similar" clades.'

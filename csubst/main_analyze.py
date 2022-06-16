@@ -19,7 +19,7 @@ from csubst import substitution
 from csubst import table
 from csubst import tree
 
-def add_median_cb_stats(g, cb, current_arity, start):
+def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
     is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
     suffices = list()
     is_targets = list()
@@ -57,26 +57,29 @@ def add_median_cb_stats(g, cb, current_arity, start):
             for ms in stats[stat]:
                 col = stat+'_'+ms+suffix
                 if not col in g['df_cb_stats'].columns:
-                    g['df_cb_stats'].loc[:,col] = numpy.nan
+                    newcol = pandas.DataFrame({col:numpy.zeros(shape=(g['df_cb_stats'].shape[0]))})
+                    g['df_cb_stats'] = pandas.concat([g['df_cb_stats'], newcol], ignore_index=False, axis=1)
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", category=RuntimeWarning)
                     if stat=='median':
                         g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
                     elif stat=='total':
                         g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
-    for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
-        key = SN+anc+'2'+des
-        totalON = g['df_cb_stats'].loc[is_arity, 'total_OC'+key+'_all'].values[0]
-        totalEN = g['df_cb_stats'].loc[is_arity, 'total_EC'+key+'_all'].values[0]
-        if totalON==0:
-            percent_value = numpy.nan
-        else:
-            percent_value = totalEN / totalON * 100
-        txt = 'Total OC{}/EC{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation.)'
-        print(txt.format(key, key, totalON, totalEN, percent_value))
+    if verbose:
+        for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
+            key = SN+anc+'2'+des
+            totalON = g['df_cb_stats'].loc[is_arity, 'total_OC'+key+'_all'].values[0]
+            totalEN = g['df_cb_stats'].loc[is_arity, 'total_EC'+key+'_all'].values[0]
+            if totalON==0:
+                percent_value = numpy.nan
+            else:
+                percent_value = totalEN / totalON * 100
+            txt = 'Total OC{}/EC{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation.)'
+            print(txt.format(key, key, totalON, totalEN, percent_value))
     elapsed_time = int(time.time() - start)
     g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
-    print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
+    if verbose:
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
     return g
 
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
@@ -172,6 +175,46 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
     g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
     g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
     return g,cb
+
+def clade_permutation(cb, g):
+    print('Starting clade permutation. Note that --fg_random examine the arity of 2.')
+    for i in numpy.arange(g['fg_random']):
+        start = time.time()
+        print('Starting foreground randomization round {:,}'.format(i+1), flush=True)
+        g = param.initialize_df_cb_stats(g)
+        g['df_cb_stats'] = g['df_cb_stats'].loc[(g['df_cb_stats'].loc[:,'arity']==2),:].reset_index(drop=True)
+        g,rid_combinations = foreground.set_random_foreground_branch(g)
+        random_mode = 'randomization_iter'+str(i+1)+'_bid'+','.join(g['fg_id'].astype(str))
+        bid_columns = [ 'branch_id_'+str(k+1) for k in numpy.arange(rid_combinations.shape[1]) ]
+        rid_combinations = pandas.DataFrame(rid_combinations)
+        rid_combinations.columns = bid_columns
+        rcb = pandas.merge(rid_combinations, cb, how='left', on=bid_columns)
+        rcb.loc[:,'is_fg'] = 'Y'
+        rcb.loc[:,'is_mg'] = 'N'
+        rcb.loc[:,'is_mf'] = 'N'
+        g = add_median_cb_stats(g, rcb, 2, start, verbose=False)
+        g['df_cb_stats'].loc[:,'mode'] = random_mode
+        g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+        print('Ending foreground randomization round {:,}\n'.format(i+1), flush=True)
+    is_arity2 = (g['df_cb_stats_main'].loc[:,'arity']==2)
+    is_stat_fg = ~g['df_cb_stats_main'].loc[:,'mode'].str.startswith('randomization_')
+    is_stat_permutation = g['df_cb_stats_main'].loc[:,'mode'].str.startswith('randomization_')
+    obs_value = g['df_cb_stats_main'].loc[is_arity2 & is_stat_fg,'median_omegaCany2spe_fg'].values[0]
+    permutation_values = g['df_cb_stats_main'].loc[is_arity2 & is_stat_permutation, 'median_omegaCany2spe_fg'].values
+    num_positive = (obs_value<=permutation_values).sum()
+    num_all = permutation_values.shape[0]
+    pvalue = num_positive / num_all
+    obs_ocn = g['df_cb_stats_main'].loc[is_arity2 & is_stat_fg,'total_OCNany2spe_fg'].values[0]
+    print('Observed total OCNany2spe in foreground lineages = {:,.3}'.format(obs_ocn))
+    permutation_ocns = g['df_cb_stats_main'].loc[is_arity2 & is_stat_permutation, 'total_OCNany2spe_fg'].values
+    txt = 'Total OCNany2spe in permutation lineages = {:,.3} ± {:,.3} (mean ± SD)'
+    print(txt.format(permutation_ocns.mean(), permutation_ocns.std()))
+    print('Observed median omegaCany2spe in foreground lineages = {:,.3}'.format(obs_value))
+    txt = 'Median omegaCany2spe in permutation lineages = {:,.3} ± {:,.3} (mean ± SD)'
+    print(txt.format(permutation_values.mean(), permutation_values.std()))
+    txt = 'P value of foreground convergence (omegaCany2spe) by clade permutations = {} (observation <= permutation = {:,}/{:,})'
+    print(txt.format(pvalue, num_positive, num_all))
+    return g
 
 def main_analyze(g):
     start = time.time()
@@ -323,33 +366,9 @@ def main_analyze(g):
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()
         g,cb = cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='foreground', write_cb=True)
-        if (g['fg_random']==0):
-            del cb
-        else:
-            for i in numpy.arange(g['fg_random']):
-                start = time.time()
-                print('Starting foreground randomization round {:,}'.format(i+1), flush=True)
-                print('--fg_random works with --arity 2.')
-                g = param.initialize_df_cb_stats(g)
-                g['df_cb_stats'] = g['df_cb_stats'].loc[(g['df_cb_stats'].loc[:,'arity']==2),:]
-                g,rid_combinations = foreground.set_random_foreground_branch(g)
-                print('rid_combinations.shape:', rid_combinations.shape)
-                random_mode = 'randomization_iter'+str(i+1)+'_bid'+','.join(g['fg_id'].astype(str))
-                bid_columns = [ 'branch_id_'+str(k+1) for k in numpy.arange(rid_combinations.shape[1]) ]
-                rid_combinations = pandas.DataFrame(rid_combinations)
-                rid_combinations.columns = bid_columns
-                rcb = pandas.merge(rid_combinations, cb, how='left', on=bid_columns)
-                rcb.loc[:,'is_fg'] = 'Y'
-                rcb.loc[:,'is_mg'] = 'N'
-                rcb.loc[:,'is_mf'] = 'N'
-                g = add_median_cb_stats(g, rcb, 2, start)
-                g['df_cb_stats'].loc[:,'mode'] = random_mode
-                g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
-
-
-
-                #g = cb_search(g, b, S_tensor, N_tensor, rid_combinations, mode=random_mode, write_cb=False)
-                print('ending foreground randomization round {:,}\n'.format(i+1), flush=True)
+        if (g['fg_random']>0):
+            g = clade_permutation(cb, g)
+        del cb
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
 

@@ -60,7 +60,8 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         if (target_nodes.shape.__len__()==1):
             target_nodes = numpy.expand_dims(target_nodes, axis=1)
         index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
-        print('Number of branch combination unions (redundant) = {:,}'.format(len(index_combinations)), flush=True)
+        if verbose:
+            print('Number of branch combination unions (redundant) = {:,}'.format(len(index_combinations)), flush=True)
         axis = (len(index_combinations), arity)
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
