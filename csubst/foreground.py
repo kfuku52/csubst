@@ -4,10 +4,13 @@ import pandas
 import copy
 import itertools
 import re
+import sys
 import time
+import warnings
 
 from csubst import combination
 from csubst import table
+from csubst import param
 
 def combinations_count(n, r):
     # https://github.com/nkmk/python-snippets/blob/05a53ae96736577906a8805b38bce6cc210fe11f/notebook/combinations_count.py#L1-L14
@@ -54,7 +57,7 @@ def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=
             count = 0
     if len(bins)<2:
         bins = numpy.array([size_min, size_max], dtype=numpy.int)
-    txt = 'Number of clade permutation bins = {:,} (bins = {}, count = {})'
+    txt = 'Number of clade permutation bins = {:,} (bin limits = {}, counts = {})'
     print(txt.format(bins.shape[0]-1, ', '.join([ str(s) for s in bins ]), ', '.join([ str(s) for s in counts ])))
     bins = bins[::-1]
     df_clade_size.loc[:,'bin'] = numpy.digitize(size_array, bins, right=False)
@@ -62,7 +65,6 @@ def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=
     fg_bins = df_clade_size.loc[is_fg,'bin']
     df_clade_size.loc[:,'is_foreground_stem_randomized'] = df_clade_size.loc[:,'is_foreground_stem']
     df_clade_size.loc[:,'is_blocked'] = False
-    #for bin in df_clade_size.loc[:,'bin'].unique()[::-1]:
     for bin in fg_bins.unique():
         is_bin = (df_clade_size.loc[:,'bin']==bin)
         is_blocked = df_clade_size.loc[:,'is_blocked'].values
@@ -75,7 +77,7 @@ def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=
         cc_wo = combinations_count(n=num_bin, r=num_fg_bin)
         txt = 'bin {}: foreground/all clades = {:,}/{:,}, ' \
               'min/max clade sizes = {:,}/{:,}, ' \
-              'randomization complexity with/without considering branch independency = {:,}/{:,}'
+              'randomization complexity with/without considering branch dependency = {:,}/{:,}'
         print(txt.format(bin, num_fg_bin, num_bin, min_bin_size, max_bin_size, cc_w, cc_wo), flush=True)
         before_randomization = df_clade_size.loc[is_bin&~is_blocked,'is_foreground_stem_randomized'].values
         if sample_original_foreground:
@@ -232,7 +234,8 @@ def print_num_possible_permuted_combinations(df_clade_size, sample_original_fore
             num_bin_choice = (is_bin & ~is_fg_stem).sum()
         num_possible_permutation_combination_bin = scipy.special.comb(N=num_bin_choice, k=num_bin_fg, repetition=False)
         num_possible_permutation_combination *= num_possible_permutation_combination_bin
-    print('Number of possible clade-permuted combinations = {:,}'.format(int(num_possible_permutation_combination)))
+    txt = 'Number of possible clade-permuted combinations without considering branch dependency = {:,}'
+    print(txt.format(int(num_possible_permutation_combination)))
 
 def randomize_foreground_branch(g, sample_original_foreground=False):
     g['fg_id_original'] = copy.deepcopy(g['fg_id'])
@@ -357,6 +360,125 @@ def set_random_foreground_branch(g, num_trial=100):
         g,rid_combinations = combination.get_node_combinations(g, target_nodes=g['target_id'], arity=g['current_arity'],
                                                                check_attr="name", verbose=False)
         if rid_combinations.shape[0]!=0:
+            txt = 'Foreground branch permutation finished after {:,} trials.'
+            print(txt.format(i+1))
             return g,rid_combinations
-    txt = 'Foreground branch randomization failed {} times. There may not be enough numbers of "similar" clades.'
+    txt = 'Foreground branch permutation failed {:,} times. There may not be enough numbers of "similar" clades.\n'
     raise Exception(txt.format(num_trial))
+
+def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
+    is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
+    suffices = list()
+    is_targets = list()
+    suffices.append('_all')
+    is_targets.append(numpy.ones(shape=cb.shape[0], dtype=numpy.bool))
+    target_cols = ['is_fg','is_mg','is_mf','dummy']
+    suffix_candidates = ['_fg','_mg','_mf']
+    if g['exhaustive_until']>=current_arity:
+        suffix_candidates.append('_all')
+    for target_col,sc in zip(target_cols,suffix_candidates):
+        if target_col in cb.columns:
+            suffices.append(sc)
+            if sc=='_all':
+                is_targets.append(True)
+            else:
+                is_targets.append(cb.loc[:,target_col]=='Y')
+    stats = dict()
+    omega_cols = cb.columns[cb.columns.str.startswith('omegaC')].tolist()
+    is_ON = cb.columns.str.startswith('OCNany') | cb.columns.str.startswith('OCNdif') | cb.columns.str.startswith('OCNspe')
+    is_OS = cb.columns.str.startswith('OCSany') | cb.columns.str.startswith('OCSdif') | cb.columns.str.startswith('OCSspe')
+    is_EN = cb.columns.str.startswith('ECNany') | cb.columns.str.startswith('ECNdif') | cb.columns.str.startswith('ECNspe')
+    is_ES = cb.columns.str.startswith('ECSany') | cb.columns.str.startswith('ECSdif') | cb.columns.str.startswith('ECSspe')
+    ON_cols = cb.columns[is_ON].tolist()
+    OS_cols = cb.columns[is_OS].tolist()
+    EN_cols = cb.columns[is_EN].tolist()
+    ES_cols = cb.columns[is_ES].tolist()
+    stats['median'] = ['dist_bl','dist_node_num',] + omega_cols
+    stats['total'] = ON_cols + OS_cols + EN_cols + ES_cols
+    is_qualified = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
+    for suffix, is_target in zip(suffices, is_targets):
+        g['df_cb_stats'].loc[is_arity, 'num' + suffix] = is_target.sum()
+        g['df_cb_stats'].loc[is_arity, 'num_qualified' + suffix] = (is_target&is_qualified).sum()
+    for stat in stats.keys():
+        for suffix,is_target in zip(suffices,is_targets):
+            for ms in stats[stat]:
+                col = stat+'_'+ms+suffix
+                if not col in g['df_cb_stats'].columns:
+                    newcol = pandas.DataFrame({col:numpy.zeros(shape=(g['df_cb_stats'].shape[0]))})
+                    g['df_cb_stats'] = pandas.concat([g['df_cb_stats'], newcol], ignore_index=False, axis=1)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    if stat=='median':
+                        g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
+                    elif stat=='total':
+                        g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
+    if verbose:
+        for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
+            key = SN+anc+'2'+des
+            totalON = g['df_cb_stats'].loc[is_arity, 'total_OC'+key+'_all'].values[0]
+            totalEN = g['df_cb_stats'].loc[is_arity, 'total_EC'+key+'_all'].values[0]
+            if totalON==0:
+                percent_value = numpy.nan
+            else:
+                percent_value = totalEN / totalON * 100
+            txt = 'Total OC{}/EC{} = {:,.1f}/{:,.1f} (Expectation equals to {:,.1f}% of the observation.)'
+            print(txt.format(key, key, totalON, totalEN, percent_value))
+    elapsed_time = int(time.time() - start)
+    g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
+    if verbose:
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
+    return g
+
+def clade_permutation(cb, g):
+    print('Starting foreground clade permutation. Note that --fg_clade_permutation examine the arity of 2.')
+    i = 1
+    for trial_no in numpy.arange(g['fg_clade_permutation']*10):
+        start = time.time()
+        txt = 'Starting foreground clade permutation round {:,} (of {:,})'
+        print(txt.format(i, g['fg_clade_permutation']), flush=True)
+        g = param.initialize_df_cb_stats(g)
+        g['df_cb_stats'] = g['df_cb_stats'].loc[(g['df_cb_stats'].loc[:,'arity']==2),:].reset_index(drop=True)
+        g,rid_combinations = set_random_foreground_branch(g)
+        random_mode = 'randomization_iter'+str(i)+'_bid'+','.join(g['fg_id'].astype(str))
+        bid_columns = [ 'branch_id_'+str(k+1) for k in numpy.arange(rid_combinations.shape[1]) ]
+        rid_combinations = pandas.DataFrame(rid_combinations)
+        rid_combinations.columns = bid_columns
+        rcb = pandas.merge(rid_combinations, cb, how='inner', on=bid_columns)
+        if (rid_combinations.shape[0] != rcb.shape[0]):
+            txt = '{:,} ({:,} - {:,}) permuted foreground branch combinations were dropped because they were not included in the cb table.'
+            print(txt.format(rid_combinations.shape[0]-rcb.shape[0], rid_combinations.shape[0], rcb.shape[0]))
+        rcb.loc[:,'is_fg'] = 'Y'
+        rcb.loc[:,'is_mg'] = 'N'
+        rcb.loc[:,'is_mf'] = 'N'
+        g = add_median_cb_stats(g, rcb, 2, start, verbose=False)
+        g['df_cb_stats'].loc[:,'mode'] = random_mode
+        g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+        print('')
+        if (i==g['fg_clade_permutation']):
+            txt = 'Clade permutation successfully found {:,} new branch combinations after {:,} trials.'
+            print(txt.format(g['fg_clade_permutation'], trial_no+1))
+            break
+        if (trial_no==(g['fg_clade_permutation']*10)):
+            txt = 'Clade permutation could not find enough number of new branch combinations even after {:,} trials.\n'
+            sys.stderr.write(txt.format(g['fg_clade_permutation']*10))
+        i += 1
+
+    is_arity2 = (g['df_cb_stats_main'].loc[:,'arity']==2)
+    is_stat_fg = ~g['df_cb_stats_main'].loc[:,'mode'].str.startswith('randomization_')
+    is_stat_permutation = g['df_cb_stats_main'].loc[:,'mode'].str.startswith('randomization_')
+    obs_value = g['df_cb_stats_main'].loc[is_arity2 & is_stat_fg,'median_omegaCany2spe_fg'].values[0]
+    permutation_values = g['df_cb_stats_main'].loc[is_arity2 & is_stat_permutation, 'median_omegaCany2spe_fg'].values
+    num_positive = (obs_value<=permutation_values).sum()
+    num_all = permutation_values.shape[0]
+    pvalue = num_positive / num_all
+    obs_ocn = g['df_cb_stats_main'].loc[is_arity2 & is_stat_fg,'total_OCNany2spe_fg'].values[0]
+    print('Observed total OCNany2spe in foreground lineages = {:,.3}'.format(obs_ocn))
+    permutation_ocns = g['df_cb_stats_main'].loc[is_arity2 & is_stat_permutation, 'total_OCNany2spe_fg'].values
+    txt = 'Total OCNany2spe in permutation lineages = {:,.3} ± {:,.3} (mean ± SD)'
+    print(txt.format(permutation_ocns.mean(), permutation_ocns.std()))
+    print('Observed median omegaCany2spe in foreground lineages = {:,.3}'.format(obs_value))
+    txt = 'Median omegaCany2spe in permutation lineages = {:,.3} ± {:,.3} (mean ± SD)'
+    print(txt.format(permutation_values.mean(), permutation_values.std()))
+    txt = 'P value of foreground convergence (omegaCany2spe) by clade permutations = {} (observation <= permutation = {:,}/{:,})'
+    print(txt.format(pvalue, num_positive, num_all))
+    return g

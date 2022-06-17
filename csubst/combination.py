@@ -18,16 +18,7 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             df_mmap[i, :] = node_union
             i += 1
 
-def nc_matrix2id_combinations_old(nc_matrix, arity, ncpu):
-    rows,cols = numpy.where(nc_matrix==1)
-    unique_cols = numpy.unique(cols)
-    id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int32)
-    for i,col in enumerate(unique_cols):
-        id_combinations[i,:] = rows[cols==col]
-    #id_combinations.sort(axis=1) # This sort is not necessary
-    return id_combinations
-
-def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
+def nc_matrix2id_combinations(nc_matrix, arity, ncpu, verbose):
     start = time.time()
     rows, cols = numpy.where(numpy.equal(nc_matrix, 1))
     unique_cols = numpy.unique(cols)
@@ -39,7 +30,8 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
         (chunk, start, arity, ind2, rows, cols, unique_cols) for chunk, start in zip(chunks, starts)
     )
     id_combinations = numpy.concatenate(out)
-    print('Time elapsed for generating branch combinations: {:,} sec'.format(int(time.time() - start)))
+    if verbose:
+        print('Time elapsed for generating branch combinations: {:,} sec'.format(int(time.time() - start)))
     return id_combinations
 
 def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True):
@@ -102,13 +94,13 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
                 print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
             fg_dep_nc_matrix = numpy.copy(nc_matrix)
             fg_dep_nc_matrix[:,~is_fg_dependent_col] = False
-            g['fg_dependent_id_combinations'] = nc_matrix2id_combinations(fg_dep_nc_matrix, arity, g['threads'])
+            g['fg_dependent_id_combinations'] = nc_matrix2id_combinations(fg_dep_nc_matrix, arity, g['threads'], verbose)
         else:
             if verbose:
                 txt = 'removing {:,} (out of {:,}) dependent foreground branch combinations.'
                 print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
             nc_matrix = nc_matrix[:,~is_fg_dependent_col]
-    id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
+    id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'], verbose)
     if verbose:
         print("Number of independent node combinations: {:,}".format(id_combinations.shape[0]), flush=True)
     return g,id_combinations
