@@ -357,12 +357,15 @@ def set_random_foreground_branch(g, num_trial=100):
     for i in numpy.arange(num_trial):
         g = get_foreground_branch(g)
         g = randomize_foreground_branch(g)
+        if g['target_id'].shape[0]<2:
+            continue
         g,rid_combinations = combination.get_node_combinations(g, target_nodes=g['target_id'], arity=g['current_arity'],
                                                                check_attr="name", verbose=False)
-        if rid_combinations.shape[0]!=0:
-            txt = 'Foreground branch permutation finished after {:,} trials.'
-            print(txt.format(i+1))
-            return g,rid_combinations
+        if rid_combinations.shape[0]==0:
+            continue
+        txt = 'Foreground branch permutation finished after {:,} trials.'
+        print(txt.format(i+1))
+        return g,rid_combinations
     txt = 'Foreground branch permutation failed {:,} times. There may not be enough numbers of "similar" clades.\n'
     raise Exception(txt.format(num_trial))
 
@@ -452,6 +455,11 @@ def clade_permutation(cb, g):
         rcb.loc[:,'is_mf'] = 'N'
         g = add_median_cb_stats(g, rcb, 2, start, verbose=False)
         g['df_cb_stats'].loc[:,'mode'] = random_mode
+        if numpy.isnan(g['df_cb_stats'].loc[:,'median_omegaCany2spe_fg'].values[0]):
+            print('OmegaCany2spe could not be obtained for permuted foregrounds:')
+            print(rid_combinations)
+            print('')
+            continue
         g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
         print('')
         if (i==g['fg_clade_permutation']):
