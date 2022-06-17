@@ -68,17 +68,17 @@ def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=
     for bin in fg_bins.unique():
         is_bin = (df_clade_size.loc[:,'bin']==bin)
         is_blocked = df_clade_size.loc[:,'is_blocked'].values
-        min_bin_size = df_clade_size.loc[is_bin,'size'].min()
-        max_bin_size = df_clade_size.loc[is_bin,'size'].max()
-        num_fg_bin = (fg_bins==bin).sum()
-        num_bin = is_bin.sum()
-        num_unblocked_bin = (is_bin&~is_blocked).sum()
-        cc_w = combinations_count(n=num_unblocked_bin, r=num_fg_bin)
-        cc_wo = combinations_count(n=num_bin, r=num_fg_bin)
-        txt = 'bin {}: foreground/all clades = {:,}/{:,}, ' \
-              'min/max clade sizes = {:,}/{:,}, ' \
-              'randomization complexity with/without considering branch dependency = {:,}/{:,}'
-        print(txt.format(bin, num_fg_bin, num_bin, min_bin_size, max_bin_size, cc_w, cc_wo), flush=True)
+        #min_bin_size = df_clade_size.loc[is_bin,'size'].min()
+        #max_bin_size = df_clade_size.loc[is_bin,'size'].max()
+        #num_fg_bin = (fg_bins==bin).sum()
+        #num_bin = is_bin.sum()
+        #num_unblocked_bin = (is_bin&~is_blocked).sum()
+        #cc_w = combinations_count(n=num_unblocked_bin, r=num_fg_bin)
+        #cc_wo = combinations_count(n=num_bin, r=num_fg_bin)
+        #txt = 'bin {}: foreground/all clades = {:,}/{:,}, ' \
+        #      'min/max clade sizes = {:,}/{:,}, ' \
+        #      'randomization complexity with/without considering branch dependency = {:,}/{:,}'
+        #print(txt.format(bin, num_fg_bin, num_bin, min_bin_size, max_bin_size, cc_w, cc_wo), flush=True)
         before_randomization = df_clade_size.loc[is_bin&~is_blocked,'is_foreground_stem_randomized'].values
         if sample_original_foreground:
             after_randomization = numpy.random.permutation(before_randomization)
@@ -482,11 +482,11 @@ def clade_permutation(cb, g):
     obs_ocn = g['df_cb_stats_main'].loc[is_arity2 & is_stat_fg,'total_OCNany2spe_fg'].values[0]
     print('Observed total OCNany2spe in foreground lineages = {:,.3}'.format(obs_ocn))
     permutation_ocns = g['df_cb_stats_main'].loc[is_arity2 & is_stat_permutation, 'total_OCNany2spe_fg'].values
-    txt = 'Total OCNany2spe in permutation lineages = {:,.3} ± {:,.3} (mean ± SD)'
-    print(txt.format(permutation_ocns.mean(), permutation_ocns.std()))
+    txt = 'Total OCNany2spe in permutation lineages = {:,.3}; {:,.3} ± {:,.3} (median; mean ± SD excluding inf)'
+    print(txt.format(numpy.median(permutation_ocns), permutation_ocns.mean(), permutation_ocns.std()))
     print('Observed median omegaCany2spe in foreground lineages = {:,.3}'.format(obs_value))
-    txt = 'Median omegaCany2spe in permutation lineages = {:,.3} ± {:,.3} (mean ± SD)'
-    print(txt.format(permutation_values.mean(), permutation_values.std()))
+    txt = 'Median omegaCany2spe in permutation lineages = {:,.3}; {:,.3} ± {:,.3} (median; mean ± SD excluding inf)'
+    print(txt.format(numpy.median(permutation_values), permutation_values[numpy.isfinite(permutation_values)].mean(), permutation_values[numpy.isfinite(permutation_values)].std()))
     txt = 'P value of foreground convergence (omegaCany2spe) by clade permutations = {} (observation <= permutation = {:,}/{:,})'
     print(txt.format(pvalue, num_positive, num_all))
     return g
