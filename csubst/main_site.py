@@ -138,20 +138,30 @@ def add_substitution_labels(df, SN, sub_type, SN_colors, ax, g):
     return ax
 
 def plot_barchart(df, g):
-    sub_types = {
-        '_sub':'Branch-wise\nsubstitutions\nin the entire tree',
-        '_sub_':'Branch-wise\nsubstitutions\nin the targets',
-        'any2spe':'Posterior prob.\nof any2spe',
-        'any2dif':'Posterior prob.\nof any2dif',
-    }
-    SN_color_all = {
-        '_sub': {'N':'black', 'S':'gainsboro'},
-        '_sub_': {'N':'black', 'S':'gainsboro'},
-        'any2spe': {'N':'red', 'S':'gainsboro'},
-        'any2dif': {'N':'blue', 'S':'gainsboro'},
-    }
+    if g['single_branch_mode']:
+        sub_types = {
+            '_sub':'Branch-wise\nsubstitutions\nin the entire tree',
+            'any2any':'Branch-wise\nsubstitutions\nin the targets', # Identical to branch-wise substitutions in the targets
+        }
+        SN_color_all = {
+            '_sub': {'N':'black', 'S':'gainsboro'},
+            'any2any': {'N':'purple', 'S':'gainsboro'}, # Identical to branch-wise substitutions in the targets
+        }
+    else:
+        sub_types = {
+            '_sub':'Branch-wise\nsubstitutions\nin the entire tree',
+            '_sub_':'Branch-wise\nsubstitutions\nin the targets',
+            'any2spe':'Posterior prob.\nof any2spe',
+            'any2dif':'Posterior prob.\nof any2dif',
+        }
+        SN_color_all = {
+            '_sub': {'N':'black', 'S':'gainsboro'},
+            '_sub_': {'N':'black', 'S':'gainsboro'},
+            'any2spe': {'N':'red', 'S':'gainsboro'},
+            'any2dif': {'N':'blue', 'S':'gainsboro'},
+        }
     num_row = len(sub_types)
-    fig,axes = matplotlib.pyplot.subplots(nrows=num_row, ncols=1, figsize=(7.2, 4.8), sharex=True)
+    fig,axes = matplotlib.pyplot.subplots(nrows=num_row, ncols=1, figsize=(7.2, 1.2*len(sub_types)), sharex=True)
     axes = axes.flat
     i = 0
     NS_ymax = df.loc[:,['N_sub','S_sub']].sum(axis=1).max() + 0.5
@@ -687,20 +697,25 @@ def pdb_sequence_search(g):
             pdb_id = None
     return pdb_id
 
+def combinatorial2single_columns(df):
+    for SN in ['OCS','OCN']:
+        for anc in ['any','spe','dif']:
+            for des in ['any', 'spe', 'dif']:
+                col = SN+anc+'2'+des
+                if col in df.columns:
+                    df = df.drop(labels=col, axis=1)
+    return df
+
 def main_site(g):
     if g['pdb'] is not None:
         from csubst import parser_pymol
-    if g['pdb'] =='besthit':
-        g['run_pdb_sequence_search'] = True
-    else:
-        g['run_pdb_sequence_search'] = False
     print("Reading and parsing input files.", flush=True)
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = tree.read_treefile(g)
     g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)
-    g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
+    g = parser_misc.prep_state(g)
     N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     N_tensor = substitution.apply_min_sub_pp(g, N_tensor)
     S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
@@ -708,6 +723,11 @@ def main_site(g):
     g = add_branch_id_list(g)
     for branch_ids in g['branch_id_list']:
         print('\nProcessing branch_ids: {}'.format(','.join([ str(bid) for bid in branch_ids ])), flush=True)
+        if len(branch_ids)==1:
+            print('Single branch mode. Substitutions, rather than combinatorial substitutions, will be mapped.')
+            g['single_branch_mode'] = True
+        else:
+            g['single_branch_mode'] = False
         g['branch_ids'] = branch_ids
         g['site_outdir'] = './csubst_site.branch_id'+','.join([ str(bid) for bid in branch_ids ])
         if not os.path.exists(g['site_outdir']):
@@ -749,6 +769,8 @@ def main_site(g):
         else:
             out_file = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.tsv'
             out_path = os.path.join(g['site_outdir'], out_file)
+        if g['single_branch_mode']:
+            df = combinatorial2single_columns(df)
         df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
     print('To visualize the convergence probability on protein structure, please see: https://github.com/kfuku52/csubst/wiki')
     print('')

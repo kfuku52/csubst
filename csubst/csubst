@@ -134,11 +134,11 @@ if __name__ == "__main__":
     psr_fg.add_argument('--mg_sister_stem_only', metavar='yes|no', default='yes', type=strtobool,
                     help='default=%(default)s: Set "yes" to exclude non-stem branches of sister lineages.')
     psr_fg.add_argument('--fg_clade_permutation', metavar='INT', default=0, type=int,
-                    help='default=%(default)s: Randomly select the same/similar number and size of clades as foreground '
+                    help='default=%(default)s: Experimental. Randomly select the same/similar number and size of clades as foreground '
                          'and run analysis N times to obtain a permutation-based P value of convergence. '
                          'At least 1000 is recommended.')
     psr_fg.add_argument('--min_clade_bin_count', metavar='INT', default=10, type=int,
-                    help='default=%(default)s: Minimum number of branches per bin for foreground clade permutation.')
+                    help='default=%(default)s: Experimental. Minimum number of branches per bin for foreground clade permutation. ')
 
     # dataset
     dataset = subparsers.add_parser('dataset', help='see `csubst dataset -h` or https://github.com/kfuku52/csubst/wiki', parents=[])
@@ -204,7 +204,7 @@ if __name__ == "__main__":
                            'Used only with --pdb.')
     site.add_argument('--remove_ligand', metavar='CODE1,CODE2,CODE3,...', default='', type=str,
                       help='default=%(default)s: Comma-delimited list of PDB ligand codes to be removed. '
-                           'e.g., "so4,po4,bme"'
+                           'e.g., "so4,po4,bme". '
                            'Used only with --pdb.')
     site.add_argument('--mask_subunit', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to mask unrelated subunits. '
@@ -292,7 +292,7 @@ if __name__ == "__main__":
                               'This option should be used with --omegaC_method "modelfree".')
     analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
                          choices=['no', 'pool', 'sn', 'each', 'file'],
-                         help='default=%(default)s: Correct among-site rate variation in omega/quantile calculation. '
+                         help='default=%(default)s: Experimental. Correct among-site rate variation in omega/quantile calculation. '
                               '"no", No ASRV, meaning the uniform rate among sites. '
                               '"pool", All categories of substitutions are pooled to calculate a single set of ASRV. '
                               '"sn", Synonymous and nonsynonymous substitutions are processed individually '

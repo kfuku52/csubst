@@ -218,7 +218,10 @@ def prep_state(g):
         elif g['input_data_type'] == 'cdn':
             state_cdn = parser_iqtree.get_state_tensor(g)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
-    return g,state_nuc,state_cdn,state_pep
+    g['state_nuc'] = state_nuc
+    g['state_cdn'] = state_cdn
+    g['state_pep'] = state_pep
+    return g
 
 def read_exchangeability_matrix(file, codon_orders):
     txt = pkg_resources.resource_string(__name__, file)

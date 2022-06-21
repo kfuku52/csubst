@@ -37,6 +37,11 @@ def get_global_parameters(args):
         elif (g['float_type']==64):
             g['float_type'] = numpy.float64
             g['float_tol'] = 10**-9
+    if 'pdb' in g.keys():
+        if g['pdb']=='besthit':
+            g['run_pdb_sequence_search'] = True
+        else:
+            g['run_pdb_sequence_search'] = False
     if 'percent_biased_sub' in g.keys():
         assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
     if 'float_digit' in g.keys():

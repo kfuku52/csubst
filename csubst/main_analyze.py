@@ -120,7 +120,7 @@ def main_analyze(g):
     g = parser_misc.generate_intermediate_files(g)
     g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)
-    g,g['state_nuc'],g['state_cdn'],g['state_pep'] = parser_misc.prep_state(g)
+    g = parser_misc.prep_state(g)
 
     sequence.write_alignment('csubst_alignment_codon.fa', mode='codon', g=g)
     sequence.write_alignment('csubst_alignment_aa.fa', mode='aa', g=g)

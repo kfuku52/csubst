@@ -3,7 +3,7 @@ import pandas
 import pymol
 
 from io import StringIO
-#import itertools
+import copy
 import os
 import re
 import subprocess
@@ -214,6 +214,11 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                     color_sites['OCNany2dif'].append(codon_site)
                 elif (prob_single_sub>=g['pymol_min_single_prob']):
                     color_sites['single_sub'].append(codon_site)
+            if g['single_branch_mode']:
+                color_sites['single_branch_N'] = copy.deepcopy(color_sites['OCNany2spe'])
+                del color_sites['OCNany2spe']
+                del color_sites['OCNany2dif']
+                del color_sites['single_sub']
             for key in color_sites.keys():
                 if key=='OCNany2spe':
                     hex_value = utility.rgb_to_hex(r=1, g=0, b=0)
@@ -221,6 +226,8 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                     hex_value = utility.rgb_to_hex(r=0, g=0, b=1)
                 elif key=='single_sub':
                     hex_value = utility.rgb_to_hex(r=0.4, g=0.4, b=0.4)
+                elif key=='single_branch_N':
+                    hex_value = utility.rgb_to_hex(r=0.5, g=0, b=0.5)
                 print('Amino acid sites with {} will be painted with {}.'.format(key, hex_value), flush=True)
                 txt_resi = '+'.join([str(site) for site in color_sites[key]])
                 cmd_color = "color {}, {} and chain {} and resi {}"
