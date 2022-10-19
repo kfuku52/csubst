@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     # Main parser
     parser = argparse.ArgumentParser(description='csubst - a toolkit for molecular convergence. For details, see https://github.com/kfuku52/csubst/wiki')
-    parser.add_argument('--version', action='version', version='csubst version ' + __version__)
+    parser.add_argument('--version', action='version', version='CSUBST version: {}'.format(__version__))
     subparsers = parser.add_subparsers()
 
     # shared: common

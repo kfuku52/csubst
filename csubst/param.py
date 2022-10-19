@@ -4,7 +4,11 @@ import pandas
 import os
 import sys
 
+from csubst.__init__ import __version__
+
 def get_global_parameters(args):
+    print('CSUBST version: {}'.format(__version__))
+    print('CSUBST command: {}'.format(' '.join(sys.argv)))
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:
         g[attr] = getattr(args, attr)
