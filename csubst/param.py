@@ -54,8 +54,8 @@ def initialize_df_cb_stats(g):
     ind = numpy.arange(0, g['max_arity'])
     cols = ['arity','elapsed_sec','fg_enrichment_factor','mode','dSC_calibration',]
     g['df_cb_stats'] = pandas.DataFrame(index=ind, columns=cols)
-    g['df_cb_stats'].loc[:,'arity'] = ind + 1
-    g['df_cb_stats'].loc[:,'cutoff_stat'] = g['cutoff_stat']
+    g['df_cb_stats']['arity'] = ind + 1
+    g['df_cb_stats']['cutoff_stat'] = g['cutoff_stat']
     return(g)
 
 def set_num_thread_variables(num_thread=1):

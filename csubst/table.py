@@ -14,7 +14,7 @@ def sort_labels(df):
         swap_columns.append('site')
     df = df.sort_values(by=swap_columns)
     for cn in swap_columns:
-        df.loc[:,cn] = df[cn].astype(int)
+        df[cn] = df[cn].astype(int)
     return df
 
 def sort_cb(cb):

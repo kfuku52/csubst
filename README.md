@@ -48,7 +48,7 @@ CSUBST is composed of several subcommands.
 Many options are available, but those used by a typical user would be as follows. 
 More advanced usage is available in [CSUBST wiki](https://github.com/kfuku52/csubst/wiki). 
 
-- `csubst dataset` returns an out-of-the-box test datasets.
+- `csubst dataset` returns out-of-the-box test datasets.
   - `--name`: Name of dataset. For a small test dataset, try `PGK` (vertebrate phosphoglycerate kinase genes).
 - `csubst analyze` is the main function of CSUBST. This subcommand returns various files including a table for ω<sub>C</sub>, dN<sub>C</sub>, and dS<sub>C</sub>.
   - `--alignment_file`: PATH to input in-frame codon alignment.
