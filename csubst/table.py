@@ -100,9 +100,10 @@ def get_cutoff_stat_bool_array(cb, cutoff_stat_str):
         cutoff_stat_value = float(cutoff_stat_list2[1])
         is_col = cb.columns.str.fullmatch(cutoff_stat_exp, na=False)
         if is_col.sum()==0:
-            txt = '--cutoff_stat specification "{}" is omitted. Check the format carefully.\n'
-            sys.stderr.write(txt.format(cutoff_stat_str))
-            continue
+            txt = 'The column "{}" was not found in the cb table. '
+            txt += 'Check the format of the --cutoff_stat specification ("{}") carefully. Exiting.\n'
+            sys.stderr.write(txt.format(cutoff_stat_exp, cutoff_stat_str))
+            sys.exit(1)
         cutoff_stat_cols = cb.columns[is_col]
         for cutoff_stat_col in cutoff_stat_cols:
             is_enough_stat &= (cb.loc[:,cutoff_stat_col] >= cutoff_stat_value).fillna(False)
