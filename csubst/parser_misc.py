@@ -48,7 +48,7 @@ def read_input(g):
     base_model = re.sub('\+R.*', '', base_model)
     txt = 'Instantaneous substitution rate matrix will be generated using the base model: {}'
     print(txt.format(base_model))
-    txt = 'Transition matrix will be generated using the model in the ancestral state reconstruction:'
+    txt = 'Transition matrix will be generated using the model in the ancestral state reconstruction: {}'
     print(txt.format(g['substitution_model']))
     if (g['substitution_model'].startswith('ECMK07')):
         matrix_file = 'substitution_matrix/ECMunrest.dat'
