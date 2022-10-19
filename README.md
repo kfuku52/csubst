@@ -48,16 +48,16 @@ CSUBST is composed of several subcommands.
 Many options are available, but those used by a typical user would be as follows. 
 More advanced usage is available in [CSUBST wiki](https://github.com/kfuku52/csubst/wiki). 
 
-- `csubst dataset` returns out-of-the-box test datasets.
+- `csubst dataset` generates out-of-the-box test datasets.
   - `--name`: Name of dataset. For a small test dataset, try `PGK` (vertebrate phosphoglycerate kinase genes).
-- `csubst analyze` is the main function of CSUBST. This subcommand returns various files including a table for ω<sub>C</sub>, dN<sub>C</sub>, and dS<sub>C</sub>.
+- `csubst analyze` calculates convergence rates and other metrics including ω<sub>C</sub>, dN<sub>C</sub>, and dS<sub>C</sub> on branch combinations.
   - `--alignment_file`: PATH to input in-frame codon alignment.
   - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
   - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
   - `--iqtree_model`: Codon substitution model for ancestral state reconstruction. Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. Among-site rate heterogeneity and codon frequencies can be specified. See [IQTREE's website](http://www.iqtree.org/doc/Substitution-Models) for details.
   - `--threads`: The number of CPUs for parallel computations (e.g., `1` or `4`).
   - `--foreground`: Optional. A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
-- `csubst site` maps combinatorial substitutions onto protein structure.
+- `csubst site` calculates site-wise combinatorial substitutions on focal branch combinations and maps it onto protein structure.
   - `--alignment_file`: PATH to input in-frame codon alignment.
   - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
   - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.

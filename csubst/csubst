@@ -44,17 +44,13 @@ def command_analyze(args):
     print('csubst analyze: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst analyze end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
-def command_help(args):
-    print(parser.parse_args([args.command, '--help']))
-
-
 if __name__ == "__main__":
     # Start time
     csubst_start = time.time()
     print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
     # Main parser
-    parser = argparse.ArgumentParser(description='csubst - a toolkit for molecular convergence. For details, see https://github.com/kfuku52/csubst/wiki')
+    parser = argparse.ArgumentParser(description='CSUBST - a toolkit for molecular convergence. For details, see https://github.com/kfuku52/csubst')
     parser.add_argument('--version', action='version', version='CSUBST version: {}'.format(__version__))
     subparsers = parser.add_subparsers()
 
@@ -109,7 +105,7 @@ if __name__ == "__main__":
                          help='default=%(default)s: The minimum posterior probability of single substitutions to count. '
                               'Set 0 for a counting without binarization. Omitted if --ml_anc is set to "yes".')
 
-    # shared: PhyloBayes inputs
+    # shared: PhyloBayes inputs, but PhyloBayes is no longer supported.
     psr_pb = argparse.ArgumentParser(add_help=False)
     #psr_pb.add_argument('--phylobayes_dir', metavar='PATH', default='./', type=str, required=False,
     #                   help='default=%(default)s: PATH to the PhyloBayes output directory.')
@@ -141,14 +137,16 @@ if __name__ == "__main__":
                     help='default=%(default)s: Experimental. Minimum number of branches per bin for foreground clade permutation. ')
 
     # dataset
-    dataset = subparsers.add_parser('dataset', help='see `csubst dataset -h` or https://github.com/kfuku52/csubst/wiki', parents=[])
+    help_txt = 'generates out-of-the-box test datasets. See `csubst dataset -h`'
+    dataset = subparsers.add_parser('dataset', help=help_txt, parents=[])
     dataset.add_argument('--name', metavar='STR', default='PGK', type=str, choices=['PGK','PEPC'],
                          help='default=%(default)s: Name of dataset to generate.')
     dataset.set_defaults(handler=command_dataset)
 
 
     # simulate
-    simulate = subparsers.add_parser('simulate', help='see `csubst simulate -h` or https://github.com/kfuku52/csubst/wiki', parents=[psr_co,psr_iq,psr_pb,psr_fg])
+    help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
+    simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg])
     simulate.add_argument('--background_omega', metavar='FLOAT', default=0.2, type=float,
                           help='default=%(default)s: dN/dS for background branches.')
     simulate.add_argument('--foreground_omega', metavar='FLOAT', default=0.2, type=float,
@@ -182,7 +180,9 @@ if __name__ == "__main__":
 
 
     # site
-    site = subparsers.add_parser('site', help='see `csubst site -h` or https://github.com/kfuku52/csubst/wiki', parents=[psr_co,psr_iq,psr_as])
+    help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps it onto protein structure. '
+    help_txt += ' See `csubst site -h`'
+    site = subparsers.add_parser('site', help=help_txt, parents=[psr_co,psr_iq,psr_as])
     site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default=None, required=True, type=str,
                       help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
                       'Run `csubst analyze` first and select branches of interest. '
@@ -231,7 +231,8 @@ if __name__ == "__main__":
 
 
     # analyze
-    analyze = subparsers.add_parser('analyze', help='see `csubst analyze -h` or https://github.com/kfuku52/csubst/wiki', parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as])
+    help_txt = 'calculates convergence rates and other metrics on branch combinations.  See `csubst analyze -h`'
+    analyze = subparsers.add_parser('analyze', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as])
     analyze.set_defaults(handler=command_analyze)
     # branch combinations
     analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
@@ -276,7 +277,7 @@ if __name__ == "__main__":
     analyze.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Tree plots with per-site ancestral codon states. '
                               'This option will generate many pdfs')
-    # Omega calculation
+    # Omega_C calculation
     analyze.add_argument('--omegaC_method', metavar='[modelfree|submodel]', default='submodel', type=str,
                          choices=['modelfree','submodel'],
                          help='default=%(default)s: Method to calculate omega_C. '
@@ -304,10 +305,6 @@ if __name__ == "__main__":
     analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
                               'by quantile-based transformation.')
-    # Sub parser: help
-    parser_help = subparsers.add_parser('help', help='see `help -h`')
-    parser_help.add_argument('command', help='command name which help is shown')
-    parser_help.set_defaults(handler=command_help)
 
     # Handler
     args = parser.parse_args()
