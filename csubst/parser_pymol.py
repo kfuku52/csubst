@@ -133,8 +133,12 @@ def calc_aa_identity(g):
     aa_ranges = dict()
     for pdb_seqname in pdb_seqnames:
         alphabet_sites = [ m.start() for m in re.finditer('[a-zA-Z]', seqs[pdb_seqname]) ]
-        aa_start = min(alphabet_sites)
-        aa_end = max(alphabet_sites)
+        if len(alphabet_sites)==0:
+            aa_start = 0
+            aa_end = 0
+        else:
+            aa_start = min(alphabet_sites)
+            aa_end = max(alphabet_sites)
         aa_ranges[pdb_seqname] = [aa_start, aa_end]
     g['aa_identity_values'] = aa_identity_values
     g['aa_identity_means'] = aa_identity_means
@@ -169,7 +173,8 @@ def mask_subunit(g):
             continue
         chain = pdb_seqname.replace(g['pdb']+'_', '')
         print('Masking chain {}'.format(chain), flush=True)
-        pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
+        if spans[1]!=0: # End position = 0 if no protein in the chain
+            pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
         i += 1
     for chain in pymol.cmd.get_chains(selection='polymer.nucleic'):
         print('Masking chain {}'.format(chain), flush=True)
