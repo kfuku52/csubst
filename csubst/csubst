@@ -198,7 +198,14 @@ if __name__ == "__main__":
                            'PDB CODE: e.g. 3SV0. PDB file will be fetched from the database. '
                            'The PDB protein sequence will be aligned with mafft, '
                            'and a pymol session visualizing convergence and divergence will be generated. '
-                           'besthit: Run online MMseqs2 and automatically fetch the best hit PDB model. ')
+                           'besthit: Run online sequence search and fetch the best-hit model. See --database.')
+    site.add_argument('--database', metavar='DATABASE1,DATABASE2,...', default='pdb,alphafill,alphafold', required=False, type=str,
+                      help='default=%(default)s: '
+                           'Comma-delimited names of protein structure databases to search. '
+                           'The top priority is given to the first. '
+                           'pdb: Run online MMseqs2 search against the RCSB PDB database (https://www.rcsb.org/) and fetch the best-hit PDB model. '
+                           'alphafill: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFill model (https://alphafill.eu/).'
+                           'alphafold: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFold model (https://alphafold.ebi.ac.uk/).')
     site.add_argument('--remove_solvent', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to remove solvent and small non-specific ligands. '
                            'Used only with --pdb.')

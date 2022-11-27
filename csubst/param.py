@@ -9,6 +9,8 @@ from csubst.__init__ import __version__
 def get_global_parameters(args):
     print('CSUBST version: {}'.format(__version__))
     print('CSUBST command: {}'.format(' '.join(sys.argv)))
+    current_working_directory = os.getcwd()
+    print('CSUBST working directory: {}'.format(current_working_directory))
     print('CSUBST bug report: https://github.com/kfuku52/csubst/issues')
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:

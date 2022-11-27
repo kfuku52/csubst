@@ -63,9 +63,9 @@ def write_mafft_map(g):
 def get_residue_numberings():
     out = dict()
     object_names = pymol.cmd.get_names()
+    object_names = [ on for on in object_names if not on.endswith('_pol_conts') ]
+    print('Detected protein structure objects: {}'.format(', '.join(object_names)))
     for object_name in object_names:
-        if object_name.endswith('_pol_conts'):
-            continue
         for ch in pymol.cmd.get_chains(object_name):
             pymol.stored.residues = []
             txt_selection = '{} and chain {} and name ca'.format(object_name, ch)
@@ -87,10 +87,10 @@ def add_pdb_residue_numbering(df):
         for ch in pymol.cmd.get_chains(object_name):
             key = object_name+'_'+ch
             if residue_numberings[key].shape[0]==0:
-                sys.stderr.write('PDB protein sequence is unavailable: {}\n'.format(key))
                 continue
-            df = pandas.merge(df, residue_numberings[key], on='codon_site_'+key, how='left')
-            df.loc[:,'codon_site_pdb_'+key] = df.loc[:,'codon_site_pdb_'+key].fillna(0).astype(int)
+            if 'codon_site_'+key in df.columns:
+                df = pandas.merge(df, residue_numberings[key], on='codon_site_'+key, how='left')
+                df.loc[:,'codon_site_pdb_'+key] = df.loc[:,'codon_site_pdb_'+key].fillna(0).astype(int)
     return df
 
 def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):

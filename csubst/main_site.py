@@ -6,9 +6,9 @@ import itertools
 import os
 import re
 import sys
-import urllib
 
 from csubst import genetic_code
+from csubst import parser_biodb
 from csubst import parser_misc
 from csubst import sequence
 from csubst import substitution
@@ -200,7 +200,7 @@ def plot_barchart(df, g):
     if g['pdb'] is None:
         outbase = os.path.join(g['site_outdir'], 'csubst_site')
     else:
-        outbase = os.path.join(g['site_outdir'], 'csubst_site.' + re.sub('.pdb$', '', os.path.basename(g['pdb'])))
+        outbase = g['pdb_outfile_base']
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
     #fig.savefig(outbase+".svg", format='svg', transparent=True)
     print("Nonsynonymous and synonymous substitutions are shown in color and gray, respectively.", flush=True)
@@ -620,83 +620,6 @@ def add_branch_id_list(g):
         g['branch_id_list'] = [numpy.array([ int(s) for s in g['branch_id'].split(',')]),]
     return g
 
-def get_representative_leaf(node, size='median'):
-    leaves = node.get_leaves()
-    leaf_seqlens = [ len(l.sequence.replace('-', '')) for l in leaves ]
-    if size=='median':
-        ind = numpy.argsort(leaf_seqlens)[len(leaf_seqlens) // 2]
-    representative_leaf = leaves[ind]
-    return representative_leaf
-
-def get_top_hit_id(my_hits):
-    top_hit_title = my_hits.descriptions[0].title
-    top_hit_id = re.findall('\|.*\|', top_hit_title)[0]
-    top_hit_id = re.sub('\|', '', top_hit_id)
-    top_hit_id = re.sub('\..*', '', top_hit_id)
-    return top_hit_id
-
-def is_url_valid(url):
-    request = urllib.request.Request(url)
-    request.get_method = lambda: 'HEAD'
-    try:
-        urllib.request.urlopen(request)
-        return True
-    except urllib.request.HTTPError:
-        return False
-
-def pdb_sequence_search(g):
-    from pypdb import Query
-    print('')
-    representative_branch_id = g['branch_ids'][0]
-    for node in g['tree'].traverse():
-        if (node.numerical_label==representative_branch_id):
-            representative_leaf = get_representative_leaf(node, size='median')
-            nlabel = representative_leaf.numerical_label
-            aa_query = sequence.translate_state(nlabel=nlabel, mode='aa', g=g)
-            aa_query = aa_query.replace('-', '')
-            break
-    print('MMseqs2 search against PDB: Query = {}'.format(representative_leaf.name))
-    print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
-    q = Query(aa_query, query_type='sequence', return_type='polymer_entity')
-    try:
-        mmseqs2_out = q.search()
-        best_hit = mmseqs2_out['result_set'][0]
-        best_hit_mc = best_hit['services'][0]['nodes'][0]['match_context'][0]
-        print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
-        for key in best_hit_mc.keys():
-            print('MMseqs2 search against PDB: Best hit {} = {}'.format(key, best_hit_mc[key]))
-        print('')
-        pdb_id = re.sub('_.*', '', best_hit['identifier'])
-    except:
-        from Bio.Blast import NCBIWWW
-        from Bio.Blast import NCBIXML
-        print('MMseqs2 search against PDB was unsuccessful.')
-        print('Running NCBI BLAST against UniProtKB/SwissProt. This step may take hours depending on the NCBI QBLAST server conditions.')
-        my_search = NCBIWWW.qblast(program='blastp', database='swissprot', sequence=aa_query, expect=10)
-        my_hits = NCBIXML.read(my_search)
-        my_search.close()
-        if my_hits.descriptions is None:
-            print('No hit found.')
-            pdb_id = None
-            return pdb_id
-        print('Top hits (up to 10 displayed)')
-        for i,description in enumerate(my_hits.descriptions):
-            if i>=10:
-                break
-            print(description.title)
-        top_hit_id = get_top_hit_id(my_hits)
-        download_url = 'https://alphafold.ebi.ac.uk/files/AF-'+top_hit_id+'-F1-model_v2.pdb'
-        if is_url_valid(url=download_url):
-            alphafold_pdb = urllib.request.urlopen(download_url).read()
-            alphafold_pdb_path = os.path.basename(download_url)
-            with open(alphafold_pdb_path, mode='wb') as f:
-                f.write(alphafold_pdb)
-            pdb_id = alphafold_pdb_path
-        else:
-            print('AlphaFold download URL not found: {}'.format(download_url))
-            pdb_id = None
-    return pdb_id
-
 def combinatorial2single_columns(df):
     for SN in ['OCS','OCN']:
         for anc in ['any','spe','dif']:
@@ -751,24 +674,25 @@ def main_site(g):
         if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
             export2chimera(df, g)
         if g['run_pdb_sequence_search']:
-            g['pdb'] = pdb_sequence_search(g)
+            g = parser_biodb.pdb_sequence_search(g)
         if (g['pdb'] is not None):
+            id_base = os.path.basename(g['pdb'])
+            id_base = re.sub('.pdb$', '', id_base)
+            id_base = re.sub('.cif$', '', id_base)
+            g['pdb_outfile_base'] = os.path.join(g['site_outdir'], 'csubst_site.' + id_base)
             parser_pymol.initialize_pymol(g=g)
-            pdb_base = re.sub('.*/', '', g['pdb'])
-            g['mafft_add_fasta'] = os.path.join(g['site_outdir'], 'csubst_site.' + pdb_base + '.fa')
+            g['mafft_add_fasta'] = g['pdb_outfile_base']+'.fa'
             parser_pymol.write_mafft_map(g=g)
             df = parser_pymol.add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
             df = parser_pymol.add_pdb_residue_numbering(df=df)
-            session_file_name = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.pymol.pse'
-            g['session_file_path'] = os.path.join(g['site_outdir'], session_file_name)
+            g['session_file_path'] = g['pdb_outfile_base']+'.pymol.pse'
             parser_pymol.write_pymol_session(df=df, g=g)
         plot_barchart(df, g)
         plot_state(N_tensor, S_tensor, g['branch_ids'], g)
         if g['pdb'] is None:
             out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
         else:
-            out_file = 'csubst_site.'+re.sub('.pdb$', '', os.path.basename(g['pdb']))+'.tsv'
-            out_path = os.path.join(g['site_outdir'], out_file)
+            out_path = g['pdb_outfile_base']+'.tsv'
         if g['single_branch_mode']:
             df = combinatorial2single_columns(df)
         df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
