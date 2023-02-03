@@ -125,7 +125,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     if (g['threads']>1):
         igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, g['threads'])
     if stat=='mean':
-        if (g['threads']==1)|(g['parallel_mode']=='thread'):
+        if (g['threads']==1):
             E_b = calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g)
         else:
             my_dtype = sub_tensor.dtype
