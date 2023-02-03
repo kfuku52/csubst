@@ -90,7 +90,7 @@ def add_pdb_residue_numbering(df):
                 continue
             if 'codon_site_'+key in df.columns:
                 df = pandas.merge(df, residue_numberings[key], on='codon_site_'+key, how='left')
-                df.loc[:,'codon_site_pdb_'+key] = df.loc[:,'codon_site_pdb_'+key].fillna(0).astype(int)
+                df['codon_site_pdb_'+key] = df['codon_site_pdb_'+key].fillna(0).astype(int)
     return df
 
 def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
@@ -106,12 +106,12 @@ def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
         else:
             df_tmp = pandas.read_csv(StringIO(seq_csv), comment='#', header=None)
             df_tmp.columns = ['aa_'+seq_name, 'codon_site_'+seq_name, 'codon_site_alignment']
-            is_missing_in_aln = (df_tmp.loc[:,'codon_site_alignment']==' -')
+            is_missing_in_aln = (df_tmp['codon_site_alignment']==' -')
             df_tmp = df_tmp.loc[~is_missing_in_aln,:]
-            df_tmp.loc[:,'codon_site_alignment'] = df_tmp.loc[:,'codon_site_alignment'].astype(int)
+            df_tmp['codon_site_alignment'] = df_tmp['codon_site_alignment'].astype(int)
             df = pandas.merge(df, df_tmp, on='codon_site_alignment', how='left')
-            df.loc[:,'codon_site_'+seq_name] = df.loc[:,'codon_site_'+seq_name].fillna(0).astype(int)
-            df.loc[:,'aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
+            df['codon_site_'+seq_name] = df['codon_site_'+seq_name].fillna(0).astype(int)
+            df['aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
     return df
 
 def calc_aa_identity(g):
