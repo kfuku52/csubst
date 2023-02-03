@@ -70,7 +70,7 @@ More advanced usage is available in [CSUBST wiki](https://github.com/kfuku52/csu
   - `--foreground`: A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
 
 ## Citation
-Fukushima K, Pollock DD. 2022. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. bioRxiv 487346 [DOI: 10.1101/2022.04.06.487346](https://doi.org/10.1101/2022.04.06.487346)
+Fukushima K, Pollock DD. 2023. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. Nature Ecology & Evolution 7: 155–170. [DOI: 10.1038/s41559-022-01932-7](https://doi.org/10.1038/s41559-022-01932-7)
 
 ## Licensing
 **CSUBST** is BSD-licensed (3 clause). See [LICENSE](LICENSE) for details.
