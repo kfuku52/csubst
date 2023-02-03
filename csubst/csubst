@@ -243,18 +243,19 @@ if __name__ == "__main__":
     analyze.set_defaults(handler=command_analyze)
     # branch combinations
     analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
-                         help='default=%(default)s: The maximum combinatorial number of branches. '
-                              'Set 2 for paired substitutions. 3 or larger for higher-order combinations.')
+                         help='default=%(default)s: The maximum combinatorial number of branches (K). '
+                              'Set 2 for branch pairs. 3 or larger for higher-order combinations.')
     analyze.add_argument('--exhaustive_until', metavar='INTEGER', default=2, type=int,
-                         help='default=%(default)s: Analyze all independent branch combinations until specified arity. '
+                         help='default=%(default)s: Analyze all independent branch combinations until specified arity (K). '
                               'Be careful of combinatorial explosion if set to 3 or higher. '
-                              'Set 1 for foreground-only analysis.')
+                              'Set to 1 for foreground-only analysis.')
     analyze.add_argument('--max_combination', metavar='INTEGER', default=10000, type=int,
-                         help='default=%(default)s: Maximum number of branch combinations to explore arity+1. '
-                              'Branch combinations with high --cutoff_stat values are selected. '
-                              'The first stat in --cutoff_stat is most prioritized when selection.')
+                         help='default=%(default)s: Maximum number of branch combinations to generate at K+1. '
+                              'If possible branch combinations at K+1 are more than this number, '
+                              'top N convergent combinatinons are selected with the thresholds specified by --cutoff_stat. '
+                              'The first stat in --cutoff_stat is most prioritized.')
     analyze.add_argument('--exclude_sister_pair', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Set "yes" to exclude sister branches in branch combination analysis.')
+                         help='default=%(default)s: Set to "yes" for excluding sister branches in branch combination analysis.')
     analyze.add_argument('--cutoff_stat', metavar='[STAT1,VALUE1|STAT2,VALUE2|...]',
                          default='OCNany2spe,2.0|omegaCany2spe,5.0', type=str,
                          help='default=%(default)s: Cutoff statistics for searching higher-order branch combinations. '

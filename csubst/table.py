@@ -4,7 +4,7 @@ import pandas
 import sys
 import time
 
-def sort_labels(df):
+def sort_branch_ids(df):
     swap_columns = df.columns[df.columns.str.startswith('branch_id')].tolist()
     if len(swap_columns)>1:
         swap_values = df.loc[:,swap_columns].values
@@ -22,8 +22,9 @@ def sort_cb(cb):
     is_omega = cb.columns.str.contains('^omegaC')
     is_d = cb.columns.str.contains('^d[NS]C')
     is_nocalib = cb.columns.str.contains('_nocalib$')
+    num_branch_id_cols = cb.columns.str.contains('^branch_id_').sum()
     col_order = []
-    col_order += cb.columns[cb.columns.str.contains('^branch_id_')].sort_values().tolist()
+    col_order += [ 'branch_id_'+str(i+1) for i in numpy.arange(num_branch_id_cols) ] # https://github.com/kfuku52/csubst/issues/20
     col_order += cb.columns[cb.columns.str.contains('^dist_')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^branch_num_')].sort_values().tolist()
     col_order += cb.columns[cb.columns.str.contains('^is_')].sort_values().tolist()
@@ -57,7 +58,7 @@ def merge_tables(df1, df2):
     columns = columns + df1.columns[df1.columns.str.startswith('branch_id')].tolist()
     columns = columns + df1.columns[df1.columns.str.startswith('site')].tolist()
     df = pandas.merge(df1, df2, on=columns)
-    df = sort_labels(df=df)
+    df = sort_branch_ids(df=df)
     print('Time elapsed for merging tables: {:,} sec'.format(int(time.time() - start)))
     return df
 

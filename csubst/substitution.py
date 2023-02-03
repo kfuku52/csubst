@@ -181,7 +181,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
             )
         df = pandas.DataFrame(df_mmap, columns=cn)
         if os.path.exists(mmap_out): os.unlink(mmap_out)
-    df = table.sort_labels(df)
+    df = table.sort_branch_ids(df)
     df = df.dropna()
     if not attr.startswith('EC'):
         df = table.set_substitution_dtype(df=df)
@@ -248,7 +248,7 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         df = pandas.DataFrame(df_mmap, columns=cn1 + cn2 + cn3)
         if os.path.exists(mmap_out): os.remove(mmap_out)
     df = df.dropna()
-    df = table.sort_labels(df)
+    df = table.sort_branch_ids(df)
     df = table.set_substitution_dtype(df=df)
     return(df)
 

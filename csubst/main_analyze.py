@@ -176,7 +176,7 @@ def main_analyze(g):
         start = time.time()
         print("Generating branch-site table.", flush=True)
         bs = substitution.get_bs(S_tensor, N_tensor)
-        bs = table.sort_labels(df=bs)
+        bs = table.sort_branch_ids(df=bs)
         bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(bs.values.nbytes/1024/1024, bs.values.dtype), flush=True)
