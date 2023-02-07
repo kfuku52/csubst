@@ -59,7 +59,7 @@ def write_alignment(outfile, mode, g, leaf_only=False):
         aln_tmp += translate_state(nlabel, mode, g)
         aln_out += aln_tmp+'\n'
     with open(outfile, 'w') as f:
-        print('Writing alignment:', outfile, flush=True)
+        print('Writing sequence alignment:', outfile, flush=True)
         f.write(aln_out)
 
 def get_state_index(state, input_state, ambiguous_table):

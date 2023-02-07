@@ -57,9 +57,9 @@ if __name__ == "__main__":
     # shared: common
     psr_co = argparse.ArgumentParser(add_help=False)
     psr_co.add_argument('--alignment_file', metavar='PATH', default='', type=str,
-                       help='default=%(default)s: PATH to input in-frame codon alignment.')
+                       help='default=%(default)s: PATH to in-frame codon alignment (FASTA format).')
     psr_co.add_argument('--rooted_tree_file', metavar='PATH', default='', type=str,
-                       help='default=%(default)s: PATH to input rooted tree. Tip labels should be consistent with --alignment_file.')
+                       help='default=%(default)s: PATH to input rooted tree (Newick format). Tip labels should be consistent with --alignment_file.')
     psr_co.add_argument('--genetic_code', metavar='INTEGER', type=int, required=False, default=1,
                        help='default=%(default)s: NCBI codon table ID. 1 = "Standard". See here: '
                             'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
@@ -208,6 +208,8 @@ if __name__ == "__main__":
                       help='default=%(default)s: E-value cutoff in the database searches. Applied to MMseqs2 and QBLAST.')
     site.add_argument('--database_minimum_identity', metavar='FLOAT', default=0.5, required=False, type=float,
                       help='default=%(default)s: The minimum sequence identity for the database searches. Applied to MMseqs2. See https://search.rcsb.org/index.html#search-api')
+    site.add_argument('--user_alignment', metavar='PATH', default=None, required=False, type=str,
+                      help='default=%(default)s: The user-provided alignment FASTA for the substitution mapping to protein structures.')
     site.add_argument('--remove_solvent', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to remove solvent and small non-specific ligands. '
                            'Used only with --pdb.')

@@ -681,9 +681,13 @@ def main_site(g):
             id_base = re.sub('.cif$', '', id_base)
             g['pdb_outfile_base'] = os.path.join(g['site_outdir'], 'csubst_site.' + id_base)
             parser_pymol.initialize_pymol(g=g)
-            g['mafft_add_fasta'] = g['pdb_outfile_base']+'.fa'
-            parser_pymol.write_mafft_map(g=g)
-            df = parser_pymol.add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
+            if g['user_alignment'] is not None:
+                g['mafft_add_fasta'] = g['user_alignment']
+                df = parser_pymol.add_coordinate_from_user_alignment(df=df, user_alignment=g['mafft_add_fasta'])
+            else:
+                g['mafft_add_fasta'] = g['pdb_outfile_base']+'.fa'
+                parser_pymol.write_mafft_alignment(g=g)
+                df = parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
             df = parser_pymol.add_pdb_residue_numbering(df=df)
             g['session_file_path'] = g['pdb_outfile_base']+'.pymol.pse'
             parser_pymol.write_pymol_session(df=df, g=g)

@@ -2,6 +2,8 @@ import numpy
 import pandas
 import pymol
 
+from Bio import SeqIO
+
 from io import StringIO
 import copy
 import os
@@ -26,7 +28,7 @@ def initialize_pymol(g):
         print('Loading PDB file: {}'.format(g['pdb']), flush=True)
         pymol.cmd.load(g['pdb'])
 
-def write_mafft_map(g):
+def write_mafft_alignment(g):
     tmp_pdb_fasta = 'tmp.csubst.pdb_seq.fa'
     mafft_map_file = tmp_pdb_fasta+'.map'
     if os.path.exists(mafft_map_file):
@@ -45,16 +47,19 @@ def write_mafft_map(g):
     out_mafft = subprocess.run(cmd_mafft, stdout=subprocess.PIPE)
     with open(g['mafft_add_fasta'], 'w') as f:
         f.write(out_mafft.stdout.decode('utf8'))
+    print('')
     for i in range(10):
         if os.path.exists(mafft_map_file):
-            print('mafft map file was generated.', flush=True)
+            print('MAFFT alignment file was generated: {}'.format(g['mafft_add_fasta']), flush=True)
             break
         else:
-            print('mafft map file not detected. Waiting {:} sec'.format(i+1), flush=True)
+            print('MAFFT alignment file not detected. Waiting {:} sec'.format(i+1), flush=True)
             time.sleep(1)
-    txt = 'CSUBST does not exclude poorly aligned regions. ' \
-          'Please carefully check {} before biological interpretation of substitution events.'
-    print(txt.format(g['mafft_add_fasta']), flush=True)
+    print('CSUBST does not exclude poorly aligned regions.', flush=True)
+    print('Please carefully check the MAFFT alignment file before biological interpretation of substitution events.', flush=True)
+    print('If manual adjustment is necessary, please correct the amino acid positions of database-derived sequences and use the updated MAFFT alignment file as input with --user_alignment.', flush=True)
+    print('The CSUBST input sequences (i.e., sequences in the file specified by --alignment_file) should not be modified at this stage.', flush=True)
+    print('', flush=True)
     if os.path.getsize(g['mafft_add_fasta'])==0:
         sys.stderr.write('File size of {} is 0. A wrong ID might be specified in --pdb.\n'.format(g['mafft_add_fasta']))
         sys.stderr.write('Exiting.\n')
@@ -91,9 +96,12 @@ def add_pdb_residue_numbering(df):
             if 'codon_site_'+key in df.columns:
                 df = pandas.merge(df, residue_numberings[key], on='codon_site_'+key, how='left')
                 df['codon_site_pdb_'+key] = df['codon_site_pdb_'+key].fillna(0).astype(int)
+    print('The column "codon_site_**ID**" indicates the positions of codons/amino acids in the sequence "**ID**" in the input alignment. 0 = missing site.')
+    print('The column "codon_site_pdb_**ID**" indicates the positions of codons/amino acids in the sequence "**ID**" in the PDB file. 0 = missing site.')
     return df
 
-def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
+def add_coordinate_from_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
+    print('Loading amino acid coordinates from: {}'.format(mafft_map_file), flush=True)
     with open(mafft_map_file, 'r') as f:
         map_str = f.read()
     map_list = map_str.split('>')[1:]
@@ -112,6 +120,39 @@ def add_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
             df = pandas.merge(df, df_tmp, on='codon_site_alignment', how='left')
             df['codon_site_'+seq_name] = df['codon_site_'+seq_name].fillna(0).astype(int)
             df['aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
+    return df
+
+def add_coordinate_from_user_alignment(df, user_alignment):
+    print('Loading amino acid coordinates from: {}'.format(user_alignment), flush=True)
+    pdb_fasta = pymol.cmd.get_fastastr(selection='polymer.protein', state=-1, quiet=1)
+    tmp_pdb_fasta = 'tmp.csubst.pdb_seq.fa'
+    with open(tmp_pdb_fasta, 'w') as f:
+        f.write(pdb_fasta)
+    pdb_seqs = list(SeqIO.parse(open(tmp_pdb_fasta, 'r'), 'fasta'))
+    user_seqs = list(SeqIO.parse(open(user_alignment, 'r'), 'fasta'))
+    for user_seq in user_seqs:
+        for pdb_seq in pdb_seqs:
+            if user_seq.name!=pdb_seq.name:
+                continue
+            user_seq_str = str(user_seq.seq).replace('\n', '')
+            pdb_seq_str = str(pdb_seq.seq).replace('\n', '')
+            user_seq_counter = 0
+            pdb_seq_counter = 0
+            txt = 'The alignment length should match between --alignment_file ({} sites) and --user_alignment ({} sites)'
+            assert len(user_seq_str)==df.shape[0], txt.format(df.shape[0], len(user_seq_str))
+            df['aa_' + user_seq.name] = ''
+            df['codon_site_' + user_seq.name] = 0
+            while user_seq_counter <= df.shape[0]-1:
+                if user_seq_str[user_seq_counter]=='-':
+                    user_seq_counter += 1
+                    continue
+                if user_seq_str[user_seq_counter]==pdb_seq_str[pdb_seq_counter]:
+                    df.at[user_seq_counter, 'aa_' + user_seq.name] = user_seq_str[user_seq_counter]
+                    df.at[user_seq_counter, 'codon_site_' + user_seq.name] = pdb_seq_counter + 1
+                    user_seq_counter += 1
+                    pdb_seq_counter += 1
+                else:
+                    pdb_seq_counter += 1
     return df
 
 def calc_aa_identity(g):
