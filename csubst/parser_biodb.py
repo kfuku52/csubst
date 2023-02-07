@@ -2,8 +2,10 @@ import numpy
 from Bio.Blast import NCBIWWW
 from Bio.Blast import NCBIXML
 
+import json
 import os
 import re
+import requests
 import urllib
 
 from csubst import sequence
@@ -51,7 +53,6 @@ def is_url_valid(url):
         return False
 
 def pdb_sequence_search(g):
-    from pypdb import Query
     print('')
     representative_branch_id = g['branch_ids'][0]
     for node in g['tree'].traverse():
@@ -69,20 +70,30 @@ def pdb_sequence_search(g):
             break
         print('Starting the sequence similarity search against protein structure database: {}'.format(database_name))
         if (database_name=='pdb'):
+            print('MMseqs2 search against PDB: Query = {}'.format(representative_leaf.name))
+            print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
             try:
-                print('MMseqs2 search against PDB: Query = {}'.format(representative_leaf.name))
-                print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
-                q = Query(aa_query, query_type='sequence', return_type='polymer_entity')
-                mmseqs2_out = q.search()
+                endpoint_url = 'https://search.rcsb.org/rcsbsearch/v2/query'
+                param_dict = { # https://search.rcsb.org/index.html#building-search-request
+                    'evalue_cutoff':0.1,
+                    'identity_cutoff':0.5,
+                    'sequence_type':'protein',
+                    'value':aa_query,
+                }
+                query_dict = {
+                    'query':{'type':'terminal', 'service':'sequence', 'parameters':param_dict,},
+                    'request_options':{'scoring_strategy':'sequence',},
+                    'return_type':'polymer_entity',
+                }
+                query_json = json.dumps(query_dict)
+                response = requests.post(url=endpoint_url, data=query_json)
+                mmseqs2_out = response.json()
                 best_hit = mmseqs2_out['result_set'][0]
-                best_hit_mc = best_hit['services'][0]['nodes'][0]['match_context'][0]
                 print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
-                for key in best_hit_mc.keys():
-                    print('MMseqs2 search against PDB: Best hit {} = {}'.format(key, best_hit_mc[key]))
-                print('')
                 pdb_id = re.sub('_.*', '', best_hit['identifier'])
                 g['selected_database'] = 'pdb'
-            except:
+            except Exception as e:
+                print(e)
                 print('MMseqs2 search against PDB was unsuccessful.')
                 pdb_id = None
         elif (database_name=='alphafill')|(database_name=='alphafold'):
