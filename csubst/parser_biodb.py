@@ -6,6 +6,7 @@ import json
 import os
 import re
 import requests
+import time
 import urllib
 
 from csubst import sequence
@@ -20,9 +21,11 @@ def get_top_hit_id(my_hits):
 def run_qblast(aa_query, num_display=10, evalue_cutoff=10):
     print('Running NCBI BLAST against UniProtKB/SwissProt. '
           'This step should finish within minutes but may take hours depending on the NCBI QBLAST server conditions.')
+    start = time.time()
     my_search = NCBIWWW.qblast(program='blastp', database='swissprot', sequence=aa_query, expect=evalue_cutoff)
     my_hits = NCBIXML.read(my_search)
     my_search.close()
+    print('Time elapsed for NCBI QBLAST: {:,} sec'.format(int(time.time() - start)))
     if my_hits.descriptions is None:
         print('No hit found.')
         pdb_id = None
@@ -75,8 +78,8 @@ def pdb_sequence_search(g):
             try:
                 endpoint_url = 'https://search.rcsb.org/rcsbsearch/v2/query'
                 param_dict = { # https://search.rcsb.org/index.html#building-search-request
-                    'evalue_cutoff':0.1,
-                    'identity_cutoff':0.5,
+                    'evalue_cutoff':g['database_evalue_cutoff'],
+                    'identity_cutoff':g['database_minimum_identity'],
                     'sequence_type':'protein',
                     'value':aa_query,
                 }
@@ -86,9 +89,15 @@ def pdb_sequence_search(g):
                     'return_type':'polymer_entity',
                 }
                 query_json = json.dumps(query_dict)
+                start = time.time()
                 response = requests.post(url=endpoint_url, data=query_json)
+                print('Time elapsed for MMseqs2 search: {:,} sec'.format(int(time.time() - start)))
                 mmseqs2_out = response.json()
                 best_hit = mmseqs2_out['result_set'][0]
+                print('Top hits (up to 10 displayed)')
+                for hit in mmseqs2_out['result_set']:
+                    txt = 'PDB identifier: {}  RCSB PDB Search Score: {}'
+                    print(txt.format(hit['identifier'], hit['score']))
                 print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
                 pdb_id = re.sub('_.*', '', best_hit['identifier'])
                 g['selected_database'] = 'pdb'
@@ -98,7 +107,7 @@ def pdb_sequence_search(g):
                 pdb_id = None
         elif (database_name=='alphafill')|(database_name=='alphafold'):
             if top_hit_id is None:
-                top_hit_id = run_qblast(aa_query, num_display=10, evalue_cutoff=10)
+                top_hit_id = run_qblast(aa_query, num_display=10, evalue_cutoff=g['database_evalue_cutoff'])
             if (database_name=='alphafill'):
                 download_url = 'https://alphafill.eu/v1/aff/'+top_hit_id
             elif (database_name=='alphafold'):

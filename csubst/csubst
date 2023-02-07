@@ -191,10 +191,11 @@ if __name__ == "__main__":
                            'Codon positions along the sequence(s) appear in the output tsv.')
     site.add_argument('--pdb', metavar='PATH/PDB_CODE/besthit', default=None, required=False, type=str,
                       help='default=%(default)s: '
-                           'PATH: PATH to downloaded pdb file. '
+                           'One of the followings. '
+                           'PATH: PATH to the downloaded pdb file. '
                            'PDB CODE: e.g. 3SV0. PDB file will be fetched from the database. '
                            'The PDB protein sequence will be aligned with mafft, '
-                           'and a pymol session visualizing convergence and divergence will be generated. '
+                           'and a pymol session will be generated. '
                            'besthit: Run online sequence search and fetch the best-hit model. See --database.')
     site.add_argument('--database', metavar='DATABASE1,DATABASE2,...', default='pdb,alphafill,alphafold', required=False, type=str,
                       help='default=%(default)s: '
@@ -203,6 +204,10 @@ if __name__ == "__main__":
                            'pdb: Run online MMseqs2 search against the RCSB PDB database (https://www.rcsb.org/) and fetch the best-hit PDB model. '
                            'alphafill: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFill model (https://alphafill.eu/). '
                            'alphafold: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFold model (https://alphafold.ebi.ac.uk/).')
+    site.add_argument('--database_evalue_cutoff', metavar='FLOAT', default=1.0, required=False, type=float,
+                      help='default=%(default)s: E-value cutoff in the database searches. Applied to MMseqs2 and QBLAST.')
+    site.add_argument('--database_minimum_identity', metavar='FLOAT', default=0.5, required=False, type=float,
+                      help='default=%(default)s: The minimum sequence identity for the database searches. Applied to MMseqs2. See https://search.rcsb.org/index.html#search-api')
     site.add_argument('--remove_solvent', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to remove solvent and small non-specific ligands. '
                            'Used only with --pdb.')

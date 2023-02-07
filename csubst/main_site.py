@@ -645,7 +645,7 @@ def main_site(g):
     S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
     g = add_branch_id_list(g)
     for branch_ids in g['branch_id_list']:
-        print('\nProcessing branch_ids: {}'.format(','.join([ str(bid) for bid in branch_ids ])), flush=True)
+        print('\nProcessing branch IDs: {}'.format(','.join([ str(bid) for bid in branch_ids ])), flush=True)
         if len(branch_ids)==1:
             print('Single branch mode. Substitutions, rather than combinatorial substitutions, will be mapped.')
             g['single_branch_mode'] = True
