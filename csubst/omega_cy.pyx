@@ -7,8 +7,8 @@ cimport cython
 cpdef get_permutations(long[:,:] cb_ids, long[:] sites, long[:] sub_branches, double[:] p, long niter):
     cdef cnumpy.ndarray[cnumpy.uint8_t, ndim = 3, cast=True] ps
     cdef cnumpy.ndarray[cnumpy.uint8_t, ndim = 2, cast=True] sub_bool_array
-    cdef long[:,:] num_shared_sub = numpy.zeros(shape=(cb_ids.shape[0], niter), dtype=numpy.long)
-    cdef long[:] num_shared_sub2 = numpy.zeros(shape=(niter), dtype=numpy.long)
+    cdef long[:,:] num_shared_sub = numpy.zeros(shape=(cb_ids.shape[0], niter), dtype=numpy.int64)
+    cdef long[:] num_shared_sub2 = numpy.zeros(shape=(niter), dtype=numpy.int64)
     cdef long size
     cdef long prev
     cdef long[:] site_indices

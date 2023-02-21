@@ -9,7 +9,7 @@ cdef where_equal_1d(long[:] data, long val):
     cdef int xmax = data.shape[0]
     cdef Py_ssize_t x
     cdef int count = 0
-    cdef Py_ssize_t[:] xind = numpy.zeros(xmax, dtype=numpy.long)
+    cdef Py_ssize_t[:] xind = numpy.zeros(xmax, dtype=numpy.int64)
     for x in range(xmax):
         if (data[x] == val):
             xind[count] = x

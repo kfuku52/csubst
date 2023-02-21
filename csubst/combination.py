@@ -22,8 +22,8 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu, verbose):
     start = time.time()
     rows, cols = numpy.where(numpy.equal(nc_matrix, 1))
     unique_cols = numpy.unique(cols)
-    ind2  = numpy.arange(arity, dtype=numpy.long)
-    empty_id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.long)
+    ind2  = numpy.arange(arity, dtype=numpy.int64)
+    empty_id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int64)
     chunks, starts = parallel.get_chunks(empty_id_combinations, ncpu)
     out = joblib.Parallel(n_jobs=ncpu, max_nbytes=None, backend='multiprocessing')(
         joblib.delayed(combination_cy.generate_id_chunk)
@@ -68,12 +68,12 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         if (is_valid_combination.sum()>0):
             node_combinations = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
         else:
-            node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int)
+            node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
     if verbose:
         num_target_node = numpy.unique(target_nodes.flatten()).shape[0]
         print("Number of target branches: {:,}".format(num_target_node), flush=True)
         print("Number of independent and non-independent branch combinations: {:,}".format(node_combinations.shape[0]), flush=True)
-    nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=numpy.bool)
+    nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=bool)
     for i in numpy.arange(node_combinations.shape[0]):
         nc_matrix[node_combinations[i,:],i] = 1
     is_dependent_col = False
@@ -144,7 +144,7 @@ def node_combination_subsamples_rifle(g, arity, rep):
 def node_combination_subsamples_shotgun(g, arity, rep):
     all_ids = [ n.numerical_label for n in g['tree'].traverse() ]
     sub_ids = g['sub_branches']
-    id_combinations = numpy.zeros(shape=(0,arity), dtype=numpy.int)
+    id_combinations = numpy.zeros(shape=(0,arity), dtype=numpy.int64)
     id_combinations_dif = numpy.inf
     round = 1
     while (id_combinations.shape[0] < rep)&(id_combinations_dif > rep/200):
@@ -158,7 +158,7 @@ def node_combination_subsamples_shotgun(g, arity, rep):
         ss_matrix = ss_matrix[:,~is_dependent_col]
         rows,cols = numpy.where(ss_matrix==1)
         unique_cols = numpy.unique(cols)
-        tmp_id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int)
+        tmp_id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int64)
         for i in unique_cols:
             tmp_id_combinations[i,:] = rows[cols==i]
         previous_num = id_combinations.shape[0]

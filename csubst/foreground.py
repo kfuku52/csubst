@@ -38,11 +38,11 @@ def get_df_clade_size(g):
     return df_clade_size
 
 def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=False):
-    size_array = df_clade_size.loc[:,'size'].values.astype(numpy.int)
+    size_array = df_clade_size.loc[:,'size'].values.astype(numpy.int64)
     size_min = size_array.min()
     size_max = size_array.max()
     sizes = numpy.unique(size_array)[::-1] # To start counting from rarer (larger) clades
-    bins = numpy.array([size_max+1,], dtype=numpy.int)
+    bins = numpy.array([size_max+1,], dtype=numpy.int64)
     count = 0
     counts = []
     for size in sizes:
@@ -56,7 +56,7 @@ def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=
             counts.append(count)
             count = 0
     if len(bins)<2:
-        bins = numpy.array([size_min, size_max], dtype=numpy.int)
+        bins = numpy.array([size_min, size_max], dtype=numpy.int64)
     txt = 'Number of clade permutation bins = {:,} (bin limits = {}, counts = {})'
     print(txt.format(bins.shape[0]-1, ', '.join([ str(s) for s in bins ]), ', '.join([ str(s) for s in counts ])))
     bins = bins[::-1]
@@ -111,11 +111,11 @@ def get_new_foreground_ids(df_clade_size, g):
                 if (node.numerical_label==fg_stem_bid):
                     new_lineage_fg_ids = [ n.numerical_label for n in node.traverse() ]
                     new_fg_ids = new_fg_ids + new_lineage_fg_ids
-    new_fg_ids = numpy.array(new_fg_ids, dtype=numpy.int)
+    new_fg_ids = numpy.array(new_fg_ids, dtype=numpy.int64)
     return new_fg_ids
 
 def annotate_foreground_branch(tree, fg_df, fg_stem_only):
-    target_id = numpy.zeros(shape=(0,), dtype=numpy.int)
+    target_id = numpy.zeros(shape=(0,), dtype=numpy.int64)
     fg_leaf_name = []
     leaf_names = [ leaf.name for leaf in tree.get_leaves() ]
     if fg_df.shape[0]==0:
@@ -178,7 +178,7 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
                     if node.numerical_label not in lineage_fg_id:
                         lineage_fg_id.append(node.numerical_label)
             dif = len(lineage_fg_id) - num_id
-        tmp = numpy.array(lineage_fg_id, dtype=numpy.int)
+        tmp = numpy.array(lineage_fg_id, dtype=numpy.int64)
         target_id = numpy.concatenate([target_id, tmp])
     if fg_stem_only:
         for node in tree.traverse():
@@ -207,7 +207,7 @@ def get_foreground_branch(g):
         g['fg_df'] = pandas.DataFrame()
         g['fg_id'] = list()
         g['fg_leaf_name'] = list()
-        g['target_id'] = numpy.zeros(shape=(0,), dtype=numpy.int)
+        g['target_id'] = numpy.zeros(shape=(0,), dtype=numpy.int64)
     else:
         g['fg_df'] = pandas.read_csv(g['foreground'], sep='\t', comment='#', skip_blank_lines=True, header=None)
         if g['fg_df'].shape[1]!=2:
@@ -271,7 +271,7 @@ def get_marginal_branch(g):
                     for sister_des in sister.traverse():
                         if sister_des.is_foreground==False:
                             marginal_ids.append(sister_des.numerical_label)
-    g['mg_id'] = numpy.array(list(set(marginal_ids)-set(g['target_id'])), dtype=numpy.int)
+    g['mg_id'] = numpy.array(list(set(marginal_ids)-set(g['target_id'])), dtype=numpy.int64)
     g['target_id'] = numpy.concatenate([g['target_id'], g['mg_id']])
     for node in g['tree'].traverse():
         node.is_marginal = False # initializing
@@ -374,7 +374,7 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
     suffices = list()
     is_targets = list()
     suffices.append('_all')
-    is_targets.append(numpy.ones(shape=cb.shape[0], dtype=numpy.bool))
+    is_targets.append(numpy.ones(shape=cb.shape[0], dtype=bool))
     target_cols = ['is_fg','is_mg','is_mf','dummy']
     suffix_candidates = ['_fg','_mg','_mf']
     if g['exhaustive_until']>=current_arity:

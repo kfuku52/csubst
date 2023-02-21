@@ -255,7 +255,7 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
 def get_sub_sites(g, sS, sN, state_tensor):
     num_site = sS.shape[0]
     num_branch = len(list(g['tree'].traverse()))
-    g['is_site_nonmissing'] = numpy.zeros(shape=[num_branch, num_site], dtype=numpy.bool)
+    g['is_site_nonmissing'] = numpy.zeros(shape=[num_branch, num_site], dtype=bool)
     for node in g['tree'].traverse():
         nl = node.numerical_label
         g['is_site_nonmissing'][nl,:] = (state_tensor[nl,:,:].sum(axis=1)!=0)
