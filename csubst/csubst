@@ -121,7 +121,7 @@ if __name__ == "__main__":
     psr_fg.add_argument('--mg_parent', metavar='yes|no', default='no', type=strtobool,
                     help='default=%(default)s: Mark the parent branches of the foreground stem branches as "marginal". '
                          'They may serve as "negative controls" relative to the foreground lineages.')
-    psr_fg.add_argument('--mg_sister', metavar='yes|no', default='yes', type=strtobool,
+    psr_fg.add_argument('--mg_sister', metavar='yes|no', default='no', type=strtobool,
                     help='default=%(default)s: Mark the sister branches of the foreground stem branches as "marginal". '
                          'They may serve as "negative controls" relative to the foreground lineages.')
     psr_fg.add_argument('--mg_sister_stem_only', metavar='yes|no', default='yes', type=strtobool,
