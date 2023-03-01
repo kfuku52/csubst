@@ -324,7 +324,7 @@ def get_foreground_branch_num(cb, g):
     else:
         percent_fg_enough = num_fg_enough / num_enough * 100
         enrichment_factor = (num_fg_enough/num_enough) / (num_fg/num_all)
-    txt = 'arity={}, foreground branch combinations with cutoff conditions {} = {:.0f}% ({:,}/{:,}, ' \
+    txt = 'Arity = {}: Foreground branch combinations with cutoff conditions {} = {:.0f}% ({:,}/{:,}, ' \
           'total examined = {:,}, enrichment factor = {:.1f})'
     txt = txt.format(arity, g['cutoff_stat'], percent_fg_enough, num_fg_enough, num_enough,
                      num_all, enrichment_factor)
@@ -429,7 +429,7 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
     elapsed_time = int(time.time() - start)
     g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
     if verbose:
-        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
+        print(("Elapsed time for arity={}: {:,.1f} sec\n".format(current_arity, elapsed_time)), flush=True)
     return g
 
 def clade_permutation(cb, g):

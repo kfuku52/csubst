@@ -50,7 +50,7 @@ if __name__ == "__main__":
     print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
     # Main parser
-    parser = argparse.ArgumentParser(description='CSUBST - a toolkit for molecular convergence. For details, see https://github.com/kfuku52/csubst')
+    parser = argparse.ArgumentParser(description='CSUBST - a toolkit for molecular convergence detection. For details, see https://github.com/kfuku52/csubst')
     parser.add_argument('--version', action='version', version='CSUBST version: {}'.format(__version__))
     subparsers = parser.add_subparsers()
 
@@ -139,7 +139,6 @@ if __name__ == "__main__":
     dataset.add_argument('--name', metavar='STR', default='PGK', type=str, choices=['PGK','PEPC'],
                          help='default=%(default)s: Name of dataset to generate.')
     dataset.set_defaults(handler=command_dataset)
-
 
     # simulate
     help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
@@ -290,13 +289,13 @@ if __name__ == "__main__":
                          help='default=%(default)s: Tree plots with per-site ancestral codon states. '
                               'This option will generate many pdfs')
     # Omega_C calculation
-    analyze.add_argument('--omegaC_method', metavar='[modelfree|submodel]', default='submodel', type=str,
+    analyze.add_argument('--omegaC_method', metavar='[submodel|modelfree]', default='submodel', type=str,
                          choices=['modelfree','submodel'],
                          help='default=%(default)s: Method to calculate omega_C. '
                               '"submodel" utilizes a codon substitution model in the ancestral state reconstruction. '
                               'In addition to the base substitution models, codon frequencies and '
                               'among-site rate heterogeneity are taken into account. '
-                              'Described in Fukushima and Pollock (2022). '
+                              'Described in Fukushima and Pollock (2023, https://doi.org/10.1038/s41559-022-01932-7). '
                               '"modelfree" (experimental) for expected values from among-site randomization '
                               '(urn sampling) of substitutions. ')
     analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
@@ -306,14 +305,14 @@ if __name__ == "__main__":
     analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
                          choices=['no', 'pool', 'sn', 'each', 'file'],
                          help='default=%(default)s: Experimental. Correct among-site rate variation in omega/quantile calculation. '
-                              '"no", No ASRV, meaning the uniform rate among sites. '
+                              'This option is used in --omegaC_method modelfree but not with --omegaC_method submodel. '
+                              '"no", No ASRV, meaning a uniform rate among sites. '
                               '"pool", All categories of substitutions are pooled to calculate a single set of ASRV. '
                               '"sn", Synonymous and nonsynonymous substitutions are processed individually '
                               'to calculate their respective ASRVs (2 sets). '
                               '"each", Each of 61x60 patterns of substitutions are processed individually '
                               'to calculate their respective ASRVs. '
-                              '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
-                              'This option is used in --omegaC_method modelfree but not with --omegaC_method submodel.')
+                              '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). ')
     analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
                               'by quantile-based transformation.')

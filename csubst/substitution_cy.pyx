@@ -30,6 +30,6 @@ cpdef calc_combinatorial_sub_float32(long[:,:] id_combinations, int mmap_start,
         if j % 1000 == 0:
             mmap_end = mmap_start + id_combinations.shape[0]
             elapsed_sec = int(time.time()) - start_time
-            txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
+            txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} sec'
             print(txt.format(j, mmap_start, mmap_end, elapsed_sec))
     return numpy.asarray(df)

@@ -2,16 +2,18 @@ import numpy
 import pandas
 
 import os
+import platform
 import sys
 
 from csubst.__init__ import __version__
 
 def get_global_parameters(args):
-    print('CSUBST version: {}'.format(__version__))
-    print('CSUBST command: {}'.format(' '.join(sys.argv)))
-    current_working_directory = os.getcwd()
-    print('CSUBST working directory: {}'.format(current_working_directory))
-    print('CSUBST bug report: https://github.com/kfuku52/csubst/issues')
+    print('OS: {}'.format(platform.platform()), flush=True)
+    print('Python version: {}'.format(sys.version.replace('\n', ' ')), flush=True)
+    print('CSUBST version: {}'.format(__version__), flush=True)
+    print('CSUBST command: {}'.format(' '.join(sys.argv)), flush=True)
+    print('CSUBST working directory: {}'.format(os.getcwd()), flush=True)
+    print('CSUBST bug report: https://github.com/kfuku52/csubst/issues', flush=True)
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:
         g[attr] = getattr(args, attr)

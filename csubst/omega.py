@@ -295,7 +295,7 @@ def get_CoD(cb, g):
 
 def print_cb_stats(cb, prefix):
     arity = cb.columns.str.startswith('branch_id_').sum()
-    hd = 'arity='+str(arity)+', '+prefix+':'
+    hd = 'Arity = {:,}, {}:'.format(arity, prefix)
     combinatorial_substitutions = ['any2any','any2spe','any2dif',
                                    'dif2any','dif2spe','dif2dif',
                                    'spe2any','spe2spe','spe2dif',
@@ -305,7 +305,7 @@ def print_cb_stats(cb, prefix):
         if not col_omega in cb.columns:
             continue
         median_value = cb.loc[:,col_omega].median()
-        txt = '{} median {} (non-calibrated) = {:.3f}'
+        txt = '{} median {} (non-corrected for dNc vs dSc distribution ranges): {:.3f}'
         print(txt.format(hd, col_omega, median_value), flush=True)
 
 def calc_omega(cb, S_tensor, N_tensor, g):
@@ -318,7 +318,7 @@ def calc_omega(cb, S_tensor, N_tensor, g):
 def calibrate_dsc(cb, transformation='quantile'):
     prefix='cb'
     arity = cb.columns.str.startswith('branch_id_').sum()
-    hd = 'arity='+str(arity)+', '+prefix+':'
+    hd = 'Arity = {:,}, {}:'.format(arity, prefix)
     combinatorial_substitutions = ['any2any','any2spe','any2dif',
                                    'dif2any','dif2spe','dif2dif',
                                    'spe2any','spe2spe','spe2dif',
@@ -349,6 +349,6 @@ def calibrate_dsc(cb, transformation='quantile'):
         cb.loc[:,col_omega] = numpy.nan
         cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
         median_value = cb.loc[:,col_omega].median()
-        txt = '{} median {} (calibrated for different distribution ranges in dNc and dSc) = {:.3f}'
-        print(txt.format(hd, col_omega, median_value), flush=True)
+        txt = '{} median {} ({:,}/{:,} branch combinations were corrected for dNc vs dSc distribution ranges): {:.3f}'
+        print(txt.format(hd, col_omega, (~is_nocalib_higher).sum(), cb.shape[0], median_value), flush=True)
     return cb

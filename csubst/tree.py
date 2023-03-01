@@ -92,12 +92,12 @@ def calc_node_dist_chunk(chunk, start, tree_dict, float_type):
         arr_dist[i,2] = node_dist
         if i % 10000 == 0:
             end = start + nrow
-            txt = 'Inter-branch distance: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
+            txt = 'Inter-branch distance: {:,}th in the id range {:,}-{:,}: {:,} sec'
             print(txt.format(i, start, end, int(time.time() - start_time)), flush=True)
     return arr_dist
 
 def get_node_distance(tree, cb, ncpu, float_type):
-    txt = 'Starting node distance calculation. If it takes too long, disable this step by --branch_dist no'
+    txt = 'Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no'
     print(txt, flush=True)
     start_time = time.time()
     if not 'numerical_label' in dir(tree):
@@ -116,6 +116,7 @@ def get_node_distance(tree, cb, ncpu, float_type):
     cb.loc[:, 'dist_bl'] = numpy.nan
     for arr_dist in out_list:
         ind = arr_dist[:,0].astype(int)
+        cb.loc[ind,'dist_node_num'] = arr_dist[:,1] # This line causes the warning when arr_dist.shape[0] == 1: FutureWarning: In a future version, `df.iloc[:, i] = newvals` will attempt to set the values inplace instead of always setting a new array. To retain the old behavior, use either `df[df.columns[i]] = newvals` or, if columns are non-unique, `df.isetitem(i, newvals)`
         cb.loc[ind,'dist_node_num'] = arr_dist[:,1]
         cb.loc[ind,'dist_bl'] = arr_dist[:,2]
     print('Time elapsed for calculating inter-branch distances: {:,} sec'.format(int(time.time() - start_time)))

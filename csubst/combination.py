@@ -53,7 +53,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             target_nodes = numpy.expand_dims(target_nodes, axis=1)
         index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
         if verbose:
-            print('Number of branch combination unions (redundant) = {:,}'.format(len(index_combinations)), flush=True)
+            print('Number of redundant branch combination unions: {:,}'.format(len(index_combinations)), flush=True)
         axis = (len(index_combinations), arity)
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
@@ -72,7 +72,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     if verbose:
         num_target_node = numpy.unique(target_nodes.flatten()).shape[0]
         print("Number of target branches: {:,}".format(num_target_node), flush=True)
-        print("Number of independent and non-independent branch combinations: {:,}".format(node_combinations.shape[0]), flush=True)
+        print("Number of independent/non-independent branch combinations: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=bool)
     for i in numpy.arange(node_combinations.shape[0]):
         nc_matrix[node_combinations[i,:],i] = 1
@@ -102,7 +102,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             nc_matrix = nc_matrix[:,~is_fg_dependent_col]
     id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'], verbose)
     if verbose:
-        print("Number of independent node combinations: {:,}".format(id_combinations.shape[0]), flush=True)
+        print("Number of independent branch combinations: {:,}".format(id_combinations.shape[0]), flush=True)
     return g,id_combinations
 
 def node_combination_subsamples_rifle(g, arity, rep):

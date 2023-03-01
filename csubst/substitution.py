@@ -23,7 +23,7 @@ def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None)
     axis = (num_branch,num_site,num_syngroup,num_state,num_state) # axis = [branch,site,matrix_group,state_from,state_to]
     mmap_tensor = os.path.join(os.getcwd(), 'tmp.csubst.sub_tensor.'+mmap_attr+'.mmap')
     if os.path.exists(mmap_tensor): os.unlink(mmap_tensor)
-    txt = 'Memory map is generated. dtype={}, axis={}, path={}'
+    txt = 'Generating memory map: dtype={}, axis={}, path={}'
     print(txt.format(state_tensor.dtype, axis, mmap_tensor), flush=True)
     sub_tensor = numpy.memmap(mmap_tensor, dtype=dtype, shape=axis, mode='w+')
     return sub_tensor
@@ -151,7 +151,7 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
                 df[i, arity+3] += sub_tensor[id_combinations[j,:], :, sg, :, :].prod(axis=0).sum(axis=(1, 2)).sum(axis=0) # spe2spe
             if j % 10000 == 0:
                 mmap_end = mmap_start + id_combinations.shape[0]
-                txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
+                txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} sec'
                 print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
     if not mmap:
         return (df)
@@ -215,7 +215,7 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
         if (node%10000==0):
             mmap_start = mmap_start
             mmap_end = mmap_start+id_combinations.shape[0]
-            txt = 'cbs: {:,}th in the id range {:,}-{:,}: {:,} [sec]'
+            txt = 'cbs: {:,}th in the id range {:,}-{:,}: {:,} sec'
             print(txt.format(node, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
         node += 1
     if not mmap:

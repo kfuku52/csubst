@@ -22,16 +22,18 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
     g = param.initialize_df_cb_stats(g)
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
-        print("Generating combinat-branch table. Arity = {:,}".format(current_arity), flush=True)
+        print("Arity = {:,}: Generating cb table".format(current_arity), flush=True)
         g['current_arity'] = current_arity
         if (current_arity==2):
             if (g['exhaustive_until']<current_arity)&(g['foreground'] is not None):
-                print('Searching foreground branch combinations only.', flush=True)
+                txt = 'Arity = {:,}: Targeted search of foreground branch combinations'
+                print(txt.format(current_arity), flush=True)
                 g['df_cb_stats'].loc[current_arity-1, 'mode'] = 'foreground'
                 g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'],
                                                                       arity=current_arity, check_attr='name')
             else:
-                print('Exhaustively searching independent branch combinations.', flush=True)
+                txt = 'Arity = {:,}: Exhaustive search with all independent branch combinations'
+                print(txt.format(current_arity), flush=True)
                 g['df_cb_stats'].loc[current_arity-1, 'mode'] = 'exhaustive'
                 g,id_combinations = combination.get_node_combinations(g=g, target_nodes=None,
                                                                       arity=current_arity, check_attr="name")
@@ -39,18 +41,18 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             if (g['exhaustive_until'] < current_arity):
                 is_stat_enough = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
                 num_branch_ids = is_stat_enough.sum()
-                txt = 'Arity = {:,}: Branch combinations at K-1 that passed cutoff stats ({}): {:,}'
-                print(txt.format(current_arity, g['cutoff_stat'], num_branch_ids), flush=True)
+                txt = 'Arity = {:,}: Heuristic search with {:,} K-1 branch combinations that passed cutoff stats ({})'
+                print(txt.format(current_arity, num_branch_ids, g['cutoff_stat']), flush=True)
                 g['df_cb_stats'].loc[current_arity - 1, 'mode'] = 'branch_and_bound'
             else:
                 is_stat_enough = numpy.ones(shape=cb.shape[0], dtype=bool)
-                txt = 'Arity = {:,}: Exhaustive search from {:,} branch combinations at K-1.'
+                txt = 'Arity = {:,}: Exhaustive search with {:,} K-1 branch combinations'
                 print(txt.format(current_arity, cb.shape[0]))
                 g['df_cb_stats'].loc[current_arity - 1, 'mode'] = 'exhaustive'
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
             if is_stat_enough.sum()>g['max_combination']:
-                txt = 'Only {:,} of {:,} branch combinations at arity={} will be used to search arity={}'
-                txt = txt.format(g['max_combination'], is_stat_enough.sum(), current_arity-1, current_arity)
+                txt = 'Arity = {:,}: Search will be limited to {:,} of {:,} K-1 branch combinations (see --max_combination)'
+                txt = txt.format(current_arity, g['max_combination'], is_stat_enough.sum())
                 print(txt, flush=True)
                 cutoff_stat_exp = [ item.split(',')[0] for item in g['cutoff_stat'].split('|') ]
                 is_col = False
@@ -71,9 +73,9 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             if id_combinations.shape[0] == 0:
                 end_flag = 1
                 break
-        print('Preparing the OCS table with {:,} process(es).'.format(g['threads']), flush=True)
+        print('Preparing OCS table with {:,} process(es).'.format(g['threads']), flush=True)
         cbS = substitution.get_cb(id_combinations, S_tensor, g, 'OCS')
-        print('Preparing the OCN table with {:,} process(es).'.format(g['threads']), flush=True)
+        print('Preparing OCN table with {:,} process(es).'.format(g['threads']), flush=True)
         cbN = substitution.get_cb(id_combinations, N_tensor, g, 'OCN')
         cb = table.merge_tables(cbS, cbN)
         del cbS, cbN
@@ -104,7 +106,8 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         g = foreground.add_median_cb_stats(g, cb, current_arity, start)
         if end_flag:
-            print('No combination satisfied phylogenetic independence. Ending branch combination analysis.')
+            txt = 'No branch combination satisfied phylogenetic independence. Ending higher-order search at K = {:,}.'
+            print(txt.format(current_arity))
             break
     g['df_cb_stats'] = g['df_cb_stats'].loc[(~g['df_cb_stats'].loc[:,'elapsed_sec'].isnull()),:]
     g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
@@ -174,7 +177,7 @@ def main_analyze(g):
 
     if (g['bs']):
         start = time.time()
-        print("Generating branch-site table.", flush=True)
+        print("Generating bs table", flush=True)
         bs = substitution.get_bs(S_tensor, N_tensor)
         bs = table.sort_branch_ids(df=bs)
         bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
@@ -186,7 +189,7 @@ def main_analyze(g):
 
     if (g['s']) | (g['cb']):
         start = time.time()
-        print("Generating site table.", flush=True)
+        print("Generating s table", flush=True)
         sS = substitution.get_s(S_tensor, attr='S')
         sN = substitution.get_s(N_tensor, attr='N')
         s = table.merge_tables(sS, sN)
@@ -205,7 +208,7 @@ def main_analyze(g):
 
     if (g['b']) | (g['cb']):
         start = time.time()
-        print("Generating branch table.", flush=True)
+        print("Generating b table", flush=True)
         bS = substitution.get_b(g, S_tensor, attr='S')
         bN = substitution.get_b(g, N_tensor, attr='N')
         b = table.merge_tables(bS, bN)
@@ -228,7 +231,7 @@ def main_analyze(g):
 
     if (g['cs']):
         start = time.time()
-        print("Generating combinat-site table.", flush=True)
+        print("Generating cs table", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
         csS = substitution.get_cs(id_combinations, S_tensor, attr='S')
@@ -244,7 +247,7 @@ def main_analyze(g):
 
     if (g['cbs']):
         start = time.time()
-        print("Generating combinat-branch-site table.", flush=True)
+        print("Generating cbs table", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, arity=g['current_arity'], check_attr="name")
         cbsS = substitution.get_cbs(id_combinations, S_tensor, attr='S', g=g)
