@@ -296,7 +296,9 @@ def annotate_tree(g, ignore_tree_inconsistency=False):
             sys.stderr.write('Exiting.\n')
             sys.exit(1)
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
-    print('Total branch length of --rooted_tree_file:', sum([ n.dist for n in g['rooted_tree'].traverse() ]))
-    print('Total branch length of --iqtree_treefile:', sum([ n.dist for n in g['node_label_tree'].traverse() ]))
+    total_root_tree_len = sum([ n.dist for n in g['rooted_tree'].traverse() ])
+    total_iqtree_len = sum([ n.dist for n in g['node_label_tree'].traverse() ])
+    print('Total branch length of --rooted_tree_file: {:,.4f}'.format(total_root_tree_len))
+    print('Total branch length of --iqtree_treefile: {:,.4f}'.format(total_iqtree_len))
     print('')
     return g

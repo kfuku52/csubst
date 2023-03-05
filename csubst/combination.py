@@ -186,7 +186,7 @@ def calc_substitution_patterns(cb):
         sub_patterns3 = sub_patterns2.loc[:,cols].drop_duplicates()
         sp_min = int(sub_patterns3.sum(axis=1).min())
         sp_max = int(sub_patterns3.sum(axis=1).max())
-        txt = 'Number of {} patterns among {:,} branch combinations={:,}, Min total subs={:,}, Max total subs={:,}'
+        txt = 'Number of {} patterns among {:,} branch combinations={:,}, Min total subs={:,.1f}, Max total subs={:,.1f}'
         print(txt.format(key, cb.shape[0], sub_patterns3.shape[0], sp_min, sp_max), flush=True)
         sub_patterns3.loc[:,'sub_pattern_id'] = numpy.arange(sub_patterns3.shape[0])
         sub_patterns4 = pandas.merge(sub_patterns2, sub_patterns3, on=cols, sort=False)

@@ -17,7 +17,7 @@ from csubst import substitution
 from csubst import table
 from csubst import tree
 
-def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True):
+def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
     end_flag = 0
     g = param.initialize_df_cb_stats(g)
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
@@ -66,12 +66,13 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='', write_cb=True)
                 branch_ids = cb.loc[is_stat_enough, id_columns].values
             if len(set(branch_ids.ravel().tolist())) < current_arity:
                 end_flag = 1
+                cb = pandas.DataFrame()
                 break
-            del cb
             g,id_combinations = combination.get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
                                                                   check_attr='name')
             if id_combinations.shape[0] == 0:
                 end_flag = 1
+                cb = pandas.DataFrame()
                 break
         print('Preparing OCS table with {:,} process(es).'.format(g['threads']), flush=True)
         cbS = substitution.get_cb(id_combinations, S_tensor, g, 'OCS')
@@ -215,7 +216,7 @@ def main_analyze(g):
         b.loc[:,'branch_length'] = numpy.nan
         for node in g['tree'].traverse():
             b.loc[node.numerical_label,'branch_length'] = node.dist
-        txt = 'Number of {} patterns among {:,} branches={:,}, min={:,}, max={:,}'
+        txt = 'Number of {} patterns among {:,} branches={:,}, min={:,.1f}, max={:,.1f}'
         for key in ['S_sub', 'N_sub']:
             p = b.loc[:, key].drop_duplicates().values
             print(txt.format(key, b.shape[0], p.shape[0], p.min(), p.max()), flush=True)
@@ -263,11 +264,12 @@ def main_analyze(g):
 
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()
-        g,cb = cb_search(g, b, S_tensor, N_tensor, id_combinations, mode='foreground', write_cb=True)
+        g,cb = cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True)
         if (g['fg_clade_permutation']>0):
             g = foreground.clade_permutation(cb, g)
         del cb
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
+        print('Writing csubst_cb_stats.tsv', flush=True)
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]

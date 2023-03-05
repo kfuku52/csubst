@@ -20,10 +20,13 @@ def get_global_parameters(args):
     if 'calc_quantile' in g.keys():
         if g['calc_quantile']:
             assert g['omegaC_method']=='modelfree', '--calc_quantile "yes" should be used with --omegaC_method "modelfree".'
+    if 'exhaustive_until' in g.keys():
+        if (g['exhaustive_until']==1)&(g['foreground'] is None):
+            raise Exception('To enable --exhaustive_until 1, use --foreground')
     if 'fg_clade_permutation' in g.keys():
         if g['fg_clade_permutation']>0:
             if (g['foreground'] is None):
-                raise Exception('To enable --fg_clade_permutation, set --foreground')
+                raise Exception('To enable --fg_clade_permutation, use --foreground')
     if 'iqtree_treefile' in g.keys():
         if (g['iqtree_treefile']=='infer'):
             g['iqtree_treefile'] = g['alignment_file']+'.treefile'
