@@ -1,4 +1,4 @@
-![](logo/logo_csubst_large.svg)
+![](logo/logo_csubst_large.png)
 
 ## Overview
 **CSUBST** ([/si:sʌbst/](http://ipa-reader.xyz/?text=si:s%CA%8Cbst&voice=Salli)) is a tool for analyzing **C**ombinatorial **SUBST**itutions of codon sequences in phylogenetic trees.
