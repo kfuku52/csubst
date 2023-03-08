@@ -70,10 +70,10 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
                 break
             g,id_combinations = combination.get_node_combinations(g=g, target_nodes=branch_ids, arity=current_arity,
                                                                   check_attr='name')
-            if id_combinations.shape[0] == 0:
-                end_flag = 1
-                cb = pandas.DataFrame()
-                break
+        if id_combinations.shape[0] == 0:
+            end_flag = 1
+            cb = pandas.DataFrame()
+            break
         print('Preparing OCS table with {:,} process(es).'.format(g['threads']), flush=True)
         cbS = substitution.get_cb(id_combinations, S_tensor, g, 'OCS')
         print('Preparing OCN table with {:,} process(es).'.format(g['threads']), flush=True)

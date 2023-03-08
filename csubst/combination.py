@@ -4,6 +4,7 @@ import pandas
 
 import itertools
 import os
+import sys
 import time
 
 from csubst import parallel
@@ -35,6 +36,7 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu, verbose):
     return id_combinations
 
 def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True):
+    g['fg_dependent_id_combinations'] = None
     tree = g['tree']
     all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
     if verbose:
@@ -52,6 +54,10 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         if (target_nodes.shape.__len__()==1):
             target_nodes = numpy.expand_dims(target_nodes, axis=1)
         index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
+        if len(index_combinations)==0:
+            sys.stderr.write('There is no target branch combination at K = {:,}.\n'.format(arity))
+            id_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
+            return g, id_combinations
         if verbose:
             print('Number of redundant branch combination unions: {:,}'.format(len(index_combinations)), flush=True)
         axis = (len(index_combinations), arity)
@@ -59,7 +65,6 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
         chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
-        # TODO distinct thread/process
         joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
             joblib.delayed(node_union)
             (ids, target_nodes, df_mmap, ms) for ids, ms in zip(chunks, starts)
@@ -82,7 +87,6 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     if verbose:
         print('Removing {:,} non-independent branch combinations.'.format(is_dependent_col.sum()), flush=True)
     nc_matrix = nc_matrix[:,~is_dependent_col]
-    g['fg_dependent_id_combinations'] = None
     if (g['foreground'] is not None)&(len(g['fg_dep_ids']) > 0):
         is_fg_dependent_col = False
         for fg_dep_id in g['fg_dep_ids']:
