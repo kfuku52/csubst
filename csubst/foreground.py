@@ -187,6 +187,8 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
             else:
                 node.is_foreground = False
                 node.color = 'black'
+    target_id = target_id[target_id!=tree.get_tree_root().numerical_label]
+    target_id.sort()
     with open('csubst_target_branch.txt', 'w') as f:
         for x in target_id:
             f.write(str(x)+'\n')

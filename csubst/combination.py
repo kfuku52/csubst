@@ -80,7 +80,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         print("Number of independent/non-independent branch combinations: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=bool)
     for i in numpy.arange(node_combinations.shape[0]):
-        nc_matrix[node_combinations[i,:],i] = 1
+        nc_matrix[node_combinations[i,:],i] = True
     is_dependent_col = False
     for dep_id in g['dep_ids']:
         is_dependent_col = (is_dependent_col)|(nc_matrix[dep_id,:].sum(axis=0)>1)
@@ -233,6 +233,8 @@ def get_dep_ids(g):
             tmp_fg_dep_ids = list()
             for node in g['tree'].traverse():
                 is_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.get_leaf_names() ])
+                if node.is_root():
+                    continue
                 if not is_all_leaf_lineage_fg:
                     continue
                 is_up_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.up.get_leaf_names() ])
