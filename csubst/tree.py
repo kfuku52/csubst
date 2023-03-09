@@ -46,6 +46,9 @@ def transfer_root(tree_to, tree_from, verbose=False):
         outgroup_ancestor = [n for n in tree_to.iter_leaves() if n.name == outgroups[0]][0]
     else:
         outgroup_ancestor = tree_to.get_common_ancestor(outgroups)
+    if not set(outgroups) == set(outgroup_ancestor.get_leaf_names()):
+        sys.stderr.write('No root bipartition found in --infile. Exiting.\n')
+        sys.exit(1)
     tree_to.set_outgroup(outgroup_ancestor)
     subroot_to = tree_to.get_children()
     subroot_from = tree_from.get_children()
