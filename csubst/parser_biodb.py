@@ -11,14 +11,17 @@ import urllib
 
 from csubst import sequence
 
-def get_top_hit_id(my_hits):
+def get_top_hit_ids(my_hits):
     if len(my_hits.descriptions)==0:
-        return None
-    top_hit_title = my_hits.descriptions[0].title
-    top_hit_id = re.findall('\|.*\|', top_hit_title)[0]
-    top_hit_id = re.sub('\|', '', top_hit_id)
-    top_hit_id = re.sub('\..*', '', top_hit_id)
-    return top_hit_id
+        return []
+    top_hit_ids = []
+    for i in range(len(my_hits.descriptions)):
+        top_hit_title = my_hits.descriptions[i].title
+        top_hit_id = re.findall('\|.*\|', top_hit_title)[0]
+        top_hit_id = re.sub('\|', '', top_hit_id)
+        top_hit_id = re.sub('\..*', '', top_hit_id)
+        top_hit_ids.append(top_hit_id)
+    return top_hit_ids
 
 def run_qblast(aa_query, num_display=10, evalue_cutoff=10):
     print('Running NCBI BLAST against UniProtKB/SwissProt. '
@@ -37,8 +40,8 @@ def run_qblast(aa_query, num_display=10, evalue_cutoff=10):
         if i >= num_display:
             break
         print(description.title)
-    top_hit_id = get_top_hit_id(my_hits)
-    return top_hit_id
+    top_hit_ids = get_top_hit_ids(my_hits)
+    return top_hit_ids
 
 def get_representative_leaf(node, size='median'):
     leaves = node.get_leaves()
@@ -68,7 +71,7 @@ def pdb_sequence_search(g):
             aa_query = aa_query.replace('-', '')
             break
     pdb_id = None
-    top_hit_id = None
+    top_hit_ids = []
     database_names = g['database'].split(',')
     for database_name in database_names:
         if pdb_id is not None:
@@ -108,29 +111,37 @@ def pdb_sequence_search(g):
                 print('MMseqs2 search against PDB was unsuccessful.')
                 pdb_id = None
         elif (database_name=='alphafill')|(database_name=='alphafold'):
-            if top_hit_id is None:
-                top_hit_id = run_qblast(aa_query, num_display=10, evalue_cutoff=g['database_evalue_cutoff'])
-            if (top_hit_id is None):
+            if len(top_hit_ids)==0:
+                top_hit_ids = run_qblast(aa_query, num_display=10, evalue_cutoff=g['database_evalue_cutoff'])
+            if len(top_hit_ids)==0:
                 print('No QBLAST hit with the E-value threshold of {}.'.format(g['database_evalue_cutoff']))
                 pdb_id = None
             else:
-                if (database_name=='alphafill'):
-                    download_url = 'https://alphafill.eu/v1/aff/'+top_hit_id
-                elif (database_name=='alphafold'):
-                    download_url = 'https://alphafold.ebi.ac.uk/files/AF-' + top_hit_id + '-F1-model_v2.pdb'
-                if is_url_valid(url=download_url):
-                    alphafold_pdb = urllib.request.urlopen(download_url).read()
-                    if (database_name == 'alphafill'):
-                        alphafold_pdb_path = os.path.basename(download_url)+'.cif'
+                for i in range(len(top_hit_ids)):
+                    print('Retrieving protein structure: {}'.format(top_hit_ids[i]), flush=True)
+                    if (database_name=='alphafill'):
+                        download_url = 'https://alphafill.eu/v1/aff/'+top_hit_ids[i]
                     elif (database_name=='alphafold'):
-                        alphafold_pdb_path = os.path.basename(download_url)
-                    with open(alphafold_pdb_path, mode='wb') as f:
-                        f.write(alphafold_pdb)
-                    pdb_id = alphafold_pdb_path
-                    g['selected_database'] = database_name
-                else:
-                    print('Download URL not found: {}'.format(download_url))
-                    pdb_id = None
+                        download_url = 'https://alphafold.ebi.ac.uk/files/AF-' + top_hit_ids[i] + '-F1-model_v2.pdb'
+                    if is_url_valid(url=download_url):
+                        try:
+                            alphafold_pdb = urllib.request.urlopen(download_url).read()
+                            if (database_name == 'alphafill'):
+                                alphafold_pdb_path = os.path.basename(download_url)+'.cif'
+                            elif (database_name=='alphafold'):
+                                alphafold_pdb_path = os.path.basename(download_url)
+                            with open(alphafold_pdb_path, mode='wb') as f:
+                                f.write(alphafold_pdb)
+                            print('Download succeeded at: {}'.format(download_url), flush=True)
+                            pdb_id = alphafold_pdb_path
+                            g['selected_database'] = database_name
+                            break
+                        except:
+                            print('Download failed at: {}'.format(download_url), flush=True)
+                            pdb_id = None
+                    else:
+                        print('Download URL not found: {}'.format(download_url), flush=True)
+                        pdb_id = None
     g['pdb'] = pdb_id
     if g['pdb'] is not None:
         print('Selected database and ID: {} and {}'.format(g['selected_database'], g['pdb']))
