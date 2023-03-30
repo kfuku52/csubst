@@ -70,14 +70,33 @@ def apply_min_sub_pp(g, sub_tensor):
         sub_tensor[(sub_tensor<g['min_sub_pp'])] = 0
     return sub_tensor
 
-def get_b(g, sub_tensor, attr):
-    column_names=['branch_name','branch_id',attr+'_sub']
+def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
+    if sitewise:
+        column_names=['branch_name','branch_id',attr+'_sub',attr+'_sitewise']
+    else:
+        column_names=['branch_name','branch_id',attr+'_sub']
     df = pandas.DataFrame(numpy.nan, index=range(0, g['num_node']), columns=column_names)
     i=0
     for node in g['tree'].traverse():
-        df.loc[i,'branch_name'] = getattr(node, 'name')
-        df.loc[i,'branch_id'] = getattr(node, 'numerical_label')
-        df.loc[i,attr+'_sub'] = sub_tensor[node.numerical_label,:,:,:,:].sum()
+        df.at[i,'branch_name'] = getattr(node, 'name')
+        df.at[i,'branch_id'] = getattr(node, 'numerical_label')
+        df.at[i,attr+'_sub'] = sub_tensor[node.numerical_label,:,:,:,:].sum()
+        if sitewise:
+            sub_list = list()
+            if attr=='N':
+                state_order = g['amino_acid_orders']
+            elif attr=='S':
+                raise Error('This function is not supported for synonymous substitutions.')
+            for s in range(sub_tensor.shape[1]):
+                max_value = sub_tensor[node.numerical_label,s,:,:,:].max()
+                if max_value < min_sitewise_pp:
+                    continue
+                max_idx = numpy.where(sub_tensor[node.numerical_label,s,:,:,:]==max_value)
+                ancestral_state = state_order[max_idx[1][0]]
+                derived_state = state_order[max_idx[2][0]]
+                sub_string = ancestral_state+str(s+1)+derived_state
+                sub_list.append(sub_string)
+            df.at[i, attr + '_sitewise'] = ','.join(sub_list)
         i+=1
     df = df.dropna(axis=0)
     df['branch_id'] = df['branch_id'].astype(int)

@@ -210,8 +210,8 @@ def main_analyze(g):
     if (g['b']) | (g['cb']):
         start = time.time()
         print("Generating b table", flush=True)
-        bS = substitution.get_b(g, S_tensor, attr='S')
-        bN = substitution.get_b(g, N_tensor, attr='N')
+        bS = substitution.get_b(g=g, sub_tensor=S_tensor, attr='S', sitewise=False)
+        bN = substitution.get_b(g=g, sub_tensor=N_tensor, attr='N', sitewise=True)
         b = table.merge_tables(bS, bN)
         b.loc[:,'branch_length'] = numpy.nan
         for node in g['tree'].traverse():
