@@ -278,12 +278,8 @@ def read_exchangeability_eq_freq(file, g):
 
 def annotate_tree(g, ignore_tree_inconsistency=False):
     g['node_label_tree_file'] = g['iqtree_treefile']
-    f = open(g['node_label_tree_file'])
-    tree_string = f.readline()
-    g['node_label_tree'] = ete3.PhyloNode(tree_string, format=1)
-    f.close()
+    g['node_label_tree'] = ete3.PhyloNode(g['node_label_tree_file'], format=1)
     g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
-
     is_consistent_tree = tree.is_consistent_tree(tree1=g['node_label_tree'], tree2=g['rooted_tree'])
     if is_consistent_tree:
         g['tree'] = tree.transfer_root(tree_to=g['node_label_tree'], tree_from=g['rooted_tree'], verbose=False)

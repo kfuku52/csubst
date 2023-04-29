@@ -131,6 +131,14 @@ def standardize_node_names(tree):
         node.name = re.sub('/.*', '', node.name)
         node.name = re.sub('^\'', '', node.name)
         node.name = re.sub('\'$', '', node.name)
+    leaf_names = tree.get_leaf_names()
+    if len(leaf_names)!=len(set(leaf_names)):
+        raise ValueError('Leaf names are not unique')
+    node_names = [ node.name for node in tree.traverse() if (not node.is_leaf())&(node.name!='') ]
+    if len(node_names)!=len(set(node_names)):
+        raise ValueError('Internal node labels are not unique. '
+                         'Please provide unique internal node labels or delete them from --rooted_tree_file. '
+                         'For the label deletion, nwkit drop may be useful: https://github.com/kfuku52/nwkit/wiki/nwkit-drop')
     return tree
 
 def is_internal_node_labeled(tree):
