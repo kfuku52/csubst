@@ -164,11 +164,11 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
         for node in tree.traverse():
             node_leaf_name_set = set(node.get_leaf_names())
             if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
-                if fg_stem_only:
+                if node.is_root() | (not fg_stem_only):
+                    lineage_fg_id.append(node.numerical_label)
+                else:
                     if (node.is_lineage_foreground==True)&(node.up.is_lineage_foreground==False):
                         lineage_fg_id.append(node.numerical_label)
-                else:
-                    lineage_fg_id.append(node.numerical_label)
         dif = 1
         while dif:
             num_id = len(lineage_fg_id)
