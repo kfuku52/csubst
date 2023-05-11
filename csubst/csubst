@@ -205,7 +205,7 @@ if __name__ == "__main__":
                            'alphafold: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFold model (https://alphafold.ebi.ac.uk/).')
     site.add_argument('--database_evalue_cutoff', metavar='FLOAT', default=1.0, required=False, type=float,
                       help='default=%(default)s: E-value cutoff in the database searches. Applied to MMseqs2 and QBLAST.')
-    site.add_argument('--database_minimum_identity', metavar='FLOAT', default=0.5, required=False, type=float,
+    site.add_argument('--database_minimum_identity', metavar='FLOAT', default=0.25, required=False, type=float,
                       help='default=%(default)s: The minimum sequence identity for the database searches. Applied to MMseqs2. See https://search.rcsb.org/index.html#search-api')
     site.add_argument('--user_alignment', metavar='PATH', default=None, required=False, type=str,
                       help='default=%(default)s: The user-provided alignment FASTA for the substitution mapping to protein structures.')
