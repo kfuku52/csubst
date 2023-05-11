@@ -610,11 +610,11 @@ def add_branch_sub_prob(df, branch_ids, sub_tensor, attr):
 def add_branch_id_list(g):
     if g['branch_id']=='fg':
         g['branch_id_list'] = []
-        cb2 = pandas.read_csv(g['cb2'], sep="\t", index_col=False, header=0)
-        bid_cols = cb2.columns[cb2.columns.str.startswith('branch_id_')]
-        cb2_fg = cb2.loc[(cb2.loc[:,'is_fg']=='Y'),:]
-        for i in cb2_fg.index:
-            bids = cb2_fg.loc[i,bid_cols].values.astype(int)
+        cb = pandas.read_csv(g['cb_file'], sep="\t", index_col=False, header=0)
+        bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
+        cb_fg = cb.loc[(cb.loc[:,'is_fg']=='Y'),:]
+        for i in cb_fg.index:
+            bids = cb_fg.loc[i,bid_cols].values.astype(int)
             g['branch_id_list'].append(bids)
     else:
         g['branch_id_list'] = [numpy.array([ int(s) for s in g['branch_id'].split(',')]),]
