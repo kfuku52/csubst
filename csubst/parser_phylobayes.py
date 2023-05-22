@@ -103,7 +103,7 @@ def get_state_tensor(g):
                   'is_root =', node.is_root(), 'is_leaf =', node.is_leaf())
     if (g['ml_anc']):
         idxmax = numpy.argmax(state_tensor, axis=2)
-        state_tensor = numpy.zeros(state_tensor.shape, dtype=numpy.bool)
+        state_tensor = numpy.zeros(state_tensor.shape, dtype=bool)
         for b in numpy.arange(state_tensor.shape[0]):
             for s in numpy.arange(state_tensor.shape[1]):
                 state_tensor[b,s,idxmax[b,s]] = 1

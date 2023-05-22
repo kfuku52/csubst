@@ -13,7 +13,7 @@ cpdef get_permutations(long[:,:] cb_ids, long[:] sites, long[:] sub_branches, do
     cdef long prev
     cdef long[:] site_indices
     cdef Py_ssize_t i,j,s,b # Py_ssize_t is the proper C type for Python array indices.
-    ps = numpy.zeros(shape=(sub_branches.shape[0], niter, sites.shape[0]), dtype=numpy.bool_)
+    ps = numpy.zeros(shape=(sub_branches.shape[0], niter, sites.shape[0]), dtype=bool)
     for i in range(sub_branches.shape[0]):
         size = sub_branches[i]
         if size!=0:

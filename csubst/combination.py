@@ -152,7 +152,7 @@ def node_combination_subsamples_shotgun(g, arity, rep):
     id_combinations_dif = numpy.inf
     round = 1
     while (id_combinations.shape[0] < rep)&(id_combinations_dif > rep/200):
-        ss_matrix = numpy.zeros(shape=(len(all_ids), rep), dtype=numpy.bool_, order='C')
+        ss_matrix = numpy.zeros(shape=(len(all_ids), rep), dtype=bool, order='C')
         for i in numpy.arange(rep):
             ind = numpy.random.choice(a=sub_ids, size=arity, replace=False)
             ss_matrix[ind,i] = 1

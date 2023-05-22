@@ -153,7 +153,7 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
         if mmap:
             df = df_mmap
         else:
-            if (sub_tensor.dtype == numpy.bool):
+            if (sub_tensor.dtype == bool):
                 data_type = numpy.int32
             else:
                 data_type = float_type

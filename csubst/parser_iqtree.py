@@ -193,7 +193,7 @@ def get_state_tensor(g):
     if (g['ml_anc']):
         print('Ancestral state frequency is converted to the ML-like binary states.')
         idxmax = numpy.argmax(state_tensor, axis=2)
-        state_tensor2 = numpy.zeros(state_tensor.shape, dtype=numpy.bool_)
+        state_tensor2 = numpy.zeros(state_tensor.shape, dtype=bool)
         for b in numpy.arange(state_tensor2.shape[0]):
             for s in numpy.arange(state_tensor2.shape[1]):
                 if state_tensor[b,s,:].sum()!=0:
