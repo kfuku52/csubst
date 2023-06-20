@@ -523,7 +523,7 @@ def get_df_dist(sub_tensor, g, mode):
             for nds in list(itertools.combinations(nodes, 2)):
                 node_dist = nds[0].get_distance(target=nds[1], topology_only=False)
                 node_dists.append(node_dist - nds[1].dist)
-            interbranch_dist = max(node_dists)  # Maximum value among pairwise distances
+            interbranch_dist = max(node_dists) # Maximum value among pairwise distances
         df_dist.loc[current_row, :] = [state_key, state_from, state_to, interbranch_dist]
         current_row += 1
     df_dist = df_dist.loc[~df_dist['group'].isnull(),:]
@@ -553,6 +553,7 @@ def plot_state(N_tensor, S_tensor, branch_ids, g):
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank4')
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
         df_dist = get_df_dist(sub_tensor=sub_tensor, g=g, mode=mode)
+        df_dist_target = get_df_dist(sub_tensor=sub_target, g=g, mode=mode)
         df_ad = pandas.merge(df_ad, df_dist, on=['group','state_from','state_to'])
         out_path = os.path.join(g['site_outdir'], outfile)
         df_ad.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
@@ -574,13 +575,12 @@ def plot_state(N_tensor, S_tensor, branch_ids, g):
         ax = axes[2,ax_col]
         bins = numpy.arange(21) / 20 * df_dist.loc[:,'max_dist_bl'].max()
         ax.hist(x=df_dist.loc[:, 'max_dist_bl'].dropna(), bins=bins, color='black')
-        #ax.hist(x=df_ad.loc[(df_ad.loc[:, 'has_target_high_combinat_prob_site']), 'site_tsi'], bins=bins, color=color)
+        #ax.hist(x=df_dist_target.loc[:, 'max_dist_bl'].dropna(), bins=bins, color=color)
         ax.set_xlabel('Max inter-branch distance of substitution category', fontsize=font_size)
         ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
     fig.tight_layout(h_pad=0.5, w_pad=1)
     outbase = os.path.join(g['site_outdir'], 'csubst_site.state')
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
-    #fig.savefig(outbase+".svg", format='svg', transparent=True)
 
 def initialize_site_df(num_site):
     df = pandas.DataFrame()
