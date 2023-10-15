@@ -266,6 +266,9 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 del color_sites['OCNany2dif']
                 del color_sites['single_sub']
             for key in color_sites.keys():
+                if len(color_sites[key])==0:
+                    print('Skipping site painting. No amino acid substitutions: {}'.format(key), flush=True)
+                    continue
                 if key=='OCNany2spe':
                     hex_value = utility.rgb_to_hex(r=1, g=0, b=0)
                 elif key=='OCNany2dif':

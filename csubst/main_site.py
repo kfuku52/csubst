@@ -418,6 +418,9 @@ def get_df_ad(sub_tensor, g, mode):
     nrow = sum([ len(v)**2-len(v) for v in state_orders.values() ])
     df_ad = pandas.DataFrame(numpy.zeros(shape=(nrow, len(cols))))
     df_ad.columns = cols
+    df_ad['group'] = df_ad['group'].astype('str')
+    df_ad['state_from'] = df_ad['state_from'].astype('str')
+    df_ad['state_to'] = df_ad['state_to'].astype('str')
     current_row = 0
     for g in numpy.arange(gad.shape[0]):
         state_key = state_keys[g]
