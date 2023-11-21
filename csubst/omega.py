@@ -11,6 +11,7 @@ from scipy.linalg import expm
 
 import itertools
 import os
+import sys
 import time
 
 from csubst import parallel
@@ -268,19 +269,19 @@ def get_omega(cb, g):
         col_omega = 'omegaC'+sub
         col_N = 'OCN'+sub
         col_EN = 'ECN'+sub
-        col_dN = 'dNC'+sub
+        col_dNc = 'dNC'+sub
         col_S = 'OCS'+sub
         col_ES = 'ECS'+sub
-        col_dS = 'dSC'+sub
+        col_dSc = 'dSC'+sub
         if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
-            cb.loc[:,col_dN] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
+            cb.loc[:,col_dNc] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
             is_N_zero = (cb.loc[:,col_N]<g['float_tol'])
-            cb.loc[is_N_zero,col_dN] = 0
-            cb.loc[:,col_dS] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
+            cb.loc[is_N_zero,col_dNc] = 0
+            cb.loc[:,col_dSc] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
             is_S_zero = (cb.loc[:,col_S]<g['float_tol'])
-            cb.loc[is_S_zero,col_dS] = 0
-            cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
-            is_dN_zero = (cb.loc[:,col_dN]<g['float_tol'])
+            cb.loc[is_S_zero,col_dSc] = 0
+            cb.loc[:,col_omega] = cb.loc[:,col_dNc] / cb.loc[:,col_dSc]
+            is_dN_zero = (cb.loc[:,col_dNc]<g['float_tol'])
             cb.loc[is_dN_zero,col_omega] = 0
     return cb
 
@@ -324,30 +325,36 @@ def calibrate_dsc(cb, transformation='quantile'):
                                    'spe2any','spe2spe','spe2dif',
                                    ]
     for sub in combinatorial_substitutions:
-        col_dN = 'dNC'+sub
-        col_dS = 'dSC'+sub
+        col_dNc = 'dNC'+sub
+        col_dSc = 'dSC'+sub
         col_omega = 'omegaC'+sub
-        col_noncalibrated_dS = 'dSC'+sub+'_nocalib'
+        col_noncalibrated_dSc = 'dSC'+sub+'_nocalib'
         col_noncalibrated_omega = 'omegaC'+sub+'_nocalib'
-        x = cb.loc[:,col_dN]
-        x = x.replace([numpy.inf, -numpy.inf], numpy.nan).dropna()
-        if (x.shape[0]==0):
-            print('dSc calibration could not be applied: {}'.format(sub), flush=True)
+        dNc_values = cb.loc[:,col_dNc].replace([numpy.inf, -numpy.inf], numpy.nan)
+        if (dNc_values.shape[0]==0):
+            sys.stderr.write('dSc calibration could not be applied: {}\n'.format(sub))
             continue
-        cb.columns = cb.columns.str.replace(col_dS, col_noncalibrated_dS)
+        cb.columns = cb.columns.str.replace(col_dSc, col_noncalibrated_dSc)
         cb.columns = cb.columns.str.replace(col_omega, col_noncalibrated_omega)
-        ranks = stats.rankdata(cb.loc[:,col_noncalibrated_dS])
+        uncorrected_dSc_values = cb.loc[:,col_noncalibrated_dSc].replace([numpy.inf, -numpy.inf], numpy.nan)
+        is_na = (uncorrected_dSc_values.isnull() | dNc_values.isnull())
+        if (is_na.sum()>0):
+            txt = 'dSc calibration could not be applied to {:,}/{:,} branch combinations for {}\n'
+            sys.stderr.write(txt.format(is_na.sum(), cb.shape[0], sub))
+        dNc_values_wo_na = dNc_values[~is_na]
+        uncorrected_dSc_values_wo_na = uncorrected_dSc_values[~is_na]
+        ranks = stats.rankdata(uncorrected_dSc_values_wo_na)
         quantiles = ranks / ranks.max()
         if (transformation=='gamma'):
-            alpha,loc,beta = stats.gamma.fit(x)
-            cb.loc[:,col_dS] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
+            alpha,loc,beta = stats.gamma.fit(dNc_values_wo_na)
+            cb.loc[~is_na,col_dSc] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
         elif (transformation=='quantile'):
-            cb.loc[:,col_dS] = numpy.quantile(x, quantiles)
-        noncalibrated_dS_values = cb.loc[:,col_noncalibrated_dS].values
-        is_nocalib_higher = (noncalibrated_dS_values>cb.loc[:,col_dS]).fillna(False)
-        cb.loc[is_nocalib_higher,col_dS] = noncalibrated_dS_values[is_nocalib_higher]
+            cb.loc[~is_na,col_dSc] = numpy.quantile(dNc_values_wo_na, quantiles)
+        noncalibrated_dSc_values = cb.loc[:,col_noncalibrated_dSc].values
+        is_nocalib_higher = (noncalibrated_dSc_values>cb.loc[:,col_dSc]).fillna(False)
+        cb.loc[is_nocalib_higher,col_dSc] = noncalibrated_dSc_values[is_nocalib_higher]
         cb.loc[:,col_omega] = numpy.nan
-        cb.loc[:,col_omega] = cb.loc[:,col_dN] / cb.loc[:,col_dS]
+        cb.loc[:,col_omega] = cb.loc[:,col_dNc] / cb.loc[:,col_dSc]
         median_value = cb.loc[:,col_omega].median()
         txt = '{} median {} ({:,}/{:,} branch combinations were corrected for dNc vs dSc distribution ranges): {:.3f}'
         print(txt.format(hd, col_omega, (~is_nocalib_higher).sum(), cb.shape[0], median_value), flush=True)

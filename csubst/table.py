@@ -94,7 +94,7 @@ def chisq_test(x, total_S, total_N):
 
 def get_cutoff_stat_bool_array(cb, cutoff_stat_str):
     is_enough_stat = True
-    cutoff_stat_list = cutoff_stat_str.split('|')
+    cutoff_stat_list = [ s.replace('\'', '').replace('\"', '') for s in cutoff_stat_str.split('|') ]
     for cutoff_stat in cutoff_stat_list:
         cutoff_stat_list2 = cutoff_stat.split(',')
         cutoff_stat_exp = cutoff_stat_list2[0]
