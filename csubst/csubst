@@ -112,7 +112,8 @@ if __name__ == "__main__":
     psr_fg.add_argument('--foreground', metavar='PATH', default=None, type=str, required=False,
                     help='default=%(default)s: A text file to specify the foreground lineages. '
                          'The file should contain two columns separated by a tab: '
-                         '1st column for lineage IDs and 2nd for regex-compatible leaf names.')
+                         '1st column for lineage IDs and 2nd for regex-compatible leaf names. '
+                         'See https://github.com/kfuku52/csubst/wiki/Foreground-specification')
     psr_fg.add_argument('--fg_exclude_wg', metavar='yes|no', default='yes', type=strtobool,
                     help='default=%(default)s: Set "yes" to exclude branch combinations '
                          'within individual foreground lineages.')

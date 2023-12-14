@@ -114,14 +114,7 @@ def get_new_foreground_ids(df_clade_size, g):
     new_fg_ids = numpy.array(new_fg_ids, dtype=numpy.int64)
     return new_fg_ids
 
-def annotate_foreground_branch(tree, fg_df, fg_stem_only):
-    target_id = numpy.zeros(shape=(0,), dtype=numpy.int64)
-    fg_leaf_name = []
-    leaf_names = [ leaf.name for leaf in tree.get_leaves() ]
-    if fg_df.shape[0]==0:
-        lineages = []
-    else:
-        lineages = fg_df.iloc[:,0].unique()
+def get_lineage_color_list():
     lineage_colors = [
         'red',
         'blue',
@@ -135,51 +128,78 @@ def annotate_foreground_branch(tree, fg_df, fg_stem_only):
         'green',
         'darkorchid',
     ]
-    for i in numpy.arange(len(lineages)):
-        fg_leaf_name.append([])
-        is_lineage = (fg_df.iloc[:,0]==lineages[i])
-        lineage_regex_names = fg_df.loc[is_lineage,:].iloc[:,1].unique().tolist()
-        iter = itertools.product(leaf_names, lineage_regex_names)
-        lineage_leaf_names = [ ln for ln,lr in iter if re.match('^'+lr+'$', ln) ]
-        lineage_fg_id = list()
-        for lln in lineage_leaf_names:
-            match_leaves = [ ln for ln in leaf_names if lln==ln ]
-            if len(match_leaves)==1:
-                fg_leaf_name[i].append(match_leaves[0])
+    return lineage_colors
+
+def annotate_lineage_foreground(tree, fg_leaf_name_set, i, lineage_colors):
+    for node in tree.traverse():
+        node.is_lineage_foreground = False  # re-initializing
+    for node in tree.traverse():
+        node_leaf_name_set = set(node.get_leaf_names())
+        if len(node_leaf_name_set.difference(fg_leaf_name_set)) == 0:
+            node.is_lineage_foreground = True
+            node.is_foreground = True
+            node.foreground_lineage_id = i + 1
+            node.color = lineage_colors[i % len(lineage_colors)]
+            node.labelcolor = lineage_colors[i % len(lineage_colors)]
+        if node.name in fg_leaf_name_set:
+            node.labelcolor = lineage_colors[i % len(lineage_colors)]
+    return tree
+
+def append_fg_leaf_name(fg_leaf_name, lineage_leaf_names, leaf_names, i):
+    fg_leaf_name.append([])
+    for lln in lineage_leaf_names:
+        match_leaves = [ln for ln in leaf_names if lln == ln]
+        if len(match_leaves) == 1:
+            fg_leaf_name[i].append(match_leaves[0])
+        else:
+            print('The foreground leaf name cannot be identified:', lln, match_leaves)
+    return fg_leaf_name
+
+def get_lineage_fg_id(tree, fg_leaf_name_set, fg_stem_only):
+    lineage_fg_id = list()
+    for node in tree.traverse():
+        node_leaf_name_set = set(node.get_leaf_names())
+        if len(node_leaf_name_set.difference(fg_leaf_name_set)) == 0:
+            if node.is_root() | (not fg_stem_only):
+                lineage_fg_id.append(node.numerical_label)
             else:
-                print('The foreground leaf name cannot be identified:', lln, match_leaves)
-        fg_leaf_name_set = set(fg_leaf_name[i])
-        for node in tree.traverse():
-            node.is_lineage_foreground = False # re-initializing
-        for node in tree.traverse():
-            node_leaf_name_set = set(node.get_leaf_names())
-            if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
-                node.is_lineage_foreground = True
-                node.is_foreground = True
-                node.foreground_lineage_id = i+1
-                node.color = lineage_colors[i%len(lineage_colors)]
-                node.labelcolor = lineage_colors[i%len(lineage_colors)]
-            if node.name in fg_leaf_name_set:
-                node.labelcolor = lineage_colors[i%len(lineage_colors)]
-        for node in tree.traverse():
-            node_leaf_name_set = set(node.get_leaf_names())
-            if len(node_leaf_name_set.difference(fg_leaf_name_set))==0:
-                if node.is_root() | (not fg_stem_only):
+                if (node.is_lineage_foreground == True) & (node.up.is_lineage_foreground == False):
                     lineage_fg_id.append(node.numerical_label)
-                else:
-                    if (node.is_lineage_foreground==True)&(node.up.is_lineage_foreground==False):
-                        lineage_fg_id.append(node.numerical_label)
-        dif = 1
-        while dif:
-            num_id = len(lineage_fg_id)
-            for node in tree.traverse():
-                child_ids = [ child.numerical_label for child in node.get_children() ]
-                if all([ id in lineage_fg_id for id in child_ids ])&(len(child_ids)!=0):
-                    if node.numerical_label not in lineage_fg_id:
-                        lineage_fg_id.append(node.numerical_label)
-            dif = len(lineage_fg_id) - num_id
-        tmp = numpy.array(lineage_fg_id, dtype=numpy.int64)
-        target_id = numpy.concatenate([target_id, tmp])
+    dif = 1
+    while dif:
+        num_id = len(lineage_fg_id)
+        for node in tree.traverse():
+            child_ids = [child.numerical_label for child in node.get_children()]
+            if all([id in lineage_fg_id for id in child_ids]) & (len(child_ids) != 0):
+                if node.numerical_label not in lineage_fg_id:
+                    lineage_fg_id.append(node.numerical_label)
+        dif = len(lineage_fg_id) - num_id
+    lineage_fg_id = numpy.array(lineage_fg_id, dtype=numpy.int64)
+    return lineage_fg_id
+
+def get_lineage_leaf_names(fg_df, lineages, leaf_names, i):
+    is_lineage = (fg_df.iloc[:, 0] == lineages[i])
+    lineage_regex_names = fg_df.loc[is_lineage, :].iloc[:, 1].unique().tolist()
+    iter = itertools.product(leaf_names, lineage_regex_names)
+    lineage_leaf_names = [ln for ln, lr in iter if re.match('^' + lr + '$', ln)]
+    return lineage_leaf_names
+
+def annotate_foreground_branch(tree, fg_df, fg_stem_only):
+    lineage_colors = get_lineage_color_list()
+    target_id = numpy.zeros(shape=(0,), dtype=numpy.int64)
+    fg_leaf_name = []
+    leaf_names = tree.get_leaf_names()
+    if fg_df.shape[0]==0:
+        lineages = []
+    else:
+        lineages = fg_df.iloc[:,0].unique()
+    for i in numpy.arange(len(lineages)):
+        lineage_leaf_names = get_lineage_leaf_names(fg_df, lineages, leaf_names, i)
+        fg_leaf_name = append_fg_leaf_name(fg_leaf_name, lineage_leaf_names, leaf_names, i)
+        fg_leaf_name_set = set(fg_leaf_name[i])
+        tree = annotate_lineage_foreground(tree, fg_leaf_name_set, i, lineage_colors)
+        lineage_fg_id = get_lineage_fg_id(tree, fg_leaf_name_set, fg_stem_only)
+        target_id = numpy.concatenate([target_id, lineage_fg_id])
     if fg_stem_only:
         for node in tree.traverse():
             if node.numerical_label in target_id:
@@ -210,15 +230,17 @@ def get_foreground_branch(g):
         g['fg_id'] = list()
         g['fg_leaf_name'] = list()
         g['target_id'] = numpy.zeros(shape=(0,), dtype=numpy.int64)
-    else:
-        g['fg_df'] = pandas.read_csv(g['foreground'], sep='\t', comment='#', skip_blank_lines=True, header=None)
-        if g['fg_df'].shape[1]!=2:
-            txt = '--foreground file should have a tab-separated two-column table without header. ' \
-                  'First column = lineage id; Second column = Sequence name'
-            raise Exception(txt)
-        # target_id is numerical_label for leaves in --foreground as well as their ancestors
-        g['tree'],g['fg_leaf_name'],g['target_id'] = annotate_foreground_branch(g['tree'], g['fg_df'], g['fg_stem_only'])
-        g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
+        return g
+    g['fg_df'] = pandas.read_csv(g['foreground'], sep='\t', comment='#', skip_blank_lines=True, header=None)
+    if g['fg_df'].shape[1]!=2:
+        txt = '--foreground file should have a tab-separated two-column table without header. '
+        txt += 'First column = lineage id; Second column = Sequence name'
+        raise Exception(txt)
+    out1,out2,out3 = annotate_foreground_branch(g['tree'], g['fg_df'], g['fg_stem_only'])
+    g['tree'] = out1
+    g['fg_leaf_name'] = out2
+    g['target_id'] = out3 # target_id is numerical_label for leaves in --foreground as well as their ancestors
+    g['fg_id'] = copy.deepcopy(g['target_id']) # marginal_ids may be added to target_id but fg_id won't be changed.
     return g
 
 def print_num_possible_permuted_combinations(df_clade_size, sample_original_foreground):
