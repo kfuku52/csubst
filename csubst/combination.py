@@ -19,8 +19,7 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             df_mmap[i, :] = node_union
             i += 1
 
-def nc_matrix2id_combinations(nc_matrix, arity, ncpu, verbose):
-    start = time.time()
+def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
     rows, cols = numpy.where(numpy.equal(nc_matrix, 1))
     unique_cols = numpy.unique(cols)
     ind2  = numpy.arange(arity, dtype=numpy.int64)
@@ -31,12 +30,10 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu, verbose):
         (chunk, start, arity, ind2, rows, cols, unique_cols) for chunk, start in zip(chunks, starts)
     )
     id_combinations = numpy.concatenate(out)
-    if verbose:
-        print('Time elapsed for generating branch combinations: {:,} sec'.format(int(time.time() - start)))
     return id_combinations
 
 def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True):
-    g['fg_dependent_id_combinations'] = None
+    g['fg_dependent_id_combinations'] = dict()
     tree = g['tree']
     all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
     if verbose:
@@ -48,8 +45,37 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
                 target_nodes.append(node.numerical_label)
         target_nodes = numpy.array(target_nodes)
         node_combinations = list(itertools.combinations(target_nodes, arity))
-        node_combinations = [set(nc) for nc in node_combinations]
-        node_combinations = numpy.array([list(nc) for nc in node_combinations])
+        node_combinations = [ set(nc) for nc in node_combinations ]
+        node_combinations = numpy.array([ list(nc) for nc in node_combinations ])
+    elif isinstance(target_nodes, dict):
+        trait_names = list(target_nodes.keys())
+        node_combination_dict = dict()
+        for trait_name in trait_names:
+            if (target_nodes[trait_name].shape.__len__()==1):
+                target_nodes[trait_name] = numpy.expand_dims(target_nodes[trait_name], axis=1)
+            index_combinations = list(itertools.combinations(numpy.arange(target_nodes[trait_name].shape[0]), 2))
+            if len(index_combinations)==0:
+                sys.stderr.write('There is no target branch combination at K = {:,}.\n'.format(arity))
+                id_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
+                return g, id_combinations
+            if verbose:
+                txt = 'Number of branch combinations before independency check for {}: {:,}'
+                print(txt.format(trait_name, len(index_combinations)), flush=True)
+            axis = (len(index_combinations), arity)
+            mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
+            if os.path.exists(mmap_out): os.unlink(mmap_out)
+            df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
+            chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
+            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+                joblib.delayed(node_union)
+                (ids, target_nodes[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)
+            )
+            is_valid_combination = (df_mmap.sum(axis=1)!=0)
+            if (is_valid_combination.sum()>0):
+                node_combination_dict[trait_name] = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
+            else:
+                node_combination_dict[trait_name] = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
+        node_combinations = numpy.unique(numpy.concatenate(list(node_combination_dict.values()), axis=0), axis=0)
     elif isinstance(target_nodes, numpy.ndarray):
         if (target_nodes.shape.__len__()==1):
             target_nodes = numpy.expand_dims(target_nodes, axis=1)
@@ -74,10 +100,10 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             node_combinations = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
         else:
             node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
+    else:
+        raise Exception('target_nodes must be either None, dict, or numpy.ndarray.')
     if verbose:
-        num_target_node = numpy.unique(target_nodes.flatten()).shape[0]
-        print("Number of target branches: {:,}".format(num_target_node), flush=True)
-        print("Number of independent/non-independent branch combinations: {:,}".format(node_combinations.shape[0]), flush=True)
+        print("Number of all branch combinations before independency check: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=bool)
     for i in numpy.arange(node_combinations.shape[0]):
         nc_matrix[node_combinations[i,:],i] = True
@@ -87,26 +113,39 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     if verbose:
         print('Number of non-independent branch combinations to be removed: {:,}'.format(is_dependent_col.sum()), flush=True)
     nc_matrix = nc_matrix[:,~is_dependent_col]
-    if (g['foreground'] is not None)&(len(g['fg_dep_ids']) > 0):
-        is_fg_dependent_col = False
-        for fg_dep_id in g['fg_dep_ids']:
+    id_combinations = numpy.zeros(shape=(0,arity), dtype=numpy.int64)
+    start = time.time()
+    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
+    for trait_name in trait_names:
+        if verbose:
+            if isinstance(target_nodes, dict):
+                num_target_node = numpy.unique(target_nodes[trait_name].flatten()).shape[0]
+            else:
+                num_target_node = numpy.unique(target_nodes.flatten()).shape[0]
+            print("Number of target branches: {:,}".format(num_target_node), flush=True)
+        is_fg_dependent_col = numpy.zeros(shape=(nc_matrix.shape[1],), dtype=bool)
+        for fg_dep_id in g['fg_dep_ids'][trait_name]:
             is_fg_dependent_col |= (nc_matrix[fg_dep_id, :].sum(axis=0) > 1)
         if (g['exhaustive_until']>=arity):
             if verbose:
-                txt = 'Detected {:,} (out of {:,}) foreground branch combinations to be treated as non-foreground '
-                txt += '(e.g., parent-child pairs).'
-                print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
+                txt = 'Number of non-independent foreground branch combinations to be non-foreground-marked for {}: {:,} / {:,}'
+                print(txt.format(trait_name, is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
             fg_dep_nc_matrix = numpy.copy(nc_matrix)
             fg_dep_nc_matrix[:,~is_fg_dependent_col] = False
-            g['fg_dependent_id_combinations'] = nc_matrix2id_combinations(fg_dep_nc_matrix, arity, g['threads'], verbose)
+            g['fg_dependent_id_combinations'][trait_name] = nc_matrix2id_combinations(fg_dep_nc_matrix, arity, g['threads'])
+            if trait_name == trait_names[0]:
+                id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
         else:
             if verbose:
-                txt = 'removing {:,} (out of {:,}) dependent foreground branch combinations.'
-                print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
+                txt = 'Removing {:,} (out of {:,}) non-independent foreground branch combinations for {}.'
+                print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0], trait_name), flush=True)
             nc_matrix = nc_matrix[:,~is_fg_dependent_col]
-    id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'], verbose)
+            g['fg_dependent_id_combinations'][trait_name] = numpy.array([])
+            trait_id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
+            id_combinations = numpy.unique(numpy.concatenate((id_combinations, trait_id_combinations), axis=0), axis=0)
     if verbose:
-        print("Number of independent branch combinations: {:,}".format(id_combinations.shape[0]), flush=True)
+        print('Time elapsed for generating branch combinations: {:,} sec'.format(int(time.time() - start)))
+        print("Number of independent branch combinations to be analyzed: {:,}".format(id_combinations.shape[0]), flush=True)
     return g,id_combinations
 
 def node_combination_subsamples_rifle(g, arity, rep):
@@ -198,58 +237,67 @@ def calc_substitution_patterns(cb):
         cb.loc[:,key+'_pattern_id'] = sub_patterns4.loc[:,'sub_pattern_id']
     return cb
 
-def get_dep_ids(g):
-    dep_ids = list()
+def get_global_dep_ids(g):
+    global_dep_ids = list()
     for leaf in g['tree'].iter_leaves():
-        ancestor_nns = [ node.numerical_label for node in leaf.iter_ancestors() if not node.is_root() ]
-        dep_id = [leaf.numerical_label,] + ancestor_nns
+        ancestor_nns = [node.numerical_label for node in leaf.iter_ancestors() if not node.is_root()]
+        dep_id = [leaf.numerical_label, ] + ancestor_nns
         dep_id = numpy.sort(numpy.array(dep_id))
-        dep_ids.append(dep_id)
-    if g['exclude_sister_pair']:
-        for node in g['tree'].traverse():
-            children = node.get_children()
-            if len(children)>1:
-                dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
-                dep_ids.append(dep_id)
+        global_dep_ids.append(dep_id)
+        if g['exclude_sister_pair']:
+            for node in g['tree'].traverse():
+                children = node.get_children()
+                if len(children)>1:
+                    dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
+                    global_dep_ids.append(dep_id)
     root_nn = g['tree'].numerical_label
-    root_state_sum = g['state_cdn'][root_nn,:,:].sum()
-    if (root_state_sum==0):
+    root_state_sum = g['state_cdn'][root_nn, :, :].sum()
+    if (root_state_sum == 0):
         print('Ancestral states were not estimated on the root node. Excluding sub-root nodes from the analysis.')
-        subroot_nns = [ node.numerical_label for node in g['tree'].get_children() ]
+        subroot_nns = [node.numerical_label for node in g['tree'].get_children()]
         for subroot_nn in subroot_nns:
             for node in g['tree'].traverse():
                 if node.is_root():
                     continue
-                if subroot_nn==node.numerical_label:
+                if subroot_nn == node.numerical_label:
                     continue
-                ancestor_nns = [ anc.numerical_label for anc in node.iter_ancestors() ]
+                ancestor_nns = [anc.numerical_label for anc in node.iter_ancestors()]
                 if subroot_nn in ancestor_nns:
                     continue
-                dep_ids.append(numpy.array([subroot_nn, node.numerical_label]))
-    g['dep_ids'] = dep_ids
-    if (g['foreground'] is not None)&(g['fg_exclude_wg']):
-        fg_dep_ids = list()
-        for i in numpy.arange(len(g['fg_leaf_name'])):
-            tmp_fg_dep_ids = list()
-            for node in g['tree'].traverse():
-                if node.is_root():
-                    continue
-                is_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.get_leaf_names() ])
-                if not is_all_leaf_lineage_fg:
-                    continue
-                is_up_all_leaf_lineage_fg = all([ ln in g['fg_leaf_name'][i] for ln in node.up.get_leaf_names() ])
-                if is_up_all_leaf_lineage_fg:
-                    continue
-                if node.is_leaf():
-                    tmp_fg_dep_ids.append(node.numerical_label)
-                else:
-                    descendant_nn = [ n.numerical_label for n in node.get_descendants() ]
-                    tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
-            if len(tmp_fg_dep_ids)>1:
-                fg_dep_ids.append(numpy.sort(numpy.array(tmp_fg_dep_ids)))
-        if (g['mg_sister'])|(g['mg_parent']):
-            fg_dep_ids.append(numpy.sort(numpy.array(g['mg_id'])))
-        g['fg_dep_ids'] = fg_dep_ids
-    else:
-        g['fg_dep_ids'] = numpy.array([])
+                global_dep_ids.append(numpy.array([subroot_nn, node.numerical_label]))
+    return global_dep_ids
+
+def get_foreground_dep_ids(g):
+    fg_dep_ids = dict()
+    for trait_name in g['fg_df'].columns[1:len(g['fg_df'].columns)]:
+        if (g['foreground'] is not None)&(g['fg_exclude_wg']):
+            fg_dep_ids[trait_name] = list()
+            for i in numpy.arange(len(g['fg_leaf_names'][trait_name])):
+                fg_lineage_leaf_names = g['fg_leaf_names'][trait_name][i]
+                tmp_fg_dep_ids = list()
+                for node in g['tree'].traverse():
+                    if node.is_root():
+                        continue
+                    is_all_leaf_lineage_fg = all([ ln in fg_lineage_leaf_names for ln in node.get_leaf_names() ])
+                    if not is_all_leaf_lineage_fg:
+                        continue
+                    is_up_all_leaf_lineage_fg = all([ ln in fg_lineage_leaf_names for ln in node.up.get_leaf_names() ])
+                    if is_up_all_leaf_lineage_fg:
+                        continue
+                    if node.is_leaf():
+                        tmp_fg_dep_ids.append(node.numerical_label)
+                    else:
+                        descendant_nn = [ n.numerical_label for n in node.get_descendants() ]
+                        tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
+                if len(tmp_fg_dep_ids)>1:
+                    fg_dep_ids[trait_name].append(numpy.sort(numpy.array(tmp_fg_dep_ids)))
+            if (g['mg_sister'])|(g['mg_parent']):
+                fg_dep_ids[trait_name].append(numpy.sort(numpy.array(g['mg_ids'][trait_name])))
+        else:
+            fg_dep_ids[trait_name] = numpy.array([])
+    return fg_dep_ids
+
+def get_dep_ids(g):
+    g['dep_ids'] = get_global_dep_ids(g)
+    g['fg_dep_ids'] = get_foreground_dep_ids(g)
     return g

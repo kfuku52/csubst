@@ -46,15 +46,15 @@ def scale_tree(tree, scaling_factor):
         node.dist = node.dist * scaling_factor
     return tree
 
-def get_pyvolve_newick(tree):
+def get_pyvolve_newick(tree, trait_name):
     for node in tree.traverse():
         node.dist2 = node.dist
         node.dist = node.numerical_label
     newick_txt = tree.write(format=1)
     for node in tree.traverse():
         sub_from = str(node.numerical_label)
-        if node.is_foreground:
-            sub_to = str(node.dist2)+'#m'+str(node.foreground_lineage_id)
+        if getattr(node, 'is_fg_'+trait_name):
+            sub_to = str(node.dist2)+'#m'+str(getattr(node, 'foreground_lineage_id_'+trait_name))
         else:
             sub_to = str(node.dist2)
         newick_txt = re.sub(':'+sub_from+',', ':'+sub_to+',', newick_txt)
@@ -212,7 +212,7 @@ def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, 
     return mat
 
 def evolve_convergent_partitions(g):
-    num_fl = foreground.get_num_foreground_lineages(tree=g['tree'])
+    num_fl = foreground.get_num_foreground_lineages(tree=g['tree'], trait_name=g['trait_name'])
     model_names = ['root',] + [ 'm'+str(i+1) for i in range(num_fl) ]
     num_convergent_partition = g['num_convergent_site']
     convergent_partitions = list()
@@ -297,13 +297,13 @@ def evolve_nonconvergent_partition(g):
         write_anc=False
     )
 
-def get_pyvolve_tree(tree, foreground_scaling_factor=1):
+def get_pyvolve_tree(tree, foreground_scaling_factor, trait_name):
     if (foreground_scaling_factor!=1):
         print('Foreground branches are rescaled by {}.'.format(foreground_scaling_factor))
     for node in tree.traverse():
-        if node.is_foreground:
+        if getattr(node, 'is_fg_'+trait_name):
             node.dist *= foreground_scaling_factor
-    newick_txt = get_pyvolve_newick(tree=tree)
+    newick_txt = get_pyvolve_newick(tree=tree, trait_name=trait_name)
     pyvolve_tree = pyvolve.read_tree(tree=newick_txt)
     return pyvolve_tree
 
@@ -311,7 +311,7 @@ def get_background_Q(g, Q_method):
     if (Q_method=='csubst'):
         matrix_file = 'substitution_matrix/ECMunrest.dat'
         g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(matrix_file, g['pyvolve_codon_orders'])
-        unscaled_mat = parser_misc.exchangeability2Q(g['exchangeability_matrix'], g['eq_freq'], g['float_type'])
+        unscaled_mat = parser_misc.exchangeability2Q(g['exchangeability_matrix'], g['eq_freq'])
         dnds = get_total_Q(unscaled_mat, g['all_nsy_cdn_index']) / get_total_Q(unscaled_mat, g['all_syn_cdn_index'])
         scaling_factor = g['background_omega']/dnds
         background_Q = rescale_substitution_matrix(unscaled_mat, g['all_nsy_cdn_index'], scaling_factor)
@@ -348,7 +348,8 @@ def main_simulate(g, Q_method='csubst'):
     g = parser_misc.generate_intermediate_files(g, force_notree_run=True)
     g = parser_misc.annotate_tree(g, ignore_tree_inconsistency=True)
     g = parser_misc.read_input(g)
-    g = foreground.get_foreground_branch(g)
+    g = foreground.get_foreground_branch(g, simulate=True)
+    g['trait_name'] = 'PLACEHOLDER'
     g['all_syn_cdn_index'] = get_synonymous_codon_substitution_index(g, get_pyvolve_codon_order())
     g['all_nsy_cdn_index'] = get_nonsynonymous_codon_substitution_index(g['all_syn_cdn_index'])
     if (g['num_simulated_site']==-1):
@@ -359,11 +360,10 @@ def main_simulate(g, Q_method='csubst'):
         g['tree2'] = g['tree']
         g['tree'] = g['rooted_tree']
     g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
-    g['tree'] = foreground.initialize_foreground_annotation(tree=g['tree'])
-    g['tree'],_,_ = foreground.annotate_foreground_branch(g['tree'], g['fg_df'], g['fg_stem_only'])
-    tree.plot_branch_category(g['tree'], file_name='simulate_branch_category.pdf')
-    g['background_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=1)
-    g['foreground_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=g['foreground_scaling_factor'])
+    g['tree'] = foreground.dummy_foreground_annotation(tree=g['tree'], trait_name=g['trait_name'])
+    tree.plot_branch_category(g, file_base='simulate_branch_id', label='all')
+    g['background_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=1, trait_name=g['trait_name'])
+    g['foreground_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=g['foreground_scaling_factor'], trait_name=g['trait_name'])
     f = pyvolve.ReadFrequencies('codon', file=g['alignment_file'])
     g['eq_freq'] = f.compute_frequencies()
     g['pyvolve_codon_orders'] = get_pyvolve_codon_order()

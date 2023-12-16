@@ -22,14 +22,14 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
     g = param.initialize_df_cb_stats(g)
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
-        print("Arity = {:,}: Generating cb table".format(current_arity), flush=True)
+        print("Arity (K) = {:,}: Generating cb table".format(current_arity), flush=True)
         g['current_arity'] = current_arity
         if (current_arity==2):
             if (g['exhaustive_until']<current_arity)&(g['foreground'] is not None):
                 txt = 'Arity = {:,}: Targeted search of foreground branch combinations'
                 print(txt.format(current_arity), flush=True)
                 g['df_cb_stats'].loc[current_arity-1, 'mode'] = 'foreground'
-                g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_id'],
+                g,id_combinations = combination.get_node_combinations(g=g, target_nodes=g['target_ids'],
                                                                       arity=current_arity, check_attr='name')
             else:
                 txt = 'Arity = {:,}: Exhaustive search with all independent branch combinations'
@@ -51,9 +51,9 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
                 g['df_cb_stats'].loc[current_arity - 1, 'mode'] = 'exhaustive'
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
             if is_stat_enough.sum()>g['max_combination']:
-                txt = 'Arity = {:,}: Search will be limited to {:,} of {:,} K-1 branch combinations (see --max_combination)'
+                txt = 'Arity = {:,}: Search will be limited to {:,} of {:,} K-1 branch combinations (see --max_combination)\n'
                 txt = txt.format(current_arity, g['max_combination'], is_stat_enough.sum())
-                print(txt, flush=True)
+                sys.stderr.write(txt)
                 cutoff_stat_exp = [ item.split(',')[0] for item in g['cutoff_stat'].split('|') ]
                 is_col = False
                 for cse in cutoff_stat_exp:
@@ -102,10 +102,15 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
         cb = table.sort_cb(cb)
         if write_cb:
             file_name = "csubst_cb_" + str(current_arity) + ".tsv"
+            cb_column_original = cb.columns.tolist()
+            cb.columns = cb.columns.str.replace('_PLACEHOLDER', '')
             cb.to_csv(file_name, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+            cb.columns = cb_column_original
             txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         g = foreground.add_median_cb_stats(g, cb, current_arity, start)
+        if (g['fg_clade_permutation']>0):
+            g = foreground.clade_permutation(cb, g)
         if end_flag:
             txt = 'No branch combination satisfied phylogenetic independence. Ending higher-order search at K = {:,}.'
             print(txt.format(current_arity))
@@ -125,17 +130,16 @@ def main_analyze(g):
     g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)
     g = parser_misc.prep_state(g)
-
     sequence.write_alignment('csubst_alignment_codon.fa', mode='codon', g=g)
     sequence.write_alignment('csubst_alignment_aa.fa', mode='aa', g=g)
-
     g = foreground.get_foreground_branch(g)
     g = foreground.get_marginal_branch(g)
     g = combination.get_dep_ids(g)
     tree.write_tree(g['tree'])
-    tree.plot_branch_category(g['tree'], file_name='csubst_branch_id.pdf', label='all')
-    tree.plot_branch_category(g['tree'], file_name='csubst_branch_id_leaf.pdf', label='leaf')
-    tree.plot_branch_category(g['tree'], file_name='csubst_branch_id_nolabel.pdf', label='no')
+    tree.plot_branch_category(g, file_base='csubst_branch_id', label='all')
+    if g['more_tree_plot']:
+        tree.plot_branch_category(g, file_base='csubst_branch_id_leaf', label='leaf')
+        tree.plot_branch_category(g, file_base='csubst_branch_id_nolabel', label='no')
     if g['plot_state_aa']:
         if os.path.exists('csubst_plot_state_aa'):
             shutil.rmtree('csubst_plot_state_aa')
@@ -150,7 +154,6 @@ def main_analyze(g):
         os.chdir('csubst_plot_state_codon')
         tree.plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)
         os.chdir('..')
-
     N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     N_tensor = substitution.apply_min_sub_pp(g, N_tensor)
     sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()
@@ -158,11 +161,8 @@ def main_analyze(g):
     S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
     sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
-
     g = tree.rescale_branch_length(g, S_tensor, N_tensor)
-
     id_combinations = None
-
     S_total = S_tensor.sum(axis=(0, 1, 2, 3, 4))
     N_total = N_tensor.sum(axis=(0, 1, 2, 3, 4))
     num_branch = g['num_node'] - 1
@@ -221,10 +221,13 @@ def main_analyze(g):
             p = b.loc[:, key].drop_duplicates().values
             print(txt.format(key, b.shape[0], p.shape[0], p.min(), p.max()), flush=True)
         del bS, bN
-        b = foreground.annotate_foreground(b, g)
+        b = foreground.annotate_b_foreground(b, g)
         g['branch_table'] = b
         if (g['b']):
+            b_column_original = b.columns.tolist()
+            b.columns = b.columns.str.replace('_PLACEHOLDER', '')
             b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+            b.columns = b_column_original
         txt = 'Memory consumption of b table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(b.values.nbytes/1024/1024, b.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
@@ -265,12 +268,15 @@ def main_analyze(g):
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()
         g,cb = cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True)
-        if (g['fg_clade_permutation']>0):
-            g = foreground.clade_permutation(cb, g)
-        del cb
+        #if (g['fg_clade_permutation']>0):
+        #    g = foreground.clade_permutation(cb, g)
+        #del cb
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
         print('Writing csubst_cb_stats.tsv', flush=True)
+        column_original = g['df_cb_stats_main'].columns.tolist()
+        g['df_cb_stats_main'].columns = g['df_cb_stats_main'].columns.str.replace('_PLACEHOLDER', '')
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        g['df_cb_stats_main'].columns = column_original
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]

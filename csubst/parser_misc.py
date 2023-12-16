@@ -55,13 +55,13 @@ def read_input(g):
         g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
         g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
         g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
-        g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'], g['float_type'])
+        g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'])
     elif (g['substitution_model'].startswith('ECMrest')):
         matrix_file = 'substitution_matrix/ECMrest.dat'
         g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
         g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
         g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
-        g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'], g['float_type'])
+        g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'])
     elif (g['substitution_model'].startswith('GY')):
         txt = 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
         assert (g['omega'] is not None), txt
@@ -171,8 +171,8 @@ def cdn2pep_matrix(inst_cdn, g):
     #inst_pep = scale_instantaneous_rate_matrix(inst_pep, eq_pep)
     return inst_pep
 
-def exchangeability2Q(ex, eq, float_type):
-    inst = ex.dot(numpy.diag(eq)).astype(float_type) # pi_j * s_ij
+def exchangeability2Q(ex, eq):
+    inst = ex.dot(numpy.diag(eq)).astype(numpy.float64) # pi_j * s_ij. float32 is not enough for Pyvolve
     inst = scale_instantaneous_rate_matrix(inst, eq)
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst

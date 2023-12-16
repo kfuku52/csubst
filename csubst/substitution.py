@@ -71,11 +71,11 @@ def apply_min_sub_pp(g, sub_tensor):
     return sub_tensor
 
 def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
-    if sitewise:
-        column_names=['branch_name','branch_id',attr+'_sub',attr+'_sitewise']
-    else:
-        column_names=['branch_name','branch_id',attr+'_sub']
+    column_names=['branch_name', 'branch_id', attr+'_sub']
     df = pandas.DataFrame(numpy.nan, index=range(0, g['num_node']), columns=column_names)
+    df['branch_name'] = df['branch_name'].astype(str)
+    if sitewise:
+        df[attr + '_sitewise'] = ''
     i=0
     for node in g['tree'].traverse():
         df.at[i,'branch_name'] = getattr(node, 'name')
@@ -86,7 +86,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
             if attr=='N':
                 state_order = g['amino_acid_orders']
             elif attr=='S':
-                raise Error('This function is not supported for synonymous substitutions.')
+                raise Exception('This function is not supported for synonymous substitutions.')
             for s in range(sub_tensor.shape[1]):
                 max_value = sub_tensor[node.numerical_label,s,:,:,:].max()
                 if max_value < min_sitewise_pp:

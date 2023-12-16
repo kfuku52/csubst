@@ -156,36 +156,45 @@ def write_tree(tree, outfile='csubst_tree.nwk', add_numerical_label=True):
             node.name = node.name + '|' + str(node.numerical_label)
     tree2.write(format=1, outfile=outfile)
 
-def branch_category_layout(node):
-    nstyle = ete3.NodeStyle()
-    nstyle['size'] = 0
-    nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-    nstyle["hz_line_color"] = node.color
-    nstyle["vt_line_color"] = node.color
-    nlabel = node.name+'|'+str(node.numerical_label)
-    nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=node.labelcolor)
-    ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
-    node.set_style(nstyle)
-
-def branch_category_layout_leafonly(node):
-    nstyle = ete3.NodeStyle()
-    nstyle['size'] = 0
-    nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-    nstyle["hz_line_color"] = node.color
-    nstyle["vt_line_color"] = node.color
-    if node.is_leaf():
+def branch_category_layout(trait_name):
+    def layout_fn(node):
+        nstyle = ete3.NodeStyle()
+        nstyle['size'] = 0
+        nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
+        nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
+        nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
         nlabel = node.name+'|'+str(node.numerical_label)
-        nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=node.labelcolor)
+        nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=getattr(node, 'labelcolor_'+trait_name))
         ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
-    node.set_style(nstyle)
+        node.set_style(nstyle)
+        pass
+    return layout_fn
 
-def branch_category_layout_nolabel(node):
-    nstyle = ete3.NodeStyle()
-    nstyle['size'] = 0
-    nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-    nstyle["hz_line_color"] = node.color
-    nstyle["vt_line_color"] = node.color
-    node.set_style(nstyle)
+def branch_category_layout_leafonly(trait_name):
+    def layout_fn(node):
+        nstyle = ete3.NodeStyle()
+        nstyle['size'] = 0
+        nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
+        nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
+        nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
+        if node.is_leaf():
+            nlabel = node.name+'|'+str(node.numerical_label)
+            nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=getattr(node, 'labelcolor_'+trait_name))
+            ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+        node.set_style(nstyle)
+        pass
+    return layout_fn
+
+def branch_category_layout_nolabel(trait_name):
+    def layout_fn(node):
+        nstyle = ete3.NodeStyle()
+        nstyle['size'] = 0
+        nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
+        nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
+        nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
+        node.set_style(nstyle)
+        pass
+    return layout_fn
 
 def is_ete_plottable():
     try:
@@ -199,36 +208,43 @@ def is_ete_plottable():
         return False
     return True
 
-def plot_branch_category(tree, file_name, label='all'):
+def plot_branch_category(g, file_base, label='all'):
     if not is_ete_plottable():
         return None
-    ts = ete3.TreeStyle()
-    ts.mode = 'r'
-    ts.show_leaf_name = False
-    if label=='all':
-        ts.layout_fn = branch_category_layout
-        ts.branch_vertical_margin = 0
-    elif label=='leaf':
-        ts.layout_fn = branch_category_layout_leafonly
-        ts.branch_vertical_margin = 0
-    elif label=='no':
-        ts.layout_fn = branch_category_layout_nolabel
-        ts.branch_vertical_margin = 1
-    tree.render(file_name=file_name, tree_style=ts, units='mm', w=172)
+    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
+    for trait_name in trait_names:
+        ts = ete3.TreeStyle()
+        ts.mode = 'r'
+        ts.show_leaf_name = False
+        if label=='all':
+            ts.layout_fn = branch_category_layout(trait_name)
+            ts.branch_vertical_margin = 0
+        elif label=='leaf':
+            ts.layout_fn = branch_category_layout_leafonly(trait_name)
+            ts.branch_vertical_margin = 0
+        elif label=='no':
+            ts.layout_fn = branch_category_layout_nolabel(trait_name)
+            ts.branch_vertical_margin = 1
+        file_name = file_base+'_'+trait_name+'.pdf'
+        file_name = file_name.replace('_PLACEHOLDER', '')
+        g['tree'].render(file_name=file_name, tree_style=ts, units='mm', w=172)
 
-def branch_state_layout(node):
-    nstyle = ete3.NodeStyle()
-    nstyle['size'] = 0
-    nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-    nstyle["hz_line_color"] = node.color
-    nstyle["vt_line_color"] = node.color
-    if node.is_leaf():
-        nlabel = str(node.state)+'|'+node.name
-    else:
-        nlabel = str(node.state)
-    nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor=node.labelcolor)
-    ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
-    node.set_style(nstyle)
+def branch_state_layout(trait_name):
+    def layout_fn(node):
+        nstyle = ete3.NodeStyle()
+        nstyle['size'] = 0
+        nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
+        nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
+        nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
+        if node.is_leaf():
+            nlabel = str(node.state)+'|'+node.name
+        else:
+            nlabel = str(node.state)
+        nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor=getattr(node, 'labelcolor_'+trait_name))
+        ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+        node.set_style(nstyle)
+        pass
+    return layout_fn
 
 def plot_state_tree(state, orders, mode, g):
     print('Writing ancestral state trees: mode = {}, number of pdf files = {}'.format(mode, state.shape[1]), flush=True)
@@ -238,25 +254,28 @@ def plot_state_tree(state, orders, mode, g):
         missing_state = '---'
     else:
         missing_state = '-'
-    ts = ete3.TreeStyle()
-    ts.mode = 'r'
-    ts.show_leaf_name = False
-    ts.layout_fn = branch_state_layout
-    ndigit = int(numpy.log10(state.shape[1]))+1
-    for i in numpy.arange(state.shape[1]):
-        for node in g['tree'].traverse():
-            if node.is_root():
-                node.state = missing_state
-                continue
-            nlabel = node.numerical_label
-            max_prob = max(state[nlabel,i,:])
-            index = numpy.where(state[nlabel,i,:]==max_prob)[0]
-            if len(index)==1:
-                node.state = orders[index[0]]
-            elif (len(index)==0)|(max_prob==0):
-                node.state = missing_state
-        file_name = 'csubst_state_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
-        g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
+    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
+    for trait_name in trait_names:
+        ts = ete3.TreeStyle()
+        ts.mode = 'r'
+        ts.show_leaf_name = False
+        ts.layout_fn = branch_state_layout(trait_name)
+        ndigit = int(numpy.log10(state.shape[1]))+1
+        for i in numpy.arange(state.shape[1]):
+            for node in g['tree'].traverse():
+                if node.is_root():
+                    node.state = missing_state
+                    continue
+                nlabel = node.numerical_label
+                max_prob = max(state[nlabel,i,:])
+                index = numpy.where(state[nlabel,i,:]==max_prob)[0]
+                if len(index)==1:
+                    node.state = orders[index[0]]
+                elif (len(index)==0)|(max_prob==0):
+                    node.state = missing_state
+            file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
+            file_name = file_name.replace('_PLACEHOLDER', '')
+            g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
 
 def get_num_adjusted_sites(g, node):
     nl = node.numerical_label

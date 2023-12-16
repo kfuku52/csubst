@@ -114,6 +114,8 @@ if __name__ == "__main__":
                          'The file should contain two columns separated by a tab: '
                          '1st column for lineage IDs and 2nd for regex-compatible leaf names. '
                          'See https://github.com/kfuku52/csubst/wiki/Foreground-specification')
+    psr_fg.add_argument('--fg_format', metavar='1|2', default=1, type=int, choices=[1,2],
+                    help='default=%(default)s: Table format of --foreground.')
     psr_fg.add_argument('--fg_exclude_wg', metavar='yes|no', default='yes', type=strtobool,
                     help='default=%(default)s: Set "yes" to exclude branch combinations '
                          'within individual foreground lineages.')
@@ -283,6 +285,8 @@ if __name__ == "__main__":
     analyze.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output tsv.')
     # Plot outputs
+    analyze.add_argument('--more_tree_plot', metavar='yes|no', default='no', type=strtobool,
+                         help='default=%(default)s: More tree plots to generate.')
     analyze.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Tree plots with per-site ancestral amino acid states. '
                               'This option will generate many pdfs')
