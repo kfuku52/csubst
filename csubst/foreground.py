@@ -449,7 +449,7 @@ def set_random_foreground_branch(g, trait_name, num_trial=100):
         g = randomize_foreground_branch(g, trait_name)
         if g['r_target_ids'][trait_name].shape[0]<2:
             continue
-        g,rid_combinations = combination.get_node_combinations(g, target_nodes=g['r_target_ids'],
+        g,rid_combinations = combination.get_node_combinations(g=g, target_id_dict=g['r_target_ids'],
                                                                arity=g['current_arity'],
                                                                check_attr="name", verbose=False)
         if rid_combinations.shape[0]==0:
@@ -521,7 +521,7 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
     elapsed_time = int(time.time() - start)
     g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
     if verbose:
-        print(("Elapsed time for arity={}: {:,.1f} sec\n".format(current_arity, elapsed_time)), flush=True)
+        print(("Elapsed time for arity = {}: {:,.1f} sec\n".format(current_arity, elapsed_time)), flush=True)
     return g
 
 def clade_permutation(cb, g):

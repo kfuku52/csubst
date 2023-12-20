@@ -32,14 +32,18 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
     id_combinations = numpy.concatenate(out)
     return id_combinations
 
-def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbose=True):
+def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=False, cb_all=False, arity=2,
+                          check_attr=None, verbose=True):
+    if sum([target_id_dict is not None, cb_passed is not None, exhaustive])!=1:
+        raise Exception('Only one of target_id_dict, cb_passed, or exhaustive must be set.')
     g['fg_dependent_id_combinations'] = dict()
     tree = g['tree']
-    all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
     if verbose:
-        print("All branches: {:,}".format(len(all_nodes)), flush=True)
-    if (target_nodes is None):
+        all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
+        print("Number of all branches: {:,}".format(len(all_nodes)), flush=True)
+    if exhaustive:
         target_nodes = list()
+        all_nodes = [node for node in tree.traverse() if not node.is_root()]
         for node in all_nodes:
             if (check_attr is None)|(check_attr in dir(node)):
                 target_nodes.append(node.numerical_label)
@@ -47,23 +51,24 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
         node_combinations = list(itertools.combinations(target_nodes, arity))
         node_combinations = [ set(nc) for nc in node_combinations ]
         node_combinations = numpy.array([ list(nc) for nc in node_combinations ])
-    elif isinstance(target_nodes, dict):
-        trait_names = list(target_nodes.keys())
+    if target_id_dict is not None:
+        trait_names = list(target_id_dict.keys())
         node_combination_dict = dict()
         is_all_trait_no_branch_combination = True
         for trait_name in trait_names:
-            if (target_nodes[trait_name].shape.__len__()==1):
-                target_nodes[trait_name] = numpy.expand_dims(target_nodes[trait_name], axis=1)
-            index_combinations = list(itertools.combinations(numpy.arange(target_nodes[trait_name].shape[0]), 2))
+            if (target_id_dict[trait_name].shape.__len__()==1):
+                target_id_dict[trait_name] = numpy.expand_dims(target_id_dict[trait_name], axis=1)
+            index_combinations = list(itertools.combinations(numpy.arange(target_id_dict[trait_name].shape[0]), 2))
             if len(index_combinations) > 0:
                 is_all_trait_no_branch_combination = False
+                if verbose:
+                    txt = 'Number of branch combinations before independency check for {}: {:,}'
+                    print(txt.format(trait_name, len(index_combinations)), flush=True)
             else:
-                txt = 'There is no target branch combination for {} at K = {:,}.\n'
-                sys.stderr.write(txt.format(trait_name, arity))
-                continue
-            if verbose:
-                txt = 'Number of branch combinations before independency check for {}: {:,}'
-                print(txt.format(trait_name, len(index_combinations)), flush=True)
+                if verbose:
+                    txt = 'There is no target branch combination for {} at K = {:,}.\n'
+                    sys.stderr.write(txt.format(trait_name, arity))
+                    continue
             axis = (len(index_combinations), arity)
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
@@ -71,7 +76,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
             joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
                 joblib.delayed(node_union)
-                (ids, target_nodes[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)
+                (ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)
             )
             is_valid_combination = (df_mmap.sum(axis=1)!=0)
             if (is_valid_combination.sum()>0):
@@ -80,36 +85,57 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
                 node_combination_dict[trait_name] = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
         if is_all_trait_no_branch_combination:
             txt = 'There is no target branch combination for all traits at K = {:,}.\n'
-            sys.stderr.write(txt.format(trait_name, arity))
+            sys.stderr.write(txt.format(arity))
             id_combinations = numpy.zeros(shape=[0, arity], dtype=numpy.int64)
             return g, id_combinations
         node_combinations = numpy.unique(numpy.concatenate(list(node_combination_dict.values()), axis=0), axis=0)
-    elif isinstance(target_nodes, numpy.ndarray):
-        if (target_nodes.shape.__len__()==1):
-            target_nodes = numpy.expand_dims(target_nodes, axis=1)
-        index_combinations = list(itertools.combinations(numpy.arange(target_nodes.shape[0]), 2))
-        if len(index_combinations)==0:
-            sys.stderr.write('There is no target branch combination at K = {:,}.\n'.format(arity))
-            id_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
-            return g, id_combinations
-        if verbose:
-            print('Number of redundant branch combination unions: {:,}'.format(len(index_combinations)), flush=True)
-        axis = (len(index_combinations), arity)
-        mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
-        df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
-        chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
-        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-            joblib.delayed(node_union)
-            (ids, target_nodes, df_mmap, ms) for ids, ms in zip(chunks, starts)
-        )
-        is_valid_combination = (df_mmap.sum(axis=1)!=0)
-        if (is_valid_combination.sum()>0):
-            node_combinations = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
+    if cb_passed is not None:
+        node_combinations_dict = dict()
+        if cb_all:
+            trait_names = ['all',]
         else:
-            node_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
-    else:
-        raise Exception('target_nodes must be either None, dict, or numpy.ndarray.')
+            trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
+        bid_cols = cb_passed.columns[cb_passed.columns.str.startswith('branch_id_')].tolist()
+        is_all_trait_no_branch_combination = True
+        for trait_name in trait_names:
+            if cb_all:
+                is_trait = numpy.ones(shape=(cb_passed.shape[0],), dtype=bool)
+            else:
+                is_trait = False
+                is_trait |= (cb_passed.loc[:,'is_fg_'+trait_name]=='Y')
+                is_trait |= (cb_passed.loc[:,'is_mf_'+trait_name]=='Y')
+                is_trait |= (cb_passed.loc[:,'is_mg_'+trait_name]=='Y')
+            bid_trait = cb_passed.loc[is_trait,bid_cols].values
+            index_combinations = list(itertools.combinations(numpy.arange(bid_trait.shape[0]), 2))
+            if len(index_combinations) > 0:
+                is_all_trait_no_branch_combination = False
+            else:
+                txt = 'There is no target branch combination for {} at K = {:,}.\n'
+                sys.stderr.write(txt.format(trait_name, arity))
+                continue
+            if verbose:
+                txt = 'Number of redundant branch combination unions for {}: {:,}'
+                print(txt.format(trait_name, len(index_combinations)), flush=True)
+            axis = (len(index_combinations), arity)
+            mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
+            if os.path.exists(mmap_out): os.unlink(mmap_out)
+            df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
+            chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
+            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+                joblib.delayed(node_union)
+                (ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)
+            )
+            is_valid_combination = (df_mmap.sum(axis=1)!=0)
+            if (is_valid_combination.sum()>0):
+                node_combinations_dict[trait_name] = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
+            else:
+                node_combinations_dict[trait_name] = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
+        if is_all_trait_no_branch_combination:
+            txt = 'There is no target branch combination for all traits at K = {:,}.\n'
+            sys.stderr.write(txt.format(arity))
+            id_combinations = numpy.zeros(shape=[0, arity], dtype=numpy.int64)
+            return g, id_combinations
+        node_combinations = numpy.unique(numpy.concatenate(list(node_combinations_dict.values()), axis=0), axis=0)
     if verbose:
         print("Number of all branch combinations before independency check: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = numpy.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=bool)
@@ -125,12 +151,6 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     start = time.time()
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
     for trait_name in trait_names:
-        if verbose:
-            if isinstance(target_nodes, dict):
-                num_target_node = numpy.unique(target_nodes[trait_name].flatten()).shape[0]
-            else:
-                num_target_node = numpy.unique(target_nodes.flatten()).shape[0]
-            print("Number of target branches for {}: {:,}".format(trait_name, num_target_node), flush=True)
         is_fg_dependent_col = numpy.zeros(shape=(nc_matrix.shape[1],), dtype=bool)
         for fg_dep_id in g['fg_dep_ids'][trait_name]:
             is_fg_dependent_col |= (nc_matrix[fg_dep_id, :].sum(axis=0) > 1)
