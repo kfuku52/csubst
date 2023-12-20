@@ -50,14 +50,17 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
     elif isinstance(target_nodes, dict):
         trait_names = list(target_nodes.keys())
         node_combination_dict = dict()
+        is_all_trait_no_branch_combination = True
         for trait_name in trait_names:
             if (target_nodes[trait_name].shape.__len__()==1):
                 target_nodes[trait_name] = numpy.expand_dims(target_nodes[trait_name], axis=1)
             index_combinations = list(itertools.combinations(numpy.arange(target_nodes[trait_name].shape[0]), 2))
-            if len(index_combinations)==0:
-                sys.stderr.write('There is no target branch combination at K = {:,}.\n'.format(arity))
-                id_combinations = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
-                return g, id_combinations
+            if len(index_combinations) > 0:
+                is_all_trait_no_branch_combination = False
+            else:
+                txt = 'There is no target branch combination for {} at K = {:,}.\n'
+                sys.stderr.write(txt.format(trait_name, arity))
+                continue
             if verbose:
                 txt = 'Number of branch combinations before independency check for {}: {:,}'
                 print(txt.format(trait_name, len(index_combinations)), flush=True)
@@ -75,6 +78,11 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
                 node_combination_dict[trait_name] = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
             else:
                 node_combination_dict[trait_name] = numpy.zeros(shape=[0,arity], dtype=numpy.int64)
+        if is_all_trait_no_branch_combination:
+            txt = 'There is no target branch combination for all traits at K = {:,}.\n'
+            sys.stderr.write(txt.format(trait_name, arity))
+            id_combinations = numpy.zeros(shape=[0, arity], dtype=numpy.int64)
+            return g, id_combinations
         node_combinations = numpy.unique(numpy.concatenate(list(node_combination_dict.values()), axis=0), axis=0)
     elif isinstance(target_nodes, numpy.ndarray):
         if (target_nodes.shape.__len__()==1):
@@ -122,7 +130,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
                 num_target_node = numpy.unique(target_nodes[trait_name].flatten()).shape[0]
             else:
                 num_target_node = numpy.unique(target_nodes.flatten()).shape[0]
-            print("Number of target branches: {:,}".format(num_target_node), flush=True)
+            print("Number of target branches for {}: {:,}".format(trait_name, num_target_node), flush=True)
         is_fg_dependent_col = numpy.zeros(shape=(nc_matrix.shape[1],), dtype=bool)
         for fg_dep_id in g['fg_dep_ids'][trait_name]:
             is_fg_dependent_col |= (nc_matrix[fg_dep_id, :].sum(axis=0) > 1)
@@ -136,7 +144,7 @@ def get_node_combinations(g, target_nodes=None, arity=2, check_attr=None, verbos
             if trait_name == trait_names[0]:
                 id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
         else:
-            if verbose:
+            if (verbose & is_fg_dependent_col.sum() > 0):
                 txt = 'Removing {:,} (out of {:,}) non-independent foreground branch combinations for {}.'
                 print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0], trait_name), flush=True)
             nc_matrix = nc_matrix[:,~is_fg_dependent_col]

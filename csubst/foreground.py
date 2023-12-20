@@ -361,9 +361,10 @@ def get_marginal_branch(g):
                 node.add_features(**{'is_marginal_'+trait_name: False})
         file_name = 'csubst_marginal_branch_' + trait_name + '.txt'
         file_name = file_name.replace('_PLACEHOLDER', '')
-        with open(file_name, 'w') as f:
-            for x in g['mg_ids'][trait_name]:
-                f.write(str(x)+'\n')
+        if len(g['mg_ids'][trait_name]) > 0:
+            with open(file_name, 'w') as f:
+                for x in g['mg_ids'][trait_name]:
+                    f.write(str(x)+'\n')
     return g
 
 def calculate_fg_or_mg_branch_num(row, bid_cols, id_set, arity):
@@ -484,9 +485,13 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
     stats['median'] = ['dist_bl','dist_node_num',] + omega_cols
     stats['total'] = ON_cols + OS_cols + EN_cols + ES_cols
     is_qualified = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
+    new_columns = {}
     for suffix, is_target in is_targets.items():
-        g['df_cb_stats'].loc[is_arity, 'num' + suffix] = is_target.sum()
-        g['df_cb_stats'].loc[is_arity, 'num_qualified' + suffix] = (is_target&is_qualified).sum()
+        new_columns['num' + suffix] = is_target.sum()
+        new_columns['num_qualified' + suffix] = (is_target & is_qualified).sum()
+    new_columns_df = pandas.DataFrame(new_columns, index=g['df_cb_stats'].index)
+    new_columns_df = new_columns_df.loc[is_arity]
+    g['df_cb_stats'] = pandas.concat([g['df_cb_stats'], new_columns_df], axis=1)
     for stat in stats.keys():
         for suffix,is_target in is_targets.items():
             for ms in stats[stat]:
