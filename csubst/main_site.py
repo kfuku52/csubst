@@ -615,7 +615,7 @@ def add_branch_id_list(g):
         g['branch_id_list'] = []
         cb = pandas.read_csv(g['cb_file'], sep="\t", index_col=False, header=0)
         bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
-        cb_fg = cb.loc[(cb.loc[:,'is_fg']=='Y'),:]
+        cb_fg = cb.loc[(cb.loc[:,cb.columns.str.startswith('is_fg')]=='Y').any(axis=0),:]
         for i in cb_fg.index:
             bids = cb_fg.loc[i,bid_cols].values.astype(int)
             g['branch_id_list'].append(bids)
