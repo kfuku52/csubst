@@ -1,15 +1,13 @@
-import pkg_resources
+import os
+import shutil
 
 def main_dataset(g):
-    dataset_base = 'dataset/'+g['name']
-    extensions = ['.fa','.nwk','.txt','.untrimmed_cds.fa']
-    outfiles = ['alignment.fa','tree.nwk','foreground.txt','untrimmed_cds.fa']
-    for ext,outfile in zip(extensions,outfiles):
-        file_path = dataset_base+ext
-        try:
-            binary_obj = pkg_resources.resource_string(__name__, file_path)
-        except:
-            continue
-        print('Writing {} for the dataset {}'.format(outfile, g['name']))
-        with open(outfile, mode='wb') as f:
-            f.write(binary_obj)
+    dir_csubst = os.path.dirname(os.path.abspath(__file__))
+    dir_dataset = os.path.join(dir_csubst, 'dataset')
+    files = [ f for f in os.listdir(dir_dataset) if f.startswith(g['name']) ]
+    for file in files:
+        new_file_name = file.replace(g['name']+'.', '')
+        path_from = os.path.join(dir_dataset, file)
+        path_to = os.path.join('.', new_file_name)
+        print(f"Copying {g['name']} file: {new_file_name}")
+        shutil.copy(path_from, path_to)
