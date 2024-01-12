@@ -187,11 +187,14 @@ def calc_aa_identity(g):
     return g
 
 def mask_subunit(g):
-    colors = ['wheat','slate','salmon','brightorange','violet','olive',
-              'firebrick','pink','marine','density','cyan','chocolate','teal',]
-    colors *= 10 # for supercomplex
     g = calc_aa_identity(g)
     pdb_seqnames = list(g['aa_identity_means'].keys())
+    nucleic_chains = pymol.cmd.get_chains('polymer.nucleic')
+    colors = ['wheat','slate','salmon','brightorange','violet','olive',
+              'firebrick','pink','marine','density','cyan','chocolate','teal',]
+    num_chains = len(pdb_seqnames) + len(nucleic_chains)
+    if num_chains > len(colors):
+        colors *= int(num_chains/len(colors)) + 1 # for supercomplex
     for nucleotide in ['DG','DT','DA','DC']: # DNA
         pymol.cmd.do('color pink, resn '+nucleotide)
     if len(pdb_seqnames)==1:
@@ -214,10 +217,11 @@ def mask_subunit(g):
             continue
         chain = pdb_seqname.replace(g['pdb']+'_', '')
         print('Masking chain {}'.format(chain), flush=True)
-        if spans[1]!=0: # End position = 0 if no protein in the chain
-            pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
+        if spans[1]==0: # End position = 0 if no protein in the chain
+            continue
+        pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
         i += 1
-    for chain in pymol.cmd.get_chains(selection='polymer.nucleic'):
+    for chain in nucleic_chains:
         print('Masking chain {}'.format(chain), flush=True)
         pymol.cmd.do('color {}, chain {} and polymer.nucleic'.format(colors[i], chain))
         i += 1
