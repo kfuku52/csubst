@@ -82,6 +82,7 @@ def pdb_sequence_search(g):
             print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
             try:
                 endpoint_url = 'https://search.rcsb.org/rcsbsearch/v2/query'
+                headers = {'Content-Type':'application/json'}
                 param_dict = { # https://search.rcsb.org/index.html#building-search-request
                     'evalue_cutoff':g['database_evalue_cutoff'],
                     'identity_cutoff':g['database_minimum_identity'],
@@ -95,7 +96,7 @@ def pdb_sequence_search(g):
                 }
                 query_json = json.dumps(query_dict)
                 start = time.time()
-                response = requests.post(url=endpoint_url, data=query_json)
+                response = requests.post(url=endpoint_url, data=query_json, headers=headers)
                 print('Time elapsed for MMseqs2 search: {:,} sec'.format(int(time.time() - start)))
                 mmseqs2_out = response.json()
                 best_hit = mmseqs2_out['result_set'][0]
