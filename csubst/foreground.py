@@ -422,16 +422,16 @@ def get_foreground_branch_num(cb, g):
 def annotate_b_foreground(b, g):
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
     for trait_name in trait_names:
-        if len(g['fg_ids'][trait_name]) > 0:
+        if (g['foreground'] is None):
+            b.loc[:, 'is_fg_' + trait_name] = 'Y'
+            b.loc[:, 'is_mg_' + trait_name] = 'N'
+        else:
             b.loc[:,'is_fg_'+trait_name] = 'N'
-            b.loc[g['fg_ids'][trait_name],'is_fg_'+trait_name] = 'Y'
-        else:
-            b.loc[:,'is_fg_'+trait_name] = 'Y'
-        if len(g['mg_ids'][trait_name]) > 0:
-            b.loc[:,'is_mg_'+trait_name] = 'N'
-            b.loc[g['mg_ids'][trait_name],'is_mg_'+trait_name] = 'Y'
-        else:
-            b.loc[:,'is_mg_'+trait_name] = 'N'
+            b.loc[:, 'is_mg_' + trait_name] = 'N'
+            if (len(g['fg_ids'][trait_name]) > 0):
+                b.loc[g['fg_ids'][trait_name],'is_fg_'+trait_name] = 'Y'
+            if len(g['mg_ids'][trait_name]) > 0:
+                b.loc[g['mg_ids'][trait_name],'is_mg_'+trait_name] = 'Y'
     return b
 
 def get_num_foreground_lineages(tree, trait_name):
