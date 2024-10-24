@@ -55,7 +55,7 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
                     txt = 'Arity (K) = {:,}: Search will be limited to {:,} of {:,} K-1 branch combinations (see --max_combination)\n'
                     txt = txt.format(current_arity, g['max_combination'], is_stat_enough.sum())
                     sys.stderr.write(txt)
-                    cb_passed = cb.loc[is_stat_enough, :].sort_values(by=stat_columns, ascending=False)
+                    cb_passed = cb.loc[is_stat_enough, :].sort_values(by=stat_columns, ascending=False).reset_index(drop=True)
                     cb_passed = cb_passed.loc[0:g['max_combination'],cb_passed_columns].reset_index(drop=True)
                 else:
                     cb_passed = cb.loc[is_stat_enough,cb_passed_columns].reset_index(drop=True)
