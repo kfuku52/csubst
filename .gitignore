@@ -1,2 +1,8 @@
 /tests/
 /data/
+build/*
+csubst/__pycache__
+csubst/*-darwin.so
+csubst/*.c
+csubst/.DS_Store
+.DS_Store
