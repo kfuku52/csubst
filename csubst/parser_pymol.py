@@ -1,4 +1,5 @@
 import numpy
+import matplotlib.pyplot
 import pandas
 import pymol
 
@@ -319,3 +320,153 @@ def write_pymol_session(df, g):
 
 def quit_pymol():
     pymol.cmd.quit(code=0)
+
+def save_six_views(selection='all', 
+                   prefix='tmp.csubst.pymol', 
+                   width=900, 
+                   height=900, 
+                   dpi=300, 
+                   ray=True):
+    """
+    Saves six images of the selected object from +X, -X, +Y, -Y, +Z, -Z directions.
+    """
+    
+    # Each direction is 18 floats:
+    #   1) 3x3 rotation matrix = 9 floats
+    #   2) camera position (3 floats)
+    #   3) front, back (2 floats)
+    #   4) perspective (1 float)
+    #   5) origin shift (3 floats)
+    directions = {
+        'pos_x': [
+            # Rotation: point the camera along +X => +X points "out of screen"
+            0.0,  0.0, -1.0,   # row1
+            0.0,  1.0,  0.0,   # row2
+            1.0,  0.0,  0.0,   # row3
+            
+            # Camera position (move camera +X):
+            100.0, 0.0, 0.0,
+            
+            # front plane, back plane:
+            0.0, 200.0,
+            
+            # perspective (1.0 => perspective on, -1 or 0 => orthoscopic):
+            1.0,
+            
+            # origin translation:
+            0.0, 0.0, 0.0
+        ],
+        'neg_x': [
+            0.0,  0.0,  1.0,
+            0.0,  1.0,  0.0,
+           -1.0,  0.0,  0.0,
+           
+           -100.0, 0.0, 0.0,
+           0.0, 200.0,
+           1.0,
+           0.0, 0.0, 0.0
+        ],
+        'pos_y': [
+            # Camera along +Y => +Y out of screen
+            1.0,  0.0,  0.0,
+            0.0,  0.0, -1.0,
+            0.0,  1.0,  0.0,
+            
+            0.0, 100.0, 0.0,
+            0.0, 200.0,
+            1.0,
+            0.0, 0.0, 0.0
+        ],
+        'neg_y': [
+            1.0,  0.0,  0.0,
+            0.0,  0.0,  1.0,
+            0.0, -1.0,  0.0,
+            
+            0.0, -100.0, 0.0,
+            0.0, 200.0,
+            1.0,
+            0.0, 0.0, 0.0
+        ],
+        'pos_z': [
+            # Camera along +Z => +Z out of screen
+            1.0,  0.0,  0.0,
+            0.0,  1.0,  0.0,
+            0.0,  0.0,  1.0,
+            
+            0.0, 0.0, 100.0,
+            0.0, 200.0,
+            1.0,
+            0.0, 0.0, 0.0
+        ],
+        'neg_z': [
+            1.0,  0.0,  0.0,
+            0.0,  1.0,  0.0,
+            0.0,  0.0, -1.0,
+            
+            0.0, 0.0, -100.0,
+            0.0, 200.0,
+            1.0,
+            0.0, 0.0, 0.0
+        ],
+    }
+
+    for direction, view in directions.items():
+        pymol.cmd.set_view(view)
+        pymol.cmd.zoom(selection, buffer=0.5)  
+        
+        filename = f"{prefix}_{direction}.png"
+        pymol.cmd.png(filename, width=width, height=height, dpi=dpi, ray=ray)
+        print(f"Saved {filename}")
+    return None
+
+def save_6view_pdf(image_prefix='tmp.csubst.pymol', 
+                   directions=None, 
+                   pdf_filename='6view.pdf'):
+    """
+    Combines the 6 saved view images into a single PDF with 2 columns and 3 rows.
+
+    Parameters
+    ----------
+    image_prefix : str
+        Common prefix used when saving the 6 PNG images with save_six_views.
+    directions : list of str
+        List of the view directions in the order you want them arranged.
+        Default is ['pos_x','neg_x','pos_y','neg_y','pos_z','neg_z'].
+    pdf_filename : str
+        Name of the output PDF file.
+    """
+    if directions is None:
+        directions = ['pos_x','neg_x','pos_y','neg_y','pos_z','neg_z']
+
+    # Create a figure with 3 rows & 2 columns
+    fig, axes = matplotlib.pyplot.subplots(nrows=3, ncols=2, figsize=(8.3, 11.7)) # A4 paper size
+
+    for idx, direction in enumerate(directions):
+        row = idx // 2
+        col = idx % 2
+        ax = axes[row, col]
+        
+        # Construct filename for each view image
+        img_file = f"{image_prefix}_{direction}.png"
+        
+        if not os.path.isfile(img_file):
+            print(f"Warning: {img_file} not found. Skipping.")
+            ax.axis('off')
+            ax.set_title(f"{direction} (missing)")
+            continue
+        
+        # Read and show image
+        img = matplotlib.image.imread(img_file)
+        ax.imshow(img)
+        
+        # Remove axes ticks
+        ax.axis('off')
+        
+        # Optionally label each subplot
+        ax.set_title(direction)
+
+    matplotlib.pyplot.tight_layout()
+    matplotlib.pyplot.savefig(pdf_filename)
+    matplotlib.pyplot.close(fig)
+    print(f"Saved 6-view PDF as {pdf_filename}")
+    return None

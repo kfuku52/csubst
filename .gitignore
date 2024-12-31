@@ -6,3 +6,4 @@ csubst/*-darwin.so
 csubst/*.c
 csubst/.DS_Store
 .DS_Store
+.vscode/

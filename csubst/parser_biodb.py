@@ -17,9 +17,9 @@ def get_top_hit_ids(my_hits):
     top_hit_ids = []
     for i in range(len(my_hits.descriptions)):
         top_hit_title = my_hits.descriptions[i].title
-        top_hit_id = re.findall('\|.*\|', top_hit_title)[0]
-        top_hit_id = re.sub('\|', '', top_hit_id)
-        top_hit_id = re.sub('\..*', '', top_hit_id)
+        top_hit_id = re.findall(r'\|.*\|', top_hit_title)[0]
+        top_hit_id = re.sub(r'\|', '', top_hit_id)
+        top_hit_id = re.sub(r'\..*', '', top_hit_id)
         top_hit_ids.append(top_hit_id)
     return top_hit_ids
 

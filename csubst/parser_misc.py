@@ -44,8 +44,8 @@ def read_input(g):
         return g
     if (g['omegaC_method']!='submodel'):
         return g
-    base_model = re.sub('\+G.*', '', g['substitution_model'])
-    base_model = re.sub('\+R.*', '', base_model)
+    base_model = re.sub(r'\+G.*', '', g['substitution_model'])
+    base_model = re.sub(r'\+R.*', '', base_model)
     txt = 'Instantaneous substitution rate matrix will be generated using the base model: {}'
     print(txt.format(base_model))
     txt = 'Transition matrix will be generated using the model in the ancestral state reconstruction: {}'

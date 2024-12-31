@@ -34,6 +34,10 @@ def command_site(args):
     main_site(g)
     print('csubst site: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst site end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    if (g['pdb'] is not None):
+        # This should be executed at the very end, otherwise CSUBST's main process is killed.
+        from parser_pymol import quit_pymol
+        quit_pymol()
 
 def command_analyze(args):
     print('csubst analyze start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
