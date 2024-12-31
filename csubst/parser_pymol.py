@@ -439,7 +439,7 @@ def save_6view_pdf(image_prefix='tmp.csubst.pymol',
         directions = ['pos_x','neg_x','pos_y','neg_y','pos_z','neg_z']
 
     # Create a figure with 3 rows & 2 columns
-    fig, axes = matplotlib.pyplot.subplots(nrows=3, ncols=2, figsize=(8.3, 11.7)) # A4 paper size
+    fig, axes = matplotlib.pyplot.subplots(nrows=3, ncols=2, figsize=(7.2, 9.7))
 
     for idx, direction in enumerate(directions):
         row = idx // 2
