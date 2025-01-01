@@ -24,10 +24,10 @@ def combinations_count(n, r):
 def get_df_clade_size(g, trait_name):
     num_branch = max([ n.numerical_label for n in g['tree'].traverse() ])
     branch_ids = numpy.arange(num_branch)
-    cols = ['branch_id','size','is_fg_stem']
+    cols = ['branch_id','size','is_fg_stem_'+trait_name]
     df_clade_size = pandas.DataFrame(index=branch_ids, columns=cols)
     df_clade_size.loc[:,'branch_id'] = branch_ids
-    df_clade_size.loc[:,'is_fg_stem'] = False
+    df_clade_size.loc[:,'is_fg_stem_'+trait_name] = False
     for node in g['tree'].traverse():
         if node.is_root():
             continue
@@ -36,7 +36,7 @@ def get_df_clade_size(g, trait_name):
         is_fg = getattr(node, 'is_fg_'+trait_name)
         is_parent_fg = getattr(node.up, 'is_fg_'+trait_name)
         if (is_fg)&(~is_parent_fg):
-            df_clade_size.at[bid,'is_fg_stem'] = True
+            df_clade_size.at[bid,'is_fg_stem_'+trait_name] = True
     return df_clade_size
 
 def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=False):
@@ -51,7 +51,7 @@ def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=
         if sample_original_foreground:
             is_size = (size_array==size)
         else:
-            is_size = ((size_array==size)&(~df_clade_size.loc[:,'is_fg_stem']))
+            is_size = ((size_array==size)&(~df_clade_size.loc[:,'is_fg_stem_'+trait_name]))
         count += is_size.sum()
         if (count >= g['min_clade_bin_count']):
             bins = numpy.append(bins, size)
@@ -63,9 +63,9 @@ def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=
     print(txt.format(bins.shape[0]-1, ', '.join([ str(s) for s in bins ]), ', '.join([ str(s) for s in counts ])))
     bins = bins[::-1]
     df_clade_size.loc[:,'bin'] = numpy.digitize(size_array, bins, right=False)
-    is_fg = (df_clade_size.loc[:,'is_fg_stem']==True)
+    is_fg = (df_clade_size.loc[:,'is_fg_stem_'+trait_name]==True)
     fg_bins = df_clade_size.loc[is_fg,'bin']
-    df_clade_size.loc[:,'is_fg_stem_randomized'] = df_clade_size.loc[:,'is_fg_stem']
+    df_clade_size.loc[:,'is_fg_stem_randomized'] = df_clade_size.loc[:,'is_fg_stem_'+trait_name]
     df_clade_size.loc[:,'is_blocked'] = False
     for bin in fg_bins.unique():
         is_bin = (df_clade_size.loc[:,'bin']==bin)
@@ -295,7 +295,7 @@ def get_foreground_branch(g, simulate=False):
 def print_num_possible_permuted_combinations(df_clade_size, sample_original_foreground):
     import scipy
     num_possible_permutation_combination = 1
-    is_fg_stem = df_clade_size.loc[:, 'is_fg_stem'].values
+    is_fg_stem = df_clade_size.loc[:, 'is_fg_stem_'+trait_name].values
     for bin_no in df_clade_size.loc[:, 'bin'].unique():
         is_bin = (df_clade_size.loc[:, 'bin'] == bin_no)
         num_bin_fg = (is_bin & is_fg_stem).sum()
@@ -367,10 +367,6 @@ def get_marginal_branch(g):
                     f.write(str(x)+'\n')
     return g
 
-def calculate_fg_or_mg_branch_num(row, bid_cols, id_set, arity):
-    branch_id_set = set(row[bid_cols])
-    return arity - len(branch_id_set.difference(id_set))
-
 def get_foreground_branch_num(cb, g):
     start_time = time.time()
     bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
@@ -380,7 +376,8 @@ def get_foreground_branch_num(cb, g):
         for id_key,newcol in zip(['fg_ids','mg_ids'],['branch_num_fg_'+trait_name,'branch_num_mg_'+trait_name]):
             id_set = set(g[id_key][trait_name])
             cb.loc[:,newcol] = 0
-            cb[newcol] = cb.apply(calculate_fg_or_mg_branch_num, axis=1, args=(bid_cols, id_set, arity))
+            for bid_col in bid_cols:
+                cb.loc[(cb[bid_col].isin(id_set)),newcol] += 1
         cb.loc[:,'is_fg_'+trait_name] = 'N'
         cb.loc[(cb.loc[:,'branch_num_fg_'+trait_name]==arity),'is_fg_'+trait_name] = 'Y'
         for i in numpy.arange(g['fg_dependent_id_combinations'][trait_name].shape[0]):
@@ -394,6 +391,11 @@ def get_foreground_branch_num(cb, g):
         is_mg = (cb['branch_num_fg_'+trait_name]>0) & (cb['branch_num_mg_'+trait_name]>0)
         is_mg = (is_mg) & ((cb['branch_num_fg_'+trait_name] + cb['branch_num_mg_'+trait_name])==arity)
         cb.loc[is_mg,'is_mf_'+trait_name] = 'Y'
+        df_clade_size = get_df_clade_size(g, trait_name)
+        fg_stem_bids = df_clade_size.loc[df_clade_size.loc[:,'is_fg_stem_'+trait_name],'branch_id'].values
+        cb.loc[:,'branch_num_fg_stem_'+trait_name] = 0
+        for bid_col in bid_cols:
+            cb.loc[(cb[bid_col].isin(fg_stem_bids)),'branch_num_fg_stem_'+trait_name] += 1
         is_fg = (cb['is_fg_'+trait_name]=='Y')
         is_enough_stat = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
         num_enough = is_enough_stat.sum()
