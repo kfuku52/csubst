@@ -193,21 +193,20 @@ def get_target_ids(lineages, trait_name, g):
     return target_ids
 
 def annotate_foreground(lineages, trait_name, g):
-    tree = g['tree']
+    for node in g['tree'].traverse(): # Initialize
+        node.add_features(**{'is_fg_'+trait_name: False})
+        node.add_features(**{'color_'+trait_name: 'black'})
+        node.add_features(**{'labelcolor_' + trait_name: 'black'})
     lineage_colors = get_lineage_color_list()
     for i in numpy.arange(len(lineages)):
         fg_leaf_name_set = set(g['fg_leaf_names'][trait_name][i])
         lineage_color = lineage_colors[i % len(lineage_colors)]
-        for node in tree.traverse():
+        for node in g['tree'].traverse():
             if g['fg_stem_only']:
                 if node.numerical_label in g['target_ids'][trait_name]:
                     node.add_features(**{'is_fg_'+trait_name: True})
                     node.add_features(**{'color_'+trait_name: lineage_color})
                     node.add_features(**{'labelcolor_'+trait_name: lineage_color})
-                else:
-                    node.add_features(**{'is_fg_'+trait_name: False})
-                    node.add_features(**{'color_'+trait_name: 'black'})
-                    node.add_features(**{'labelcolor_' + trait_name: 'black'})
                 if node.name in fg_leaf_name_set:
                     node.add_features(**{'labelcolor_' + trait_name: lineage_color})
             else:
@@ -216,11 +215,7 @@ def annotate_foreground(lineages, trait_name, g):
                     node.add_features(**{'is_fg_' + trait_name: True})
                     node.add_features(**{'color_' + trait_name: lineage_color})
                     node.add_features(**{'labelcolor_' + trait_name: lineage_color})
-                else:
-                    node.add_features(**{'is_fg_' + trait_name: False})
-                    node.add_features(**{'color_' + trait_name: 'black'})
-                    node.add_features(**{'labelcolor_' + trait_name: 'black'})
-    return tree
+    return g['tree']
 
 def get_foreground_ids(g, write=True):
     g['fg_leaf_names'] = dict()
