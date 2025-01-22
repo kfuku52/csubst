@@ -694,8 +694,9 @@ def main_site(g):
             df = parser_pymol.add_pdb_residue_numbering(df=df)
             g['session_file_path'] = g['pdb_outfile_base']+'.pymol.pse'
             parser_pymol.write_pymol_session(df=df, g=g)
-            parser_pymol.save_six_views()
-            parser_pymol.save_6view_pdf(pdf_filename=os.path.join(g['site_outdir'], f'csubst_site.{id_base}.pymol.pdf'))
+            if g['pymol_img']:
+                parser_pymol.save_six_views()
+                parser_pymol.save_6view_pdf(pdf_filename=os.path.join(g['site_outdir'], f'csubst_site.{id_base}.pymol.pdf'))
         plot_barchart(df, g)
         plot_state(N_tensor, S_tensor, g['branch_ids'], g)
         if g['pdb'] is None:

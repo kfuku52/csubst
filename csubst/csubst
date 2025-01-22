@@ -243,6 +243,8 @@ if __name__ == "__main__":
                       help='default=%(default)s: Gray value for no-substitution sites. 0=black, 100=white')
     site.add_argument('--pymol_transparency', metavar='FLOAT', default=0.65, required=False, type=float,
                       help='default=%(default)s: Surface transparency. 0=non-transparent, 1=completely transparent')
+    site.add_argument('--pymol_img', metavar='yes|no', default='yes', type=strtobool,
+                      help='default=%(default)s: Whether to generate a rendered 6-view image file of protein structure.')
     site.add_argument('--export2chimera', metavar='yes|no', default='no', required=False, type=strtobool,
                       help='default=%(default)s: Set "yes" to export files for the visualization of '
                            'convergence/divergence probabilities with UCSF Chimera. '
