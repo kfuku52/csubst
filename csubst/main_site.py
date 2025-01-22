@@ -686,6 +686,8 @@ def main_site(g):
             parser_pymol.initialize_pymol(g=g)
             if g['user_alignment'] is not None:
                 g['mafft_add_fasta'] = g['user_alignment']
+                print('User protein alignment file is provided. Using it for the coordinate mapping.', flush=True)
+                print('Please make sure that the alignment site positions are consistent with the input codon alignment.', flush=True)
                 df = parser_pymol.add_coordinate_from_user_alignment(df=df, user_alignment=g['mafft_add_fasta'])
             else:
                 g['mafft_add_fasta'] = g['pdb_outfile_base']+'.fa'

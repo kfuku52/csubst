@@ -39,12 +39,14 @@ def write_mafft_alignment(g):
         f.write(pdb_seq)
     sequence.write_alignment(outfile='tmp.csubst.leaf.aa.fa', mode='aa', g=g, leaf_only=True)
     cmd_mafft = [g['mafft_exe'], '--keeplength', '--mapout', '--quiet',
-                 '--thread', '1',
-                 '--op', str(g['mafft_op']),
-                 '--ep', str(g['mafft_ep']),
-                 '--add', tmp_pdb_fasta,
-                 'tmp.csubst.leaf.aa.fa',
-                 ]
+                 '--thread', '1',]
+    if g['mafft_op'] >= 0:
+        cmd_mafft += ['--op', str(g['mafft_op']),]
+    if g['mafft_ep'] >= 0:
+        cmd_mafft += ['--ep', str(g['mafft_ep']),]
+    cmd_mafft += ['--add', tmp_pdb_fasta, 'tmp.csubst.leaf.aa.fa',]
+    print('Running MAFFT to align the PDB sequence with the input alignment.', flush=True)
+    print('Command: {}'.format(' '.join(cmd_mafft)), flush=True)
     out_mafft = subprocess.run(cmd_mafft, stdout=subprocess.PIPE)
     with open(g['mafft_add_fasta'], 'w') as f:
         f.write(out_mafft.stdout.decode('utf8'))
@@ -56,10 +58,28 @@ def write_mafft_alignment(g):
         else:
             print('MAFFT alignment file not detected. Waiting {:} sec'.format(i+1), flush=True)
             time.sleep(1)
-    print('CSUBST does not exclude poorly aligned regions.', flush=True)
-    print('Please carefully check the MAFFT alignment file before biological interpretation of substitution events.', flush=True)
-    print('If manual adjustment is necessary, please correct the amino acid positions of database-derived sequences and use the updated MAFFT alignment file as input with --user_alignment.', flush=True)
-    print('The CSUBST input sequences (i.e., sequences in the file specified by --alignment_file) should not be modified at this stage.', flush=True)
+    print(
+        "Since CSUBST does not automatically exclude poorly aligned regions, "
+        "please carefully check the MAFFT alignment file before interpreting substitution events.",
+        flush=True
+    )
+    print(
+        "If manual adjustments are necessary, please correct the amino acid positions of the "
+        "database-derived sequences and use the updated MAFFT alignment file as input with --user_alignment.",
+        flush=True
+    )
+    print(
+        "When manually editing the alignment, do not disturb the amino acid positions. "
+        "If excess amino acid sites are present in the database-derived sequences, remove them, "
+        "but be mindful of amino acid site numbering because CSUBST cannot account for numbering shifts "
+        "introduced by manual removal.",
+        flush=True
+    )
+    print(
+        "If you choose to rerun CSUBST with --user_alignment, please use the same --alignment_file "
+        "that was used in this run.",
+        flush=True
+    )
     print('', flush=True)
     if os.path.getsize(g['mafft_add_fasta'])==0:
         sys.stderr.write('File size of {} is 0. A wrong ID might be specified in --pdb.\n'.format(g['mafft_add_fasta']))
