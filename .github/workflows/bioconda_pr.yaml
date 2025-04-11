@@ -11,13 +11,37 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v3
 
-      - name: Extract version and package name
+      - name: Extract version and package name using ast
         id: vars
         run: |
-          VERSION=$(grep -Po '__version__\s*=\s*"\K[0-9.]+' **/__init__.py | head -n1)
-          PACKAGE=$(basename "$GITHUB_REPOSITORY")
+          set -e
+
+          INIT_PATH=$(find . -type f -name '__init__.py' | head -n1)
+          echo "📄 Found __init__.py at: $INIT_PATH"
+
+          echo 'import ast' > get_version.py
+          echo 'with open("'"$INIT_PATH"'") as f:' >> get_version.py
+          echo '    tree = ast.parse(f.read())' >> get_version.py
+          echo 'for node in ast.walk(tree):' >> get_version.py
+          echo '    if isinstance(node, ast.Assign):' >> get_version.py
+          echo '        if getattr(node.targets[0], "id", None) == "__version__":' >> get_version.py
+          echo '            print(node.value.s)' >> get_version.py
+          echo '            break' >> get_version.py
+
+          VERSION=$(python3 get_version.py)
+          PACKAGE=$(basename $(dirname "$INIT_PATH"))
+
+          if [ -z "$VERSION" ]; then
+            echo "❌ __version__ not found in $INIT_PATH"
+            cat "$INIT_PATH"
+            exit 1
+          fi
+
+          echo "📦 PACKAGE: $PACKAGE"
+          echo "📌 VERSION: $VERSION"
+
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "PACKAGE=$PACKAGE"
+          echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
 
       - name: Download source archive and compute SHA256
         run: |
