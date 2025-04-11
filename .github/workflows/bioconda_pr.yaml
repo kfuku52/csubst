@@ -1,4 +1,4 @@
-name: Auto Bioconda PR with Test (Manual Only)
+name: Auto Bioconda PR with Test & meta.yaml generation (Manual Only)
 
 on:
   workflow_dispatch:
@@ -43,6 +43,45 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
 
+      - name: Generate meta.yaml in recipes/${PACKAGE}
+        run: |
+          mkdir -p recipes/${PACKAGE}
+          echo "{% set name = \"${PACKAGE}\" %}" > recipes/${PACKAGE}/meta.yaml
+          echo "{% set version = \"${VERSION}\" %}" >> recipes/${PACKAGE}/meta.yaml
+          echo "" >> recipes/${PACKAGE}/meta.yaml
+          echo "package:" >> recipes/${PACKAGE}/meta.yaml
+          echo "  name: \"{{ name|lower }}\"" >> recipes/${PACKAGE}/meta.yaml
+          echo "  version: \"{{ version }}\"" >> recipes/${PACKAGE}/meta.yaml
+          echo "" >> recipes/${PACKAGE}/meta.yaml
+          echo "source:" >> recipes/${PACKAGE}/meta.yaml
+          echo "  url: https://github.com/kamome1201/${PACKAGE}/archive/refs/tags/v{{ version }}.tar.gz" >> recipes/${PACKAGE}/meta.yaml
+          echo "  sha256: \"TO_BE_REPLACED\"" >> recipes/${PACKAGE}/meta.yaml
+          echo "" >> recipes/${PACKAGE}/meta.yaml
+          echo "build:" >> recipes/${PACKAGE}/meta.yaml
+          echo "  number: 0" >> recipes/${PACKAGE}/meta.yaml
+          echo "  noarch: python" >> recipes/${PACKAGE}/meta.yaml
+          echo "  script: \"{{ PYTHON }} -m pip install . -vv --ignore-installed --no-deps\"" >> recipes/${PACKAGE}/meta.yaml
+          echo "" >> recipes/${PACKAGE}/meta.yaml
+          echo "requirements:" >> recipes/${PACKAGE}/meta.yaml
+          echo "  host:" >> recipes/${PACKAGE}/meta.yaml
+          echo "    - python >=3.8" >> recipes/${PACKAGE}/meta.yaml
+          echo "    - pip" >> recipes/${PACKAGE}/meta.yaml
+          echo "    - setuptools" >> recipes/${PACKAGE}/meta.yaml
+          echo "    - wheel" >> recipes/${PACKAGE}/meta.yaml
+          echo "  run:" >> recipes/${PACKAGE}/meta.yaml
+          echo "    - python >=3.8" >> recipes/${PACKAGE}/meta.yaml
+          echo "" >> recipes/${PACKAGE}/meta.yaml
+          echo "test:" >> recipes/${PACKAGE}/meta.yaml
+          echo "  imports:" >> recipes/${PACKAGE}/meta.yaml
+          echo "    - ${PACKAGE}" >> recipes/${PACKAGE}/meta.yaml
+          echo "" >> recipes/${PACKAGE}/meta.yaml
+          echo "about:" >> recipes/${PACKAGE}/meta.yaml
+          echo "  home: \"https://github.com/kfuku52/${PACKAGE}\"" >> recipes/${PACKAGE}/meta.yaml
+          echo "  license: \"BSD-3-Clause\"" >> recipes/${PACKAGE}/meta.yaml
+          echo "  license_file: \"LICENSE\"" >> recipes/${PACKAGE}/meta.yaml"
+          echo "  summary: \"Short summary of what ${PACKAGE} does.\"" >> recipes/${PACKAGE}/meta.yaml
+
+
       - name: Download source archive and compute SHA256
         run: |
           url="https://github.com/kamome1201/${PACKAGE}/archive/refs/tags/v${VERSION}.tar.gz"
@@ -64,16 +103,11 @@ jobs:
 
       - name: Copy recipe into bioconda-recipes
         run: |
-          cp -r ${PACKAGE} bioconda-recipes/recipes/
-          if [ ! -f bioconda-recipes/recipes/${PACKAGE}/meta.yaml ]; then
-            echo "❌ meta.yaml not found in expected location"
-            exit 1
-          fi
+          cp -r recipes/${PACKAGE} bioconda-recipes/recipes/
 
-      - name: Update meta.yaml version and sha256
+      - name: Replace sha256 in meta.yaml
         run: |
-          sed -i "s/{% set version = \".*\" %}/{% set version = \"$VERSION\" %}/" ${PACKAGE}/meta.yaml
-          sed -i "s/sha256: .*/sha256: \"${SHA256}\"/" ${PACKAGE}/meta.yaml
+          sed -i "s/sha256: .*/sha256: \"${SHA256}\"/" bioconda-recipes/recipes/${PACKAGE}/meta.yaml
 
       - name: Create config.yml for bioconda-utils
         run: |
