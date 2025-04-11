@@ -46,21 +46,21 @@ jobs:
       - name: Generate meta.yaml in recipes/${PACKAGE}
         run: |
           mkdir -p recipes/${PACKAGE}
-          echo "{% set name = \"${PACKAGE}\" %}" > recipes/${PACKAGE}/meta.yaml
-          echo "{% set version = \"${VERSION}\" %}" >> recipes/${PACKAGE}/meta.yaml
+          echo '{% set name = "'${PACKAGE}'" %}' > recipes/${PACKAGE}/meta.yaml
+          echo '{% set version = "'${VERSION}'" %}' >> recipes/${PACKAGE}/meta.yaml
           echo "" >> recipes/${PACKAGE}/meta.yaml
           echo "package:" >> recipes/${PACKAGE}/meta.yaml
-          echo "  name: \"{{ name|lower }}\"" >> recipes/${PACKAGE}/meta.yaml
-          echo "  version: \"{{ version }}\"" >> recipes/${PACKAGE}/meta.yaml
+          echo '  name: "{{ name|lower }}"' >> recipes/${PACKAGE}/meta.yaml
+          echo '  version: "{{ version }}"' >> recipes/${PACKAGE}/meta.yaml
           echo "" >> recipes/${PACKAGE}/meta.yaml
           echo "source:" >> recipes/${PACKAGE}/meta.yaml
-          echo "  url: https://github.com/kamome1201/${PACKAGE}/archive/refs/tags/v{{ version }}.tar.gz" >> recipes/${PACKAGE}/meta.yaml
-          echo "  sha256: \"TO_BE_REPLACED\"" >> recipes/${PACKAGE}/meta.yaml
+          echo '  url: https://github.com/kamome1201/'${PACKAGE}'/archive/refs/tags/v{{ version }}.tar.gz' >> recipes/${PACKAGE}/meta.yaml
+          echo '  sha256: "TO_BE_REPLACED"' >> recipes/${PACKAGE}/meta.yaml
           echo "" >> recipes/${PACKAGE}/meta.yaml
           echo "build:" >> recipes/${PACKAGE}/meta.yaml
           echo "  number: 0" >> recipes/${PACKAGE}/meta.yaml
           echo "  noarch: python" >> recipes/${PACKAGE}/meta.yaml
-          echo "  script: \"{{ PYTHON }} -m pip install . -vv --ignore-installed --no-deps\"" >> recipes/${PACKAGE}/meta.yaml
+          echo '  script: "{{ PYTHON }} -m pip install . -vv --ignore-installed --no-deps"' >> recipes/${PACKAGE}/meta.yaml
           echo "" >> recipes/${PACKAGE}/meta.yaml
           echo "requirements:" >> recipes/${PACKAGE}/meta.yaml
           echo "  host:" >> recipes/${PACKAGE}/meta.yaml
@@ -79,8 +79,7 @@ jobs:
           echo "  home: \"https://github.com/kfuku52/${PACKAGE}\"" >> recipes/${PACKAGE}/meta.yaml
           echo "  license: \"BSD-3-Clause\"" >> recipes/${PACKAGE}/meta.yaml
           echo "  license_file: \"LICENSE\"" >> recipes/${PACKAGE}/meta.yaml"
-          echo "  summary: \"Short summary of what ${PACKAGE} does.\"" >> recipes/${PACKAGE}/meta.yaml
-
+          echo '  summary: "Short summary of what '${PACKAGE}' does."' >> recipes/${PACKAGE}/meta.yaml
 
       - name: Download source archive and compute SHA256
         run: |
