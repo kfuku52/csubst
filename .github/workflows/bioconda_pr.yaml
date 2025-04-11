@@ -21,7 +21,7 @@ jobs:
 
       - name: Download source archive and compute SHA256
         run: |
-          url="https://github.com/kfuku52/${PACKAGE}/archive/refs/tags/v${VERSION}.tar.gz"
+          url="https://github.com/kamome1201/${PACKAGE}/archive/refs/tags/v${VERSION}.tar.gz"
           wget -O source.tar.gz "$url"
           sha256=$(sha256sum source.tar.gz | awk '{print $1}')
           echo "SHA256=$sha256" >> $GITHUB_ENV
