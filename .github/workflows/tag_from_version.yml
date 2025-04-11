@@ -14,26 +14,46 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set package name and read version
-        id: version
+      - name: Detect version using AST
+        id: get_version
         run: |
+          echo "🔍 Searching for __init__.py..."
+
           INIT_PATH=$(find . -type f -name '__init__.py' | head -n1)
-          echo "Found __init__.py at: $INIT_PATH"
-      
-          VERSION=$(grep -Po '__version__\s*=\s*"\K[0-9.]+' "$INIT_PATH")
-          PACKAGE=$(basename "$(dirname "$INIT_PATH")")
-      
+          echo "Found: $INIT_PATH"
+
+          python3 <<EOF > version.txt
+import ast
+with open("$INIT_PATH") as f:
+    tree = ast.parse(f.read())
+for node in ast.walk(tree):
+    if isinstance(node, ast.Assign):
+        if getattr(node.targets[0], "id", None) == "__version__":
+            print(node.value.s)
+            break
+EOF
+
+          VERSION=$(cat version.txt)
+          PACKAGE=$(basename $(dirname "$INIT_PATH"))
+
+          if [ -z "$VERSION" ]; then
+            echo "❌ __version__ not found in $INIT_PATH"
+            exit 1
+          fi
+
+          echo "📦 PACKAGE: $PACKAGE"
+          echo "📌 VERSION: $VERSION"
+
           echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Detected package: $PACKAGE"
-          echo "Detected version: $VERSION"
 
       - name: Create tag if not exists
         run: |
           git fetch --tags
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            echo "Tag v$VERSION already exists"
+            echo "✅ Tag v$VERSION already exists. Skipping."
           else
+            echo "🏷 Creating new tag v$VERSION"
             git config user.name "github-actions"
             git config user.email "actions@github.com"
             git tag "v$VERSION"
