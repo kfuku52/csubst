@@ -17,8 +17,12 @@ jobs:
       - name: Set package name and read version
         id: version
         run: |
-          PACKAGE=$(basename "$GITHUB_REPOSITORY")
-          VERSION=$(grep -Po '__version__\s*=\s*"\K[0-9.]+' ${PACKAGE}/__init__.py)
+          INIT_PATH=$(find . -type f -name '__init__.py' | head -n1)
+          echo "Found __init__.py at: $INIT_PATH"
+      
+          VERSION=$(grep -Po '__version__\s*=\s*"\K[0-9.]+' "$INIT_PATH")
+          PACKAGE=$(basename "$(dirname "$INIT_PATH")")
+      
           echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Detected package: $PACKAGE"
