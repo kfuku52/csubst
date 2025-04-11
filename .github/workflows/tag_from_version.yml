@@ -1,0 +1,37 @@
+name: Create GitHub Tag from __version__
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  create_tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set package name and read version
+        id: version
+        run: |
+          PACKAGE=$(basename "$GITHUB_REPOSITORY")
+          VERSION=$(grep -Po '__version__\s*=\s*"\K[0-9.]+' ${PACKAGE}/__init__.py)
+          echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Detected package: $PACKAGE"
+          echo "Detected version: $VERSION"
+
+      - name: Create tag if not exists
+        run: |
+          git fetch --tags
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"
+          else
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
