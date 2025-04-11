@@ -62,23 +62,25 @@ jobs:
           cd bioconda-recipes
           git checkout -b add-${PACKAGE}-${VERSION}
 
+      - name: Copy recipe into bioconda-recipes
+        run: |
+          cp -r ${PACKAGE} bioconda-recipes/recipes/
+          if [ ! -f bioconda-recipes/recipes/${PACKAGE}/meta.yaml ]; then
+            echo "❌ meta.yaml not found in expected location"
+            exit 1
+          fi
+
       - name: Update meta.yaml version and sha256
         run: |
           sed -i "s/{% set version = \".*\" %}/{% set version = \"$VERSION\" %}/" ${PACKAGE}/meta.yaml
           sed -i "s/sha256: .*/sha256: \"${SHA256}\"/" ${PACKAGE}/meta.yaml
 
-      - name: Copy recipe into bioconda-recipes
-        run: |
-          cp -r ${PACKAGE} bioconda-recipes/recipes/
-
       - name: Create config.yml for bioconda-utils
         run: |
-          cat <<EOF > bioconda-recipes/config.yml
-          channels:
-            - bioconda
-            - conda-forge
-            - defaults
-          EOF
+          echo "channels:" > bioconda-recipes/config.yml
+          echo "  - bioconda" >> bioconda-recipes/config.yml
+          echo "  - conda-forge" >> bioconda-recipes/config.yml
+          echo "  - defaults" >> bioconda-recipes/config.yml
 
       - name: Run lint + build + test with bioconda-utils (Docker)
         run: |
