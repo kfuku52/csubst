@@ -22,18 +22,16 @@ jobs:
           INIT_PATH=$(find . -type f -name '__init__.py' | head -n1)
           echo "Found: $INIT_PATH"
 
-          python3 <<EOF > version.txt
-import ast
-with open("$INIT_PATH") as f:
-    tree = ast.parse(f.read())
-for node in ast.walk(tree):
-    if isinstance(node, ast.Assign):
-        if getattr(node.targets[0], "id", None) == "__version__":
-            print(node.value.s)
-            break
-EOF
+          echo 'import ast' > get_version.py
+          echo 'with open("'"$INIT_PATH"'") as f:' >> get_version.py
+          echo '    tree = ast.parse(f.read())' >> get_version.py
+          echo 'for node in ast.walk(tree):' >> get_version.py
+          echo '    if isinstance(node, ast.Assign):' >> get_version.py
+          echo '        if getattr(node.targets[0], "id", None) == "__version__":' >> get_version.py
+          echo '            print(node.value.s)' >> get_version.py
+          echo '            break' >> get_version.py
 
-          VERSION=$(cat version.txt)
+          VERSION=$(python3 get_version.py)
           PACKAGE=$(basename $(dirname "$INIT_PATH"))
 
           if [ -z "$VERSION" ]; then
