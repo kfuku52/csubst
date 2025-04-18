@@ -118,13 +118,21 @@ jobs:
       - name: Check copied recipe contents
         run: |
           ls -R bioconda-recipes/recipes
-
+          
+      - name: Check if recipe was copied correctly
+        run: |
+          if [ ! -d bioconda-recipes/recipes/${PACKAGE} ]; then
+            echo "❌ Recipe folder not found!"
+            ls -R bioconda-recipes/recipes
+            exit 1
+          fi
+  
       - name: Run lint + build + test with bioconda-utils (Docker)
         run: |
           ABS_PATH=$(realpath bioconda-recipes)
           docker run --rm -v $ABS_PATH:/bioconda-recipes \
             quay.io/bioconda/bioconda-utils-build-env \
-            bioconda-utils build recipes config.yml --packages ${PACKAGE} --loglevel info --docker --git-range master
+            bioconda-utils build /bioconda-recipes/recipes /bioconda-recipes/config.yml --packages ${PACKAGE} --loglevel info --docker --git-range master
 
 #      - name: Commit and push
 #        run: |
