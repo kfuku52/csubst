@@ -94,6 +94,7 @@ jobs:
           cd bioconda-recipes
           git remote add upstream https://github.com/bioconda/bioconda-recipes.git
           git fetch upstream
+          git checkout -b add-${PACKAGE}-${VERSION} upstream/master
 
       - name: Create new branch
         run: |
