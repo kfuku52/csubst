@@ -43,15 +43,15 @@ jobs:
         run: |
           mkdir -p recipes/${PACKAGE}
           cat <<'EOF' > recipes/${PACKAGE}/meta.yaml
-{% set name = "${PACKAGE}" %}
-{% set version = "${VERSION}" %}
+{% set name = "{{ name }}" %}
+{% set version = "{{ version }}" %}
 
 package:
   name: "{{ name|lower }}"
   version: "{{ version }}"
 
 source:
-  url: https://github.com/kamome1201/${PACKAGE}/archive/refs/tags/v{{ version }}.tar.gz
+  url: https://github.com/kamome1201/{{ name }}/archive/refs/tags/v{{ version }}.tar.gz
   sha256: "TO_BE_REPLACED"
 
 build:
@@ -70,13 +70,13 @@ requirements:
 
 test:
   imports:
-    - ${PACKAGE}
+    - {{ name }}
 
 about:
-  home: "https://github.com/kfuku52/${PACKAGE}"
+  home: "https://github.com/kfuku52/{{ name }}"
   license: "BSD-3-Clause"
   license_file: "LICENSE"
-  summary: "Short summary of what ${PACKAGE} does."
+  summary: "Short summary of what {{ name }} does."
 EOF
 
       - name: Download source archive and compute SHA256
