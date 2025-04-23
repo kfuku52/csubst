@@ -116,6 +116,9 @@ jobs:
           echo "  - bioconda" >> bioconda-recipes/config.yml
           echo "  - conda-forge" >> bioconda-recipes/config.yml
           echo "  - defaults" >> bioconda-recipes/config.yml
+          echo "" >> bioconda-recipes/config.yml
+          echo "conda_build_config: conda_build_config.yaml" >> bioconda-recipes/config.yml
+          touch bioconda-recipes/conda_build_config.yaml
 
       - name: Check copied recipe contents
         run: |
