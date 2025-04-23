@@ -140,7 +140,7 @@ jobs:
           cd bioconda-recipes
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add recipes/${PACKAGE} config.yml conda_build_config.yaml
+          git add recipes/${PACKAGE}
           git commit -m "Add ${PACKAGE} v${VERSION} [auto-generated]"
           git push origin add-${PACKAGE}-${VERSION}
 
