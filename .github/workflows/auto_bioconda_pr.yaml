@@ -79,7 +79,16 @@ jobs:
           echo "  home: \"https://github.com/kfuku52/${PACKAGE}\"" >> recipes/${PACKAGE}/meta.yaml
           echo "  license: \"BSD-3-Clause\"" >> recipes/${PACKAGE}/meta.yaml
           echo "  license_file: \"LICENSE\"" >> recipes/${PACKAGE}/meta.yaml
-          SUMMARY=$(head -n 1 README.md | sed 's/"/\\"/g')
+          SUMMARY=$(awk '
+            found && NF {
+              gsub(/!\[[^]]*\]\([^)]*\)/, "");        # remove images ![](...)
+              gsub(/\[[^]]+\]\([^)]*\)/, "");         # remove links [](url)
+              gsub(/^[ \t*]+/, "");                   # trim leading bullets or stars
+              gsub(/"/, "\\\"");                      # escape double quotes
+              print; exit
+            }
+            /^##[ \t]+Overview/ { found = 1 }
+            ' README.md)
           echo "  summary: \"${SUMMARY}\"" >> recipes/${PACKAGE}/meta.yaml
 
       - name: Download source archive and compute SHA256
