@@ -3,7 +3,7 @@ name: Auto Bioconda PR with Test & meta.yaml generation (Manual Only)
 on:
   push:
     branches:
-      - develop
+      - main
   workflow_dispatch:
 
 jobs:
