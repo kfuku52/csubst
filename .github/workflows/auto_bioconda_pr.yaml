@@ -148,7 +148,7 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GH_PAT }}
-          title: "Add ${PACKAGE} recipe v${{ env.VERSION }}"
+          title: "Add ${{ env.PACKAGE }} recipe v${{ env.VERSION }}"
           commit-message: "Auto PR: ${PACKAGE} v${{ env.VERSION }}"
           base: master
           branch: add-${PACKAGE}-${{ env.VERSION }}
