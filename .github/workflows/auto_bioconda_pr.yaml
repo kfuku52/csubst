@@ -81,14 +81,18 @@ jobs:
           echo "  license_file: \"LICENSE\"" >> recipes/${PACKAGE}/meta.yaml
           SUMMARY=$(awk '
             found && NF {
-              gsub(/!\[[^]]*\]\([^)]*\)/, "");        # remove images ![](...)
-              gsub(/\[[^]]+\]\([^)]*\)/, "");         # remove links [](url)
-              gsub(/^[ \t*]+/, "");                   # trim leading bullets or stars
-              gsub(/"/, "\\\"");                      # escape double quotes
-              print; exit
+              line = $0
+              gsub(/!\[[^]]*\]\([^)]*\)/, "", line)      # remove images
+              gsub(/\[[^]]+\]\([^)]*\)/, "", line)       # remove links
+              gsub(/\*\*/, "", line)                     # remove **
+              gsub(/__/, "", line)                       # remove __
+              gsub(/^[ \t*-]+/, "", line)                # leading cleanup
+              gsub(/"/, "\\\"", line)                    # escape double quotes
+              print line
+              exit
             }
             /^##[ \t]+Overview/ { found = 1 }
-            ' README.md)
+          ' README.md)
           echo "  summary: \"${SUMMARY}\"" >> recipes/${PACKAGE}/meta.yaml
 
       - name: Download source archive and compute SHA256
