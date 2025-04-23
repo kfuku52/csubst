@@ -11,6 +11,9 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v3
 
+      - name: Set GH_PAT as env var
+        run: echo "GH_PAT=${{ secrets.GH_PAT }}" >> $GITHUB_ENV
+
       - name: Extract version and package name using ast
         id: vars
         run: |
@@ -126,6 +129,11 @@ jobs:
           cat bioconda-recipes/config.yml
           echo "---"
           cat bioconda-recipes/conda_build_config.yaml
+
+      - name: Set authenticated remote URL
+        run: |
+          cd bioconda-recipes
+          git remote set-url origin https://x-access-token:$GH_PAT@github.com/kamome1201/bioconda-recipes.git
 
       - name: Commit and push
         run: |
