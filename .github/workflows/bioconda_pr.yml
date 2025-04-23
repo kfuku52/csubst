@@ -39,7 +39,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
 
-            - name: Generate meta.yaml in recipes/${{ env.PACKAGE }}
+      - name: Generate meta.yaml in recipes/${{ env.PACKAGE }}
         run: |
           mkdir -p recipes/${PACKAGE}
           cat <<'EOF' > recipes/${PACKAGE}/meta.yaml
@@ -121,6 +121,8 @@ EOF
           docker run --rm -v $ABS_PATH:/bioconda-recipes \
           quay.io/bioconda/bioconda-utils-build-env \
           bash -c "cd /bioconda-recipes && bioconda-utils build recipes config.yml --packages ${PACKAGE} --loglevel info --docker --git-range master"
+
+      # 以下のステップは一時的にコメントアウトされています（必要時に有効化してください）
 
       # - name: Commit and push
       #   run: |
