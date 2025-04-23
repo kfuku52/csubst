@@ -126,7 +126,7 @@ jobs:
           ABS_PATH=$(realpath bioconda-recipes)
           docker run --rm -v $ABS_PATH:/bioconda-recipes \
             quay.io/bioconda/bioconda-utils-build-env \
-            bioconda-utils build recipes config.yml --packages ${PACKAGE} --loglevel info --docker --git-range master
+            bash -c "cd /bioconda-recipes && bioconda-utils build recipes config.yml --packages ${PACKAGE} --loglevel info --docker --git-range master"
 
 #      - name: Commit and push
 #        run: |
