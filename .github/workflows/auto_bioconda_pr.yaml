@@ -120,6 +120,9 @@ jobs:
           echo "conda_build_config: conda_build_config.yaml" >> bioconda-recipes/config.yml
           touch bioconda-recipes/conda_build_config.yaml
 
+      - name: Show config.yml contents (debug)
+        run: cat bioconda-recipes/config.yml
+
       - name: Check copied recipe contents
         run: |
           ls -R bioconda-recipes/recipes
