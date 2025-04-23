@@ -81,6 +81,7 @@ jobs:
           echo "    - pip" >> recipes/${PACKAGE}/meta.yaml
           echo "    - setuptools" >> recipes/${PACKAGE}/meta.yaml
           echo "    - wheel" >> recipes/${PACKAGE}/meta.yaml
+          echo "    - cython" >> recipes/${PACKAGE}/meta.yaml
           echo "  run:" >> recipes/${PACKAGE}/meta.yaml
           echo "    - python >=3.8" >> recipes/${PACKAGE}/meta.yaml
           echo "" >> recipes/${PACKAGE}/meta.yaml
