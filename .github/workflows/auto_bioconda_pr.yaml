@@ -72,6 +72,8 @@ jobs:
           echo "  number: 0" >> recipes/${PACKAGE}/meta.yaml
           echo "  noarch: python" >> recipes/${PACKAGE}/meta.yaml
           echo "  script: \"{{ PYTHON }} -m pip install . -vv --ignore-installed --no-deps\"" >> recipes/${PACKAGE}/meta.yaml
+          echo "  run_exports:" >> recipes/${PACKAGE}/meta.yaml
+          echo "    - {{ pin_subpackage(\"${PACKAGE}\", max_pin=\"x\") }}" >> recipes/${PACKAGE}/meta.yaml
           echo "" >> recipes/${PACKAGE}/meta.yaml
           echo "requirements:" >> recipes/${PACKAGE}/meta.yaml
           echo "  host:" >> recipes/${PACKAGE}/meta.yaml
