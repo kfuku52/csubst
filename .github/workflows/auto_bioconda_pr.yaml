@@ -142,7 +142,7 @@ jobs:
           git config user.email "actions@github.com"
           git add recipes/${PACKAGE}
           git commit -m "Add ${PACKAGE} v${VERSION} [auto-generated]"
-          git push origin add-${PACKAGE}-${VERSION}
+          git push --force origin add-${PACKAGE}-${VERSION}
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
