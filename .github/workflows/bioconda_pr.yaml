@@ -15,78 +15,78 @@ jobs:
         id: vars
         run: |
           set -e
-
           INIT_PATH=$(find . -type f -name '__init__.py' | head -n1)
           echo "📄 Found __init__.py at: $INIT_PATH"
 
-          echo 'import ast' > get_version.py
-          echo 'with open("'$INIT_PATH'") as f:' >> get_version.py
-          echo '    tree = ast.parse(f.read())' >> get_version.py
-          echo 'for node in ast.walk(tree):' >> get_version.py
-          echo '    if isinstance(node, ast.Assign):' >> get_version.py
-          echo '        if getattr(node.targets[0], "id", None) == "__version__":' >> get_version.py
-          echo '            print(node.value.s)' >> get_version.py
-          echo '            break' >> get_version.py
+          python3 - <<EOF > .version.tmp
+import ast
+with open("$INIT_PATH") as f:
+    tree = ast.parse(f.read())
+for node in ast.walk(tree):
+    if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "__version__":
+        print(node.value.s)
+        break
+EOF
 
-          VERSION=$(python3 get_version.py)
+          VERSION=$(cat .version.tmp)
           PACKAGE=$(basename $(dirname "$INIT_PATH"))
 
           if [ -z "$VERSION" ]; then
-            echo "❌ __version__ not found in $INIT_PATH"
-            cat "$INIT_PATH"
+            echo "❌ __version__ not found"
             exit 1
           fi
 
           echo "📦 PACKAGE: $PACKAGE"
           echo "📌 VERSION: $VERSION"
-
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
 
-      - name: Generate meta.yaml in recipes/${PACKAGE}
+      - name: Generate meta.yaml in recipes/${{ env.PACKAGE }}
         run: |
           mkdir -p recipes/${PACKAGE}
-          echo "{% set name = \"${PACKAGE}\" %}" > recipes/${PACKAGE}/meta.yaml
-          echo "{% set version = \"${VERSION}\" %}" >> recipes/${PACKAGE}/meta.yaml
-          echo "" >> recipes/${PACKAGE}/meta.yaml
-          echo "package:" >> recipes/${PACKAGE}/meta.yaml
-          echo "  name: \"{{ name|lower }}\"" >> recipes/${PACKAGE}/meta.yaml
-          echo "  version: \"{{ version }}\"" >> recipes/${PACKAGE}/meta.yaml
-          echo "" >> recipes/${PACKAGE}/meta.yaml
-          echo "source:" >> recipes/${PACKAGE}/meta.yaml
-          echo "  url: https://github.com/kamome1201/${PACKAGE}/archive/refs/tags/v{{ version }}.tar.gz" >> recipes/${PACKAGE}/meta.yaml
-          echo "  sha256: \"TO_BE_REPLACED\"" >> recipes/${PACKAGE}/meta.yaml
-          echo "" >> recipes/${PACKAGE}/meta.yaml
-          echo "build:" >> recipes/${PACKAGE}/meta.yaml
-          echo "  number: 0" >> recipes/${PACKAGE}/meta.yaml
-          echo "  noarch: python" >> recipes/${PACKAGE}/meta.yaml
-          echo "  script: \"{{ PYTHON }} -m pip install . -vv --ignore-installed --no-deps\"" >> recipes/${PACKAGE}/meta.yaml
-          echo "" >> recipes/${PACKAGE}/meta.yaml
-          echo "requirements:" >> recipes/${PACKAGE}/meta.yaml
-          echo "  host:" >> recipes/${PACKAGE}/meta.yaml
-          echo "    - python >=3.8" >> recipes/${PACKAGE}/meta.yaml
-          echo "    - pip" >> recipes/${PACKAGE}/meta.yaml
-          echo "    - setuptools" >> recipes/${PACKAGE}/meta.yaml
-          echo "    - wheel" >> recipes/${PACKAGE}/meta.yaml
-          echo "  run:" >> recipes/${PACKAGE}/meta.yaml
-          echo "    - python >=3.8" >> recipes/${PACKAGE}/meta.yaml
-          echo "" >> recipes/${PACKAGE}/meta.yaml
-          echo "test:" >> recipes/${PACKAGE}/meta.yaml
-          echo "  imports:" >> recipes/${PACKAGE}/meta.yaml
-          echo "    - ${PACKAGE}" >> recipes/${PACKAGE}/meta.yaml
-          echo "" >> recipes/${PACKAGE}/meta.yaml
-          echo "about:" >> recipes/${PACKAGE}/meta.yaml
-          echo "  home: \"https://github.com/kfuku52/${PACKAGE}\"" >> recipes/${PACKAGE}/meta.yaml
-          echo "  license: \"BSD-3-Clause\"" >> recipes/${PACKAGE}/meta.yaml
-          echo "  license_file: \"LICENSE\"" >> recipes/${PACKAGE}/meta.yaml
-          echo "  summary: \"Short summary of what ${PACKAGE} does.\"" >> recipes/${PACKAGE}/meta.yaml
+          cat <<EOF > recipes/${PACKAGE}/meta.yaml
+{% set name = "${PACKAGE}" %}
+{% set version = "${VERSION}" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://github.com/kamome1201/${PACKAGE}/archive/refs/tags/v{{ version }}.tar.gz
+  sha256: "TO_BE_REPLACED"
+
+build:
+  number: 0
+  noarch: python
+  script: "{{ PYTHON }} -m pip install . -vv --ignore-installed --no-deps"
+
+requirements:
+  host:
+    - python >=3.8
+    - pip
+    - setuptools
+    - wheel
+  run:
+    - python >=3.8
+
+test:
+  imports:
+    - ${PACKAGE}
+
+about:
+  home: "https://github.com/kfuku52/${PACKAGE}"
+  license: "BSD-3-Clause"
+  license_file: "LICENSE"
+  summary: "Short summary of what ${PACKAGE} does."
+EOF
 
       - name: Download source archive and compute SHA256
         run: |
           url="https://github.com/kamome1201/${PACKAGE}/archive/refs/tags/v${VERSION}.tar.gz"
           wget -O source.tar.gz "$url"
-          sha256=$(sha256sum source.tar.gz | awk '{print $1}')
-          echo "SHA256=$sha256" >> $GITHUB_ENV
+          SHA256=$(sha256sum source.tar.gz | awk '{print $1}')
+          echo "SHA256=$SHA256" >> $GITHUB_ENV
 
       - name: Clone your fork of bioconda-recipes
         run: |
@@ -94,12 +94,7 @@ jobs:
           cd bioconda-recipes
           git remote add upstream https://github.com/bioconda/bioconda-recipes.git
           git fetch upstream
-          git checkout -b add-${PACKAGE}-${VERSION} upstream/master
-
-      - name: Create new branch
-        run: |
-          cd bioconda-recipes
-          git checkout -b add-${PACKAGE}-${VERSION}
+          git checkout -B add-${PACKAGE}-${VERSION} upstream/master
 
       - name: Copy recipe into bioconda-recipes
         run: |
@@ -107,27 +102,21 @@ jobs:
 
       - name: Replace sha256 in meta.yaml
         run: |
-          sed -i "s/sha256: .*/sha256: \"${SHA256}\"/" bioconda-recipes/recipes/${PACKAGE}/meta.yaml
+          sed -i "s|sha256: .*|sha256: \"${SHA256}\"|" bioconda-recipes/recipes/${PACKAGE}/meta.yaml
 
       - name: Create config.yml for bioconda-utils
         run: |
-          echo "channels:" > bioconda-recipes/config.yml
-          echo "  - bioconda" >> bioconda-recipes/config.yml
-          echo "  - conda-forge" >> bioconda-recipes/config.yml
-          echo "  - defaults" >> bioconda-recipes/config.yml
+          cat <<EOF > bioconda-recipes/config.yml
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+EOF
 
       - name: Check copied recipe contents
         run: |
-          ls -R bioconda-recipes/recipes
-          
-      - name: Check if recipe was copied correctly
-        run: |
-          if [ ! -d bioconda-recipes/recipes/${PACKAGE} ]; then
-            echo "❌ Recipe folder not found!"
-            ls -R bioconda-recipes/recipes
-            exit 1
-          fi
-  
+          ls -R bioconda-recipes/recipes/${PACKAGE}
+
       - name: Run lint + build + test with bioconda-utils (Docker)
         run: |
           ABS_PATH=$(realpath bioconda-recipes)
@@ -135,28 +124,25 @@ jobs:
           quay.io/bioconda/bioconda-utils-build-env \
           bash -c "cd /bioconda-recipes && bioconda-utils build recipes config.yml --packages ${PACKAGE} --loglevel info --docker --git-range master"
 
-      - name: Show recipe and config path inside container
+      - name: Commit and push
         run: |
-          ls -R bioconda-recipes/recipes/${PACKAGE}
-          cat bioconda-recipes/config.yml
+          cd bioconda-recipes
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add recipes/${PACKAGE}
+          git commit -m "Add ${PACKAGE} v${VERSION} [auto-generated]"
+          git push origin add-${PACKAGE}-${VERSION}
 
-#      - name: Commit and push
-#        run: |
-#          cd bioconda-recipes
-#          git add recipes/${PACKAGE}
-#          git commit -m "Update ${PACKAGE} recipe to v$VERSION"
-#          git push origin add-${PACKAGE}-${VERSION}
-
-#      - name: Create Pull Request
-#        uses: peter-evans/create-pull-request@v5
-#        with:
-#          token: ${{ secrets.GH_PAT }}
-#          title: "Update ${PACKAGE} recipe to v${{ env.VERSION }}"
-#          commit-message: "Auto PR for Bioconda: ${PACKAGE} v${{ env.VERSION }}"
-#          base: master
-#          branch: add-${PACKAGE}-${{ env.VERSION }}
-#          body: |
-#            This PR was automatically generated by GitHub Actions.
-#            - Package: ${{ env.PACKAGE }}
-#            - Version: v${{ env.VERSION }}
-#            - sha256: ${{ env.SHA256 }}
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          title: "Add ${PACKAGE} recipe v${{ env.VERSION }}"
+          commit-message: "Auto PR: ${PACKAGE} v${{ env.VERSION }}"
+          base: master
+          branch: add-${PACKAGE}-${{ env.VERSION }}
+          body: |
+            This PR was automatically generated by GitHub Actions.
+            - **Package**: ${{ env.PACKAGE }}
+            - **Version**: v${{ env.VERSION }}
+            - **SHA256**: ${{ env.SHA256 }}
