@@ -123,6 +123,9 @@ jobs:
       - name: Show config.yml contents (debug)
         run: cat bioconda-recipes/config.yml
 
+      - name: Show generated meta.yaml contents (debug)
+        run: cat recipes/${PACKAGE}/meta.yaml
+
       - name: Check copied recipe contents
         run: |
           ls -R bioconda-recipes/recipes
