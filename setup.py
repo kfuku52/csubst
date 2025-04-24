@@ -10,7 +10,7 @@ from numpy import get_include # for "cimport numpy"
 
 if platform.system() == 'Darwin':
     # https://stackoverflow.com/questions/39114132/cython-fatal-error-numpy-arrayobject-h-file-not-found-using-numpy
-    os.environ["CPPFLAGS"] = os.getenv("CPPFLAGS", "") + "-I" + get_include()
+    os.environ["CPPFLAGS"] = os.getenv("CPPFLAGS", "") + " -I" + get_include()
 
 with open(os.path.join('csubst', '__init__.py')) as f:
     match = re.search(r'__version__\s+=\s+(.*)', f.read())

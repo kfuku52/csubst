@@ -1,0 +1,59 @@
+name: Create GitHub Tag from __version__
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  create_tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Detect version using AST
+        id: get_version
+        run: |
+          echo "🔍 Searching for __init__.py..."
+
+          INIT_PATH=$(find . -type f -name '__init__.py' | head -n1)
+          echo "Found: $INIT_PATH"
+
+          echo 'import ast' > get_version.py
+          echo 'with open("'"$INIT_PATH"'") as f:' >> get_version.py
+          echo '    tree = ast.parse(f.read())' >> get_version.py
+          echo 'for node in ast.walk(tree):' >> get_version.py
+          echo '    if isinstance(node, ast.Assign):' >> get_version.py
+          echo '        if getattr(node.targets[0], "id", None) == "__version__":' >> get_version.py
+          echo '            print(node.value.s)' >> get_version.py
+          echo '            break' >> get_version.py
+
+          VERSION=$(python3 get_version.py)
+          PACKAGE=$(basename $(dirname "$INIT_PATH"))
+
+          if [ -z "$VERSION" ]; then
+            echo "❌ __version__ not found in $INIT_PATH"
+            exit 1
+          fi
+
+          echo "📦 PACKAGE: $PACKAGE"
+          echo "📌 VERSION: $VERSION"
+
+          echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Create tag if not exists
+        run: |
+          git fetch --tags
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "✅ Tag v$VERSION already exists. Skipping."
+          else
+            echo "🏷 Creating new tag v$VERSION"
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
