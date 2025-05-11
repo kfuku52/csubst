@@ -127,10 +127,10 @@ def get_node_distance(tree, cb, ncpu, float_type):
 
 def standardize_node_names(tree):
     for node in tree.traverse():
-        node.name = re.sub('\[.*', '', node.name)
-        node.name = re.sub('/.*', '', node.name)
-        node.name = re.sub('^\'', '', node.name)
-        node.name = re.sub('\'$', '', node.name)
+        node.name = re.sub(r'\[.*', '', node.name)
+        node.name = re.sub(r'/.*', '', node.name)
+        node.name = re.sub(r'^\'', '', node.name)
+        node.name = re.sub(r'\'$', '', node.name)
     leaf_names = tree.get_leaf_names()
     if len(leaf_names)!=len(set(leaf_names)):
         raise ValueError('Leaf names are not unique')

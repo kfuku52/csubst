@@ -10,6 +10,7 @@ import time
 import urllib
 
 from csubst import sequence
+from csubst import parser_pymol
 
 def get_top_hit_ids(my_hits):
     if len(my_hits.descriptions)==0:
@@ -99,14 +100,27 @@ def pdb_sequence_search(g):
                 response = requests.post(url=endpoint_url, data=query_json, headers=headers)
                 print('Time elapsed for MMseqs2 search: {:,} sec'.format(int(time.time() - start)))
                 mmseqs2_out = response.json()
-                best_hit = mmseqs2_out['result_set'][0]
                 print('Top hits (up to 10 displayed)')
+                best_hit = None
                 for hit in mmseqs2_out['result_set']:
                     txt = 'PDB identifier: {}  RCSB PDB Search Score: {}'
                     print(txt.format(hit['identifier'], hit['score']))
-                print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
-                pdb_id = re.sub('_.*', '', best_hit['identifier'])
-                g['selected_database'] = 'pdb'
+                for hit in mmseqs2_out['result_set']:
+                    if best_hit is None:
+                        hit_pdb_id = re.sub('_.*', '', hit['identifier'])
+                        parser_pymol.initialize_pymol(pdb_id=hit_pdb_id)
+                        num_chain = parser_pymol.get_num_chain()
+                        if num_chain <= g['pymol_max_num_chain']:
+                            best_hit = hit
+                        else:
+                            print(f'Number of chains in {hit_pdb_id} ({num_chain}) is larger than the maximum number of chains allowed (--pymol_max_num_chain {g['pymol_max_num_chain']}). Unsuitable.', flush=True)
+                if best_hit is None:
+                    print('No suitable hit found in the PDB database.')
+                    pdb_id = None
+                else:
+                    print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
+                    pdb_id = re.sub('_.*', '', best_hit['identifier'])
+                    g['selected_database'] = 'pdb'
             except Exception as e:
                 print(e)
                 print('MMseqs2 search against PDB was unsuccessful.')

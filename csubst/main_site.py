@@ -683,7 +683,11 @@ def main_site(g):
             id_base = re.sub('.pdb$', '', id_base)
             id_base = re.sub('.cif$', '', id_base)
             g['pdb_outfile_base'] = os.path.join(g['site_outdir'], 'csubst_site.' + id_base)
-            parser_pymol.initialize_pymol(g=g)
+            parser_pymol.initialize_pymol(pdb_id=g['pdb'])
+            num_chain = parser_pymol.get_num_chain()
+            if num_chain >= g['pymol_max_num_chain']:
+                print(f'Number of chains ({num_chain}) in the PDB file is larger than the maximum number of chains allowed (--pymol_max_num_chain {g['pymol_max_num_chain']}). PyMOL session image generation is disabled.', flush=True)
+                g['pymol_img'] = False
             if g['user_alignment'] is not None:
                 g['mafft_add_fasta'] = g['user_alignment']
                 print('User protein alignment file is provided. Using it for the coordinate mapping.', flush=True)

@@ -245,6 +245,10 @@ if __name__ == "__main__":
                       help='default=%(default)s: Surface transparency. 0=non-transparent, 1=completely transparent')
     site.add_argument('--pymol_img', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to generate a rendered 6-view image file of protein structure.')
+    site.add_argument('--pymol_max_num_chain', metavar='INT', default=20, required=False, type=int,
+                         help='default=%(default)s: Maximum number of chains to visualize. '
+                               'If the number of chains in the PDB file is larger than this value, '
+                               '--pymol_img will be disabled.')
     site.add_argument('--export2chimera', metavar='yes|no', default='no', required=False, type=strtobool,
                       help='default=%(default)s: Set "yes" to export files for the visualization of '
                            'convergence/divergence probabilities with UCSF Chimera. '

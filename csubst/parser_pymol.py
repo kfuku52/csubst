@@ -16,18 +16,18 @@ import time
 from csubst import sequence
 from csubst import utility
 
-def initialize_pymol(g):
+def initialize_pymol(pdb_id):
     #pymol.pymol_argv = ['pymol','-qc']
     #pymol.finish_launching()
     pymol.cmd.do('delete all')
-    is_old_pdb_code = bool(re.fullmatch('[0-9][A-Za-z0-9]{3}', g['pdb']))
-    is_new_pdb_code = bool(re.fullmatch('pdb_[0-9]{5}[A-Za-z0-9]{3}', g['pdb']))
+    is_old_pdb_code = bool(re.fullmatch('[0-9][A-Za-z0-9]{3}', pdb_id))
+    is_new_pdb_code = bool(re.fullmatch('pdb_[0-9]{5}[A-Za-z0-9]{3}', pdb_id))
     if is_old_pdb_code|is_new_pdb_code:
-        print('Fetching PDB code {}. Internet connection is needed.'.format(g['pdb']), flush=True)
-        pymol.cmd.do('fetch {}'.format(g['pdb']))
+        print('Fetching PDB code {}. Internet connection is needed.'.format(pdb_id), flush=True)
+        pymol.cmd.do('fetch {}'.format(pdb_id))
     else:
-        print('Loading PDB file: {}'.format(g['pdb']), flush=True)
-        pymol.cmd.load(g['pdb'])
+        print('Loading PDB file: {}'.format(pdb_id), flush=True)
+        pymol.cmd.load(pdb_id)
 
 def write_mafft_alignment(g):
     tmp_pdb_fasta = 'tmp.csubst.pdb_seq.fa'
@@ -490,3 +490,11 @@ def save_6view_pdf(image_prefix='tmp.csubst.pymol',
     matplotlib.pyplot.close(fig)
     print(f"Saved 6-view PDF as {pdf_filename}")
     return None
+
+def get_num_chain():
+    """
+    Get the number of chains in the PDB file.
+    """
+    chains = pymol.cmd.get_chains('all')
+    num_chain = len(chains)
+    return num_chain
