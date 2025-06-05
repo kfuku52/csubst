@@ -408,10 +408,9 @@ def get_foreground_branch_num(cb, g):
         txt = txt.format(arity, g['cutoff_stat'], trait_name, percent_fg_enough, num_fg_enough, num_enough,
                          num_all, enrichment_factor)
         print(txt, flush=True)
-        is_arity = (g['df_cb_stats'].loc[:,'arity']==arity)
         if not 'fg_enrichment_factor_'+trait_name in g['df_cb_stats'].columns:
             g['df_cb_stats']['fg_enrichment_factor_'+trait_name] = numpy.nan
-        g['df_cb_stats'].loc[is_arity,'fg_enrichment_factor_'+trait_name] = enrichment_factor
+        g['df_cb_stats'].at[0,'fg_enrichment_factor_'+trait_name] = enrichment_factor
     txt = 'Time elapsed for obtaining foreground branch numbers in the cb table: {:,} sec'
     print(txt.format(int(time.time() - start_time)))
     return cb, g
@@ -457,7 +456,6 @@ def set_random_foreground_branch(g, trait_name, num_trial=100):
     raise Exception(txt.format(num_trial))
 
 def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
-    is_arity = (g['df_cb_stats'].loc[:,'arity'] == current_arity)
     is_targets = dict()
     target_col_prefixes = ['is_fg','is_mg','is_mf','is_all']
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
@@ -487,7 +485,6 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
         new_columns['num' + suffix] = is_target.sum()
         new_columns['num_qualified' + suffix] = (is_target & is_qualified).sum()
     new_columns_df = pandas.DataFrame(new_columns, index=g['df_cb_stats'].index)
-    new_columns_df = new_columns_df.loc[is_arity]
     g['df_cb_stats'] = pandas.concat([g['df_cb_stats'], new_columns_df], axis=1)
     for stat in stats.keys():
         for suffix,is_target in is_targets.items():
@@ -501,14 +498,14 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", category=RuntimeWarning)
                     if stat=='median':
-                        g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].median()
+                        g['df_cb_stats'].at[0,col] = cb.loc[is_target,ms].median()
                     elif stat=='total':
-                        g['df_cb_stats'].loc[is_arity,col] = cb.loc[is_target,ms].sum()
+                        g['df_cb_stats'].at[0,col] = cb.loc[is_target,ms].sum()
     if verbose:
         for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
             key = SN+anc+'2'+des
-            totalON = g['df_cb_stats'].loc[is_arity, 'total_OC'+key+'_all'].values[0]
-            totalEN = g['df_cb_stats'].loc[is_arity, 'total_EC'+key+'_all'].values[0]
+            totalON = g['df_cb_stats'].at[0, 'total_OC'+key+'_all']
+            totalEN = g['df_cb_stats'].at[0, 'total_EC'+key+'_all']
             if totalON==0:
                 percent_value = numpy.nan
             else:
@@ -516,7 +513,7 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
             txt = 'Total OC{}/EC{} = {:,.1f}/{:,.1f} (expectation = {:,.1f}% of observation)'
             print(txt.format(key, key, totalON, totalEN, percent_value))
     elapsed_time = int(time.time() - start)
-    g['df_cb_stats'].loc[is_arity, 'elapsed_sec'] = elapsed_time
+    g['df_cb_stats'].at[0, 'elapsed_sec'] = elapsed_time
     if verbose:
         print(("Elapsed time for arity = {}: {:,.1f} sec\n".format(current_arity, elapsed_time)), flush=True)
     return g

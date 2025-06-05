@@ -63,10 +63,9 @@ def get_global_parameters(args):
     return g
 
 def initialize_df_cb_stats(g):
-    ind = numpy.arange(0, g['max_arity'])
     cols = ['arity','elapsed_sec','fg_enrichment_factor','mode','dSC_calibration',]
-    g['df_cb_stats'] = pandas.DataFrame(index=ind, columns=cols)
-    g['df_cb_stats']['arity'] = ind + 1
+    g['df_cb_stats'] = pandas.DataFrame(index=[0,], columns=cols)
+    g['df_cb_stats']['arity'] = [g['current_arity'],]
     g['df_cb_stats']['cutoff_stat'] = g['cutoff_stat']
     return(g)
 
