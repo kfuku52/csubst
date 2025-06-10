@@ -18,7 +18,6 @@ from csubst import table
 from csubst import tree
 
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
-    end_flag = 0
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
         g['current_arity'] = current_arity
@@ -60,8 +59,9 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
                 else:
                     cb_passed = cb.loc[is_stat_enough,cb_passed_columns].reset_index(drop=True)
                 if len(set(cb_passed.loc[:,id_columns].values.ravel().tolist())) < current_arity:
-                    end_flag = 1
                     cb = pandas.DataFrame()
+                    txt = 'Arity (K) = {:,}: No branch combination satisfied --cutoff_stat. Ending higher-order search at K = {:,}.'
+                    print(txt.format(current_arity, current_arity))
                     break
                 g,id_combinations = combination.get_node_combinations(g=g, cb_passed=cb_passed, cb_all=False,
                                                                       arity=current_arity, check_attr='name')
@@ -75,8 +75,9 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
         else:
             raise Exception('Invalid arity: {}'.format(current_arity))
         if id_combinations.shape[0] == 0:
-            end_flag = 1
             cb = pandas.DataFrame()
+            txt = 'Arity (K) = {:,}: No branch combination satisfied phylogenetic independence. Ending higher-order search at K = {:,}.'
+            print(txt.format(current_arity, current_arity))
             break
         print('Preparing OCS table with {:,} process(es).'.format(g['threads']), flush=True)
         cbS = substitution.get_cb(id_combinations, S_tensor, g, 'OCS')
@@ -115,16 +116,12 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
         g = foreground.add_median_cb_stats(g, cb, current_arity, start)
         if (g['fg_clade_permutation']>0):
             g = foreground.clade_permutation(cb, g)
-        if end_flag:
-            txt = 'No branch combination satisfied phylogenetic independence. Ending higher-order search at K = {:,}.'
-            print(txt.format(current_arity))
-            break
+        g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
+        g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
         if current_arity == g['max_arity']:
             txt = 'Maximum arity (K = {:,}) reached. Ending higher-order search of branch combinations.'
             print(txt.format(g['max_arity']))
             break
-        g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
-        g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
     return g,cb
 
 def main_analyze(g):
