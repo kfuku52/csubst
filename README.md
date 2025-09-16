@@ -21,17 +21,23 @@ The main features of **CSUBST** include:
 - [Newick](https://en.wikipedia.org/wiki/Newick_format) file for the rooted tree
 - [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
 
-## Installation and test run
-**CSUBST** runs on python 3 (tested with >=3.6.0). 
-For a quick installation and test run, try:
-```angular2html
-# IQ-TREE installation with conda
-conda install iqtree
+## Installation
+**CSUBST** runs on python 3 (tested with >=3.6.0). Installation via `conda` is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
 
-# Installation with pip
+#### Installation with conda
+```
+conda install bioconda::csubst
+```
+
+#### Installation with pip
+```
+# IQ-TREE should be installed separately: https://iqtree.github.io/
 pip install numpy cython # NumPy and Cython should be available upon csubst installation
 pip install git+https://github.com/kfuku52/csubst
+```
 
+## Test run
+```
 # Generate a test dataset
 csubst dataset --name PGK
 
