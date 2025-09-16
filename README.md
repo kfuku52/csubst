@@ -22,7 +22,7 @@ The main features of **CSUBST** include:
 - [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
 
 ## Installation
-**CSUBST** runs on python 3 (tested with >=3.6.0). Installation via `conda` is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
+**CSUBST** runs on python 3 (tested with >=3.6.0). Installation via [bioconda](https://anaconda.org/bioconda/csubst) is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
 
 #### Installation with conda
 ```
