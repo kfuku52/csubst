@@ -24,12 +24,12 @@ The main features of **CSUBST** include:
 ## Installation
 **CSUBST** runs on python 3 (tested with >=3.6.0). Installation via [bioconda](https://anaconda.org/bioconda/csubst) is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
 
-#### Installation with conda
+#### Option 1: Installation with `conda`
 ```
 conda install bioconda::csubst
 ```
 
-#### Installation with pip
+#### Option 2: Installation with `pip`
 ```
 # IQ-TREE should be installed separately: https://iqtree.github.io/
 pip install numpy cython # NumPy and Cython should be available upon csubst installation
