@@ -1,0 +1,70 @@
+name: Smoke test (csubst)
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-csubst-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        install: [source, bioconda]  # PRのコードをテスト / Biocondaパッケージも健全性チェック
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up micromamba
+        uses: mambaorg/setup-micromamba@v1
+        with:
+          environment-name: csubst-smoke
+          create-args: >-
+            python=3.11
+            iqtree
+            numpy
+            cython
+            pip
+          condarc: |
+            channels:
+              - bioconda
+              - conda-forge
+              - defaults
+            channel_priority: strict
+          cache-environment: true
+          cache-downloads: true
+
+      - name: Install csubst (from source)
+        if: matrix.install == 'source'
+        shell: bash -l {0}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Install csubst (from Bioconda)
+        if: matrix.install == 'bioconda'
+        shell: bash -l {0}
+        run: |
+          micromamba install -y csubst
+
+      - name: Run smoke test
+        shell: bash -l {0}
+        run: |
+          bash ci/csubst_smoke.sh
+
+      - name: Upload smoke logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs-${{ matrix.install }}
+          path: |
+            $RUNNER_TEMP/csubst_smoke/**
+            !$RUNNER_TEMP/csubst_smoke/**/*.fa
+            !$RUNNER_TEMP/csubst_smoke/**/*.nwk
+            !$RUNNER_TEMP/csubst_smoke/**/*.txt
