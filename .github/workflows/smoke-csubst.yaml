@@ -1,4 +1,4 @@
-name: Smoke test (csubst)
+name: smoke csubst
 
 on:
   push:
@@ -15,14 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
-        install: [source, bioconda]  # PRのコードをテスト / Biocondaパッケージも健全性チェック
+        install: [source, bioconda]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up micromamba
-        uses: mambaorg/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v1   # ← 修正点（ハイフンあり）
         with:
           environment-name: csubst-smoke
           create-args: >-
