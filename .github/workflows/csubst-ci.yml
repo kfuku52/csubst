@@ -1,4 +1,4 @@
-name: csubst smoke
+name: csubst ci
 
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
       - name: Install runtime deps
         shell: bash -l {0}
         run: |
-          micromamba install -y numpy=1.26.* cython=0.29.* iqtree
+          micromamba install -y numpy=1.26.* cython=0.29.* iqtree biopython
 
       - name: Install csubst (from source)
         if: matrix.install == 'source'
