@@ -34,8 +34,8 @@ jobs:
             pip
           condarc: |
             channels:
-              - bioconda
               - conda-forge
+              - bioconda
             channel_priority: strict
           cache-environment: true
           cache-downloads: true
@@ -43,7 +43,9 @@ jobs:
       - name: Install runtime deps
         shell: bash -l {0}
         run: |
-          micromamba install -y numpy=1.26.* cython=0.29.* iqtree biopython
+          micromamba install -y \
+            numpy=1.26.* cython=0.29.* iqtree \
+            conda-forge::biopython conda-forge::requests
 
       - name: Install csubst (from source)
         if: matrix.install == 'source'
@@ -72,7 +74,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      # --- command tests ---
       - name: Run command tests
         shell: bash -l {0}
+        env:
+          MPLBACKEND: Agg
         run: bash ci/csubst_commands.sh
+
