@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python: ['3.11']          # ← まずは 3.11 に寄せる（bioconda のビルド有）
+        python: ['3.10']              # ← 3.10 に統一
         install: [source, bioconda]
 
     steps:
@@ -29,33 +29,39 @@ jobs:
         uses: mamba-org/setup-micromamba@v1
         with:
           environment-name: csubst-smoke
-          # ここでは Python だけ。その他は後段でまとめて入れる
+          # まずは軽い環境（Python+pip）だけ作る
           create-args: >-
             python=${{ matrix.python }}
             pip
           condarc: |
             channels:
               - bioconda
-              - conda-forge        # ← defaults を外す
+              - conda-forge
             channel_priority: strict
           cache-environment: true
           cache-downloads: true
 
-      # ---- source インストール系 ----
-      - name: Install deps (for source)
+      # 共通の実行時依存は conda でピン留め（NumPy 1.26 / Cython 0.29）
+      - name: Install runtime deps (common)
+        shell: bash -l {0}
+        run: |
+          micromamba install -y numpy=1.26.* cython=0.29.* iqtree
+
+      # ---- source ビルド ----
+      - name: Install csubst (from source)
         if: matrix.install == 'source'
         shell: bash -l {0}
         run: |
-          micromamba install -y iqtree numpy cython
           python -m pip install --upgrade pip
+          # 環境内の numpy/cython を使わせる
           pip install --no-build-isolation .
 
-      # ---- bioconda インストール系 ----
+      # ---- bioconda ----
       - name: Install csubst (from Bioconda)
         if: matrix.install == 'bioconda'
         shell: bash -l {0}
         run: |
-          micromamba install -y csubst iqtree
+          micromamba install -y csubst
 
       - name: Run smoke test
         shell: bash -l {0}

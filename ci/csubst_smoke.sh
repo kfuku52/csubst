@@ -23,7 +23,7 @@ csubst dataset --name PGK
 test -s alignment.fa && test -s tree.nwk && test -s foreground.txt
 
 export OMP_NUM_THREADS=1
-# デフォルト（ECMK07）での AssertionError を避けるため、GY に切り替え
+# GY にして実行
 csubst analyze \
   --alignment_file alignment.fa \
   --rooted_tree_file tree.nwk \
