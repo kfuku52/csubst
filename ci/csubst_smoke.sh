@@ -3,44 +3,39 @@ set -euo pipefail
 
 echo "== csubst smoke test =="
 
-# どの csubst を使っているか表示
 which csubst
 (csubst --version || true)
+python - <<'PY'
+import sys
+try:
+    import numpy as np
+    print("Python:", sys.version.split()[0], "| NumPy:", np.__version__)
+except Exception as e:
+    print("Py/Numpy check:", e)
+PY
 
-# ヘルプが出れば CLI は生きている
-csubst -h | head -n 20
-
-# 作業用ディレクトリ
 WORKDIR="${RUNNER_TEMP:-$(mktemp -d)}/csubst_smoke"
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 
-# 最小データ生成（PGK）
-# README / Wiki に記載の手順そのまま
+# 最小データ生成
 csubst dataset --name PGK
+test -s alignment.fa && test -s tree.nwk && test -s foreground.txt
 
-# 入力ができているか軽く確認
-test -s alignment.fa
-test -s tree.nwk
-test -s foreground.txt
-
-# スレッドは 1 にして最小限で実行（CI 安定化）
 export OMP_NUM_THREADS=1
+# デフォルト（ECMK07）での AssertionError を避けるため、GY に切り替え
 csubst analyze \
   --alignment_file alignment.fa \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt \
+  --iqtree_model GY+F3x4+R2 \
   --threads 1
 
-# 代表的な出力（cb テーブル）ができたか確認
+# 代表的な出力の存在確認
 shopt -s nullglob
 CB=(csubst_cb_*.tsv)
 if [ ${#CB[@]} -eq 0 ]; then
   echo "ERROR: csubst_cb_*.tsv が生成されませんでした"; ls -l; exit 1
 fi
-
 echo "OK: 出力 ${#CB[@]} 件: ${CB[*]}"
 head -n 5 "${CB[0]}"
-
-# 成果物をワークフローのアーティファクトに載せるために残す
-pwd

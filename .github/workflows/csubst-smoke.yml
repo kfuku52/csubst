@@ -13,47 +13,49 @@ concurrency:
 jobs:
   smoke:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python: ['3.12']
+        python: ['3.11']          # ← まずは 3.11 に寄せる（bioconda のビルド有）
         install: [source, bioconda]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up micromamba
-        uses: mamba-org/setup-micromamba@v1   # ← 修正点（ハイフンあり）
+        uses: mamba-org/setup-micromamba@v1
         with:
           environment-name: csubst-smoke
+          # ここでは Python だけ。その他は後段でまとめて入れる
           create-args: >-
             python=${{ matrix.python }}
-            iqtree
-            numpy
-            cython
             pip
           condarc: |
             channels:
               - bioconda
-              - conda-forge
-              - defaults
+              - conda-forge        # ← defaults を外す
             channel_priority: strict
           cache-environment: true
           cache-downloads: true
 
-      - name: Install csubst (from source)
+      # ---- source インストール系 ----
+      - name: Install deps (for source)
         if: matrix.install == 'source'
         shell: bash -l {0}
         run: |
+          micromamba install -y iqtree numpy cython
           python -m pip install --upgrade pip
           pip install --no-build-isolation .
 
+      # ---- bioconda インストール系 ----
       - name: Install csubst (from Bioconda)
         if: matrix.install == 'bioconda'
         shell: bash -l {0}
         run: |
-          micromamba install -y python=${{ matrix.python }} csubst
+          micromamba install -y csubst iqtree
 
       - name: Run smoke test
         shell: bash -l {0}
@@ -64,7 +66,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-logs-${{ matrix.install }}
+          name: smoke-logs-${{ matrix.os }}-${{ matrix.install }}
           path: |
             $RUNNER_TEMP/csubst_smoke/**
             !$RUNNER_TEMP/csubst_smoke/**/*.fa
