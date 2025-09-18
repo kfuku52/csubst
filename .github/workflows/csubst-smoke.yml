@@ -19,7 +19,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python: ['3.10']              # ← 3.10 に統一
-        install: [source, bioconda]
+        install: [source]
 
     steps:
       - name: Checkout
