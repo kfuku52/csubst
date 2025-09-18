@@ -73,8 +73,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smoke-logs-${{ matrix.os }}-${{ matrix.install }}
-          path: |
-            $RUNNER_TEMP/csubst_smoke/**
-            !$RUNNER_TEMP/csubst_smoke/**/*.fa
-            !$RUNNER_TEMP/csubst_smoke/**/*.nwk
-            !$RUNNER_TEMP/csubst_smoke/**/*.txt
+          path: $RUNNER_TEMP/csubst_smoke/_artifacts
+          if-no-files-found: ignore
+          retention-days: 7
