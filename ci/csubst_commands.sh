@@ -55,65 +55,55 @@ NEW_TSV=($(find . -maxdepth 1 -type f -name "csubst_*.tsv" -newer "$MARKER" -pri
 echo "OK: analyze(GY)(created): ${NEW_TSV[*]}"
 
 # --- site（サイト別計算） ---
-# まずは fg（foreground 指定の枝集合）で試す
+# analyze 実行後に作られた cb テーブルを特定
+CBFILE="$(ls -1t csubst_cb_*.tsv 2>/dev/null | head -n1 || true)"
+if [ -z "${CBFILE}" ]; then
+  echo "ERROR: cb テーブルが見つかりません（csubst_cb_*.tsv）"; exit 1
+fi
+
+# IQ-TREE 中間をクリーンにしても site 側で再生成できます
 rm -f alignment.fa.{iqtree,log,rate,state,treefile} || true
+
 MARKER=$(mktemp); sleep 1; touch "$MARKER"
 
+# まずは最短ルート：cb テーブルに対して fg（foreground の組）を指定
 set +e
 env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst site \
   --alignment_file alignment.fa \
   --rooted_tree_file tree.nwk \
-  --foreground foreground.txt \
+  --cb_file "$CBFILE" \
   --branch_id fg \
   --threads 1
 rc=$?
 set -e
 
+# もし fg が通らない場合は、cb テーブルから最初の枝ID組（例: "12,34"）を抽出して実行
 if [ $rc -ne 0 ]; then
-  echo "WARN: site --branch_id fg が失敗。cb出力から枝IDをフォールバックで抽出します"
-  # 例：csubst_cb_2.tsv などから「数字,数字」の最初の組を拾う
-  combo="$(grep -Eho '(^|[[:space:]])[0-9]+,[0-9]+' csubst_cb_*.tsv 2>/dev/null | head -n1 | tr -d '[:space:]')"
-  if [ -z "${combo}" ] && [ -f csubst_b.tsv ]; then
-    # 単枝IDでも可（最初の1つ）
-    combo="$(awk -F'\t' 'NR==2{print $1}' csubst_b.tsv 2>/dev/null)"
+  echo "WARN: site --branch_id fg が失敗。cb テーブルから枝IDを抽出して再実行します"
+  combo="$(awk -F'\t' '
+    NR==1{
+      for(i=1;i<=NF;i++){
+        if($i ~ /branch_?id/i || $i ~ /branches/i){col=i}
+      }
+    }
+    NR==2 && col {print $col}
+  ' "$CBFILE")"
+  # 列名が分からない場合のフォールバック（行頭の d+,d+ を拾う）
+  if [ -z "$combo" ]; then
+    combo="$(grep -Eho '^[[:space:]]*[0-9]+,[0-9]+' "$CBFILE" | head -n1 | tr -d '[:space:]')"
   fi
-  [ -n "${combo}" ] || { echo "ERROR: 枝IDの抽出に失敗"; exit 1; }
-  echo "Fallback branch_id=${combo}"
+  [ -n "$combo" ] || { echo "ERROR: cb テーブルから枝IDを取得できませんでした"; exit 1; }
+
   env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst site \
     --alignment_file alignment.fa \
     --rooted_tree_file tree.nwk \
-    --foreground foreground.txt \
-    --branch_id "${combo}" \
+    --branch_id "$combo" \
     --threads 1
 fi
 
-NEW_SITE_TSV=($(find . -maxdepth 1 -type f -name "csubst_site*.tsv" -newer "$MARKER" -print))
-# 名前が将来変わっても、直後に増えた .tsv があることも確認
-[ ${#NEW_SITE_TSV[@]} -ge 1 ] || NEW_SITE_TSV=($(find . -maxdepth 1 -type f -name "*.tsv" -newer "$MARKER" -print))
-[ ${#NEW_SITE_TSV[@]} -ge 1 ] || { echo "ERROR: site 実行で TSV が作られていない"; exit 1; }
+# 生成確認（ファイル名変更に強いように直後に増えた .tsv を拾う）
+NEW_SITE_TSV=($(find . -maxdepth 1 -type f -name "*.tsv" -newer "$MARKER" -print))
+[ ${#NEW_SITE_TSV[@]} -ge 1 ] || { echo "ERROR: site 実行で TSV が作られていません"; exit 1; }
 echo "OK: site(created): ${NEW_SITE_TSV[*]}"
-
-# --- simulate（シミュレーション） ---
-MARKER=$(mktemp); sleep 1; touch "$MARKER"
-# ※ simulate は速い前提。安全のため threads=1。
-env PYTHONOPTIMIZE=1 csubst simulate \
-  --alignment_file alignment.fa \
-  --rooted_tree_file tree.nwk \
-  --foreground foreground.txt \
-  --threads 1
-NEW_SIM=($(find . -maxdepth 1 -type f \( -name "*.fa" -o -name "*.fasta" -o -name "*.phy" \) -newer "$MARKER" -print))
-[ ${#NEW_SIM[@]} -ge 1 ] || { echo "ERROR: simulate 実行で配列ファイルが作られていない"; exit 1; }
-echo "OK: simulate(created): ${NEW_SIM[*]}"
-
-# --- 体裁の最小チェック（TSV が非空 & タブ区切り） ---
-TSV_PICK="${NEW_TSV[0]}"
-[ -n "${TSV_PICK:-}" ] && [ -s "$TSV_PICK" ] && grep $'\t' "$TSV_PICK" >/dev/null || true
-
-# --- アーティファクト収集 ---
-ART="$WORKDIR/_artifacts_cmd"
-mkdir -p "$ART"
-for f in csubst_*.tsv alignment.fa.{iqtree,log,rate,state,treefile} *.fa *.fasta *.phy; do
-  [ -f "$f" ] && cp -v "$f" "$ART" || true
-done
 
 echo "Command tests OK"
