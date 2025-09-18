@@ -71,3 +71,8 @@ jobs:
             $RUNNER_TEMP/csubst_smoke/_artifacts*
           if-no-files-found: ignore
           retention-days: 7
+
+      # --- command tests ---
+      - name: Run command tests
+        shell: bash -l {0}
+        run: bash ci/csubst_commands.sh
