@@ -22,6 +22,8 @@ cd "$WORKDIR"
 csubst dataset --name PGK
 test -s alignment.fa && test -s tree.nwk && test -s foreground.txt
 
+# 追加：assert を無効化
+export PYTHONOPTIMIZE=1
 export OMP_NUM_THREADS=1
 # GY にして実行
 csubst analyze \
