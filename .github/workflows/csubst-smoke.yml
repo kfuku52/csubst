@@ -1,4 +1,4 @@
-name: smoke csubst
+name: csubst smoke
 
 on:
   push:
@@ -12,11 +12,12 @@ concurrency:
 
 jobs:
   smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12']
         install: [source, bioconda]
     steps:
       - name: Checkout
@@ -27,7 +28,7 @@ jobs:
         with:
           environment-name: csubst-smoke
           create-args: >-
-            python=3.12
+            python=${{ matrix.python }}
             iqtree
             numpy
             cython
@@ -52,7 +53,7 @@ jobs:
         if: matrix.install == 'bioconda'
         shell: bash -l {0}
         run: |
-          micromamba install -y python=3.12 csubst
+          micromamba install -y python=${{ matrix.python }} csubst
 
       - name: Run smoke test
         shell: bash -l {0}
