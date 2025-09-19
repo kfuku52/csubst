@@ -25,20 +25,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      # .github/workflows/csubst-smoke.yml（抜粋）
       - name: Set up micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
           environment-name: csubst-smoke
           create-args: >-
             python=${{ matrix.python }}
+            iqtree
+            numpy
+            scipy
+            cython
+            biopython
+            requests
             pip
           condarc: |
             channels:
-              - conda-forge
               - bioconda
+              - conda-forge
+              - defaults
             channel_priority: strict
           cache-environment: true
           cache-downloads: true
+
+      # ← 追加: pyvolve は pip から入れる
+      - name: Install pyvolve (pip)
+        shell: bash -l {0}
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-input pyvolve==1.1.0
 
       - name: Install runtime deps
         shell: bash -l {0}
@@ -46,7 +62,6 @@ jobs:
           micromamba install -y \
             numpy=1.26.* cython=0.29.* iqtree \
             conda-forge::biopython conda-forge::requests \
-            conda-forge::pyvolve
 
       - name: Install csubst (from source)
         if: matrix.install == 'source'

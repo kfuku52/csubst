@@ -20,14 +20,15 @@ WORKDIR="${RUNNER_TEMP:-$(mktemp -d)}/csubst_smoke"
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 
+# アーティファクト置き場
+ART="$WORKDIR/_artifacts_cmd"
+mkdir -p "$ART"
+
 # 最小データが無ければ生成
 if [ ! -s alignment.fa ]; then
   csubst dataset --name PGK
 fi
 test -s alignment.fa && test -s tree.nwk && test -s foreground.txt
-
-# 便利関数：直近生成ファイルの列挙
-newer_files() { find . -maxdepth 1 -type f -newer "$1" -printf "%f\n" || true; }
 
 # --- analyze（既定＝ECM系） ---
 rm -f alignment.fa.{iqtree,log,rate,state,treefile} || true
@@ -67,12 +68,12 @@ MARKER=$(mktemp); sleep 1; touch "$MARKER"
 
 # ログを保存しつつ終了コードを保持
 set +e
-env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 ${MPLBACKEND:+env MPLBACKEND=$MPLBACKEND} csubst site \
+env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst site \
   --alignment_file alignment.fa \
   --rooted_tree_file tree.nwk \
   --cb_file "$CBFILE" \
   --branch_id fg \
-  --threads 1 2>&1 | tee site.log
+  --threads 1 2>&1 | tee "$ART/site.log"
 rc=${PIPESTATUS[0]}
 set -e
 
@@ -84,11 +85,11 @@ if [ $rc -ne 0 ]; then
   [ -n "$combo" ] || { echo "ERROR: cb テーブルから枝IDを取得できませんでした"; exit 1; }
 
   set +e
-  env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 ${MPLBACKEND:+env MPLBACKEND=$MPLBACKEND} csubst site \
+  env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst site \
     --alignment_file alignment.fa \
     --rooted_tree_file tree.nwk \
     --branch_id "$combo" \
-    --threads 1 2>&1 | tee site.log
+    --threads 1 2>&1 | tee "$ART/site.log"
   rc=${PIPESTATUS[0]}
   set -e
 fi
@@ -96,14 +97,13 @@ fi
 [ $rc -eq 0 ] || { echo "ERROR: csubst site が非0終了"; exit 1; }
 
 # ---- 成功判定：ログ＋中間ファイル（.mmap を必須にしない） ----
-grep -E "csubst site end|Generating memory map" site.log >/dev/null || {
+grep -E "csubst site end|Generating memory map" "$ART/site.log" >/dev/null || {
   echo "ERROR: site.log に実行完了の痕跡がありません"; exit 1; }
 
 # IQ-TREEの中間が直近でできていること（少なくとも state/rate）
 test -s alignment.fa.state && test -s alignment.fa.rate || {
   echo "ERROR: alignment.fa.state / .rate が見つかりません"; exit 1; }
-# 実行後に更新されたかを軽く確認（無理ならスキップしてOK）
-if [ -n "$(find . -maxdepth 1 -name 'alignment.fa.state' -newer "$MARKER" -print -quit)" ]; then
+if find . -maxdepth 1 -name 'alignment.fa.state' -newer "$MARKER" | head -n1 | grep -q .; then
   echo "OK: site 再計算で state/rate を生成/更新"
 else
   echo "NOTE: site は既存の IQ-TREE 中間を再利用した可能性があります"
@@ -113,22 +113,40 @@ fi
 SITE_TSV=($(find . -maxdepth 1 -type f -name "csubst_site*.tsv" -newer "$MARKER" -print))
 [ ${#SITE_TSV[@]} -ge 1 ] && echo "NOTE: site TSV: ${SITE_TSV[*]}"
 
-# アーティファクト収集に site.log も追加
-ART="$WORKDIR/_artifacts_cmd"
-mkdir -p "$ART"
-cp -v site.log "$ART" || true
-
 echo "OK: site finished (verified by logs and IQ-TREE intermediates)"
 
-# --- round-trip: simulate の出力を analyze へ ---
-MARKER=$(mktemp); sleep 1; touch "$MARKER"
+# --- simulate（pyvolve の存在を確認してから） ---
+python - <<'PY'
+import sys
+try:
+    import pyvolve  # noqa: F401
+except Exception as e:
+    print("FATAL: pyvolve import failed:", e)
+    sys.exit(1)
+print("OK: pyvolve import")
+PY
 
-env PYTHONOPTIMIZE=1 csubst simulate \
+# simulate 実行（ログ保存）
+MARKER=$(mktemp); sleep 1; touch "$MARKER"
+set -o pipefail
+csubst simulate \
   --alignment_file alignment.fa \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt \
-  --threads 1
+  --iqtree_model GY+F3x4+R2 \
+  --threads 1 | tee "$ART/simulate.log"
+sim_ec=${PIPESTATUS[0]}
+set +o pipefail
 
+# 合否判定：終了コード + ログマーカー
+if [[ $sim_ec -ne 0 ]]; then
+  echo "ERROR: simulate failed (exit $sim_ec)"; exit 1
+fi
+grep -q "csubst simulate start" "$ART/simulate.log" || { echo "ERROR: simulate log missing 'start' mark"; exit 1; }
+grep -q "Time elapsed" "$ART/simulate.log" || { echo "ERROR: simulate log missing 'Time elapsed'"; exit 1; }
+echo "OK: simulate finished (verified by exit code and log markers)"
+
+# --- round-trip: simulate の出力を analyze へ ---
 SIM_ALN="$(find . -maxdepth 1 -type f \( -name "*.fa" -o -name "*.fasta" -o -name "*.phy" \) -newer "$MARKER" | head -n1)"
 [ -s "${SIM_ALN:-}" ] || { echo "ERROR: simulate 出力の配列ファイルが見つかりません"; exit 1; }
 
@@ -138,13 +156,13 @@ env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst analyze \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt \
   --threads 1
-
 NEW_TSV2=($(find . -maxdepth 1 -type f -name "csubst_*.tsv" -newer "$MARKER2" -print))
 [ ${#NEW_TSV2[@]} -ge 1 ] || { echo "ERROR: simulate→analyze で TSV が生成されていません"; exit 1; }
 echo "OK: round-trip simulate→analyze(created): ${NEW_TSV2[*]}"
 
 echo "Command tests OK"
 
+# サマリ
 {
   echo "# csubst CI Summary"
   echo
