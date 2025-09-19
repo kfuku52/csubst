@@ -34,8 +34,8 @@ jobs:
             iqtree numpy scipy cython biopython requests pip
           condarc: |
             channels:
-              - bioconda
               - conda-forge
+              - bioconda
               - defaults
             channel_priority: strict
           cache-environment: true
