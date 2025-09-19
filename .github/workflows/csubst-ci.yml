@@ -26,20 +26,12 @@ jobs:
         uses: actions/checkout@v4
 
 
-      # .github/workflows/csubst-smoke.yml（抜粋）
       - name: Set up micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
           environment-name: csubst-smoke
           create-args: >-
-            python=${{ matrix.python }}
-            iqtree
-            numpy
-            scipy
-            cython
-            biopython
-            requests
-            pip
+            python=${{ matrix.python }} iqtree numpy scipy cython biopython requests pip
           condarc: |
             channels:
               - bioconda
@@ -48,6 +40,13 @@ jobs:
             channel_priority: strict
           cache-environment: true
           cache-downloads: true
+
+      # ← 追加：ポスト処理の ENOENT 回避
+      - name: Workaround micromamba post-step ENOENT
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/setup-micromamba"
+          : > "$RUNNER_TEMP/setup-micromamba/micromamba-shell"
 
       # ← 追加: pyvolve は pip から入れる
       - name: Install pyvolve (pip)
