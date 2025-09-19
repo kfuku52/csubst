@@ -45,7 +45,8 @@ jobs:
         run: |
           micromamba install -y \
             numpy=1.26.* cython=0.29.* iqtree \
-            conda-forge::biopython conda-forge::requests
+            conda-forge::biopython conda-forge::requests \
+            conda-forge::pyvolve
 
       - name: Install csubst (from source)
         if: matrix.install == 'source'
