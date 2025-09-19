@@ -80,3 +80,6 @@ jobs:
           MPLBACKEND: Agg
         run: bash ci/csubst_commands.sh
 
+      - name: Validate outputs (schema-lite)
+        shell: bash -l {0}
+        run: python ci/check_csubst_outputs.py

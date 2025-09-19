@@ -120,4 +120,36 @@ cp -v site.log "$ART" || true
 
 echo "OK: site finished (verified by logs and IQ-TREE intermediates)"
 
+# --- round-trip: simulate の出力を analyze へ ---
+MARKER=$(mktemp); sleep 1; touch "$MARKER"
+
+env PYTHONOPTIMIZE=1 csubst simulate \
+  --alignment_file alignment.fa \
+  --rooted_tree_file tree.nwk \
+  --foreground foreground.txt \
+  --threads 1
+
+SIM_ALN="$(find . -maxdepth 1 -type f \( -name "*.fa" -o -name "*.fasta" -o -name "*.phy" \) -newer "$MARKER" | head -n1)"
+[ -s "${SIM_ALN:-}" ] || { echo "ERROR: simulate 出力の配列ファイルが見つかりません"; exit 1; }
+
+MARKER2=$(mktemp); sleep 1; touch "$MARKER2"
+env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst analyze \
+  --alignment_file "$SIM_ALN" \
+  --rooted_tree_file tree.nwk \
+  --foreground foreground.txt \
+  --threads 1
+
+NEW_TSV2=($(find . -maxdepth 1 -type f -name "csubst_*.tsv" -newer "$MARKER2" -print))
+[ ${#NEW_TSV2[@]} -ge 1 ] || { echo "ERROR: simulate→analyze で TSV が生成されていません"; exit 1; }
+echo "OK: round-trip simulate→analyze(created): ${NEW_TSV2[*]}"
+
 echo "Command tests OK"
+
+{
+  echo "# csubst CI Summary"
+  echo
+  echo "## Generated files"
+  ls -lh | sed 's/^/- /'
+} > summary.md
+
+cp -v summary.md "$ART" || true
