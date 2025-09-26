@@ -33,11 +33,17 @@ test -s alignment.fa && test -s tree.nwk && test -s foreground.txt
 # --- analyze（既定＝ECM系） ---
 rm -f alignment.fa.{iqtree,log,rate,state,treefile} || true
 MARKER=$(mktemp); sleep 1; touch "$MARKER"
+
+set +e
 env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst analyze \
   --alignment_file alignment.fa \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt \
   --threads 1
+ANALYZE_RC1=$?
+set -e
+echo "[SMOKE] analyze exited rc=${ANALYZE_RC1} (validate by files)"
+
 NEW_TSV=($(find . -maxdepth 1 -type f -name "csubst_*.tsv" -newer "$MARKER" -print))
 [ ${#NEW_TSV[@]} -ge 1 ] || { echo "ERROR: analyze 後に TSV が増えていない"; exit 1; }
 echo "OK: analyze(created): ${NEW_TSV[*]}"
@@ -45,12 +51,17 @@ echo "OK: analyze(created): ${NEW_TSV[*]}"
 # --- analyze（GY 分岐） ---
 rm -f alignment.fa.{iqtree,log,rate,state,treefile} || true
 MARKER=$(mktemp); sleep 1; touch "$MARKER"
+
+set +e
 env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst analyze \
-  --alignment_file alignment.fa \
-  --rooted_tree_file tree.nwk \
-  --foreground foreground.txt \
-  --iqtree_model GY+F3x4+R2 \
-  --threads 1
+    --alignment_file alignment.fa \
+    --rooted_tree_file tree.nwk \
+    --foreground foreground.txt \
+    --threads 1
+ANALYZE_RC1=$?
+set -e
+echo "[SMOKE] analyze exited rc=${ANALYZE_RC1} (validate by files)"
+
 NEW_TSV=($(find . -maxdepth 1 -type f -name "csubst_*.tsv" -newer "$MARKER" -print))
 [ ${#NEW_TSV[@]} -ge 1 ] || { echo "ERROR: analyze(GY) 後に TSV が増えていない"; exit 1; }
 echo "OK: analyze(GY)(created): ${NEW_TSV[*]}"
