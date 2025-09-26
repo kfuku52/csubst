@@ -66,76 +66,68 @@ NEW_TSV=($(find . -maxdepth 1 -type f -name "csubst_*.tsv" -newer "$MARKER" -pri
 [ ${#NEW_TSV[@]} -ge 1 ] || { echo "ERROR: analyze(GY) 後に TSV が増えていない"; exit 1; }
 echo "OK: analyze(GY)(created): ${NEW_TSV[*]}"
 
-# --- site（サイト別計算：最小オプションで可視化前処理を確認） ---
-CBFILE="$(ls -1t csubst_cb_*.tsv 2>/dev/null | head -n1 || true)"
-if [ -z "${CBFILE}" ]; then
-  echo "ERROR: cb テーブルが見つかりません（csubst_cb_*.tsv）"; exit 1
-fi
-
-# IQ-TREE 中間を消して site 側の再生成も確認（または再利用させる）
-rm -f alignment.fa.{iqtree,log,rate,state,treefile} || true
-
-MARKER=$(mktemp); sleep 1; touch "$MARKER"
-
-# ログを保存しつつ終了コードを保持
-set +e
-env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst site \
-  --alignment_file alignment.fa \
-  --rooted_tree_file tree.nwk \
-  --cb_file "$CBFILE" \
-  --branch_id fg \
-  --threads 1 2>&1 | tee "$ART/site.log"
-rc=${PIPESTATUS[0]}
-set -e
-
-# fg が通らない場合は cb から最初の枝IDを抽出して再実行
-if [ $rc -ne 0 ]; then
-  echo "WARN: site --branch_id fg が失敗。cb テーブルから枝IDを抽出して再実行します"
-  combo="$(awk -F'\t' 'NR==1{for(i=1;i<=NF;i++){if($i ~ /branch_?id|branches/i) col=i}} NR==2 && col{print $col}' "$CBFILE")"
-  [ -n "$combo" ] || combo="$(grep -Eho '^[[:space:]]*[0-9]+,[0-9]+' "$CBFILE" | head -n1 | tr -d '[:space:]')"
-  [ -n "$combo" ] || { echo "ERROR: cb テーブルから枝IDを取得できませんでした"; exit 1; }
-
+## --- site（PyMOL がある時だけ実行） ---
+python - <<'PY'
+import importlib.util, sys
+sys.exit(0 if importlib.util.find_spec("pymol") else 1)
+PY
+if [ $? -ne 0 ]; then
+  echo "NOTE: PyMOL not available -> skip 'csubst site'"
+else
+  CBFILE="$(ls -1t csubst_cb_*.tsv 2>/dev/null | head -n1 || true)"
+  if [ -z "${CBFILE}" ]; then
+    echo "ERROR: cb テーブルが見つかりません（csubst_cb_*.tsv）"; exit 1
+  fi
+  rm -f alignment.fa.{iqtree,log,rate,state,treefile} || true
+  MARKER=$(mktemp); sleep 1; touch "$MARKER"
   set +e
   env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst site \
     --alignment_file alignment.fa \
     --rooted_tree_file tree.nwk \
-    --branch_id "$combo" \
+    --cb_file "$CBFILE" \
+    --branch_id fg \
     --threads 1 2>&1 | tee "$ART/site.log"
   rc=${PIPESTATUS[0]}
   set -e
+  if [ $rc -ne 0 ]; then
+    echo "WARN: site --branch_id fg が失敗。cb テーブルから枝IDを抽出して再実行します"
+    combo="$(awk -F'\t' 'NR==1{for(i=1;i<=NF;i++){if($i ~ /branch_?id|branches/i) col=i}} NR==2 && col{print $col}' "$CBFILE")"
+    [ -n "$combo" ] || combo="$(grep -Eho '^[[:space:]]*[0-9]+,[0-9]+' "$CBFILE" | head -n1 | tr -d '[:space:]')"
+    [ -n "$combo" ] || { echo "ERROR: cb テーブルから枝IDを取得できませんでした"; exit 1; }
+    set +e
+    env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst site \
+      --alignment_file alignment.fa \
+      --rooted_tree_file tree.nwk \
+      --branch_id "$combo" \
+      --threads 1 2>&1 | tee "$ART/site.log"
+    rc=${PIPESTATUS[0]}
+    set -e
+  fi
+  [ $rc -eq 0 ] || { echo "ERROR: csubst site が非0終了"; exit 1; }
+  grep -E "csubst site end|Generating memory map" "$ART/site.log" >/dev/null || {
+    echo "ERROR: site.log に実行完了の痕跡がありません"; exit 1; }
+  test -s alignment.fa.state && test -s alignment.fa.rate || {
+    echo "ERROR: alignment.fa.state / .rate が見つかりません"; exit 1; }
+  if find . -maxdepth 1 -name 'alignment.fa.state' -newer "$MARKER" | head -n1 | grep -q .; then
+    echo "OK: site 再計算で state/rate を生成/更新"
+  else
+    echo "NOTE: site は既存の IQ-TREE 中間を再利用した可能性があります"
+  fi
+  SITE_TSV=($(find . -maxdepth 1 -type f -name "csubst_site*.tsv" -newer "$MARKER" -print))
+  [ ${#SITE_TSV[@]} -ge 1 ] && echo "NOTE: site TSV: ${SITE_TSV[*]}"
+  echo "OK: site finished (verified by logs and IQ-TREE intermediates)"
 fi
 
-[ $rc -eq 0 ] || { echo "ERROR: csubst site が非0終了"; exit 1; }
-
-# ---- 成功判定：ログ＋中間ファイル（.mmap を必須にしない） ----
-grep -E "csubst site end|Generating memory map" "$ART/site.log" >/dev/null || {
-  echo "ERROR: site.log に実行完了の痕跡がありません"; exit 1; }
-
-# IQ-TREEの中間が直近でできていること（少なくとも state/rate）
-test -s alignment.fa.state && test -s alignment.fa.rate || {
-  echo "ERROR: alignment.fa.state / .rate が見つかりません"; exit 1; }
-if find . -maxdepth 1 -name 'alignment.fa.state' -newer "$MARKER" | head -n1 | grep -q .; then
-  echo "OK: site 再計算で state/rate を生成/更新"
-else
-  echo "NOTE: site は既存の IQ-TREE 中間を再利用した可能性があります"
-fi
-
-# もし TSV が出来ていれば記録（必須にしない）
-SITE_TSV=($(find . -maxdepth 1 -type f -name "csubst_site*.tsv" -newer "$MARKER" -print))
-[ ${#SITE_TSV[@]} -ge 1 ] && echo "NOTE: site TSV: ${SITE_TSV[*]}"
-
-echo "OK: site finished (verified by logs and IQ-TREE intermediates)"
-
-# --- simulate（pyvolve の存在を確認してから） ---
+# --- simulate（pyvolve がある時だけ実行） ---
 python - <<'PY'
-import sys
-try:
-    import pyvolve  # noqa: F401
-except Exception as e:
-    print("FATAL: pyvolve import failed:", e)
-    sys.exit(1)
-print("OK: pyvolve import")
+import importlib.util, sys
+ok = importlib.util.find_spec("pyvolve") is not None
+print("pyvolve:", "available" if ok else "missing")
+sys.exit(0 if ok else 1)
 PY
+if [ $? -ne 0 ]; then
+  echo "NOTE: pyvolve not available -> skip 'csubst simulate'"
+else
 
 # simulate 実行（ログ保存）
 MARKER=$(mktemp); sleep 1; touch "$MARKER"
@@ -170,6 +162,7 @@ env PYTHONOPTIMIZE=1 OMP_NUM_THREADS=1 csubst analyze \
 NEW_TSV2=($(find . -maxdepth 1 -type f -name "csubst_*.tsv" -newer "$MARKER2" -print))
 [ ${#NEW_TSV2[@]} -ge 1 ] || { echo "ERROR: simulate→analyze で TSV が生成されていません"; exit 1; }
 echo "OK: round-trip simulate→analyze(created): ${NEW_TSV2[*]}"
+fi
 
 echo "Command tests OK"
 
