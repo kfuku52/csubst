@@ -33,6 +33,18 @@ csubst analyze \
   --iqtree_model GY+F3x4+R2 \
   --threads 1
 
+# PyMOLがある時だけ site を実行
+python - <<'PY'
+import importlib.util, sys
+sys.exit(0 if importlib.util.find_spec("pymol") else 1)
+PY
+if [ $? -eq 0 ]; then
+  echo "[SMOKE] run site (PyMOL available)"
+  csubst site ...   # 既存の引数
+else
+  echo "[SMOKE] skip site (PyMOL not available in CI)"
+fi
+
 # 代表的な出力の存在確認
 shopt -s nullglob
 CB=(csubst_cb_*.tsv)
