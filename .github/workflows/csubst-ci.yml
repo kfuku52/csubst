@@ -19,7 +19,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python: ['3.9', '3.10', '3.11', '3.12']
-        install: [source]   # bioconda は後で復活可
+        install: [source]
 
     steps:
       - name: Checkout
@@ -41,19 +41,17 @@ jobs:
           cache-environment: true
           cache-downloads: true
 
-      # ← 追加：post の ENOENT / “not find … in .bash_profile” 回避
+      # post の ENOENT 回避
       - name: Workaround micromamba post-step quirks
         if: always()
         run: |
-          # post が探す一時ファイルを用意
           mkdir -p "$RUNNER_TEMP/setup-micromamba"
           : > "$RUNNER_TEMP/setup-micromamba/micromamba-shell"
-          # post が .bash_profile から消そうとする行をダミーで用意
           touch "$HOME/.bash_profile"
           grep -q 'micromamba activate csubst-smoke' "$HOME/.bash_profile" \
             || echo 'micromamba activate csubst-smoke' >> "$HOME/.bash_profile"
 
-      # ← 追加: pyvolve は pip から入れる
+      # pyvolve を pip から
       - name: Install pyvolve (pip)
         shell: bash -l {0}
         run: |
@@ -65,7 +63,7 @@ jobs:
         run: |
           micromamba install -y \
             numpy=1.26.* cython=0.29.* iqtree \
-            conda-forge::biopython conda-forge::requests \
+            conda-forge::biopython conda-forge::requests
 
       - name: Install csubst (from source)
         if: matrix.install == 'source'
@@ -94,10 +92,26 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # PyMOL の有無を検出（heredoc の閉じは行頭に PY）
+      - name: Check PyMOL
+        id: pymol
+        shell: bash -l {0}
+        run: |
+          HAVE=$(python - <<'PY'
+try:
+    import pymol  # noqa: F401
+    print("true")
+except Exception:
+    print("false")
+PY
+          )
+          echo "have=$HAVE" >> "$GITHUB_OUTPUT"
+
       - name: Run command tests
         shell: bash -l {0}
         env:
           MPLBACKEND: Agg
+          HAVE_PYMOL: ${{ steps.pymol.outputs.have }}
         run: bash ci/csubst_commands.sh
 
       - name: Validate outputs (schema-lite)
