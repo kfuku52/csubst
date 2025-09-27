@@ -93,19 +93,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      # PyMOL の有無を検出（heredoc の閉じは行頭に PY）
+      # Detect the presence of PyMOL
       - name: Check PyMOL
         id: pymol
         shell: bash -l {0}
         run: |
-          HAVE=$(python - <<'PY'
-try:
-    import pymol  # noqa: F401
-    print("true")
-except Exception:
-    print("false")
-PY
-          )
+          HAVE="$(python -c 'import importlib.util as u; print("true" if u.find_spec("pymol") else "false")')"
           echo "have=$HAVE" >> "$GITHUB_OUTPUT"
 
       - name: Run command tests
