@@ -1,0 +1,120 @@
+name: csubst ci
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+concurrency:
+  group: csubst-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.9', '3.10', '3.11', '3.12']
+        install: [source]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up micromamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-name: csubst-smoke
+          create-args: >-
+            python=${{ matrix.python }}
+            iqtree numpy scipy cython biopython requests pip
+          condarc: |
+            channels:
+              - conda-forge
+              - bioconda
+              - defaults
+            channel_priority: strict
+          cache-environment: true
+          cache-downloads: true
+
+      # post の ENOENT 回避
+      - name: Workaround micromamba post-step quirks
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/setup-micromamba"
+          : > "$RUNNER_TEMP/setup-micromamba/micromamba-shell"
+          touch "$HOME/.bash_profile"
+          grep -q 'micromamba activate csubst-smoke' "$HOME/.bash_profile" \
+            || echo 'micromamba activate csubst-smoke' >> "$HOME/.bash_profile"
+
+      # pyvolve を pip から
+      - name: Install pyvolve (pip)
+        shell: bash -l {0}
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-input pyvolve==1.1.0
+
+      - name: Install runtime deps
+        shell: bash -l {0}
+        run: |
+          micromamba install -y \
+            numpy=1.26.* cython=0.29.* iqtree \
+            conda-forge::biopython conda-forge::requests
+
+      - name: Install csubst (from source)
+        if: matrix.install == 'source'
+        shell: bash -l {0}
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-build-isolation .
+
+      # --- Smoke ---
+      - name: Run smoke test
+        shell: bash -l {0}
+        run: bash ci/csubst_smoke.sh
+
+      # --- CLI tests ---
+      - name: Run CLI tests
+        shell: bash -l {0}
+        run: bash ci/csubst_cli.sh
+
+      - name: Upload artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-and-cli-${{ matrix.os }}-${{ matrix.install }}
+          path: |
+            $RUNNER_TEMP/csubst_smoke/_artifacts*
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # PyMOL の有無を検出（heredoc の閉じは行頭に PY）
+      - name: Check PyMOL
+        id: pymol
+        shell: bash -l {0}
+        run: |
+          HAVE=$(python - <<'PY'
+try:
+    import pymol  # noqa: F401
+    print("true")
+except Exception:
+    print("false")
+PY
+          )
+          echo "have=$HAVE" >> "$GITHUB_OUTPUT"
+
+      - name: Run command tests
+        shell: bash -l {0}
+        env:
+          MPLBACKEND: Agg
+          HAVE_PYMOL: ${{ steps.pymol.outputs.have }}
+        run: bash ci/csubst_commands.sh
+
+      - name: Validate outputs (schema-lite)
+        shell: bash -l {0}
+        run: python ci/check_csubst_outputs.py
