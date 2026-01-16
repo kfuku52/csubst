@@ -42,10 +42,7 @@ pip install git+https://github.com/kfuku52/csubst
 csubst dataset --name PGK
 
 # Run csubst analyze
-csubst analyze \
---alignment_file alignment.fa \
---rooted_tree_file tree.nwk \
---foreground foreground.txt
+csubst analyze --alignment_file alignment.fa --rooted_tree_file tree.nwk --foreground foreground.txt
 ```
 
 ## Basic usage

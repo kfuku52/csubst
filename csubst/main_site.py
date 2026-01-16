@@ -686,7 +686,7 @@ def main_site(g):
             parser_pymol.initialize_pymol(pdb_id=g['pdb'])
             num_chain = parser_pymol.get_num_chain()
             if num_chain >= g['pymol_max_num_chain']:
-                print(f'Number of chains ({num_chain}) in the PDB file is larger than the maximum number of chains allowed (--pymol_max_num_chain {g['pymol_max_num_chain']}). PyMOL session image generation is disabled.', flush=True)
+                print(f'Number of chains ({num_chain}) in the PDB file is larger than the maximum number of chains allowed (--pymol_max_num_chain {g["pymol_max_num_chain"]}). PyMOL session image generation is disabled.', flush=True)
                 g['pymol_img'] = False
             if g['user_alignment'] is not None:
                 g['mafft_add_fasta'] = g['user_alignment']

@@ -113,7 +113,7 @@ def pdb_sequence_search(g):
                         if num_chain <= g['pymol_max_num_chain']:
                             best_hit = hit
                         else:
-                            print(f'Number of chains in {hit_pdb_id} ({num_chain}) is larger than the maximum number of chains allowed (--pymol_max_num_chain {g['pymol_max_num_chain']}). Unsuitable.', flush=True)
+                            print(f'Number of chains in {hit_pdb_id} ({num_chain}) is larger than the maximum number of chains allowed (--pymol_max_num_chain {g["pymol_max_num_chain"]}). Unsuitable.', flush=True)
                 if best_hit is None:
                     print('No suitable hit found in the PDB database.')
                     pdb_id = None
