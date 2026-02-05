@@ -8,7 +8,6 @@ import re
 import sys
 
 from csubst import genetic_code
-from csubst import parser_biodb
 from csubst import parser_misc
 from csubst import sequence
 from csubst import substitution
@@ -677,6 +676,7 @@ def main_site(g):
         if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
             export2chimera(df, g)
         if g['run_pdb_sequence_search']:
+            from csubst import parser_biodb
             g = parser_biodb.pdb_sequence_search(g)
         if (g['pdb'] is not None):
             id_base = os.path.basename(g['pdb'])
