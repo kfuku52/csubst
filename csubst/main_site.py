@@ -81,18 +81,18 @@ def get_yvalues(df, sub_type, SN):
     col = SN + sub_type
     if sub_type == '_sub':
         if SN == 'S':
-            yvalues = df.loc[:, 'S' + sub_type].values
+            yvalues = df.loc[:, 'S' + sub_type].to_numpy(copy=True)
             is_enough_value = (yvalues > 0.01)
             yvalues[is_enough_value] = df.loc[is_enough_value, ['N' + sub_type, 'S' + sub_type]].sum(axis=1).values
         elif SN == 'N':
-            yvalues = df.loc[:, col].values
+            yvalues = df.loc[:, col].to_numpy(copy=True)
     elif sub_type=='_sub_':
         if SN == 'S':
             is_S_cols = df.columns.str.startswith('S_sub_')
             S_cols = df.columns[is_S_cols]
             is_y_cols = is_S_cols | df.columns.str.startswith('N_sub_')
             y_cols = df.columns[is_y_cols]
-            yvalues = df.loc[:, S_cols].sum(axis=1).values
+            yvalues = df.loc[:, S_cols].sum(axis=1).to_numpy(copy=True)
             is_enough_value = (yvalues>0.01)
             yvalues[is_enough_value] = df.loc[is_enough_value,y_cols].sum(axis=1).values
         elif SN == 'N':

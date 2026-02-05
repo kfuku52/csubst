@@ -7,7 +7,7 @@ import time
 def sort_branch_ids(df):
     swap_columns = df.columns[df.columns.str.startswith('branch_id')].tolist()
     if len(swap_columns)>1:
-        swap_values = df.loc[:,swap_columns].values
+        swap_values = df.loc[:,swap_columns].to_numpy(copy=True)
         swap_values.sort(axis=1)
         df.loc[:,swap_columns] = swap_values
     if 'site' in df.columns:
