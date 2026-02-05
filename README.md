@@ -30,7 +30,7 @@ The main features of **CSUBST** include:
 - [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
 
 ## Installation
-**CSUBST** runs on python 3 (tested with >=3.6.0). Installation via [bioconda](https://anaconda.org/bioconda/csubst) is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
+**CSUBST** runs on python 3. Installation via [bioconda](https://anaconda.org/bioconda/csubst) is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
 
 #### Option 1: Installation with `conda`
 ```
@@ -53,32 +53,41 @@ csubst dataset --name PGK
 csubst analyze --alignment_file alignment.fa --rooted_tree_file tree.nwk --foreground foreground.txt
 ```
 
-## Basic usage
-CSUBST is composed of several subcommands. 
-`csubst -h` shows the list of subcommands, and the complete set of subcommand options are available from `csubst SUBCOMMAND -h` (e.g., `csubst analyze -h`). 
-Many options are available, but those used by a typical user would be as follows. 
-More advanced usage is available in [CSUBST wiki](https://github.com/kfuku52/csubst/wiki). 
+## Usage
+CSUBST provides four main subcommands:
 
-- `csubst dataset` generates out-of-the-box test datasets.
-  - `--name`: Name of dataset. For a small test dataset, try `PGK` (vertebrate phosphoglycerate kinase genes).
-- `csubst analyze` calculates convergence rates and other metrics including ω<sub>C</sub>, dN<sub>C</sub>, and dS<sub>C</sub> on branch combinations.
-  - `--alignment_file`: PATH to input in-frame codon alignment.
-  - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
-  - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
-  - `--iqtree_model`: Codon substitution model for ancestral state reconstruction. Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. Among-site rate heterogeneity and codon frequencies can be specified. See [IQTREE's website](http://www.iqtree.org/doc/Substitution-Models) for details.
-  - `--threads`: The number of CPUs for parallel computations (e.g., `1` or `4`).
-  - `--foreground`: Optional. A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
-- `csubst site` calculates site-wise combinatorial substitutions on focal branch combinations and maps it onto protein structure.
-  - `--alignment_file`: PATH to input in-frame codon alignment.
-  - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
-  - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
-  - `--iqtree_model`: Codon substitution model for ancestral state reconstruction. Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. Among-site rate heterogeneity and codon frequencies can be specified. See [IQTREE's website](http://www.iqtree.org/doc/Substitution-Models) for details.
-- `csubst simulate` generates a simulated sequence alignment under a convergent evolutionary scenario.
-  - `--alignment_file`: PATH to input in-frame codon alignment.
-  - `--rooted_tree_file`: PATH to input rooted tree. Tip labels should be consistent with `--alignment_file`.
-  - `--genetic_code`: NCBI codon table ID. 1 = "Standard". See [here](https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi) for details.
-  - `--iqtree_model`: Codon substitution model for ancestral state reconstruction. Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. Among-site rate heterogeneity and codon frequencies can be specified. See [IQTREE's website](http://www.iqtree.org/doc/Substitution-Models) for details.
-  - `--foreground`: A text file to specify the foreground lineages. The file should contain two columns separated by a tab: 1st column for lineage IDs and 2nd for regex-compatible leaf names.
+- `csubst dataset`: generate bundled example datasets (e.g., `PGK`, `PEPC`).
+- `csubst analyze`: run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
+- `csubst site`: compute site-wise combinatorial substitutions for selected branch combinations and optionally map them to protein structures.
+- `csubst simulate`: simulate codon sequence evolution under user-defined convergent scenarios.
+
+Get available commands and options:
+
+```bash
+csubst -h
+csubst SUBCOMMAND -h
+```
+
+Typical workflow:
+
+```bash
+# 1) Prepare a toy dataset
+csubst dataset --name PGK
+
+# 2) Run convergence analysis
+csubst analyze \
+  --alignment_file alignment.fa \
+  --rooted_tree_file tree.nwk \
+  --foreground foreground.txt
+
+# 3) Inspect site-wise convergence for a branch pair (example)
+csubst site \
+  --alignment_file alignment.fa \
+  --rooted_tree_file tree.nwk \
+  --branch_id 23,51
+```
+
+For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 
 ## Citation
 Fukushima K, Pollock DD. 2023. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. Nature Ecology & Evolution 7: 155–170. [DOI: 10.1038/s41559-022-01932-7](https://doi.org/10.1038/s41559-022-01932-7)
