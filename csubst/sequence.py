@@ -69,14 +69,14 @@ def get_state_index(state, input_state, ambiguous_table):
     state_set = set(list(state))
     key_set = set(ambiguous_table.keys())
     if (len(state_set.intersection(key_set))>0):
-        for amb in ambiguous_table.keys():
+        for amb in [a for a in ambiguous_table.keys() if a in state_set]:
             vals = ambiguous_table[amb]
             states = [ s.replace(amb, val) for s in states for val in vals ]
     state_index0 = [ numpy.where(input_state==s)[0] for s in states ]
     state_index0 = [ s for s in state_index0 if s.shape[0]!=0 ]
     if len(state_index0)==0:
         return []
-    state_index = [ int(si) for si in state_index0 ]
+    state_index = [ int(idx) for si in state_index0 for idx in si ]
     return state_index
 
 def read_fasta(path):

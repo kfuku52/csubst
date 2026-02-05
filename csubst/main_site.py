@@ -218,7 +218,7 @@ def extend_site_index_edge(sites, num_extend):
         if sites.loc[i]-1 == sites.loc[i-1]:
             continue
         to_append = to_append_base + sites.loc[i]
-        new_sites = new_sites.append(to_append, ignore_index=True)
+        new_sites = pandas.concat([new_sites, to_append], ignore_index=True)
     new_sites = new_sites.loc[new_sites>=0]
     new_sites = new_sites.drop_duplicates().sort_values().reset_index(drop=True)
     return new_sites

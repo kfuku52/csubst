@@ -2,7 +2,7 @@ import ete3
 import numpy
 
 import itertools
-import pkg_resources
+import pkgutil
 import re
 import sys
 
@@ -10,6 +10,13 @@ from csubst import sequence
 from csubst import parser_phylobayes
 from csubst import parser_iqtree
 from csubst import tree
+
+def _read_package_text(file):
+    txt = pkgutil.get_data('csubst', file)
+    if txt is None:
+        raise FileNotFoundError('Unable to read package data file: {}'.format(file))
+    txt = txt.decode('utf-8')
+    return txt
 
 def generate_intermediate_files(g, force_notree_run=False):
     if (g['infile_type'] == 'phylobayes'):
@@ -224,11 +231,11 @@ def prep_state(g):
     return g
 
 def read_exchangeability_matrix(file, codon_orders):
-    txt = pkg_resources.resource_string(__name__, file)
-    txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
+    txt = _read_package_text(file=file)
+    txt = txt.replace('\r', '').split('\n')
     txt_mat = txt[0:60]
-    txt_mat = ''.join(txt_mat).split(' ')
-    arr = numpy.array([ float(s) for s in txt_mat if s!='' ], dtype=float)
+    txt_mat = ''.join(txt_mat).split()
+    arr = numpy.array([ float(s) for s in txt_mat ], dtype=float)
     assert (arr.shape[0]==1830), 'This is not a codon substitution matrix.'
     num_state = 61
     mat_exchangeability = numpy.zeros(shape=(num_state,num_state))
@@ -266,10 +273,10 @@ def get_exchangeability_codon_order():
     return exchangeability_codon_order
 
 def read_exchangeability_eq_freq(file, g):
-    txt = pkg_resources.resource_string(__name__, file)
-    txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
-    freqs = txt[61].split(' ')
-    freqs = numpy.array([ float(s) for s in freqs if s!='' ], dtype=float)
+    txt = _read_package_text(file=file)
+    txt = txt.replace('\r', '').split('\n')
+    freqs = txt[61].split()
+    freqs = numpy.array([ float(s) for s in freqs ], dtype=float)
     assert freqs.shape[0]==61, 'Number of equilibrium frequencies ({}) should be 61.'.format(freqs.shape[0])
     ex_codon_order = get_exchangeability_codon_order()
     codon_order_index = get_codon_order_index(order_from=g['codon_orders'], order_to=ex_codon_order)

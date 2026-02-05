@@ -45,7 +45,8 @@ def sort_cb(cb):
 
 def sort_cb_stats(cb_stats):
     col_order = ['arity', 'elapsed_sec', 'cutoff_stat', 'fg_enrichment_factor', 'mode', 'dSC_calibration', ]
-    col_order += cb_stats.columns[cb_stats.columns.str.contains('^num_')].tolist()
+    str_columns = pandas.Index([str(c) for c in cb_stats.columns])
+    col_order += cb_stats.columns[str_columns.str.contains('^num_')].tolist()
     if (len(col_order) < cb_stats.columns.shape[0]):
         col_order += [ col for col in cb_stats.columns if col not in col_order ]
     cb_stats = cb_stats.loc[:,col_order]
@@ -69,7 +70,7 @@ def set_substitution_dtype(df):
         sub_cols = sub_cols + df.columns[df.columns.str.endswith(ck)].tolist()
     for sc in sub_cols:
         if (df[sc]%1).sum()==0:
-            df.loc[:,sc] = df[sc].astype(int)
+            df[sc] = df[sc].astype(int)
     return df
 
 def get_linear_regression(cb):
