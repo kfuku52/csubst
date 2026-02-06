@@ -302,12 +302,12 @@ def get_num_adjusted_sites(g, node):
         adjusted_site_N += prop_N * codon_counts[i]
     return adjusted_site_S,adjusted_site_N
 
-def rescale_branch_length(g, S_tensor, N_tensor, denominator='L'):
+def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
     print('Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, '
           'rather than nucleotide-substitutions/codon-site.')
     print('Total branch length before rescaling: {:,.3f} nucleotide substitutions / codon site'.format(sum([ n.dist for n in g['tree'].traverse() ])))
-    S_branch_sub = substitution.get_branch_sub_counts(S_tensor)
-    N_branch_sub = substitution.get_branch_sub_counts(N_tensor)
+    OS_branch_sub = substitution.get_branch_sub_counts(OS_tensor)
+    ON_branch_sub = substitution.get_branch_sub_counts(ON_tensor)
     for node in g['tree'].traverse():
         if node.is_root():
             node.Sdist = 0
@@ -322,8 +322,8 @@ def rescale_branch_length(g, S_tensor, N_tensor, denominator='L'):
             node.Ndist = 0
             node.SNdist = 0
             continue
-        num_S_sub = S_branch_sub[nl]
-        num_N_sub = N_branch_sub[nl]
+        num_S_sub = OS_branch_sub[nl]
+        num_N_sub = ON_branch_sub[nl]
         # is_S_zero = (num_S_sub==0)
         # is_N_zero = (num_N_sub==0)
         if (denominator=='L'):

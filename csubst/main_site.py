@@ -532,13 +532,13 @@ def get_df_dist(sub_tensor, g, mode):
     df_dist = df_dist.loc[~df_dist['group'].isnull(),:]
     return df_dist
 
-def plot_state(N_tensor, S_tensor, branch_ids, g):
+def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     fig,axes = matplotlib.pyplot.subplots(nrows=3, ncols=2, figsize=(7.2, 7.2), sharex=False)
     outfiles = ['csubst_site.state_N.tsv', 'csubst_site.state_S.tsv']
     colors = ['red','blue']
     ax_cols = [0,1]
     titles = ['Nonsynonymous substitution','Synonymous substitution']
-    iter_items = zip(ax_cols,['nsy','syn'],[N_tensor,S_tensor],outfiles,colors,titles)
+    iter_items = zip(ax_cols,['nsy','syn'],[ON_tensor,OS_tensor],outfiles,colors,titles)
     for ax_col,mode,sub_tensor,outfile,color,title in iter_items:
         sub_target = sub_tensor[branch_ids,:,:,:,:]
         sub_target_combinat = numpy.expand_dims(sub_target.prod(axis=0), axis=0)
@@ -642,10 +642,10 @@ def main_site(g):
     g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)
     g = parser_misc.prep_state(g)
-    N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
-    N_tensor = substitution.apply_min_sub_pp(g, N_tensor)
-    S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
-    S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
+    ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
+    ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
+    OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
+    OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
     g = add_branch_id_list(g)
     for branch_ids in g['branch_id_list']:
         print('\nProcessing branch IDs: {}'.format(','.join([ str(bid) for bid in branch_ids ])), flush=True)
@@ -659,16 +659,16 @@ def main_site(g):
         if not os.path.exists(g['site_outdir']):
             os.makedirs(g['site_outdir'])
         leaf_nn = [ n.numerical_label for n in g['tree'].traverse() if n.is_leaf() ]
-        num_site = N_tensor.shape[1]
+        num_site = ON_tensor.shape[1]
         df = initialize_site_df(num_site)
-        df = add_cs_info(df, g['branch_ids'], sub_tensor=S_tensor, attr='S')
-        df = add_cs_info(df, g['branch_ids'], sub_tensor=N_tensor, attr='N')
+        df = add_cs_info(df, g['branch_ids'], sub_tensor=OS_tensor, attr='S')
+        df = add_cs_info(df, g['branch_ids'], sub_tensor=ON_tensor, attr='N')
         df.loc[:,'gap_rate_all'] = get_gapsite_rate(state_tensor=g['state_cdn'][leaf_nn,:,:])
         df.loc[:,'gap_rate_target'] = get_gapsite_rate(state_tensor=g['state_cdn'][g['branch_ids'],:,:])
-        df = add_site_info(df, sub_tensor=S_tensor, attr='S')
-        df = add_site_info(df, sub_tensor=N_tensor, attr='N')
-        df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=S_tensor, attr='S')
-        df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=N_tensor, attr='N')
+        df = add_site_info(df, sub_tensor=OS_tensor, attr='S')
+        df = add_site_info(df, sub_tensor=ON_tensor, attr='N')
+        df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=OS_tensor, attr='S')
+        df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=ON_tensor, attr='N')
         df = add_states(df, g['branch_ids'], g)
         if (g['untrimmed_cds'] is not None):
             df = add_gene_index(df, g)
@@ -707,7 +707,7 @@ def main_site(g):
                 parser_pymol.save_six_views()
                 parser_pymol.save_6view_pdf(pdf_filename=os.path.join(g['site_outdir'], f'csubst_site.{id_base}.pymol.pdf'))
         plot_barchart(df, g)
-        plot_state(N_tensor, S_tensor, g['branch_ids'], g)
+        plot_state(ON_tensor, OS_tensor, g['branch_ids'], g)
         if g['pdb'] is None:
             out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
         else:

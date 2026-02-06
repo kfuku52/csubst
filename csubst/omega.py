@@ -187,43 +187,43 @@ def subroot_E2nan(cb, tree):
             cb.loc[is_node,E_cols] = numpy.nan
     return cb
 
-def get_E(cb, g, N_tensor, S_tensor):
+def get_E(cb, g, ON_tensor, OS_tensor):
     if (g['omegaC_method']=='modelfree'):
-        N_gad, N_ga, N_gd = substitution.get_group_state_totals(N_tensor)
-        S_gad, S_ga, S_gd = substitution.get_group_state_totals(S_tensor)
-        g['N_ind_nomissing_gad'] = numpy.where(N_gad!=0)
-        g['N_ind_nomissing_ga'] = numpy.where(N_ga!=0)
-        g['N_ind_nomissing_gd'] = numpy.where(N_gd!=0)
-        g['S_ind_nomissing_gad'] = numpy.where(S_gad!=0)
-        g['S_ind_nomissing_ga'] = numpy.where(S_ga!=0)
-        g['S_ind_nomissing_gd'] = numpy.where(S_gd!=0)
+        ON_gad, ON_ga, ON_gd = substitution.get_group_state_totals(ON_tensor)
+        OS_gad, OS_ga, OS_gd = substitution.get_group_state_totals(OS_tensor)
+        g['N_ind_nomissing_gad'] = numpy.where(ON_gad!=0)
+        g['N_ind_nomissing_ga'] = numpy.where(ON_ga!=0)
+        g['N_ind_nomissing_gd'] = numpy.where(ON_gd!=0)
+        g['S_ind_nomissing_gad'] = numpy.where(OS_gad!=0)
+        g['S_ind_nomissing_ga'] = numpy.where(OS_ga!=0)
+        g['S_ind_nomissing_gd'] = numpy.where(OS_gd!=0)
         for st in ['any2any','any2spe','spe2any','spe2spe']:
-            cb['ECN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
-            cb['ECS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='mean', SN='S', g=g)
+            cb['ECN'+st] = calc_E_stat(cb, ON_tensor, mode=st, stat='mean', SN='N', g=g)
+            cb['ECS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='mean', SN='S', g=g)
     if (g['omegaC_method']=='submodel'):
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_pepE = get_exp_state(g=g, mode='pep')
         if (g['current_arity']==2):
-            g['ECN_tensor'] = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
+            g['EN_tensor'] = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(substitution.get_total_substitution(g['ECN_tensor'])))
+        print(txt.format(substitution.get_total_substitution(g['EN_tensor'])))
         print('Preparing the ECN table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbEN = substitution.get_cb(cb.loc[:,id_cols].values, g['ECN_tensor'], g, 'ECN')
+        cbEN = substitution.get_cb(cb.loc[:,id_cols].values, g['EN_tensor'], g, 'ECN')
         cb = table.merge_tables(cb, cbEN)
         del state_pepE,cbEN
         state_cdnE = get_exp_state(g=g, mode='cdn')
         if (g['current_arity'] == 2):
-            g['ECS_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
+            g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(substitution.get_total_substitution(g['ECS_tensor'])))
+        print(txt.format(substitution.get_total_substitution(g['ES_tensor'])))
         print('Preparing the ECS table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbES = substitution.get_cb(cb.loc[:,id_cols].values, g['ECS_tensor'], g, 'ECS')
+        cbES = substitution.get_cb(cb.loc[:,id_cols].values, g['ES_tensor'], g, 'ECS')
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
     if g['calc_quantile']:
         for st in ['any2any','any2spe','spe2any','spe2spe']:
-            cb['QCN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='quantile', SN='N', g=g)
-            cb['QCS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='quantile', SN='S', g=g)
+            cb['QCN'+st] = calc_E_stat(cb, ON_tensor, mode=st, stat='quantile', SN='N', g=g)
+            cb['QCS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='quantile', SN='S', g=g)
     cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC')
     cb = subroot_E2nan(cb, tree=g['tree'])
     return cb
@@ -316,8 +316,8 @@ def print_cb_stats(cb, prefix):
         txt = '{} median {} (non-corrected for dNc vs dSc distribution ranges): {:.3f}'
         print(txt.format(hd, col_omega, median_value), flush=True)
 
-def calc_omega(cb, S_tensor, N_tensor, g):
-    cb = get_E(cb, g, N_tensor, S_tensor)
+def calc_omega(cb, OS_tensor, ON_tensor, g):
+    cb = get_E(cb, g, ON_tensor, OS_tensor)
     cb = get_omega(cb, g)
     cb = get_CoD(cb, g)
     print_cb_stats(cb=cb, prefix='cb')

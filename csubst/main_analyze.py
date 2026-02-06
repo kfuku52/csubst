@@ -17,9 +17,9 @@ from csubst import substitution
 from csubst import table
 from csubst import tree
 
-def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
-    S_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=S_tensor, g=g, label='omegaS')
-    N_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=N_tensor, g=g, label='omegaN')
+def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
+    OS_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=OS_tensor, g=g, label='OS')
+    ON_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=ON_tensor, g=g, label='ON')
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
         g['current_arity'] = current_arity
@@ -82,13 +82,13 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
             print(txt.format(current_arity, current_arity))
             break
         print('Preparing OCS table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbS = substitution.get_cb(id_combinations, S_tensor_reducer, g, 'OCS')
+        cbOS = substitution.get_cb(id_combinations, OS_tensor_reducer, g, 'OCS')
         print('Preparing OCN table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbN = substitution.get_cb(id_combinations, N_tensor_reducer, g, 'OCN')
-        cb = table.merge_tables(cbS, cbN)
-        del cbS, cbN
+        cbON = substitution.get_cb(id_combinations, ON_tensor_reducer, g, 'OCN')
+        cb = table.merge_tables(cbOS, cbON)
+        del cbOS, cbON
         cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='OC')
-        cb, g = omega.calc_omega(cb, S_tensor_reducer, N_tensor_reducer, g)
+        cb, g = omega.calc_omega(cb, OS_tensor_reducer, ON_tensor_reducer, g)
         if (g['calibrate_longtail']):
             if (g['exhaustive_until'] >= current_arity):
                 cb = omega.calibrate_dsc(cb)
@@ -160,32 +160,32 @@ def main_analyze(g):
         os.chdir('csubst_plot_state_codon')
         tree.plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)
         os.chdir('..')
-    N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
-    N_tensor = substitution.apply_min_sub_pp(g, N_tensor)
-    sub_branches = numpy.where(substitution.get_branch_sub_counts(N_tensor) != 0)[0].tolist()
-    S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
-    S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
-    sub_branches = list(set(sub_branches).union(set(numpy.where(substitution.get_branch_sub_counts(S_tensor) != 0)[0].tolist())))
+    ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
+    ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
+    sub_branches = numpy.where(substitution.get_branch_sub_counts(ON_tensor) != 0)[0].tolist()
+    OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
+    OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
+    sub_branches = list(set(sub_branches).union(set(numpy.where(substitution.get_branch_sub_counts(OS_tensor) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
-    g = tree.rescale_branch_length(g, S_tensor, N_tensor)
+    g = tree.rescale_branch_length(g, OS_tensor, ON_tensor)
     id_combinations = None
-    S_total = substitution.get_total_substitution(S_tensor)
-    N_total = substitution.get_total_substitution(N_tensor)
+    OS_total = substitution.get_total_substitution(OS_tensor)
+    ON_total = substitution.get_total_substitution(ON_tensor)
     num_branch = g['num_node'] - 1
-    num_site = S_tensor.shape[1]
-    print('Synonymous substitutions / tree = {:,.1f}'.format(S_total), flush=True)
-    print('Nonsynonymous substitutions / tree = {:,.1f}'.format(N_total), flush=True)
-    print('Synonymous substitutions / branch = {:,.1f}'.format(S_total / num_branch), flush=True)
-    print('Nonsynonymous substitutions / branch = {:,.1f}'.format(N_total / num_branch), flush=True)
-    print('Synonymous substitutions / site = {:,.1f}'.format(S_total / num_site), flush=True)
-    print('Nonsynonymous substitutions / site = {:,.1f}'.format(N_total / num_site), flush=True)
+    num_site = OS_tensor.shape[1]
+    print('Synonymous substitutions / tree = {:,.1f}'.format(OS_total), flush=True)
+    print('Nonsynonymous substitutions / tree = {:,.1f}'.format(ON_total), flush=True)
+    print('Synonymous substitutions / branch = {:,.1f}'.format(OS_total / num_branch), flush=True)
+    print('Nonsynonymous substitutions / branch = {:,.1f}'.format(ON_total / num_branch), flush=True)
+    print('Synonymous substitutions / site = {:,.1f}'.format(OS_total / num_site), flush=True)
+    print('Nonsynonymous substitutions / site = {:,.1f}'.format(ON_total / num_site), flush=True)
     elapsed_time = int(time.time() - start)
     print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if (g['bs']):
         start = time.time()
         print("Generating bs table", flush=True)
-        bs = substitution.get_bs(S_tensor, N_tensor)
+        bs = substitution.get_bs(OS_tensor, ON_tensor)
         bs = table.sort_branch_ids(df=bs)
         bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
@@ -197,11 +197,11 @@ def main_analyze(g):
     if (g['s']) | (g['cb']):
         start = time.time()
         print("Generating s table", flush=True)
-        sS = substitution.get_s(S_tensor, attr='S')
-        sN = substitution.get_s(N_tensor, attr='N')
-        s = table.merge_tables(sS, sN)
-        g = substitution.get_sub_sites(g, sS, sN, state_tensor=g['state_cdn'])
-        del sS, sN
+        sOS = substitution.get_s(OS_tensor, attr='S')
+        sON = substitution.get_s(ON_tensor, attr='N')
+        s = table.merge_tables(sOS, sON)
+        g = substitution.get_sub_sites(g, sOS, sON, state_tensor=g['state_cdn'])
+        del sOS, sON
         if (g['s']):
             s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
@@ -216,9 +216,9 @@ def main_analyze(g):
     if (g['b']) | (g['cb']):
         start = time.time()
         print("Generating b table", flush=True)
-        bS = substitution.get_b(g=g, sub_tensor=S_tensor, attr='S', sitewise=False)
-        bN = substitution.get_b(g=g, sub_tensor=N_tensor, attr='N', sitewise=True)
-        b = table.merge_tables(bS, bN)
+        bOS = substitution.get_b(g=g, sub_tensor=OS_tensor, attr='S', sitewise=False)
+        bON = substitution.get_b(g=g, sub_tensor=ON_tensor, attr='N', sitewise=True)
+        b = table.merge_tables(bOS, bON)
         b.loc[:,'branch_length'] = numpy.nan
         for node in g['tree'].traverse():
             b.loc[node.numerical_label,'branch_length'] = node.dist
@@ -226,7 +226,7 @@ def main_analyze(g):
         for key in ['S_sub', 'N_sub']:
             p = b.loc[:, key].drop_duplicates().values
             print(txt.format(key, b.shape[0], p.shape[0], p.min(), p.max()), flush=True)
-        del bS, bN
+        del bOS, bON
         b = foreground.annotate_b_foreground(b, g)
         g['branch_table'] = b
         if (g['b']):
@@ -244,12 +244,12 @@ def main_analyze(g):
         print("Generating cs table", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, exhaustive=True, arity=g['current_arity'], check_attr="name")
-        reducer_S_tensor = substitution.get_reducer_sub_tensor(sub_tensor=S_tensor, g=g, label='csS')
-        reducer_N_tensor = substitution.get_reducer_sub_tensor(sub_tensor=N_tensor, g=g, label='csN')
-        csS = substitution.get_cs(id_combinations, reducer_S_tensor, attr='S')
-        csN = substitution.get_cs(id_combinations, reducer_N_tensor, attr='N')
-        cs = table.merge_tables(csS, csN)
-        del csS, csN
+        reducer_OS_tensor = substitution.get_reducer_sub_tensor(sub_tensor=OS_tensor, g=g, label='csOS')
+        reducer_ON_tensor = substitution.get_reducer_sub_tensor(sub_tensor=ON_tensor, g=g, label='csON')
+        csOS = substitution.get_cs(id_combinations, reducer_OS_tensor, attr='S')
+        csON = substitution.get_cs(id_combinations, reducer_ON_tensor, attr='N')
+        cs = table.merge_tables(csOS, csON)
+        del csOS, csON
         cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of cs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cs.values.nbytes/1024/1024, cs.values.dtype), flush=True)
@@ -262,10 +262,10 @@ def main_analyze(g):
         print("Generating cbs table", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, exhaustive=True, arity=g['current_arity'], check_attr="name")
-        cbsS = substitution.get_cbs(id_combinations, S_tensor, attr='S', g=g)
-        cbsN = substitution.get_cbs(id_combinations, N_tensor, attr='N', g=g)
-        cbs = table.merge_tables(cbsS, cbsN)
-        del cbsS, cbsN
+        cbsOS = substitution.get_cbs(id_combinations, OS_tensor, attr='S', g=g)
+        cbsON = substitution.get_cbs(id_combinations, ON_tensor, attr='N', g=g)
+        cbs = table.merge_tables(cbsOS, cbsON)
+        del cbsOS, cbsON
         cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of cbs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cbs.values.nbytes/1024/1024, cbs.values.dtype), flush=True)
@@ -275,7 +275,7 @@ def main_analyze(g):
 
     if (g['cb']):
         g['df_cb_stats_main'] = pandas.DataFrame()
-        g,cb = cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True)
+        g,cb = cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True)
         #if (g['fg_clade_permutation']>0):
         #    g = foreground.clade_permutation(cb, g)
         #del cb
