@@ -134,12 +134,10 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0]), mode='w+')
-            from threadpoolctl import threadpool_limits
-            with threadpool_limits(limits=1, user_api='blas'):
-                joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-                    joblib.delayed(joblib_calc_E_mean)
-                    (mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
-                )
+            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+                joblib.delayed(joblib_calc_E_mean)
+                (mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
+            )
             E_b = dfEb
             if os.path.exists(mmap_out): os.unlink(mmap_out)
     elif stat=='quantile':

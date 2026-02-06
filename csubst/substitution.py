@@ -192,12 +192,10 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        from threadpoolctl import threadpool_limits
-        with threadpool_limits(limits=1, user_api='blas'):
-            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-                joblib.delayed(sub_tensor2cb)
-                (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids,ms in zip(id_chunks, mmap_starts)
-            )
+        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+            joblib.delayed(sub_tensor2cb)
+            (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids,ms in zip(id_chunks, mmap_starts)
+        )
         df = pandas.DataFrame(df_mmap, columns=cn)
         if os.path.exists(mmap_out): os.unlink(mmap_out)
     df = table.sort_branch_ids(df)
@@ -258,12 +256,10 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        from threadpoolctl import threadpool_limits
-        with threadpool_limits(limits=1, user_api='blas'):
-            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-                joblib.delayed(sub_tensor2cbs)
-                (ids, sub_tensor, True, df_mmap, ms) for ids,ms in zip(id_chunks,mmap_starts)
-            )
+        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+            joblib.delayed(sub_tensor2cbs)
+            (ids, sub_tensor, True, df_mmap, ms) for ids,ms in zip(id_chunks,mmap_starts)
+        )
         df = pandas.DataFrame(df_mmap, columns=cn1 + cn2 + cn3)
         if os.path.exists(mmap_out): os.remove(mmap_out)
     df = df.dropna()
