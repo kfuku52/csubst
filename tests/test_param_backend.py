@@ -19,6 +19,7 @@ def _args(**kwargs):
 def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     g = param.get_global_parameters(_args())
     assert g["sub_tensor_backend"] == "auto"
+    assert g["sub_tensor_sparse_density_cutoff"] == pytest.approx(0.15)
 
 
 def test_get_global_parameters_normalizes_sub_tensor_backend_case():
@@ -31,6 +32,11 @@ def test_get_global_parameters_rejects_invalid_sub_tensor_backend():
         param.get_global_parameters(_args(sub_tensor_backend="not-a-backend"))
 
 
+def test_get_global_parameters_rejects_invalid_sparse_density_cutoff():
+    with pytest.raises(ValueError, match="sub_tensor_sparse_density_cutoff"):
+        param.get_global_parameters(_args(sub_tensor_sparse_density_cutoff=1.5))
+
+
 def test_resolve_sub_tensor_backend_auto_to_dense():
     g = {"sub_tensor_backend": "auto"}
     assert substitution.resolve_sub_tensor_backend(g) == "dense"
@@ -41,4 +47,3 @@ def test_resolve_sub_tensor_backend_sparse_falls_back_to_dense():
     g = {"sub_tensor_backend": "sparse"}
     assert substitution.resolve_sub_tensor_backend(g) == "dense"
     assert g["resolved_sub_tensor_backend"] == "dense"
-

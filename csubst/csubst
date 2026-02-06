@@ -76,7 +76,10 @@ if __name__ == "__main__":
     psr_co.add_argument('--sub_tensor_backend', metavar='auto|dense|sparse', default='auto', type=str,
                         choices=['auto', 'dense', 'sparse'],
                         help='default=%(default)s: Backend for substitution tensors. '
-                             '"auto" currently resolves to dense mode.')
+                             '"auto" selects sparse reducers for low-density tensors.')
+    psr_co.add_argument('--sub_tensor_sparse_density_cutoff', metavar='FLOAT', default=0.15, type=float, required=False,
+                        help='default=%(default)s: Density cutoff for --sub_tensor_backend auto. '
+                             'Sparse reducers are selected when estimated substitution tensor density is <= this value.')
     psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')
 

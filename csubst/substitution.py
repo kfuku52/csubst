@@ -37,6 +37,60 @@ def sparse_to_dense_sub_tensor(sparse_sub_tensor):
 def _is_sparse_sub_tensor(sub_tensor):
     return isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor)
 
+def estimate_sub_tensor_density(sub_tensor, tol=0):
+    if _is_sparse_sub_tensor(sub_tensor):
+        return sub_tensor.density
+    arr = numpy.asarray(sub_tensor)
+    if arr.size == 0:
+        return 0.0
+    if tol > 0:
+        nnz = numpy.count_nonzero(numpy.abs(arr) > tol)
+    else:
+        nnz = numpy.count_nonzero(arr)
+    return nnz / arr.size
+
+def resolve_reducer_backend(g, sub_tensor=None, label=''):
+    requested = str(g.get('sub_tensor_backend', 'auto')).lower()
+    if requested not in ['auto', 'dense', 'sparse']:
+        raise ValueError('Invalid sub_tensor_backend: {}'.format(requested))
+    if requested in ['dense', 'sparse']:
+        resolved = requested
+    else:
+        if sub_tensor is None:
+            resolved = 'dense'
+        else:
+            tol = float(g.get('float_tol', 0))
+            cutoff = float(g.get('sub_tensor_sparse_density_cutoff', 0.15))
+            density = estimate_sub_tensor_density(sub_tensor=sub_tensor, tol=tol)
+            resolved = 'sparse' if (density <= cutoff) else 'dense'
+            txt = 'Auto-selected substitution reducer backend{}: density={:.6f}, cutoff={:.6f}, resolved={}'
+            lbl = '' if label == '' else ' for {}'.format(label)
+            print(txt.format(lbl, density, cutoff, resolved), flush=True)
+    if 'resolved_reducer_backend' not in g.keys():
+        g['resolved_reducer_backend'] = dict()
+    if label != '':
+        g['resolved_reducer_backend'][label] = resolved
+    return resolved
+
+def get_reducer_sub_tensor(sub_tensor, g, label=''):
+    if _is_sparse_sub_tensor(sub_tensor):
+        return sub_tensor
+    resolved = resolve_reducer_backend(g=g, sub_tensor=sub_tensor, label=label)
+    if resolved != 'sparse':
+        return sub_tensor
+    if 'reducer_sub_tensor_cache' not in g.keys():
+        g['reducer_sub_tensor_cache'] = dict()
+    if label in g['reducer_sub_tensor_cache']:
+        return g['reducer_sub_tensor_cache'][label]
+    tol = float(g.get('float_tol', 0))
+    sparse_sub_tensor = dense_to_sparse_sub_tensor(sub_tensor=sub_tensor, tol=tol)
+    txt = 'Converted substitution tensor{} to sparse: density={:.6f} ({:,}/{:,})'
+    lbl = '' if label == '' else ' for {}'.format(label)
+    print(txt.format(lbl, sparse_sub_tensor.density, sparse_sub_tensor.nnz, sparse_sub_tensor.size), flush=True)
+    if label != '':
+        g['reducer_sub_tensor_cache'][label] = sparse_sub_tensor
+    return sparse_sub_tensor
+
 def _prepare_sparse_projection_mats(sub_tensor):
     mats_any2any = list()
     mats_spe2any = list()
@@ -314,6 +368,7 @@ def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, 
         return (df)
 
 def get_cb(id_combinations, sub_tensor, g, attr):
+    sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cb_'+attr)
     arity = id_combinations.shape[1]
     cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
@@ -418,6 +473,7 @@ def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None,
         return df
 
 def get_cbs(id_combinations, sub_tensor, attr, g):
+    sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cbs_'+attr)
     print("Calculating combinatorial substitutions: attr =", attr, flush=True)
     arity = id_combinations.shape[1]
     cn1 = [ "branch_id_" + str(num+1) for num in range(0,arity) ]

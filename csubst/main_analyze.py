@@ -18,6 +18,8 @@ from csubst import table
 from csubst import tree
 
 def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
+    S_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=S_tensor, g=g, label='omegaS')
+    N_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=N_tensor, g=g, label='omegaN')
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
         start = time.time()
         g['current_arity'] = current_arity
@@ -80,13 +82,13 @@ def cb_search(g, b, S_tensor, N_tensor, id_combinations, write_cb=True):
             print(txt.format(current_arity, current_arity))
             break
         print('Preparing OCS table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbS = substitution.get_cb(id_combinations, S_tensor, g, 'OCS')
+        cbS = substitution.get_cb(id_combinations, S_tensor_reducer, g, 'OCS')
         print('Preparing OCN table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbN = substitution.get_cb(id_combinations, N_tensor, g, 'OCN')
+        cbN = substitution.get_cb(id_combinations, N_tensor_reducer, g, 'OCN')
         cb = table.merge_tables(cbS, cbN)
         del cbS, cbN
         cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='OC')
-        cb, g = omega.calc_omega(cb, S_tensor, N_tensor, g)
+        cb, g = omega.calc_omega(cb, S_tensor_reducer, N_tensor_reducer, g)
         if (g['calibrate_longtail']):
             if (g['exhaustive_until'] >= current_arity):
                 cb = omega.calibrate_dsc(cb)
@@ -242,8 +244,10 @@ def main_analyze(g):
         print("Generating cs table", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, exhaustive=True, arity=g['current_arity'], check_attr="name")
-        csS = substitution.get_cs(id_combinations, S_tensor, attr='S')
-        csN = substitution.get_cs(id_combinations, N_tensor, attr='N')
+        reducer_S_tensor = substitution.get_reducer_sub_tensor(sub_tensor=S_tensor, g=g, label='csS')
+        reducer_N_tensor = substitution.get_reducer_sub_tensor(sub_tensor=N_tensor, g=g, label='csN')
+        csS = substitution.get_cs(id_combinations, reducer_S_tensor, attr='S')
+        csN = substitution.get_cs(id_combinations, reducer_N_tensor, attr='N')
         cs = table.merge_tables(csS, csN)
         del csS, csN
         cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
@@ -284,4 +288,3 @@ def main_analyze(g):
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]
-

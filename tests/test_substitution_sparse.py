@@ -124,3 +124,28 @@ def test_get_cbs_sparse_matches_dense():
     out_dense = substitution.get_cbs(ids, dense, attr="N", g=g)
     out_sparse = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g)
     numpy.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
+
+
+def test_estimate_sub_tensor_density_matches_dense_and_sparse():
+    dense = _toy_dense_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    expected = numpy.count_nonzero(dense) / dense.size
+    assert substitution.estimate_sub_tensor_density(dense) == expected
+    assert substitution.estimate_sub_tensor_density(sparse_tensor) == expected
+
+
+def test_resolve_reducer_backend_auto_threshold_switches_dense_sparse():
+    dense = _toy_dense_tensor()
+    high_cutoff = {"sub_tensor_backend": "auto", "sub_tensor_sparse_density_cutoff": 1.0}
+    low_cutoff = {"sub_tensor_backend": "auto", "sub_tensor_sparse_density_cutoff": 0.00001}
+    assert substitution.resolve_reducer_backend(high_cutoff, dense, label="x") == "sparse"
+    assert substitution.resolve_reducer_backend(low_cutoff, dense, label="y") == "dense"
+
+
+def test_get_reducer_sub_tensor_converts_and_caches_sparse():
+    dense = _toy_dense_tensor()
+    g = {"sub_tensor_backend": "sparse", "float_tol": 0.0}
+    sparse1 = substitution.get_reducer_sub_tensor(dense, g=g, label="test")
+    sparse2 = substitution.get_reducer_sub_tensor(dense, g=g, label="test")
+    assert isinstance(sparse1, substitution_sparse.SparseSubstitutionTensor)
+    assert sparse1 is sparse2

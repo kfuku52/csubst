@@ -50,6 +50,10 @@ class SparseSubstitutionTensor:
             out[:, :, sg, a, d] = mat.toarray()
         return out
 
+    def sum(self, axis=None):
+        # Keep numpy-like behavior for legacy call sites that aggregate dense tensors.
+        return self.to_dense().sum(axis=axis)
+
     def get_block(self, sg, a, d):
         key = (int(sg), int(a), int(d))
         mat = self.blocks.get(key)

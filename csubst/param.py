@@ -55,6 +55,12 @@ def get_global_parameters(args):
         g['sub_tensor_backend'] = 'auto'
     if g['sub_tensor_backend'] not in ['auto', 'dense', 'sparse']:
         raise ValueError('--sub_tensor_backend should be one of auto, dense, sparse.')
+    if 'sub_tensor_sparse_density_cutoff' in g.keys():
+        g['sub_tensor_sparse_density_cutoff'] = float(g['sub_tensor_sparse_density_cutoff'])
+    else:
+        g['sub_tensor_sparse_density_cutoff'] = 0.15
+    if (g['sub_tensor_sparse_density_cutoff'] < 0) or (g['sub_tensor_sparse_density_cutoff'] > 1):
+        raise ValueError('--sub_tensor_sparse_density_cutoff should be between 0 and 1.')
     if 'pdb' in g.keys():
         if g['pdb']=='besthit':
             g['run_pdb_sequence_search'] = True
