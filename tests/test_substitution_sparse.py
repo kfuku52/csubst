@@ -62,3 +62,44 @@ def test_substitution_helpers_convert_dense_and_sparse():
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
     restored = substitution.sparse_to_dense_sub_tensor(sparse_tensor)
     numpy.testing.assert_allclose(restored, dense, atol=1e-12)
+
+
+def _toy_reducer_tensor():
+    # shape = [branch, site, group, from, to]
+    sub = numpy.zeros((3, 2, 1, 2, 2), dtype=numpy.float64)
+    sub[0, 0, 0, :, :] = [[0.0, 0.2], [0.1, 0.0]]
+    sub[1, 0, 0, :, :] = [[0.0, 0.5], [0.2, 0.0]]
+    sub[2, 0, 0, :, :] = [[0.0, 0.4], [0.3, 0.0]]
+    sub[0, 1, 0, :, :] = [[0.0, 0.1], [0.0, 0.0]]
+    sub[1, 1, 0, :, :] = [[0.0, 0.1], [0.3, 0.0]]
+    sub[2, 1, 0, :, :] = [[0.0, 0.2], [0.1, 0.0]]
+    return sub
+
+
+def test_get_cs_sparse_matches_dense():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([[2, 0], [1, 2]], dtype=numpy.int64)
+    out_dense = substitution.get_cs(ids, dense, attr="N")
+    out_sparse = substitution.get_cs(ids, sparse_tensor, attr="N")
+    numpy.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
+
+
+def test_get_cb_sparse_matches_dense():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([[2, 0], [1, 2]], dtype=numpy.int64)
+    g = {"threads": 1, "float_type": numpy.float64}
+    out_dense = substitution.get_cb(ids, dense, g, attr="OCN")
+    out_sparse = substitution.get_cb(ids, sparse_tensor, g, attr="OCN")
+    numpy.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
+
+
+def test_get_cbs_sparse_matches_dense():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([[2, 0], [1, 2]], dtype=numpy.int64)
+    g = {"threads": 1}
+    out_dense = substitution.get_cbs(ids, dense, attr="N", g=g)
+    out_sparse = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g)
+    numpy.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)

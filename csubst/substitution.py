@@ -34,6 +34,78 @@ def dense_to_sparse_sub_tensor(sub_tensor, tol=0):
 def sparse_to_dense_sub_tensor(sparse_sub_tensor):
     return substitution_sparse.sparse_to_dense_substitution_tensor(sparse_tensor=sparse_sub_tensor)
 
+def _is_sparse_sub_tensor(sub_tensor):
+    return isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor)
+
+def _prepare_sparse_projection_mats(sub_tensor):
+    mats_any2any = list()
+    mats_spe2any = list()
+    mats_any2spe = list()
+    blocks_by_sg = {sg: list() for sg in range(sub_tensor.num_group)}
+    for sg in range(sub_tensor.num_group):
+        mats_any2any.append(sub_tensor.project_any2any(sg).tocsr())
+        mats_spe2any.append([sub_tensor.project_spe2any(sg, a).tocsr() for a in range(sub_tensor.num_state_from)])
+        mats_any2spe.append([sub_tensor.project_any2spe(sg, d).tocsr() for d in range(sub_tensor.num_state_to)])
+    for (sg, a, d), mat in sub_tensor.blocks.items():
+        blocks_by_sg[sg].append((a, d, mat.tocsr()))
+    return mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg
+
+def _sparse_row_product(mat, branch_ids):
+    row = mat.getrow(int(branch_ids[0]))
+    for bid in branch_ids[1:]:
+        row = row.multiply(mat.getrow(int(bid)))
+        if row.nnz == 0:
+            break
+    return row
+
+def _get_sparse_site_vectors(branch_ids, sub_tensor, mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg, data_type):
+    num_site = sub_tensor.num_site
+    any2any = numpy.zeros(shape=(num_site,), dtype=data_type)
+    spe2any = numpy.zeros(shape=(num_site,), dtype=data_type)
+    any2spe = numpy.zeros(shape=(num_site,), dtype=data_type)
+    spe2spe = numpy.zeros(shape=(num_site,), dtype=data_type)
+    for sg in range(sub_tensor.num_group):
+        row = _sparse_row_product(mats_any2any[sg], branch_ids)
+        if row.nnz != 0:
+            any2any += row.toarray()[0, :]
+        for a in range(sub_tensor.num_state_from):
+            row = _sparse_row_product(mats_spe2any[sg][a], branch_ids)
+            if row.nnz != 0:
+                spe2any += row.toarray()[0, :]
+        for d in range(sub_tensor.num_state_to):
+            row = _sparse_row_product(mats_any2spe[sg][d], branch_ids)
+            if row.nnz != 0:
+                any2spe += row.toarray()[0, :]
+        for a, d, mat in blocks_by_sg[sg]:
+            row = _sparse_row_product(mat, branch_ids)
+            if row.nnz != 0:
+                spe2spe += row.toarray()[0, :]
+    return any2any, spe2any, any2spe, spe2spe
+
+def get_cs_sparse(id_combinations, sub_tensor, attr):
+    num_site = sub_tensor.shape[1]
+    df = numpy.zeros([num_site, 5], dtype=numpy.float64)
+    df[:, 0] = numpy.arange(num_site)
+    mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg = _prepare_sparse_projection_mats(sub_tensor)
+    for i in numpy.arange(id_combinations.shape[0]):
+        any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
+            branch_ids=id_combinations[i, :],
+            sub_tensor=sub_tensor,
+            mats_any2any=mats_any2any,
+            mats_spe2any=mats_spe2any,
+            mats_any2spe=mats_any2spe,
+            blocks_by_sg=blocks_by_sg,
+            data_type=numpy.float64,
+        )
+        df[:, 1] += any2any
+        df[:, 2] += spe2any
+        df[:, 3] += any2spe
+        df[:, 4] += spe2spe
+    cn = ['site',] + [ 'OC'+attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
+    df = pandas.DataFrame(df, columns=cn)
+    df = table.set_substitution_dtype(df=df)
+    return df
+
 def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None):
     if dtype is None:
         dtype = state_tensor.dtype
@@ -144,6 +216,8 @@ def get_s(sub_tensor, attr):
     return(df)
 
 def get_cs(id_combinations, sub_tensor, attr):
+    if _is_sparse_sub_tensor(sub_tensor):
+        return get_cs_sparse(id_combinations=id_combinations, sub_tensor=sub_tensor, attr=attr)
     num_site = sub_tensor.shape[1]
     df = numpy.zeros([num_site, 5])
     df[:, 0] = numpy.arange(num_site)
@@ -203,13 +277,49 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
     if not mmap:
         return (df)
 
+def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64):
+    arity = id_combinations.shape[1]
+    if mmap:
+        df = df_mmap
+    else:
+        if (sub_tensor.dtype == bool):
+            data_type = numpy.int32
+        else:
+            data_type = float_type
+        df = numpy.zeros([id_combinations.shape[0], arity + 4], dtype=data_type)
+    start_time = time.time()
+    start = mmap_start
+    end = mmap_start + id_combinations.shape[0]
+    df[start:end, :arity] = id_combinations[:, :]  # branch_ids
+    mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg = _prepare_sparse_projection_mats(sub_tensor)
+    for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
+        any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
+            branch_ids=id_combinations[j, :],
+            sub_tensor=sub_tensor,
+            mats_any2any=mats_any2any,
+            mats_spe2any=mats_spe2any,
+            mats_any2spe=mats_any2spe,
+            blocks_by_sg=blocks_by_sg,
+            data_type=df.dtype,
+        )
+        df[i, arity+0] += any2any.sum()
+        df[i, arity+1] += spe2any.sum()
+        df[i, arity+2] += any2spe.sum()
+        df[i, arity+3] += spe2spe.sum()
+        if j % 10000 == 0:
+            mmap_end = mmap_start + id_combinations.shape[0]
+            txt = 'cb(sparse): {:,}th in the id range {:,}-{:,}: {:,} sec'
+            print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
+    if not mmap:
+        return (df)
+
 def get_cb(id_combinations, sub_tensor, g, attr):
     arity = id_combinations.shape[1]
     cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
+    writer = sub_tensor2cb_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cb
     if (g['threads']==1):
-        df = sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None,
-                           mmap_start=0, float_type=g['float_type'])
+        df = writer(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
     else:
         id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['threads'])
@@ -221,7 +331,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-            joblib.delayed(sub_tensor2cb)
+            joblib.delayed(writer)
             (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids,ms in zip(id_chunks, mmap_starts)
         )
         df = pandas.DataFrame(df_mmap, columns=cn)
@@ -266,14 +376,56 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
     if not mmap:
         return df
 
+def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0):
+    arity = id_combinations.shape[1]
+    num_site = sub_tensor.shape[1]
+    sites = numpy.arange(num_site)
+    if mmap:
+        df = df_mmap
+    else:
+        shape = (int(id_combinations.shape[0]*num_site), arity+5)
+        my_dtype = sub_tensor.dtype
+        if 'bool' in str(my_dtype):
+            my_dtype = numpy.int32
+        df = numpy.zeros(shape=shape, dtype=my_dtype)
+    node = 0
+    start_time = time.time()
+    mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg = _prepare_sparse_projection_mats(sub_tensor)
+    for i in numpy.arange(id_combinations.shape[0]):
+        row_start = (node*num_site)+(mmap_start*num_site)
+        row_end = ((node+1)*num_site)+(mmap_start*num_site)
+        df[row_start:row_end,:arity] = id_combinations[node,:] # branch_ids
+        df[row_start:row_end,arity] = sites # site
+        any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
+            branch_ids=id_combinations[i, :],
+            sub_tensor=sub_tensor,
+            mats_any2any=mats_any2any,
+            mats_spe2any=mats_spe2any,
+            mats_any2spe=mats_any2spe,
+            blocks_by_sg=blocks_by_sg,
+            data_type=df.dtype,
+        )
+        df[row_start:row_end,arity+1] += any2any
+        df[row_start:row_end,arity+2] += spe2any
+        df[row_start:row_end,arity+3] += any2spe
+        df[row_start:row_end,arity+4] += spe2spe
+        if (node%10000==0):
+            mmap_end = mmap_start+id_combinations.shape[0]
+            txt = 'cbs(sparse): {:,}th in the id range {:,}-{:,}: {:,} sec'
+            print(txt.format(node, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
+        node += 1
+    if not mmap:
+        return df
+
 def get_cbs(id_combinations, sub_tensor, attr, g):
     print("Calculating combinatorial substitutions: attr =", attr, flush=True)
     arity = id_combinations.shape[1]
     cn1 = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn2 = ["site",]
     cn3 = [ 'OC'+attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
+    writer = sub_tensor2cbs_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cbs
     if (g['threads']==1):
-        df = sub_tensor2cbs(id_combinations, sub_tensor)
+        df = writer(id_combinations, sub_tensor)
         df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)
     else:
         id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['threads'])
@@ -285,7 +437,7 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-            joblib.delayed(sub_tensor2cbs)
+            joblib.delayed(writer)
             (ids, sub_tensor, True, df_mmap, ms) for ids,ms in zip(id_chunks,mmap_starts)
         )
         df = pandas.DataFrame(df_mmap, columns=cn1 + cn2 + cn3)
