@@ -64,6 +64,27 @@ def test_substitution_helpers_convert_dense_and_sparse():
     numpy.testing.assert_allclose(restored, dense, atol=1e-12)
 
 
+def test_sparse_summary_matches_dense_axis_sums():
+    dense = _toy_dense_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+
+    sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor, mode="spe2spe")
+    numpy.testing.assert_allclose(sub_bg, dense.sum(axis=1), atol=1e-12)
+    numpy.testing.assert_allclose(sub_sg, dense.sum(axis=0), atol=1e-12)
+
+    sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor, mode="spe2any")
+    numpy.testing.assert_allclose(sub_bg, dense.sum(axis=(1, 4)), atol=1e-12)
+    numpy.testing.assert_allclose(sub_sg, dense.sum(axis=(0, 4)), atol=1e-12)
+
+    sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor, mode="any2spe")
+    numpy.testing.assert_allclose(sub_bg, dense.sum(axis=(1, 3)), atol=1e-12)
+    numpy.testing.assert_allclose(sub_sg, dense.sum(axis=(0, 3)), atol=1e-12)
+
+    sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor, mode="any2any")
+    numpy.testing.assert_allclose(sub_bg, dense.sum(axis=(1, 3, 4)), atol=1e-12)
+    numpy.testing.assert_allclose(sub_sg, dense.sum(axis=(0, 3, 4)), atol=1e-12)
+
+
 def _toy_reducer_tensor():
     # shape = [branch, site, group, from, to]
     sub = numpy.zeros((3, 2, 1, 2, 2), dtype=numpy.float64)

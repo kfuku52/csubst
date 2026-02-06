@@ -118,3 +118,34 @@ def dense_to_sparse_substitution_tensor(sub_tensor, tol=0):
 def sparse_to_dense_substitution_tensor(sparse_tensor):
     return sparse_tensor.to_dense()
 
+
+def summarize_sparse_sub_tensor(sparse_tensor, mode):
+    num_branch, num_site, num_group, num_state_from, num_state_to = sparse_tensor.shape
+    dtype = sparse_tensor.dtype
+    if mode == 'spe2spe':
+        sub_bg = numpy.zeros(shape=(num_branch, num_group, num_state_from, num_state_to), dtype=dtype)
+        sub_sg = numpy.zeros(shape=(num_site, num_group, num_state_from, num_state_to), dtype=dtype)
+        for (sg, a, d), mat in sparse_tensor.blocks.items():
+            sub_bg[:, sg, a, d] = numpy.asarray(mat.sum(axis=1)).reshape(-1)
+            sub_sg[:, sg, a, d] = numpy.asarray(mat.sum(axis=0)).reshape(-1)
+    elif mode == 'spe2any':
+        sub_bg = numpy.zeros(shape=(num_branch, num_group, num_state_from), dtype=dtype)
+        sub_sg = numpy.zeros(shape=(num_site, num_group, num_state_from), dtype=dtype)
+        for (sg, a, d), mat in sparse_tensor.blocks.items():
+            sub_bg[:, sg, a] += numpy.asarray(mat.sum(axis=1)).reshape(-1)
+            sub_sg[:, sg, a] += numpy.asarray(mat.sum(axis=0)).reshape(-1)
+    elif mode == 'any2spe':
+        sub_bg = numpy.zeros(shape=(num_branch, num_group, num_state_to), dtype=dtype)
+        sub_sg = numpy.zeros(shape=(num_site, num_group, num_state_to), dtype=dtype)
+        for (sg, a, d), mat in sparse_tensor.blocks.items():
+            sub_bg[:, sg, d] += numpy.asarray(mat.sum(axis=1)).reshape(-1)
+            sub_sg[:, sg, d] += numpy.asarray(mat.sum(axis=0)).reshape(-1)
+    elif mode == 'any2any':
+        sub_bg = numpy.zeros(shape=(num_branch, num_group), dtype=dtype)
+        sub_sg = numpy.zeros(shape=(num_site, num_group), dtype=dtype)
+        for (sg, a, d), mat in sparse_tensor.blocks.items():
+            sub_bg[:, sg] += numpy.asarray(mat.sum(axis=1)).reshape(-1)
+            sub_sg[:, sg] += numpy.asarray(mat.sum(axis=0)).reshape(-1)
+    else:
+        raise ValueError('Unsupported mode: {}'.format(mode))
+    return sub_bg, sub_sg

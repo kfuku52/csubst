@@ -16,6 +16,7 @@ import time
 
 from csubst import parallel
 from csubst import substitution
+from csubst import substitution_sparse
 from csubst import table
 from csubst import omega_cy
 
@@ -102,21 +103,27 @@ def joblib_calc_quantile(mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col,
         print(txt.format(obs_col, i+1, num_gad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g={}):
+    if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
+        sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor=sub_tensor, mode=mode)
     if mode=='spe2spe':
-        sub_bg = sub_tensor.sum(axis=1) # branch, matrix_group, ancestral_state, derived_state
-        sub_sg = sub_tensor.sum(axis=0) # site, matrix_group, ancestral_state, derived_state
+        if not isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
+            sub_bg = sub_tensor.sum(axis=1) # branch, matrix_group, ancestral_state, derived_state
+            sub_sg = sub_tensor.sum(axis=0) # site, matrix_group, ancestral_state, derived_state
         list_gad = [ [g,a,d] for g,a,d in itertools.zip_longest(*g[SN+'_ind_nomissing_gad']) ]
     elif mode=='spe2any':
-        sub_bg = sub_tensor.sum(axis=(1, 4)) # branch, matrix_group, ancestral_state
-        sub_sg = sub_tensor.sum(axis=(0, 4)) # site, matrix_group, ancestral_state
+        if not isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
+            sub_bg = sub_tensor.sum(axis=(1, 4)) # branch, matrix_group, ancestral_state
+            sub_sg = sub_tensor.sum(axis=(0, 4)) # site, matrix_group, ancestral_state
         list_gad = [ [g,a,'2any'] for g,a in itertools.zip_longest(*g[SN+'_ind_nomissing_ga']) ]
     elif mode=='any2spe':
-        sub_bg = sub_tensor.sum(axis=(1, 3)) # branch, matrix_group, derived_state
-        sub_sg = sub_tensor.sum(axis=(0, 3)) # site, matrix_group, derived_state
+        if not isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
+            sub_bg = sub_tensor.sum(axis=(1, 3)) # branch, matrix_group, derived_state
+            sub_sg = sub_tensor.sum(axis=(0, 3)) # site, matrix_group, derived_state
         list_gad = [ [g,'any2',d] for g,d in itertools.zip_longest(*g[SN+'_ind_nomissing_gd']) ]
     elif mode=='any2any':
-        sub_bg = sub_tensor.sum(axis=(1, 3, 4)) # branch, matrix_group
-        sub_sg = sub_tensor.sum(axis=(0, 3, 4)) # site, matrix_group
+        if not isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
+            sub_bg = sub_tensor.sum(axis=(1, 3, 4)) # branch, matrix_group
+            sub_sg = sub_tensor.sum(axis=(0, 3, 4)) # site, matrix_group
         list_gad = list(itertools.product(numpy.arange(sub_tensor.shape[2]), ['any2',], ['2any',]))
     num_gad_combinat = len(list_gad)
     txt = 'E{}{}: Total number of substitution categories after NaN removals: {}'
