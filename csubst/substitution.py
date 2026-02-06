@@ -1,9 +1,11 @@
 import joblib
 import numpy
 import pandas
+import scipy.sparse
 
 import os
 import time
+from collections import defaultdict
 
 from csubst import table
 from csubst import parallel
@@ -19,9 +21,7 @@ def resolve_sub_tensor_backend(g):
     if requested in ['auto', 'dense']:
         resolved = 'dense'
     elif requested == 'sparse':
-        txt = 'Requested --sub_tensor_backend sparse, but sparse backend is not implemented yet. Falling back to dense.'
-        print(txt, flush=True)
-        resolved = 'dense'
+        resolved = 'sparse'
     g['sub_tensor_backend'] = requested
     g['resolved_sub_tensor_backend'] = resolved
     txt = 'Substitution tensor backend: requested={}, resolved={}'
@@ -91,64 +91,200 @@ def get_reducer_sub_tensor(sub_tensor, g, label=''):
         g['reducer_sub_tensor_cache'][label] = sparse_sub_tensor
     return sparse_sub_tensor
 
-def _prepare_sparse_projection_mats(sub_tensor):
-    mats_any2any = list()
-    mats_spe2any = list()
-    mats_any2spe = list()
-    blocks_by_sg = {sg: list() for sg in range(sub_tensor.num_group)}
-    for sg in range(sub_tensor.num_group):
-        mats_any2any.append(sub_tensor.project_any2any(sg).tocsr())
-        mats_spe2any.append([sub_tensor.project_spe2any(sg, a).tocsr() for a in range(sub_tensor.num_state_from)])
-        mats_any2spe.append([sub_tensor.project_any2spe(sg, d).tocsr() for d in range(sub_tensor.num_state_to)])
+def _get_sparse_combination_group_tensor(sub_tensor, branch_ids, sg, data_type=None):
+    if data_type is None:
+        data_type = sub_tensor.dtype
+    arity = len(branch_ids)
+    out = numpy.zeros(
+        shape=(arity, sub_tensor.num_site, sub_tensor.num_state_from, sub_tensor.num_state_to),
+        dtype=data_type,
+    )
+    for (group_id, a, d), mat in sub_tensor.blocks.items():
+        if group_id != sg:
+            continue
+        for bi, bid in enumerate(branch_ids):
+            row = mat.getrow(int(bid))
+            if row.nnz == 0:
+                continue
+            out[bi, row.indices, a, d] = row.data
+    return out
+
+
+def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
+    dtype = state_tensor.dtype
+    num_branch = state_tensor.shape[0]
+    num_site = state_tensor.shape[1]
+    if mode == 'asis':
+        num_syngroup = 1
+        num_state = state_tensor.shape[2]
+    elif mode == 'syn':
+        num_syngroup = len(g['amino_acid_orders'])
+        num_state = g['max_synonymous_size']
+    else:
+        raise ValueError('Unsupported mode for sparse substitution tensor: {}'.format(mode))
+    sparse_entries = defaultdict(lambda: [list(), list(), list()])  # key -> [rows, cols, data]
+    for node in g['tree'].traverse():
+        if node.is_root():
+            continue
+        child = node.numerical_label
+        parent = node.up.numerical_label
+        if state_tensor_anc[parent, :, :].sum() < g['float_tol']:
+            continue
+        parent_matrix = state_tensor_anc[parent, :, :]
+        child_matrix = state_tensor[child, :, :]
+        if mode == 'asis':
+            for a in range(num_state):
+                parent_state = parent_matrix[:, a]
+                if not numpy.any(parent_state):
+                    continue
+                for d in range(num_state):
+                    if a == d:
+                        continue
+                    vals = parent_state * child_matrix[:, d]
+                    nz = numpy.where(vals != 0)[0]
+                    if nz.shape[0] == 0:
+                        continue
+                    rows, cols, data = sparse_entries[(0, a, d)]
+                    rows.extend([child] * nz.shape[0])
+                    cols.extend(nz.tolist())
+                    data.extend(vals[nz].tolist())
+        elif mode == 'syn':
+            for sg, aa in enumerate(g['amino_acid_orders']):
+                ind = numpy.array(g['synonymous_indices'][aa], dtype=numpy.int64)
+                size = ind.shape[0]
+                if size <= 1:
+                    continue
+                # Keep indexing semantics consistent with dense path: [state, site].
+                parent_sub = state_tensor_anc[parent, :, ind]
+                child_sub = state_tensor[child, :, ind]
+                for a in range(size):
+                    parent_state = parent_sub[a, :]
+                    if not numpy.any(parent_state):
+                        continue
+                    for d in range(size):
+                        if a == d:
+                            continue
+                        vals = parent_state * child_sub[d, :]
+                        nz = numpy.where(vals != 0)[0]
+                        if nz.shape[0] == 0:
+                            continue
+                        rows, cols, data = sparse_entries[(sg, a, d)]
+                        rows.extend([child] * nz.shape[0])
+                        cols.extend(nz.tolist())
+                        data.extend(vals[nz].tolist())
+    blocks = dict()
+    shape = (num_branch, num_site)
+    for key, (rows, cols, data) in sparse_entries.items():
+        if len(data) == 0:
+            continue
+        mat = scipy.sparse.coo_matrix(
+            (numpy.asarray(data, dtype=dtype), (numpy.asarray(rows), numpy.asarray(cols))),
+            shape=shape,
+            dtype=dtype,
+        ).tocsr()
+        mat.sum_duplicates()
+        mat.eliminate_zeros()
+        if mat.nnz > 0:
+            blocks[key] = mat
+    tensor_shape = (num_branch, num_site, num_syngroup, num_state, num_state)
+    out = substitution_sparse.SparseSubstitutionTensor(shape=tensor_shape, dtype=dtype, blocks=blocks)
+    txt = 'Generated sparse substitution tensor: shape={}, density={:.6f} ({:,}/{:,})'
+    print(txt.format(out.shape, out.density, out.nnz, out.size), flush=True)
+    return out
+
+
+def get_branch_sub_counts(sub_tensor):
+    if _is_sparse_sub_tensor(sub_tensor):
+        out = numpy.zeros(shape=(sub_tensor.num_branch,), dtype=numpy.float64)
+        for mat in sub_tensor.blocks.values():
+            out += numpy.asarray(mat.sum(axis=1)).reshape(-1)
+        return out
+    return numpy.nan_to_num(sub_tensor).sum(axis=(1, 2, 3, 4))
+
+
+def get_site_sub_counts(sub_tensor):
+    if _is_sparse_sub_tensor(sub_tensor):
+        out = numpy.zeros(shape=(sub_tensor.num_site,), dtype=numpy.float64)
+        for mat in sub_tensor.blocks.values():
+            out += numpy.asarray(mat.sum(axis=0)).reshape(-1)
+        return out
+    return numpy.nan_to_num(sub_tensor).sum(axis=(0, 2, 3, 4))
+
+
+def get_branch_site_sub_counts(sub_tensor, branch_id):
+    if _is_sparse_sub_tensor(sub_tensor):
+        out = numpy.zeros(shape=(sub_tensor.num_site,), dtype=numpy.float64)
+        for mat in sub_tensor.blocks.values():
+            row = mat.getrow(int(branch_id))
+            if row.nnz == 0:
+                continue
+            out[row.indices] += row.data
+        return out
+    return numpy.nan_to_num(sub_tensor[branch_id, :, :, :, :]).sum(axis=(1, 2, 3))
+
+
+def get_total_substitution(sub_tensor):
+    if _is_sparse_sub_tensor(sub_tensor):
+        return float(sum([mat.data.sum() for mat in sub_tensor.blocks.values()]))
+    return float(numpy.nan_to_num(sub_tensor).sum())
+
+
+def get_group_state_totals(sub_tensor):
+    if _is_sparse_sub_tensor(sub_tensor):
+        gad = numpy.zeros(
+            shape=(sub_tensor.num_group, sub_tensor.num_state_from, sub_tensor.num_state_to),
+            dtype=numpy.float64,
+        )
+        for (sg, a, d), mat in sub_tensor.blocks.items():
+            gad[sg, a, d] += float(mat.data.sum())
+    else:
+        gad = numpy.nan_to_num(sub_tensor).sum(axis=(0, 1))
+    ga = gad.sum(axis=2)
+    gd = gad.sum(axis=1)
+    return gad, ga, gd
+
+
+def _get_sparse_branch_tensor(sub_tensor, branch_id):
+    out = numpy.zeros(
+        shape=(sub_tensor.num_site, sub_tensor.num_group, sub_tensor.num_state_from, sub_tensor.num_state_to),
+        dtype=sub_tensor.dtype,
+    )
     for (sg, a, d), mat in sub_tensor.blocks.items():
-        blocks_by_sg[sg].append((a, d, mat.tocsr()))
-    return mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg
-
-def _sparse_row_product(mat, branch_ids):
-    row = mat.getrow(int(branch_ids[0]))
-    for bid in branch_ids[1:]:
-        row = row.multiply(mat.getrow(int(bid)))
+        row = mat.getrow(int(branch_id))
         if row.nnz == 0:
-            break
-    return row
+            continue
+        out[row.indices, sg, a, d] = row.data
+    return out
 
-def _get_sparse_site_vectors(branch_ids, sub_tensor, mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg, data_type):
+
+def _get_sparse_site_vectors(sub_tensor, branch_ids, data_type=numpy.float64):
     num_site = sub_tensor.num_site
     any2any = numpy.zeros(shape=(num_site,), dtype=data_type)
     spe2any = numpy.zeros(shape=(num_site,), dtype=data_type)
     any2spe = numpy.zeros(shape=(num_site,), dtype=data_type)
     spe2spe = numpy.zeros(shape=(num_site,), dtype=data_type)
     for sg in range(sub_tensor.num_group):
-        row = _sparse_row_product(mats_any2any[sg], branch_ids)
-        if row.nnz != 0:
-            any2any += row.toarray()[0, :]
-        for a in range(sub_tensor.num_state_from):
-            row = _sparse_row_product(mats_spe2any[sg][a], branch_ids)
-            if row.nnz != 0:
-                spe2any += row.toarray()[0, :]
-        for d in range(sub_tensor.num_state_to):
-            row = _sparse_row_product(mats_any2spe[sg][d], branch_ids)
-            if row.nnz != 0:
-                any2spe += row.toarray()[0, :]
-        for a, d, mat in blocks_by_sg[sg]:
-            row = _sparse_row_product(mat, branch_ids)
-            if row.nnz != 0:
-                spe2spe += row.toarray()[0, :]
+        sub_sg = _get_sparse_combination_group_tensor(
+            sub_tensor=sub_tensor,
+            branch_ids=branch_ids,
+            sg=int(sg),
+            data_type=data_type,
+        )
+        any2any += numpy.nan_to_num(sub_sg.sum(axis=(2, 3)).prod(axis=0))
+        spe2any += numpy.nan_to_num(sub_sg.sum(axis=3).prod(axis=0).sum(axis=1))
+        any2spe += numpy.nan_to_num(sub_sg.sum(axis=2).prod(axis=0).sum(axis=1))
+        spe2spe += numpy.nan_to_num(sub_sg.prod(axis=0).sum(axis=(1, 2)))
     return any2any, spe2any, any2spe, spe2spe
+
 
 def get_cs_sparse(id_combinations, sub_tensor, attr):
     num_site = sub_tensor.shape[1]
     df = numpy.zeros([num_site, 5], dtype=numpy.float64)
     df[:, 0] = numpy.arange(num_site)
-    mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg = _prepare_sparse_projection_mats(sub_tensor)
     for i in numpy.arange(id_combinations.shape[0]):
         any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
-            branch_ids=id_combinations[i, :],
             sub_tensor=sub_tensor,
-            mats_any2any=mats_any2any,
-            mats_spe2any=mats_spe2any,
-            mats_any2spe=mats_any2spe,
-            blocks_by_sg=blocks_by_sg,
+            branch_ids=id_combinations[i, :],
             data_type=numpy.float64,
         )
         df[:, 1] += any2any
@@ -181,11 +317,16 @@ def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None)
 
 def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, mmap_attr=''):
     backend = resolve_sub_tensor_backend(g)
-    if backend != 'dense':
-        raise NotImplementedError('Only dense substitution backend is available in this version.')
-    sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
+    if backend == 'sparse':
+        return _build_sparse_substitution_tensor(
+            state_tensor=state_tensor,
+            state_tensor_anc=state_tensor_anc,
+            mode=mode,
+            g=g,
+        )
+    sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
     if (g['ml_anc']=='no'):
         sub_tensor[:,:,:,:,:] = numpy.nan
     if mode=='asis':
@@ -221,7 +362,24 @@ def apply_min_sub_pp(g, sub_tensor):
     if (g['ml_anc']):
         print('--ml_anc is set. --min_sub_pp will not be applied.')
     else:
-        sub_tensor[(sub_tensor<g['min_sub_pp'])] = 0
+        if _is_sparse_sub_tensor(sub_tensor):
+            threshold = g['min_sub_pp']
+            new_blocks = dict()
+            for key, mat in sub_tensor.blocks.items():
+                new_mat = mat.copy()
+                is_small = (new_mat.data < threshold)
+                if is_small.any():
+                    new_mat.data[is_small] = 0
+                    new_mat.eliminate_zeros()
+                if new_mat.nnz > 0:
+                    new_blocks[key] = new_mat
+            sub_tensor = substitution_sparse.SparseSubstitutionTensor(
+                shape=sub_tensor.shape,
+                dtype=sub_tensor.dtype,
+                blocks=new_blocks,
+            )
+        else:
+            sub_tensor[(sub_tensor<g['min_sub_pp'])] = 0
     return sub_tensor
 
 def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
@@ -230,11 +388,17 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
     df['branch_name'] = df['branch_name'].astype(str)
     if sitewise:
         df[attr + '_sitewise'] = ''
+    branch_sub_counts = get_branch_sub_counts(sub_tensor) if _is_sparse_sub_tensor(sub_tensor) else None
     i=0
     for node in g['tree'].traverse():
         df.at[i,'branch_name'] = getattr(node, 'name')
         df.at[i,'branch_id'] = getattr(node, 'numerical_label')
-        df.at[i,attr+'_sub'] = sub_tensor[node.numerical_label,:,:,:,:].sum()
+        if _is_sparse_sub_tensor(sub_tensor):
+            df.at[i,attr+'_sub'] = branch_sub_counts[node.numerical_label]
+            branch_tensor = _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=node.numerical_label) if sitewise else None
+        else:
+            df.at[i,attr+'_sub'] = sub_tensor[node.numerical_label,:,:,:,:].sum()
+            branch_tensor = sub_tensor[node.numerical_label, :, :, :, :] if sitewise else None
         if sitewise:
             sub_list = list()
             if attr=='N':
@@ -242,10 +406,10 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
             elif attr=='S':
                 raise Exception('This function is not supported for synonymous substitutions.')
             for s in range(sub_tensor.shape[1]):
-                max_value = sub_tensor[node.numerical_label,s,:,:,:].max()
+                max_value = branch_tensor[s, :, :, :].max()
                 if max_value < min_sitewise_pp:
                     continue
-                max_idx = numpy.where(sub_tensor[node.numerical_label,s,:,:,:]==max_value)
+                max_idx = numpy.where(branch_tensor[s, :, :, :]==max_value)
                 ancestral_state = state_order[max_idx[1][0]]
                 derived_state = state_order[max_idx[2][0]]
                 sub_string = ancestral_state+str(s+1)+derived_state
@@ -263,7 +427,7 @@ def get_s(sub_tensor, attr):
     num_site = sub_tensor.shape[1]
     df = pandas.DataFrame(0, index=numpy.arange(0,num_site), columns=column_names)
     df['site'] = numpy.arange(0, num_site)
-    df[attr+'_sub'] = numpy.nan_to_num(sub_tensor).sum(axis=4).sum(axis=3).sum(axis=2).sum(axis=0)
+    df[attr+'_sub'] = get_site_sub_counts(sub_tensor)
     df['site'] = df['site'].astype(int)
     df = df.sort_values(by='site')
     df = table.set_substitution_dtype(df=df)
@@ -295,8 +459,8 @@ def get_bs(S_tensor, N_tensor):
         ind = numpy.arange(i*num_site, (i+1)*num_site)
         df.loc[ind, 'site'] = numpy.arange(0, num_site)
         df.loc[ind, 'branch_id'] = i
-        df.loc[ind, 'S_sub'] = numpy.nan_to_num(S_tensor[i, :, :, :, :]).sum(axis=(1,2,3))
-        df.loc[ind, 'N_sub'] = numpy.nan_to_num(N_tensor[i, :, :, :, :]).sum(axis=(1,2,3))
+        df.loc[ind, 'S_sub'] = get_branch_site_sub_counts(S_tensor, i)
+        df.loc[ind, 'N_sub'] = get_branch_site_sub_counts(N_tensor, i)
     df = table.set_substitution_dtype(df=df)
     return(df)
 
@@ -345,15 +509,10 @@ def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, 
     start = mmap_start
     end = mmap_start + id_combinations.shape[0]
     df[start:end, :arity] = id_combinations[:, :]  # branch_ids
-    mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg = _prepare_sparse_projection_mats(sub_tensor)
     for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
         any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
-            branch_ids=id_combinations[j, :],
             sub_tensor=sub_tensor,
-            mats_any2any=mats_any2any,
-            mats_spe2any=mats_spe2any,
-            mats_any2spe=mats_any2spe,
-            blocks_by_sg=blocks_by_sg,
+            branch_ids=id_combinations[j, :],
             data_type=df.dtype,
         )
         df[i, arity+0] += any2any.sum()
@@ -445,19 +604,14 @@ def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None,
         df = numpy.zeros(shape=shape, dtype=my_dtype)
     node = 0
     start_time = time.time()
-    mats_any2any, mats_spe2any, mats_any2spe, blocks_by_sg = _prepare_sparse_projection_mats(sub_tensor)
     for i in numpy.arange(id_combinations.shape[0]):
         row_start = (node*num_site)+(mmap_start*num_site)
         row_end = ((node+1)*num_site)+(mmap_start*num_site)
         df[row_start:row_end,:arity] = id_combinations[node,:] # branch_ids
         df[row_start:row_end,arity] = sites # site
         any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
-            branch_ids=id_combinations[i, :],
             sub_tensor=sub_tensor,
-            mats_any2any=mats_any2any,
-            mats_spe2any=mats_spe2any,
-            mats_any2spe=mats_any2spe,
-            blocks_by_sg=blocks_by_sg,
+            branch_ids=id_combinations[i, :],
             data_type=df.dtype,
         )
         df[row_start:row_end,arity+1] += any2any

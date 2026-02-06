@@ -162,15 +162,15 @@ def main_analyze(g):
         os.chdir('..')
     N_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     N_tensor = substitution.apply_min_sub_pp(g, N_tensor)
-    sub_branches = numpy.where(N_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist()
+    sub_branches = numpy.where(substitution.get_branch_sub_counts(N_tensor) != 0)[0].tolist()
     S_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     S_tensor = substitution.apply_min_sub_pp(g, S_tensor)
-    sub_branches = list(set(sub_branches).union(set(numpy.where(S_tensor.sum(axis=(1, 2, 3, 4)) != 0)[0].tolist())))
+    sub_branches = list(set(sub_branches).union(set(numpy.where(substitution.get_branch_sub_counts(S_tensor) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
     g = tree.rescale_branch_length(g, S_tensor, N_tensor)
     id_combinations = None
-    S_total = S_tensor.sum(axis=(0, 1, 2, 3, 4))
-    N_total = N_tensor.sum(axis=(0, 1, 2, 3, 4))
+    S_total = substitution.get_total_substitution(S_tensor)
+    N_total = substitution.get_total_substitution(N_tensor)
     num_branch = g['num_node'] - 1
     num_site = S_tensor.shape[1]
     print('Synonymous substitutions / tree = {:,.1f}'.format(S_total), flush=True)

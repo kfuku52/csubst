@@ -11,6 +11,7 @@ import time
 
 from csubst import sequence
 from csubst import parallel
+from csubst import substitution
 
 def add_numerical_node_labels(tree):
     all_leaf_names = tree.get_leaf_names()
@@ -305,6 +306,8 @@ def rescale_branch_length(g, S_tensor, N_tensor, denominator='L'):
     print('Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, '
           'rather than nucleotide-substitutions/codon-site.')
     print('Total branch length before rescaling: {:,.3f} nucleotide substitutions / codon site'.format(sum([ n.dist for n in g['tree'].traverse() ])))
+    S_branch_sub = substitution.get_branch_sub_counts(S_tensor)
+    N_branch_sub = substitution.get_branch_sub_counts(N_tensor)
     for node in g['tree'].traverse():
         if node.is_root():
             node.Sdist = 0
@@ -319,8 +322,8 @@ def rescale_branch_length(g, S_tensor, N_tensor, denominator='L'):
             node.Ndist = 0
             node.SNdist = 0
             continue
-        num_S_sub = S_tensor[nl,:,:,:,:].sum()
-        num_N_sub = N_tensor[nl,:,:,:,:].sum()
+        num_S_sub = S_branch_sub[nl]
+        num_N_sub = N_branch_sub[nl]
         # is_S_zero = (num_S_sub==0)
         # is_N_zero = (num_N_sub==0)
         if (denominator=='L'):

@@ -189,12 +189,14 @@ def subroot_E2nan(cb, tree):
 
 def get_E(cb, g, N_tensor, S_tensor):
     if (g['omegaC_method']=='modelfree'):
-        g['N_ind_nomissing_gad'] = numpy.where(N_tensor.sum(axis=(0,1))!=0)
-        g['N_ind_nomissing_ga'] = numpy.where(N_tensor.sum(axis=(0,1,4))!=0)
-        g['N_ind_nomissing_gd'] = numpy.where(N_tensor.sum(axis=(0,1,3))!=0)
-        g['S_ind_nomissing_gad'] = numpy.where(S_tensor.sum(axis=(0,1))!=0)
-        g['S_ind_nomissing_ga'] = numpy.where(S_tensor.sum(axis=(0,1,4))!=0)
-        g['S_ind_nomissing_gd'] = numpy.where(S_tensor.sum(axis=(0,1,3))!=0)
+        N_gad, N_ga, N_gd = substitution.get_group_state_totals(N_tensor)
+        S_gad, S_ga, S_gd = substitution.get_group_state_totals(S_tensor)
+        g['N_ind_nomissing_gad'] = numpy.where(N_gad!=0)
+        g['N_ind_nomissing_ga'] = numpy.where(N_ga!=0)
+        g['N_ind_nomissing_gd'] = numpy.where(N_gd!=0)
+        g['S_ind_nomissing_gad'] = numpy.where(S_gad!=0)
+        g['S_ind_nomissing_ga'] = numpy.where(S_ga!=0)
+        g['S_ind_nomissing_gd'] = numpy.where(S_gd!=0)
         for st in ['any2any','any2spe','spe2any','spe2spe']:
             cb['ECN'+st] = calc_E_stat(cb, N_tensor, mode=st, stat='mean', SN='N', g=g)
             cb['ECS'+st] = calc_E_stat(cb, S_tensor, mode=st, stat='mean', SN='S', g=g)
@@ -204,7 +206,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         if (g['current_arity']==2):
             g['ECN_tensor'] = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(g['ECN_tensor'].sum()))
+        print(txt.format(substitution.get_total_substitution(g['ECN_tensor'])))
         print('Preparing the ECN table with {:,} process(es).'.format(g['threads']), flush=True)
         cbEN = substitution.get_cb(cb.loc[:,id_cols].values, g['ECN_tensor'], g, 'ECN')
         cb = table.merge_tables(cb, cbEN)
@@ -213,7 +215,7 @@ def get_E(cb, g, N_tensor, S_tensor):
         if (g['current_arity'] == 2):
             g['ECS_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(g['ECS_tensor'].sum()))
+        print(txt.format(substitution.get_total_substitution(g['ECS_tensor'])))
         print('Preparing the ECS table with {:,} process(es).'.format(g['threads']), flush=True)
         cbES = substitution.get_cb(cb.loc[:,id_cols].values, g['ECS_tensor'], g, 'ECS')
         cb = table.merge_tables(cb, cbES)

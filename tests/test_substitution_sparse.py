@@ -1,7 +1,10 @@
 import numpy
+import ete3
+from pathlib import Path
 
 from csubst import substitution
 from csubst import substitution_sparse
+from csubst import tree
 
 
 def _toy_dense_tensor():
@@ -149,3 +152,57 @@ def test_get_reducer_sub_tensor_converts_and_caches_sparse():
     sparse2 = substitution.get_reducer_sub_tensor(dense, g=g, label="test")
     assert isinstance(sparse1, substitution_sparse.SparseSubstitutionTensor)
     assert sparse1 is sparse2
+
+
+def test_get_substitution_tensor_sparse_asis_matches_dense():
+    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: n.numerical_label for n in tr.traverse()}
+    state = numpy.zeros((3, 2, 2), dtype=float)
+    state[labels["R"], :, :] = [[1.0, 0.0], [0.5, 0.5]]
+    state[labels["A"], :, :] = [[0.0, 1.0], [1.0, 0.0]]
+    state[labels["B"], :, :] = [[1.0, 0.0], [0.0, 1.0]]
+    base_g = {"tree": tr, "ml_anc": "yes", "float_tol": 1e-12}
+    dense_mmap = Path("tmp.csubst.sub_tensor.toy_dense_asis.mmap")
+    sparse_mmap = Path("tmp.csubst.sub_tensor.toy_sparse_asis.mmap")
+    try:
+        dense = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="asis",
+            g=dict(base_g, sub_tensor_backend="dense"),
+            mmap_attr="toy_dense_asis",
+        )
+        sparse = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="asis",
+            g=dict(base_g, sub_tensor_backend="sparse"),
+            mmap_attr="toy_sparse_asis",
+        )
+        assert isinstance(sparse, substitution_sparse.SparseSubstitutionTensor)
+        numpy.testing.assert_allclose(sparse.to_dense(), dense, atol=1e-12)
+    finally:
+        if dense_mmap.exists():
+            dense_mmap.unlink()
+        if sparse_mmap.exists():
+            sparse_mmap.unlink()
+
+
+def test_apply_min_sub_pp_sparse_matches_dense():
+    dense = _toy_reducer_tensor()
+    sparse = substitution.dense_to_sparse_sub_tensor(dense.copy(), tol=0)
+    g = {"min_sub_pp": 0.25, "ml_anc": False}
+    dense_out = substitution.apply_min_sub_pp(g, dense.copy())
+    sparse_out = substitution.apply_min_sub_pp(g, sparse)
+    numpy.testing.assert_allclose(sparse_out.to_dense(), dense_out, atol=1e-12)
+
+
+def test_get_group_state_totals_matches_dense_and_sparse():
+    dense = _toy_dense_tensor()
+    sparse = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    gad_d, ga_d, gd_d = substitution.get_group_state_totals(dense)
+    gad_s, ga_s, gd_s = substitution.get_group_state_totals(sparse)
+    numpy.testing.assert_allclose(gad_d, dense.sum(axis=(0, 1)), atol=1e-12)
+    numpy.testing.assert_allclose(ga_d, dense.sum(axis=(0, 1, 4)), atol=1e-12)
+    numpy.testing.assert_allclose(gd_d, dense.sum(axis=(0, 1, 3)), atol=1e-12)
+    numpy.testing.assert_allclose(gad_s, gad_d, atol=1e-12)
+    numpy.testing.assert_allclose(ga_s, ga_d, atol=1e-12)
+    numpy.testing.assert_allclose(gd_s, gd_d, atol=1e-12)

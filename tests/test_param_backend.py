@@ -43,7 +43,7 @@ def test_resolve_sub_tensor_backend_auto_to_dense():
     assert g["resolved_sub_tensor_backend"] == "dense"
 
 
-def test_resolve_sub_tensor_backend_sparse_falls_back_to_dense():
+def test_resolve_sub_tensor_backend_sparse_is_sparse():
     g = {"sub_tensor_backend": "sparse"}
-    assert substitution.resolve_sub_tensor_backend(g) == "dense"
-    assert g["resolved_sub_tensor_backend"] == "dense"
+    assert substitution.resolve_sub_tensor_backend(g) == "sparse"
+    assert g["resolved_sub_tensor_backend"] == "sparse"
