@@ -91,7 +91,35 @@ def get_reducer_sub_tensor(sub_tensor, g, label=''):
         g['reducer_sub_tensor_cache'][label] = sparse_sub_tensor
     return sparse_sub_tensor
 
-def _get_sparse_combination_group_tensor(sub_tensor, branch_ids, sg, data_type=None):
+def _get_sparse_group_block_index(sub_tensor):
+    cache = getattr(sub_tensor, '_group_block_index', None)
+    if cache is not None:
+        return cache
+    index = [list() for _ in range(sub_tensor.num_group)]
+    for (group_id, a, d), mat in sub_tensor.blocks.items():
+        index[int(group_id)].append((int(a), int(d), mat))
+    cache = tuple(index)
+    setattr(sub_tensor, '_group_block_index', cache)
+    return cache
+
+
+def _get_sparse_row_indices_and_data(mat, branch_id, row_cache=None):
+    branch_id = int(branch_id)
+    if row_cache is not None:
+        key = (id(mat), branch_id)
+        cached = row_cache.get(key)
+        if cached is not None:
+            return cached
+    start = mat.indptr[branch_id]
+    end = mat.indptr[branch_id + 1]
+    indices = mat.indices[start:end]
+    data = mat.data[start:end]
+    if row_cache is not None:
+        row_cache[key] = (indices, data)
+    return indices, data
+
+
+def _get_sparse_combination_group_tensor(sub_tensor, branch_ids, sg, data_type=None, group_block_index=None, row_cache=None):
     if data_type is None:
         data_type = sub_tensor.dtype
     arity = len(branch_ids)
@@ -99,14 +127,20 @@ def _get_sparse_combination_group_tensor(sub_tensor, branch_ids, sg, data_type=N
         shape=(arity, sub_tensor.num_site, sub_tensor.num_state_from, sub_tensor.num_state_to),
         dtype=data_type,
     )
-    for (group_id, a, d), mat in sub_tensor.blocks.items():
-        if group_id != sg:
-            continue
+    if group_block_index is None:
+        group_blocks = _get_sparse_group_block_index(sub_tensor)[int(sg)]
+    else:
+        group_blocks = group_block_index[int(sg)]
+    for a, d, mat in group_blocks:
         for bi, bid in enumerate(branch_ids):
-            row = mat.getrow(int(bid))
-            if row.nnz == 0:
+            indices, data = _get_sparse_row_indices_and_data(
+                mat=mat,
+                branch_id=bid,
+                row_cache=row_cache,
+            )
+            if data.shape[0] == 0:
                 continue
-            out[bi, row.indices, a, d] = row.data
+            out[bi, indices, a, d] = data
     return out
 
 
@@ -257,7 +291,7 @@ def _get_sparse_branch_tensor(sub_tensor, branch_id):
     return out
 
 
-def _get_sparse_site_vectors(sub_tensor, branch_ids, data_type=numpy.float64):
+def _get_sparse_site_vectors(sub_tensor, branch_ids, data_type=numpy.float64, group_block_index=None, row_cache=None):
     num_site = sub_tensor.num_site
     any2any = numpy.zeros(shape=(num_site,), dtype=data_type)
     spe2any = numpy.zeros(shape=(num_site,), dtype=data_type)
@@ -269,11 +303,13 @@ def _get_sparse_site_vectors(sub_tensor, branch_ids, data_type=numpy.float64):
             branch_ids=branch_ids,
             sg=int(sg),
             data_type=data_type,
+            group_block_index=group_block_index,
+            row_cache=row_cache,
         )
-        any2any += numpy.nan_to_num(sub_sg.sum(axis=(2, 3)).prod(axis=0))
-        spe2any += numpy.nan_to_num(sub_sg.sum(axis=3).prod(axis=0).sum(axis=1))
-        any2spe += numpy.nan_to_num(sub_sg.sum(axis=2).prod(axis=0).sum(axis=1))
-        spe2spe += numpy.nan_to_num(sub_sg.prod(axis=0).sum(axis=(1, 2)))
+        any2any += sub_sg.sum(axis=(2, 3)).prod(axis=0)
+        spe2any += sub_sg.sum(axis=3).prod(axis=0).sum(axis=1)
+        any2spe += sub_sg.sum(axis=2).prod(axis=0).sum(axis=1)
+        spe2spe += sub_sg.prod(axis=0).sum(axis=(1, 2))
     return any2any, spe2any, any2spe, spe2spe
 
 
@@ -281,11 +317,15 @@ def get_cs_sparse(id_combinations, sub_tensor, attr):
     num_site = sub_tensor.shape[1]
     df = numpy.zeros([num_site, 5], dtype=numpy.float64)
     df[:, 0] = numpy.arange(num_site)
+    group_block_index = _get_sparse_group_block_index(sub_tensor)
+    row_cache = dict()
     for i in numpy.arange(id_combinations.shape[0]):
         any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
             sub_tensor=sub_tensor,
             branch_ids=id_combinations[i, :],
             data_type=numpy.float64,
+            group_block_index=group_block_index,
+            row_cache=row_cache,
         )
         df[:, 1] += any2any
         df[:, 2] += spe2any
@@ -509,11 +549,15 @@ def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, 
     start = mmap_start
     end = mmap_start + id_combinations.shape[0]
     df[start:end, :arity] = id_combinations[:, :]  # branch_ids
+    group_block_index = _get_sparse_group_block_index(sub_tensor)
+    row_cache = dict()
     for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
         any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
             sub_tensor=sub_tensor,
             branch_ids=id_combinations[j, :],
             data_type=df.dtype,
+            group_block_index=group_block_index,
+            row_cache=row_cache,
         )
         df[i, arity+0] += any2any.sum()
         df[i, arity+1] += spe2any.sum()
@@ -604,6 +648,8 @@ def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None,
         df = numpy.zeros(shape=shape, dtype=my_dtype)
     node = 0
     start_time = time.time()
+    group_block_index = _get_sparse_group_block_index(sub_tensor)
+    row_cache = dict()
     for i in numpy.arange(id_combinations.shape[0]):
         row_start = (node*num_site)+(mmap_start*num_site)
         row_end = ((node+1)*num_site)+(mmap_start*num_site)
@@ -613,6 +659,8 @@ def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None,
             sub_tensor=sub_tensor,
             branch_ids=id_combinations[i, :],
             data_type=df.dtype,
+            group_block_index=group_block_index,
+            row_cache=row_cache,
         )
         df[row_start:row_end,arity+1] += any2any
         df[row_start:row_end,arity+2] += spe2any

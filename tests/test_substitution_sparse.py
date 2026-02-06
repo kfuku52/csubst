@@ -119,6 +119,51 @@ def test_get_cb_sparse_matches_dense():
     numpy.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
 
 
+def test_sparse_group_tensor_cache_matches_uncached():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([2, 0], dtype=numpy.int64)
+    uncached = substitution._get_sparse_combination_group_tensor(
+        sub_tensor=sparse_tensor,
+        branch_ids=ids,
+        sg=0,
+        data_type=numpy.float64,
+    )
+    group_block_index = substitution._get_sparse_group_block_index(sparse_tensor)
+    row_cache = dict()
+    cached = substitution._get_sparse_combination_group_tensor(
+        sub_tensor=sparse_tensor,
+        branch_ids=ids,
+        sg=0,
+        data_type=numpy.float64,
+        group_block_index=group_block_index,
+        row_cache=row_cache,
+    )
+    numpy.testing.assert_allclose(cached, uncached, atol=1e-12)
+    assert len(row_cache) > 0
+    assert substitution._get_sparse_group_block_index(sparse_tensor) is group_block_index
+
+
+def test_sparse_site_vectors_cache_matches_uncached():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([2, 0], dtype=numpy.int64)
+    uncached = substitution._get_sparse_site_vectors(
+        sub_tensor=sparse_tensor,
+        branch_ids=ids,
+        data_type=numpy.float64,
+    )
+    cached = substitution._get_sparse_site_vectors(
+        sub_tensor=sparse_tensor,
+        branch_ids=ids,
+        data_type=numpy.float64,
+        group_block_index=substitution._get_sparse_group_block_index(sparse_tensor),
+        row_cache=dict(),
+    )
+    for observed, expected in zip(cached, uncached):
+        numpy.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
 def test_get_cbs_sparse_matches_dense():
     dense = _toy_reducer_tensor()
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
