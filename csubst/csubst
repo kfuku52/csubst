@@ -73,6 +73,10 @@ if __name__ == "__main__":
                        help='default=%(default)s: The number of CPUs for parallel computations.')
     psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
                         help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
+    psr_co.add_argument('--sub_tensor_backend', metavar='auto|dense|sparse', default='auto', type=str,
+                        choices=['auto', 'dense', 'sparse'],
+                        help='default=%(default)s: Backend for substitution tensors. '
+                             '"auto" currently resolves to dense mode.')
     psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')
 

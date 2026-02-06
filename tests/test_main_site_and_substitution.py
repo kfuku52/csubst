@@ -222,3 +222,115 @@ def test_add_dif_column_and_add_dif_stats():
     out2 = substitution.add_dif_stats(cb.copy(), tol=1e-6, prefix="OC")
     assert "OCSany2dif" in out2.columns
     assert "OCNdif2spe" in out2.columns
+
+
+def test_get_substitution_tensor_syn_matches_manual_groupwise_products():
+    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: n.numerical_label for n in tr.traverse()}
+    # codon state order: [AAA, AAG, TTT, TTC]
+    # synonymous groups: K=[AAA,AAG], F=[TTT,TTC]
+    state = numpy.zeros((3, 1, 4), dtype=float)
+    state[labels["R"], 0, :] = [0.6, 0.4, 0.0, 0.0]
+    state[labels["A"], 0, :] = [0.1, 0.9, 0.0, 0.0]
+    state[labels["B"], 0, :] = [0.8, 0.2, 0.0, 0.0]
+    g = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "amino_acid_orders": ["K", "F"],
+        "synonymous_indices": {"K": [0, 1], "F": [2, 3]},
+        "max_synonymous_size": 2,
+    }
+    mmap_file = Path("tmp.csubst.sub_tensor.toy_syn.mmap")
+    try:
+        out = substitution.get_substitution_tensor(state_tensor=state, mode="syn", g=g, mmap_attr="toy_syn")
+        # Branch A, group K: diag masked outer product of parent [0.6,0.4] and child [0.1,0.9].
+        numpy.testing.assert_allclose(out[labels["A"], 0, 0, :, :], [[0.0, 0.54], [0.04, 0.0]], atol=1e-12)
+        # Group F has no support in this toy example.
+        numpy.testing.assert_allclose(out[labels["A"], 0, 1, :, :], [[0.0, 0.0], [0.0, 0.0]], atol=1e-12)
+        # Branch B, group K:
+        numpy.testing.assert_allclose(out[labels["B"], 0, 0, :, :], [[0.0, 0.12], [0.32, 0.0]], atol=1e-12)
+    finally:
+        if mmap_file.exists():
+            mmap_file.unlink()
+
+
+def _toy_sub_tensor():
+    # shape = [branch, site, group, from, to]
+    sub = numpy.zeros((3, 2, 1, 2, 2), dtype=float)
+    sub[0, 0, 0, :, :] = [[0.0, 0.2], [0.1, 0.0]]
+    sub[1, 0, 0, :, :] = [[0.0, 0.5], [0.2, 0.0]]
+    sub[2, 0, 0, :, :] = [[0.0, 0.4], [0.3, 0.0]]
+    sub[0, 1, 0, :, :] = [[0.0, 0.1], [0.0, 0.0]]
+    sub[1, 1, 0, :, :] = [[0.0, 0.1], [0.3, 0.0]]
+    sub[2, 1, 0, :, :] = [[0.0, 0.2], [0.1, 0.0]]
+    return sub
+
+
+def test_sub_tensor2cb_mmap_chunk_writer_matches_non_mmap(tmp_path):
+    sub = _toy_sub_tensor()
+    ids = numpy.array([[2, 0], [1, 2]], dtype=numpy.int64)
+    expected = substitution.sub_tensor2cb(ids, sub, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64)
+
+    arity = ids.shape[1]
+    mmap_path = tmp_path / "cb_writer.mmap"
+    mmap_out = numpy.memmap(mmap_path, dtype=numpy.float64, mode="w+", shape=(ids.shape[0] + 1, arity + 4))
+    mmap_out[:] = 0.0
+    substitution.sub_tensor2cb(ids, sub, mmap=True, df_mmap=mmap_out, mmap_start=1, float_type=numpy.float64)
+    observed = numpy.array(mmap_out[1 : 1 + ids.shape[0], :], copy=True)
+    del mmap_out
+
+    numpy.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sub_tensor2cbs_mmap_chunk_writer_matches_non_mmap(tmp_path):
+    sub = _toy_sub_tensor()
+    ids = numpy.array([[2, 0], [1, 2]], dtype=numpy.int64)
+    expected = substitution.sub_tensor2cbs(ids, sub, mmap=False, df_mmap=None, mmap_start=0)
+
+    arity = ids.shape[1]
+    num_site = sub.shape[1]
+    mmap_path = tmp_path / "cbs_writer.mmap"
+    mmap_rows = (ids.shape[0] + 1) * num_site
+    mmap_out = numpy.memmap(mmap_path, dtype=numpy.float64, mode="w+", shape=(mmap_rows, arity + 5))
+    mmap_out[:] = 0.0
+    substitution.sub_tensor2cbs(ids, sub, mmap=True, df_mmap=mmap_out, mmap_start=1)
+    row_start = num_site
+    row_end = row_start + expected.shape[0]
+    observed = numpy.array(mmap_out[row_start:row_end, :], copy=True)
+    del mmap_out
+
+    numpy.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_get_cb_matches_sum_of_get_cs_per_combination():
+    sub = _toy_sub_tensor()
+    ids = numpy.array([[2, 0], [1, 2]], dtype=numpy.int64)
+    cb = substitution.get_cb(ids, sub, {"threads": 1, "float_type": numpy.float64}, attr="OCN")
+
+    for combo in ids:
+        c1, c2 = sorted(combo.tolist())
+        row = cb.loc[(cb["branch_id_1"] == c1) & (cb["branch_id_2"] == c2), :].iloc[0]
+        cs = substitution.get_cs(numpy.array([[c1, c2]], dtype=numpy.int64), sub, attr="N")
+        assert pytest.approx(float(row["OCNany2any"]), abs=1e-12) == float(cs["OCNany2any"].sum())
+        assert pytest.approx(float(row["OCNspe2any"]), abs=1e-12) == float(cs["OCNspe2any"].sum())
+        assert pytest.approx(float(row["OCNany2spe"]), abs=1e-12) == float(cs["OCNany2spe"].sum())
+        assert pytest.approx(float(row["OCNspe2spe"]), abs=1e-12) == float(cs["OCNspe2spe"].sum())
+
+
+def test_get_cbs_grouped_sum_matches_get_cb():
+    sub = _toy_sub_tensor()
+    ids = numpy.array([[2, 0], [1, 2]], dtype=numpy.int64)
+
+    cb = substitution.get_cb(ids, sub, {"threads": 1, "float_type": numpy.float64}, attr="OCN")
+    cbs = substitution.get_cbs(ids, sub, attr="N", g={"threads": 1})
+    cols = ["OCNany2any", "OCNspe2any", "OCNany2spe", "OCNspe2spe"]
+    summed = cbs.groupby(["branch_id_1", "branch_id_2"], as_index=False)[cols].sum()
+    merged = cb.merge(summed, on=["branch_id_1", "branch_id_2"], suffixes=("_cb", "_cbs"))
+
+    for col in cols:
+        numpy.testing.assert_allclose(
+            merged[f"{col}_cb"].to_numpy(),
+            merged[f"{col}_cbs"].to_numpy(),
+            atol=1e-12,
+        )

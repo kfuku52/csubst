@@ -49,6 +49,12 @@ def get_global_parameters(args):
         elif (g['float_type']==64):
             g['float_type'] = numpy.float64
             g['float_tol'] = 10**-9
+    if 'sub_tensor_backend' in g.keys():
+        g['sub_tensor_backend'] = str(g['sub_tensor_backend']).lower()
+    else:
+        g['sub_tensor_backend'] = 'auto'
+    if g['sub_tensor_backend'] not in ['auto', 'dense', 'sparse']:
+        raise ValueError('--sub_tensor_backend should be one of auto, dense, sparse.')
     if 'pdb' in g.keys():
         if g['pdb']=='besthit':
             g['run_pdb_sequence_search'] = True

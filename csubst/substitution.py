@@ -9,6 +9,24 @@ from csubst import table
 from csubst import parallel
 from csubst import substitution_cy
 
+def resolve_sub_tensor_backend(g):
+    if 'resolved_sub_tensor_backend' in g.keys():
+        return g['resolved_sub_tensor_backend']
+    requested = str(g.get('sub_tensor_backend', 'auto')).lower()
+    if requested not in ['auto', 'dense', 'sparse']:
+        raise ValueError('Invalid sub_tensor_backend: {}'.format(requested))
+    if requested in ['auto', 'dense']:
+        resolved = 'dense'
+    elif requested == 'sparse':
+        txt = 'Requested --sub_tensor_backend sparse, but sparse backend is not implemented yet. Falling back to dense.'
+        print(txt, flush=True)
+        resolved = 'dense'
+    g['sub_tensor_backend'] = requested
+    g['resolved_sub_tensor_backend'] = resolved
+    txt = 'Substitution tensor backend: requested={}, resolved={}'
+    print(txt.format(requested, resolved), flush=True)
+    return resolved
+
 def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None):
     if dtype is None:
         dtype = state_tensor.dtype
@@ -29,6 +47,9 @@ def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None)
     return sub_tensor
 
 def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, mmap_attr=''):
+    backend = resolve_sub_tensor_backend(g)
+    if backend != 'dense':
+        raise NotImplementedError('Only dense substitution backend is available in this version.')
     sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
