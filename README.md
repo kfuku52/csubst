@@ -32,6 +32,8 @@ The main features of **CSUBST** include:
 ## Installation
 **CSUBST** runs on python 3. Installation via [bioconda](https://anaconda.org/bioconda/csubst) is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
 
+IQ-TREE compatibility: CSUBST supports IQ-TREE 2.x and 3.x outputs. For some IQ-TREE 3 codon runs where `.iqtree` does not print codon `pi(...)` entries, CSUBST estimates empirical codon frequencies directly from the input alignment.
+
 #### Option 1: Installation with `conda`
 ```
 conda install bioconda::csubst

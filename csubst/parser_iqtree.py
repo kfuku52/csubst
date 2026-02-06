@@ -12,13 +12,118 @@ from csubst import genetic_code
 from csubst import sequence
 from csubst import tree
 
+def _parse_iqtree_version_text(txt):
+    # IQ-TREE 2 and 3 both expose a semantic version string in startup banners.
+    patterns = [
+        r'IQ-TREE(?: multicore)? version\s+([0-9]+(?:\.[0-9]+)*)',
+        r'IQ-TREE\s+([0-9]+(?:\.[0-9]+)*)',
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, txt)
+        if m is not None:
+            version = m.group(1)
+            major = int(version.split('.')[0])
+            return version, major
+    return None, None
+
+def _read_text(path):
+    with open(path) as f:
+        return f.read()
+
+def detect_iqtree_output_version(g):
+    g['iqtree_output_version'] = None
+    g['iqtree_output_version_major'] = None
+    for key in ['path_iqtree_iqtree', 'path_iqtree_log']:
+        path = g.get(key, None)
+        if (path is None) or (not os.path.exists(path)):
+            continue
+        txt = _read_text(path)
+        version, major = _parse_iqtree_version_text(txt)
+        if version is not None:
+            g['iqtree_output_version'] = version
+            g['iqtree_output_version_major'] = major
+            break
+    return g
+
+def _parse_substitution_model(iqtree_txt):
+    model = None
+    for line in iqtree_txt.splitlines():
+        m = re.match(r'\s*Model of substitution:\s*(.+?)\s*$', line)
+        if m is not None:
+            model = m.group(1)
+            break
+    return model
+
+def _parse_equilibrium_frequency(iqtree_txt, codon_orders, parser_name, float_type):
+    # IQ-TREE 2 and 3 share similar labels but differ slightly in spacing/number formatting.
+    pattern_iqtree2 = r'pi\(([A-Z]+)\)\s*=\s*([0-9.]+)(?![eE][+-]?[0-9]+)'
+    pattern_iqtree3 = r'pi\(\s*([A-Z]+)\s*\)\s*=\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)'
+    if parser_name == 'iqtree3':
+        patterns = [pattern_iqtree3, pattern_iqtree2]
+    else:
+        patterns = [pattern_iqtree2, pattern_iqtree3]
+    eq_map = dict()
+    for pattern in patterns:
+        for codon,freq in re.findall(pattern, iqtree_txt):
+            codon = codon.upper().replace('U', 'T')
+            try:
+                eq_map[codon] = float(freq)
+            except ValueError:
+                continue
+    values = list()
+    missing_codons = list()
+    for codon in codon_orders:
+        freq = eq_map.get(codon, numpy.nan)
+        if not numpy.isfinite(freq):
+            missing_codons.append(codon)
+        values.append(freq)
+    if len(missing_codons)>0:
+        txt = 'Failed to parse equilibrium frequencies from {} output. '
+        txt += 'Missing codon(s): {}'
+        missing_txt = ','.join(missing_codons[0:10])
+        if len(missing_codons)>10:
+            missing_txt += ',...'
+        raise AssertionError(txt.format(parser_name, missing_txt))
+    equilibrium_frequency = numpy.array(values, dtype=float_type)
+    total = equilibrium_frequency.sum()
+    assert total>0, 'Failed to parse equilibrium frequencies: sum should be positive.'
+    equilibrium_frequency /= total
+    return equilibrium_frequency
+
+def _parse_float_from_log_line(line, label):
+    pattern = r'\s*{}\s*:\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)'.format(re.escape(label))
+    m = re.match(pattern, line)
+    if m is not None:
+        return float(m.group(1))
+    return None
+
+def _estimate_empirical_codon_frequency_from_alignment(alignment_file, codon_orders, float_type):
+    seq_dict = sequence.read_fasta(alignment_file)
+    codon_orders = numpy.array(codon_orders)
+    counts = numpy.zeros(shape=(codon_orders.shape[0],), dtype=float_type)
+    for seq in seq_dict.values():
+        seq = seq.upper().replace('U', 'T')
+        assert len(seq)%3==0, 'Sequence length is not multiple of 3 in alignment file.'
+        for s in numpy.arange(0, len(seq), 3):
+            codon = seq[s:s+3]
+            codon_idx = sequence.get_state_index(codon, codon_orders, genetic_code.ambiguous_table)
+            if len(codon_idx)==0:
+                continue
+            counts[codon_idx] += 1 / len(codon_idx)
+    total = counts.sum()
+    assert total>0, 'Failed to estimate codon frequencies from alignment file.'
+    counts /= total
+    return counts
+
 def check_iqtree_dependency(g):
     test_iqtree = subprocess.run([g['iqtree_exe'], '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     assert (test_iqtree.returncode==0), "iqtree PATH cannot be found: "+g['iqtree_exe']
-    version_iqtree = test_iqtree.stdout.decode('utf8')
-    version_iqtree = version_iqtree.replace('\n','')
-    version_iqtree = re.sub('.*version ', '', version_iqtree)
-    version_iqtree = re.sub(' for.*', '', version_iqtree)
+    txt = test_iqtree.stdout.decode('utf8') + '\n' + test_iqtree.stderr.decode('utf8')
+    version_iqtree,major_iqtree = _parse_iqtree_version_text(txt)
+    if version_iqtree is None:
+        version_iqtree = txt.split('\n')[0].strip()
+    g['iqtree_version'] = version_iqtree
+    g['iqtree_version_major'] = major_iqtree
     is_satisfied_version = LooseVersion(version_iqtree) >= LooseVersion('2.0.0')
     assert is_satisfied_version, 'IQ-TREE version ({}) should be 2.0.0 or greater.'.format(version_iqtree)
     print("IQ-TREE's version: {}, PATH: {}".format(version_iqtree, g['iqtree_exe']), flush=True)
@@ -102,36 +207,57 @@ def read_rate(g):
     return rate_sites
 
 def read_iqtree(g, eq=True):
-    with open(g['path_iqtree_iqtree']) as f:
-        lines = f.readlines()
-    for line in lines:
-        model = re.match(r'Model of substitution: (.+)', line)
-        if model is not None:
-            g['substitution_model'] = model.group(1)
+    iqtree_txt = _read_text(g['path_iqtree_iqtree'])
+    g = detect_iqtree_output_version(g)
+    if g['iqtree_output_version_major'] is None:
+        # Fall back to executable version if .iqtree file lacks a version banner.
+        g['iqtree_output_version'] = g.get('iqtree_version', None)
+        g['iqtree_output_version_major'] = g.get('iqtree_version_major', None)
+    if (g['iqtree_output_version_major'] is not None) and (g['iqtree_output_version_major']>=3):
+        parser_name = 'iqtree3'
+    else:
+        parser_name = 'iqtree2'
+    g['iqtree_parser'] = parser_name
+    g['substitution_model'] = _parse_substitution_model(iqtree_txt)
+    assert g['substitution_model'] is not None, 'Failed to parse substitution model from IQ-TREE output.'
     if eq:
-        with open(g['path_iqtree_iqtree']) as f:
-            txt = f.read()
-        pi = pandas.DataFrame(index=g['codon_orders'], columns=['freq',])
-        for m in re.finditer(r'  pi\(([A-Z]+)\) = ([0-9.]+)', txt, re.MULTILINE):
-            pi.at[m.group(1),'freq'] = float(m.group(2))
-        g['equilibrium_frequency'] = pi.loc[:,'freq'].values.astype(g['float_type'])
-        g['equilibrium_frequency'] /= g['equilibrium_frequency'].sum()
+        try:
+            g['equilibrium_frequency'] = _parse_equilibrium_frequency(
+                iqtree_txt=iqtree_txt,
+                codon_orders=g['codon_orders'],
+                parser_name=parser_name,
+                float_type=g['float_type'],
+            )
+        except AssertionError as e:
+            # IQ-TREE 3 may omit codon pi(...) entries from .iqtree outputs for codon models.
+            if parser_name == 'iqtree3':
+                txt = 'Could not parse codon frequencies from IQ-TREE 3 output. '
+                txt += 'Estimating empirical codon frequencies from alignment: {}'
+                print(txt.format(g['alignment_file']), flush=True)
+                g['equilibrium_frequency'] = _estimate_empirical_codon_frequency_from_alignment(
+                    alignment_file=g['alignment_file'],
+                    codon_orders=g['codon_orders'],
+                    float_type=g['float_type'],
+                )
+            else:
+                raise e
     return g
 
 def read_log(g):
+    g = detect_iqtree_output_version(g)
     g['omega'] = None
     g['kappa'] = None
     g['reconstruction_codon_table'] = None
     with open(g['path_iqtree_log']) as f:
         lines = f.readlines()
     for line in lines:
-        omega = re.match(r'Nonsynonymous/synonymous ratio \(omega\): ([0-9.]+)', line)
+        omega = _parse_float_from_log_line(line, 'Nonsynonymous/synonymous ratio (omega)')
         if omega is not None:
-            g['omega'] = float(omega.group(1))
-        kappa = re.match(r'Transition/transversion ratio \(kappa\): ([0-9.]+)', line)
+            g['omega'] = omega
+        kappa = _parse_float_from_log_line(line, 'Transition/transversion ratio (kappa)')
         if kappa is not None:
-            g['kappa'] = float(kappa.group(1))
-        rgc = re.match(r'Converting to codon sequences with genetic code ([0-9]+) \.\.\.', line)
+            g['kappa'] = kappa
+        rgc = re.match(r'\s*Converting to codon sequences with genetic code\s+([0-9]+)\s*\.\.\.', line)
         if rgc is not None:
             g['reconstruction_codon_table'] = int(rgc.group(1))
     return g
