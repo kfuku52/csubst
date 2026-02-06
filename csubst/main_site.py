@@ -106,6 +106,7 @@ def get_yvalues(df, sub_type, SN):
     return yvalues
 
 def get_highest_identity_chain_name(g):
+    from csubst import parser_pymol
     if 'aa_identity_means' not in g.keys():
         g = parser_pymol.calc_aa_identity(g)
     mean_keys = numpy.array(list(g['aa_identity_means'].keys()))
@@ -698,6 +699,8 @@ def main_site(g):
                 parser_pymol.write_mafft_alignment(g=g)
                 df = parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
             df = parser_pymol.add_pdb_residue_numbering(df=df)
+            from csubst import parser_uniprot
+            df = parser_uniprot.add_uniprot_site_annotations(df=df, g=g)
             g['session_file_path'] = g['pdb_outfile_base']+'.pymol.pse'
             parser_pymol.write_pymol_session(df=df, g=g)
             if g['pymol_img']:

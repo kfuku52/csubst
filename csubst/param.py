@@ -54,6 +54,18 @@ def get_global_parameters(args):
             g['run_pdb_sequence_search'] = True
         else:
             g['run_pdb_sequence_search'] = False
+    if 'uniprot_feature_types' in g.keys():
+        value = g['uniprot_feature_types']
+        if value is None:
+            g['uniprot_feature_types'] = None
+        else:
+            value = str(value).strip()
+            if (value=='')|(value.lower() in ['all','*']):
+                g['uniprot_feature_types'] = None
+            else:
+                g['uniprot_feature_types'] = [ v.strip() for v in value.split(',') if v.strip()!='' ]
+    if 'uniprot_include_redundant' in g.keys():
+        g['uniprot_include_redundant'] = bool(g['uniprot_include_redundant'])
     if 'percent_biased_sub' in g.keys():
         assert (g['percent_biased_sub']<100), '--percent_biased_sub should be <100.'
     if 'float_digit' in g.keys():

@@ -249,6 +249,15 @@ if __name__ == "__main__":
                          help='default=%(default)s: Maximum number of chains to visualize. '
                                'If the number of chains in the PDB file is larger than this value, '
                                '--pymol_img will be disabled.')
+    site.add_argument('--uniprot_feature_types', metavar='all|TYPE1,TYPE2,...', default='all', required=False, type=str,
+                      help='default=%(default)s: UniProt feature types to append to csubst_site output. '
+                           'By default ("all"), all available UniProt features are considered. '
+                           'Redundant annotations (including the uniprot_feature_types_* column) are excluded unless '
+                           '--uniprot_include_redundant is "yes". '
+                           'Use a comma-delimited subset to filter (e.g., "Active site,Binding site").')
+    site.add_argument('--uniprot_include_redundant', metavar='yes|no', default='no', required=False, type=strtobool,
+                      help='default=%(default)s: Include site-invariant/redundant UniProt annotations '
+                           '(e.g., accession columns and full-length features such as Chain).')
     site.add_argument('--export2chimera', metavar='yes|no', default='no', required=False, type=strtobool,
                       help='default=%(default)s: Set "yes" to export files for the visualization of '
                            'convergence/divergence probabilities with UCSF Chimera. '
