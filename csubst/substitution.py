@@ -8,6 +8,7 @@ import time
 from csubst import table
 from csubst import parallel
 from csubst import substitution_cy
+from csubst import substitution_sparse
 
 def resolve_sub_tensor_backend(g):
     if 'resolved_sub_tensor_backend' in g.keys():
@@ -26,6 +27,12 @@ def resolve_sub_tensor_backend(g):
     txt = 'Substitution tensor backend: requested={}, resolved={}'
     print(txt.format(requested, resolved), flush=True)
     return resolved
+
+def dense_to_sparse_sub_tensor(sub_tensor, tol=0):
+    return substitution_sparse.dense_to_sparse_substitution_tensor(sub_tensor=sub_tensor, tol=tol)
+
+def sparse_to_dense_sub_tensor(sparse_sub_tensor):
+    return substitution_sparse.sparse_to_dense_substitution_tensor(sparse_tensor=sparse_sub_tensor)
 
 def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None):
     if dtype is None:
