@@ -524,10 +524,15 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
         df[start:end, :arity] = id_combinations[:, :]  # branch_ids
         for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
             for sg in numpy.arange(sub_tensor.shape[2]):
-                df[i, arity+0] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=(2, 3)).prod(axis=0).sum(axis=0) # any2any
-                df[i, arity+1] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=3).prod(axis=0).sum(axis=1).sum(axis=0) # spe2any
-                df[i, arity+2] += sub_tensor[id_combinations[j,:], :, sg, :, :].sum(axis=2).prod(axis=0).sum(axis=1).sum(axis=0) # any2spe
-                df[i, arity+3] += sub_tensor[id_combinations[j,:], :, sg, :, :].prod(axis=0).sum(axis=(1, 2)).sum(axis=0) # spe2spe
+                sub_combo = sub_tensor[id_combinations[j, :], :, sg, :, :]
+                sum_any2any = sub_combo.sum(axis=(2, 3))
+                sum_spe2any = sub_combo.sum(axis=3)
+                sum_any2spe = sub_combo.sum(axis=2)
+                prod_spe2spe = sub_combo.prod(axis=0)
+                df[i, arity+0] += sum_any2any.prod(axis=0).sum(axis=0) # any2any
+                df[i, arity+1] += sum_spe2any.prod(axis=0).sum(axis=1).sum(axis=0) # spe2any
+                df[i, arity+2] += sum_any2spe.prod(axis=0).sum(axis=1).sum(axis=0) # any2spe
+                df[i, arity+3] += prod_spe2spe.sum(axis=(1, 2)).sum(axis=0) # spe2spe
             if j % 10000 == 0:
                 mmap_end = mmap_start + id_combinations.shape[0]
                 txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} sec'
@@ -621,10 +626,15 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
         df[row_start:row_end,arity] = sites # site
         ic = id_combinations[i,:]
         for sg in range(sub_tensor.shape[2]):
-            df[row_start:row_end,arity+1] += sub_tensor[ic,:,sg,:,:].sum(axis=(2,3)).prod(axis=0) #any2any
-            df[row_start:row_end,arity+2] += sub_tensor[ic,:,sg,:,:].sum(axis=3).prod(axis=0).sum(axis=1) #spe2any
-            df[row_start:row_end,arity+3] += sub_tensor[ic,:,sg,:,:].sum(axis=2).prod(axis=0).sum(axis=1) #any2spe
-            df[row_start:row_end,arity+4] += sub_tensor[ic,:,sg,:,:].prod(axis=0).sum(axis=(1,2)) #spe2spe
+            sub_combo = sub_tensor[ic, :, sg, :, :]
+            sum_any2any = sub_combo.sum(axis=(2, 3))
+            sum_spe2any = sub_combo.sum(axis=3)
+            sum_any2spe = sub_combo.sum(axis=2)
+            prod_spe2spe = sub_combo.prod(axis=0)
+            df[row_start:row_end,arity+1] += sum_any2any.prod(axis=0) #any2any
+            df[row_start:row_end,arity+2] += sum_spe2any.prod(axis=0).sum(axis=1) #spe2any
+            df[row_start:row_end,arity+3] += sum_any2spe.prod(axis=0).sum(axis=1) #any2spe
+            df[row_start:row_end,arity+4] += prod_spe2spe.sum(axis=(1,2)) #spe2spe
         if (node%10000==0):
             mmap_start = mmap_start
             mmap_end = mmap_start+id_combinations.shape[0]
