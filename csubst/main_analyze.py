@@ -15,6 +15,7 @@ from csubst import parser_misc
 from csubst import sequence
 from csubst import substitution
 from csubst import table
+from csubst import ete
 from csubst import tree
 
 def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
@@ -221,7 +222,7 @@ def main_analyze(g):
         b = table.merge_tables(bOS, bON)
         b.loc[:,'branch_length'] = numpy.nan
         for node in g['tree'].traverse():
-            b.loc[node.numerical_label,'branch_length'] = node.dist
+            b.loc[ete.get_prop(node, "numerical_label"),'branch_length'] = node.dist
         txt = 'Number of {} patterns among {:,} branches={:,}, min={:,.1f}, max={:,.1f}'
         for key in ['S_sub', 'N_sub']:
             p = b.loc[:, key].drop_duplicates().values

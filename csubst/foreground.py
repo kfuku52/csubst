@@ -23,7 +23,7 @@ def combinations_count(n, r):
     return numer // denom
 
 def get_df_clade_size(g, trait_name):
-    num_branch = max([ n.numerical_label for n in g['tree'].traverse() ])
+    num_branch = max([ ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() ])
     branch_ids = numpy.arange(num_branch)
     cols = ['branch_id','size','is_fg_stem_'+trait_name]
     df_clade_size = pandas.DataFrame(index=branch_ids, columns=cols)
@@ -32,10 +32,10 @@ def get_df_clade_size(g, trait_name):
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
-        bid = node.numerical_label
+        bid = ete.get_prop(node, "numerical_label")
         df_clade_size.at[bid,'size'] = len(ete.get_leaf_names(node))
-        is_fg = getattr(node, 'is_fg_'+trait_name)
-        is_parent_fg = getattr(node.up, 'is_fg_'+trait_name)
+        is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
+        is_parent_fg = ete.get_prop(node.up, 'is_fg_' + trait_name, False)
         if (is_fg)&(~is_parent_fg):
             df_clade_size.at[bid,'is_fg_stem_'+trait_name] = True
     return df_clade_size
@@ -96,8 +96,8 @@ def foreground_clade_randomization(df_clade_size, g, trait_name, sample_original
         new_fg_bids = df_clade_size.loc[is_new_fg,'branch_id'].values
         for new_fg_bid in new_fg_bids:
             for node in g['tree'].traverse():
-                if (node.numerical_label==new_fg_bid):
-                    des_bids = [ d.numerical_label for d in node.traverse() ]
+                if (ete.get_prop(node, "numerical_label")==new_fg_bid):
+                    des_bids = [ ete.get_prop(d, "numerical_label") for d in node.traverse() ]
                     df_clade_size.loc[des_bids,'is_blocked'] = True
                     break
     return df_clade_size
@@ -111,8 +111,8 @@ def get_new_foreground_ids(df_clade_size, g):
     else:
         for fg_stem_bid in fg_stem_bids:
             for node in g['tree'].traverse():
-                if (node.numerical_label==fg_stem_bid):
-                    new_lineage_fg_ids = [ n.numerical_label for n in node.traverse() ]
+                if (ete.get_prop(node, "numerical_label")==fg_stem_bid):
+                    new_lineage_fg_ids = [ ete.get_prop(n, "numerical_label") for n in node.traverse() ]
                     new_fg_ids += new_lineage_fg_ids
                     break
     new_fg_ids = numpy.unique(numpy.array(new_fg_ids, dtype=numpy.int64))
@@ -172,24 +172,24 @@ def get_target_ids(lineages, trait_name, g):
             node_leaf_name_set = set(ete.get_leaf_names(node))
             if len(node_leaf_name_set.difference(fg_leaf_name_set)) == 0:
                 if ete.is_root(node) | (not g['fg_stem_only']):
-                    lineage_fg_ids.append(node.numerical_label)
+                    lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
                 else:
-                    is_lineage_fg = getattr(node, 'is_lineage_fg_' + trait_name + '_' + str(i + 1))
-                    is_parent_lineage_fg = getattr(node.up, 'is_lineage_fg_' + trait_name + '_' + str(i + 1))
+                    is_lineage_fg = ete.get_prop(node, 'is_lineage_fg_' + trait_name + '_' + str(i + 1), False)
+                    is_parent_lineage_fg = ete.get_prop(node.up, 'is_lineage_fg_' + trait_name + '_' + str(i + 1), False)
                     if (is_lineage_fg == True) & (is_parent_lineage_fg == False):
-                        lineage_fg_ids.append(node.numerical_label)
+                        lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
         dif = 1
         while dif:
             num_id = len(lineage_fg_ids)
             for node in g['tree'].traverse():
-                child_ids = [child.numerical_label for child in node.get_children()]
+                child_ids = [ete.get_prop(child, "numerical_label") for child in node.get_children()]
                 if all([id in lineage_fg_ids for id in child_ids]) & (len(child_ids) != 0):
-                    if node.numerical_label not in lineage_fg_ids:
-                        lineage_fg_ids.append(node.numerical_label)
+                    if ete.get_prop(node, "numerical_label") not in lineage_fg_ids:
+                        lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
             dif = len(lineage_fg_ids) - num_id
         lineage_fg_ids = numpy.array(lineage_fg_ids, dtype=numpy.int64)
         target_ids = numpy.concatenate([target_ids, lineage_fg_ids])
-    target_id = target_ids[target_ids != ete.get_tree_root(g['tree']).numerical_label]
+    target_id = target_ids[target_ids != ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label")]
     target_id.sort()
     return target_ids
 
@@ -204,14 +204,14 @@ def annotate_foreground(lineages, trait_name, g):
         lineage_color = lineage_colors[i % len(lineage_colors)]
         for node in g['tree'].traverse():
             if g['fg_stem_only']:
-                if node.numerical_label in g['target_ids'][trait_name]:
+                if ete.get_prop(node, "numerical_label") in g['target_ids'][trait_name]:
                     ete.add_features(node, **{'is_fg_'+trait_name: True})
                     ete.add_features(node, **{'color_'+trait_name: lineage_color})
                     ete.add_features(node, **{'labelcolor_'+trait_name: lineage_color})
                 if node.name in fg_leaf_name_set:
                     ete.add_features(node, **{'labelcolor_' + trait_name: lineage_color})
             else:
-                is_lineage_fg = getattr(node, 'is_lineage_fg_' + trait_name + '_' + str(i + 1))
+                is_lineage_fg = ete.get_prop(node, 'is_lineage_fg_' + trait_name + '_' + str(i + 1), False)
                 if is_lineage_fg == True:
                     ete.add_features(node, **{'is_fg_' + trait_name: True})
                     ete.add_features(node, **{'color_' + trait_name: lineage_color})
@@ -315,7 +315,7 @@ def randomize_foreground_branch(g, trait_name, sample_original_foreground=False)
     print_num_possible_permuted_combinations(r_df_clade_size, trait_name, sample_original_foreground)
     g['r_target_ids'][trait_name] = get_new_foreground_ids(r_df_clade_size, g)
     g['r_fg_ids'][trait_name] = copy.deepcopy(g['r_target_ids'][trait_name])
-    new_fg_leaf_names = [ete.get_leaf_names(n) for n in g['tree'].traverse() if n.numerical_label in g['r_fg_ids'][trait_name]]
+    new_fg_leaf_names = [ete.get_leaf_names(n) for n in g['tree'].traverse() if ete.get_prop(n, "numerical_label") in g['r_fg_ids'][trait_name]]
     new_fg_leaf_names = list(itertools.chain(*new_fg_leaf_names))
     new_fg_leaf_names = list(set(new_fg_leaf_names))
     g['r_fg_leaf_names'][trait_name] = new_fg_leaf_names
@@ -328,30 +328,30 @@ def get_marginal_branch(g):
         for node in g['tree'].traverse():
             if ete.is_root(node):
                 continue
-            is_fg = getattr(node, 'is_fg_' + trait_name)
+            is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
             if (is_fg==False):
                 continue
             if (g['mg_parent']):
-                is_parent_fg = getattr(node.up, 'is_fg_' + trait_name)
+                is_parent_fg = ete.get_prop(node.up, 'is_fg_' + trait_name, False)
                 if (is_parent_fg==False):
-                    g['mg_ids'][trait_name].append(node.up.numerical_label)
+                    g['mg_ids'][trait_name].append(ete.get_prop(node.up, "numerical_label"))
             if (g['mg_sister']):
                 sisters = node.get_sisters()
                 for sister in sisters:
                     if (g['mg_sister_stem_only']):
-                        is_sister_fg = getattr(sister, 'is_fg_' + trait_name)
+                        is_sister_fg = ete.get_prop(sister, 'is_fg_' + trait_name, False)
                         if is_sister_fg==False:
-                            g['mg_ids'][trait_name].append(sister.numerical_label)
+                            g['mg_ids'][trait_name].append(ete.get_prop(sister, "numerical_label"))
                     else:
                         for sister_des in sister.traverse():
-                            is_sister_des_fg = getattr(sister_des, 'is_fg_' + trait_name)
+                            is_sister_des_fg = ete.get_prop(sister_des, 'is_fg_' + trait_name, False)
                             if is_sister_des_fg==False:
-                                g['mg_ids'][trait_name].append(sister_des.numerical_label)
+                                g['mg_ids'][trait_name].append(ete.get_prop(sister_des, "numerical_label"))
         concat_ids = list(set(g['mg_ids'][trait_name])-set(g['target_ids'][trait_name]))
         g['mg_ids'][trait_name] = numpy.array(concat_ids, dtype=numpy.int64)
         g['target_ids'][trait_name] = numpy.concatenate([g['target_ids'][trait_name], g['mg_ids'][trait_name]])
         for node in g['tree'].traverse():
-            if node.numerical_label in g['mg_ids'][trait_name]:
+            if ete.get_prop(node, "numerical_label") in g['mg_ids'][trait_name]:
                 ete.add_features(node, **{'is_marginal_'+trait_name: True})
             else:
                 ete.add_features(node, **{'is_marginal_'+trait_name: False})

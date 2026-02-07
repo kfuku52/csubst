@@ -228,7 +228,7 @@ def add_gene_index(df, g):
     seqs = sequence.read_fasta(path=g['untrimmed_cds'])
     num_site = g['state_cdn'].shape[1]
     for leaf in ete.iter_leaves(g['tree']):
-        leaf_nn = leaf.numerical_label
+        leaf_nn = ete.get_prop(leaf, "numerical_label")
         if leaf.name not in seqs.keys():
             continue
         print('Matching untrimmed CDS sequence: {}'.format(leaf.name), flush=True)
@@ -357,8 +357,8 @@ def export2chimera(df, g):
 def get_parent_branch_ids(branch_ids, g):
     parent_branch_ids = dict()
     for node in g['tree'].traverse():
-        if node.numerical_label in branch_ids:
-            parent_branch_ids[node.numerical_label] = node.up.numerical_label
+        if ete.get_prop(node, "numerical_label") in branch_ids:
+            parent_branch_ids[ete.get_prop(node, "numerical_label")] = ete.get_prop(node.up, "numerical_label")
     return parent_branch_ids
 
 def add_states(df, branch_ids, g, add_hydrophobicity=True):
@@ -496,7 +496,7 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
 def get_df_dist(sub_tensor, g, mode):
     tree_dict = dict()
     for node in g['tree'].traverse():
-        tree_dict[node.numerical_label] = node
+        tree_dict[ete.get_prop(node, "numerical_label")] = node
     state_orders, state_keys = get_state_orders(g, mode)
     cols = ['group','state_from','state_to','max_dist_bl']
     inds = numpy.arange(numpy.array(sub_tensor.shape[2:]).prod()-sub_tensor.shape[4])
@@ -525,7 +525,7 @@ def get_df_dist(sub_tensor, g, mode):
             node_dists = list()
             nodes = [ tree_dict[n] for n in branch_ids ]
             for nds in list(itertools.combinations(nodes, 2)):
-                node_dist = nds[0].get_distance(target=nds[1], topology_only=False)
+                node_dist = ete.get_distance(nds[0], nds[1], topology_only=False)
                 node_dists.append(node_dist - nds[1].dist)
             interbranch_dist = max(node_dists) # Maximum value among pairwise distances
         df_dist.loc[current_row, :] = [state_key, state_from, state_to, interbranch_dist]
@@ -659,7 +659,7 @@ def main_site(g):
         g['site_outdir'] = './csubst_site.branch_id'+','.join([ str(bid) for bid in branch_ids ])
         if not os.path.exists(g['site_outdir']):
             os.makedirs(g['site_outdir'])
-        leaf_nn = [n.numerical_label for n in g['tree'].traverse() if ete.is_leaf(n)]
+        leaf_nn = [ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() if ete.is_leaf(n)]
         num_site = ON_tensor.shape[1]
         df = initialize_site_df(num_site)
         df = add_cs_info(df, g['branch_ids'], sub_tensor=OS_tensor, attr='S')

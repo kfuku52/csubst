@@ -66,9 +66,9 @@ def pdb_sequence_search(g):
     print('')
     representative_branch_id = g['branch_ids'][0]
     for node in g['tree'].traverse():
-        if (node.numerical_label==representative_branch_id):
+        if (ete.get_prop(node, "numerical_label")==representative_branch_id):
             representative_leaf = get_representative_leaf(node, size='median')
-            nlabel = representative_leaf.numerical_label
+            nlabel = ete.get_prop(representative_leaf, "numerical_label")
             aa_query = sequence.translate_state(nlabel=nlabel, mode='aa', g=g)
             aa_query = aa_query.replace('-', '')
             break

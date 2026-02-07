@@ -56,7 +56,7 @@ def write_alignment(outfile, mode, g, leaf_only=False):
     for node in nodes:
         if ete.is_root(node):
             continue
-        nlabel = node.numerical_label
+        nlabel = ete.get_prop(node, "numerical_label")
         aln_tmp = '>'+node.name+'|'+str(nlabel)+'\n'
         aln_tmp += translate_state(nlabel, mode, g)
         aln_out += aln_tmp+'\n'

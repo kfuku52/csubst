@@ -267,10 +267,10 @@ def mask_missing_sites(state_tensor, tree):
     for node in tree.traverse():
         if (ete.is_root(node)) | (ete.is_leaf(node)):
             continue
-        nl = node.numerical_label
-        child0_leaf_nls = numpy.array([l.numerical_label for l in ete.get_leaves(node.get_children()[0])], dtype=int)
-        child1_leaf_nls = numpy.array([l.numerical_label for l in ete.get_leaves(node.get_children()[1])], dtype=int)
-        sister_leaf_nls = numpy.array([l.numerical_label for l in ete.get_leaves(node.get_sisters()[0])], dtype=int)
+        nl = ete.get_prop(node, "numerical_label")
+        child0_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(node.get_children()[0])], dtype=int)
+        child1_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(node.get_children()[1])], dtype=int)
+        sister_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(node.get_sisters()[0])], dtype=int)
         c0 = (state_tensor[child0_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child0_leaf_nonzero
         c1 = (state_tensor[child1_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child1_leaf_nonzero
         s = (state_tensor[sister_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_sister_leaf_nonzero
@@ -306,7 +306,7 @@ def get_state_tensor(g):
                     nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)
                     for ni in nuc_index:
                         state_matrix[s, ni] = 1/len(nuc_index)
-            state_tensor[node.numerical_label,:,:] = state_matrix
+            state_tensor[ete.get_prop(node, "numerical_label"),:,:] = state_matrix
         else: # Internal nodes
             state_matrix = state_table.loc[(state_table['Node']==node.name),:].iloc[:,3:]
             is_missing = (state_table.loc[:,'State']=='???') | (state_table.loc[:,'State']=='?')
@@ -314,7 +314,7 @@ def get_state_tensor(g):
             if state_matrix.shape[0]==0:
                 print('Node name not found in .state file:', node.name)
             else:
-                state_tensor[node.numerical_label,:,:] = state_matrix
+                state_tensor[ete.get_prop(node, "numerical_label"),:,:] = state_matrix
     state_tensor = numpy.nan_to_num(state_tensor)
     state_tensor = mask_missing_sites(state_tensor, g['tree'])
     if (g['ml_anc']):

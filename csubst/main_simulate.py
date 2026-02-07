@@ -44,25 +44,27 @@ class suppress_stdout_stderr(object):
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
-        node.dist = node.dist * scaling_factor
+        node.dist = (node.dist or 0.0) * scaling_factor
     return tree
 
 def get_pyvolve_newick(tree, trait_name):
     for node in tree.traverse():
-        node.dist2 = node.dist
-        node.dist = node.numerical_label
+        ete.set_prop(node, 'dist2', node.dist)
+        node.dist = ete.get_prop(node, "numerical_label")
     newick_txt = ete.write_tree(tree, format=1)
     for node in tree.traverse():
-        sub_from = str(node.numerical_label)
-        if getattr(node, 'is_fg_'+trait_name):
-            sub_to = str(node.dist2)+'#m'+str(getattr(node, 'foreground_lineage_id_'+trait_name))
+        sub_from = str(ete.get_prop(node, "numerical_label"))
+        is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
+        if is_fg:
+            fg_lineage = ete.get_prop(node, 'foreground_lineage_id_' + trait_name, 0)
+            sub_to = str(ete.get_prop(node, 'dist2')) + '#m' + str(fg_lineage)
         else:
-            sub_to = str(node.dist2)
+            sub_to = str(ete.get_prop(node, 'dist2'))
         newick_txt = re.sub(':'+sub_from+',', ':'+sub_to+',', newick_txt)
         newick_txt = re.sub(':'+sub_from+'\)', ':'+sub_to+')', newick_txt)
     for node in tree.traverse():
-        node.dist = node.dist2
-        node.dist2 = None
+        node.dist = ete.get_prop(node, 'dist2')
+        ete.del_prop(node, 'dist2')
     return newick_txt
 
 def get_pyvolve_codon_order():
@@ -302,7 +304,7 @@ def get_pyvolve_tree(tree, foreground_scaling_factor, trait_name):
     if (foreground_scaling_factor!=1):
         print('Foreground branches are rescaled by {}.'.format(foreground_scaling_factor))
     for node in tree.traverse():
-        if getattr(node, 'is_fg_'+trait_name):
+        if ete.get_prop(node, 'is_fg_' + trait_name, False):
             node.dist *= foreground_scaling_factor
     newick_txt = get_pyvolve_newick(tree=tree, trait_name=trait_name)
     pyvolve_tree = pyvolve.read_tree(tree=newick_txt)

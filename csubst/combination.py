@@ -53,7 +53,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
         target_nodes = list()
         for node in all_nodes:
             if (check_attr is None)|(check_attr in dir(node)):
-                target_nodes.append(node.numerical_label)
+                target_nodes.append(ete.get_prop(node, "numerical_label"))
         target_nodes = numpy.array(target_nodes)
         node_combinations = list(itertools.combinations(target_nodes, arity))
         node_combinations = [ set(nc) for nc in node_combinations ]
@@ -204,7 +204,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     return g,id_combinations
 
 def node_combination_subsamples_rifle(g, arity, rep):
-    all_ids = [ n.numerical_label for n in g['tree'].traverse() ]
+    all_ids = [ ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() ]
     sub_ids = g['sub_branches']
     all_dep_ids = g['dep_ids']
     num_fail = 0
@@ -240,7 +240,7 @@ def node_combination_subsamples_rifle(g, arity, rep):
     return id_combinations
 
 def node_combination_subsamples_shotgun(g, arity, rep):
-    all_ids = [ n.numerical_label for n in g['tree'].traverse() ]
+    all_ids = [ ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() ]
     sub_ids = g['sub_branches']
     id_combinations = numpy.zeros(shape=(0,arity), dtype=numpy.int64)
     id_combinations_dif = numpy.inf
@@ -295,31 +295,31 @@ def calc_substitution_patterns(cb):
 def get_global_dep_ids(g):
     global_dep_ids = list()
     for leaf in ete.iter_leaves(g['tree']):
-        ancestor_nns = [node.numerical_label for node in ete.iter_ancestors(leaf) if not ete.is_root(node)]
-        dep_id = [leaf.numerical_label, ] + ancestor_nns
+        ancestor_nns = [ete.get_prop(node, "numerical_label") for node in ete.iter_ancestors(leaf) if not ete.is_root(node)]
+        dep_id = [ete.get_prop(leaf, "numerical_label"), ] + ancestor_nns
         dep_id = numpy.sort(numpy.array(dep_id))
         global_dep_ids.append(dep_id)
         if g['exclude_sister_pair']:
             for node in g['tree'].traverse():
                 children = node.get_children()
                 if len(children)>1:
-                    dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
+                    dep_id = numpy.sort(numpy.array([ ete.get_prop(node, "numerical_label") for node in children ]))
                     global_dep_ids.append(dep_id)
-    root_nn = g['tree'].numerical_label
+    root_nn = ete.get_prop(g['tree'], "numerical_label")
     root_state_sum = g['state_cdn'][root_nn, :, :].sum()
     if (root_state_sum == 0):
         print('Ancestral states were not estimated on the root node. Excluding sub-root nodes from the analysis.')
-        subroot_nns = [node.numerical_label for node in g['tree'].get_children()]
+        subroot_nns = [ete.get_prop(node, "numerical_label") for node in g['tree'].get_children()]
         for subroot_nn in subroot_nns:
             for node in g['tree'].traverse():
                 if ete.is_root(node):
                     continue
-                if subroot_nn == node.numerical_label:
+                if subroot_nn == ete.get_prop(node, "numerical_label"):
                     continue
-                ancestor_nns = [anc.numerical_label for anc in ete.iter_ancestors(node)]
+                ancestor_nns = [ete.get_prop(anc, "numerical_label") for anc in ete.iter_ancestors(node)]
                 if subroot_nn in ancestor_nns:
                     continue
-                global_dep_ids.append(numpy.array([subroot_nn, node.numerical_label]))
+                global_dep_ids.append(numpy.array([subroot_nn, ete.get_prop(node, "numerical_label")]))
     return global_dep_ids
 
 def get_foreground_dep_ids(g):
@@ -340,10 +340,10 @@ def get_foreground_dep_ids(g):
                     if is_up_all_leaf_lineage_fg:
                         continue
                     if ete.is_leaf(node):
-                        tmp_fg_dep_ids.append(node.numerical_label)
+                        tmp_fg_dep_ids.append(ete.get_prop(node, "numerical_label"))
                     else:
-                        descendant_nn = [ n.numerical_label for n in node.get_descendants() ]
-                        tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
+                        descendant_nn = [ ete.get_prop(n, "numerical_label") for n in node.get_descendants() ]
+                        tmp_fg_dep_ids += [ete.get_prop(node, "numerical_label"),] + descendant_nn
                 if len(tmp_fg_dep_ids)>1:
                     fg_dep_ids[trait_name].append(numpy.sort(numpy.array(tmp_fg_dep_ids)))
             if (g['mg_sister'])|(g['mg_parent']):

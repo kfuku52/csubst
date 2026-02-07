@@ -8,7 +8,7 @@ from csubst import ete
 
 def test_add_numerical_node_labels_assigns_unique_integers():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(B:1,(A:1,C:1)X:1)R;", format=1))
-    labels = [n.numerical_label for n in tr.traverse()]
+    labels = [ete.get_prop(n, "numerical_label") for n in tr.traverse()]
     assert sorted(labels) == list(range(len(labels)))
 
 
@@ -124,8 +124,8 @@ def test_get_pyvolve_newick_marks_foreground_without_mutating_distances():
     for node in tr.traverse():
         ete.add_features(node, **{"is_fg_t": False, "foreground_lineage_id_t": 0})
     a_node = [n for n in tr.traverse() if n.name == "A"][0]
-    a_node.is_fg_t = True
-    a_node.foreground_lineage_id_t = 1
+    ete.set_prop(a_node, "is_fg_t", True)
+    ete.set_prop(a_node, "foreground_lineage_id_t", 1)
     out = main_simulate.get_pyvolve_newick(tr, "t")
     assert "#m1" in out
     assert pytest.approx(a_node.dist, rel=0, abs=1e-12) == 0.1

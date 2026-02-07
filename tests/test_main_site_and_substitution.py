@@ -88,11 +88,11 @@ def test_get_parent_branch_ids(tiny_tree):
     bids = []
     for node in tiny_tree.traverse():
         if node.name in {"A", "C"}:
-            bids.append(node.numerical_label)
+            bids.append(ete.get_prop(node, "numerical_label"))
     out = main_site.get_parent_branch_ids(numpy.array(bids), {"tree": tiny_tree})
     assert len(out) == 2
     # Both A and C have internal node X as parent.
-    x_id = [n.numerical_label for n in tiny_tree.traverse() if n.name == "X"][0]
+    x_id = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if n.name == "X"][0]
     assert set(out.values()) == {x_id}
 
 
@@ -138,11 +138,11 @@ def test_get_df_ad_add_site_stats_and_target_flag():
 
 def test_get_df_dist_reports_max_distance_for_multi_branch_substitutions(tiny_tree):
     g = {"tree": tiny_tree, "amino_acid_orders": numpy.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
-    num_node = max(n.numerical_label for n in tiny_tree.traverse()) + 1
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
     sub_tensor = numpy.zeros((num_node, 1, 1, 2, 2), dtype=float)
-    a_id = [n.numerical_label for n in tiny_tree.traverse() if n.name == "A"][0]
-    c_id = [n.numerical_label for n in tiny_tree.traverse() if n.name == "C"][0]
-    b_id = [n.numerical_label for n in tiny_tree.traverse() if n.name == "B"][0]
+    a_id = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if n.name == "A"][0]
+    c_id = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if n.name == "C"][0]
+    b_id = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if n.name == "B"][0]
     sub_tensor[a_id, 0, 0, 0, 1] = 0.6
     sub_tensor[c_id, 0, 0, 0, 1] = 0.6
     sub_tensor[b_id, 0, 0, 1, 0] = 0.7
@@ -155,7 +155,7 @@ def test_get_df_dist_reports_max_distance_for_multi_branch_substitutions(tiny_tr
 
 def test_get_substitution_tensor_asis_matches_manual_outer_products():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    labels = {n.name: n.numerical_label for n in tr.traverse()}
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
     state = numpy.zeros((3, 2, 2), dtype=float)
     state[labels["R"], :, :] = [[1.0, 0.0], [0.5, 0.5]]
     state[labels["A"], :, :] = [[0.0, 1.0], [1.0, 0.0]]
@@ -227,7 +227,7 @@ def test_add_dif_column_and_add_dif_stats():
 
 def test_get_substitution_tensor_syn_matches_manual_groupwise_products():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    labels = {n.name: n.numerical_label for n in tr.traverse()}
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
     # codon state order: [AAA, AAG, TTT, TTC]
     # synonymous groups: K=[AAA,AAG], F=[TTT,TTC]
     state = numpy.zeros((3, 1, 4), dtype=float)

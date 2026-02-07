@@ -26,7 +26,7 @@ def add_numerical_node_labels(tree):
     short_labels = numpy.arange(len(argsort_labels))
     i=0
     for node in tree.traverse():
-        node.numerical_label = short_labels[argsort_labels==i][0]
+        ete.set_prop(node, "numerical_label", short_labels[argsort_labels == i][0])
         i+=1
     return tree
 
@@ -91,9 +91,9 @@ def calc_node_dist_chunk(chunk, start, tree_dict, float_type):
         node_dists = list()
         node_nums = list()
         for nds in list(itertools.combinations(nodes, 2)):
-            node_dist = nds[0].get_distance(target=nds[1], topology_only=False)
+            node_dist = ete.get_distance(nds[0], nds[1], topology_only=False)
             node_dists.append(node_dist - nds[1].dist)
-            node_nums.append(nds[0].get_distance(target=nds[1], topology_only=True))
+            node_nums.append(ete.get_distance(nds[0], nds[1], topology_only=True))
         node_dist = max(node_dists) # Maximum value among pairwise distances
         node_num = max(node_nums) # Maximum value among pairwise distances
         arr_dist[i,1] = node_num
@@ -108,11 +108,11 @@ def get_node_distance(tree, cb, ncpu, float_type):
     txt = 'Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no'
     print(txt, flush=True)
     start_time = time.time()
-    if not 'numerical_label' in dir(tree):
-        tree = tree.add_numerical_node_labels(tree)
+    if ete.get_prop(tree, "numerical_label") is None:
+        tree = add_numerical_node_labels(tree)
     tree_dict = dict()
     for node in tree.traverse():
-        tree_dict[node.numerical_label] = node
+        tree_dict[ete.get_prop(node, "numerical_label")] = node
     cn1 = cb.columns[cb.columns.str.startswith('branch_id_')]
     id_combinations = cb.loc[:,cn1].values
     n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=ncpu)
@@ -166,7 +166,7 @@ def write_tree(tree, outfile='csubst_tree.nwk', add_numerical_label=True):
     tree2 = copy.deepcopy(tree)
     if add_numerical_label:
         for node in tree2.traverse():
-            node.name = (node.name or '') + '|' + str(node.numerical_label)
+            node.name = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
     ete.write_tree(tree2, format=1, outfile=outfile)
 
 def branch_category_layout(trait_name):
@@ -175,10 +175,10 @@ def branch_category_layout(trait_name):
         nstyle = tv.NodeStyle()
         nstyle['size'] = 0
         nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-        nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
-        nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
-        nlabel = (node.name or '') + '|' + str(node.numerical_label)
-        nlabelFace = tv.TextFace(nlabel, fsize=4, fgcolor=getattr(node, 'labelcolor_'+trait_name))
+        nstyle["hz_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
+        nstyle["vt_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
+        nlabel = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
+        nlabelFace = tv.TextFace(nlabel, fsize=4, fgcolor=ete.get_prop(node, "labelcolor_" + trait_name, "black"))
         tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
         node.set_style(nstyle)
         pass
@@ -190,11 +190,11 @@ def branch_category_layout_leafonly(trait_name):
         nstyle = tv.NodeStyle()
         nstyle['size'] = 0
         nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-        nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
-        nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
+        nstyle["hz_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
+        nstyle["vt_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
         if ete.is_leaf(node):
-            nlabel = (node.name or '') + '|' + str(node.numerical_label)
-            nlabelFace = tv.TextFace(nlabel, fsize=4, fgcolor=getattr(node, 'labelcolor_'+trait_name))
+            nlabel = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
+            nlabelFace = tv.TextFace(nlabel, fsize=4, fgcolor=ete.get_prop(node, "labelcolor_" + trait_name, "black"))
             tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
         node.set_style(nstyle)
         pass
@@ -206,8 +206,8 @@ def branch_category_layout_nolabel(trait_name):
         nstyle = tv.NodeStyle()
         nstyle['size'] = 0
         nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-        nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
-        nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
+        nstyle["hz_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
+        nstyle["vt_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
         node.set_style(nstyle)
         pass
     return layout_fn
@@ -250,13 +250,13 @@ def branch_state_layout(trait_name):
         nstyle = tv.NodeStyle()
         nstyle['size'] = 0
         nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-        nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
-        nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
+        nstyle["hz_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
+        nstyle["vt_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
         if ete.is_leaf(node):
-            nlabel = str(node.state) + '|' + (node.name or '')
+            nlabel = str(ete.get_prop(node, "state", "-")) + '|' + (node.name or '')
         else:
-            nlabel = str(node.state)
-        nlabelFace = tv.TextFace(nlabel, fsize=6, fgcolor=getattr(node, 'labelcolor_'+trait_name))
+            nlabel = str(ete.get_prop(node, "state", "-"))
+        nlabelFace = tv.TextFace(nlabel, fsize=6, fgcolor=ete.get_prop(node, "labelcolor_" + trait_name, "black"))
         tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
         node.set_style(nstyle)
         pass
@@ -281,22 +281,22 @@ def plot_state_tree(state, orders, mode, g):
         for i in numpy.arange(state.shape[1]):
             for node in g['tree'].traverse():
                 if ete.is_root(node):
-                    node.state = missing_state
+                    ete.set_prop(node, "state", missing_state)
                     continue
-                nlabel = node.numerical_label
+                nlabel = ete.get_prop(node, "numerical_label")
                 max_prob = max(state[nlabel,i,:])
                 index = numpy.where(state[nlabel,i,:]==max_prob)[0]
                 if len(index)==1:
-                    node.state = orders[index[0]]
+                    ete.set_prop(node, "state", orders[index[0]])
                 elif (len(index)==0)|(max_prob==0):
-                    node.state = missing_state
+                    ete.set_prop(node, "state", missing_state)
             file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
             file_name = file_name.replace('_PLACEHOLDER', '')
             g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
 
 def get_num_adjusted_sites(g, node):
-    nl = node.numerical_label
-    parent = node.up.numerical_label
+    nl = ete.get_prop(node, "numerical_label")
+    parent = ete.get_prop(node.up, "numerical_label")
     child_states = g['state_cdn'][nl,:,:]
     parent_states = g['state_cdn'][parent,:,:]
     is_child_present = numpy.expand_dims(child_states.sum(axis=1)!=0, axis=1)
@@ -326,26 +326,28 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
     ON_branch_sub = substitution.get_branch_sub_counts(ON_tensor)
     for node in g['tree'].traverse():
         if ete.is_root(node):
-            node.Sdist = 0
-            node.Ndist = 0
-            node.SNdist = 0
+            ete.set_prop(node, "Sdist", 0)
+            ete.set_prop(node, "Ndist", 0)
+            ete.set_prop(node, "SNdist", 0)
             continue
-        nl = node.numerical_label
-        parent = node.up.numerical_label
+        nl = ete.get_prop(node, "numerical_label")
+        parent = ete.get_prop(node.up, "numerical_label")
         num_nonmissing_codon = (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum()
         if num_nonmissing_codon==0:
-            node.Sdist = 0
-            node.Ndist = 0
-            node.SNdist = 0
+            ete.set_prop(node, "Sdist", 0)
+            ete.set_prop(node, "Ndist", 0)
+            ete.set_prop(node, "SNdist", 0)
             continue
         num_S_sub = OS_branch_sub[nl]
         num_N_sub = ON_branch_sub[nl]
         # is_S_zero = (num_S_sub==0)
         # is_N_zero = (num_N_sub==0)
         if (denominator=='L'):
-            node.Sdist = num_S_sub / num_nonmissing_codon
-            node.Ndist = num_N_sub / num_nonmissing_codon
-            node.SNdist = node.Sdist + node.Ndist
+            sdist = num_S_sub / num_nonmissing_codon
+            ndist = num_N_sub / num_nonmissing_codon
+            ete.set_prop(node, "Sdist", sdist)
+            ete.set_prop(node, "Ndist", ndist)
+            ete.set_prop(node, "SNdist", sdist + ndist)
         elif (denominator=='adjusted_site'): # This option overestimated EN and ES compared with "L"
             adjusted_site_S,adjusted_site_N = get_num_adjusted_sites(g, node)
             #prop_S = adjusted_site_S / (adjusted_site_S + adjusted_site_N)
@@ -357,20 +359,28 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
             prop_S = adjusted_num_S_sub / (adjusted_num_S_sub + adjusted_num_N_sub)
             prop_N = adjusted_num_N_sub / (adjusted_num_S_sub + adjusted_num_N_sub)
             if num_S_sub<g['float_tol']:
-                node.Sdist = 0
+                sdist = 0
             else:
-                node.Sdist = node.dist * prop_S
+                sdist = node.dist * prop_S
                 #node.Sdist = adjusted_site_S / prop_S
             if num_S_sub<g['float_tol']:
-                node.Ndist = 0
+                ndist = 0
             else:
-                node.Ndist = node.dist * prop_N
+                ndist = node.dist * prop_N
                 #node.Ndist = adjusted_site_N / prop_N
-            node.SNdist = node.Sdist + node.Ndist
+            ete.set_prop(node, "Sdist", sdist)
+            ete.set_prop(node, "Ndist", ndist)
+            ete.set_prop(node, "SNdist", sdist + ndist)
 
-    print('Total S+N branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(sum([ n.SNdist for n in g['tree'].traverse() ])))
-    print('Total S branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(sum([ n.Sdist for n in g['tree'].traverse() ])))
-    print('Total N branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(sum([ n.Ndist for n in g['tree'].traverse() ])))
+    print('Total S+N branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(
+        sum([ete.get_prop(n, "SNdist", 0) for n in g['tree'].traverse()])
+    ))
+    print('Total S branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(
+        sum([ete.get_prop(n, "Sdist", 0) for n in g['tree'].traverse()])
+    ))
+    print('Total N branch length after rescaling: {:,.3f} codon substitutions / codon site'.format(
+        sum([ete.get_prop(n, "Ndist", 0) for n in g['tree'].traverse()])
+    ))
     return g
 
 def read_treefile(g):

@@ -92,14 +92,14 @@ def get_state_tensor(g):
         pp_file = get_node_phylobayes_out(node=node, files=state_files)
         if len(pp_file) == 1:
             pp_file = pp_file[0]
-            state_tensor[node.numerical_label,:,:] = get_pp_nuc(g['phylobayes_dir'], pp_file)
+            state_tensor[ete.get_prop(node, "numerical_label"),:,:] = get_pp_nuc(g['phylobayes_dir'], pp_file)
         elif (len(pp_file) > 1)&(not isinstance(pp_file, str)):
             raise Exception('Multiple .ancstatepostprob files for the node.',
-                  'node.name =', node.name, 'node.numerical_label =', node.numerical_label,
+                  'node.name =', node.name, 'ete.get_prop(node, "numerical_label") =', ete.get_prop(node, "numerical_label"),
                   'files =', pp_file)
         elif len(pp_file) == 0:
             print('Could not find .ancstatepostprob file for the node.',
-                  'node.name =', node.name, 'node.numerical_label =', node.numerical_label,
+                  'node.name =', node.name, 'ete.get_prop(node, "numerical_label") =', ete.get_prop(node, "numerical_label"),
                   'is_root =', ete.is_root(node), 'is_leaf =', ete.is_leaf(node))
     if (g['ml_anc']):
         idxmax = numpy.argmax(state_tensor, axis=2)

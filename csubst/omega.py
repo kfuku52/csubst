@@ -227,7 +227,7 @@ def subroot_E2nan(cb, tree):
         if continue_flag:
             continue
         for id_col in id_cols:
-            is_node = (cb.loc[:,id_col]==node.numerical_label)
+            is_node = (cb.loc[:,id_col]==ete.get_prop(node, "numerical_label"))
             cb.loc[is_node,E_cols] = numpy.nan
     return cb
 
@@ -290,8 +290,8 @@ def get_exp_state(g, mode):
         branch_length = max(branch_length, 0)
         if branch_length<g['float_tol']:
             continue # Skip if no substitution
-        nl = node.numerical_label
-        parent_nl = node.up.numerical_label
+        nl = ete.get_prop(node, "numerical_label")
+        parent_nl = ete.get_prop(node.up, "numerical_label")
         if parent_nl>stateE.shape[0]:
             continue # Skip if parent is the root node
         inst_bl = inst * branch_length

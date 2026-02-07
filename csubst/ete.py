@@ -81,6 +81,12 @@ def get_common_ancestor(tree, targets):
     return tree.get_common_ancestor(targets)
 
 
+def get_distance(node, target, topology_only=False):
+    if _backend == "ete4":
+        return node.get_distance(node, target, topological=topology_only)
+    return node.get_distance(target=target, topology_only=topology_only)
+
+
 def get_tree_root(tree):
     if hasattr(tree, "root"):
         return tree.root
@@ -92,6 +98,36 @@ def add_features(node, **kwargs):
         node.add_props(**kwargs)
         return None
     return node.add_features(**kwargs)
+
+
+def set_prop(node, key, value):
+    if _backend == "ete4":
+        node.add_props(**{key: value})
+        return value
+    setattr(node, key, value)
+    return value
+
+
+def get_prop(node, key, default=None):
+    if _backend == "ete4":
+        return node.props.get(key, default)
+    return getattr(node, key, default)
+
+
+def has_prop(node, key):
+    if _backend == "ete4":
+        return key in node.props
+    return hasattr(node, key)
+
+
+def del_prop(node, key):
+    if _backend == "ete4":
+        if key in node.props:
+            del node.props[key]
+        return None
+    if hasattr(node, key):
+        delattr(node, key)
+    return None
 
 
 def write_tree(tree, format=1, outfile=None):

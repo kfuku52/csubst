@@ -160,8 +160,8 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
-        child = node.numerical_label
-        parent = node.up.numerical_label
+        child = ete.get_prop(node, "numerical_label")
+        parent = ete.get_prop(node.up, "numerical_label")
         if state_tensor_anc[parent, :, :].sum() < g['float_tol']:
             continue
         parent_matrix = state_tensor_anc[parent, :, :]
@@ -375,8 +375,8 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
-        child = node.numerical_label
-        parent = node.up.numerical_label
+        child = ete.get_prop(node, "numerical_label")
+        parent = ete.get_prop(node.up, "numerical_label")
         if state_tensor_anc[parent, :, :].sum()<g['float_tol']:
             continue
         if mode=='asis':
@@ -434,11 +434,11 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
         df.at[i,'branch_name'] = getattr(node, 'name')
         df.at[i,'branch_id'] = getattr(node, 'numerical_label')
         if _is_sparse_sub_tensor(sub_tensor):
-            df.at[i,attr+'_sub'] = branch_sub_counts[node.numerical_label]
-            branch_tensor = _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=node.numerical_label) if sitewise else None
+            df.at[i,attr+'_sub'] = branch_sub_counts[ete.get_prop(node, "numerical_label")]
+            branch_tensor = _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=ete.get_prop(node, "numerical_label")) if sitewise else None
         else:
-            df.at[i,attr+'_sub'] = sub_tensor[node.numerical_label,:,:,:,:].sum()
-            branch_tensor = sub_tensor[node.numerical_label, :, :, :, :] if sitewise else None
+            df.at[i,attr+'_sub'] = sub_tensor[ete.get_prop(node, "numerical_label"),:,:,:,:].sum()
+            branch_tensor = sub_tensor[ete.get_prop(node, "numerical_label"), :, :, :, :] if sitewise else None
         if sitewise:
             sub_list = list()
             if attr=='N':
@@ -859,7 +859,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
     num_branch = len(list(g['tree'].traverse()))
     g['is_site_nonmissing'] = numpy.zeros(shape=[num_branch, num_site], dtype=bool)
     for node in g['tree'].traverse():
-        nl = node.numerical_label
+        nl = ete.get_prop(node, "numerical_label")
         g['is_site_nonmissing'][nl,:] = (state_tensor[nl,:,:].sum(axis=1)!=0)
     g['sub_sites'] = dict()
     g['sub_sites'][g['asrv']] = numpy.zeros(shape=[num_branch, num_site], dtype=g['float_type'])
@@ -874,7 +874,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
             g['sub_sites'][SN] = numpy.zeros(shape=[num_branch, num_site], dtype=g['float_type'])
             sub_sites = df[SN+'_sub'].values
             for node in g['tree'].traverse():
-                nl = node.numerical_label
+                nl = ete.get_prop(node, "numerical_label")
                 adjusted_sub_sites = sub_sites * g['is_site_nonmissing'][nl,:]
                 total_sub_sites = adjusted_sub_sites.sum()
                 total_sub_sites = 1 if (total_sub_sites==0) else total_sub_sites
@@ -882,7 +882,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
                 g['sub_sites'][SN][nl,:] = adjusted_sub_sites
     elif (g['asrv']!='each'): # if 'each', Defined later in get_each_sub_sites()
         for node in g['tree'].traverse():
-            nl = node.numerical_label
+            nl = ete.get_prop(node, "numerical_label")
             is_site_nonmissing = (state_tensor[nl,:,:].sum(axis=1)!=0)
             adjusted_sub_sites = sub_sites * is_site_nonmissing
             total_sub_sites = adjusted_sub_sites.sum()
@@ -902,7 +902,7 @@ def get_each_sub_sites(sub_sg, mode, sg, a, d, g): # sub_sites for each "sg" gro
     elif mode == 'any2any':
         nonadjusted_sub_sites = sub_sg[:, sg]
     for node in g['tree'].traverse():
-        nl = node.numerical_label
+        nl = ete.get_prop(node, "numerical_label")
         sub_sites[nl,:] = nonadjusted_sub_sites * g['is_site_nonmissing'][nl,:]
         total_sub_sites = sub_sites[nl,:].sum()
         total_sub_sites = 1 if (total_sub_sites==0) else total_sub_sites
