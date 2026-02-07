@@ -625,6 +625,15 @@ def get_cb(id_combinations, sub_tensor, g, attr):
     cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     writer = sub_tensor2cb_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cb
     n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
+    if (writer is sub_tensor2cb) and _can_use_cython_dense_cb(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        mmap=False,
+        df_mmap=None,
+        float_type=g['float_type'],
+    ):
+        # Dense arity-2 Cython loop is fast enough that process overhead dominates.
+        n_jobs = 1
     if n_jobs == 1:
         df = writer(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
@@ -757,6 +766,13 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     cn3 = [ 'OC'+attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     writer = sub_tensor2cbs_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cbs
     n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
+    if (writer is sub_tensor2cbs) and _can_use_cython_dense_cbs(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        mmap=False,
+        df_mmap=None,
+    ):
+        n_jobs = 1
     if n_jobs == 1:
         df = writer(id_combinations, sub_tensor)
         df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)
