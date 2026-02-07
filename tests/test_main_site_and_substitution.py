@@ -6,6 +6,7 @@ from pathlib import Path
 
 from csubst import main_site
 from csubst import substitution
+from csubst import substitution_cy
 from csubst import tree
 
 
@@ -299,6 +300,38 @@ def test_sub_tensor2cbs_mmap_chunk_writer_matches_non_mmap(tmp_path):
     row_end = row_start + expected.shape[0]
     observed = numpy.array(mmap_out[row_start:row_end, :], copy=True)
     del mmap_out
+
+    numpy.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sub_tensor2cb_cython_fastpath_matches_python_fallback(monkeypatch):
+    if not hasattr(substitution_cy, "calc_combinatorial_sub_double_arity2"):
+        pytest.skip("Cython dense reducer fast path is unavailable")
+    rng = numpy.random.default_rng(7)
+    sub = rng.random((5, 4, 2, 3, 3), dtype=numpy.float64)
+    ids = numpy.array([[0, 1], [2, 3], [4, 1]], dtype=numpy.int64)
+
+    monkeypatch.setattr(substitution, "_can_use_cython_dense_cb", lambda *args, **kwargs: False)
+    expected = substitution.sub_tensor2cb(ids, sub, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64)
+
+    monkeypatch.setattr(substitution, "_can_use_cython_dense_cb", lambda *args, **kwargs: True)
+    observed = substitution.sub_tensor2cb(ids, sub, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64)
+
+    numpy.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sub_tensor2cbs_cython_fastpath_matches_python_fallback(monkeypatch):
+    if not hasattr(substitution_cy, "calc_combinatorial_sub_by_site_double_arity2"):
+        pytest.skip("Cython dense reducer fast path is unavailable")
+    rng = numpy.random.default_rng(11)
+    sub = rng.random((4, 3, 2, 3, 3), dtype=numpy.float64)
+    ids = numpy.array([[0, 1], [2, 3]], dtype=numpy.int64)
+
+    monkeypatch.setattr(substitution, "_can_use_cython_dense_cbs", lambda *args, **kwargs: False)
+    expected = substitution.sub_tensor2cbs(ids, sub, mmap=False, df_mmap=None, mmap_start=0)
+
+    monkeypatch.setattr(substitution, "_can_use_cython_dense_cbs", lambda *args, **kwargs: True)
+    observed = substitution.sub_tensor2cbs(ids, sub, mmap=False, df_mmap=None, mmap_start=0)
 
     numpy.testing.assert_allclose(observed, expected, atol=1e-12)
 

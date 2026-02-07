@@ -504,38 +504,82 @@ def get_bs(S_tensor, N_tensor):
     df = table.set_substitution_dtype(df=df)
     return(df)
 
+def _can_use_cython_dense_cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, float_type=numpy.float64):
+    if _is_sparse_sub_tensor(sub_tensor):
+        return False
+    if id_combinations.shape[1] != 2:
+        return False
+    if (id_combinations.dtype.kind not in ['i', 'u']):
+        return False
+    if (sub_tensor.dtype != numpy.float64):
+        return False
+    if (float_type != numpy.float64):
+        return False
+    if mmap and ((df_mmap is None) or (df_mmap.dtype != numpy.float64)):
+        return False
+    return hasattr(substitution_cy, 'calc_combinatorial_sub_double_arity2')
+
+def _can_use_cython_dense_cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None):
+    if _is_sparse_sub_tensor(sub_tensor):
+        return False
+    if id_combinations.shape[1] != 2:
+        return False
+    if (id_combinations.dtype.kind not in ['i', 'u']):
+        return False
+    if (sub_tensor.dtype != numpy.float64):
+        return False
+    if mmap and ((df_mmap is None) or (df_mmap.dtype != numpy.float64)):
+        return False
+    return hasattr(substitution_cy, 'calc_combinatorial_sub_by_site_double_arity2')
+
 def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64):
-    if False:
-        # Experimental. Currently this function does not speed up the analysis.
-        df = substitution_cy.calc_combinatorial_sub_float32(id_combinations, mmap_start, sub_tensor, mmap, df_mmap)
+    if _can_use_cython_dense_cb(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        mmap=mmap,
+        df_mmap=df_mmap,
+        float_type=float_type,
+    ):
+        try:
+            out = substitution_cy.calc_combinatorial_sub_double_arity2(
+                id_combinations=numpy.asarray(id_combinations, dtype=numpy.int64),
+                mmap_start=mmap_start,
+                sub_tensor=sub_tensor,
+                mmap=mmap,
+                df_mmap=df_mmap,
+            )
+            if not mmap:
+                return out
+            return
+        except Exception:
+            pass
+    arity = id_combinations.shape[1]
+    if mmap:
+        df = df_mmap
     else:
-        arity = id_combinations.shape[1]
-        if mmap:
-            df = df_mmap
+        if (sub_tensor.dtype == bool):
+            data_type = numpy.int32
         else:
-            if (sub_tensor.dtype == bool):
-                data_type = numpy.int32
-            else:
-                data_type = float_type
-            df = numpy.zeros([id_combinations.shape[0], arity + 4], dtype=data_type)
-        start_time = time.time()
-        start = mmap_start
-        end = mmap_start + id_combinations.shape[0]
-        df[start:end, :arity] = id_combinations[:, :]  # branch_ids
-        for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
-            sub_combo = sub_tensor[id_combinations[j, :], :, :, :, :]
-            sum_any2any = sub_combo.sum(axis=(3, 4))
-            sum_spe2any = sub_combo.sum(axis=4)
-            sum_any2spe = sub_combo.sum(axis=3)
-            prod_spe2spe = sub_combo.prod(axis=0)
-            df[i, arity+0] += sum_any2any.prod(axis=0).sum() # any2any
-            df[i, arity+1] += sum_spe2any.prod(axis=0).sum() # spe2any
-            df[i, arity+2] += sum_any2spe.prod(axis=0).sum() # any2spe
-            df[i, arity+3] += prod_spe2spe.sum() # spe2spe
-            if j % 10000 == 0:
-                mmap_end = mmap_start + id_combinations.shape[0]
-                txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} sec'
-                print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
+            data_type = float_type
+        df = numpy.zeros([id_combinations.shape[0], arity + 4], dtype=data_type)
+    start_time = time.time()
+    start = mmap_start
+    end = mmap_start + id_combinations.shape[0]
+    df[start:end, :arity] = id_combinations[:, :]  # branch_ids
+    for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
+        sub_combo = sub_tensor[id_combinations[j, :], :, :, :, :]
+        sum_any2any = sub_combo.sum(axis=(3, 4))
+        sum_spe2any = sub_combo.sum(axis=4)
+        sum_any2spe = sub_combo.sum(axis=3)
+        prod_spe2spe = sub_combo.prod(axis=0)
+        df[i, arity+0] += sum_any2any.prod(axis=0).sum() # any2any
+        df[i, arity+1] += sum_spe2any.prod(axis=0).sum() # spe2any
+        df[i, arity+2] += sum_any2spe.prod(axis=0).sum() # any2spe
+        df[i, arity+3] += prod_spe2spe.sum() # spe2spe
+        if j % 10000 == 0:
+            mmap_end = mmap_start + id_combinations.shape[0]
+            txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} sec'
+            print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
     if not mmap:
         return (df)
 
@@ -608,6 +652,25 @@ def get_cb(id_combinations, sub_tensor, g, attr):
     return df
 
 def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0):
+    if _can_use_cython_dense_cbs(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        mmap=mmap,
+        df_mmap=df_mmap,
+    ):
+        try:
+            out = substitution_cy.calc_combinatorial_sub_by_site_double_arity2(
+                id_combinations=numpy.asarray(id_combinations, dtype=numpy.int64),
+                mmap_start=mmap_start,
+                sub_tensor=sub_tensor,
+                mmap=mmap,
+                df_mmap=df_mmap,
+            )
+            if not mmap:
+                return out
+            return
+        except Exception:
+            pass
     arity = id_combinations.shape[1]
     num_site = sub_tensor.shape[1]
     sites = numpy.arange(num_site)
