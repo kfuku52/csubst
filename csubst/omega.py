@@ -20,81 +20,91 @@ from csubst import substitution_sparse
 from csubst import table
 from csubst import omega_cy
 
-def calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g):
-    E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
+
+def _get_cb_ids(cb):
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
+    cb_ids = cb.loc[:, bid_columns].values
+    if not numpy.issubdtype(cb_ids.dtype, numpy.integer):
+        cb_ids = cb_ids.astype(numpy.int64)
+    return cb_ids
+
+
+def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
+    if (g['asrv']=='each'):
+        return substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
+    if (g['asrv']=='sn'):
+        if (obs_col.startswith('OCS')):
+            return g['sub_sites']['S']
+        if (obs_col.startswith('OCN')):
+            return g['sub_sites']['N']
+    return g['sub_sites'][g['asrv']]
+
+
+def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type):
+    if (cb_ids.shape[1] == 1):
+        bids = cb_ids[:, 0]
+        tmp_E = sub_sites[bids, :] * sub_branches[bids, None]
+        return tmp_E.sum(axis=1)
+    if (cb_ids.shape[1] == 2):
+        bid1 = cb_ids[:, 0]
+        bid2 = cb_ids[:, 1]
+        tmp_E = sub_sites[bid1, :] * sub_branches[bid1, None]
+        tmp_E *= sub_sites[bid2, :] * sub_branches[bid2, None]
+        return tmp_E.sum(axis=1)
+    tmp_E = numpy.ones(shape=(cb_ids.shape[0], sub_sites.shape[1]), dtype=float_type)
+    for col in range(cb_ids.shape[1]):
+        bids = cb_ids[:, col]
+        tmp_E *= sub_sites[bids, :] * sub_branches[bids, None]
+    return tmp_E.sum(axis=1)
+
+
+def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g):
+    E_b = numpy.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
     for i,sg,a,d in list_igad:
         if (a==d):
             continue
-        if (g['asrv']=='each'):
-            sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
-        elif (g['asrv']=='sn'):
-            if (obs_col.startswith('OCS')):
-                sub_sites = g['sub_sites']['S']
-            elif (obs_col.startswith('OCN')):
-                sub_sites = g['sub_sites']['N']
-        else:
-            sub_sites = g['sub_sites'][g['asrv']]
+        sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        tmp_E = numpy.ones(shape=(E_b.shape[0], sub_sites.shape[1]), dtype=g['float_type'])
-        for bid in numpy.unique(cb.loc[:,bid_columns].values):
-            is_b = False
-            for bc in bid_columns:
-                is_b = (is_b)|(cb.loc[:,bc]==bid)
-            tmp_E[is_b,:] *= sub_sites[bid,:] * sub_branches[bid]
-        E_b += tmp_E.sum(axis=1)
+        E_b += _calc_tmp_E_sum(
+            cb_ids=cb_ids,
+            sub_sites=sub_sites,
+            sub_branches=sub_branches,
+            float_type=g['float_type'],
+        )
     return E_b
 
-def joblib_calc_E_mean(mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g):
+
+def joblib_calc_E_mean(mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g):
     iter_start = time.time()
-    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     if (igad_chunk==[]):
         return None # This happens when the number of iteration is smaller than --threads
     i_start = igad_chunk[0][0]
     for i,sg,a,d in igad_chunk:
         if (a==d):
             continue
-        if (g['asrv']=='each'):
-            sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
-        elif (g['asrv']=='sn'):
-            if (obs_col.startswith('OCS')):
-                sub_sites = g['sub_sites']['S']
-            elif (obs_col.startswith('OCN')):
-                sub_sites = g['sub_sites']['N']
-        else:
-            sub_sites = g['sub_sites'][g['asrv']]
+        sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        tmp_E = numpy.ones(shape=(dfEb.shape[0], sub_sites.shape[1]), dtype=g['float_type'])
-        for bid in numpy.unique(cb.loc[:,bid_columns].values):
-            is_b = False
-            for bc in bid_columns:
-                is_b = (is_b)|(cb.loc[:,bc]==bid)
-            tmp_E[is_b,:] *= sub_sites[bid,:] * sub_branches[bid]
-        dfEb += tmp_E.sum(axis=1)
+        dfEb += _calc_tmp_E_sum(
+            cb_ids=cb_ids,
+            sub_sites=sub_sites,
+            sub_branches=sub_branches,
+            float_type=g['float_type'],
+        )
     txt = 'E{}: {}-{}th of {} matrix_group/ancestral_state/derived_state combinations. Time elapsed: {:,} [sec]'
     print(txt.format(obs_col, i_start, i, num_gad_combinat, int(time.time()-iter_start)), flush=True)
 
-def joblib_calc_quantile(mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
-    bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
+
+def joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
+    array_site = numpy.arange(sub_sg.shape[0])
     for i,sg,a,d in igad_chunk:
         if (a==d):
             continue
-        if (g['asrv']=='each'):
-            sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
-        elif (g['asrv']=='sn'):
-                if (obs_col.startswith('OCS')):
-                    sub_sites = g['sub_sites']['S']
-                elif (obs_col.startswith('OCN')):
-                    sub_sites = g['sub_sites']['N']
-        else:
-            sub_sites = g['sub_sites'][g['asrv']]
+        sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
         p = sub_sites[0]
         if p.sum()==0:
             continue
         pm_start = time.time()
-        array_site = numpy.arange(p.shape[0])
-        cb_ids = cb.loc[:,bid_columns].values
         if 'float' in str(sub_branches.dtype):
             # TODO: warn this rounding (only once)
             sub_branches = sub_branches.round().astype(numpy.int64)
@@ -130,12 +140,13 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     print(txt.format(SN, mode, num_gad_combinat))
     list_igad = [ [i,]+list(items) for i,items in zip(range(num_gad_combinat), list_gad) ]
     obs_col = 'OC'+SN+mode
+    cb_ids = _get_cb_ids(cb)
     n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
     chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
     igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
     if stat=='mean':
         if n_jobs == 1:
-            E_b = calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g)
+            E_b = calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g)
         else:
             my_dtype = sub_tensor.dtype
             if 'bool' in str(my_dtype): my_dtype = g['float_type']
@@ -144,7 +155,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0]), mode='w+')
             joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend='multiprocessing')(
                 joblib.delayed(joblib_calc_E_mean)
-                (mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
+                (mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
             )
             E_b = dfEb
             if os.path.exists(mmap_out): os.unlink(mmap_out)
@@ -156,11 +167,11 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0], quantile_niter), mode='w+')
         # TODO distinct thread/process
         if n_jobs == 1:
-            joblib_calc_quantile(mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, list_igad, g)
+            joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, list_igad, g)
         else:
             joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend='multiprocessing')(
                 joblib.delayed(joblib_calc_quantile)
-                (mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
+                (mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
             )
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
