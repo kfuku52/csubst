@@ -152,6 +152,40 @@ def test_get_cb_auto_parallel_matches_single_thread_for_dense_and_sparse():
     numpy.testing.assert_allclose(out_sparse_auto.values, out_sparse_single.values, atol=1e-12)
 
 
+def test_resolve_dense_cython_n_jobs_prefers_single_for_small_workload():
+    ids = numpy.zeros((1200, 2), dtype=numpy.int64)
+    sub = numpy.zeros((10, 100, 1, 4, 4), dtype=numpy.float64)
+    g = {
+        "parallel_dense_cython_min_combos_per_job": 5000,
+        "parallel_dense_cython_min_ops_per_job": 500000000,
+    }
+    out = substitution._resolve_dense_cython_n_jobs(
+        n_jobs=8,
+        id_combinations=ids,
+        sub_tensor=sub,
+        g=g,
+        task="cb",
+    )
+    assert out == 1
+
+
+def test_resolve_dense_cython_n_jobs_allows_parallel_for_large_workload():
+    ids = numpy.zeros((200000, 2), dtype=numpy.int64)
+    sub = numpy.zeros((10, 500, 1, 4, 4), dtype=numpy.float64)
+    g = {
+        "parallel_dense_cython_min_combos_per_job": 5000,
+        "parallel_dense_cython_min_ops_per_job": 500000000,
+    }
+    out = substitution._resolve_dense_cython_n_jobs(
+        n_jobs=8,
+        id_combinations=ids,
+        sub_tensor=sub,
+        g=g,
+        task="cb",
+    )
+    assert out >= 2
+
+
 def test_sparse_group_tensor_cache_matches_uncached():
     dense = _toy_reducer_tensor()
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)

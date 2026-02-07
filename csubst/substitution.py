@@ -532,6 +532,25 @@ def _can_use_cython_dense_cbs(id_combinations, sub_tensor, mmap=False, df_mmap=N
         return False
     return hasattr(substitution_cy, 'calc_combinatorial_sub_by_site_double_arity2')
 
+def _resolve_dense_cython_n_jobs(n_jobs, id_combinations, sub_tensor, g, task='cb'):
+    if n_jobs <= 1:
+        return 1
+    min_combos_per_job = int(g.get('parallel_dense_cython_min_combos_per_job', 5000))
+    min_ops_per_job = int(g.get('parallel_dense_cython_min_ops_per_job', 500000000))
+    if min_combos_per_job < 1:
+        min_combos_per_job = 1
+    if min_ops_per_job < 1:
+        min_ops_per_job = 1
+    num_comb = int(id_combinations.shape[0])
+    ops_per_comb = int(sub_tensor.shape[1]) * int(sub_tensor.shape[2]) * int(sub_tensor.shape[3]) * int(sub_tensor.shape[4])
+    total_ops = num_comb * ops_per_comb
+    max_jobs_by_combos = max(1, num_comb // min_combos_per_job)
+    max_jobs_by_ops = max(1, total_ops // min_ops_per_job)
+    resolved = max(1, min(int(n_jobs), max_jobs_by_combos, max_jobs_by_ops))
+    txt = 'Dense Cython scheduler for {}: combos={}, estimated_ops={}, workers {} -> {}'
+    print(txt.format(task, num_comb, total_ops, n_jobs, resolved), flush=True)
+    return resolved
+
 def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64):
     if _can_use_cython_dense_cb(
         id_combinations=id_combinations,
@@ -632,8 +651,13 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         df_mmap=None,
         float_type=g['float_type'],
     ):
-        # Dense arity-2 Cython loop is fast enough that process overhead dominates.
-        n_jobs = 1
+        n_jobs = _resolve_dense_cython_n_jobs(
+            n_jobs=n_jobs,
+            id_combinations=id_combinations,
+            sub_tensor=sub_tensor,
+            g=g,
+            task='cb',
+        )
     if n_jobs == 1:
         df = writer(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
@@ -772,7 +796,13 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         mmap=False,
         df_mmap=None,
     ):
-        n_jobs = 1
+        n_jobs = _resolve_dense_cython_n_jobs(
+            n_jobs=n_jobs,
+            id_combinations=id_combinations,
+            sub_tensor=sub_tensor,
+            g=g,
+            task='cbs',
+        )
     if n_jobs == 1:
         df = writer(id_combinations, sub_tensor)
         df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)
