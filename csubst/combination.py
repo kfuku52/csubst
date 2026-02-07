@@ -45,12 +45,11 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
         raise Exception('Only one of target_id_dict, cb_passed, or exhaustive must be set.')
     g['fg_dependent_id_combinations'] = dict()
     tree = g['tree']
+    all_nodes = [node for node in tree.traverse() if not node.is_root()]
     if verbose:
-        all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
         print("Number of all branches: {:,}".format(len(all_nodes)), flush=True)
     if exhaustive:
         target_nodes = list()
-        all_nodes = [node for node in tree.traverse() if not node.is_root()]
         for node in all_nodes:
             if (check_attr is None)|(check_attr in dir(node)):
                 target_nodes.append(node.numerical_label)
@@ -86,7 +85,8 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             else:
                 chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
                 chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
-                backend = parallel.resolve_parallel_backend(g=g, task='general')
+                # node_union writes into a shared memmap; threads reliably share that memory map.
+                backend = 'threading'
                 tasks = [(ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)]
                 parallel.run_starmap(
                     func=node_union,
@@ -142,7 +142,8 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             else:
                 chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
                 chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
-                backend = parallel.resolve_parallel_backend(g=g, task='general')
+                # node_union writes into a shared memmap; threads reliably share that memory map.
+                backend = 'threading'
                 tasks = [(ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)]
                 parallel.run_starmap(
                     func=node_union,

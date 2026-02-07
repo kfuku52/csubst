@@ -39,7 +39,7 @@ def get_df_clade_size(g, trait_name):
             df_clade_size.at[bid,'is_fg_stem_'+trait_name] = True
     return df_clade_size
 
-def foreground_clade_randomization(df_clade_size, g, sample_original_foreground=False):
+def foreground_clade_randomization(df_clade_size, g, trait_name, sample_original_foreground=False):
     size_array = df_clade_size.loc[:,'size'].values.astype(numpy.int64)
     size_min = size_array.min()
     size_max = size_array.max()
@@ -287,7 +287,7 @@ def get_foreground_branch(g, simulate=False):
         g = get_foreground_ids(g=g, write=True)
     return g
 
-def print_num_possible_permuted_combinations(df_clade_size, sample_original_foreground):
+def print_num_possible_permuted_combinations(df_clade_size, trait_name, sample_original_foreground):
     import scipy
     num_possible_permutation_combination = 1
     is_fg_stem = df_clade_size.loc[:, 'is_fg_stem_'+trait_name].values
@@ -310,11 +310,11 @@ def randomize_foreground_branch(g, trait_name, sample_original_foreground=False)
     g['r_fg_ids'] = dict()
     g['r_fg_leaf_names'] = dict()
     df_clade_size = get_df_clade_size(g, trait_name)
-    r_df_clade_size = foreground_clade_randomization(df_clade_size, g, sample_original_foreground)
-    print_num_possible_permuted_combinations(r_df_clade_size, sample_original_foreground)
+    r_df_clade_size = foreground_clade_randomization(df_clade_size, g, trait_name, sample_original_foreground)
+    print_num_possible_permuted_combinations(r_df_clade_size, trait_name, sample_original_foreground)
     g['r_target_ids'][trait_name] = get_new_foreground_ids(r_df_clade_size, g)
     g['r_fg_ids'][trait_name] = copy.deepcopy(g['r_target_ids'][trait_name])
-    new_fg_leaf_names = [ n.get_leaf_names() for n in g['tree'].traverse() if n.numerical_label in g['r_fg_ids'] ]
+    new_fg_leaf_names = [ n.get_leaf_names() for n in g['tree'].traverse() if n.numerical_label in g['r_fg_ids'][trait_name] ]
     new_fg_leaf_names = list(itertools.chain(*new_fg_leaf_names))
     new_fg_leaf_names = list(set(new_fg_leaf_names))
     g['r_fg_leaf_names'][trait_name] = new_fg_leaf_names
@@ -439,10 +439,11 @@ def get_num_foreground_lineages(tree, trait_name):
         break
     return num_fl
 
-def set_random_foreground_branch(g, trait_name, num_trial=100):
+def set_random_foreground_branch(g, trait_name, num_trial=100, sample_original_foreground=False):
+    # Refresh tree foreground annotations once before randomization attempts.
+    g = get_foreground_branch(g)
     for i in numpy.arange(num_trial):
-        g = get_foreground_branch(g)
-        g = randomize_foreground_branch(g, trait_name)
+        g = randomize_foreground_branch(g, trait_name, sample_original_foreground=sample_original_foreground)
         if g['r_target_ids'][trait_name].shape[0]<2:
             continue
         g,rid_combinations = combination.get_node_combinations(g=g, target_id_dict=g['r_target_ids'],
@@ -452,7 +453,10 @@ def set_random_foreground_branch(g, trait_name, num_trial=100):
             continue
         print('Foreground branch permutation finished after {:,} trials.'.format(i+1), flush=True)
         return g,rid_combinations
-    txt = 'Foreground branch permutation failed {:,} times. There may not be enough numbers of "similar" clades.\n'
+    if sample_original_foreground:
+        txt = 'Foreground branch permutation failed {:,} times even when allowing sampling from original foreground clades.'
+    else:
+        txt = 'Foreground branch permutation failed {:,} times. There may not be enough numbers of "similar" clades.'
     raise Exception(txt.format(num_trial))
 
 def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
@@ -518,65 +522,150 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
         print(("Elapsed time for arity = {}: {:,.1f} sec\n".format(current_arity, elapsed_time)), flush=True)
     return g
 
-def clade_permutation(cb, g):
-    print('Starting foreground clade permutation.')
-    if g['fg_df'].shape[1] > 2:
-        sys.stderr.write('Only the first trait column will be used for clade permutation.\n')
-    g['df_cb_stats_observed'] = g['df_cb_stats'].copy()
-    trait_name = g['fg_df'].columns[1]
-    i = 1
-    for trial_no in numpy.arange(g['fg_clade_permutation']*10):
-        start = time.time()
-        txt = 'Starting foreground clade permutation round {:,} (of {:,})'
-        print(txt.format(i, g['fg_clade_permutation']), flush=True)
-        g = param.initialize_df_cb_stats(g)
-        g['df_cb_stats'] = g['df_cb_stats'].loc[(g['df_cb_stats'].loc[:,'arity']==g['current_arity']),:].reset_index(drop=True)
-        g,rid_combinations = set_random_foreground_branch(g, trait_name)
-        random_mode = 'randomization_iter'+str(i)+'_bid'+','.join(g['r_fg_ids'][trait_name].astype(str))
-        bid_columns = [ 'branch_id_'+str(k+1) for k in numpy.arange(rid_combinations.shape[1]) ]
-        rid_combinations = pandas.DataFrame(rid_combinations)
-        rid_combinations.columns = bid_columns
-        rcb = pandas.merge(rid_combinations, cb, how='inner', on=bid_columns)
-        if (rid_combinations.shape[0] != rcb.shape[0]):
-            txt = '{:,} ({:,} - {:,}) permuted foreground branch combinations were dropped because they were not included in the cb table.'
-            print(txt.format(rid_combinations.shape[0]-rcb.shape[0], rid_combinations.shape[0], rcb.shape[0]))
-        rcb['is_fg_'+trait_name] = 'Y'
-        rcb['is_mg_'+trait_name] = 'N'
-        rcb['is_mf_'+trait_name] = 'N'
-        g = add_median_cb_stats(g, rcb, 2, start, verbose=False)
-        g['df_cb_stats'].loc[:,'mode'] = random_mode
-        if numpy.isnan(g['df_cb_stats'].loc[:,'median_omegaCany2spe_fg_'+trait_name].values[0]):
-            print('OmegaCany2spe could not be obtained for permuted foregrounds:')
-            print(rid_combinations)
-            print('')
-            continue
-        g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
-        print('')
-        if (i==g['fg_clade_permutation']):
-            txt = 'Clade permutation successfully found {:,} new branch combinations after {:,} trials.'
-            print(txt.format(g['fg_clade_permutation'], trial_no+1))
-            break
-        if (trial_no==(g['fg_clade_permutation']*10)):
-            txt = 'Clade permutation could not find enough number of new branch combinations even after {:,} trials.\n'
-            sys.stderr.write(txt.format(g['fg_clade_permutation']*10))
-        i += 1
-    is_arity = (g['df_cb_stats_main'].loc[:,'arity']==g['current_arity'])
-    is_stat_fg = ~g['df_cb_stats_main'].loc[:,'mode'].str.startswith('randomization_')
-    is_stat_permutation = g['df_cb_stats_main'].loc[:,'mode'].str.startswith('randomization_')
-    obs_value = g['df_cb_stats_main'].loc[is_arity & is_stat_fg,'median_omegaCany2spe_fg_'+trait_name].values[0]
-    permutation_values = g['df_cb_stats_main'].loc[is_arity & is_stat_permutation, 'median_omegaCany2spe_fg_'+trait_name].values
-    num_positive = (obs_value<=permutation_values).sum()
+def _clade_permutation_mode_prefix(trait_name):
+    return 'randomization_' + str(trait_name) + '_'
+
+
+def _report_clade_permutation_stats(g, trait_name):
+    obs_col = 'median_omegaCany2spe_fg_' + trait_name
+    obs_ocn_col = 'total_OCNany2spe_fg_' + trait_name
+    if obs_col not in g['df_cb_stats_observed'].columns:
+        txt = 'Observed stats were unavailable for trait "{}"; skipping clade-permutation summary.\n'
+        sys.stderr.write(txt.format(trait_name))
+        return
+    is_arity_obs = (g['df_cb_stats_observed'].loc[:, 'arity'] == g['current_arity'])
+    obs_values = g['df_cb_stats_observed'].loc[is_arity_obs, obs_col].dropna().values
+    if obs_values.shape[0] == 0:
+        txt = 'No observed omegaCany2spe value was found for trait "{}"; skipping clade-permutation summary.\n'
+        sys.stderr.write(txt.format(trait_name))
+        return
+    obs_value = obs_values[0]
+    if 'mode' not in g['df_cb_stats_main'].columns:
+        txt = 'Permutation rows were unavailable for trait "{}"; skipping clade-permutation summary.\n'
+        sys.stderr.write(txt.format(trait_name))
+        return
+    if obs_col not in g['df_cb_stats_main'].columns:
+        txt = 'Permutation omegaCany2spe values were unavailable for trait "{}"; skipping clade-permutation summary.\n'
+        sys.stderr.write(txt.format(trait_name))
+        return
+    mode_prefix = _clade_permutation_mode_prefix(trait_name)
+    is_arity_perm = (g['df_cb_stats_main'].loc[:, 'arity'] == g['current_arity'])
+    is_stat_permutation = g['df_cb_stats_main'].loc[:, 'mode'].astype(str).str.startswith(mode_prefix)
+    permutation_values = g['df_cb_stats_main'].loc[is_arity_perm & is_stat_permutation, obs_col].dropna().values
+    if permutation_values.shape[0] == 0:
+        txt = 'No valid clade permutations were available for trait "{}"; p value was not calculated.\n'
+        sys.stderr.write(txt.format(trait_name))
+        return
+    num_positive = (obs_value <= permutation_values).sum()
     num_all = permutation_values.shape[0]
     pvalue = num_positive / num_all
-    obs_ocn = g['df_cb_stats_main'].loc[is_arity & is_stat_fg,'total_OCNany2spe_fg_'+trait_name].values[0]
-    print('Observed total OCNany2spe in foreground lineages = {:,.3}'.format(obs_ocn))
-    permutation_ocns = g['df_cb_stats_main'].loc[is_arity & is_stat_permutation, 'total_OCNany2spe_fg_'+trait_name].values
-    txt = 'Total OCNany2spe in permutation lineages = {:,.3}; {:,.3} ± {:,.3} (median; mean ± SD excluding inf)'
-    print(txt.format(numpy.median(permutation_ocns), permutation_ocns.mean(), permutation_ocns.std()))
-    print('Observed median omegaCany2spe in foreground lineages = {:,.3}'.format(obs_value))
-    txt = 'Median omegaCany2spe in permutation lineages = {:,.3}; {:,.3} ± {:,.3} (median; mean ± SD excluding inf)'
-    print(txt.format(numpy.median(permutation_values), permutation_values[numpy.isfinite(permutation_values)].mean(), permutation_values[numpy.isfinite(permutation_values)].std()))
-    txt = 'P value of foreground convergence (omegaCany2spe) by clade permutations = {} (observation <= permutation = {:,}/{:,})'
-    print(txt.format(pvalue, num_positive, num_all))
+    if obs_ocn_col in g['df_cb_stats_observed'].columns:
+        obs_ocn_values = g['df_cb_stats_observed'].loc[is_arity_obs, obs_ocn_col].dropna().values
+        if obs_ocn_values.shape[0] > 0:
+            print('Trait {}: Observed total OCNany2spe in foreground lineages = {:,.3}'.format(trait_name, obs_ocn_values[0]))
+    if obs_ocn_col in g['df_cb_stats_main'].columns:
+        permutation_ocns = g['df_cb_stats_main'].loc[is_arity_perm & is_stat_permutation, obs_ocn_col].dropna().values
+        if permutation_ocns.shape[0] > 0:
+            txt = 'Trait {}: Total OCNany2spe in permutation lineages = {:,.3}; {:,.3} ± {:,.3} (median; mean ± SD excluding inf)'
+            print(txt.format(trait_name, numpy.median(permutation_ocns), permutation_ocns.mean(), permutation_ocns.std()))
+    print('Trait {}: Observed median omegaCany2spe in foreground lineages = {:,.3}'.format(trait_name, obs_value))
+    finite_omega = permutation_values[numpy.isfinite(permutation_values)]
+    if finite_omega.shape[0] > 0:
+        finite_mean = finite_omega.mean()
+        finite_std = finite_omega.std()
+    else:
+        finite_mean = numpy.nan
+        finite_std = numpy.nan
+    txt = 'Trait {}: Median omegaCany2spe in permutation lineages = {:,.3}; {:,.3} ± {:,.3} (median; mean ± SD excluding inf)'
+    print(txt.format(trait_name, numpy.median(permutation_values), finite_mean, finite_std))
+    txt = 'Trait {}: P value of foreground convergence (omegaCany2spe) by clade permutations = {} (observation <= permutation = {:,}/{:,})'
+    print(txt.format(trait_name, pvalue, num_positive, num_all))
+
+
+def _append_clade_permutation_failure_row(g, trait_name, trial_no, reason):
+    g = param.initialize_df_cb_stats(g)
+    is_arity = (g['df_cb_stats'].loc[:, 'arity'] == g['current_arity'])
+    g['df_cb_stats'] = g['df_cb_stats'].loc[is_arity, :].reset_index(drop=True)
+    mode_prefix = _clade_permutation_mode_prefix(trait_name)
+    g['df_cb_stats'].loc[:, 'mode'] = mode_prefix + 'iter0_failed_trial' + str(trial_no)
+    status_col = 'clade_permutation_status_' + trait_name
+    g['df_cb_stats'].loc[:, status_col] = str(reason)
+    g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+    return g
+
+
+def clade_permutation(cb, g):
+    print('Starting foreground clade permutation.')
+    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
+    if len(trait_names) == 0:
+        sys.stderr.write('No foreground traits were available for clade permutation.\n')
+        return g
+    g['df_cb_stats_observed'] = g['df_cb_stats'].copy()
+    max_trials = g['fg_clade_permutation'] * 10
+    for trait_name in trait_names:
+        i = 1
+        sample_original_foreground = False
+        for trial_no in numpy.arange(max_trials):
+            start = time.time()
+            txt = 'Starting foreground clade permutation round {:,} (of {:,}) for trait "{}"'
+            print(txt.format(i, g['fg_clade_permutation'], trait_name), flush=True)
+            g = param.initialize_df_cb_stats(g)
+            is_arity = (g['df_cb_stats'].loc[:, 'arity'] == g['current_arity'])
+            g['df_cb_stats'] = g['df_cb_stats'].loc[is_arity, :].reset_index(drop=True)
+            try:
+                g, rid_combinations = set_random_foreground_branch(
+                    g,
+                    trait_name,
+                    sample_original_foreground=sample_original_foreground,
+                )
+            except Exception as exc:
+                if not sample_original_foreground:
+                    sample_original_foreground = True
+                    txt = 'Clade permutation retry for trait "{}": allowing sampling from original foreground clades after trial {:,} failure ({})\n'
+                    sys.stderr.write(txt.format(trait_name, trial_no + 1, str(exc)))
+                    continue
+                g = _append_clade_permutation_failure_row(g, trait_name, trial_no + 1, str(exc))
+                txt = 'Clade permutation failed for trait "{}" at trial {:,}: {}\n'
+                sys.stderr.write(txt.format(trait_name, trial_no + 1, str(exc)))
+                break
+            randomized_bids = numpy.asarray(g['r_fg_ids'][trait_name]).astype(str)
+            mode_prefix = _clade_permutation_mode_prefix(trait_name)
+            random_mode = mode_prefix + 'iter' + str(i)
+            if sample_original_foreground:
+                random_mode += '_sampleorig'
+            random_mode += '_bid' + ','.join(randomized_bids)
+            bid_columns = ['branch_id_' + str(k + 1) for k in numpy.arange(rid_combinations.shape[1])]
+            rid_combinations = pandas.DataFrame(rid_combinations)
+            rid_combinations.columns = bid_columns
+            rcb = pandas.merge(rid_combinations, cb, how='inner', on=bid_columns)
+            if rid_combinations.shape[0] != rcb.shape[0]:
+                txt = '{:,} ({:,} - {:,}) permuted foreground branch combinations were dropped because they were not included in the cb table.'
+                print(txt.format(rid_combinations.shape[0] - rcb.shape[0], rid_combinations.shape[0], rcb.shape[0]))
+            rcb['is_fg_' + trait_name] = 'Y'
+            rcb['is_mg_' + trait_name] = 'N'
+            rcb['is_mf_' + trait_name] = 'N'
+            g = add_median_cb_stats(g, rcb, g['current_arity'], start, verbose=False)
+            g['df_cb_stats'].loc[:, 'mode'] = random_mode
+            omega_col = 'median_omegaCany2spe_fg_' + trait_name
+            if omega_col not in g['df_cb_stats'].columns:
+                txt = 'omegaCany2spe could not be obtained for trait "{}"; skipping this clade permutation trial.\n'
+                sys.stderr.write(txt.format(trait_name))
+                continue
+            if pandas.isna(g['df_cb_stats'].loc[:, omega_col].values[0]):
+                print('OmegaCany2spe could not be obtained for permuted foregrounds:')
+                print(rid_combinations)
+                print('')
+                continue
+            g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+            print('')
+            if i == g['fg_clade_permutation']:
+                txt = 'Clade permutation successfully found {:,} new branch combinations for trait "{}" after {:,} trials.'
+                print(txt.format(g['fg_clade_permutation'], trait_name, trial_no + 1))
+                break
+            if trial_no == (max_trials - 1):
+                txt = 'Clade permutation could not find enough number of new branch combinations for trait "{}" even after {:,} trials.\n'
+                sys.stderr.write(txt.format(trait_name, max_trials))
+            i += 1
+        _report_clade_permutation_stats(g, trait_name)
     g['df_cb_stats'] = g['df_cb_stats_observed'].copy()
     return g
