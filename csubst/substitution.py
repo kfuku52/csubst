@@ -675,7 +675,7 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        backend = parallel.resolve_joblib_backend(g=g, task='reducer')
+        backend = parallel.resolve_parallel_backend(g=g, task='reducer')
         tasks = [
             (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms, g['float_type'])
             for ids, ms in zip(id_chunks, mmap_starts)
@@ -833,7 +833,7 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        backend = parallel.resolve_joblib_backend(g=g, task='reducer')
+        backend = parallel.resolve_parallel_backend(g=g, task='reducer')
         tasks = [
             (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms)
             for ids, ms in zip(id_chunks, mmap_starts)

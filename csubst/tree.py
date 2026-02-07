@@ -1,5 +1,4 @@
 import ete3
-import joblib
 import numpy
 
 import copy
@@ -111,11 +110,18 @@ def get_node_distance(tree, cb, ncpu, float_type):
         tree_dict[node.numerical_label] = node
     cn1 = cb.columns[cb.columns.str.startswith('branch_id_')]
     id_combinations = cb.loc[:,cn1].values
-    chunks, starts = parallel.get_chunks(id_combinations, ncpu)
-    out_list = joblib.Parallel(n_jobs=ncpu, max_nbytes=None, backend='multiprocessing')(
-        joblib.delayed(calc_node_dist_chunk)
-        (chunk, start, tree_dict, float_type) for chunk, start in zip(chunks, starts)
-    )
+    n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=ncpu)
+    if n_jobs == 1:
+        out_list = [calc_node_dist_chunk(id_combinations, 0, tree_dict, float_type)]
+    else:
+        chunks, starts = parallel.get_chunks(id_combinations, n_jobs)
+        tasks = [(chunk, start, tree_dict, float_type) for chunk, start in zip(chunks, starts)]
+        out_list = parallel.run_starmap(
+            func=calc_node_dist_chunk,
+            args_iterable=tasks,
+            n_jobs=n_jobs,
+            backend='threading',
+        )
     cb.loc[:, 'dist_node_num'] = -1
     cb.loc[:, 'dist_bl'] = numpy.nan
     for arr_dist in out_list:

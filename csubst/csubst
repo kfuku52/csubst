@@ -82,7 +82,7 @@ if __name__ == "__main__":
                              'Sparse reducers are selected when estimated substitution tensor density is <= this value.')
     psr_co.add_argument('--parallel_backend', metavar='auto|multiprocessing|threading|loky', default='auto', type=str,
                         choices=['auto', 'multiprocessing', 'threading', 'loky'],
-                        help='default=%(default)s: joblib backend policy for parallel workloads. '
+                        help='default=%(default)s: Backend policy for parallel workloads. '
                              '"auto" uses multiprocessing.')
     psr_co.add_argument('--parallel_chunk_factor', metavar='INT', default=1, type=int, required=False,
                         help='default=%(default)s: Number of chunks per worker for general parallel workloads.')

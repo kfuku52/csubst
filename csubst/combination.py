@@ -86,7 +86,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             else:
                 chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
                 chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
-                backend = parallel.resolve_joblib_backend(g=g, task='general')
+                backend = parallel.resolve_parallel_backend(g=g, task='general')
                 tasks = [(ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)]
                 parallel.run_starmap(
                     func=node_union,
@@ -142,7 +142,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             else:
                 chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
                 chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
-                backend = parallel.resolve_joblib_backend(g=g, task='general')
+                backend = parallel.resolve_parallel_backend(g=g, task='general')
                 tasks = [(ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)]
                 parallel.run_starmap(
                     func=node_union,

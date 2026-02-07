@@ -20,7 +20,7 @@ def resolve_n_jobs(num_items, threads):
     return min(num_items, threads)
 
 
-def resolve_joblib_backend(g, task='general'):
+def resolve_parallel_backend(g, task='general'):
     backend = str(g.get('parallel_backend', 'auto')).lower()
     if backend not in ['auto', 'multiprocessing', 'threading', 'loky']:
         raise ValueError('parallel_backend should be one of auto, multiprocessing, threading, loky.')
@@ -29,6 +29,11 @@ def resolve_joblib_backend(g, task='general'):
     if task in ['reducer']:
         return 'multiprocessing'
     return 'multiprocessing'
+
+
+def resolve_joblib_backend(g, task='general'):
+    # Backward-compatible alias retained while migration off joblib is in progress.
+    return resolve_parallel_backend(g=g, task=task)
 
 
 def resolve_chunk_factor(g, task='general'):

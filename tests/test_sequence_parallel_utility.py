@@ -58,10 +58,10 @@ def test_resolve_n_jobs_is_capped_by_workload_size():
     assert parallel.resolve_n_jobs(num_items=8, threads=2) == 2
 
 
-def test_resolve_joblib_backend_auto_uses_task_policy():
+def test_resolve_parallel_backend_auto_uses_task_policy():
     g = {"parallel_backend": "auto"}
-    assert parallel.resolve_joblib_backend(g=g, task="general") == "multiprocessing"
-    assert parallel.resolve_joblib_backend(g=g, task="reducer") == "multiprocessing"
+    assert parallel.resolve_parallel_backend(g=g, task="general") == "multiprocessing"
+    assert parallel.resolve_parallel_backend(g=g, task="reducer") == "multiprocessing"
 
 
 def test_run_starmap_single_process_matches_direct_evaluation():
