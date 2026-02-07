@@ -1,4 +1,3 @@
-import joblib
 import numpy
 import pandas
 import scipy.sparse
@@ -637,6 +636,11 @@ def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, 
     if not mmap:
         return (df)
 
+def _write_cb_chunk_to_mmap(writer, ids, sub_tensor, mmap_out, axis, dtype, mmap_start, float_type):
+    df_mmap = numpy.memmap(mmap_out, dtype=dtype, shape=axis, mode='r+')
+    writer(ids, sub_tensor, True, df_mmap, mmap_start, float_type)
+    df_mmap.flush()
+
 def get_cb(id_combinations, sub_tensor, g, attr):
     sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cb_'+attr)
     arity = id_combinations.shape[1]
@@ -672,11 +676,19 @@ def get_cb(id_combinations, sub_tensor, g, attr):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         backend = parallel.resolve_joblib_backend(g=g, task='reducer')
-        joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend=backend)(
-            joblib.delayed(writer)
-            (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids,ms in zip(id_chunks, mmap_starts)
+        tasks = [
+            (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms, g['float_type'])
+            for ids, ms in zip(id_chunks, mmap_starts)
+        ]
+        parallel.run_starmap(
+            func=_write_cb_chunk_to_mmap,
+            args_iterable=tasks,
+            n_jobs=n_jobs,
+            backend=backend,
         )
+        df_mmap.flush()
         df = pandas.DataFrame(df_mmap, columns=cn)
+        del df_mmap
         if os.path.exists(mmap_out): os.unlink(mmap_out)
     df = table.sort_branch_ids(df)
     df = df.dropna()
@@ -781,6 +793,11 @@ def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None,
     if not mmap:
         return df
 
+def _write_cbs_chunk_to_mmap(writer, ids, sub_tensor, mmap_out, axis, dtype, mmap_start):
+    df_mmap = numpy.memmap(mmap_out, dtype=dtype, shape=axis, mode='r+')
+    writer(ids, sub_tensor, True, df_mmap, mmap_start)
+    df_mmap.flush()
+
 def get_cbs(id_combinations, sub_tensor, attr, g):
     sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cbs_'+attr)
     print("Calculating combinatorial substitutions: attr =", attr, flush=True)
@@ -817,11 +834,19 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         backend = parallel.resolve_joblib_backend(g=g, task='reducer')
-        joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend=backend)(
-            joblib.delayed(writer)
-            (ids, sub_tensor, True, df_mmap, ms) for ids,ms in zip(id_chunks,mmap_starts)
+        tasks = [
+            (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms)
+            for ids, ms in zip(id_chunks, mmap_starts)
+        ]
+        parallel.run_starmap(
+            func=_write_cbs_chunk_to_mmap,
+            args_iterable=tasks,
+            n_jobs=n_jobs,
+            backend=backend,
         )
+        df_mmap.flush()
         df = pandas.DataFrame(df_mmap, columns=cn1 + cn2 + cn3)
+        del df_mmap
         if os.path.exists(mmap_out): os.remove(mmap_out)
     df = df.dropna()
     df = table.sort_branch_ids(df)
