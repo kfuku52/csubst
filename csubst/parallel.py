@@ -1,3 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
+
+
 def _get_num_items(input_data):
     if 'shape' in dir(input_data):
         return int(input_data.shape[0])
@@ -35,6 +39,40 @@ def resolve_chunk_factor(g, task='general'):
     if value < 1:
         raise ValueError('parallel_chunk_factor should be >= 1.')
     return value
+
+
+def _normalize_parallel_backend(backend):
+    backend = str(backend).lower()
+    if backend == 'auto':
+        return 'multiprocessing'
+    if backend in ['multiprocessing', 'threading', 'loky']:
+        return backend
+    raise ValueError('parallel_backend should be one of auto, multiprocessing, threading, loky.')
+
+
+def run_starmap(func, args_iterable, n_jobs, backend='multiprocessing', chunksize=None):
+    args_list = list(args_iterable)
+    if len(args_list) == 0:
+        return list()
+    n_jobs = int(n_jobs)
+    if n_jobs < 1:
+        raise ValueError('n_jobs should be >= 1.')
+    if n_jobs == 1:
+        return [func(*args) for args in args_list]
+    backend = _normalize_parallel_backend(backend)
+    if backend == 'threading':
+        with ThreadPoolExecutor(max_workers=n_jobs) as executor:
+            futures = [executor.submit(func, *args) for args in args_list]
+            return [future.result() for future in futures]
+    if chunksize is None:
+        chunksize = max(1, len(args_list) // (n_jobs * 4))
+    else:
+        chunksize = int(chunksize)
+        if chunksize < 1:
+            raise ValueError('chunksize should be >= 1.')
+    ctx = multiprocessing.get_context()
+    with ctx.Pool(processes=n_jobs) as pool:
+        return pool.starmap(func, args_list, chunksize=chunksize)
 
 
 def get_chunks(input_data, threads, chunk_factor=1):

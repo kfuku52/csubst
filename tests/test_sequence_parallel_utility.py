@@ -9,6 +9,10 @@ from csubst import sequence
 from csubst import utility
 
 
+def _starmap_add_mul(a, b):
+    return (a + b) * 2
+
+
 def test_rgb_to_hex_rounding_matches_manual_conversion():
     # 0.5 * 255 = 127.5 -> 128 after rounding.
     assert utility.rgb_to_hex(0.0, 0.5, 1.0) == "0x0080FF"
@@ -58,6 +62,24 @@ def test_resolve_joblib_backend_auto_uses_task_policy():
     g = {"parallel_backend": "auto"}
     assert parallel.resolve_joblib_backend(g=g, task="general") == "multiprocessing"
     assert parallel.resolve_joblib_backend(g=g, task="reducer") == "multiprocessing"
+
+
+def test_run_starmap_single_process_matches_direct_evaluation():
+    args = [(1, 2), (3, 4), (5, 6)]
+    out = parallel.run_starmap(_starmap_add_mul, args, n_jobs=1, backend="multiprocessing")
+    assert out == [6, 14, 22]
+
+
+def test_run_starmap_process_backend_preserves_order():
+    args = [(1, 2), (3, 4), (5, 6), (7, 8)]
+    out = parallel.run_starmap(_starmap_add_mul, args, n_jobs=2, backend="multiprocessing")
+    assert out == [6, 14, 22, 30]
+
+
+def test_run_starmap_threading_backend_works():
+    args = [(2, 3), (4, 5), (6, 7)]
+    out = parallel.run_starmap(_starmap_add_mul, args, n_jobs=2, backend="threading")
+    assert out == [10, 18, 26]
 
 
 def test_calc_omega_state_matches_manual_tensor_product():

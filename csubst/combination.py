@@ -1,4 +1,3 @@
-import joblib
 import numpy
 import pandas
 
@@ -30,9 +29,12 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
     if n_jobs == 1:
         return combination_cy.generate_id_chunk(empty_id_combinations, 0, arity, ind2, rows, cols, unique_cols)
     chunks, starts = parallel.get_chunks(empty_id_combinations, n_jobs)
-    out = joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend='multiprocessing')(
-        joblib.delayed(combination_cy.generate_id_chunk)
-        (chunk, start, arity, ind2, rows, cols, unique_cols) for chunk, start in zip(chunks, starts)
+    tasks = [(chunk, start, arity, ind2, rows, cols, unique_cols) for chunk, start in zip(chunks, starts)]
+    out = parallel.run_starmap(
+        func=combination_cy.generate_id_chunk,
+        args_iterable=tasks,
+        n_jobs=n_jobs,
+        backend='multiprocessing',
     )
     id_combinations = numpy.concatenate(out)
     return id_combinations
@@ -85,9 +87,12 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
                 chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
                 backend = parallel.resolve_joblib_backend(g=g, task='general')
-                joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend=backend)(
-                    joblib.delayed(node_union)
-                    (ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)
+                tasks = [(ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)]
+                parallel.run_starmap(
+                    func=node_union,
+                    args_iterable=tasks,
+                    n_jobs=n_jobs,
+                    backend=backend,
                 )
             is_valid_combination = (df_mmap.sum(axis=1)!=0)
             if (is_valid_combination.sum()>0):
@@ -138,9 +143,12 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
                 chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
                 backend = parallel.resolve_joblib_backend(g=g, task='general')
-                joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend=backend)(
-                    joblib.delayed(node_union)
-                    (ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)
+                tasks = [(ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)]
+                parallel.run_starmap(
+                    func=node_union,
+                    args_iterable=tasks,
+                    n_jobs=n_jobs,
+                    backend=backend,
                 )
             is_valid_combination = (df_mmap.sum(axis=1)!=0)
             if (is_valid_combination.sum()>0):
