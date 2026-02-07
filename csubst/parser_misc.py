@@ -1,4 +1,3 @@
-import ete3
 import numpy
 
 import itertools
@@ -10,6 +9,7 @@ from csubst import sequence
 from csubst import parser_phylobayes
 from csubst import parser_iqtree
 from csubst import tree
+from csubst import ete
 
 def _read_package_text(file):
     txt = pkgutil.get_data('csubst', file)
@@ -285,7 +285,7 @@ def read_exchangeability_eq_freq(file, g):
 
 def annotate_tree(g, ignore_tree_inconsistency=False):
     g['node_label_tree_file'] = g['iqtree_treefile']
-    g['node_label_tree'] = ete3.PhyloNode(g['node_label_tree_file'], format=1)
+    g['node_label_tree'] = ete.PhyloNode(g['node_label_tree_file'], format=1)
     g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
     is_consistent_tree = tree.is_consistent_tree(tree1=g['node_label_tree'], tree2=g['rooted_tree'])
     if is_consistent_tree:

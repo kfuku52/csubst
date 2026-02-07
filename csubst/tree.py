@@ -1,4 +1,3 @@
-import ete3
 import numpy
 
 import copy
@@ -11,16 +10,17 @@ import time
 from csubst import sequence
 from csubst import parallel
 from csubst import substitution
+from csubst import ete
 
 def add_numerical_node_labels(tree):
-    all_leaf_names = tree.get_leaf_names()
+    all_leaf_names = ete.get_leaf_names(tree)
     all_leaf_names.sort()
     leaf_numerical_labels = dict()
     for i in range(0, len(all_leaf_names)):
         leaf_numerical_labels[all_leaf_names[i]] = 2**i
     numerical_labels = list()
     for node in tree.traverse():
-        leaf_names = node.get_leaf_names()
+        leaf_names = ete.get_leaf_names(node)
         numerical_labels.append(sum([leaf_numerical_labels[leaf_name] for leaf_name in leaf_names]))
     argsort_labels = numpy.argsort(numerical_labels)
     short_labels = numpy.arange(len(argsort_labels))
@@ -31,48 +31,53 @@ def add_numerical_node_labels(tree):
     return tree
 
 def is_consistent_tree(tree1, tree2):
-    is_consistent_tree = set(tree1.get_leaf_names()) == set(tree2.get_leaf_names())
+    is_consistent_tree = set(ete.get_leaf_names(tree1)) == set(ete.get_leaf_names(tree2))
     return is_consistent_tree
 
 def transfer_root(tree_to, tree_from, verbose=False):
-    subroot_leaves = [ n.get_leaf_names() for n in tree_from.get_children() ]
+    for node in tree_to.traverse():
+        if node.dist is None:
+            node.dist = 0.0
+    subroot_leaves = [ete.get_leaf_names(n) for n in tree_from.get_children()]
     is_n0_bigger_than_n1 = (len(subroot_leaves[0]) > len(subroot_leaves[1]))
     ingroups = subroot_leaves[0] if is_n0_bigger_than_n1 else subroot_leaves[1]
     outgroups = subroot_leaves[0] if not is_n0_bigger_than_n1 else subroot_leaves[1]
     if verbose:
         print('outgroups:', outgroups)
+    original_root_name = tree_to.name
     tree_to.set_outgroup(ingroups[0])
     if (len(outgroups) == 1):
-        outgroup_ancestor = [n for n in tree_to.iter_leaves() if n.name == outgroups[0]][0]
+        outgroup_ancestor = [n for n in ete.iter_leaves(tree_to) if n.name == outgroups[0]][0]
     else:
-        outgroup_ancestor = tree_to.get_common_ancestor(outgroups)
-    if not set(outgroups) == set(outgroup_ancestor.get_leaf_names()):
+        outgroup_ancestor = ete.get_common_ancestor(tree_to, outgroups)
+    if not set(outgroups) == set(ete.get_leaf_names(outgroup_ancestor)):
         sys.stderr.write('No root bipartition found in --infile. Exiting.\n')
         sys.exit(1)
     tree_to.set_outgroup(outgroup_ancestor)
     subroot_to = tree_to.get_children()
     subroot_from = tree_from.get_children()
-    total_subroot_length_to = sum([n.dist for n in subroot_to])
-    total_subroot_length_from = sum([n.dist for n in subroot_from])
+    total_subroot_length_to = sum([(n.dist or 0) for n in subroot_to])
+    total_subroot_length_from = sum([(n.dist or 0) for n in subroot_from])
+    if total_subroot_length_from == 0:
+        total_subroot_length_from = 1
     for n_to in subroot_to:
         for n_from in subroot_from:
-            if (set(n_to.get_leaf_names()) == set(n_from.get_leaf_names())):
-                n_to.dist = total_subroot_length_to * (n_from.dist / total_subroot_length_from)
-    for n_to in tree_to.traverse():
-        if n_to.name == '':
-            n_to.name = tree_to.name
-            tree_to.name = 'Root'
-            break
+            if (set(ete.get_leaf_names(n_to)) == set(ete.get_leaf_names(n_from))):
+                n_to.dist = total_subroot_length_to * ((n_from.dist or 0) / total_subroot_length_from)
+    if original_root_name:
+        tree_to.name = original_root_name
+    elif not tree_to.name:
+        tree_to.name = 'Root'
     return tree_to
 
 def transfer_internal_node_names(tree_to, tree_from):
     rf_dist = tree_to.robinson_foulds(tree_from, expand_polytomies=True)[0]
     assert rf_dist==0, 'tree topologies are different. RF distance = {}'.format(rf_dist)
     for to in tree_to.traverse():
-        if not to.is_leaf():
+        if not ete.is_leaf(to):
             for fr in tree_from.traverse():
-                if not fr.is_leaf():
-                    if set(to.get_leaf_names())==set(fr.get_leaf_names()):
+                if not ete.is_leaf(fr):
+                    if set(ete.get_leaf_names(to))==set(ete.get_leaf_names(fr)):
                         to.name = fr.name
     return tree_to
 
@@ -134,14 +139,15 @@ def get_node_distance(tree, cb, ncpu, float_type):
 
 def standardize_node_names(tree):
     for node in tree.traverse():
+        node.name = '' if node.name is None else str(node.name)
         node.name = re.sub(r'\[.*', '', node.name)
         node.name = re.sub(r'/.*', '', node.name)
         node.name = re.sub(r'^\'', '', node.name)
         node.name = re.sub(r'\'$', '', node.name)
-    leaf_names = tree.get_leaf_names()
+    leaf_names = ete.get_leaf_names(tree)
     if len(leaf_names)!=len(set(leaf_names)):
         raise ValueError('Leaf names are not unique')
-    node_names = [ node.name for node in tree.traverse() if (not node.is_leaf())&(node.name!='') ]
+    node_names = [node.name for node in tree.traverse() if (not ete.is_leaf(node)) and (node.name not in [None, ''])]
     if len(node_names)!=len(set(node_names)):
         raise ValueError('Internal node labels are not unique. '
                          'Please provide unique internal node labels or delete them from --rooted_tree_file. '
@@ -151,8 +157,8 @@ def standardize_node_names(tree):
 def is_internal_node_labeled(tree):
     is_labeled = True
     for node in tree.traverse():
-        if not node.is_root():
-            if node.name=='':
+        if not ete.is_root(node):
+            if not node.name:
                 is_labeled = False
     return is_labeled
 
@@ -160,41 +166,44 @@ def write_tree(tree, outfile='csubst_tree.nwk', add_numerical_label=True):
     tree2 = copy.deepcopy(tree)
     if add_numerical_label:
         for node in tree2.traverse():
-            node.name = node.name + '|' + str(node.numerical_label)
-    tree2.write(format=1, outfile=outfile)
+            node.name = (node.name or '') + '|' + str(node.numerical_label)
+    ete.write_tree(tree2, format=1, outfile=outfile)
 
 def branch_category_layout(trait_name):
     def layout_fn(node):
-        nstyle = ete3.NodeStyle()
+        tv = ete.get_treeview_module()
+        nstyle = tv.NodeStyle()
         nstyle['size'] = 0
         nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
         nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
         nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
-        nlabel = node.name+'|'+str(node.numerical_label)
-        nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=getattr(node, 'labelcolor_'+trait_name))
-        ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+        nlabel = (node.name or '') + '|' + str(node.numerical_label)
+        nlabelFace = tv.TextFace(nlabel, fsize=4, fgcolor=getattr(node, 'labelcolor_'+trait_name))
+        tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
         node.set_style(nstyle)
         pass
     return layout_fn
 
 def branch_category_layout_leafonly(trait_name):
     def layout_fn(node):
-        nstyle = ete3.NodeStyle()
+        tv = ete.get_treeview_module()
+        nstyle = tv.NodeStyle()
         nstyle['size'] = 0
         nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
         nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
         nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
-        if node.is_leaf():
-            nlabel = node.name+'|'+str(node.numerical_label)
-            nlabelFace = ete3.TextFace(nlabel, fsize=4, fgcolor=getattr(node, 'labelcolor_'+trait_name))
-            ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+        if ete.is_leaf(node):
+            nlabel = (node.name or '') + '|' + str(node.numerical_label)
+            nlabelFace = tv.TextFace(nlabel, fsize=4, fgcolor=getattr(node, 'labelcolor_'+trait_name))
+            tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
         node.set_style(nstyle)
         pass
     return layout_fn
 
 def branch_category_layout_nolabel(trait_name):
     def layout_fn(node):
-        nstyle = ete3.NodeStyle()
+        tv = ete.get_treeview_module()
+        nstyle = tv.NodeStyle()
         nstyle['size'] = 0
         nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
         nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
@@ -204,11 +213,9 @@ def branch_category_layout_nolabel(trait_name):
     return layout_fn
 
 def is_ete_plottable():
-    try:
-        from ete3 import TreeStyle
-        from ete3 import NodeStyle
-    except ImportError:
-        print('TreeStyle and/or NodeStyle are not available in installed ete3. Plotting is skipped.', flush=True)
+    tv = ete.get_treeview_module()
+    if tv is None:
+        print('TreeStyle and/or NodeStyle are not available in installed ETE backend. Plotting is skipped.', flush=True)
         return False
     if ('DISPLAY' not in os.environ.keys()):
         print('DISPLAY is not available. Plotting is skipped.', flush=True)
@@ -218,9 +225,10 @@ def is_ete_plottable():
 def plot_branch_category(g, file_base, label='all'):
     if not is_ete_plottable():
         return None
+    tv = ete.get_treeview_module()
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
     for trait_name in trait_names:
-        ts = ete3.TreeStyle()
+        ts = tv.TreeStyle()
         ts.mode = 'r'
         ts.show_leaf_name = False
         if label=='all':
@@ -238,17 +246,18 @@ def plot_branch_category(g, file_base, label='all'):
 
 def branch_state_layout(trait_name):
     def layout_fn(node):
-        nstyle = ete3.NodeStyle()
+        tv = ete.get_treeview_module()
+        nstyle = tv.NodeStyle()
         nstyle['size'] = 0
         nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
         nstyle["hz_line_color"] = getattr(node, 'color_'+trait_name)
         nstyle["vt_line_color"] = getattr(node, 'color_'+trait_name)
-        if node.is_leaf():
-            nlabel = str(node.state)+'|'+node.name
+        if ete.is_leaf(node):
+            nlabel = str(node.state) + '|' + (node.name or '')
         else:
             nlabel = str(node.state)
-        nlabelFace = ete3.TextFace(nlabel, fsize=6, fgcolor=getattr(node, 'labelcolor_'+trait_name))
-        ete3.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
+        nlabelFace = tv.TextFace(nlabel, fsize=6, fgcolor=getattr(node, 'labelcolor_'+trait_name))
+        tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
         node.set_style(nstyle)
         pass
     return layout_fn
@@ -257,20 +266,21 @@ def plot_state_tree(state, orders, mode, g):
     print('Writing ancestral state trees: mode = {}, number of pdf files = {}'.format(mode, state.shape[1]), flush=True)
     if not is_ete_plottable():
         return None
+    tv = ete.get_treeview_module()
     if mode=='codon':
         missing_state = '---'
     else:
         missing_state = '-'
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
     for trait_name in trait_names:
-        ts = ete3.TreeStyle()
+        ts = tv.TreeStyle()
         ts.mode = 'r'
         ts.show_leaf_name = False
         ts.layout_fn = branch_state_layout(trait_name)
         ndigit = int(numpy.log10(state.shape[1]))+1
         for i in numpy.arange(state.shape[1]):
             for node in g['tree'].traverse():
-                if node.is_root():
+                if ete.is_root(node):
                     node.state = missing_state
                     continue
                 nlabel = node.numerical_label
@@ -315,7 +325,7 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
     OS_branch_sub = substitution.get_branch_sub_counts(OS_tensor)
     ON_branch_sub = substitution.get_branch_sub_counts(ON_tensor)
     for node in g['tree'].traverse():
-        if node.is_root():
+        if ete.is_root(node):
             node.Sdist = 0
             node.Ndist = 0
             node.SNdist = 0
@@ -364,7 +374,7 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
     return g
 
 def read_treefile(g):
-    g['rooted_tree'] = ete3.PhyloNode(g['rooted_tree_file'], format=1)
+    g['rooted_tree'] = ete.PhyloNode(g['rooted_tree_file'], format=1)
     assert len(g['rooted_tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
     g['rooted_tree'] = standardize_node_names(g['rooted_tree'])
     g['rooted_tree'] = add_numerical_node_labels(g['rooted_tree'])
@@ -374,7 +384,7 @@ def read_treefile(g):
     return g
 
 def is_consistent_tree_and_aln(g):
-    leaf_names = [ l.name for l in g['rooted_tree'].get_leaves() ]
+    leaf_names = [l.name for l in ete.get_leaves(g['rooted_tree'])]
     fasta_dict = sequence.read_fasta(path=g['alignment_file'])
     seq_names = list(fasta_dict.keys())
     is_consistent = set(leaf_names) == set(seq_names)

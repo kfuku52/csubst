@@ -10,6 +10,7 @@ from csubst import table
 from csubst import parallel
 from csubst import substitution_cy
 from csubst import substitution_sparse
+from csubst import ete
 
 def resolve_sub_tensor_backend(g):
     if 'resolved_sub_tensor_backend' in g.keys():
@@ -157,7 +158,7 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
         raise ValueError('Unsupported mode for sparse substitution tensor: {}'.format(mode))
     sparse_entries = defaultdict(lambda: [list(), list(), list()])  # key -> [rows, cols, data]
     for node in g['tree'].traverse():
-        if node.is_root():
+        if ete.is_root(node):
             continue
         child = node.numerical_label
         parent = node.up.numerical_label
@@ -372,7 +373,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
         num_state = state_tensor.shape[2]
         diag_zero = numpy.diag([-1] * num_state) + 1
     for node in g['tree'].traverse():
-        if node.is_root():
+        if ete.is_root(node):
             continue
         child = node.numerical_label
         parent = node.up.numerical_label

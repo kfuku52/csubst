@@ -1,15 +1,15 @@
-import ete3
 import numpy
 import pandas
 
 from csubst import combination
 from csubst import tree
+from csubst import ete
 
 
 def test_get_node_combinations_target_dict_verbose_false():
-    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:1,B:1)R;", format=1))
-    non_root_ids = [n.numerical_label for n in tr.traverse() if not n.is_root()]
-    leaf_ids = [n.numerical_label for n in tr.iter_leaves()]
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    non_root_ids = [n.numerical_label for n in tr.traverse() if not ete.is_root(n)]
+    leaf_ids = [n.numerical_label for n in ete.iter_leaves(tr)]
     g = {
         "tree": tr,
         "dep_ids": [numpy.array([bid], dtype=numpy.int64) for bid in non_root_ids],
@@ -34,9 +34,9 @@ def test_get_node_combinations_target_dict_verbose_false():
 
 
 def test_get_node_combinations_target_dict_uses_threading_for_union(monkeypatch):
-    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:1,B:1,C:1)R;", format=1))
-    non_root_ids = [n.numerical_label for n in tr.traverse() if not n.is_root()]
-    leaf_ids = [n.numerical_label for n in tr.iter_leaves()]
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1,C:1)R;", format=1))
+    non_root_ids = [n.numerical_label for n in tr.traverse() if not ete.is_root(n)]
+    leaf_ids = [n.numerical_label for n in ete.iter_leaves(tr)]
     g = {
         "tree": tr,
         "dep_ids": [numpy.array([bid], dtype=numpy.int64) for bid in non_root_ids],
@@ -71,9 +71,9 @@ def test_get_node_combinations_target_dict_uses_threading_for_union(monkeypatch)
 
 
 def test_get_node_combinations_cb_passed_uses_threading_for_union(monkeypatch):
-    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:1,B:1,C:1,D:1)R;", format=1))
-    non_root_ids = [n.numerical_label for n in tr.traverse() if not n.is_root()]
-    leaf_ids = [n.numerical_label for n in tr.iter_leaves()]
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1,C:1,D:1)R;", format=1))
+    non_root_ids = [n.numerical_label for n in tr.traverse() if not ete.is_root(n)]
+    leaf_ids = [n.numerical_label for n in ete.iter_leaves(tr)]
     a, b, c, d = sorted(leaf_ids)
     g = {
         "tree": tr,

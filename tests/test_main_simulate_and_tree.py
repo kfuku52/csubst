@@ -1,44 +1,44 @@
-import ete3
 import numpy
 import pytest
 
 from csubst import main_simulate
 from csubst import tree
+from csubst import ete
 
 
 def test_add_numerical_node_labels_assigns_unique_integers():
-    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(B:1,(A:1,C:1)X:1)R;", format=1))
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(B:1,(A:1,C:1)X:1)R;", format=1))
     labels = [n.numerical_label for n in tr.traverse()]
     assert sorted(labels) == list(range(len(labels)))
 
 
 def test_is_consistent_tree_checks_leaf_sets():
-    t1 = ete3.PhyloNode("(A:1,B:1)R;", format=1)
-    t2 = ete3.PhyloNode("(B:1,A:1)R2;", format=1)
-    t3 = ete3.PhyloNode("(A:1,C:1)R3;", format=1)
+    t1 = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    t2 = ete.PhyloNode("(B:1,A:1)R2;", format=1)
+    t3 = ete.PhyloNode("(A:1,C:1)R3;", format=1)
     assert tree.is_consistent_tree(t1, t2)
     assert not tree.is_consistent_tree(t1, t3)
 
 
 def test_standardize_node_names_removes_suffixes_and_quotes():
-    tr = ete3.PhyloNode("('A/1':1,'B[abc]':1)'N1[xy]':0;", format=1)
+    tr = ete.PhyloNode("('A/1':1,'B[abc]':1)'N1[xy]':0;", format=1)
     out = tree.standardize_node_names(tr)
     names = sorted([n.name for n in out.traverse()])
     assert names == ["A", "B", "N1"]
 
 
 def test_transfer_internal_node_names_copies_labels_by_topology():
-    tree_to = ete3.PhyloNode("(A:1,(B:1,C:1):1);", format=1)
-    tree_from = ete3.PhyloNode("(A:2,(B:2,C:2)X:2)R;", format=1)
+    tree_to = ete.PhyloNode("(A:1,(B:1,C:1):1);", format=1)
+    tree_from = ete.PhyloNode("(A:2,(B:2,C:2)X:2)R;", format=1)
     out = tree.transfer_internal_node_names(tree_to, tree_from)
-    name_by_leafset = {tuple(sorted(n.get_leaf_names())): n.name for n in out.traverse() if not n.is_leaf()}
+    name_by_leafset = {tuple(sorted(ete.get_leaf_names(n))): n.name for n in out.traverse() if not ete.is_leaf(n)}
     assert name_by_leafset[("A", "B", "C")] == "R"
     assert name_by_leafset[("B", "C")] == "X"
 
 
 def test_is_internal_node_labeled():
-    labeled = ete3.PhyloNode("(A:1,B:1)R;", format=1)
-    unlabeled = ete3.PhyloNode("(A:1,(B:1,C:1):1)R;", format=1)
+    labeled = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    unlabeled = ete.PhyloNode("(A:1,(B:1,C:1):1)R;", format=1)
     assert tree.is_internal_node_labeled(labeled)
     assert not tree.is_internal_node_labeled(unlabeled)
 
@@ -120,9 +120,9 @@ def test_apply_percent_biased_sub_preserves_foreground_omega():
 
 
 def test_get_pyvolve_newick_marks_foreground_without_mutating_distances():
-    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:0.1,B:0.2)R;", format=1))
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:0.1,B:0.2)R;", format=1))
     for node in tr.traverse():
-        node.add_features(**{"is_fg_t": False, "foreground_lineage_id_t": 0})
+        ete.add_features(node, **{"is_fg_t": False, "foreground_lineage_id_t": 0})
     a_node = [n for n in tr.traverse() if n.name == "A"][0]
     a_node.is_fg_t = True
     a_node.foreground_lineage_id_t = 1
@@ -132,7 +132,7 @@ def test_get_pyvolve_newick_marks_foreground_without_mutating_distances():
 
 
 def test_scale_tree_multiplies_every_branch_length():
-    tr = ete3.PhyloNode("(A:1.0,B:2.0)R;", format=1)
+    tr = ete.PhyloNode("(A:1.0,B:2.0)R;", format=1)
     out = main_simulate.scale_tree(tr, 3.0)
     dists = sorted([n.dist for n in out.traverse()])
     assert dists == [0.0, 3.0, 6.0]

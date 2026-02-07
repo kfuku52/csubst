@@ -1,10 +1,10 @@
 import numpy
-import ete3
 from pathlib import Path
 
 from csubst import substitution
 from csubst import substitution_sparse
 from csubst import tree
+from csubst import ete
 
 
 def _toy_dense_tensor():
@@ -295,7 +295,7 @@ def test_get_reducer_sub_tensor_converts_and_caches_sparse():
 
 
 def test_get_substitution_tensor_sparse_asis_matches_dense():
-    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:1,B:1)R;", format=1))
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: n.numerical_label for n in tr.traverse()}
     state = numpy.zeros((3, 2, 2), dtype=float)
     state[labels["R"], :, :] = [[1.0, 0.0], [0.5, 0.5]]

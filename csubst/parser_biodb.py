@@ -11,6 +11,7 @@ import urllib
 
 from csubst import sequence
 from csubst import parser_pymol
+from csubst import ete
 
 def get_top_hit_ids(my_hits):
     if len(my_hits.descriptions)==0:
@@ -45,7 +46,7 @@ def run_qblast(aa_query, num_display=10, evalue_cutoff=10):
     return top_hit_ids
 
 def get_representative_leaf(node, size='median'):
-    leaves = node.get_leaves()
+    leaves = ete.get_leaves(node)
     leaf_seqlens = [ len(l.sequence.replace('-', '')) for l in leaves ]
     if size=='median':
         ind = numpy.argsort(leaf_seqlens)[len(leaf_seqlens) // 2]

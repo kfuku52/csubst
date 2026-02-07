@@ -8,6 +8,7 @@ import time
 
 from csubst import parallel
 from csubst import combination_cy
+from csubst import ete
 
 def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
     arity = target_nodes.shape[1] + 1
@@ -45,7 +46,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
         raise Exception('Only one of target_id_dict, cb_passed, or exhaustive must be set.')
     g['fg_dependent_id_combinations'] = dict()
     tree = g['tree']
-    all_nodes = [node for node in tree.traverse() if not node.is_root()]
+    all_nodes = [node for node in tree.traverse() if not ete.is_root(node)]
     if verbose:
         print("Number of all branches: {:,}".format(len(all_nodes)), flush=True)
     if exhaustive:
@@ -293,8 +294,8 @@ def calc_substitution_patterns(cb):
 
 def get_global_dep_ids(g):
     global_dep_ids = list()
-    for leaf in g['tree'].iter_leaves():
-        ancestor_nns = [node.numerical_label for node in leaf.iter_ancestors() if not node.is_root()]
+    for leaf in ete.iter_leaves(g['tree']):
+        ancestor_nns = [node.numerical_label for node in ete.iter_ancestors(leaf) if not ete.is_root(node)]
         dep_id = [leaf.numerical_label, ] + ancestor_nns
         dep_id = numpy.sort(numpy.array(dep_id))
         global_dep_ids.append(dep_id)
@@ -311,11 +312,11 @@ def get_global_dep_ids(g):
         subroot_nns = [node.numerical_label for node in g['tree'].get_children()]
         for subroot_nn in subroot_nns:
             for node in g['tree'].traverse():
-                if node.is_root():
+                if ete.is_root(node):
                     continue
                 if subroot_nn == node.numerical_label:
                     continue
-                ancestor_nns = [anc.numerical_label for anc in node.iter_ancestors()]
+                ancestor_nns = [anc.numerical_label for anc in ete.iter_ancestors(node)]
                 if subroot_nn in ancestor_nns:
                     continue
                 global_dep_ids.append(numpy.array([subroot_nn, node.numerical_label]))
@@ -330,15 +331,15 @@ def get_foreground_dep_ids(g):
                 fg_lineage_leaf_names = g['fg_leaf_names'][trait_name][i]
                 tmp_fg_dep_ids = list()
                 for node in g['tree'].traverse():
-                    if node.is_root():
+                    if ete.is_root(node):
                         continue
-                    is_all_leaf_lineage_fg = all([ ln in fg_lineage_leaf_names for ln in node.get_leaf_names() ])
+                    is_all_leaf_lineage_fg = all([ln in fg_lineage_leaf_names for ln in ete.get_leaf_names(node)])
                     if not is_all_leaf_lineage_fg:
                         continue
-                    is_up_all_leaf_lineage_fg = all([ ln in fg_lineage_leaf_names for ln in node.up.get_leaf_names() ])
+                    is_up_all_leaf_lineage_fg = all([ln in fg_lineage_leaf_names for ln in ete.get_leaf_names(node.up)])
                     if is_up_all_leaf_lineage_fg:
                         continue
-                    if node.is_leaf():
+                    if ete.is_leaf(node):
                         tmp_fg_dep_ids.append(node.numerical_label)
                     else:
                         descendant_nn = [ n.numerical_label for n in node.get_descendants() ]

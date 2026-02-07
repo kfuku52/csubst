@@ -1,5 +1,7 @@
 import numpy
 
+from csubst import ete
+
 def calc_omega_state(state_nuc, g): # implement exclude stop codon freq
     num_node = state_nuc.shape[0]
     num_nuc_site = state_nuc.shape[1]
@@ -48,11 +50,11 @@ def translate_state(nlabel, mode, g):
 def write_alignment(outfile, mode, g, leaf_only=False):
     aln_out = ''
     if leaf_only:
-        nodes = g['tree'].iter_leaves()
+        nodes = ete.iter_leaves(g['tree'])
     else:
         nodes = g['tree'].traverse()
     for node in nodes:
-        if node.is_root():
+        if ete.is_root(node):
             continue
         nlabel = node.numerical_label
         aln_tmp = '>'+node.name+'|'+str(nlabel)+'\n'

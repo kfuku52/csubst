@@ -27,7 +27,7 @@ setup(
     keywords         = 'molecular convergence',
     python_requires  = '>=3.1',
     packages         = find_packages(),
-    install_requires = ['ete3','numpy','scipy','pandas','cython','matplotlib'],
+    install_requires = ['ete4>=4.4.0','numpy','scipy','pandas','cython','matplotlib'],
     scripts          = ['csubst/csubst',],
     setup_requires   = ['setuptools>=18.0','cython'],
     ext_modules      = cythonize(

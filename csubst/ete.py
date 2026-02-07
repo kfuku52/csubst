@@ -1,0 +1,120 @@
+"""ETE compatibility helpers.
+
+This module provides a small compatibility layer so CSUBST can run with either
+ete4 (preferred) or ete3 (fallback for older environments).
+"""
+
+from __future__ import annotations
+
+_ete4_import_error = None
+_ete3_import_error = None
+_backend = None
+
+try:
+    import ete4 as _ete_mod  # type: ignore[import-not-found]
+    _backend = "ete4"
+except Exception as exc:  # pragma: no cover - backend-specific
+    _ete4_import_error = exc
+    _ete_mod = None
+
+if _backend is None:
+    try:
+        import ete3 as _ete_mod  # type: ignore[import-not-found]
+        _backend = "ete3"
+    except Exception as exc:  # pragma: no cover - backend-specific
+        _ete3_import_error = exc
+
+if _backend is None:  # pragma: no cover - backend-specific
+    raise ImportError(
+        "Failed to import both ete4 and ete3. "
+        f"ete4 error={_ete4_import_error!r}, ete3 error={_ete3_import_error!r}"
+    )
+
+
+def backend_name():
+    return _backend
+
+
+def PhyloNode(source, format=1):
+    if _backend == "ete4":
+        return _ete_mod.Tree(source, parser=format)
+    return _ete_mod.PhyloNode(source, format=format)
+
+
+def is_root(node):
+    value = getattr(node, "is_root")
+    return value() if callable(value) else bool(value)
+
+
+def is_leaf(node):
+    value = getattr(node, "is_leaf")
+    return value() if callable(value) else bool(value)
+
+
+def get_leaf_names(node):
+    if hasattr(node, "leaf_names"):
+        return list(node.leaf_names())
+    return node.get_leaf_names()
+
+
+def get_leaves(node):
+    if hasattr(node, "leaves"):
+        return list(node.leaves())
+    return node.get_leaves()
+
+
+def iter_leaves(node):
+    if hasattr(node, "leaves"):
+        return node.leaves()
+    return node.iter_leaves()
+
+
+def iter_ancestors(node):
+    if hasattr(node, "ancestors"):
+        return node.ancestors()
+    return node.iter_ancestors()
+
+
+def get_common_ancestor(tree, targets):
+    if hasattr(tree, "common_ancestor"):
+        return tree.common_ancestor(targets)
+    return tree.get_common_ancestor(targets)
+
+
+def get_tree_root(tree):
+    if hasattr(tree, "root"):
+        return tree.root
+    return tree.get_tree_root()
+
+
+def add_features(node, **kwargs):
+    if hasattr(node, "add_props"):
+        node.add_props(**kwargs)
+        return None
+    return node.add_features(**kwargs)
+
+
+def write_tree(tree, format=1, outfile=None):
+    if _backend == "ete4":
+        text = tree.write(parser=format, format_root_node=True)
+        if outfile is None:
+            return text
+        with open(outfile, "w") as handle:
+            handle.write(text)
+        return None
+    return tree.write(format=format, outfile=outfile)
+
+
+def get_treeview_module():
+    required = ("TreeStyle", "NodeStyle", "TextFace", "add_face_to_node")
+    if _backend == "ete4":
+        try:
+            from ete4 import treeview as tv  # type: ignore[import-not-found]
+            if all(hasattr(tv, attr) for attr in required):
+                return tv
+            return None
+        except Exception:  # pragma: no cover - optional feature
+            return None
+    if all(hasattr(_ete_mod, attr) for attr in required):
+        return _ete_mod
+    return None

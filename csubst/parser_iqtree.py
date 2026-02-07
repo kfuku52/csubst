@@ -11,6 +11,7 @@ from distutils.version import LooseVersion
 from csubst import genetic_code
 from csubst import sequence
 from csubst import tree
+from csubst import ete
 
 def _parse_iqtree_version_text(txt):
     # IQ-TREE 2 and 3 both expose a semantic version string in startup banners.
@@ -264,12 +265,12 @@ def read_log(g):
 
 def mask_missing_sites(state_tensor, tree):
     for node in tree.traverse():
-        if (node.is_root())|(node.is_leaf()):
+        if (ete.is_root(node)) | (ete.is_leaf(node)):
             continue
         nl = node.numerical_label
-        child0_leaf_nls = numpy.array([ l.numerical_label for l in node.get_children()[0].get_leaves() ], dtype=int)
-        child1_leaf_nls = numpy.array([ l.numerical_label for l in node.get_children()[1].get_leaves() ], dtype=int)
-        sister_leaf_nls = numpy.array([ l.numerical_label for l in node.get_sisters()[0].get_leaves() ], dtype=int)
+        child0_leaf_nls = numpy.array([l.numerical_label for l in ete.get_leaves(node.get_children()[0])], dtype=int)
+        child1_leaf_nls = numpy.array([l.numerical_label for l in ete.get_leaves(node.get_children()[1])], dtype=int)
+        sister_leaf_nls = numpy.array([l.numerical_label for l in ete.get_leaves(node.get_sisters()[0])], dtype=int)
         c0 = (state_tensor[child0_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child0_leaf_nonzero
         c1 = (state_tensor[child1_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child1_leaf_nonzero
         s = (state_tensor[sister_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_sister_leaf_nonzero
@@ -279,7 +280,7 @@ def mask_missing_sites(state_tensor, tree):
 
 def get_state_tensor(g):
     g['tree'].link_to_alignment(alignment=g['alignment_file'], alg_format='fasta')
-    num_codon_alignment = int(len(g['tree'].get_leaves()[0].sequence)/3)
+    num_codon_alignment = int(len(ete.get_leaves(g['tree'])[0].sequence)/3)
     err_txt = 'The number of codon sites did not match between the alignment and ancestral states. ' \
               'Delete intermediate files and rerun.'
     assert num_codon_alignment==g['num_input_site'], err_txt
@@ -288,9 +289,9 @@ def get_state_tensor(g):
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = numpy.zeros(axis, dtype=g['float_type'])
     for node in g['tree'].traverse():
-        if node.is_root():
+        if ete.is_root(node):
             continue
-        elif node.is_leaf():
+        elif ete.is_leaf(node):
             seq = node.sequence.upper()
             state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=g['float_type'])
             if g['input_data_type']=='cdn':

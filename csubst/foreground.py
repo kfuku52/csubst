@@ -11,6 +11,7 @@ import warnings
 from csubst import combination
 from csubst import table
 from csubst import param
+from csubst import ete
 
 def combinations_count(n, r):
     # https://github.com/nkmk/python-snippets/blob/05a53ae96736577906a8805b38bce6cc210fe11f/notebook/combinations_count.py#L1-L14
@@ -29,10 +30,10 @@ def get_df_clade_size(g, trait_name):
     df_clade_size.loc[:,'branch_id'] = branch_ids
     df_clade_size.loc[:,'is_fg_stem_'+trait_name] = False
     for node in g['tree'].traverse():
-        if node.is_root():
+        if ete.is_root(node):
             continue
         bid = node.numerical_label
-        df_clade_size.at[bid,'size'] = len(node.get_leaf_names())
+        df_clade_size.at[bid,'size'] = len(ete.get_leaf_names(node))
         is_fg = getattr(node, 'is_fg_'+trait_name)
         is_parent_fg = getattr(node.up, 'is_fg_'+trait_name)
         if (is_fg)&(~is_parent_fg):
@@ -135,7 +136,7 @@ def get_lineage_color_list():
 
 def get_fg_leaf_names(lineages, trait_name, g):
     fg_leaf_names = []
-    all_leaf_names = g['tree'].get_leaf_names()
+    all_leaf_names = ete.get_leaf_names(g['tree'])
     for i in numpy.arange(len(lineages)):
         fg_leaf_names.append([])
         is_lineage = (g['fg_df'].loc[:, trait_name] == lineages[i])
@@ -155,11 +156,11 @@ def annotate_lineage_foreground(lineages, trait_name, g):
     for i in numpy.arange(len(lineages)):
         fg_leaf_name_set = set(g['fg_leaf_names'][trait_name][i])
         for node in tree.traverse():
-            node_leaf_name_set = set(node.get_leaf_names())
+            node_leaf_name_set = set(ete.get_leaf_names(node))
             if len(node_leaf_name_set.difference(fg_leaf_name_set)) == 0:
-                node.add_features(**{'is_lineage_fg_'+trait_name+'_'+str(i+1): True})
+                ete.add_features(node, **{'is_lineage_fg_'+trait_name+'_'+str(i+1): True})
             else:
-                node.add_features(**{'is_lineage_fg_'+trait_name+'_'+str(i+1): False})
+                ete.add_features(node, **{'is_lineage_fg_'+trait_name+'_'+str(i+1): False})
     return tree
 
 def get_target_ids(lineages, trait_name, g):
@@ -168,9 +169,9 @@ def get_target_ids(lineages, trait_name, g):
         fg_leaf_name_set = set(g['fg_leaf_names'][trait_name][i])
         lineage_fg_ids = list()
         for node in g['tree'].traverse():
-            node_leaf_name_set = set(node.get_leaf_names())
+            node_leaf_name_set = set(ete.get_leaf_names(node))
             if len(node_leaf_name_set.difference(fg_leaf_name_set)) == 0:
-                if node.is_root() | (not g['fg_stem_only']):
+                if ete.is_root(node) | (not g['fg_stem_only']):
                     lineage_fg_ids.append(node.numerical_label)
                 else:
                     is_lineage_fg = getattr(node, 'is_lineage_fg_' + trait_name + '_' + str(i + 1))
@@ -188,15 +189,15 @@ def get_target_ids(lineages, trait_name, g):
             dif = len(lineage_fg_ids) - num_id
         lineage_fg_ids = numpy.array(lineage_fg_ids, dtype=numpy.int64)
         target_ids = numpy.concatenate([target_ids, lineage_fg_ids])
-    target_id = target_ids[target_ids != g['tree'].get_tree_root().numerical_label]
+    target_id = target_ids[target_ids != ete.get_tree_root(g['tree']).numerical_label]
     target_id.sort()
     return target_ids
 
 def annotate_foreground(lineages, trait_name, g):
     for node in g['tree'].traverse(): # Initialize
-        node.add_features(**{'is_fg_'+trait_name: False})
-        node.add_features(**{'color_'+trait_name: 'black'})
-        node.add_features(**{'labelcolor_' + trait_name: 'black'})
+        ete.add_features(node, **{'is_fg_'+trait_name: False})
+        ete.add_features(node, **{'color_'+trait_name: 'black'})
+        ete.add_features(node, **{'labelcolor_' + trait_name: 'black'})
     lineage_colors = get_lineage_color_list()
     for i in numpy.arange(len(lineages)):
         fg_leaf_name_set = set(g['fg_leaf_names'][trait_name][i])
@@ -204,17 +205,17 @@ def annotate_foreground(lineages, trait_name, g):
         for node in g['tree'].traverse():
             if g['fg_stem_only']:
                 if node.numerical_label in g['target_ids'][trait_name]:
-                    node.add_features(**{'is_fg_'+trait_name: True})
-                    node.add_features(**{'color_'+trait_name: lineage_color})
-                    node.add_features(**{'labelcolor_'+trait_name: lineage_color})
+                    ete.add_features(node, **{'is_fg_'+trait_name: True})
+                    ete.add_features(node, **{'color_'+trait_name: lineage_color})
+                    ete.add_features(node, **{'labelcolor_'+trait_name: lineage_color})
                 if node.name in fg_leaf_name_set:
-                    node.add_features(**{'labelcolor_' + trait_name: lineage_color})
+                    ete.add_features(node, **{'labelcolor_' + trait_name: lineage_color})
             else:
                 is_lineage_fg = getattr(node, 'is_lineage_fg_' + trait_name + '_' + str(i + 1))
                 if is_lineage_fg == True:
-                    node.add_features(**{'is_fg_' + trait_name: True})
-                    node.add_features(**{'color_' + trait_name: lineage_color})
-                    node.add_features(**{'labelcolor_' + trait_name: lineage_color})
+                    ete.add_features(node, **{'is_fg_' + trait_name: True})
+                    ete.add_features(node, **{'color_' + trait_name: lineage_color})
+                    ete.add_features(node, **{'labelcolor_' + trait_name: lineage_color})
     return g['tree']
 
 def get_foreground_ids(g, write=True):
@@ -260,10 +261,10 @@ def read_foreground_file(g):
 
 def dummy_foreground_annotation(tree, trait_name):
     for node in tree.traverse():
-        node.add_features(**{'is_lineage_fg_' + trait_name + '_1': False})
-        node.add_features(**{'is_fg_' + trait_name: False})
-        node.add_features(**{'color_' + trait_name: 'black'})
-        node.add_features(**{'labelcolor_' + trait_name: 'black'})
+        ete.add_features(node, **{'is_lineage_fg_' + trait_name + '_1': False})
+        ete.add_features(node, **{'is_fg_' + trait_name: False})
+        ete.add_features(node, **{'color_' + trait_name: 'black'})
+        ete.add_features(node, **{'labelcolor_' + trait_name: 'black'})
     return tree
 
 def get_foreground_branch(g, simulate=False):
@@ -314,7 +315,7 @@ def randomize_foreground_branch(g, trait_name, sample_original_foreground=False)
     print_num_possible_permuted_combinations(r_df_clade_size, trait_name, sample_original_foreground)
     g['r_target_ids'][trait_name] = get_new_foreground_ids(r_df_clade_size, g)
     g['r_fg_ids'][trait_name] = copy.deepcopy(g['r_target_ids'][trait_name])
-    new_fg_leaf_names = [ n.get_leaf_names() for n in g['tree'].traverse() if n.numerical_label in g['r_fg_ids'][trait_name] ]
+    new_fg_leaf_names = [ete.get_leaf_names(n) for n in g['tree'].traverse() if n.numerical_label in g['r_fg_ids'][trait_name]]
     new_fg_leaf_names = list(itertools.chain(*new_fg_leaf_names))
     new_fg_leaf_names = list(set(new_fg_leaf_names))
     g['r_fg_leaf_names'][trait_name] = new_fg_leaf_names
@@ -325,7 +326,7 @@ def get_marginal_branch(g):
     for trait_name in g['fg_df'].columns[1:len(g['fg_df'].columns)]:
         g['mg_ids'][trait_name] = list()
         for node in g['tree'].traverse():
-            if (node.is_root()):
+            if ete.is_root(node):
                 continue
             is_fg = getattr(node, 'is_fg_' + trait_name)
             if (is_fg==False):
@@ -351,9 +352,9 @@ def get_marginal_branch(g):
         g['target_ids'][trait_name] = numpy.concatenate([g['target_ids'][trait_name], g['mg_ids'][trait_name]])
         for node in g['tree'].traverse():
             if node.numerical_label in g['mg_ids'][trait_name]:
-                node.add_features(**{'is_marginal_'+trait_name: True})
+                ete.add_features(node, **{'is_marginal_'+trait_name: True})
             else:
-                node.add_features(**{'is_marginal_'+trait_name: False})
+                ete.add_features(node, **{'is_marginal_'+trait_name: False})
         file_name = 'csubst_marginal_branch_' + trait_name + '.txt'
         file_name = file_name.replace('_PLACEHOLDER', '')
         if len(g['mg_ids'][trait_name]) > 0:

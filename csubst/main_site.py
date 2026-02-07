@@ -12,6 +12,7 @@ from csubst import parser_misc
 from csubst import sequence
 from csubst import substitution
 from csubst import tree
+from csubst import ete
 
 font_size = 8
 matplotlib.rcParams['font.size'] = font_size
@@ -226,7 +227,7 @@ def extend_site_index_edge(sites, num_extend):
 def add_gene_index(df, g):
     seqs = sequence.read_fasta(path=g['untrimmed_cds'])
     num_site = g['state_cdn'].shape[1]
-    for leaf in g['tree'].iter_leaves():
+    for leaf in ete.iter_leaves(g['tree']):
         leaf_nn = leaf.numerical_label
         if leaf.name not in seqs.keys():
             continue
@@ -658,7 +659,7 @@ def main_site(g):
         g['site_outdir'] = './csubst_site.branch_id'+','.join([ str(bid) for bid in branch_ids ])
         if not os.path.exists(g['site_outdir']):
             os.makedirs(g['site_outdir'])
-        leaf_nn = [ n.numerical_label for n in g['tree'].traverse() if n.is_leaf() ]
+        leaf_nn = [n.numerical_label for n in g['tree'].traverse() if ete.is_leaf(n)]
         num_site = ON_tensor.shape[1]
         df = initialize_site_df(num_site)
         df = add_cs_info(df, g['branch_ids'], sub_tensor=OS_tensor, attr='S')

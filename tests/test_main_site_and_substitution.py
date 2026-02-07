@@ -1,4 +1,3 @@
-import ete3
 import numpy
 import pandas
 import pytest
@@ -8,11 +7,12 @@ from csubst import main_site
 from csubst import substitution
 from csubst import substitution_cy
 from csubst import tree
+from csubst import ete
 
 
 @pytest.fixture
 def tiny_tree():
-    tr = ete3.PhyloNode("(B:1,(A:1,C:2)X:3)R;", format=1)
+    tr = ete.PhyloNode("(B:1,(A:1,C:2)X:3)R;", format=1)
     return tree.add_numerical_node_labels(tr)
 
 
@@ -154,7 +154,7 @@ def test_get_df_dist_reports_max_distance_for_multi_branch_substitutions(tiny_tr
 
 
 def test_get_substitution_tensor_asis_matches_manual_outer_products():
-    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:1,B:1)R;", format=1))
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: n.numerical_label for n in tr.traverse()}
     state = numpy.zeros((3, 2, 2), dtype=float)
     state[labels["R"], :, :] = [[1.0, 0.0], [0.5, 0.5]]
@@ -226,7 +226,7 @@ def test_add_dif_column_and_add_dif_stats():
 
 
 def test_get_substitution_tensor_syn_matches_manual_groupwise_products():
-    tr = tree.add_numerical_node_labels(ete3.PhyloNode("(A:1,B:1)R;", format=1))
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: n.numerical_label for n in tr.traverse()}
     # codon state order: [AAA, AAG, TTT, TTC]
     # synonymous groups: K=[AAA,AAG], F=[TTT,TTC]

@@ -18,6 +18,7 @@ from csubst import substitution
 from csubst import substitution_sparse
 from csubst import table
 from csubst import omega_cy
+from csubst import ete
 
 
 def _get_cb_ids(cb):
@@ -219,9 +220,9 @@ def subroot_E2nan(cb, tree):
         return cb
     for node in tree.traverse():
         continue_flag = 1
-        if node.is_root():
+        if ete.is_root(node):
             continue_flag = 0
-        elif node.up.is_root():
+        elif ete.is_root(node.up):
             continue_flag = 0
         if continue_flag:
             continue
@@ -280,7 +281,7 @@ def get_exp_state(g, mode):
         inst = g['instantaneous_aa_rate_matrix']
     stateE = numpy.zeros_like(state, dtype=g['float_type'])
     for node in g['tree'].traverse():
-        if node.is_root():
+        if ete.is_root(node):
             continue
         if mode=='cdn':
             branch_length = node.SNdist

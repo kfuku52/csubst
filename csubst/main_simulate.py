@@ -10,6 +10,7 @@ from csubst import foreground
 from csubst import genetic_code
 from csubst import parser_misc
 from csubst import tree
+from csubst import ete
 
 class suppress_stdout_stderr(object):
     # https://www.semicolonworld.com/question/57657/suppress-stdout-stderr-print-from-python-functions
@@ -50,7 +51,7 @@ def get_pyvolve_newick(tree, trait_name):
     for node in tree.traverse():
         node.dist2 = node.dist
         node.dist = node.numerical_label
-    newick_txt = tree.write(format=1)
+    newick_txt = ete.write_tree(tree, format=1)
     for node in tree.traverse():
         sub_from = str(node.numerical_label)
         if getattr(node, 'is_fg_'+trait_name):

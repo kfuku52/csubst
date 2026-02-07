@@ -1,4 +1,3 @@
-import ete3
 import numpy
 import pandas
 
@@ -6,9 +5,10 @@ import os
 import itertools
 
 from csubst import tree
+from csubst import ete
 
 def get_node_phylobayes_out(node, files):
-    if node.is_leaf():
+    if ete.is_leaf(node):
         pp_file = [ file for file in files if file.find(node.name+"_"+node.name+".ancstatepostprob") > -1 ]
     else:
         pp_file = [ file for file in files if file.find(".ancstatepostprob") > -1 ]
@@ -44,7 +44,7 @@ def get_pp_N(pp_cdn):
 def get_input_information(g):
     files = os.listdir(g['phylobayes_dir'])
     sample_labels = [file for file in files if "_sample.labels" in file][0]
-    g['tree'] = ete3.PhyloNode(g['phylobayes_dir'] + sample_labels, format=1)
+    g['tree'] = ete.PhyloNode(g['phylobayes_dir'] + sample_labels, format=1)
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
     g['num_node'] = len(list(g['tree'].traverse()))
     state_files = [ f for f in files if f.endswith('.ancstatepostprob') ]
@@ -100,7 +100,7 @@ def get_state_tensor(g):
         elif len(pp_file) == 0:
             print('Could not find .ancstatepostprob file for the node.',
                   'node.name =', node.name, 'node.numerical_label =', node.numerical_label,
-                  'is_root =', node.is_root(), 'is_leaf =', node.is_leaf())
+                  'is_root =', ete.is_root(node), 'is_leaf =', ete.is_leaf(node))
     if (g['ml_anc']):
         idxmax = numpy.argmax(state_tensor, axis=2)
         state_tensor = numpy.zeros(state_tensor.shape, dtype=bool)
@@ -108,5 +108,4 @@ def get_state_tensor(g):
             for s in numpy.arange(state_tensor.shape[1]):
                 state_tensor[b,s,idxmax[b,s]] = 1
     return(state_tensor)
-
 
