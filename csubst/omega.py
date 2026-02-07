@@ -4,7 +4,6 @@
 #    my_class.mp_simple_method()
 #    my_class.wait()
 
-import joblib
 import numpy
 import scipy.stats as stats
 from scipy.linalg import expm
@@ -112,6 +111,16 @@ def joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i+1, num_gad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
+def _calc_E_mean_chunk_to_mmap(mode, cb_ids, sub_sg, sub_bg, mmap_out, dtype, shape, obs_col, num_gad_combinat, igad_chunk, g):
+    dfEb = numpy.memmap(filename=mmap_out, dtype=dtype, shape=shape, mode='r+')
+    joblib_calc_E_mean(mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g)
+    dfEb.flush()
+
+def _calc_quantile_chunk_to_mmap(mode, cb_ids, sub_sg, sub_bg, mmap_out, dtype, shape, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
+    dfq = numpy.memmap(filename=mmap_out, dtype=dtype, shape=shape, mode='r+')
+    joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
+    dfq.flush()
+
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g={}):
     if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
         sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor=sub_tensor, mode=mode)
@@ -152,27 +161,46 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             if 'bool' in str(my_dtype): my_dtype = g['float_type']
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
-            dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0]), mode='w+')
-            joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend='multiprocessing')(
-                joblib.delayed(joblib_calc_E_mean)
-                (mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
+            axis = (cb.shape[0],)
+            dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
+            tasks = [
+                (mode, cb_ids, sub_sg, sub_bg, mmap_out, my_dtype, axis, obs_col, num_gad_combinat, igad_chunk, g)
+                for igad_chunk in igad_chunks
+            ]
+            parallel.run_starmap(
+                func=_calc_E_mean_chunk_to_mmap,
+                args_iterable=tasks,
+                n_jobs=n_jobs,
+                backend='threading',
             )
+            dfEb.flush()
             E_b = dfEb
+            del dfEb
             if os.path.exists(mmap_out): os.unlink(mmap_out)
     elif stat=='quantile':
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         my_dtype = sub_tensor.dtype
         if 'bool' in str(my_dtype): my_dtype = numpy.int32
-        dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0], quantile_niter), mode='w+')
+        axis = (cb.shape[0], quantile_niter)
+        dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         # TODO distinct thread/process
         if n_jobs == 1:
             joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, list_igad, g)
         else:
-            joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend='multiprocessing')(
-                joblib.delayed(joblib_calc_quantile)
-                (mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
+            tasks = [
+                (mode, cb_ids, sub_sg, sub_bg, mmap_out, my_dtype, axis, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
+                for igad_chunk in igad_chunks
+            ]
+            parallel.run_starmap(
+                func=_calc_quantile_chunk_to_mmap,
+                args_iterable=tasks,
+                n_jobs=n_jobs,
+                backend='threading',
             )
+        dfq.flush()
+        del dfq
+        dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='r')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
         for i in cb.index:
