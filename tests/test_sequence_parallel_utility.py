@@ -36,6 +36,30 @@ def test_get_chunks_for_numpy_array():
     numpy.testing.assert_array_equal(chunks[1], arr[2:, :])
 
 
+def test_get_chunks_avoids_empty_chunks_when_threads_exceed_items():
+    chunks, starts = parallel.get_chunks([10, 11], threads=8)
+    assert chunks == [[10], [11]]
+    assert starts == [0, 1]
+
+
+def test_get_chunks_supports_finer_chunk_factor_splitting():
+    chunks, starts = parallel.get_chunks(list(range(10)), threads=2, chunk_factor=3)
+    assert [len(c) for c in chunks] == [1, 1, 2, 2, 2, 2]
+    assert starts == [0, 1, 2, 4, 6, 8]
+
+
+def test_resolve_n_jobs_is_capped_by_workload_size():
+    assert parallel.resolve_n_jobs(num_items=0, threads=8) == 1
+    assert parallel.resolve_n_jobs(num_items=2, threads=8) == 2
+    assert parallel.resolve_n_jobs(num_items=8, threads=2) == 2
+
+
+def test_resolve_joblib_backend_auto_uses_task_policy():
+    g = {"parallel_backend": "auto"}
+    assert parallel.resolve_joblib_backend(g=g, task="general") == "multiprocessing"
+    assert parallel.resolve_joblib_backend(g=g, task="reducer") == "multiprocessing"
+
+
 def test_calc_omega_state_matches_manual_tensor_product():
     g = {"state_columns": [[0, 0, 0], [0, 0, 1]]}
     state_nuc = numpy.array(

@@ -24,8 +24,13 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
     unique_cols = numpy.unique(cols)
     ind2  = numpy.arange(arity, dtype=numpy.int64)
     empty_id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int64)
-    chunks, starts = parallel.get_chunks(empty_id_combinations, ncpu)
-    out = joblib.Parallel(n_jobs=ncpu, max_nbytes=None, backend='multiprocessing')(
+    if unique_cols.shape[0] == 0:
+        return empty_id_combinations
+    n_jobs = parallel.resolve_n_jobs(num_items=unique_cols.shape[0], threads=ncpu)
+    if n_jobs == 1:
+        return combination_cy.generate_id_chunk(empty_id_combinations, 0, arity, ind2, rows, cols, unique_cols)
+    chunks, starts = parallel.get_chunks(empty_id_combinations, n_jobs)
+    out = joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend='multiprocessing')(
         joblib.delayed(combination_cy.generate_id_chunk)
         (chunk, start, arity, ind2, rows, cols, unique_cols) for chunk, start in zip(chunks, starts)
     )
@@ -73,11 +78,17 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
-            chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
-            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-                joblib.delayed(node_union)
-                (ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)
-            )
+            n_jobs = parallel.resolve_n_jobs(num_items=len(index_combinations), threads=g['threads'])
+            if n_jobs == 1:
+                node_union(index_combinations, target_id_dict[trait_name], df_mmap, 0)
+            else:
+                chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+                chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
+                backend = parallel.resolve_joblib_backend(g=g, task='general')
+                joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend=backend)(
+                    joblib.delayed(node_union)
+                    (ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)
+                )
             is_valid_combination = (df_mmap.sum(axis=1)!=0)
             if (is_valid_combination.sum()>0):
                 node_combination_dict[trait_name] = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
@@ -120,11 +131,17 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
-            chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
-            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-                joblib.delayed(node_union)
-                (ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)
-            )
+            n_jobs = parallel.resolve_n_jobs(num_items=len(index_combinations), threads=g['threads'])
+            if n_jobs == 1:
+                node_union(index_combinations, bid_trait, df_mmap, 0)
+            else:
+                chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+                chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
+                backend = parallel.resolve_joblib_backend(g=g, task='general')
+                joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend=backend)(
+                    joblib.delayed(node_union)
+                    (ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)
+                )
             is_valid_combination = (df_mmap.sum(axis=1)!=0)
             if (is_valid_combination.sum()>0):
                 node_combinations_dict[trait_name] = numpy.unique(df_mmap[is_valid_combination,:], axis=0)

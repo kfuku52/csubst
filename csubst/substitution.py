@@ -581,11 +581,13 @@ def get_cb(id_combinations, sub_tensor, g, attr):
     cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
     cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     writer = sub_tensor2cb_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cb
-    if (g['threads']==1):
+    n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
+    if n_jobs == 1:
         df = writer(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=g['float_type'])
         df = pandas.DataFrame(df, columns=cn)
     else:
-        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['threads'])
+        chunk_factor = parallel.resolve_chunk_factor(g=g, task='reducer')
+        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, n_jobs, chunk_factor=chunk_factor)
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         axis = (id_combinations.shape[0], arity+4)
@@ -593,7 +595,8 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+        backend = parallel.resolve_joblib_backend(g=g, task='reducer')
+        joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend=backend)(
             joblib.delayed(writer)
             (ids, sub_tensor, True, df_mmap, ms, g['float_type']) for ids,ms in zip(id_chunks, mmap_starts)
         )
@@ -692,11 +695,13 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
     cn2 = ["site",]
     cn3 = [ 'OC'+attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
     writer = sub_tensor2cbs_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cbs
-    if (g['threads']==1):
+    n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
+    if n_jobs == 1:
         df = writer(id_combinations, sub_tensor)
         df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)
     else:
-        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, g['threads'])
+        chunk_factor = parallel.resolve_chunk_factor(g=g, task='reducer')
+        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, n_jobs, chunk_factor=chunk_factor)
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cbs.out.mmap')
         if os.path.exists(mmap_out): os.remove(mmap_out)
         axis = (id_combinations.shape[0]*sub_tensor.shape[1], arity+5)
@@ -704,7 +709,8 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+        backend = parallel.resolve_joblib_backend(g=g, task='reducer')
+        joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend=backend)(
             joblib.delayed(writer)
             (ids, sub_tensor, True, df_mmap, ms) for ids,ms in zip(id_chunks,mmap_starts)
         )

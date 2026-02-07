@@ -80,6 +80,14 @@ if __name__ == "__main__":
     psr_co.add_argument('--sub_tensor_sparse_density_cutoff', metavar='FLOAT', default=0.15, type=float, required=False,
                         help='default=%(default)s: Density cutoff for --sub_tensor_backend auto. '
                              'Sparse reducers are selected when estimated substitution tensor density is <= this value.')
+    psr_co.add_argument('--parallel_backend', metavar='auto|multiprocessing|threading|loky', default='auto', type=str,
+                        choices=['auto', 'multiprocessing', 'threading', 'loky'],
+                        help='default=%(default)s: joblib backend policy for parallel workloads. '
+                             '"auto" uses multiprocessing.')
+    psr_co.add_argument('--parallel_chunk_factor', metavar='INT', default=1, type=int, required=False,
+                        help='default=%(default)s: Number of chunks per worker for general parallel workloads.')
+    psr_co.add_argument('--parallel_chunk_factor_reducer', metavar='INT', default=4, type=int, required=False,
+                        help='default=%(default)s: Number of chunks per worker for dense/sparse combinatorial reducers.')
     psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')
 

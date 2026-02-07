@@ -119,6 +119,39 @@ def test_get_cb_sparse_matches_dense():
     numpy.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
 
 
+def test_get_cb_threading_matches_single_thread_for_dense_and_sparse():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([[2, 0], [1, 2], [0, 1]], dtype=numpy.int64)
+    g_single = {"threads": 1, "float_type": numpy.float64}
+    g_thread = {
+        "threads": 2,
+        "float_type": numpy.float64,
+        "parallel_backend": "threading",
+        "parallel_chunk_factor_reducer": 2,
+    }
+    out_dense_single = substitution.get_cb(ids, dense, g_single, attr="OCN")
+    out_dense_thread = substitution.get_cb(ids, dense, g_thread, attr="OCN")
+    out_sparse_single = substitution.get_cb(ids, sparse_tensor, g_single, attr="OCN")
+    out_sparse_thread = substitution.get_cb(ids, sparse_tensor, g_thread, attr="OCN")
+    numpy.testing.assert_allclose(out_dense_thread.values, out_dense_single.values, atol=1e-12)
+    numpy.testing.assert_allclose(out_sparse_thread.values, out_sparse_single.values, atol=1e-12)
+
+
+def test_get_cb_auto_parallel_matches_single_thread_for_dense_and_sparse():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([[2, 0], [1, 2], [0, 1]], dtype=numpy.int64)
+    g_single = {"threads": 1, "float_type": numpy.float64}
+    g_auto = {"threads": 2, "float_type": numpy.float64, "parallel_backend": "auto"}
+    out_dense_single = substitution.get_cb(ids, dense, g_single, attr="OCN")
+    out_dense_auto = substitution.get_cb(ids, dense, g_auto, attr="OCN")
+    out_sparse_single = substitution.get_cb(ids, sparse_tensor, g_single, attr="OCN")
+    out_sparse_auto = substitution.get_cb(ids, sparse_tensor, g_auto, attr="OCN")
+    numpy.testing.assert_allclose(out_dense_auto.values, out_dense_single.values, atol=1e-12)
+    numpy.testing.assert_allclose(out_sparse_auto.values, out_sparse_single.values, atol=1e-12)
+
+
 def test_sparse_group_tensor_cache_matches_uncached():
     dense = _toy_reducer_tensor()
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
@@ -172,6 +205,34 @@ def test_get_cbs_sparse_matches_dense():
     out_dense = substitution.get_cbs(ids, dense, attr="N", g=g)
     out_sparse = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g)
     numpy.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
+
+
+def test_get_cbs_threading_matches_single_thread_for_dense_and_sparse():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([[2, 0], [1, 2], [0, 1]], dtype=numpy.int64)
+    g_single = {"threads": 1}
+    g_thread = {"threads": 2, "parallel_backend": "threading", "parallel_chunk_factor_reducer": 2}
+    out_dense_single = substitution.get_cbs(ids, dense, attr="N", g=g_single)
+    out_dense_thread = substitution.get_cbs(ids, dense, attr="N", g=g_thread)
+    out_sparse_single = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g_single)
+    out_sparse_thread = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g_thread)
+    numpy.testing.assert_allclose(out_dense_thread.values, out_dense_single.values, atol=1e-12)
+    numpy.testing.assert_allclose(out_sparse_thread.values, out_sparse_single.values, atol=1e-12)
+
+
+def test_get_cbs_auto_parallel_matches_single_thread_for_dense_and_sparse():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = numpy.array([[2, 0], [1, 2], [0, 1]], dtype=numpy.int64)
+    g_single = {"threads": 1}
+    g_auto = {"threads": 2, "parallel_backend": "auto"}
+    out_dense_single = substitution.get_cbs(ids, dense, attr="N", g=g_single)
+    out_dense_auto = substitution.get_cbs(ids, dense, attr="N", g=g_auto)
+    out_sparse_single = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g_single)
+    out_sparse_auto = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g_auto)
+    numpy.testing.assert_allclose(out_dense_auto.values, out_dense_single.values, atol=1e-12)
+    numpy.testing.assert_allclose(out_sparse_auto.values, out_sparse_single.values, atol=1e-12)
 
 
 def test_estimate_sub_tensor_density_matches_dense_and_sparse():

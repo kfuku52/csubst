@@ -20,6 +20,9 @@ def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     g = param.get_global_parameters(_args())
     assert g["sub_tensor_backend"] == "auto"
     assert g["sub_tensor_sparse_density_cutoff"] == pytest.approx(0.15)
+    assert g["parallel_backend"] == "auto"
+    assert g["parallel_chunk_factor"] == 1
+    assert g["parallel_chunk_factor_reducer"] == 4
 
 
 def test_get_global_parameters_normalizes_sub_tensor_backend_case():
@@ -35,6 +38,18 @@ def test_get_global_parameters_rejects_invalid_sub_tensor_backend():
 def test_get_global_parameters_rejects_invalid_sparse_density_cutoff():
     with pytest.raises(ValueError, match="sub_tensor_sparse_density_cutoff"):
         param.get_global_parameters(_args(sub_tensor_sparse_density_cutoff=1.5))
+
+
+def test_get_global_parameters_rejects_invalid_parallel_backend():
+    with pytest.raises(ValueError, match="parallel_backend"):
+        param.get_global_parameters(_args(parallel_backend="invalid"))
+
+
+def test_get_global_parameters_rejects_invalid_chunk_factors():
+    with pytest.raises(ValueError, match="parallel_chunk_factor"):
+        param.get_global_parameters(_args(parallel_chunk_factor=0))
+    with pytest.raises(ValueError, match="parallel_chunk_factor_reducer"):
+        param.get_global_parameters(_args(parallel_chunk_factor_reducer=0))
 
 
 def test_resolve_sub_tensor_backend_auto_to_dense():

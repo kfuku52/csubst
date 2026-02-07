@@ -130,10 +130,11 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     print(txt.format(SN, mode, num_gad_combinat))
     list_igad = [ [i,]+list(items) for i,items in zip(range(num_gad_combinat), list_gad) ]
     obs_col = 'OC'+SN+mode
-    if (g['threads']>1):
-        igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, g['threads'])
+    n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
+    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
     if stat=='mean':
-        if (g['threads']==1):
+        if n_jobs == 1:
             E_b = calc_E_mean(mode, cb, sub_sg, sub_bg, obs_col, list_igad, g)
         else:
             my_dtype = sub_tensor.dtype
@@ -141,7 +142,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0]), mode='w+')
-            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
+            joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend='multiprocessing')(
                 joblib.delayed(joblib_calc_E_mean)
                 (mode, cb, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
             )
@@ -154,10 +155,13 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         if 'bool' in str(my_dtype): my_dtype = numpy.int32
         dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=(cb.shape[0], quantile_niter), mode='w+')
         # TODO distinct thread/process
-        joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-            joblib.delayed(joblib_calc_quantile)
-            (mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
-        )
+        if n_jobs == 1:
+            joblib_calc_quantile(mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, list_igad, g)
+        else:
+            joblib.Parallel(n_jobs=n_jobs, max_nbytes=None, backend='multiprocessing')(
+                joblib.delayed(joblib_calc_quantile)
+                (mode, cb, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g) for igad_chunk in igad_chunks
+            )
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
         for i in cb.index:

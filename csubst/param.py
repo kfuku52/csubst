@@ -61,6 +61,24 @@ def get_global_parameters(args):
         g['sub_tensor_sparse_density_cutoff'] = 0.15
     if (g['sub_tensor_sparse_density_cutoff'] < 0) or (g['sub_tensor_sparse_density_cutoff'] > 1):
         raise ValueError('--sub_tensor_sparse_density_cutoff should be between 0 and 1.')
+    if 'parallel_backend' in g.keys():
+        g['parallel_backend'] = str(g['parallel_backend']).lower()
+    else:
+        g['parallel_backend'] = 'auto'
+    if g['parallel_backend'] not in ['auto', 'multiprocessing', 'threading', 'loky']:
+        raise ValueError('--parallel_backend should be one of auto, multiprocessing, threading, loky.')
+    if 'parallel_chunk_factor' in g.keys():
+        g['parallel_chunk_factor'] = int(g['parallel_chunk_factor'])
+    else:
+        g['parallel_chunk_factor'] = 1
+    if g['parallel_chunk_factor'] < 1:
+        raise ValueError('--parallel_chunk_factor should be >= 1.')
+    if 'parallel_chunk_factor_reducer' in g.keys():
+        g['parallel_chunk_factor_reducer'] = int(g['parallel_chunk_factor_reducer'])
+    else:
+        g['parallel_chunk_factor_reducer'] = 4
+    if g['parallel_chunk_factor_reducer'] < 1:
+        raise ValueError('--parallel_chunk_factor_reducer should be >= 1.')
     if 'pdb' in g.keys():
         if g['pdb']=='besthit':
             g['run_pdb_sequence_search'] = True
