@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 
@@ -7,7 +8,13 @@ def _run_cli(*args):
     repo_root = Path(__file__).resolve().parents[1]
     cmd = [sys.executable, str(repo_root / "csubst" / "csubst")]
     cmd.extend(args)
-    return subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(repo_root) + (
+        os.pathsep + env["PYTHONPATH"] if "PYTHONPATH" in env else ""
+    )
+    return subprocess.run(
+        cmd, cwd=str(repo_root), env=env, capture_output=True, text=True
+    )
 
 
 def test_site_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects():
