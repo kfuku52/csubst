@@ -38,7 +38,7 @@ def transfer_root(tree_to, tree_from, verbose=False):
     for node in tree_to.traverse():
         if node.dist is None:
             node.dist = 0.0
-    subroot_leaves = [ete.get_leaf_names(n) for n in tree_from.get_children()]
+    subroot_leaves = [ete.get_leaf_names(n) for n in ete.get_children(tree_from)]
     is_n0_bigger_than_n1 = (len(subroot_leaves[0]) > len(subroot_leaves[1]))
     ingroups = subroot_leaves[0] if is_n0_bigger_than_n1 else subroot_leaves[1]
     outgroups = subroot_leaves[0] if not is_n0_bigger_than_n1 else subroot_leaves[1]
@@ -54,8 +54,8 @@ def transfer_root(tree_to, tree_from, verbose=False):
         sys.stderr.write('No root bipartition found in --infile. Exiting.\n')
         sys.exit(1)
     tree_to.set_outgroup(outgroup_ancestor)
-    subroot_to = tree_to.get_children()
-    subroot_from = tree_from.get_children()
+    subroot_to = ete.get_children(tree_to)
+    subroot_from = ete.get_children(tree_from)
     total_subroot_length_to = sum([(n.dist or 0) for n in subroot_to])
     total_subroot_length_from = sum([(n.dist or 0) for n in subroot_from])
     if total_subroot_length_from == 0:
@@ -321,7 +321,9 @@ def get_num_adjusted_sites(g, node):
 def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
     print('Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, '
           'rather than nucleotide-substitutions/codon-site.')
-    print('Total branch length before rescaling: {:,.3f} nucleotide substitutions / codon site'.format(sum([ n.dist for n in g['tree'].traverse() ])))
+    print('Total branch length before rescaling: {:,.3f} nucleotide substitutions / codon site'.format(
+        sum([(n.dist or 0.0) for n in g['tree'].traverse()])
+    ))
     OS_branch_sub = substitution.get_branch_sub_counts(OS_tensor)
     ON_branch_sub = substitution.get_branch_sub_counts(ON_tensor)
     for node in g['tree'].traverse():
@@ -385,7 +387,7 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
 
 def read_treefile(g):
     g['rooted_tree'] = ete.PhyloNode(g['rooted_tree_file'], format=1)
-    assert len(g['rooted_tree'].get_children())==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
+    assert len(ete.get_children(g['rooted_tree']))==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
     g['rooted_tree'] = standardize_node_names(g['rooted_tree'])
     g['rooted_tree'] = add_numerical_node_labels(g['rooted_tree'])
     g['num_node'] = len(list(g['rooted_tree'].traverse()))

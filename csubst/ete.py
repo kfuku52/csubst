@@ -63,6 +63,24 @@ def get_leaves(node):
     return node.get_leaves()
 
 
+def get_children(node):
+    if hasattr(node, "children"):
+        return list(node.children)
+    return node.get_children()
+
+
+def get_sisters(node):
+    if hasattr(node, "sisters"):
+        return list(node.sisters())
+    return node.get_sisters()
+
+
+def get_descendants(node):
+    if hasattr(node, "descendants"):
+        return list(node.descendants())
+    return node.get_descendants()
+
+
 def iter_leaves(node):
     if hasattr(node, "leaves"):
         return node.leaves()
@@ -100,6 +118,24 @@ def add_features(node, **kwargs):
     return node.add_features(**kwargs)
 
 
+def _read_fasta(path):
+    seq_dict = {}
+    current_name = None
+    with open(path, "r") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                current_name = line[1:]
+                seq_dict[current_name] = ""
+                continue
+            if current_name is None:
+                raise ValueError(f"Invalid FASTA format: sequence line before header in {path}")
+            seq_dict[current_name] += line
+    return seq_dict
+
+
 def set_prop(node, key, value):
     if _backend == "ete4":
         node.add_props(**{key: value})
@@ -127,6 +163,22 @@ def del_prop(node, key):
         return None
     if hasattr(node, key):
         delattr(node, key)
+    return None
+
+
+def link_to_alignment(tree, alignment, alg_format="fasta"):
+    if _backend != "ete4":
+        tree.link_to_alignment(alignment=alignment, alg_format=alg_format)
+        return None
+    if alg_format.lower() != "fasta":
+        raise ValueError(f"Unsupported alignment format for ete4 compatibility: {alg_format}")
+    seq_dict = _read_fasta(alignment)
+    for leaf in iter_leaves(tree):
+        seq = seq_dict.get(leaf.name)
+        if seq is None:
+            # Common fallback: FASTA headers may contain extra description fields.
+            seq = seq_dict.get(leaf.name.split(" ", 1)[0], "")
+        set_prop(leaf, "sequence", seq)
     return None
 
 

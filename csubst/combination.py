@@ -301,7 +301,7 @@ def get_global_dep_ids(g):
         global_dep_ids.append(dep_id)
         if g['exclude_sister_pair']:
             for node in g['tree'].traverse():
-                children = node.get_children()
+                children = ete.get_children(node)
                 if len(children)>1:
                     dep_id = numpy.sort(numpy.array([ ete.get_prop(node, "numerical_label") for node in children ]))
                     global_dep_ids.append(dep_id)
@@ -309,7 +309,7 @@ def get_global_dep_ids(g):
     root_state_sum = g['state_cdn'][root_nn, :, :].sum()
     if (root_state_sum == 0):
         print('Ancestral states were not estimated on the root node. Excluding sub-root nodes from the analysis.')
-        subroot_nns = [ete.get_prop(node, "numerical_label") for node in g['tree'].get_children()]
+        subroot_nns = [ete.get_prop(node, "numerical_label") for node in ete.get_children(g['tree'])]
         for subroot_nn in subroot_nns:
             for node in g['tree'].traverse():
                 if ete.is_root(node):
@@ -342,7 +342,7 @@ def get_foreground_dep_ids(g):
                     if ete.is_leaf(node):
                         tmp_fg_dep_ids.append(ete.get_prop(node, "numerical_label"))
                     else:
-                        descendant_nn = [ ete.get_prop(n, "numerical_label") for n in node.get_descendants() ]
+                        descendant_nn = [ ete.get_prop(n, "numerical_label") for n in ete.get_descendants(node) ]
                         tmp_fg_dep_ids += [ete.get_prop(node, "numerical_label"),] + descendant_nn
                 if len(tmp_fg_dep_ids)>1:
                     fg_dep_ids[trait_name].append(numpy.sort(numpy.array(tmp_fg_dep_ids)))

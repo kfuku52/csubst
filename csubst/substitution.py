@@ -432,7 +432,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
     i=0
     for node in g['tree'].traverse():
         df.at[i,'branch_name'] = getattr(node, 'name')
-        df.at[i,'branch_id'] = getattr(node, 'numerical_label')
+        df.at[i,'branch_id'] = ete.get_prop(node, "numerical_label")
         if _is_sparse_sub_tensor(sub_tensor):
             df.at[i,attr+'_sub'] = branch_sub_counts[ete.get_prop(node, "numerical_label")]
             branch_tensor = _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=ete.get_prop(node, "numerical_label")) if sitewise else None

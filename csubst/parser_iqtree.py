@@ -268,9 +268,11 @@ def mask_missing_sites(state_tensor, tree):
         if (ete.is_root(node)) | (ete.is_leaf(node)):
             continue
         nl = ete.get_prop(node, "numerical_label")
-        child0_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(node.get_children()[0])], dtype=int)
-        child1_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(node.get_children()[1])], dtype=int)
-        sister_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(node.get_sisters()[0])], dtype=int)
+        children = ete.get_children(node)
+        sisters = ete.get_sisters(node)
+        child0_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(children[0])], dtype=int)
+        child1_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(children[1])], dtype=int)
+        sister_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(sisters[0])], dtype=int)
         c0 = (state_tensor[child0_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child0_leaf_nonzero
         c1 = (state_tensor[child1_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child1_leaf_nonzero
         s = (state_tensor[sister_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_sister_leaf_nonzero
@@ -279,8 +281,10 @@ def mask_missing_sites(state_tensor, tree):
     return state_tensor
 
 def get_state_tensor(g):
-    g['tree'].link_to_alignment(alignment=g['alignment_file'], alg_format='fasta')
-    num_codon_alignment = int(len(ete.get_leaves(g['tree'])[0].sequence)/3)
+    ete.link_to_alignment(g['tree'], alignment=g['alignment_file'], alg_format='fasta')
+    first_leaf_seq = ete.get_prop(ete.get_leaves(g['tree'])[0], 'sequence', '')
+    assert first_leaf_seq != '', 'Failed to map alignment to tree leaves. Check leaf labels in --alignment_file and --rooted_tree_file.'
+    num_codon_alignment = int(len(first_leaf_seq)/3)
     err_txt = 'The number of codon sites did not match between the alignment and ancestral states. ' \
               'Delete intermediate files and rerun.'
     assert num_codon_alignment==g['num_input_site'], err_txt
@@ -292,7 +296,8 @@ def get_state_tensor(g):
         if ete.is_root(node):
             continue
         elif ete.is_leaf(node):
-            seq = node.sequence.upper()
+            seq = ete.get_prop(node, 'sequence', '').upper()
+            assert seq != '', 'Leaf sequence not found for node "{}". Check tree/alignment labels.'.format(node.name)
             state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=g['float_type'])
             if g['input_data_type']=='cdn':
                 assert len(seq)%3==0, 'Sequence length is not multiple of 3. Node name = '+node.name

@@ -47,7 +47,7 @@ def run_qblast(aa_query, num_display=10, evalue_cutoff=10):
 
 def get_representative_leaf(node, size='median'):
     leaves = ete.get_leaves(node)
-    leaf_seqlens = [ len(l.sequence.replace('-', '')) for l in leaves ]
+    leaf_seqlens = [ len(ete.get_prop(l, 'sequence', '').replace('-', '')) for l in leaves ]
     if size=='median':
         ind = numpy.argsort(leaf_seqlens)[len(leaf_seqlens) // 2]
     representative_leaf = leaves[ind]

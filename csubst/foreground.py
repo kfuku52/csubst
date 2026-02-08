@@ -182,7 +182,7 @@ def get_target_ids(lineages, trait_name, g):
         while dif:
             num_id = len(lineage_fg_ids)
             for node in g['tree'].traverse():
-                child_ids = [ete.get_prop(child, "numerical_label") for child in node.get_children()]
+                child_ids = [ete.get_prop(child, "numerical_label") for child in ete.get_children(node)]
                 if all([id in lineage_fg_ids for id in child_ids]) & (len(child_ids) != 0):
                     if ete.get_prop(node, "numerical_label") not in lineage_fg_ids:
                         lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
@@ -336,7 +336,7 @@ def get_marginal_branch(g):
                 if (is_parent_fg==False):
                     g['mg_ids'][trait_name].append(ete.get_prop(node.up, "numerical_label"))
             if (g['mg_sister']):
-                sisters = node.get_sisters()
+                sisters = ete.get_sisters(node)
                 for sister in sisters:
                     if (g['mg_sister_stem_only']):
                         is_sister_fg = ete.get_prop(sister, 'is_fg_' + trait_name, False)

@@ -30,7 +30,8 @@ matplotlib.rc('legend', fontsize=font_size)
 matplotlib.rc('figure', titlesize=font_size)
 
 def get_state(node, g):
-    seq = node.sequence.upper()
+    seq = ete.get_prop(node, 'sequence', '').upper()
+    assert seq != '', 'Leaf sequence not found for node "{}". Check tree/alignment labels.'.format(node.name)
     assert len(seq)%3==0, 'Sequence length is not multiple of 3. Node name = '+node.name
     state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=g['float_type'])
     for s in numpy.arange(g['num_input_site']):

@@ -284,9 +284,9 @@ def get_exp_state(g, mode):
         if ete.is_root(node):
             continue
         if mode=='cdn':
-            branch_length = node.SNdist
+            branch_length = ete.get_prop(node, 'SNdist', 0)
         elif mode=='pep':
-            branch_length = node.Ndist
+            branch_length = ete.get_prop(node, 'Ndist', 0)
         branch_length = max(branch_length, 0)
         if branch_length<g['float_tol']:
             continue # Skip if no substitution
