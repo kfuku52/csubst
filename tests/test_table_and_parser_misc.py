@@ -4,6 +4,7 @@ import pytest
 
 from csubst import parser_misc
 from csubst import table
+from csubst import ete
 
 
 def test_sort_branch_ids_sorts_within_rows_and_by_row():
@@ -210,3 +211,18 @@ def test_get_mechanistic_instantaneous_rate_matrix_matches_manual_example():
     )
     numpy.testing.assert_allclose(out, expected, atol=1e-12)
     numpy.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0, 0.0], atol=1e-12)
+
+
+def test_annotate_tree_handles_none_root_dist(tmp_path):
+    rooted_tree_file = tmp_path / "toy_rooted.nwk"
+    iqtree_tree_file = tmp_path / "toy_iqtree.treefile"
+    rooted_tree_file.write_text("(A:1,B:1)R;\n", encoding="utf-8")
+    iqtree_tree_file.write_text("(A:1,B:1)R;\n", encoding="utf-8")
+
+    g = {
+        "iqtree_treefile": str(iqtree_tree_file),
+        "rooted_tree": ete.PhyloNode(str(rooted_tree_file), format=1),
+    }
+    out = parser_misc.annotate_tree(g)
+    assert "tree" in out
+    assert len(list(out["tree"].traverse())) == 3

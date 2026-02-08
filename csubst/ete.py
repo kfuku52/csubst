@@ -121,6 +121,7 @@ def add_features(node, **kwargs):
 def _read_fasta(path):
     seq_dict = {}
     current_name = None
+    current_alias = None
     with open(path, "r") as handle:
         for raw_line in handle:
             line = raw_line.strip()
@@ -128,11 +129,16 @@ def _read_fasta(path):
                 continue
             if line.startswith(">"):
                 current_name = line[1:]
+                current_alias = current_name.split(" ", 1)[0]
                 seq_dict[current_name] = ""
+                if (current_alias != current_name) and (current_alias not in seq_dict):
+                    seq_dict[current_alias] = ""
                 continue
             if current_name is None:
                 raise ValueError(f"Invalid FASTA format: sequence line before header in {path}")
             seq_dict[current_name] += line
+            if (current_alias is not None) and (current_alias != current_name):
+                seq_dict[current_alias] += line
     return seq_dict
 
 

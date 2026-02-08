@@ -2,6 +2,8 @@ import numpy
 import pytest
 
 from csubst import parser_iqtree
+from csubst import tree
+from csubst import ete
 
 
 def _get_base_g(tmp_path, iqtree_text, log_text):
@@ -98,3 +100,45 @@ Transition/transversion ratio (kappa): 2.34E+00
     assert g["reconstruction_codon_table"] == 1
     assert g["omega"] == pytest.approx(0.123)
     assert g["kappa"] == pytest.approx(2.34)
+
+
+def _make_state_tensor_g(tmp_path, alignment_text):
+    alignment_file = tmp_path / "toy.fa"
+    state_file = tmp_path / "toy.state.tsv"
+    alignment_file.write_text(alignment_text, encoding="utf-8")
+    state_file.write_text("Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n", encoding="utf-8")
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    return {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": numpy.array(["AAA", "AAC", "AAG"]),
+        "float_type": numpy.float64,
+        "ml_anc": False,
+    }
+
+
+def test_get_state_tensor_reads_leaf_sequences_via_ete_compat(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
+    )
+    out = parser_iqtree.get_state_tensor(g)
+
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in g["tree"].traverse()}
+    numpy.testing.assert_allclose(out[labels["A"], 0, :], [1.0, 0.0, 0.0], atol=1e-12)
+    numpy.testing.assert_allclose(out[labels["A"], 1, :], [0.0, 1.0, 0.0], atol=1e-12)
+    numpy.testing.assert_allclose(out[labels["B"], 0, :], [0.0, 0.0, 1.0], atol=1e-12)
+    numpy.testing.assert_allclose(out[labels["B"], 1, :], [0.0, 0.0, 1.0], atol=1e-12)
+
+
+def test_get_state_tensor_raises_when_leaf_sequence_missing(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n",
+    )
+    with pytest.raises(AssertionError):
+        parser_iqtree.get_state_tensor(g)

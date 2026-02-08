@@ -204,6 +204,18 @@ def test_get_s_get_cs_and_get_bs_match_manual_values():
     assert pytest.approx(float(row0["N_sub"]), abs=1e-12) == 0.6
 
 
+def test_get_b_uses_tree_numerical_labels_for_branch_ids(tiny_tree):
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
+    sub = numpy.zeros((num_node, 1, 1, 2, 2), dtype=float)
+    a_id = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if n.name == "A"][0]
+    sub[a_id, 0, 0, 0, 1] = 0.5
+
+    out = substitution.get_b(g={"tree": tiny_tree, "num_node": num_node}, sub_tensor=sub, attr="S", sitewise=False)
+    expected_ids = sorted([ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()])
+    assert out["branch_id"].tolist() == expected_ids
+    assert set(out["branch_name"]) == set([n.name for n in tiny_tree.traverse()])
+
+
 def test_add_dif_column_and_add_dif_stats():
     cb = pandas.DataFrame(
         {

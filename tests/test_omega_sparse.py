@@ -3,6 +3,8 @@ import pandas
 
 from csubst import omega
 from csubst import substitution
+from csubst import tree
+from csubst import ete
 
 
 def _toy_sub_tensor():
@@ -54,3 +56,35 @@ def test_calc_E_stat_mean_sparse_matches_dense_for_all_modes():
         out_sparse = omega.calc_E_stat(cb=cb, sub_tensor=sparse, mode=mode, stat="mean", SN="N", g=g)
         numpy.testing.assert_allclose(out_sparse, out_dense, atol=1e-12)
 
+
+def test_get_exp_state_uses_branch_distance_props():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+
+    state = numpy.zeros((num_node, 1, 2), dtype=numpy.float64)
+    state[labels["R"], 0, 0] = 1.0
+
+    g = {
+        "tree": tr,
+        "state_pep": state.copy(),
+        "state_cdn": state.copy(),
+        "instantaneous_aa_rate_matrix": numpy.array([[-1.0, 1.0], [1.0, -1.0]], dtype=numpy.float64),
+        "instantaneous_codon_rate_matrix": numpy.array([[-1.0, 1.0], [1.0, -1.0]], dtype=numpy.float64),
+        "iqtree_rate_values": numpy.array([1.0], dtype=numpy.float64),
+        "float_type": numpy.float64,
+        "float_tol": 1e-12,
+    }
+
+    a_node = [n for n in tr.traverse() if n.name == "A"][0]
+    ete.set_prop(a_node, "Ndist", 0.5)
+    ete.set_prop(a_node, "SNdist", 0.5)
+    # B keeps missing Ndist/SNdist to confirm default=0 behavior.
+
+    pep = omega.get_exp_state(g=g, mode="pep")
+    cdn = omega.get_exp_state(g=g, mode="cdn")
+
+    assert pep[labels["A"], 0, :].sum() > 0
+    assert cdn[labels["A"], 0, :].sum() > 0
+    numpy.testing.assert_allclose(pep[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
+    numpy.testing.assert_allclose(cdn[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
