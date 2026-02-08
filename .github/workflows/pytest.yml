@@ -27,7 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           for i in 1 2 3; do
-            python -m pip install numpy scipy pandas joblib cython ete4 matplotlib threadpoolctl pyvolve pytest requests biopython && break
+            python -m pip install numpy scipy pandas joblib cython ete4==4.3.0 matplotlib threadpoolctl pyvolve pytest requests biopython && break
             echo "Dependency install failed (attempt $i). Retrying in 15s..."
             sleep 15
             if [ "$i" = "3" ]; then
@@ -59,7 +59,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           for i in 1 2 3; do
-            python -m pip install numpy scipy pandas joblib cython ete4 matplotlib threadpoolctl pyvolve pytest requests biopython && break
+            python -m pip install numpy scipy pandas joblib cython ete4==4.3.0 matplotlib threadpoolctl pyvolve pytest requests biopython && break
             echo "Dependency install failed (attempt $i). Retrying in 15s..."
             sleep 15
             if [ "$i" = "3" ]; then
