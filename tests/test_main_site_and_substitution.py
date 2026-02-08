@@ -194,6 +194,130 @@ def test_plot_tree_site_writes_figure_and_category_table(tmp_path, tiny_tree):
     assert out_df["tree_site_category"].tolist() == ["convergent", "divergent", "blank", "convergent"]
 
 
+def test_plot_tree_site_svg_contains_expected_labels_and_no_legacy_title(tmp_path, tiny_tree):
+    branch_ids = []
+    labels = {}
+    for node in tiny_tree.traverse():
+        labels[node.name] = ete.get_prop(node, "numerical_label")
+        if node.name in {"A", "C"}:
+            branch_ids.append(ete.get_prop(node, "numerical_label"))
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
+    aa_orders = numpy.array(["A", "V", "T", "I"])
+    state_pep = numpy.zeros((num_node, 4, aa_orders.shape[0]), dtype=float)
+    state_pep[labels["A"], 0, 0] = 1.0
+    state_pep[labels["A"], 1, 1] = 1.0
+    state_pep[labels["B"], 0, 0] = 1.0
+    state_pep[labels["B"], 1, 2] = 1.0
+    state_pep[labels["C"], 0, 0] = 1.0
+    state_pep[labels["C"], 1, 1] = 1.0
+    df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [1, 2, 3, 4],
+            "OCNany2spe": [0.7, 0.1, 0.2, 0.6],
+            "OCNany2dif": [0.1, 0.6, 0.1, 0.1],
+        }
+    )
+    g = {
+        "tree": tiny_tree,
+        "branch_ids": numpy.array(branch_ids, dtype=int),
+        "single_branch_mode": False,
+        "tree_site_plot": True,
+        "tree_site_plot_format": "svg",
+        "tree_site_plot_min_prob": 0.5,
+        "pymol_min_combinat_prob": 0.5,
+        "pymol_min_single_prob": 0.8,
+        "tree_site_plot_max_sites": 60,
+        "site_outdir": str(tmp_path),
+        "float_format": "%.4f",
+        "state_pep": state_pep,
+        "amino_acid_orders": aa_orders,
+    }
+    out_paths = main_site.plot_tree_site(df=df, g=g)
+    assert str(tmp_path / "csubst_site.tree_site.svg") in out_paths
+    svg_text = (tmp_path / "csubst_site.tree_site.svg").read_text(encoding="utf-8")
+    assert "Convergent sites" in svg_text
+    assert "Divergent sites" in svg_text
+    assert ("PP ≥ 0.5" in svg_text) or ("PP &#8805; 0.5" in svg_text)
+    assert "Tree + site summary" not in svg_text
+
+
+def test_plot_state_writes_outputs_when_enabled(tmp_path, tiny_tree):
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()}
+    num_node = max(labels.values()) + 1
+    on = numpy.zeros((num_node, 5, 1, 2, 2), dtype=float)
+    os = numpy.zeros((num_node, 5, 1, 2, 2), dtype=float)
+    for site in range(5):
+        on[labels["A"], site, 0, 0, 1] = 0.8 - 0.1 * site
+        on[labels["C"], site, 0, 0, 1] = 0.7 - 0.1 * site
+        os[labels["A"], site, 0, 0, 1] = 0.6 - 0.05 * site
+        os[labels["C"], site, 0, 0, 1] = 0.9 - 0.05 * site
+    g = {
+        "tree": tiny_tree,
+        "site_outdir": str(tmp_path),
+        "float_format": "%.4f",
+        "amino_acid_orders": numpy.array(["A", "B"]),
+        "matrix_groups": {"grp": ["AA", "AB"]},
+        "site_state_plot": True,
+    }
+    out_paths = main_site.plot_state(on, os, numpy.array([labels["A"], labels["C"]], dtype=int), g)
+    expected = {
+        str(tmp_path / "csubst_site.state.pdf"),
+        str(tmp_path / "csubst_site.state_N.tsv"),
+        str(tmp_path / "csubst_site.state_S.tsv"),
+    }
+    assert set(out_paths) == expected
+    for path in expected:
+        assert Path(path).exists()
+
+
+def test_plot_state_skips_outputs_when_disabled(tmp_path):
+    g = {"site_state_plot": False, "site_outdir": str(tmp_path)}
+    out_paths = main_site.plot_state(
+        ON_tensor=numpy.zeros((1, 1, 1, 1, 1), dtype=float),
+        OS_tensor=numpy.zeros((1, 1, 1, 1, 1), dtype=float),
+        branch_ids=numpy.array([0], dtype=int),
+        g=g,
+    )
+    assert out_paths == []
+    assert list(tmp_path.glob("csubst_site.state*")) == []
+
+
+def test_write_site_output_manifest_records_files_and_parameters(tmp_path):
+    existing = tmp_path / "csubst_site.tsv"
+    existing.write_text("x\n", encoding="utf-8")
+    g = {
+        "site_outdir": str(tmp_path),
+        "single_branch_mode": False,
+        "tree_site_plot": True,
+        "site_state_plot": False,
+        "tree_site_plot_format": "pdf",
+        "tree_site_plot_min_prob": 0.5,
+        "pymol_min_combinat_prob": 0.5,
+        "pymol_min_single_prob": 0.8,
+        "tree_site_plot_max_sites": 60,
+        "pdb": None,
+    }
+    rows = list()
+    branch_ids = numpy.array([23, 51], dtype=int)
+    main_site.add_site_output_manifest_row(rows, str(existing), "site_table_tsv", g, branch_ids)
+    main_site.add_site_output_manifest_row(
+        rows, str(tmp_path / "csubst_site.state.pdf"), "state_pattern_pdf", g, branch_ids, note="skipped"
+    )
+    manifest_path = main_site.write_site_output_manifest(rows, g, branch_ids)
+    assert Path(manifest_path).exists()
+    out_df = pandas.read_csv(manifest_path, sep="\t")
+    assert set(["output_kind", "output_file", "file_exists", "site_state_plot"]).issubset(set(out_df.columns))
+    assert (out_df.loc[:, "output_kind"] == "output_manifest").any()
+    manifest_row = out_df.loc[out_df.loc[:, "output_kind"] == "output_manifest", :].iloc[0]
+    assert manifest_row["file_exists"] == "yes"
+    site_row = out_df.loc[out_df.loc[:, "output_kind"] == "site_table_tsv", :].iloc[0]
+    assert site_row["file_exists"] == "yes"
+    assert int(site_row["file_size_bytes"]) > 0
+    skipped_row = out_df.loc[out_df.loc[:, "output_kind"] == "state_pattern_pdf", :].iloc[0]
+    assert skipped_row["file_exists"] == "no"
+    assert skipped_row["note"] == "skipped"
+
+
 def test_get_df_ad_add_site_stats_and_target_flag():
     g = {"amino_acid_orders": numpy.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
     sub_tensor = numpy.zeros((2, 2, 1, 2, 2), dtype=float)

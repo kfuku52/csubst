@@ -436,10 +436,15 @@ def annotate_b_foreground(b, g):
 
 def get_num_foreground_lineages(tree, trait_name):
     num_fl = 0
+    key_prefix = 'is_lineage_fg_' + trait_name + '_'
     for node in tree.traverse():
-        for k in node.__dict__.keys():
-            if k.startswith('is_lineage_fg_'+trait_name):
-                num_fl = max(num_fl, int(k.replace('is_lineage_fg_'+trait_name+'_', '')))
+        if hasattr(node, 'props'):
+            keys = node.props.keys()
+        else:
+            keys = node.__dict__.keys()
+        for k in keys:
+            if str(k).startswith(key_prefix):
+                num_fl = max(num_fl, int(str(k).replace(key_prefix, '')))
         break
     return num_fl
 

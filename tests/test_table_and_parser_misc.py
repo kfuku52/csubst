@@ -53,6 +53,20 @@ def test_sort_cb_stats_handles_non_string_column_names_regression():
     assert 999 in out.columns
 
 
+def test_sort_cb_stats_handles_empty_columns_regression():
+    cb_stats = pandas.DataFrame()
+    out = table.sort_cb_stats(cb_stats)
+    assert out.shape == (0, 6)
+    assert out.columns.tolist() == [
+        "arity",
+        "elapsed_sec",
+        "cutoff_stat",
+        "fg_enrichment_factor",
+        "mode",
+        "dSC_calibration",
+    ]
+
+
 def test_set_substitution_dtype_casts_integral_columns_only():
     df = pandas.DataFrame(
         {

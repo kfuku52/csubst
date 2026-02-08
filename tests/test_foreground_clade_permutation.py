@@ -3,6 +3,16 @@ import pandas
 import pandas.testing as pdt
 
 from csubst import foreground
+from csubst import ete
+
+
+def test_get_num_foreground_lineages_uses_compat_props():
+    tr = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    for node in tr.traverse():
+        ete.set_prop(node, "is_lineage_fg_traitA_1", False)
+    root = [n for n in tr.traverse() if ete.is_root(n)][0]
+    ete.set_prop(root, "is_lineage_fg_traitA_3", True)
+    assert foreground.get_num_foreground_lineages(tr, "traitA") == 3
 
 
 def test_clade_permutation_uses_observed_stats_when_main_table_has_only_permutations(monkeypatch):
