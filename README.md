@@ -60,7 +60,7 @@ CSUBST provides four main subcommands:
 
 - `csubst dataset`: generate bundled example datasets (e.g., `PGK`, `PEPC`).
 - `csubst analyze`: run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
-- `csubst site`: compute site-wise combinatorial substitutions for selected branch combinations and optionally map them to protein structures.
+- `csubst site`: compute site-wise combinatorial substitutions for selected branch combinations, generate tree + site summary plots, and optionally map sites to protein structures.
 - `csubst simulate`: simulate codon sequence evolution under user-defined convergent scenarios.
 
 Get available commands and options:
@@ -88,6 +88,8 @@ csubst site \
   --rooted_tree_file tree.nwk \
   --branch_id 23,51
 ```
+
+By default, `csubst site` writes branch-specific outputs under `csubst_site.branch_id*`, including `csubst_site.tree_site.pdf` and `csubst_site.tree_site.tsv`.
 
 For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 

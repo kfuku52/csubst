@@ -16,8 +16,8 @@ from csubst import ete
 
 font_size = 8
 matplotlib.rcParams['font.size'] = font_size
-#matplotlib.rcParams['font.family'] = 'Helvetica'
-#matplotlib.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+matplotlib.rcParams['font.family'] = 'sans-serif'
+matplotlib.rcParams['font.sans-serif'] = ['Helvetica', 'Arial', 'Nimbus Sans', 'DejaVu Sans']
 matplotlib.rcParams['svg.fonttype'] = 'none' # none, path, or svgfont
 matplotlib.rc('xtick', labelsize=font_size)
 matplotlib.rc('ytick', labelsize=font_size)
@@ -587,6 +587,374 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     outbase = os.path.join(g['site_outdir'], 'csubst_site.state')
     fig.savefig(outbase+".pdf", format='pdf', transparent=True)
 
+def get_tree_site_min_prob(g):
+    min_prob = g.get('tree_site_plot_min_prob', -1.0)
+    if min_prob is None:
+        min_prob = -1.0
+    min_prob = float(min_prob)
+    if min_prob >= 0:
+        return min_prob
+    if g.get('single_branch_mode', False):
+        return float(g.get('pymol_min_single_prob', 0.8))
+    return float(g.get('pymol_min_combinat_prob', 0.5))
+
+def classify_tree_site_categories(df, g):
+    if 'codon_site_alignment' not in df.columns:
+        raise ValueError('codon_site_alignment column is required.')
+    min_prob = get_tree_site_min_prob(g)
+    num_site = df.shape[0]
+    if g.get('single_branch_mode', False):
+        convergent_score = df.loc[:, 'N_sub'].values if 'N_sub' in df.columns else numpy.zeros(num_site)
+        divergent_score = numpy.zeros(num_site, dtype=float)
+    else:
+        convergent_score = df.loc[:, 'OCNany2spe'].values if 'OCNany2spe' in df.columns else numpy.zeros(num_site)
+        divergent_score = df.loc[:, 'OCNany2dif'].values if 'OCNany2dif' in df.columns else numpy.zeros(num_site)
+    convergent_score = numpy.nan_to_num(convergent_score.astype(float), nan=0.0)
+    divergent_score = numpy.nan_to_num(divergent_score.astype(float), nan=0.0)
+
+    category = numpy.full(shape=(num_site,), fill_value='blank', dtype=object)
+    is_convergent = (convergent_score >= min_prob)
+    is_divergent = (divergent_score >= min_prob)
+    category[is_convergent] = 'convergent'
+    category[is_divergent] = 'divergent'
+
+    is_both = is_convergent & is_divergent
+    category[is_both & (convergent_score >= divergent_score)] = 'convergent'
+    category[is_both & (convergent_score < divergent_score)] = 'divergent'
+
+    out = pandas.DataFrame({
+        'codon_site_alignment': df.loc[:, 'codon_site_alignment'].values,
+        'convergent_score': convergent_score,
+        'divergent_score': divergent_score,
+        'tree_site_category': category,
+    })
+    out = out.sort_values(by='codon_site_alignment').reset_index(drop=True)
+    return out,min_prob
+
+def get_tree_plot_coordinates(tree):
+    root = ete.get_tree_root(tree)
+    xcoord = dict()
+    ycoord = dict()
+    leaf_order = list()
+
+    def assign_x(node, parent_x):
+        nl = int(ete.get_prop(node, "numerical_label"))
+        xcoord[nl] = float(parent_x)
+        for child in ete.get_children(node):
+            child_dist = child.dist if child.dist is not None else 0
+            assign_x(node=child, parent_x=parent_x + child_dist)
+
+    def assign_y(node, current_y):
+        nl = int(ete.get_prop(node, "numerical_label"))
+        if ete.is_leaf(node):
+            ycoord[nl] = float(current_y)
+            leaf_order.append(nl)
+            return current_y + 1
+        child_ys = list()
+        for child in ete.get_children(node):
+            current_y = assign_y(node=child, current_y=current_y)
+            child_ys.append(ycoord[int(ete.get_prop(child, "numerical_label"))])
+        if len(child_ys) == 0:
+            ycoord[nl] = float(current_y)
+            return current_y + 1
+        ycoord[nl] = float(sum(child_ys) / len(child_ys))
+        return current_y
+
+    assign_x(node=root, parent_x=0.0)
+    _ = assign_y(node=root, current_y=0)
+    return xcoord,ycoord,leaf_order
+
+def get_tree_site_plot_max_sites(g):
+    max_sites = int(g.get('tree_site_plot_max_sites', 60))
+    if max_sites < 1:
+        max_sites = 1
+    return max_sites
+
+def get_tree_site_display_sites(tree_site_df, g):
+    max_sites = get_tree_site_plot_max_sites(g)
+    convergent_df = tree_site_df.loc[tree_site_df.loc[:, 'tree_site_category']=='convergent',:]
+    convergent_df = convergent_df.sort_values(by=['convergent_score', 'codon_site_alignment'], ascending=[False, True])
+    divergent_df = tree_site_df.loc[tree_site_df.loc[:, 'tree_site_category']=='divergent',:]
+    divergent_df = divergent_df.sort_values(by=['divergent_score', 'codon_site_alignment'], ascending=[False, True])
+
+    if (convergent_df.shape[0] + divergent_df.shape[0]) == 0:
+        fallback = tree_site_df.copy()
+        fallback.loc[:, 'max_score'] = fallback.loc[:, ['convergent_score', 'divergent_score']].max(axis=1)
+        fallback = fallback.sort_values(by=['max_score', 'codon_site_alignment'], ascending=[False, True])
+        fallback = fallback.iloc[:max_sites, :]
+        display_sites = fallback.loc[:, 'codon_site_alignment'].astype(int).tolist()
+        display_meta = [{'site': int(site), 'category': 'blank'} for site in display_sites]
+        return display_meta
+
+    if (convergent_df.shape[0] > 0) and (divergent_df.shape[0] > 0):
+        max_conv = max(1, max_sites // 2)
+        max_div = max(1, max_sites - max_conv)
+    elif convergent_df.shape[0] > 0:
+        max_conv = max_sites
+        max_div = 0
+    else:
+        max_conv = 0
+        max_div = max_sites
+
+    convergent_sites = convergent_df.iloc[:max_conv, :].loc[:, 'codon_site_alignment'].astype(int).tolist()
+    divergent_sites = divergent_df.iloc[:max_div, :].loc[:, 'codon_site_alignment'].astype(int).tolist()
+    display_meta = [{'site': int(site), 'category': 'convergent'} for site in convergent_sites]
+    if (len(convergent_sites) > 0) and (len(divergent_sites) > 0):
+        display_meta.append({'site': None, 'category': 'separator'})
+    display_meta += [{'site': int(site), 'category': 'divergent'} for site in divergent_sites]
+    return display_meta
+
+def get_highlight_leaf_and_branch_ids(tree, branch_ids):
+    highlight_branch_ids = set()
+    highlight_leaf_ids = set()
+    for node in tree.traverse():
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        if node_id not in branch_ids:
+            continue
+        for desc in node.traverse():
+            highlight_branch_ids.add(int(ete.get_prop(desc, "numerical_label")))
+        for leaf in ete.get_leaves(node):
+            highlight_leaf_ids.add(int(ete.get_prop(leaf, "numerical_label")))
+    return highlight_leaf_ids,highlight_branch_ids
+
+def get_leaf_state_letter(g, leaf_id, codon_site_alignment):
+    site_index = int(codon_site_alignment) - 1
+    if (site_index < 0) or (site_index >= g['state_pep'].shape[1]):
+        return ''
+    state_values = g['state_pep'][leaf_id, site_index, :]
+    if numpy.nan_to_num(state_values, nan=0.0).sum() == 0:
+        return ''
+    max_index = int(numpy.argmax(state_values))
+    if max_index >= len(g['amino_acid_orders']):
+        return ''
+    return str(g['amino_acid_orders'][max_index])
+
+def get_amino_acid_colors(g):
+    tab20 = matplotlib.pyplot.get_cmap('tab20')
+    aa_colors = {aa: tab20(i % 20) for i,aa in enumerate(g['amino_acid_orders'])}
+    aa_colors[''] = (1.0, 1.0, 1.0, 1.0)
+    # Match frequent residues in existing prototype style.
+    aa_colors['A'] = (1.0, 0.34, 0.0, 1.0)
+    aa_colors['V'] = (0.22, 0.04, 0.44, 1.0)
+    aa_colors['T'] = (0.00, 0.53, 0.24, 1.0)
+    aa_colors['I'] = (0.39, 0.50, 0.06, 1.0)
+    return aa_colors
+
+def get_text_color_for_background(rgba):
+    r,g,b,_ = rgba
+    luminance = 0.2126*r + 0.7152*g + 0.0722*b
+    return 'black' if luminance > 0.55 else 'white'
+
+def get_nice_scale_length(max_tree_depth):
+    max_tree_depth = float(max_tree_depth)
+    if max_tree_depth <= 0:
+        return 1.0
+    target = max_tree_depth * 0.12
+    if target <= 0:
+        return 1.0
+    exponent = numpy.floor(numpy.log10(target))
+    base = 10 ** exponent
+    normalized = target / base
+    if normalized <= 1.5:
+        scale = 1.0
+    elif normalized <= 3.5:
+        scale = 2.0
+    elif normalized <= 7.5:
+        scale = 5.0
+    else:
+        scale = 10.0
+    return scale * base
+
+def plot_tree_site(df, g):
+    if not bool(g.get('tree_site_plot', True)):
+        return None
+    tree_site_df,min_prob = classify_tree_site_categories(df=df, g=g)
+    display_meta = get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    xcoord,ycoord,leaf_order = get_tree_plot_coordinates(tree=g['tree'])
+    branch_ids = set([int(v) for v in numpy.asarray(g['branch_ids']).tolist()])
+    highlight_leaf_ids,highlight_branch_ids = get_highlight_leaf_and_branch_ids(tree=g['tree'], branch_ids=branch_ids)
+    x_values = numpy.array(list(xcoord.values()), dtype=float)
+    x_max = x_values.max() if x_values.shape[0] else 1.0
+    if x_max <= 0:
+        x_max = 1.0
+
+    num_display_site = max(len(display_meta), 1)
+    num_leaf = max(len(leaf_order), 1)
+    tree_panel_width = min(max(6.4, 5.0 + x_max * 0.55), 14.0)
+    site_panel_width = min(max(1.8, num_display_site * 0.15), 8.5)
+    fig_width = tree_panel_width + site_panel_width
+    fig_height = min(max(3.2, num_leaf * 0.18 + 0.7), 11.0)
+    fg_color = 'firebrick'
+    bg_branch_color = '#4d4d4d'
+    bg_label_color = '#5f6f7f'
+    internal_label_color = '#7a7a7a'
+    internal_label_size = 4.2
+
+    fig = matplotlib.pyplot.figure(figsize=(fig_width, fig_height))
+    gs = fig.add_gridspec(1, 2, width_ratios=[tree_panel_width, site_panel_width], wspace=0.01)
+    ax_tree = fig.add_subplot(gs[0, 0])
+    ax_site = fig.add_subplot(gs[0, 1], sharey=ax_tree)
+
+    for node in g['tree'].traverse():
+        if ete.is_leaf(node):
+            continue
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        children = ete.get_children(node)
+        if len(children) <= 1:
+            continue
+        for child in children:
+            child_id = int(ete.get_prop(child, "numerical_label"))
+            is_target = ((node_id in highlight_branch_ids) and (child_id in highlight_branch_ids))
+            color = fg_color if is_target else bg_branch_color
+            linewidth = 2.0 if is_target else 0.8
+            ax_tree.plot([xcoord[node_id], xcoord[node_id]], [ycoord[node_id], ycoord[child_id]],
+                         color=color, linewidth=linewidth, zorder=1)
+
+    for node in g['tree'].traverse():
+        if ete.is_root(node):
+            continue
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        parent_id = int(ete.get_prop(node.up, "numerical_label"))
+        is_target = node_id in highlight_branch_ids
+        color = fg_color if is_target else bg_branch_color
+        linewidth = 2.0 if is_target else 0.8
+        ax_tree.plot([xcoord[parent_id], xcoord[node_id]], [ycoord[node_id], ycoord[node_id]],
+                     color=color, linewidth=linewidth, zorder=2)
+
+    root = ete.get_tree_root(g['tree'])
+    root_id = int(ete.get_prop(root, "numerical_label"))
+    root_stub = max(x_max * 0.03, 0.03)
+    root_color = fg_color if (root_id in highlight_branch_ids) else bg_branch_color
+    ax_tree.plot([-root_stub, xcoord[root_id]], [ycoord[root_id], ycoord[root_id]],
+                 color=root_color, linewidth=0.8, zorder=2)
+
+    internal_label_offset = max(x_max * 0.008, 0.008)
+    for node in g['tree'].traverse():
+        if ete.is_leaf(node):
+            continue
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        node_color = fg_color if (node_id in highlight_branch_ids) else internal_label_color
+        ax_tree.text(xcoord[node_id] + internal_label_offset, ycoord[node_id] - 0.08, str(node_id),
+                     va='center', ha='left', fontsize=internal_label_size, color=node_color, zorder=4)
+
+    label_offset = x_max * 0.02 + 0.05
+    for leaf in ete.iter_leaves(g['tree']):
+        node_id = int(ete.get_prop(leaf, "numerical_label"))
+        label = (leaf.name or '') + '|' + str(node_id)
+        is_target_leaf = node_id in highlight_leaf_ids
+        label_color = fg_color if is_target_leaf else bg_label_color
+        ax_tree.text(x_max + label_offset, ycoord[node_id], label, va='center', ha='left',
+                     fontsize=font_size, color=label_color)
+
+    if len(leaf_order):
+        ax_tree.set_ylim(len(leaf_order)-0.5, -0.5)
+    left_xlim = -root_stub * 1.5
+    right_xlim = x_max * 1.30 + 0.35
+    ax_tree.set_xlim(left_xlim, right_xlim)
+
+    scale_length = get_nice_scale_length(x_max)
+    scale_x_start = left_xlim + (right_xlim - left_xlim) * 0.03
+    scale_x_end = scale_x_start + scale_length
+    if scale_x_end > (x_max * 0.95):
+        scale_length = get_nice_scale_length(x_max * 0.5)
+        scale_x_end = scale_x_start + scale_length
+    if len(leaf_order) > 0:
+        scale_y = len(leaf_order) - 0.85
+    else:
+        scale_y = -0.1
+    scale_tick = 0.08
+    ax_tree.plot([scale_x_start, scale_x_end], [scale_y, scale_y], color='black', linewidth=1.0, zorder=4)
+    ax_tree.plot([scale_x_start, scale_x_start], [scale_y-scale_tick, scale_y+scale_tick], color='black', linewidth=1.0, zorder=4)
+    ax_tree.plot([scale_x_end, scale_x_end], [scale_y-scale_tick, scale_y+scale_tick], color='black', linewidth=1.0, zorder=4)
+    ax_tree.text((scale_x_start + scale_x_end) / 2, scale_y + 0.25, '{:g}'.format(scale_length),
+                 va='top', ha='center', fontsize=font_size-1, color='black')
+
+    branch_text = ','.join([str(bid) for bid in sorted(branch_ids)])
+    ax_tree.set_title('Focal branch IDs: {}'.format(branch_text), loc='left')
+    ax_tree.axis('off')
+
+    aa_colors = get_amino_acid_colors(g)
+    separator_color = (0.96, 0.96, 0.96, 1.0)
+    for col_idx,item in enumerate(display_meta):
+        site = item['site']
+        is_separator = (site is None)
+        for row_idx,leaf_id in enumerate(leaf_order):
+            if is_separator:
+                facecolor = separator_color
+                aa_letter = ''
+            else:
+                aa_letter = get_leaf_state_letter(g=g, leaf_id=leaf_id, codon_site_alignment=site)
+                facecolor = aa_colors.get(aa_letter, (0.90, 0.90, 0.90, 1.0))
+            rect = matplotlib.patches.Rectangle(
+                xy=(col_idx-0.5, ycoord[leaf_id]-0.5),
+                width=1.0,
+                height=1.0,
+                facecolor=facecolor,
+                edgecolor='white',
+                linewidth=0.6,
+            )
+            ax_site.add_patch(rect)
+            if aa_letter != '':
+                ax_site.text(col_idx, ycoord[leaf_id], aa_letter, ha='center', va='center',
+                             fontsize=font_size, color=get_text_color_for_background(facecolor))
+
+    ax_site.set_xlim(-0.5, len(display_meta)-0.5)
+    if len(leaf_order):
+        ax_site.set_ylim(len(leaf_order)-0.5, -0.5)
+    tick_positions = [i for i,item in enumerate(display_meta) if item['site'] is not None]
+    tick_labels = [str(display_meta[i]['site']) for i in tick_positions]
+    ax_site.set_xticks(tick_positions)
+    ax_site.set_xticklabels(tick_labels, rotation=90, fontsize=font_size)
+    ax_site.xaxis.tick_top()
+    ax_site.tick_params(axis='x', length=0, pad=1)
+    ax_site.tick_params(axis='y', left=False, labelleft=False)
+    for spine in ax_site.spines.values():
+        spine.set_visible(False)
+
+    category_columns = {'convergent': list(), 'divergent': list()}
+    for i,item in enumerate(display_meta):
+        if item['site'] is None:
+            continue
+        category = str(item.get('category', ''))
+        if category in category_columns:
+            category_columns[category].append(i)
+    text_transform = matplotlib.transforms.blended_transform_factory(ax_site.transData, ax_site.transAxes)
+    min_prob_text = '{:g}'.format(float(min_prob))
+    if len(category_columns['convergent']) > 0:
+        x_center = (min(category_columns['convergent']) + max(category_columns['convergent'])) / 2
+        conv_count = len(category_columns['convergent'])
+        ax_site.text(x_center, 1.11, 'Convergent sites\n(N={:,}, PP \u2265 {})'.format(conv_count, min_prob_text), transform=text_transform,
+                     va='bottom', ha='center', fontsize=font_size, color='black', fontweight='bold')
+    if len(category_columns['divergent']) > 0:
+        x_center = (min(category_columns['divergent']) + max(category_columns['divergent'])) / 2
+        div_count = len(category_columns['divergent'])
+        ax_site.text(x_center, 1.11, 'Divergent sites\n(N={:,}, PP \u2265 {})'.format(div_count, min_prob_text), transform=text_transform,
+                     va='bottom', ha='center', fontsize=font_size, color='black', fontweight='bold')
+
+    fig.subplots_adjust(top=0.86, left=0.04, right=0.99, wspace=0.01)
+
+    fmt = str(g.get('tree_site_plot_format', 'pdf')).lower()
+    fig_path = os.path.join(g['site_outdir'], 'csubst_site.tree_site.' + fmt)
+    fig.savefig(fig_path, format=fmt, transparent=True, dpi=300)
+    matplotlib.pyplot.close(fig)
+    print('Writing tree + site plot: {}'.format(fig_path), flush=True)
+
+    tree_site_df.loc[:, 'is_plotted'] = False
+    tree_site_df.loc[:, 'plot_order'] = numpy.nan
+    current_order = 1
+    for item in display_meta:
+        site = item['site']
+        if site is None:
+            continue
+        is_site = (tree_site_df.loc[:, 'codon_site_alignment'] == site)
+        tree_site_df.loc[is_site, 'is_plotted'] = True
+        tree_site_df.loc[is_site, 'plot_order'] = current_order
+        current_order += 1
+    table_path = os.path.join(g['site_outdir'], 'csubst_site.tree_site.tsv')
+    tree_site_df.to_csv(table_path, sep='\t', index=False, float_format=g['float_format'], chunksize=10000)
+    print('Writing tree + site category table: {}'.format(table_path), flush=True)
+    return None
+
 def initialize_site_df(num_site):
     df = pandas.DataFrame()
     df.loc[:,'codon_site_alignment'] = numpy.arange(num_site)
@@ -710,6 +1078,7 @@ def main_site(g):
                 parser_pymol.save_6view_pdf(pdf_filename=os.path.join(g['site_outdir'], f'csubst_site.{id_base}.pymol.pdf'))
         plot_barchart(df, g)
         plot_state(ON_tensor, OS_tensor, g['branch_ids'], g)
+        plot_tree_site(df, g)
         if g['pdb'] is None:
             out_path = os.path.join(g['site_outdir'], 'csubst_site.tsv')
         else:

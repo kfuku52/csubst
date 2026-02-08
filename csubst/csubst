@@ -208,6 +208,18 @@ if __name__ == "__main__":
     site.add_argument('--mode', metavar='intersection|total', default='intersection', required=False, type=str,
                       choices=['intersection','total',],
                       help='default=%(default)s: Visualization mode. NOT SUPPORTED YET.')
+    site.add_argument('--tree_site_plot', metavar='yes|no', default='yes', type=strtobool,
+                      help='default=%(default)s: Generate a matplotlib-based tree + site summary plot.')
+    site.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
+                      choices=['pdf', 'png', 'svg'],
+                      help='default=%(default)s: Output format for --tree_site_plot.')
+    site.add_argument('--tree_site_plot_min_prob', metavar='FLOAT', default=-1.0, required=False, type=float,
+                      help='default=%(default)s: Minimum probability threshold for classifying convergent/divergent sites '
+                           'in the tree + site summary. Negative values automatically use '
+                           '--pymol_min_combinat_prob (or --pymol_min_single_prob in single-branch mode).')
+    site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=60, required=False, type=int,
+                      help='default=%(default)s: Maximum number of plotted sites in the tree + site summary '
+                           '(convergent and divergent columns are balanced when both are available).')
     site.add_argument('--cb_file', metavar='PATH', default='csubst_cb_2.tsv', required=False, type=str,
                       help='default=%(default)s: PATH to csubst_cb_*.tsv output of csubst analyze.')
     site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,

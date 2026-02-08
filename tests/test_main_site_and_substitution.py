@@ -105,6 +105,94 @@ def test_get_state_orders():
     assert keys_syn == ["grp"]
     assert orders_syn["grp"] == ["AA", "AB"]
 
+def test_classify_tree_site_categories_prefers_larger_signal():
+    df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [1, 2, 3, 4],
+            "OCNany2spe": [0.6, 0.1, 0.4, 0.8],
+            "OCNany2dif": [0.1, 0.7, 0.4, 0.9],
+        }
+    )
+    g = {
+        "single_branch_mode": False,
+        "tree_site_plot_min_prob": 0.5,
+        "pymol_min_combinat_prob": 0.5,
+        "pymol_min_single_prob": 0.8,
+    }
+    out, min_prob = main_site.classify_tree_site_categories(df=df, g=g)
+    assert pytest.approx(min_prob, abs=1e-12) == 0.5
+    assert out["tree_site_category"].tolist() == ["convergent", "divergent", "blank", "divergent"]
+
+
+def test_get_tree_plot_coordinates_returns_expected_root_and_leaf_positions(tiny_tree):
+    xcoord, ycoord, leaf_order = main_site.get_tree_plot_coordinates(tiny_tree)
+    root = ete.get_tree_root(tiny_tree)
+    root_id = ete.get_prop(root, "numerical_label")
+    all_ids = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()]
+    assert set(xcoord.keys()) == set(all_ids)
+    assert set(ycoord.keys()) == set(all_ids)
+    assert pytest.approx(float(xcoord[root_id]), abs=1e-12) == 0.0
+    leaf_ids = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if ete.is_leaf(n)]
+    leaf_y = [ycoord[i] for i in leaf_ids]
+    assert len(set(leaf_y)) == len(leaf_ids)
+    assert set(leaf_order) == set(leaf_ids)
+
+
+def test_plot_tree_site_writes_figure_and_category_table(tmp_path, tiny_tree):
+    branch_ids = []
+    labels = {}
+    for node in tiny_tree.traverse():
+        labels[node.name] = ete.get_prop(node, "numerical_label")
+        if node.name in {"A", "C"}:
+            branch_ids.append(ete.get_prop(node, "numerical_label"))
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
+    aa_orders = numpy.array(["A", "V", "T", "I"])
+    state_pep = numpy.zeros((num_node, 4, aa_orders.shape[0]), dtype=float)
+    # Leaf A states: A, V, T, A
+    state_pep[labels["A"], 0, 0] = 1.0
+    state_pep[labels["A"], 1, 1] = 1.0
+    state_pep[labels["A"], 2, 2] = 1.0
+    state_pep[labels["A"], 3, 0] = 1.0
+    # Leaf B states: A, T, T, A
+    state_pep[labels["B"], 0, 0] = 1.0
+    state_pep[labels["B"], 1, 2] = 1.0
+    state_pep[labels["B"], 2, 2] = 1.0
+    state_pep[labels["B"], 3, 0] = 1.0
+    # Leaf C states: A, V, I, A
+    state_pep[labels["C"], 0, 0] = 1.0
+    state_pep[labels["C"], 1, 1] = 1.0
+    state_pep[labels["C"], 2, 3] = 1.0
+    state_pep[labels["C"], 3, 0] = 1.0
+    df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [1, 2, 3, 4],
+            "OCNany2spe": [0.7, 0.1, 0.2, 0.6],
+            "OCNany2dif": [0.1, 0.6, 0.1, 0.1],
+        }
+    )
+    g = {
+        "tree": tiny_tree,
+        "branch_ids": numpy.array(branch_ids, dtype=int),
+        "single_branch_mode": False,
+        "tree_site_plot": True,
+        "tree_site_plot_format": "pdf",
+        "tree_site_plot_min_prob": 0.5,
+        "pymol_min_combinat_prob": 0.5,
+        "pymol_min_single_prob": 0.8,
+        "tree_site_plot_max_sites": 60,
+        "site_outdir": str(tmp_path),
+        "float_format": "%.4f",
+        "state_pep": state_pep,
+        "amino_acid_orders": aa_orders,
+    }
+    main_site.plot_tree_site(df=df, g=g)
+    fig_path = tmp_path / "csubst_site.tree_site.pdf"
+    table_path = tmp_path / "csubst_site.tree_site.tsv"
+    assert fig_path.exists()
+    assert table_path.exists()
+    out_df = pandas.read_csv(table_path, sep="\t")
+    assert out_df["tree_site_category"].tolist() == ["convergent", "divergent", "blank", "convergent"]
+
 
 def test_get_df_ad_add_site_stats_and_target_flag():
     g = {"amino_acid_orders": numpy.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
