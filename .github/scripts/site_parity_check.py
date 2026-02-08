@@ -12,6 +12,11 @@ from pathlib import Path
 
 import pandas
 
+# Ensure `csubst` is importable when this script is run directly in CI.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from csubst import ete
 from csubst import tree
 
@@ -85,7 +90,7 @@ def parse_time_metrics(stderr_text):
     raise RuntimeError("Failed to parse timing metrics from /usr/bin/time output.")
 
 
-def run_timed_command(cmd, cwd, label):
+def run_timed_command(cmd, cwd, label, env=None):
     if sys.platform.startswith("linux"):
         wrapper = ["/usr/bin/time", "-v"]
     else:
@@ -93,6 +98,7 @@ def run_timed_command(cmd, cwd, label):
     proc = subprocess.run(
         wrapper + cmd,
         cwd=str(cwd),
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -155,6 +161,10 @@ def run_dataset(repo_root, run_root, dataset_name):
     python_exe = sys.executable
     csubst_exe = repo_root / "csubst" / "csubst"
     dataset_dir = repo_root / "csubst" / "dataset"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(repo_root) + (
+        os.pathsep + env["PYTHONPATH"] if "PYTHONPATH" in env else ""
+    )
     ensure_precomputed_iqtree_outputs(repo_root=repo_root, dataset_name=dataset_name)
 
     if dataset_name == "PGK":
@@ -195,6 +205,7 @@ def run_dataset(repo_root, run_root, dataset_name):
         cmd=analyze_cmd,
         cwd=run_dir,
         label=f"{dataset_name}.analyze",
+        env=env,
     )
 
     cb_path = run_dir / "csubst_cb_2.tsv"
@@ -249,6 +260,7 @@ def run_dataset(repo_root, run_root, dataset_name):
         cmd=site_cmd,
         cwd=run_dir,
         label=f"{dataset_name}.site",
+        env=env,
     )
 
     tree_site_path = run_dir / f"csubst_site.branch_id{branch_id_text}" / "csubst_site.tree_site.tsv"
@@ -301,7 +313,7 @@ def validate_metrics(rows):
 
 def main():
     args = parse_args()
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = REPO_ROOT
     run_root = Path(args.workdir).resolve()
     if run_root.exists():
         shutil.rmtree(run_root)
