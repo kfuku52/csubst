@@ -65,6 +65,32 @@ Model of substitution: ECMK07+F+R4
     numpy.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
 
 
+def test_read_iqtree_v3_mixed_exponents_do_not_get_overridden_by_legacy_pattern(tmp_path):
+    iqtree_text = """
+IQ-TREE multicore version 3.0.1 for Linux 64-bit built Jan  1 2025
+Model of substitution: ECMK07+F+R4
+ pi(AAA)=2.0e-01 pi(AAC)=3.0e-02
+ pi(AAG)=5.0e-03
+"""
+    g = _get_base_g(tmp_path=tmp_path, iqtree_text=iqtree_text, log_text="")
+    g = parser_iqtree.read_iqtree(g, eq=True)
+    expected = numpy.array([2.0e-01, 3.0e-02, 5.0e-03], dtype=float)
+    expected /= expected.sum()
+    numpy.testing.assert_allclose(g["equilibrium_frequency"], expected, atol=1e-12)
+
+
+def test_read_iqtree_v3_mixed_spacing_scientific_notation_parses_all_codons_correctly(tmp_path):
+    iqtree_text = """
+IQ-TREE multicore version 3.0.1 for Linux 64-bit built Jan  1 2025
+Model of substitution: ECMK07+F+R4
+ pi( AAA ) = 2.000000e-01   pi(AAC)=3.000000E-01
+ pi(AAG)=5.000000e-01
+"""
+    g = _get_base_g(tmp_path=tmp_path, iqtree_text=iqtree_text, log_text="")
+    g = parser_iqtree.read_iqtree(g, eq=True)
+    numpy.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
+
+
 def test_read_iqtree_iqtree2_missing_frequency_raises_clear_error(tmp_path):
     iqtree_text = """
 IQ-TREE multicore version 2.3.6 for Linux 64-bit built Jan  1 2025

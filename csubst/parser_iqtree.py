@@ -59,14 +59,18 @@ def _parse_equilibrium_frequency(iqtree_txt, codon_orders, parser_name, float_ty
     # IQ-TREE 2 and 3 share similar labels but differ slightly in spacing/number formatting.
     pattern_iqtree2 = r'pi\(([A-Z]+)\)\s*=\s*([0-9.]+)(?![eE][+-]?[0-9]+)'
     pattern_iqtree3 = r'pi\(\s*([A-Z]+)\s*\)\s*=\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)'
+    # Parse the robust IQ-TREE3-compatible pattern first and avoid overriding
+    # already parsed codons with legacy partial matches.
     if parser_name == 'iqtree3':
         patterns = [pattern_iqtree3, pattern_iqtree2]
     else:
-        patterns = [pattern_iqtree2, pattern_iqtree3]
+        patterns = [pattern_iqtree3, pattern_iqtree2]
     eq_map = dict()
     for pattern in patterns:
         for codon,freq in re.findall(pattern, iqtree_txt):
             codon = codon.upper().replace('U', 'T')
+            if codon in eq_map:
+                continue
             try:
                 eq_map[codon] = float(freq)
             except ValueError:
