@@ -118,7 +118,12 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
         g = foreground.add_median_cb_stats(g, cb, current_arity, start)
         if (g['fg_clade_permutation']>0):
-            g = foreground.clade_permutation(cb, g)
+            g = foreground.clade_permutation(
+                cb=cb,
+                g=g,
+                OS_tensor_reducer=OS_tensor_reducer,
+                ON_tensor_reducer=ON_tensor_reducer,
+            )
         g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
         g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
         if current_arity == g['max_arity']:

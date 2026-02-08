@@ -189,3 +189,109 @@ def test_clade_permutation_retries_with_sample_original_foreground(monkeypatch):
     assert sampled_flags == [False, True]
     assert out["df_cb_stats_main"].shape[0] == 1
     assert "_sampleorig_" in out["df_cb_stats_main"].loc[0, "mode"]
+
+
+def test_clade_permutation_recomputes_missing_randomized_combinations(monkeypatch, capsys):
+    observed = pandas.DataFrame(
+        {
+            "arity": [2],
+            "mode": ["foreground"],
+            "median_omegaCany2spe_fg_traitA": [0.5],
+            "total_OCNany2spe_fg_traitA": [2.0],
+        }
+    )
+    g = {
+        "fg_df": pandas.DataFrame({"name": ["tip1"], "traitA": [1]}),
+        "df_cb_stats": observed.copy(deep=True),
+        "df_cb_stats_main": pandas.DataFrame(),
+        "fg_clade_permutation": 1,
+        "current_arity": 2,
+        "cutoff_stat": "dist_bl>0",
+    }
+    cb = pandas.DataFrame({"branch_id_1": [1], "branch_id_2": [2], "dummy": [0.0]})
+    recompute_calls = []
+
+    def fake_initialize_df_cb_stats(local_g):
+        local_g["df_cb_stats"] = pandas.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
+        return local_g
+
+    def fake_set_random_foreground_branch(local_g, trait_name, num_trial=100, sample_original_foreground=False):
+        local_g["r_fg_ids"] = {trait_name: numpy.array([1, 2], dtype=numpy.int64)}
+        # include one combination that is missing from cb to trigger recomputation
+        return local_g, numpy.array([[1, 2], [2, 3]], dtype=numpy.int64)
+
+    def fake_recompute_missing(g, missing_id_combinations, OS_tensor_reducer, ON_tensor_reducer):
+        recompute_calls.append(missing_id_combinations.tolist())
+        cb_missing = pandas.DataFrame({"branch_id_1": [2], "branch_id_2": [3], "dummy": [1.0]})
+        return cb_missing, g
+
+    def fake_add_median_cb_stats(local_g, rcb, current_arity, start, verbose=False):
+        branch_pairs = {(int(r.branch_id_1), int(r.branch_id_2)) for r in rcb.itertuples(index=False)}
+        assert branch_pairs == {(1, 2), (2, 3)}
+        local_g["df_cb_stats"].loc[:, "arity"] = current_arity
+        local_g["df_cb_stats"].loc[:, "median_omegaCany2spe_fg_traitA"] = 0.9
+        local_g["df_cb_stats"].loc[:, "total_OCNany2spe_fg_traitA"] = 3.0
+        return local_g
+
+    monkeypatch.setattr(foreground.param, "initialize_df_cb_stats", fake_initialize_df_cb_stats)
+    monkeypatch.setattr(foreground, "set_random_foreground_branch", fake_set_random_foreground_branch)
+    monkeypatch.setattr(foreground, "_recompute_missing_permutation_rows", fake_recompute_missing)
+    monkeypatch.setattr(foreground, "add_median_cb_stats", fake_add_median_cb_stats)
+
+    out = foreground.clade_permutation(
+        cb=cb,
+        g=g,
+        OS_tensor_reducer=object(),
+        ON_tensor_reducer=object(),
+    )
+
+    assert recompute_calls == [[[2, 3]]]
+    assert out["df_cb_stats_main"].shape[0] == 1
+    captured = capsys.readouterr()
+    assert "permuted foreground branch combinations were dropped" not in captured.out
+
+
+def test_clade_permutation_reports_dropped_without_recomputation(monkeypatch, capsys):
+    observed = pandas.DataFrame(
+        {
+            "arity": [2],
+            "mode": ["foreground"],
+            "median_omegaCany2spe_fg_traitA": [0.5],
+            "total_OCNany2spe_fg_traitA": [2.0],
+        }
+    )
+    g = {
+        "fg_df": pandas.DataFrame({"name": ["tip1"], "traitA": [1]}),
+        "df_cb_stats": observed.copy(deep=True),
+        "df_cb_stats_main": pandas.DataFrame(),
+        "fg_clade_permutation": 1,
+        "current_arity": 2,
+        "cutoff_stat": "dist_bl>0",
+    }
+    cb = pandas.DataFrame({"branch_id_1": [1], "branch_id_2": [2], "dummy": [0.0]})
+
+    def fake_initialize_df_cb_stats(local_g):
+        local_g["df_cb_stats"] = pandas.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
+        return local_g
+
+    def fake_set_random_foreground_branch(local_g, trait_name, num_trial=100, sample_original_foreground=False):
+        local_g["r_fg_ids"] = {trait_name: numpy.array([1, 2], dtype=numpy.int64)}
+        return local_g, numpy.array([[1, 2], [2, 3]], dtype=numpy.int64)
+
+    def fake_add_median_cb_stats(local_g, rcb, current_arity, start, verbose=False):
+        # without recomputation only one row survives from the merge
+        assert rcb.shape[0] == 1
+        local_g["df_cb_stats"].loc[:, "arity"] = current_arity
+        local_g["df_cb_stats"].loc[:, "median_omegaCany2spe_fg_traitA"] = 0.9
+        local_g["df_cb_stats"].loc[:, "total_OCNany2spe_fg_traitA"] = 3.0
+        return local_g
+
+    monkeypatch.setattr(foreground.param, "initialize_df_cb_stats", fake_initialize_df_cb_stats)
+    monkeypatch.setattr(foreground, "set_random_foreground_branch", fake_set_random_foreground_branch)
+    monkeypatch.setattr(foreground, "add_median_cb_stats", fake_add_median_cb_stats)
+
+    out = foreground.clade_permutation(cb=cb, g=g)
+
+    assert out["df_cb_stats_main"].shape[0] == 1
+    captured = capsys.readouterr()
+    assert "permuted foreground branch combinations were dropped" in captured.out

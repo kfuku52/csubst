@@ -9,9 +9,12 @@ import time
 import warnings
 
 from csubst import combination
+from csubst import omega
 from csubst import table
 from csubst import param
 from csubst import ete
+from csubst import substitution
+from csubst import tree
 
 def combinations_count(n, r):
     # https://github.com/nkmk/python-snippets/blob/05a53ae96736577906a8805b38bce6cc210fe11f/notebook/combinations_count.py#L1-L14
@@ -523,6 +526,62 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
         print(("Elapsed time for arity = {}: {:,.1f} sec\n".format(current_arity, elapsed_time)), flush=True)
     return g
 
+def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_reducer, ON_tensor_reducer):
+    cbOS = substitution.get_cb(missing_id_combinations, OS_tensor_reducer, g, 'OCS')
+    cbON = substitution.get_cb(missing_id_combinations, ON_tensor_reducer, g, 'OCN')
+    cb_missing = table.merge_tables(cbOS, cbON)
+    cb_missing = substitution.add_dif_stats(cb_missing, g['float_tol'], prefix='OC')
+    cb_missing, g = omega.calc_omega(cb_missing, OS_tensor_reducer, ON_tensor_reducer, g)
+    if g['calibrate_longtail'] and (g['exhaustive_until'] >= g['current_arity']):
+        cb_missing = omega.calibrate_dsc(cb_missing)
+    if g['branch_dist']:
+        cb_missing = tree.get_node_distance(
+            tree=g['tree'],
+            cb=cb_missing,
+            ncpu=g['threads'],
+            float_type=g['float_type'],
+        )
+    cb_missing = substitution.get_substitutions_per_branch(cb_missing, g['branch_table'], g)
+    cb_missing = table.get_linear_regression(cb_missing)
+    cb_missing, g = get_foreground_branch_num(cb_missing, g)
+    cb_missing = table.sort_cb(cb_missing)
+    return cb_missing, g
+
+def _get_permutation_cb_rows(rid_combinations, cb, cb_cache, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
+    bid_columns = ['branch_id_' + str(k + 1) for k in numpy.arange(rid_combinations.shape[1])]
+    rid_combinations = pandas.DataFrame(rid_combinations, columns=bid_columns)
+    rid_combinations = table.sort_branch_ids(rid_combinations)
+    if cb_cache.shape[0] == 0:
+        cb_pool = cb
+    else:
+        cb_pool = pandas.concat([cb, cb_cache], ignore_index=True)
+    rcb = pandas.merge(rid_combinations, cb_pool, how='inner', on=bid_columns)
+    dropped_before_recompute = rid_combinations.shape[0] - rcb.shape[0]
+    if (dropped_before_recompute > 0) and (OS_tensor_reducer is not None) and (ON_tensor_reducer is not None):
+        cb_id_rows = cb_pool.loc[:, bid_columns].drop_duplicates().reset_index(drop=True)
+        missing = pandas.merge(
+            rid_combinations,
+            cb_id_rows,
+            how='left',
+            on=bid_columns,
+            indicator=True,
+        )
+        missing = missing.loc[missing.loc[:, '_merge'] == 'left_only', bid_columns].drop_duplicates().reset_index(drop=True)
+        if missing.shape[0] != 0:
+            missing_id_combinations = missing.loc[:, bid_columns].to_numpy(copy=True, dtype=numpy.int64)
+            cb_missing, g = _recompute_missing_permutation_rows(
+                g=g,
+                missing_id_combinations=missing_id_combinations,
+                OS_tensor_reducer=OS_tensor_reducer,
+                ON_tensor_reducer=ON_tensor_reducer,
+            )
+            if cb_missing.shape[0] != 0:
+                cb_cache = pandas.concat([cb_cache, cb_missing], ignore_index=True)
+                cb_pool = pandas.concat([cb, cb_cache], ignore_index=True)
+                rcb = pandas.merge(rid_combinations, cb_pool, how='inner', on=bid_columns)
+    dropped_after_recompute = rid_combinations.shape[0] - rcb.shape[0]
+    return rcb, cb_cache, g, rid_combinations.shape[0], dropped_before_recompute, dropped_after_recompute
+
 def _clade_permutation_mode_prefix(trait_name):
     return 'randomization_' + str(trait_name) + '_'
 
@@ -595,7 +654,7 @@ def _append_clade_permutation_failure_row(g, trait_name, trial_no, reason):
     return g
 
 
-def clade_permutation(cb, g):
+def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
     print('Starting foreground clade permutation.')
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
     if len(trait_names) == 0:
@@ -603,6 +662,7 @@ def clade_permutation(cb, g):
         return g
     g['df_cb_stats_observed'] = g['df_cb_stats'].copy()
     max_trials = g['fg_clade_permutation'] * 10
+    cb_cache = pandas.DataFrame()
     for trait_name in trait_names:
         i = 1
         sample_original_foreground = False
@@ -635,13 +695,17 @@ def clade_permutation(cb, g):
             if sample_original_foreground:
                 random_mode += '_sampleorig'
             random_mode += '_bid' + ','.join(randomized_bids)
-            bid_columns = ['branch_id_' + str(k + 1) for k in numpy.arange(rid_combinations.shape[1])]
-            rid_combinations = pandas.DataFrame(rid_combinations)
-            rid_combinations.columns = bid_columns
-            rcb = pandas.merge(rid_combinations, cb, how='inner', on=bid_columns)
-            if rid_combinations.shape[0] != rcb.shape[0]:
+            rcb, cb_cache, g, requested_rows, dropped_before_recompute, dropped_after_recompute = _get_permutation_cb_rows(
+                rid_combinations=rid_combinations,
+                cb=cb,
+                cb_cache=cb_cache,
+                g=g,
+                OS_tensor_reducer=OS_tensor_reducer,
+                ON_tensor_reducer=ON_tensor_reducer,
+            )
+            if dropped_after_recompute != 0:
                 txt = '{:,} ({:,} - {:,}) permuted foreground branch combinations were dropped because they were not included in the cb table.'
-                print(txt.format(rid_combinations.shape[0] - rcb.shape[0], rid_combinations.shape[0], rcb.shape[0]))
+                print(txt.format(dropped_after_recompute, requested_rows, rcb.shape[0]))
             rcb['is_fg_' + trait_name] = 'Y'
             rcb['is_mg_' + trait_name] = 'N'
             rcb['is_mf_' + trait_name] = 'N'
