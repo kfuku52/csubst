@@ -1,5 +1,7 @@
 import numpy
 
+import os
+
 from csubst import ete
 
 def calc_omega_state(state_nuc, g): # implement exclude stop codon freq
@@ -18,15 +20,40 @@ def calc_omega_state(state_nuc, g): # implement exclude stop codon freq
         state_cdn[:, :, i] *= state_nuc[:, sites+2, g['state_columns'][i][2]]
     return state_cdn
 
-def cdn2pep_state(state_cdn, g):
+def _initialize_state_array(axis, dtype, mmap_name=None):
+    axis = tuple(axis)
+    if mmap_name is None:
+        return numpy.zeros(axis, dtype=dtype)
+    mmap_path = os.path.join(os.getcwd(), mmap_name)
+    if os.path.exists(mmap_path):
+        os.unlink(mmap_path)
+    txt = 'Generating memory map: dtype={}, axis={}, path={}'
+    print(txt.format(dtype, axis, mmap_path), flush=True)
+    return numpy.memmap(mmap_path, dtype=dtype, shape=axis, mode='w+')
+
+
+def cdn2pep_state(state_cdn, g, selected_branch_ids=None):
     num_node = state_cdn.shape[0]
     num_cdn_site = state_cdn.shape[1]
     num_pep_site = num_cdn_site
     num_pep_state = len(g['amino_acid_orders'])
     axis = [num_node, num_pep_site, num_pep_state]
-    state_pep = numpy.zeros(axis, dtype=state_cdn.dtype)
+    if selected_branch_ids is None:
+        state_pep = _initialize_state_array(axis, dtype=state_cdn.dtype)
+        selected_ids = None
+    else:
+        state_pep = _initialize_state_array(
+            axis=axis,
+            dtype=state_cdn.dtype,
+            mmap_name='tmp.csubst.state_pep.mmap',
+        )
+        selected_ids = numpy.array(sorted(set([int(v) for v in selected_branch_ids])), dtype=numpy.int64)
+        selected_state_cdn = state_cdn[selected_ids, :, :]
     for i,aa in enumerate(g['amino_acid_orders']):
-        state_pep[:, :, i] = state_cdn[:,:,g['synonymous_indices'][aa]].sum(axis=2)
+        if selected_ids is None:
+            state_pep[:, :, i] = state_cdn[:,:,g['synonymous_indices'][aa]].sum(axis=2)
+        else:
+            state_pep[selected_ids, :, i] = selected_state_cdn[:, :, g['synonymous_indices'][aa]].sum(axis=2)
     return state_pep
 
 def translate_state(nlabel, mode, g):
@@ -47,8 +74,11 @@ def translate_state(nlabel, mode, g):
             seq_out += orders[index]
     return seq_out
 
-def write_alignment(outfile, mode, g, leaf_only=False):
+def write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
     aln_out = ''
+    branch_id_set = None
+    if branch_ids is not None:
+        branch_id_set = set([int(bid) for bid in numpy.asarray(branch_ids).tolist()])
     if leaf_only:
         nodes = ete.iter_leaves(g['tree'])
     else:
@@ -57,6 +87,8 @@ def write_alignment(outfile, mode, g, leaf_only=False):
         if ete.is_root(node):
             continue
         nlabel = ete.get_prop(node, "numerical_label")
+        if (branch_id_set is not None) and (nlabel not in branch_id_set):
+            continue
         aln_tmp = '>'+node.name+'|'+str(nlabel)+'\n'
         aln_tmp += translate_state(nlabel, mode, g)
         aln_out += aln_tmp+'\n'

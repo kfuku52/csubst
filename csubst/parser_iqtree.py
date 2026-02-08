@@ -263,24 +263,101 @@ def read_log(g):
             g['reconstruction_codon_table'] = int(rgc.group(1))
     return g
 
-def mask_missing_sites(state_tensor, tree):
+def _initialize_state_tensor(axis, dtype, selective, mmap_name):
+    axis = tuple(axis)
+    if not selective:
+        return numpy.zeros(axis, dtype=dtype)
+    mmap_tensor = os.path.join(os.getcwd(), mmap_name)
+    if os.path.exists(mmap_tensor):
+        os.unlink(mmap_tensor)
+    txt = 'Generating memory map: dtype={}, axis={}, path={}'
+    print(txt.format(dtype, axis, mmap_tensor), flush=True)
+    return numpy.memmap(mmap_tensor, dtype=dtype, shape=axis, mode='w+')
+
+
+def _get_selected_branch_context(tree, selected_branch_ids):
+    if selected_branch_ids is None:
+        return None, None, set()
+    selected_set = set([int(v) for v in numpy.asarray(selected_branch_ids).tolist()])
+    root_nn = int(ete.get_prop(ete.get_tree_root(tree), "numerical_label"))
+    selected_set.add(root_nn)
+    selected_internal_ids = list()
+    node_by_id = dict()
+    for node in tree.traverse():
+        node_by_id[int(ete.get_prop(node, "numerical_label"))] = node
+    for branch_id in sorted(selected_set):
+        node = node_by_id.get(branch_id, None)
+        if node is None:
+            continue
+        if ete.is_root(node) or ete.is_leaf(node):
+            continue
+        selected_internal_ids.append(branch_id)
+    required_leaf_ids = set()
+    for branch_id in selected_internal_ids:
+        node = node_by_id[int(branch_id)]
+        children = ete.get_children(node)
+        sisters = ete.get_sisters(node)
+        for child in children:
+            required_leaf_ids.update([int(ete.get_prop(leaf, "numerical_label")) for leaf in ete.get_leaves(child)])
+        for sister in sisters:
+            required_leaf_ids.update([int(ete.get_prop(leaf, "numerical_label")) for leaf in ete.get_leaves(sister)])
+    return selected_set, selected_internal_ids, required_leaf_ids
+
+
+def _get_leaf_nonmissing_sites(g, required_leaf_ids):
+    num_node = len(list(g['tree'].traverse()))
+    leaf_nonmissing = numpy.zeros(shape=(num_node, g['num_input_site']), dtype=bool)
+    if len(required_leaf_ids) == 0:
+        return leaf_nonmissing
+    for node in g['tree'].traverse():
+        if not ete.is_leaf(node):
+            continue
+        nl = int(ete.get_prop(node, "numerical_label"))
+        if nl not in required_leaf_ids:
+            continue
+        seq = ete.get_prop(node, 'sequence', '').upper()
+        if seq == '':
+            continue
+        if g['input_data_type'] == 'cdn':
+            assert len(seq)%3==0, 'Sequence length is not multiple of 3. Node name = '+node.name
+            for s in numpy.arange(g['num_input_site']):
+                codon = seq[(s*3):((s+1)*3)]
+                codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
+                leaf_nonmissing[nl, s] = (len(codon_index) > 0)
+        elif g['input_data_type'] == 'nuc':
+            for s in numpy.arange(g['num_input_site']):
+                nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)
+                leaf_nonmissing[nl, s] = (len(nuc_index) > 0)
+    return leaf_nonmissing
+
+
+def mask_missing_sites(state_tensor, tree, selected_internal_ids=None, leaf_nonmissing_sites=None):
+    selected_set = None if selected_internal_ids is None else set([int(v) for v in selected_internal_ids])
     for node in tree.traverse():
         if (ete.is_root(node)) | (ete.is_leaf(node)):
             continue
-        nl = ete.get_prop(node, "numerical_label")
+        nl = int(ete.get_prop(node, "numerical_label"))
+        if (selected_set is not None) and (nl not in selected_set):
+            continue
         children = ete.get_children(node)
         sisters = ete.get_sisters(node)
         child0_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(children[0])], dtype=int)
         child1_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(children[1])], dtype=int)
         sister_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(sisters[0])], dtype=int)
-        c0 = (state_tensor[child0_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child0_leaf_nonzero
-        c1 = (state_tensor[child1_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child1_leaf_nonzero
-        s = (state_tensor[sister_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_sister_leaf_nonzero
+        if leaf_nonmissing_sites is None:
+            c0 = (state_tensor[child0_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child0_leaf_nonzero
+            c1 = (state_tensor[child1_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child1_leaf_nonzero
+            s = (state_tensor[sister_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_sister_leaf_nonzero
+        else:
+            c0 = leaf_nonmissing_sites[child0_leaf_nls,:].sum(axis=0) != 0
+            c1 = leaf_nonmissing_sites[child1_leaf_nls,:].sum(axis=0) != 0
+            s = leaf_nonmissing_sites[sister_leaf_nls,:].sum(axis=0) != 0
         is_nonzero = (c0&c1)|(c0&s)|(c1&s)
         state_tensor[nl,:,:] = numpy.einsum('ij,i->ij', state_tensor[nl,:,:], is_nonzero)
     return state_tensor
 
-def get_state_tensor(g):
+
+def get_state_tensor(g, selected_branch_ids=None):
     ete.link_to_alignment(g['tree'], alignment=g['alignment_file'], alg_format='fasta')
     first_leaf_seq = ete.get_prop(ete.get_leaves(g['tree'])[0], 'sequence', '')
     assert first_leaf_seq != '', 'Failed to map alignment to tree leaves. Check leaf labels in --alignment_file and --rooted_tree_file.'
@@ -289,11 +366,44 @@ def get_state_tensor(g):
               'Delete intermediate files and rerun.'
     assert num_codon_alignment==g['num_input_site'], err_txt
     num_node = len(list(g['tree'].traverse()))
+    selected_set, selected_internal_ids, required_leaf_ids = _get_selected_branch_context(
+        tree=g['tree'],
+        selected_branch_ids=selected_branch_ids,
+    )
     state_table = pandas.read_csv(g['path_iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
+    if selected_set is not None:
+        target_internal_names = []
+        for node in g['tree'].traverse():
+            if ete.is_root(node) or ete.is_leaf(node):
+                continue
+            nl = int(ete.get_prop(node, "numerical_label"))
+            if nl in selected_set:
+                target_internal_names.append(node.name)
+        if len(target_internal_names) == 0:
+            state_table = state_table.iloc[0:0,:].copy()
+        else:
+            state_table = state_table.loc[state_table.loc[:, 'Node'].isin(target_internal_names), :].copy()
+    state_columns = state_table.columns[3:]
+    if state_table.shape[0] > 0:
+        is_missing = (state_table.loc[:,'State']=='???') | (state_table.loc[:,'State']=='?')
+        state_table.loc[is_missing, state_columns] = 0
+        state_table_by_node = dict()
+        for node_name, tmp in state_table.groupby('Node', sort=False):
+            state_table_by_node[node_name] = tmp.loc[:, state_columns].to_numpy(dtype=g['float_type'], copy=False)
+    else:
+        state_table_by_node = dict()
     axis = [num_node, g['num_input_site'], g['num_input_state']]
-    state_tensor = numpy.zeros(axis, dtype=g['float_type'])
+    state_tensor = _initialize_state_tensor(
+        axis=axis,
+        dtype=g['float_type'],
+        selective=(selected_set is not None),
+        mmap_name='tmp.csubst.state_tensor.mmap',
+    )
     for node in g['tree'].traverse():
         if ete.is_root(node):
+            continue
+        nl = int(ete.get_prop(node, "numerical_label"))
+        if (selected_set is not None) and (nl not in selected_set):
             continue
         elif ete.is_leaf(node):
             seq = ete.get_prop(node, 'sequence', '').upper()
@@ -311,27 +421,51 @@ def get_state_tensor(g):
                     nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)
                     for ni in nuc_index:
                         state_matrix[s, ni] = 1/len(nuc_index)
-            state_tensor[ete.get_prop(node, "numerical_label"),:,:] = state_matrix
+            state_tensor[nl,:,:] = state_matrix
         else: # Internal nodes
-            state_matrix = state_table.loc[(state_table['Node']==node.name),:].iloc[:,3:]
-            is_missing = (state_table.loc[:,'State']=='???') | (state_table.loc[:,'State']=='?')
-            state_matrix.loc[is_missing,:] = 0
-            if state_matrix.shape[0]==0:
+            state_matrix = state_table_by_node.get(node.name, None)
+            if state_matrix is None:
                 print('Node name not found in .state file:', node.name)
             else:
-                state_tensor[ete.get_prop(node, "numerical_label"),:,:] = state_matrix
-    state_tensor = numpy.nan_to_num(state_tensor)
-    state_tensor = mask_missing_sites(state_tensor, g['tree'])
+                state_tensor[nl,:,:] = state_matrix
+    state_tensor = numpy.nan_to_num(state_tensor, copy=False)
+    if selected_set is None:
+        state_tensor = mask_missing_sites(state_tensor, g['tree'])
+    else:
+        leaf_nonmissing_sites = _get_leaf_nonmissing_sites(g, required_leaf_ids=required_leaf_ids)
+        state_tensor = mask_missing_sites(
+            state_tensor=state_tensor,
+            tree=g['tree'],
+            selected_internal_ids=selected_internal_ids,
+            leaf_nonmissing_sites=leaf_nonmissing_sites,
+        )
     if (g['ml_anc']):
         print('Ancestral state frequency is converted to the ML-like binary states.')
-        idxmax = numpy.argmax(state_tensor, axis=2)
-        state_tensor2 = numpy.zeros(state_tensor.shape, dtype=bool)
-        for b in numpy.arange(state_tensor2.shape[0]):
-            for s in numpy.arange(state_tensor2.shape[1]):
-                if state_tensor[b,s,:].sum()!=0:
-                    state_tensor2[b,s,idxmax[b,s]] = 1
-        state_tensor = state_tensor2
-        del state_tensor2
+        if selected_set is None:
+            idxmax = numpy.argmax(state_tensor, axis=2)
+            state_tensor2 = numpy.zeros(state_tensor.shape, dtype=bool)
+            for b in numpy.arange(state_tensor2.shape[0]):
+                for s in numpy.arange(state_tensor2.shape[1]):
+                    if state_tensor[b,s,:].sum()!=0:
+                        state_tensor2[b,s,idxmax[b,s]] = 1
+            state_tensor = state_tensor2
+            del state_tensor2
+        else:
+            state_tensor2 = _initialize_state_tensor(
+                axis=state_tensor.shape,
+                dtype=bool,
+                selective=True,
+                mmap_name='tmp.csubst.state_tensor_ml.mmap',
+            )
+            for b in sorted(selected_set):
+                branch_state = state_tensor[b, :, :]
+                if branch_state.sum() == 0:
+                    continue
+                idxmax = numpy.argmax(branch_state, axis=1)
+                is_nonmissing = (branch_state.sum(axis=1) != 0)
+                if is_nonmissing.any():
+                    state_tensor2[b, is_nonmissing, idxmax[is_nonmissing]] = True
+            state_tensor = state_tensor2
     return(state_tensor)
 
 def get_input_information(g):

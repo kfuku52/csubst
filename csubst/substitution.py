@@ -157,10 +157,17 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
     else:
         raise ValueError('Unsupported mode for sparse substitution tensor: {}'.format(mode))
     sparse_entries = defaultdict(lambda: [list(), list(), list()])  # key -> [rows, cols, data]
+    selected_branch_ids = g.get('state_loaded_branch_ids', None)
+    if selected_branch_ids is None:
+        selected_branch_set = None
+    else:
+        selected_branch_set = set([int(v) for v in numpy.asarray(selected_branch_ids).tolist()])
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
         child = ete.get_prop(node, "numerical_label")
+        if (selected_branch_set is not None) and (child not in selected_branch_set):
+            continue
         parent = ete.get_prop(node.up, "numerical_label")
         if state_tensor_anc[parent, :, :].sum() < g['float_tol']:
             continue
@@ -359,6 +366,11 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
     backend = resolve_sub_tensor_backend(g)
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
+    selected_branch_ids = g.get('state_loaded_branch_ids', None)
+    if selected_branch_ids is None:
+        selected_branch_set = None
+    else:
+        selected_branch_set = set([int(v) for v in numpy.asarray(selected_branch_ids).tolist()])
     if backend == 'sparse':
         return _build_sparse_substitution_tensor(
             state_tensor=state_tensor,
@@ -376,6 +388,8 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
         if ete.is_root(node):
             continue
         child = ete.get_prop(node, "numerical_label")
+        if (selected_branch_set is not None) and (child not in selected_branch_set):
+            continue
         parent = ete.get_prop(node.up, "numerical_label")
         if state_tensor_anc[parent, :, :].sum()<g['float_tol']:
             continue

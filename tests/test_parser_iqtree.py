@@ -142,3 +142,57 @@ def test_get_state_tensor_raises_when_leaf_sequence_missing(tmp_path):
     )
     with pytest.raises(AssertionError):
         parser_iqtree.get_state_tensor(g)
+
+
+def test_get_state_tensor_selected_branch_ids_preserve_global_branch_index(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
+    )
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in g["tree"].traverse()}
+    full = parser_iqtree.get_state_tensor(g)
+    selected = parser_iqtree.get_state_tensor(
+        g=g,
+        selected_branch_ids=numpy.array([labels["A"]], dtype=numpy.int64),
+    )
+    assert selected.shape == full.shape
+    numpy.testing.assert_allclose(selected[labels["A"], :, :], full[labels["A"], :, :], atol=1e-12)
+    assert selected[labels["B"], :, :].sum() == 0
+
+
+def test_get_state_tensor_selected_branch_ids_match_internal_masking_parity(tmp_path):
+    alignment_file = tmp_path / "toy_internal.fa"
+    state_file = tmp_path / "toy_internal.state.tsv"
+    alignment_file.write_text(
+        ">A\nAAA---\n"
+        ">B\nAAG---\n"
+        ">C\nAAAAAA\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "N1\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": numpy.array(["AAA", "AAC", "AAG"]),
+        "float_type": numpy.float64,
+        "ml_anc": False,
+    }
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in g["tree"].traverse()}
+    full = parser_iqtree.get_state_tensor(g)
+    selected = parser_iqtree.get_state_tensor(
+        g=g,
+        selected_branch_ids=numpy.array([labels["N1"]], dtype=numpy.int64),
+    )
+    assert selected.shape == full.shape
+    numpy.testing.assert_allclose(selected[labels["N1"], :, :], full[labels["N1"], :, :], atol=1e-12)
+    assert selected[labels["C"], :, :].sum() == 0

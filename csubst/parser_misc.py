@@ -203,28 +203,86 @@ def get_equilibrium_frequency(g, mode):
         assert abs(eq_pep.sum()-1)<g['float_tol'], txt
         return eq_pep
 
+def _can_use_selective_state_loading(g):
+    if g.get('exhaustive_until', None) != 1:
+        return False, None
+    if g.get('foreground', None) is None:
+        return False, None
+    if not bool(g.get('cb', False)):
+        return False, '--cb is disabled.'
+    blocking_outputs = [name for name in ['b', 's', 'bs', 'cs', 'cbs'] if bool(g.get(name, False))]
+    if len(blocking_outputs) > 0:
+        txt = 'full-tree outputs are enabled ({})'
+        return False, txt.format(', '.join(blocking_outputs))
+    if bool(g.get('plot_state_aa', False)) or bool(g.get('plot_state_codon', False)):
+        return False, 'state-tree plotting is enabled.'
+    if int(g.get('fg_clade_permutation', 0)) > 0:
+        return False, '--fg_clade_permutation is enabled.'
+    return True, None
+
+
+def _get_required_state_branch_ids(g):
+    root_nn = ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label")
+    required = set([int(root_nn)])
+    node_by_id = dict()
+    for node in g['tree'].traverse():
+        node_by_id[int(ete.get_prop(node, "numerical_label"))] = node
+    target_ids = set()
+    for trait_name in g['target_ids'].keys():
+        values = numpy.asarray(g['target_ids'][trait_name], dtype=numpy.int64)
+        target_ids.update([int(v) for v in values.tolist()])
+    for branch_id in target_ids:
+        required.add(branch_id)
+        node = node_by_id.get(branch_id, None)
+        if (node is None) or ete.is_root(node):
+            continue
+        required.add(int(ete.get_prop(node.up, "numerical_label")))
+    required_ids = numpy.array(sorted(required), dtype=numpy.int64)
+    return required_ids
+
+
+def resolve_state_loading(g):
+    g['state_loaded_branch_ids'] = None
+    g['is_state_selective_loading'] = False
+    use_selective, reason = _can_use_selective_state_loading(g)
+    if not use_selective:
+        if (g.get('exhaustive_until', None) == 1) and (g.get('foreground', None) is not None) and (reason is not None):
+            print('Selective state loading disabled: {}'.format(reason), flush=True)
+        return g
+    required_ids = _get_required_state_branch_ids(g)
+    if required_ids.shape[0] == 0:
+        print('Selective state loading disabled: no required branches were found.', flush=True)
+        return g
+    g['state_loaded_branch_ids'] = required_ids
+    g['is_state_selective_loading'] = True
+    txt = 'Selective state loading enabled: loading {:,} nodes out of {:,} total nodes.'
+    print(txt.format(required_ids.shape[0], g['num_node']), flush=True)
+    return g
+
+
 def prep_state(g):
     state_nuc = None
     state_cdn = None
     state_pep = None
+    loaded_branch_ids = g.get('state_loaded_branch_ids', None)
     if (g['infile_type'] == 'phylobayes'):
         from csubst import parser_phylobayes
         if g['input_data_type'] == 'nuc': # obsoleted
-            state_nuc = parser_phylobayes.get_state_tensor(g)
+            state_nuc = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
         elif g['input_data_type'] == 'cdn':
-            state_cdn = parser_phylobayes.get_state_tensor(g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+            state_cdn = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
+            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
     elif (g['infile_type'] == 'iqtree'):
         from csubst import parser_iqtree
         if g['input_data_type'] == 'nuc': # obsoleted
-            state_nuc = parser_iqtree.get_state_tensor(g)
+            state_nuc = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
         elif g['input_data_type'] == 'cdn':
-            state_cdn = parser_iqtree.get_state_tensor(g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+            state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
+            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
     g['state_nuc'] = state_nuc
     g['state_cdn'] = state_cdn
     g['state_pep'] = state_pep

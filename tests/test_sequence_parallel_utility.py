@@ -119,6 +119,30 @@ def test_cdn2pep_state_sums_synonymous_codons():
     numpy.testing.assert_allclose(out, state_cdn, atol=1e-12)
 
 
+def test_cdn2pep_state_selected_branch_ids_keeps_global_branch_index():
+    g = {
+        "amino_acid_orders": numpy.array(["K", "N"]),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+    }
+    state_cdn = numpy.array(
+        [
+            [[0.2, 0.3, 0.5], [0.0, 0.0, 1.0]],
+            [[0.1, 0.4, 0.5], [0.6, 0.2, 0.2]],
+            [[0.3, 0.3, 0.4], [0.4, 0.1, 0.5]],
+            [[0.9, 0.0, 0.1], [0.2, 0.3, 0.5]],
+        ],
+        dtype=float,
+    )
+    selected = numpy.array([1, 3], dtype=numpy.int64)
+    out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=selected)
+    expected_selected = numpy.zeros((2, 2, 2), dtype=float)
+    expected_selected[:, :, 0] = state_cdn[selected, :, :][:, :, [0, 1]].sum(axis=2)
+    expected_selected[:, :, 1] = state_cdn[selected, :, 2]
+    numpy.testing.assert_allclose(out[selected, :, :], expected_selected, atol=1e-12)
+    assert out[0, :, :].sum() == 0
+    assert out[2, :, :].sum() == 0
+
+
 def test_translate_state_handles_missing_states():
     g = {
         "float_tol": 1e-12,

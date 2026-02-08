@@ -5,6 +5,7 @@ import pytest
 from csubst import parser_misc
 from csubst import table
 from csubst import ete
+from csubst import tree
 
 
 def test_sort_branch_ids_sorts_within_rows_and_by_row():
@@ -226,3 +227,53 @@ def test_annotate_tree_handles_none_root_dist(tmp_path):
     out = parser_misc.annotate_tree(g)
     assert "tree" in out
     assert len(list(out["tree"].traverse())) == 3
+
+
+def test_resolve_state_loading_enables_selective_mode_with_targeted_cb_only():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    g = {
+        "tree": tr,
+        "num_node": len(list(tr.traverse())),
+        "exhaustive_until": 1,
+        "foreground": "dummy.tsv",
+        "cb": True,
+        "b": False,
+        "s": False,
+        "bs": False,
+        "cs": False,
+        "cbs": False,
+        "plot_state_aa": False,
+        "plot_state_codon": False,
+        "fg_clade_permutation": 0,
+        "target_ids": {"trait1": numpy.array([labels["N1"], labels["C"]], dtype=numpy.int64)},
+    }
+    out = parser_misc.resolve_state_loading(g)
+    assert out["is_state_selective_loading"] is True
+    numpy.testing.assert_array_equal(
+        out["state_loaded_branch_ids"],
+        numpy.array(sorted([labels["R"], labels["N1"], labels["C"]]), dtype=numpy.int64),
+    )
+
+
+def test_resolve_state_loading_disables_selective_mode_when_full_tree_outputs_requested():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "num_node": len(list(tr.traverse())),
+        "exhaustive_until": 1,
+        "foreground": "dummy.tsv",
+        "cb": True,
+        "b": True,
+        "s": False,
+        "bs": False,
+        "cs": False,
+        "cbs": False,
+        "plot_state_aa": False,
+        "plot_state_codon": False,
+        "fg_clade_permutation": 0,
+        "target_ids": {"trait1": numpy.array([1], dtype=numpy.int64)},
+    }
+    out = parser_misc.resolve_state_loading(g)
+    assert out["is_state_selective_loading"] is False
+    assert out["state_loaded_branch_ids"] is None
