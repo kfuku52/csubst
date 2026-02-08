@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSUBST Validation"
+  short_description: "Run reproducible parity and perf checks"
+  default_prompt: "Use this skill to validate CSUBST output parity, timing, and peak RAM with clean temp workdirs."
