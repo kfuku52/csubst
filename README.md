@@ -91,9 +91,6 @@ csubst site \
 
 For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 
-For parallel processing and performance tuning, see the wiki page:
-[Parallel processing and performance tuning](https://github.com/kfuku52/csubst/wiki/Parallel-processing-and-performance-tuning).
-
 ## Citation
 Fukushima K, Pollock DD. 2023. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. Nature Ecology & Evolution 7: 155–170. [DOI: 10.1038/s41559-022-01932-7](https://doi.org/10.1038/s41559-022-01932-7)
 
