@@ -1,0 +1,7 @@
+scenario	dropped_line_count	dropped_total	requested_total	kept_total	permutation_trials_total	pvalue_omegaCany2spe	real_sec	user_sec	sys_sec
+base_fg1_exh1	14	2968	3191	223	15	0.6	10.17	9.61	1.06
+base_fg2_exh1	14	2968	3191	223	15	0.6	10.85	9.22	1.31
+base_fg2_exh2	0	0	0	0	5	0.2	39.73	38.5	1.38
+fix_fg1_exh1	0	0	0	0	5	0.2	27.83	30.31	2.83
+fix_fg2_exh1	0	0	0	0	5	0.2	28.0	30.27	2.86
+fix_fg2_exh2	0	0	0	0	5	0.2	38.85	37.94	1.37
