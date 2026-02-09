@@ -1,5 +1,59 @@
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
+import os
+import sys
+
+
+_PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _build_worker_pythonpath():
+    # Keep worker imports aligned with the parent process package location.
+    prioritized_paths = [_PACKAGE_ROOT]
+    cwd = os.path.abspath(os.getcwd())
+    if cwd not in prioritized_paths:
+        prioritized_paths.append(cwd)
+    if len(sys.path) > 0:
+        path0 = sys.path[0]
+        if path0 in ['', '.']:
+            path0 = cwd
+        else:
+            path0 = os.path.abspath(path0)
+        if path0 not in prioritized_paths:
+            prioritized_paths.append(path0)
+    existing = os.environ.get('PYTHONPATH', '')
+    for path in existing.split(os.pathsep):
+        if path == '':
+            continue
+        normalized = os.path.abspath(path)
+        if normalized not in prioritized_paths:
+            prioritized_paths.append(normalized)
+    return os.pathsep.join(prioritized_paths)
+
+
+def _set_spawn_worker_import_path(ctx):
+    if ctx.get_start_method() not in ['spawn', 'forkserver']:
+        return None, None, False
+    old_pythonpath = os.environ.get('PYTHONPATH')
+    old_sys_path = list(sys.path)
+    new_pythonpath = _build_worker_pythonpath()
+    prioritized_paths = [p for p in new_pythonpath.split(os.pathsep) if p != '']
+    for path in reversed(prioritized_paths):
+        if path in sys.path:
+            sys.path.remove(path)
+        sys.path.insert(0, path)
+    os.environ['PYTHONPATH'] = new_pythonpath
+    return old_pythonpath, old_sys_path, True
+
+
+def _restore_import_path(old_pythonpath, old_sys_path, changed):
+    if not changed:
+        return
+    sys.path[:] = old_sys_path
+    if old_pythonpath is None:
+        os.environ.pop('PYTHONPATH', None)
+    else:
+        os.environ['PYTHONPATH'] = old_pythonpath
 
 
 def _get_num_items(input_data):
@@ -76,8 +130,12 @@ def run_starmap(func, args_iterable, n_jobs, backend='multiprocessing', chunksiz
         if chunksize < 1:
             raise ValueError('chunksize should be >= 1.')
     ctx = multiprocessing.get_context()
-    with ctx.Pool(processes=n_jobs) as pool:
-        return pool.starmap(func, args_list, chunksize=chunksize)
+    old_pythonpath, old_sys_path, changed = _set_spawn_worker_import_path(ctx)
+    try:
+        with ctx.Pool(processes=n_jobs) as pool:
+            return pool.starmap(func, args_list, chunksize=chunksize)
+    finally:
+        _restore_import_path(old_pythonpath, old_sys_path, changed)
 
 
 def get_chunks(input_data, threads, chunk_factor=1):

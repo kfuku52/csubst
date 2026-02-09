@@ -1,3 +1,4 @@
+import os
 import numpy
 import pandas
 import pytest
@@ -11,6 +12,17 @@ from csubst import utility
 
 def _starmap_add_mul(a, b):
     return (a + b) * 2
+
+
+def test_build_worker_pythonpath_prioritizes_local_package(monkeypatch, tmp_path):
+    fake_site = tmp_path / "site-packages"
+    fake_site.mkdir()
+    monkeypatch.setenv("PYTHONPATH", str(fake_site))
+    worker_pythonpath = parallel._build_worker_pythonpath()
+    entries = [p for p in worker_pythonpath.split(os.pathsep) if p]
+    expected_root = os.path.dirname(os.path.dirname(os.path.abspath(parallel.__file__)))
+    assert entries[0] == expected_root
+    assert str(fake_site) in entries
 
 
 def test_rgb_to_hex_rounding_matches_manual_conversion():
