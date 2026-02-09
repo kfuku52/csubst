@@ -425,7 +425,7 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 elif (prob_single_sub>=g['pymol_min_single_prob']):
                     color_sites['single_sub'].append(codon_site)
             if g['single_branch_mode']:
-                color_sites['single_branch_N'] = copy.deepcopy(color_sites['OCNany2spe'])
+                color_sites['single_branch_N'] = copy.deepcopy(color_sites['single_sub'])
                 del color_sites['OCNany2spe']
                 del color_sites['OCNany2dif']
                 del color_sites['single_sub']

@@ -116,6 +116,12 @@ def test_resolve_site_jobs_each_and_all_modes(tiny_tree):
     assert all(job["single_branch_mode"] for job in all_jobs)
 
 
+def test_resolve_site_jobs_all_mode_without_branch_id(tiny_tree):
+    g_all = {"tree": tiny_tree, "mode": "all"}
+    out_all = main_site.resolve_site_jobs(g_all)
+    assert len(out_all["site_jobs"]) == len([n for n in tiny_tree.traverse() if not ete.is_root(n)])
+
+
 def test_resolve_site_jobs_clade_mode_returns_all_nonroot_clade_branches(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "clade", "branch_id": str(labels["X"])}
@@ -162,9 +168,24 @@ def test_resolve_site_jobs_set_mode_extracts_expression_branch_ids(tiny_tree):
     assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.modeset.expr")
 
 
+def test_resolve_site_jobs_set_mode_without_branch_id(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {"tree": tiny_tree, "mode": "set,{}|{}".format(labels["A"], labels["B"])}
+    out = main_site.resolve_site_jobs(g)
+    assert len(out["site_jobs"]) == 1
+    numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], sorted([labels["A"], labels["B"]]))
+
+
 def test_resolve_site_jobs_set_mode_rejects_unknown_branch_ids(tiny_tree):
     g = {"tree": tiny_tree, "mode": "set,999|1", "branch_id": "unused"}
     with pytest.raises(ValueError, match="unknown branch IDs"):
+        main_site.resolve_site_jobs(g)
+
+
+def test_resolve_site_jobs_set_mode_rejects_invalid_expression_syntax(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {"tree": tiny_tree, "mode": "set,({}|{}".format(labels["A"], labels["B"])}
+    with pytest.raises(ValueError, match="Unbalanced parentheses"):
         main_site.resolve_site_jobs(g)
 
 
@@ -181,6 +202,21 @@ def test_add_set_mode_columns_evaluates_set_expression():
     # (1|5) => [T,T,T,T], minus root(0)=same, intersect 25 => [T,T,F,T]
     assert out["N_set_expr"].tolist() == [True, True, False, True]
     numpy.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [1.9, 2.0, 0.0, 1.9], atol=1e-12)
+
+
+def test_add_set_mode_columns_supports_xor_and_parentheses():
+    df = pandas.DataFrame(
+        {
+            "N_sub_1": [0.9, 0.1, 0.9, 0.1],
+            "N_sub_5": [0.1, 0.9, 0.9, 0.1],
+            "N_sub_9": [0.1, 0.1, 0.9, 0.9],
+        }
+    )
+    g = {"mode": "set", "mode_expression": "(1^5)&9", "pymol_min_single_prob": 0.8}
+    out = main_site.add_set_mode_columns(df=df.copy(), g=g)
+    # 1^5 => [T,T,F,F], intersect 9 => [F,F,F,F]
+    assert out["N_set_expr"].tolist() == [False, False, False, False]
+    numpy.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [0.0, 0.0, 0.0, 0.0], atol=1e-12)
 
 
 def test_resolve_site_jobs_intersection_fg_reads_cb_file(tmp_path, tiny_tree):

@@ -1159,6 +1159,14 @@ def _evaluate_set_expression_boolean(tokens, branch_site_bool):
     return operand_stack[0]
 
 
+def _validate_set_expression_syntax(mode_expression):
+    tokens = _tokenize_set_expression(mode_expression)
+    branch_ids = _extract_set_expression_branch_ids(mode_expression)
+    branch_site_bool = {int(branch_id): numpy.zeros(shape=(1,), dtype=bool) for branch_id in branch_ids.tolist()}
+    _evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    return None
+
+
 def add_set_mode_columns(df, g):
     if str(g.get('mode', '')).lower() != 'set':
         return df
@@ -1247,6 +1255,7 @@ def resolve_site_jobs(g):
     elif mode=='set':
         if (mode_expression is None) or (mode_expression==''):
             raise ValueError('--mode set expects an expression, e.g., --mode "set,1|5".')
+        _validate_set_expression_syntax(mode_expression=mode_expression)
         expression_branch_ids = _extract_set_expression_branch_ids(mode_expression)
         _validate_existing_branch_ids(expression_branch_ids, node_by_id)
         selected_nonroot = [bid for bid in expression_branch_ids.tolist() if not ete.is_root(node_by_id[int(bid)])]
