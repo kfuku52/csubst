@@ -143,7 +143,7 @@ def _read_fasta(path):
 
 
 def set_prop(node, key, value):
-    if _backend == "ete4":
+    if (_backend == "ete4") and hasattr(node, "add_props"):
         node.add_props(**{key: value})
         return value
     setattr(node, key, value)
@@ -151,19 +151,19 @@ def set_prop(node, key, value):
 
 
 def get_prop(node, key, default=None):
-    if _backend == "ete4":
+    if (_backend == "ete4") and hasattr(node, "props"):
         return node.props.get(key, default)
     return getattr(node, key, default)
 
 
 def has_prop(node, key):
-    if _backend == "ete4":
+    if (_backend == "ete4") and hasattr(node, "props"):
         return key in node.props
     return hasattr(node, key)
 
 
 def del_prop(node, key):
-    if _backend == "ete4":
+    if (_backend == "ete4") and hasattr(node, "props"):
         if key in node.props:
             del node.props[key]
         return None
@@ -206,9 +206,16 @@ def get_treeview_module():
             from ete4 import treeview as tv  # type: ignore[import-not-found]
             if all(hasattr(tv, attr) for attr in required):
                 return tv
-            return None
+        except Exception:  # pragma: no cover - optional feature
+            tv = None
+        # Fallback: use ete3 treeview APIs when ete4 treeview is unavailable.
+        try:
+            import ete3 as ete3_mod  # type: ignore[import-not-found]
+            if all(hasattr(ete3_mod, attr) for attr in required):
+                return ete3_mod
         except Exception:  # pragma: no cover - optional feature
             return None
+        return None
     if all(hasattr(_ete_mod, attr) for attr in required):
         return _ete_mod
     return None

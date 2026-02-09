@@ -1,4 +1,5 @@
 import numpy
+import pandas
 import pytest
 
 from csubst import main_simulate
@@ -136,3 +137,52 @@ def test_scale_tree_multiplies_every_branch_length():
     out = main_simulate.scale_tree(tr, 3.0)
     dists = sorted([n.dist for n in out.traverse()])
     assert dists == [0.0, 3.0, 6.0]
+
+
+def test_plot_branch_category_writes_pdf_with_matplotlib_backend(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_PLACEHOLDER", "black")
+        ete.set_prop(node, "labelcolor_PLACEHOLDER", "black")
+    g = {
+        "tree": tr,
+        "fg_df": pandas.DataFrame(columns=["name", "PLACEHOLDER"]),
+    }
+    outbase = tmp_path / "csubst_branch_id"
+    tree.plot_branch_category(g=g, file_base=str(outbase), label="all")
+    outfile = tmp_path / "csubst_branch_id.pdf"
+    assert outfile.exists()
+    assert outfile.stat().st_size > 0
+
+
+def test_foreground_stem_vertical_segment_is_not_colored():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(B:1,(A:1,C:1)X:1)R;", format=1))
+    by_name = {n.name: n for n in tr.traverse() if n.name}
+    root = by_name["R"]
+    x_node = by_name["X"]
+    a_node = by_name["A"]
+    c_node = by_name["C"]
+    b_node = by_name["B"]
+
+    ete.set_prop(root, "is_fg_t", False)
+    ete.set_prop(x_node, "is_fg_t", True)
+    ete.set_prop(a_node, "is_fg_t", True)
+    ete.set_prop(c_node, "is_fg_t", True)
+    ete.set_prop(b_node, "is_fg_t", False)
+
+    ete.set_prop(root, "color_t", "black")
+    ete.set_prop(x_node, "color_t", "red")
+    ete.set_prop(a_node, "color_t", "red")
+    ete.set_prop(c_node, "color_t", "red")
+    ete.set_prop(b_node, "color_t", "black")
+
+    assert tree._is_foreground_stem_branch(x_node, "t")
+    assert not tree._is_foreground_stem_branch(a_node, "t")
+
+    v_color_stem, h_color_stem = tree._get_branch_segment_colors(x_node, "t")
+    assert v_color_stem == "black"
+    assert h_color_stem == "red"
+
+    v_color_desc, h_color_desc = tree._get_branch_segment_colors(a_node, "t")
+    assert v_color_desc == "red"
+    assert h_color_desc == "red"

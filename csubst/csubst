@@ -275,11 +275,6 @@ if __name__ == "__main__":
                       help='default=%(default)s: Gray value for no-substitution sites. 0=black, 100=white')
     site.add_argument('--pymol_transparency', metavar='FLOAT', default=0.65, required=False, type=float,
                       help='default=%(default)s: Surface transparency. 0=non-transparent, 1=completely transparent')
-    site.add_argument('--color', metavar='stratigraphy|count', default='stratigraphy', required=False, type=str,
-                      choices=['stratigraphy', 'count'],
-                      help='default=%(default)s: Coloring policy for --mode lineage. '
-                           '"stratigraphy" colors sites by ancestor-descendant branch order. '
-                           '"count" colors sites by summed nonsynonymous substitution probabilities across lineage branches.')
     site.add_argument('--pymol_img', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to generate a rendered 6-view image file of protein structure.')
     site.add_argument('--pymol_max_num_chain', metavar='INT', default=20, required=False, type=int,

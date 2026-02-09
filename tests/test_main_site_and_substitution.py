@@ -56,6 +56,13 @@ def test_combinatorial2single_columns_removes_combination_columns():
     assert list(out.columns) == ["kept"]
 
 
+@pytest.mark.parametrize("mode_name,expected", [("intersection", True), ("lineage", False), ("set", False)])
+def test_mode_helpers_only_enable_optional_outputs_in_intersection(mode_name, expected):
+    g = {"mode": mode_name}
+    assert main_site.should_plot_state(g) == expected
+    assert main_site.should_save_pymol_views(g) == expected
+
+
 def test_get_yvalues_for_supported_modes():
     df = pandas.DataFrame(
         {
@@ -74,6 +81,256 @@ def test_get_yvalues_for_supported_modes():
     numpy.testing.assert_allclose(main_site.get_yvalues(df, "_sub_", "S"), [0.0, 1.0], atol=1e-12)
     numpy.testing.assert_allclose(main_site.get_yvalues(df, "any2spe", "S"), [0.3, 0.6], atol=1e-12)
     numpy.testing.assert_allclose(main_site.get_yvalues(df, "any2spe", "N"), [0.2, 0.4], atol=1e-12)
+
+
+def test_get_yvalues_for_lineage_branch_specific_rows():
+    df = pandas.DataFrame(
+        {
+            "S_sub_13": [0.0, 0.6],
+            "N_sub_13": [0.2, 0.3],
+            "S_sub_12": [0.2, 0.0],
+            "N_sub_12": [0.4, 0.5],
+        }
+    )
+    numpy.testing.assert_allclose(main_site.get_yvalues(df, "_sub_branch_13", "N"), [0.2, 0.3], atol=1e-12)
+    numpy.testing.assert_allclose(main_site.get_yvalues(df, "_sub_branch_13", "S"), [0.0, 0.9], atol=1e-12)
+    numpy.testing.assert_allclose(main_site.get_yvalues(df, "_sub_branch_12", "N"), [0.4, 0.5], atol=1e-12)
+    numpy.testing.assert_allclose(main_site.get_yvalues(df, "_sub_branch_12", "S"), [0.6, 0.0], atol=1e-12)
+
+
+def test_get_plot_sub_types_and_colors_lineage_has_n_plus_two_rows():
+    g = {"mode": "lineage", "single_branch_mode": False, "branch_ids": numpy.array([13, 12, 2], dtype=numpy.int64)}
+    sub_types, sn_colors = main_site.get_plot_sub_types_and_colors(g)
+    assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_13", "_sub_branch_12", "_sub_branch_2"]
+    assert "entire tree" in sub_types["_sub"]
+    assert sub_types["_sub_"] == "Branch-wise\nsubstitutions\nin the targets"
+    assert sub_types["_sub_branch_13"] == "Substitutions in\nbranch_id 13"
+    assert sub_types["_sub_branch_12"] == "Substitutions in\nbranch_id 12"
+    assert sub_types["_sub_branch_2"] == "Substitutions in\nbranch_id 2"
+    assert sn_colors["_sub"]["N"] == "black"
+    assert sn_colors["_sub_"]["S"] == "gainsboro"
+    assert sn_colors["_sub_branch_12"]["S"] == "gainsboro"
+
+
+def test_get_set_expression_display_branch_ids_preserves_expression_order():
+    g = {"mode_expression": "117|48", "branch_ids": numpy.array([48, 117], dtype=numpy.int64)}
+    out = main_site._get_set_expression_display_branch_ids(g)
+    assert out.tolist() == [117, 48]
+
+
+def test_get_plot_sub_types_and_colors_set_has_branch_rows_and_expression_row():
+    g = {
+        "mode": "set",
+        "single_branch_mode": False,
+        "mode_expression": "117|48",
+        "branch_ids": numpy.array([48, 117], dtype=numpy.int64),
+    }
+    sub_types, sn_colors = main_site.get_plot_sub_types_and_colors(g)
+    assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_117", "_sub_branch_48", "_set_expr"]
+    assert sub_types["_sub"] == "Branch-wise\nsubstitutions\nin the entire tree"
+    assert sub_types["_sub_"] == "Branch-wise\nsubstitutions\nin the targets"
+    assert sub_types["_sub_branch_117"] == "Substitutions in\nbranch_id 117"
+    assert sub_types["_sub_branch_48"] == "Substitutions in\nbranch_id 48"
+    assert sub_types["_set_expr"] == "Substitutions in\n117|48"
+    assert sn_colors["_set_expr"]["N"] == "red"
+    assert sn_colors["_set_expr"]["S"] == "gainsboro"
+
+
+def test_get_plot_sub_types_and_colors_set_with_A_has_A_row():
+    g = {
+        "mode": "set",
+        "single_branch_mode": False,
+        "mode_expression": "((117|48)-A)",
+        "branch_ids": numpy.array([48, 117], dtype=numpy.int64),
+    }
+    sub_types, _ = main_site.get_plot_sub_types_and_colors(g)
+    assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_117", "_sub_branch_48", "_set_other", "_set_expr"]
+    assert sub_types["_set_other"] == "Substitutions in\nA"
+
+
+def test_get_yvalues_set_expression_prefers_probability_column():
+    df = pandas.DataFrame({"N_set_expr_prob": [0.0, 1.7, 2.0], "N_set_expr": [False, True, True]})
+    numpy.testing.assert_allclose(main_site.get_yvalues(df, "_set_expr", "N"), [0.0, 1.7, 2.0], atol=1e-12)
+    numpy.testing.assert_allclose(main_site.get_yvalues(df, "_set_expr", "S"), [0.0, 0.0, 0.0], atol=1e-12)
+
+
+def test_get_yvalues_set_other_uses_other_prob_columns():
+    df = pandas.DataFrame({"N_set_other": [False, True], "N_set_other_prob": [0.2, 0.4], "S_set_other_prob": [0.1, 0.0]})
+    numpy.testing.assert_allclose(main_site.get_yvalues(df, "_set_other", "N"), [0.0, 1.0], atol=1e-12)
+    numpy.testing.assert_allclose(main_site.get_yvalues(df, "_set_other", "S"), [0.0, 0.0], atol=1e-12)
+
+
+def test_plot_barchart_set_has_n_plus_three_rows_for_two_branches(tmp_path):
+    df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [0, 1, 2],
+            "gap_rate_all": [0.0, 0.2, 0.0],
+            "gap_rate_target": [0.0, 0.1, 0.0],
+            "N_sub": [0.2, 0.3, 0.4],
+            "S_sub": [0.1, 0.0, 0.2],
+            "N_sub_117": [0.2, 0.1, 0.0],
+            "S_sub_117": [0.0, 0.2, 0.1],
+            "N_sub_48": [0.0, 0.3, 0.1],
+            "S_sub_48": [0.1, 0.0, 0.0],
+            "N_set_expr_prob": [0.0, 1.1, 1.6],
+            "N_set_expr": [False, True, True],
+        }
+    )
+    g = {
+        "mode": "set",
+        "single_branch_mode": False,
+        "mode_expression": "117|48",
+        "branch_ids": numpy.array([48, 117], dtype=numpy.int64),
+        "pdb": None,
+        "site_outdir": str(tmp_path),
+    }
+    main_site.plot_barchart(df=df, g=g)
+    fig = main_site.matplotlib.pyplot.gcf()
+    axes = fig.axes
+    assert len(axes) == 5
+    assert axes[0].get_ylabel() == "Branch-wise\nsubstitutions\nin the entire tree"
+    assert axes[1].get_ylabel() == "Branch-wise\nsubstitutions\nin the targets"
+    assert axes[2].get_ylabel() == "Substitutions in\nbranch_id 117"
+    assert axes[3].get_ylabel() == "Substitutions in\nbranch_id 48"
+    assert axes[4].get_ylabel() == "Substitutions in\n117|48"
+    main_site.matplotlib.pyplot.close(fig)
+
+
+def test_plot_barchart_set_with_A_has_extra_A_row(tmp_path):
+    df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [0, 1, 2],
+            "gap_rate_all": [0.0, 0.2, 0.0],
+            "gap_rate_target": [0.0, 0.1, 0.0],
+            "N_sub": [0.2, 0.3, 0.4],
+            "S_sub": [0.1, 0.0, 0.2],
+            "N_sub_117": [0.2, 0.1, 0.0],
+            "S_sub_117": [0.0, 0.2, 0.1],
+            "N_sub_48": [0.0, 0.3, 0.1],
+            "S_sub_48": [0.1, 0.0, 0.0],
+            "N_set_other_prob": [0.1, 0.8, 0.2],
+            "S_set_other_prob": [0.0, 0.1, 0.0],
+            "N_set_expr_prob": [0.0, 0.3, 0.9],
+            "N_set_expr": [False, True, True],
+        }
+    )
+    g = {
+        "mode": "set",
+        "single_branch_mode": False,
+        "mode_expression": "((117|48)-A)",
+        "branch_ids": numpy.array([48, 117], dtype=numpy.int64),
+        "pdb": None,
+        "site_outdir": str(tmp_path),
+    }
+    main_site.plot_barchart(df=df, g=g)
+    fig = main_site.matplotlib.pyplot.gcf()
+    axes = fig.axes
+    assert len(axes) == 6
+    assert axes[4].get_ylabel() == "Substitutions in\nA"
+    assert axes[5].get_ylabel() == "Substitutions in\n((117|48)-A)"
+    ymin, ymax = axes[4].get_ylim()
+    assert pytest.approx(ymin, abs=1e-12) == 0.0
+    assert pytest.approx(ymax, abs=1e-12) == 1.0
+    main_site.matplotlib.pyplot.close(fig)
+
+
+def test_plot_barchart_lineage_branch_rows_use_fixed_unit_y_range(tmp_path):
+    df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [0, 1, 2],
+            "gap_rate_all": [0.0, 0.2, 0.0],
+            "gap_rate_target": [0.0, 0.1, 0.0],
+            "N_sub": [0.2, 0.3, 0.4],
+            "S_sub": [0.1, 0.0, 0.2],
+            "N_sub_13": [0.2, 0.1, 0.0],
+            "S_sub_13": [0.0, 0.2, 0.1],
+            "N_sub_12": [0.0, 0.3, 0.1],
+            "S_sub_12": [0.1, 0.0, 0.0],
+            "N_sub_2": [0.4, 0.2, 0.3],
+            "S_sub_2": [0.0, 0.1, 0.0],
+        }
+    )
+    g = {
+        "mode": "lineage",
+        "single_branch_mode": False,
+        "branch_ids": numpy.array([13, 12, 2], dtype=numpy.int64),
+        "pdb": None,
+        "site_outdir": str(tmp_path),
+    }
+    main_site.plot_barchart(df=df, g=g)
+    fig = main_site.matplotlib.pyplot.gcf()
+    axes = fig.axes
+    # 5 data rows (N+2 for lineage) + 1 bottom colorbar axis
+    assert len(axes) == 6
+    for ax in axes[2:5]:
+        ymin, ymax = ax.get_ylim()
+        assert pytest.approx(ymin, abs=1e-12) == 0.0
+        assert pytest.approx(ymax, abs=1e-12) == 1.0
+    assert "Branch distance from ancestor" in axes[5].get_xlabel()
+    main_site.matplotlib.pyplot.close(fig)
+
+
+def test_plot_barchart_lineage_colorbar_uses_actual_branch_length_ticks(tmp_path, tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    x_id = labels["X"]
+    c_id = labels["C"]
+    df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [0, 1, 2],
+            "gap_rate_all": [0.0, 0.1, 0.0],
+            "gap_rate_target": [0.0, 0.1, 0.0],
+            "N_sub": [0.2, 0.3, 0.4],
+            "S_sub": [0.1, 0.0, 0.2],
+            "N_sub_{}".format(x_id): [0.1, 0.1, 0.0],
+            "S_sub_{}".format(x_id): [0.0, 0.0, 0.0],
+            "N_sub_{}".format(c_id): [0.0, 0.2, 0.1],
+            "S_sub_{}".format(c_id): [0.0, 0.0, 0.0],
+        }
+    )
+    g = {
+        "mode": "lineage",
+        "single_branch_mode": False,
+        "branch_ids": numpy.array([x_id, c_id], dtype=numpy.int64),
+        "tree": tiny_tree,
+        "pdb": None,
+        "site_outdir": str(tmp_path),
+    }
+    main_site.plot_barchart(df=df, g=g)
+    fig = main_site.matplotlib.pyplot.gcf()
+    axes = fig.axes
+    # 4 data rows (N+2 where N=2) + 1 bottom colorbar axis
+    assert len(axes) == 5
+    cax = axes[4]
+    assert "branch-length units" in cax.get_xlabel()
+    fig.canvas.draw()
+    tick_vals = [float(t.get_text()) for t in cax.get_xticklabels() if t.get_text() != ""]
+    # tiny_tree branch lengths are X=3 and C=2, so midpoint distances are 1.5 and 4.0.
+    assert pytest.approx(min(tick_vals), abs=1e-6) == 1.5
+    assert pytest.approx(max(tick_vals), abs=1e-6) == 4.0
+    main_site.matplotlib.pyplot.close(fig)
+
+
+def test_plot_lineage_tree_writes_pdf_and_applies_lineage_branch_colors(tmp_path, tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    branch_ids = numpy.array([labels["X"], labels["C"]], dtype=numpy.int64)
+    g = {
+        "mode": "lineage",
+        "tree": tiny_tree,
+        "branch_ids": branch_ids,
+    }
+    outbase = tmp_path / "csubst_site"
+    main_site.plot_lineage_tree(g=g, outbase=str(outbase))
+    outfile = tmp_path / "csubst_site.tree.pdf"
+    assert outfile.exists()
+    assert outfile.stat().st_size > 0
+    lineage_rgb = main_site._get_lineage_rgb_by_branch(branch_ids=branch_ids.tolist(), g=g)
+    for node in tiny_tree.traverse():
+        bid = int(ete.get_prop(node, "numerical_label"))
+        color = ete.get_prop(node, "color_PLACEHOLDER")
+        if bid in lineage_rgb:
+            assert color == lineage_rgb[bid]
+        else:
+            assert color == "black"
 
 
 def test_translate_and_write_fasta(tmp_path):
@@ -96,39 +353,13 @@ def test_get_parent_branch_ids(tiny_tree):
     assert set(out.values()) == {x_id}
 
 
-def test_resolve_site_jobs_each_and_all_modes(tiny_tree):
+def test_resolve_site_jobs_intersection_mode_preserves_branch_set_and_outdir_prefix(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
-
-    g_each = {"tree": tiny_tree, "mode": "each", "branch_id": "{},{}".format(labels["A"], labels["C"])}
-    out_each = main_site.resolve_site_jobs(g_each)
-    each_jobs = out_each["site_jobs"]
-    assert len(each_jobs) == 2
-    assert [int(job["branch_ids"][0]) for job in each_jobs] == [labels["A"], labels["C"]]
-    assert all(job["single_branch_mode"] for job in each_jobs)
-
-    g_all = {"tree": tiny_tree, "mode": "all", "branch_id": "ignored"}
-    out_all = main_site.resolve_site_jobs(g_all)
-    all_jobs = out_all["site_jobs"]
-    expected_nonroot = sorted(
-        [int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse() if not ete.is_root(n)]
-    )
-    assert [int(job["branch_ids"][0]) for job in all_jobs] == expected_nonroot
-    assert all(job["single_branch_mode"] for job in all_jobs)
-
-
-def test_resolve_site_jobs_all_mode_without_branch_id(tiny_tree):
-    g_all = {"tree": tiny_tree, "mode": "all"}
-    out_all = main_site.resolve_site_jobs(g_all)
-    assert len(out_all["site_jobs"]) == len([n for n in tiny_tree.traverse() if not ete.is_root(n)])
-
-
-def test_resolve_site_jobs_clade_mode_returns_all_nonroot_clade_branches(tiny_tree):
-    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
-    g = {"tree": tiny_tree, "mode": "clade", "branch_id": str(labels["X"])}
+    g = {"tree": tiny_tree, "mode": "intersection", "branch_id": "{},{}".format(labels["A"], labels["C"])}
     out = main_site.resolve_site_jobs(g)
-    got = sorted([int(job["branch_ids"][0]) for job in out["site_jobs"]])
-    expected = sorted([labels["X"], labels["A"], labels["C"]])
-    assert got == expected
+    assert len(out["site_jobs"]) == 1
+    numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
+    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.branch_id")
 
 
 def test_resolve_site_jobs_lineage_mode_returns_ancestor_to_descendant_path(tiny_tree):
@@ -137,6 +368,7 @@ def test_resolve_site_jobs_lineage_mode_returns_ancestor_to_descendant_path(tiny
     out = main_site.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["X"], labels["C"]])
+    assert out["site_jobs"][0]["site_outdir"] == "./csubst_site.lineage.branch_id{},{}".format(labels["X"], labels["C"])
     assert not out["site_jobs"][0]["single_branch_mode"]
 
 
@@ -147,13 +379,16 @@ def test_resolve_site_jobs_lineage_mode_rejects_non_ancestor_pairs(tiny_tree):
         main_site.resolve_site_jobs(g)
 
 
-def test_resolve_site_jobs_total_mode_preserves_branch_set_and_outdir_prefix(tiny_tree):
+@pytest.mark.parametrize("mode_name", ["total", "each", "all", "clade"])
+def test_resolve_site_jobs_rejects_removed_modes(tiny_tree, mode_name):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
-    g = {"tree": tiny_tree, "mode": "total", "branch_id": "{},{}".format(labels["A"], labels["C"])}
-    out = main_site.resolve_site_jobs(g)
-    assert len(out["site_jobs"]) == 1
-    numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
-    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.modetotal.branch_id")
+    g = {
+        "tree": tiny_tree,
+        "mode": mode_name,
+        "branch_id": "{},{}".format(labels["A"], labels["C"]),
+    }
+    with pytest.raises(ValueError, match="intersection,lineage,set"):
+        main_site.resolve_site_jobs(g)
 
 
 def test_resolve_site_jobs_set_mode_extracts_expression_branch_ids(tiny_tree):
@@ -165,7 +400,19 @@ def test_resolve_site_jobs_set_mode_extracts_expression_branch_ids(tiny_tree):
     numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], sorted([labels["A"], labels["C"]]))
     assert out["mode"] == "set"
     assert out["mode_expression"] == "({}|{})-{}".format(labels["A"], labels["C"], root_id)
-    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.modeset.expr")
+    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.set.expr")
+    assert "_or_" in out["site_jobs"][0]["site_outdir"]
+    assert "_minus_" in out["site_jobs"][0]["site_outdir"]
+
+
+def test_resolve_site_jobs_set_mode_with_all_other_symbol_in_label(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {"tree": tiny_tree, "mode": "set,({}|{})-A".format(labels["A"], labels["C"]), "branch_id": "unused"}
+    out = main_site.resolve_site_jobs(g)
+    assert len(out["site_jobs"]) == 1
+    numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], sorted([labels["A"], labels["C"]]))
+    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.set.expr")
+    assert "_all_other" in out["site_jobs"][0]["site_outdir"]
 
 
 def test_resolve_site_jobs_set_mode_without_branch_id(tiny_tree):
@@ -219,6 +466,47 @@ def test_add_set_mode_columns_supports_xor_and_parentheses():
     numpy.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [0.0, 0.0, 0.0, 0.0], atol=1e-12)
 
 
+def test_add_set_mode_columns_supports_all_other_symbol(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    a_id = labels["A"]
+    c_id = labels["C"]
+    b_id = labels["B"]
+    x_id = labels["X"]
+    n_site = 3
+    max_id = max([int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()])
+    on_tensor = numpy.zeros((max_id + 1, n_site, 1, 1, 1), dtype=float)
+    # Site 0: target-only substitution on A branch.
+    on_tensor[a_id, 0, 0, 0, 0] = 0.9
+    # Site 1: target on A and another-branch substitution on B.
+    on_tensor[a_id, 1, 0, 0, 0] = 0.9
+    on_tensor[b_id, 1, 0, 0, 0] = 0.9
+    # Site 2: target-only substitution on C branch.
+    on_tensor[c_id, 2, 0, 0, 0] = 0.9
+    # Keep one internal non-target branch explicitly below threshold at all sites.
+    on_tensor[x_id, :, 0, 0, 0] = 0.1
+    df = pandas.DataFrame(
+        {
+            "N_sub_{}".format(a_id): [0.9, 0.9, 0.0],
+            "N_sub_{}".format(c_id): [0.0, 0.0, 0.9],
+        }
+    )
+    g = {
+        "mode": "set",
+        "mode_expression": "({}|{})-A".format(a_id, c_id),
+        "pymol_min_single_prob": 0.8,
+        "tree": tiny_tree,
+    }
+    out = main_site.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_tensor)
+    assert out["N_set_expr"].tolist() == [True, False, True]
+    numpy.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [0.9, 0.0, 0.9], atol=1e-12)
+    assert out["N_set_other"].tolist() == [False, True, False]
+    numpy.testing.assert_allclose(out["N_set_other_prob"].to_numpy(), [0.1, 1.0, 0.1], atol=1e-12)
+    numpy.testing.assert_allclose(out["S_set_other_prob"].to_numpy(), [0.0, 0.0, 0.0], atol=1e-12)
+    assert out["N_set_A"].tolist() == [False, True, False]
+    numpy.testing.assert_allclose(out["N_set_A_prob"].to_numpy(), [0.1, 1.0, 0.1], atol=1e-12)
+    numpy.testing.assert_allclose(out["S_set_A_prob"].to_numpy(), [0.0, 0.0, 0.0], atol=1e-12)
+
+
 def test_resolve_site_jobs_intersection_fg_reads_cb_file(tmp_path, tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     cb_path = tmp_path / "cb.tsv"
@@ -238,12 +526,6 @@ def test_resolve_site_jobs_intersection_fg_reads_cb_file(tmp_path, tiny_tree):
     out = main_site.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
-
-
-def test_resolve_site_jobs_each_mode_rejects_fg(tiny_tree):
-    g = {"tree": tiny_tree, "mode": "each", "branch_id": "fg"}
-    with pytest.raises(ValueError, match="does not support"):
-        main_site.resolve_site_jobs(g)
 
 
 def test_get_state_orders():

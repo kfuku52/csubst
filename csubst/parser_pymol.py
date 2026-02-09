@@ -15,6 +15,7 @@ import time
 
 from csubst import sequence
 from csubst import utility
+from csubst import ete
 
 def initialize_pymol(pdb_id):
     #pymol.pymol_argv = ['pymol','-qc']
@@ -306,14 +307,57 @@ def _paint_intensity_sites(object_name, chain_id, site_values, label):
     return None
 
 
-def _get_lineage_hex_by_branch(branch_ids):
+def _oldness_frac_to_hex(frac):
+    frac = min(max(float(frac), 0.0), 1.0)
+    if frac <= 0.5:
+        t = frac / 0.5
+        r,g,b = t,t,1.0-t  # blue -> yellow
+    else:
+        t = (frac - 0.5) / 0.5
+        r,g,b = 1.0,1.0-t,0.0  # yellow -> red
+    return utility.rgb_to_hex(r=r, g=g, b=b)
+
+
+def _get_lineage_hex_by_branch(branch_ids, g):
+    if len(branch_ids)==0:
+        return dict()
     if len(branch_ids)==1:
-        return {int(branch_ids[0]): utility.rgb_to_hex(r=1.0, g=0.0, b=0.0)}
-    cmap = matplotlib.pyplot.get_cmap('rainbow')
+        return {int(branch_ids[0]): _oldness_frac_to_hex(1.0)}
+
+    node_by_id = dict()
+    for node in g['tree'].traverse():
+        node_by_id[int(ete.get_prop(node, "numerical_label"))] = node
+
+    lengths = []
+    for branch_id in branch_ids:
+        node = node_by_id.get(int(branch_id), None)
+        bl = float(getattr(node, 'dist', 0.0)) if (node is not None) else 0.0
+        lengths.append(max(bl, 0.0))
+
+    total_len = float(sum(lengths))
     out = dict()
-    for i,branch_id in enumerate(branch_ids):
-        rgba = cmap(i/(len(branch_ids)-1))
-        out[int(branch_id)] = utility.rgb_to_hex(r=rgba[0], g=rgba[1], b=rgba[2])
+    if total_len <= 0:
+        for i,branch_id in enumerate(branch_ids):
+            frac = i / (len(branch_ids)-1)
+            out[int(branch_id)] = _oldness_frac_to_hex(frac)
+        return out
+
+    mid_fracs = []
+    cumul = 0.0
+    for bl in lengths:
+        mid_fracs.append((cumul + bl*0.5) / total_len)
+        cumul += bl
+    min_mid = min(mid_fracs)
+    max_mid = max(mid_fracs)
+    span = max_mid - min_mid
+    if span <= 0:
+        for i,branch_id in enumerate(branch_ids):
+            frac = i / (len(branch_ids)-1)
+            out[int(branch_id)] = _oldness_frac_to_hex(frac)
+        return out
+    for branch_id,mid_frac in zip(branch_ids, mid_fracs):
+        frac = (mid_frac - min_mid) / span
+        out[int(branch_id)] = _oldness_frac_to_hex(frac)
     return out
 
 
@@ -363,49 +407,37 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 )
                 continue
             if mode=='lineage':
-                color_policy = str(g.get('color', 'stratigraphy')).lower()
-                if color_policy=='count':
-                    site_values = dict()
-                    for i in df.index:
-                        codon_site = int(df.at[i,codon_site_col])
-                        if codon_site==0:
-                            continue
-                        total_sub = float(df.loc[i,N_sub_cols].sum())
-                        if total_sub < g['pymol_min_single_prob']:
-                            continue
-                        site_values[codon_site] = max(site_values.get(codon_site, 0.0), total_sub)
-                    _paint_intensity_sites(
+                lineage_branch_ids = [int(bid) for bid in numpy.asarray(g['branch_ids']).tolist()]
+                branch_hex = _get_lineage_hex_by_branch(lineage_branch_ids, g=g)
+                site_by_branch = {bid: [] for bid in lineage_branch_ids}
+                lineage_min_prob = min(
+                    float(g.get('pymol_min_single_prob', 0.8)),
+                    float(g.get('pymol_min_combinat_prob', 0.5)),
+                )
+                for i in df.index:
+                    codon_site = int(df.at[i,codon_site_col])
+                    if codon_site==0:
+                        continue
+                    vals = df.loc[i,N_sub_cols].to_numpy(dtype=float)
+                    if vals.shape[0]==0:
+                        continue
+                    qualifying = numpy.where(vals >= lineage_min_prob)[0]
+                    if qualifying.shape[0]==0:
+                        continue
+                    # Stratigraphy mode: assign a site to the oldest lineage branch
+                    # with sufficiently high substitution probability.
+                    selected_index = int(qualifying.min())
+                    branch_id = lineage_branch_ids[min(selected_index, len(lineage_branch_ids)-1)]
+                    site_by_branch[branch_id].append(codon_site)
+                for branch_id in lineage_branch_ids:
+                    label = 'lineage_branch_{}'.format(branch_id)
+                    _paint_sites_with_hex(
                         object_name=object_name,
                         chain_id=ch,
-                        site_values=site_values,
-                        label='lineage_count_N',
+                        sites=site_by_branch[branch_id],
+                        hex_value=branch_hex[branch_id],
+                        label=label,
                     )
-                else:
-                    lineage_branch_ids = [int(bid) for bid in numpy.asarray(g['branch_ids']).tolist()]
-                    branch_hex = _get_lineage_hex_by_branch(lineage_branch_ids)
-                    site_by_branch = {bid: [] for bid in lineage_branch_ids}
-                    for i in df.index:
-                        codon_site = int(df.at[i,codon_site_col])
-                        if codon_site==0:
-                            continue
-                        vals = df.loc[i,N_sub_cols].to_numpy(dtype=float)
-                        if vals.shape[0]==0:
-                            continue
-                        max_value = vals.max()
-                        if max_value < g['pymol_min_single_prob']:
-                            continue
-                        max_index = int(vals.argmax())
-                        branch_id = lineage_branch_ids[min(max_index, len(lineage_branch_ids)-1)]
-                        site_by_branch[branch_id].append(codon_site)
-                    for branch_id in lineage_branch_ids:
-                        label = 'lineage_branch_{}'.format(branch_id)
-                        _paint_sites_with_hex(
-                            object_name=object_name,
-                            chain_id=ch,
-                            sites=site_by_branch[branch_id],
-                            hex_value=branch_hex[branch_id],
-                            label=label,
-                        )
                 continue
             color_sites = dict()
             color_sites['OCNany2spe'] = []
