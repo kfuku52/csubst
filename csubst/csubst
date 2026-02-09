@@ -201,13 +201,18 @@ if __name__ == "__main__":
     help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps it onto protein structure. '
     help_txt += ' See `csubst site -h`'
     site = subparsers.add_parser('site', help=help_txt, parents=[psr_co,psr_iq,psr_as])
-    site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default=None, required=True, type=str,
+    site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default='', required=False, type=str,
                       help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
                       'Run `csubst analyze` first and select branches of interest. '
-                      'If "fg", all foreground branch pairs will be analyzed.')
-    site.add_argument('--mode', metavar='intersection|total', default='intersection', required=False, type=str,
-                      choices=['intersection','total',],
-                      help='default=%(default)s: Visualization mode. NOT SUPPORTED YET.')
+                      'If "fg", all foreground branch pairs will be analyzed (--mode intersection only). '
+                      '--mode lineage expects ANC,DES, and --mode set ignores --branch_id.')
+    site.add_argument('--mode', metavar='MODE', default='intersection', required=False, type=str,
+                      help='default=%(default)s: Visualization mode. '
+                      '"intersection", visualize combinatorial substitutions in branches specified by --branch_id. '
+                      '"lineage", process branches between ancestor/descendant specified by --branch_id ANC,DES. '
+                      '"set,EXPR", evaluate set operations among branch-wise substitutions (|, -, &, ^). '
+                      'Use "A" for all other non-root branches. '
+                      'e.g. "set,((117|48)-A)".')
     site.add_argument('--tree_site_plot', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Generate a matplotlib-based tree + site summary plot.')
     site.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
@@ -270,6 +275,11 @@ if __name__ == "__main__":
                       help='default=%(default)s: Gray value for no-substitution sites. 0=black, 100=white')
     site.add_argument('--pymol_transparency', metavar='FLOAT', default=0.65, required=False, type=float,
                       help='default=%(default)s: Surface transparency. 0=non-transparent, 1=completely transparent')
+    site.add_argument('--color', metavar='stratigraphy|count', default='stratigraphy', required=False, type=str,
+                      choices=['stratigraphy', 'count'],
+                      help='default=%(default)s: Coloring policy for --mode lineage. '
+                           '"stratigraphy" colors sites by ancestor-descendant branch order. '
+                           '"count" colors sites by summed nonsynonymous substitution probabilities across lineage branches.')
     site.add_argument('--pymol_img', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to generate a rendered 6-view image file of protein structure.')
     site.add_argument('--pymol_max_num_chain', metavar='INT', default=20, required=False, type=int,

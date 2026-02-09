@@ -260,6 +260,63 @@ def set_color_gray(object_names, residue_numberings, gray_value):
             cmd_color = "color gray{}, {} and chain {} and resi {:}-{:}"
             pymol.cmd.do(cmd_color.format(gray_value, object_name, ch, residue_start, residue_end))
 
+
+def _paint_sites_with_hex(object_name, chain_id, sites, hex_value, label):
+    if len(sites)==0:
+        print('Skipping site painting. No amino acid substitutions: {}'.format(label), flush=True)
+        return None
+    sites = sorted(list(set([int(site) for site in sites])))
+    print('Amino acid sites with {} will be painted with {}.'.format(label, hex_value), flush=True)
+    txt_resi = '+'.join([str(site) for site in sites])
+    cmd_color = "color {}, {} and chain {} and resi {}"
+    pymol.cmd.do(cmd_color.format(hex_value, object_name, chain_id, txt_resi))
+    return None
+
+
+def _get_intensity_bin_hex(bin_index, num_bin):
+    if num_bin <= 1:
+        frac = 1.0
+    else:
+        frac = (bin_index + 1) / num_bin
+    return utility.rgb_to_hex(r=1.0, g=1.0-0.8*frac, b=1.0-0.8*frac)
+
+
+def _paint_intensity_sites(object_name, chain_id, site_values, label):
+    if len(site_values)==0:
+        print('Skipping site painting. No amino acid substitutions: {}'.format(label), flush=True)
+        return None
+    max_value = max(site_values.values())
+    if max_value <= 0:
+        print('Skipping site painting. Non-positive substitution values: {}'.format(label), flush=True)
+        return None
+    num_bin = 10
+    bins = {i: [] for i in range(num_bin)}
+    for site,value in site_values.items():
+        frac = min(max(float(value)/max_value, 0.0), 1.0)
+        bin_index = int(round(frac * (num_bin-1)))
+        bins[bin_index].append(int(site))
+    txt = '{}: max summed substitution probability = {:.4f}'
+    print(txt.format(label, max_value), flush=True)
+    for bin_index,sites in bins.items():
+        if len(sites)==0:
+            continue
+        hex_value = _get_intensity_bin_hex(bin_index=bin_index, num_bin=num_bin)
+        sub_label = '{} (bin {}/{})'.format(label, bin_index+1, num_bin)
+        _paint_sites_with_hex(object_name=object_name, chain_id=chain_id, sites=sites, hex_value=hex_value, label=sub_label)
+    return None
+
+
+def _get_lineage_hex_by_branch(branch_ids):
+    if len(branch_ids)==1:
+        return {int(branch_ids[0]): utility.rgb_to_hex(r=1.0, g=0.0, b=0.0)}
+    cmap = matplotlib.pyplot.get_cmap('rainbow')
+    out = dict()
+    for i,branch_id in enumerate(branch_ids):
+        rgba = cmap(i/(len(branch_ids)-1))
+        out[int(branch_id)] = utility.rgb_to_hex(r=rgba[0], g=rgba[1], b=rgba[2])
+    return out
+
+
 def set_substitution_colors(df, g, object_names, N_sub_cols):
     for object_name in object_names:
         if object_name.endswith('_pol_conts'):
@@ -268,12 +325,94 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             codon_site_col = 'codon_site_pdb_'+object_name+'_'+ch
             if not codon_site_col in df.columns:
                 continue
+            mode = str(g.get('mode', 'intersection')).lower()
+            if mode=='set':
+                if 'N_set_expr' not in df.columns:
+                    print('Skipping site painting. N_set_expr column was not found for --mode set.', flush=True)
+                    continue
+                selected_sites = []
+                for i in df.index:
+                    codon_site = int(df.at[i,codon_site_col])
+                    if codon_site==0:
+                        continue
+                    if bool(df.at[i,'N_set_expr']):
+                        selected_sites.append(codon_site)
+                _paint_sites_with_hex(
+                    object_name=object_name,
+                    chain_id=ch,
+                    sites=selected_sites,
+                    hex_value=utility.rgb_to_hex(r=1.0, g=0.0, b=0.0),
+                    label='set_expr_N',
+                )
+                continue
+            if mode=='total':
+                site_values = dict()
+                for i in df.index:
+                    codon_site = int(df.at[i,codon_site_col])
+                    if codon_site==0:
+                        continue
+                    total_sub = float(df.loc[i,N_sub_cols].sum())
+                    if total_sub < g['pymol_min_single_prob']:
+                        continue
+                    site_values[codon_site] = max(site_values.get(codon_site, 0.0), total_sub)
+                _paint_intensity_sites(
+                    object_name=object_name,
+                    chain_id=ch,
+                    site_values=site_values,
+                    label='total_N',
+                )
+                continue
+            if mode=='lineage':
+                color_policy = str(g.get('color', 'stratigraphy')).lower()
+                if color_policy=='count':
+                    site_values = dict()
+                    for i in df.index:
+                        codon_site = int(df.at[i,codon_site_col])
+                        if codon_site==0:
+                            continue
+                        total_sub = float(df.loc[i,N_sub_cols].sum())
+                        if total_sub < g['pymol_min_single_prob']:
+                            continue
+                        site_values[codon_site] = max(site_values.get(codon_site, 0.0), total_sub)
+                    _paint_intensity_sites(
+                        object_name=object_name,
+                        chain_id=ch,
+                        site_values=site_values,
+                        label='lineage_count_N',
+                    )
+                else:
+                    lineage_branch_ids = [int(bid) for bid in numpy.asarray(g['branch_ids']).tolist()]
+                    branch_hex = _get_lineage_hex_by_branch(lineage_branch_ids)
+                    site_by_branch = {bid: [] for bid in lineage_branch_ids}
+                    for i in df.index:
+                        codon_site = int(df.at[i,codon_site_col])
+                        if codon_site==0:
+                            continue
+                        vals = df.loc[i,N_sub_cols].to_numpy(dtype=float)
+                        if vals.shape[0]==0:
+                            continue
+                        max_value = vals.max()
+                        if max_value < g['pymol_min_single_prob']:
+                            continue
+                        max_index = int(vals.argmax())
+                        branch_id = lineage_branch_ids[min(max_index, len(lineage_branch_ids)-1)]
+                        site_by_branch[branch_id].append(codon_site)
+                    for branch_id in lineage_branch_ids:
+                        label = 'lineage_branch_{}'.format(branch_id)
+                        _paint_sites_with_hex(
+                            object_name=object_name,
+                            chain_id=ch,
+                            sites=site_by_branch[branch_id],
+                            hex_value=branch_hex[branch_id],
+                            label=label,
+                        )
+                continue
             color_sites = dict()
             color_sites['OCNany2spe'] = []
             color_sites['OCNany2dif'] = []
             color_sites['single_sub'] = []
             for i in df.index:
-                codon_site = df.at[i,codon_site_col]
+                codon_site = int(df.at[i,codon_site_col])
                 prob_Nany2spe = df.at[i,'OCNany2spe']
                 prob_Nany2dif = df.at[i,'OCNany2dif']
                 prob_single_sub = df.loc[i,N_sub_cols].max()
@@ -291,9 +430,6 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 del color_sites['OCNany2dif']
                 del color_sites['single_sub']
             for key in color_sites.keys():
-                if len(color_sites[key])==0:
-                    print('Skipping site painting. No amino acid substitutions: {}'.format(key), flush=True)
-                    continue
                 if key=='OCNany2spe':
                     hex_value = utility.rgb_to_hex(r=1, g=0, b=0)
                 elif key=='OCNany2dif':
@@ -302,11 +438,17 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                     hex_value = utility.rgb_to_hex(r=0.4, g=0.4, b=0.4)
                 elif key=='single_branch_N':
                     hex_value = utility.rgb_to_hex(r=0.5, g=0, b=0.5)
-                print('Amino acid sites with {} will be painted with {}.'.format(key, hex_value), flush=True)
-                txt_resi = '+'.join([str(site) for site in color_sites[key]])
-                cmd_color = "color {}, {} and chain {} and resi {}"
-                pymol.cmd.do(cmd_color.format(hex_value, object_name, ch, txt_resi))
-                if key in ['OCNany2spe','OCNany2dif']:
+                else:
+                    continue
+                _paint_sites_with_hex(
+                    object_name=object_name,
+                    chain_id=ch,
+                    sites=color_sites[key],
+                    hex_value=hex_value,
+                    label=key,
+                )
+                if key in ['OCNany2spe','OCNany2dif'] and len(color_sites[key])>0:
+                    txt_resi = '+'.join([str(site) for site in sorted(list(set(color_sites[key])))])
                     cmd_tp = "set transparency, 0.3, {} and chain {} and resi {:}"
                     pymol.cmd.do(cmd_tp.format(object_name, ch, txt_resi))
 

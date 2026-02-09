@@ -96,6 +96,120 @@ def test_get_parent_branch_ids(tiny_tree):
     assert set(out.values()) == {x_id}
 
 
+def test_resolve_site_jobs_each_and_all_modes(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+
+    g_each = {"tree": tiny_tree, "mode": "each", "branch_id": "{},{}".format(labels["A"], labels["C"])}
+    out_each = main_site.resolve_site_jobs(g_each)
+    each_jobs = out_each["site_jobs"]
+    assert len(each_jobs) == 2
+    assert [int(job["branch_ids"][0]) for job in each_jobs] == [labels["A"], labels["C"]]
+    assert all(job["single_branch_mode"] for job in each_jobs)
+
+    g_all = {"tree": tiny_tree, "mode": "all", "branch_id": "ignored"}
+    out_all = main_site.resolve_site_jobs(g_all)
+    all_jobs = out_all["site_jobs"]
+    expected_nonroot = sorted(
+        [int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse() if not ete.is_root(n)]
+    )
+    assert [int(job["branch_ids"][0]) for job in all_jobs] == expected_nonroot
+    assert all(job["single_branch_mode"] for job in all_jobs)
+
+
+def test_resolve_site_jobs_clade_mode_returns_all_nonroot_clade_branches(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {"tree": tiny_tree, "mode": "clade", "branch_id": str(labels["X"])}
+    out = main_site.resolve_site_jobs(g)
+    got = sorted([int(job["branch_ids"][0]) for job in out["site_jobs"]])
+    expected = sorted([labels["X"], labels["A"], labels["C"]])
+    assert got == expected
+
+
+def test_resolve_site_jobs_lineage_mode_returns_ancestor_to_descendant_path(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {"tree": tiny_tree, "mode": "lineage", "branch_id": "{},{}".format(labels["X"], labels["C"])}
+    out = main_site.resolve_site_jobs(g)
+    assert len(out["site_jobs"]) == 1
+    numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["X"], labels["C"]])
+    assert not out["site_jobs"][0]["single_branch_mode"]
+
+
+def test_resolve_site_jobs_lineage_mode_rejects_non_ancestor_pairs(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {"tree": tiny_tree, "mode": "lineage", "branch_id": "{},{}".format(labels["B"], labels["C"])}
+    with pytest.raises(ValueError, match="ancestor"):
+        main_site.resolve_site_jobs(g)
+
+
+def test_resolve_site_jobs_total_mode_preserves_branch_set_and_outdir_prefix(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {"tree": tiny_tree, "mode": "total", "branch_id": "{},{}".format(labels["A"], labels["C"])}
+    out = main_site.resolve_site_jobs(g)
+    assert len(out["site_jobs"]) == 1
+    numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
+    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.modetotal.branch_id")
+
+
+def test_resolve_site_jobs_set_mode_extracts_expression_branch_ids(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    root_id = int(ete.get_prop(tiny_tree, "numerical_label"))
+    g = {"tree": tiny_tree, "mode": "set,({}|{})-{}".format(labels["A"], labels["C"], root_id), "branch_id": "unused"}
+    out = main_site.resolve_site_jobs(g)
+    assert len(out["site_jobs"]) == 1
+    numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], sorted([labels["A"], labels["C"]]))
+    assert out["mode"] == "set"
+    assert out["mode_expression"] == "({}|{})-{}".format(labels["A"], labels["C"], root_id)
+    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.modeset.expr")
+
+
+def test_resolve_site_jobs_set_mode_rejects_unknown_branch_ids(tiny_tree):
+    g = {"tree": tiny_tree, "mode": "set,999|1", "branch_id": "unused"}
+    with pytest.raises(ValueError, match="unknown branch IDs"):
+        main_site.resolve_site_jobs(g)
+
+
+def test_add_set_mode_columns_evaluates_set_expression():
+    df = pandas.DataFrame(
+        {
+            "N_sub_1": [0.9, 0.2, 0.9, 0.1],
+            "N_sub_5": [0.1, 0.9, 0.9, 0.9],
+            "N_sub_25": [0.9, 0.9, 0.1, 0.9],
+        }
+    )
+    g = {"mode": "set", "mode_expression": "((1|5)-0)&25", "pymol_min_single_prob": 0.8}
+    out = main_site.add_set_mode_columns(df=df.copy(), g=g)
+    # (1|5) => [T,T,T,T], minus root(0)=same, intersect 25 => [T,T,F,T]
+    assert out["N_set_expr"].tolist() == [True, True, False, True]
+    numpy.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [1.9, 2.0, 0.0, 1.9], atol=1e-12)
+
+
+def test_resolve_site_jobs_intersection_fg_reads_cb_file(tmp_path, tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    cb_path = tmp_path / "cb.tsv"
+    pandas.DataFrame(
+        {
+            "branch_id_1": [labels["A"], labels["B"]],
+            "branch_id_2": [labels["C"], labels["C"]],
+            "is_fg_demo": ["Y", "N"],
+        }
+    ).to_csv(cb_path, sep="\t", index=False)
+    g = {
+        "tree": tiny_tree,
+        "mode": "intersection",
+        "branch_id": "fg",
+        "cb_file": str(cb_path),
+    }
+    out = main_site.resolve_site_jobs(g)
+    assert len(out["site_jobs"]) == 1
+    numpy.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
+
+
+def test_resolve_site_jobs_each_mode_rejects_fg(tiny_tree):
+    g = {"tree": tiny_tree, "mode": "each", "branch_id": "fg"}
+    with pytest.raises(ValueError, match="does not support"):
+        main_site.resolve_site_jobs(g)
+
+
 def test_get_state_orders():
     g = {"amino_acid_orders": numpy.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
     orders_nsy, keys_nsy = main_site.get_state_orders(g, "nsy")

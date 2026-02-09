@@ -980,18 +980,308 @@ def add_branch_sub_prob(df, branch_ids, sub_tensor, attr):
         df.loc[:,attr+'_sub_'+str(branch_id)] = sub_probs
     return df
 
-def add_branch_id_list(g):
-    if g['branch_id']=='fg':
-        g['branch_id_list'] = []
-        cb = pandas.read_csv(g['cb_file'], sep="\t", index_col=False, header=0)
-        bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
-        cb_fg = cb.loc[(cb.loc[:,cb.columns.str.startswith('is_fg')]=='Y').any(axis=1),:]
-        for i in cb_fg.index:
-            bids = cb_fg.loc[i,bid_cols].values.astype(int)
-            g['branch_id_list'].append(bids)
+def _parse_branch_ids(branch_id_text):
+    if branch_id_text is None:
+        raise ValueError('Missing --branch_id.')
+    values = [v.strip() for v in str(branch_id_text).split(',') if v.strip()!='']
+    if len(values)==0:
+        raise ValueError('No branch ID was specified in --branch_id.')
+    try:
+        branch_ids = numpy.array([int(v) for v in values], dtype=numpy.int64)
+    except ValueError as exc:
+        raise ValueError('--branch_id should be a comma-delimited list of integers.') from exc
+    return branch_ids
+
+
+def _get_node_by_branch_id(g):
+    node_by_id = dict()
+    for node in g['tree'].traverse():
+        branch_id = int(ete.get_prop(node, "numerical_label"))
+        node_by_id[branch_id] = node
+    return node_by_id
+
+
+def _get_nonroot_branch_ids(node_by_id):
+    nonroot_ids = [branch_id for branch_id,node in node_by_id.items() if not ete.is_root(node)]
+    return numpy.array(sorted(nonroot_ids), dtype=numpy.int64)
+
+
+def _validate_existing_branch_ids(branch_ids, node_by_id):
+    missing_ids = [int(bid) for bid in branch_ids.tolist() if int(bid) not in node_by_id]
+    if len(missing_ids)>0:
+        txt = '--branch_id contains unknown branch IDs: {}'
+        raise ValueError(txt.format(','.join([str(bid) for bid in sorted(missing_ids)])))
+
+
+def _validate_nonroot_branch_ids(branch_ids, node_by_id):
+    _validate_existing_branch_ids(branch_ids, node_by_id)
+    root_ids = [int(bid) for bid in branch_ids.tolist() if ete.is_root(node_by_id[int(bid)])]
+    if len(root_ids)>0:
+        txt = '--branch_id should not include root branch IDs: {}'
+        raise ValueError(txt.format(','.join([str(bid) for bid in sorted(root_ids)])))
+
+
+def _read_foreground_branch_combinations(g, node_by_id):
+    cb = pandas.read_csv(g['cb_file'], sep="\t", index_col=False, header=0)
+    bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
+    if bid_cols.shape[0]==0:
+        raise ValueError('No branch_id_* columns were found in --cb_file.')
+    is_fg_col = cb.columns.str.startswith('is_fg')
+    if is_fg_col.sum()==0:
+        raise ValueError('No is_fg* columns were found in --cb_file.')
+    cb_fg = cb.loc[(cb.loc[:,is_fg_col]=='Y').any(axis=1),:]
+    branch_id_list = []
+    for i in cb_fg.index:
+        bids = cb_fg.loc[i,bid_cols].values.astype(numpy.int64)
+        _validate_nonroot_branch_ids(bids, node_by_id)
+        branch_id_list.append(bids)
+    if len(branch_id_list)==0:
+        raise ValueError('No foreground branch combinations were found in --cb_file.')
+    return branch_id_list
+
+
+def _resolve_lineage_branch_ids(ancestor_id, descendant_id, node_by_id):
+    descendant_node = node_by_id[int(descendant_id)]
+    lineage_branch_ids = []
+    node = descendant_node
+    while True:
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        if not ete.is_root(node):
+            lineage_branch_ids.append(node_id)
+        if node_id == int(ancestor_id):
+            break
+        if ete.is_root(node):
+            txt = '--mode lineage expects --branch_id ANC,DES where ANC is an ancestor of DES.'
+            raise ValueError(txt)
+        node = node.up
+    lineage_branch_ids = lineage_branch_ids[::-1]
+    return numpy.array(lineage_branch_ids, dtype=numpy.int64)
+
+
+def _tokenize_set_expression(mode_expression):
+    tokens = []
+    i = 0
+    txt = str(mode_expression)
+    while i < len(txt):
+        ch = txt[i]
+        if ch.isspace():
+            i += 1
+            continue
+        if ch in ['|', '-', '&', '^', '(', ')']:
+            tokens.append(ch)
+            i += 1
+            continue
+        if ch.isdigit():
+            j = i + 1
+            while (j < len(txt)) and txt[j].isdigit():
+                j += 1
+            tokens.append(int(txt[i:j]))
+            i = j
+            continue
+        raise ValueError('Invalid token in --mode set expression: "{}"'.format(ch))
+    if len(tokens)==0:
+        raise ValueError('Empty --mode set expression.')
+    return tokens
+
+
+def _extract_set_expression_branch_ids(mode_expression):
+    tokens = _tokenize_set_expression(mode_expression)
+    branch_ids = sorted(set([token for token in tokens if isinstance(token, int)]))
+    if len(branch_ids)==0:
+        raise ValueError('--mode set expression should include at least one branch ID.')
+    return numpy.array(branch_ids, dtype=numpy.int64)
+
+
+def _evaluate_set_expression_boolean(tokens, branch_site_bool):
+    operators = ['|', '-', '&', '^']
+    operand_stack = []
+    operator_stack = []
+    expect_operand = True
+    operand_shape = None
+    for value in branch_site_bool.values():
+        operand_shape = value.shape
+        break
+    if operand_shape is None:
+        raise ValueError('No branch-site values were provided for set expression evaluation.')
+
+    def apply_top_operator():
+        if len(operand_stack) < 2:
+            raise ValueError('Invalid --mode set expression. Missing operand.')
+        rhs = operand_stack.pop()
+        lhs = operand_stack.pop()
+        op = operator_stack.pop()
+        if op == '|':
+            out = lhs | rhs
+        elif op == '-':
+            out = lhs & (~rhs)
+        elif op == '&':
+            out = lhs & rhs
+        elif op == '^':
+            out = lhs ^ rhs
+        else:
+            raise ValueError('Invalid operator in --mode set expression: {}'.format(op))
+        operand_stack.append(out)
+
+    for token in tokens:
+        if expect_operand:
+            if isinstance(token, int):
+                if token in branch_site_bool:
+                    operand_stack.append(branch_site_bool[token].copy())
+                else:
+                    operand_stack.append(numpy.zeros(shape=operand_shape, dtype=bool))
+                expect_operand = False
+            elif token == '(':
+                operator_stack.append(token)
+            else:
+                raise ValueError('Invalid --mode set expression near token "{}".'.format(token))
+        else:
+            if token in operators:
+                while (len(operator_stack) > 0) and (operator_stack[-1] in operators):
+                    apply_top_operator()
+                operator_stack.append(token)
+                expect_operand = True
+            elif token == ')':
+                while (len(operator_stack) > 0) and (operator_stack[-1] != '('):
+                    apply_top_operator()
+                if (len(operator_stack) == 0) or (operator_stack[-1] != '('):
+                    raise ValueError('Unbalanced parentheses in --mode set expression.')
+                operator_stack.pop()
+            else:
+                raise ValueError('Invalid --mode set expression near token "{}".'.format(token))
+    if expect_operand:
+        raise ValueError('Invalid --mode set expression. Expression ended unexpectedly.')
+    while len(operator_stack) > 0:
+        if operator_stack[-1] == '(':
+            raise ValueError('Unbalanced parentheses in --mode set expression.')
+        apply_top_operator()
+    if len(operand_stack) != 1:
+        raise ValueError('Invalid --mode set expression.')
+    return operand_stack[0]
+
+
+def add_set_mode_columns(df, g):
+    if str(g.get('mode', '')).lower() != 'set':
+        return df
+    mode_expression = g.get('mode_expression', None)
+    if mode_expression is None:
+        raise ValueError('Missing set expression for --mode set.')
+    tokens = _tokenize_set_expression(mode_expression)
+    branch_ids = _extract_set_expression_branch_ids(mode_expression)
+    n_site = df.shape[0]
+    branch_site_bool = dict()
+    for branch_id in branch_ids.tolist():
+        col = 'N_sub_{}'.format(int(branch_id))
+        if col in df.columns:
+            branch_site_bool[int(branch_id)] = (df.loc[:, col].values >= g['pymol_min_single_prob'])
+        else:
+            branch_site_bool[int(branch_id)] = numpy.zeros(shape=(n_site,), dtype=bool)
+    selected = _evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    df.loc[:, 'N_set_expr'] = selected
+    df.loc[:, 'N_set_expr_prob'] = 0.0
+    selected_any = selected.astype(bool)
+    if selected_any.any():
+        n_sub_cols = df.columns[df.columns.str.startswith('N_sub_')]
+        if n_sub_cols.shape[0] > 0:
+            df.loc[selected_any, 'N_set_expr_prob'] = df.loc[selected_any, n_sub_cols].sum(axis=1).values
+    return df
+
+
+def resolve_site_jobs(g):
+    raw_mode = str(g.get('mode', 'intersection')).strip()
+    mode_expression = None
+    if ',' in raw_mode:
+        mode_prefix,mode_expression = raw_mode.split(',', 1)
+        mode = mode_prefix.strip().lower()
+        mode_expression = mode_expression.strip()
     else:
-        g['branch_id_list'] = [numpy.array([ int(s) for s in g['branch_id'].split(',')]),]
+        mode = raw_mode.lower()
+    g['mode'] = mode
+    g['mode_expression'] = mode_expression
+    node_by_id = _get_node_by_branch_id(g)
+    nonroot_branch_ids = _get_nonroot_branch_ids(node_by_id)
+    branch_id_list = []
+
+    if mode in ['intersection', 'total']:
+        if str(g['branch_id']).lower()=='fg':
+            branch_id_list = _read_foreground_branch_combinations(g=g, node_by_id=node_by_id)
+        else:
+            branch_ids = _parse_branch_ids(g['branch_id'])
+            _validate_nonroot_branch_ids(branch_ids, node_by_id)
+            branch_id_list = [branch_ids]
+    elif mode=='each':
+        if str(g['branch_id']).lower()=='fg':
+            raise ValueError('--mode each does not support --branch_id fg. Specify explicit branch IDs.')
+        branch_ids = _parse_branch_ids(g['branch_id'])
+        _validate_nonroot_branch_ids(branch_ids, node_by_id)
+        branch_id_list = [numpy.array([bid], dtype=numpy.int64) for bid in branch_ids.tolist()]
+    elif mode=='all':
+        branch_id_list = [numpy.array([bid], dtype=numpy.int64) for bid in nonroot_branch_ids.tolist()]
+    elif mode=='clade':
+        branch_ids = _parse_branch_ids(g['branch_id'])
+        if branch_ids.shape[0]!=1:
+            raise ValueError('--mode clade expects exactly one branch ID in --branch_id.')
+        _validate_nonroot_branch_ids(branch_ids, node_by_id)
+        target_node = node_by_id[int(branch_ids[0])]
+        branch_id_list = []
+        for node in target_node.traverse():
+            if ete.is_root(node):
+                continue
+            branch_id = int(ete.get_prop(node, "numerical_label"))
+            branch_id_list.append(numpy.array([branch_id], dtype=numpy.int64))
+    elif mode=='lineage':
+        branch_ids = _parse_branch_ids(g['branch_id'])
+        if branch_ids.shape[0]!=2:
+            raise ValueError('--mode lineage expects --branch_id ANC,DES.')
+        _validate_existing_branch_ids(branch_ids, node_by_id)
+        descendant_id = int(branch_ids[1])
+        if ete.is_root(node_by_id[descendant_id]):
+            raise ValueError('--mode lineage expects a non-root DES branch ID.')
+        lineage_branch_ids = _resolve_lineage_branch_ids(
+            ancestor_id=int(branch_ids[0]),
+            descendant_id=descendant_id,
+            node_by_id=node_by_id,
+        )
+        if lineage_branch_ids.shape[0]==0:
+            raise ValueError('No non-root branch IDs were found for --mode lineage.')
+        branch_id_list = [lineage_branch_ids]
+    elif mode=='set':
+        if (mode_expression is None) or (mode_expression==''):
+            raise ValueError('--mode set expects an expression, e.g., --mode "set,1|5".')
+        expression_branch_ids = _extract_set_expression_branch_ids(mode_expression)
+        _validate_existing_branch_ids(expression_branch_ids, node_by_id)
+        selected_nonroot = [bid for bid in expression_branch_ids.tolist() if not ete.is_root(node_by_id[int(bid)])]
+        if len(selected_nonroot)==0:
+            raise ValueError('--mode set expression should include at least one non-root branch ID.')
+        branch_id_list = [numpy.array(sorted(selected_nonroot), dtype=numpy.int64)]
+    else:
+        raise ValueError('--mode should be one of intersection,total,each,all,clade,lineage,set or set,<expr>.')
+
+    site_jobs = []
+    for branch_ids in branch_id_list:
+        single_branch_mode = (branch_ids.shape[0]==1)
+        branch_txt = ','.join([str(int(bid)) for bid in branch_ids.tolist()])
+        if mode == 'intersection':
+            site_outdir = './csubst_site.branch_id'+branch_txt
+        elif mode == 'set':
+            mode_expr_label = re.sub(r'[^0-9A-Za-z]+', '_', mode_expression).strip('_')
+            if mode_expr_label == '':
+                mode_expr_label = 'expr'
+            site_outdir = './csubst_site.modeset.expr'+mode_expr_label
+        else:
+            site_outdir = './csubst_site.mode'+mode+'.branch_id'+branch_txt
+        site_jobs.append({
+            'branch_ids': branch_ids,
+            'single_branch_mode': single_branch_mode,
+            'site_outdir': site_outdir,
+            'mode_expression': mode_expression,
+        })
+    g['site_jobs'] = site_jobs
+    g['branch_id_list'] = [job['branch_ids'] for job in site_jobs]
     return g
+
+
+def add_branch_id_list(g):
+    return resolve_site_jobs(g)
 
 def combinatorial2single_columns(df):
     for SN in ['OCS','OCN']:
@@ -1016,16 +1306,19 @@ def main_site(g):
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
-    g = add_branch_id_list(g)
-    for branch_ids in g['branch_id_list']:
-        print('\nProcessing branch IDs: {}'.format(','.join([ str(bid) for bid in branch_ids ])), flush=True)
-        if len(branch_ids)==1:
-            print('Single branch mode. Substitutions, rather than combinatorial substitutions, will be mapped.')
-            g['single_branch_mode'] = True
-        else:
-            g['single_branch_mode'] = False
+    g = resolve_site_jobs(g)
+    for site_job in g['site_jobs']:
+        branch_ids = site_job['branch_ids']
+        g['single_branch_mode'] = site_job['single_branch_mode']
         g['branch_ids'] = branch_ids
-        g['site_outdir'] = './csubst_site.branch_id'+','.join([ str(bid) for bid in branch_ids ])
+        g['site_outdir'] = site_job['site_outdir']
+        g['mode_expression'] = site_job.get('mode_expression', g.get('mode_expression', None))
+        txt = '\nProcessing --mode {} with branch IDs: {}'
+        print(txt.format(g['mode'], ','.join([str(int(bid)) for bid in branch_ids.tolist()])), flush=True)
+        if (g.get('mode_expression', None) is not None) and (str(g.get('mode', '')).lower() == 'set'):
+            print('Set expression: {}'.format(g['mode_expression']), flush=True)
+        if g['single_branch_mode']:
+            print('Single branch mode. Substitutions, rather than combinatorial substitutions, will be mapped.')
         if not os.path.exists(g['site_outdir']):
             os.makedirs(g['site_outdir'])
         leaf_nn = [ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() if ete.is_leaf(n)]
@@ -1039,6 +1332,7 @@ def main_site(g):
         df = add_site_info(df, sub_tensor=ON_tensor, attr='N')
         df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=OS_tensor, attr='S')
         df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=ON_tensor, attr='N')
+        df = add_set_mode_columns(df=df, g=g)
         df = add_states(df, g['branch_ids'], g)
         if (g['untrimmed_cds'] is not None):
             df = add_gene_index(df, g)
