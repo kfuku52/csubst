@@ -381,17 +381,20 @@ def calibrate_dsc(cb, transformation='quantile'):
         col_omega = 'omegaC'+sub
         col_noncalibrated_dSc = 'dSC'+sub+'_nocalib'
         col_noncalibrated_omega = 'omegaC'+sub+'_nocalib'
-        dNc_values = cb.loc[:,col_dNc].replace([numpy.inf, -numpy.inf], numpy.nan)
-        if (dNc_values.shape[0]==0):
-            sys.stderr.write('dSc calibration could not be applied: {}\n'.format(sub))
+        if not all([col in cb.columns for col in [col_dNc, col_dSc, col_omega]]):
             continue
-        cb.columns = cb.columns.str.replace(col_dSc, col_noncalibrated_dSc)
-        cb.columns = cb.columns.str.replace(col_omega, col_noncalibrated_omega)
-        uncorrected_dSc_values = cb.loc[:,col_noncalibrated_dSc].replace([numpy.inf, -numpy.inf], numpy.nan)
+        dNc_values = cb.loc[:,col_dNc].replace([numpy.inf, -numpy.inf], numpy.nan)
+        uncorrected_dSc_values = cb.loc[:,col_dSc].replace([numpy.inf, -numpy.inf], numpy.nan)
         is_na = (uncorrected_dSc_values.isnull() | dNc_values.isnull())
+        if is_na.all():
+            txt = 'dSc calibration could not be applied: {} (no finite dNc/dSc pairs)\n'
+            sys.stderr.write(txt.format(sub))
+            continue
         if (is_na.sum()>0):
             txt = 'dSc calibration could not be applied to {:,}/{:,} branch combinations for {}\n'
             sys.stderr.write(txt.format(is_na.sum(), cb.shape[0], sub))
+        cb.columns = cb.columns.str.replace(col_dSc, col_noncalibrated_dSc, regex=False)
+        cb.columns = cb.columns.str.replace(col_omega, col_noncalibrated_omega, regex=False)
         dNc_values_wo_na = dNc_values[~is_na]
         uncorrected_dSc_values_wo_na = uncorrected_dSc_values[~is_na]
         ranks = stats.rankdata(uncorrected_dSc_values_wo_na)

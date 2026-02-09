@@ -88,3 +88,31 @@ def test_get_exp_state_uses_branch_distance_props():
     assert cdn[labels["A"], 0, :].sum() > 0
     numpy.testing.assert_allclose(pep[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
     numpy.testing.assert_allclose(cdn[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
+
+
+def test_calibrate_dsc_skips_substitution_class_without_finite_pairs():
+    combinatorial_substitutions = [
+        "any2any",
+        "any2spe",
+        "any2dif",
+        "dif2any",
+        "dif2spe",
+        "dif2dif",
+        "spe2any",
+        "spe2spe",
+        "spe2dif",
+    ]
+    row = {"branch_id_1": 0}
+    for sub in combinatorial_substitutions:
+        row["dNC" + sub] = numpy.nan
+        row["dSC" + sub] = numpy.nan
+        row["omegaC" + sub] = numpy.nan
+    cb = pandas.DataFrame([row])
+
+    out = omega.calibrate_dsc(cb=cb.copy())
+
+    for sub in combinatorial_substitutions:
+        assert "dSC" + sub in out.columns
+        assert "omegaC" + sub in out.columns
+        assert "dSC" + sub + "_nocalib" not in out.columns
+        assert "omegaC" + sub + "_nocalib" not in out.columns
