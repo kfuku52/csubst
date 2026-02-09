@@ -1,4 +1,5 @@
 import numpy
+import pandas
 import pytest
 
 from csubst import main_simulate
@@ -41,6 +42,57 @@ def test_is_internal_node_labeled():
     unlabeled = ete.PhyloNode("(A:1,(B:1,C:1):1)R;", format=1)
     assert tree.is_internal_node_labeled(labeled)
     assert not tree.is_internal_node_labeled(unlabeled)
+
+
+def test_plot_branch_category_writes_pdf_with_matplotlib(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    b_node = [n for n in tr.traverse() if n.name == "B"][0]
+    ete.set_prop(b_node, "color_trait", "red")
+    ete.set_prop(b_node, "labelcolor_trait", "red")
+    g = {
+        "tree": tr,
+        "fg_df": pandas.DataFrame({"lineage_id": [1], "trait": ["B"]}),
+    }
+    out_base = tmp_path / "branch_plot"
+    tree.plot_branch_category(g, file_base=str(out_base), label="all")
+    out_file = tmp_path / "branch_plot_trait.pdf"
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
+
+
+def test_plot_state_tree_writes_site_pdfs_with_matplotlib(tmp_path, monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = numpy.zeros((len(labels), 2, 2), dtype=float)
+    state[labels["A"], 0, :] = [1.0, 0.0]
+    state[labels["A"], 1, :] = [0.0, 1.0]
+    state[labels["B"], 0, :] = [0.0, 1.0]
+    state[labels["B"], 1, :] = [0.5, 0.5]  # Tie should render as missing state.
+    state[labels["C"], 0, :] = [1.0, 0.0]
+    state[labels["C"], 1, :] = [1.0, 0.0]
+    state[labels["X"], 0, :] = [0.0, 1.0]
+    state[labels["X"], 1, :] = [0.0, 0.0]  # Zero max should render as missing state.
+    g = {
+        "tree": tr,
+        "fg_df": pandas.DataFrame({"lineage_id": [1], "trait": ["B"]}),
+    }
+    monkeypatch.chdir(tmp_path)
+    tree.plot_state_tree(state=state, orders=numpy.array(["K", "N"]), mode="aa", g=g)
+    out_files = sorted(tmp_path.glob("csubst_state_trait_aa_*.pdf"))
+    assert [p.name for p in out_files] == ["csubst_state_trait_aa_1.pdf", "csubst_state_trait_aa_2.pdf"]
+    assert all(p.stat().st_size > 0 for p in out_files)
+
+
+def test_get_nice_scale_length_returns_expected_steps():
+    assert tree._get_nice_scale_length(0.0) == 1.0
+    assert pytest.approx(tree._get_nice_scale_length(1.0), rel=0, abs=1e-12) == 0.2
+    assert pytest.approx(tree._get_nice_scale_length(10.0), rel=0, abs=1e-12) == 2.0
 
 
 def test_get_pyvolve_codon_order_contains_61_sense_codons():

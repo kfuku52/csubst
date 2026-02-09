@@ -1,8 +1,8 @@
 import numpy
+import matplotlib.pyplot
 
 import copy
 import itertools
-import os
 import re
 import sys
 import time
@@ -169,130 +169,176 @@ def write_tree(tree, outfile='csubst_tree.nwk', add_numerical_label=True):
             node.name = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
     ete.write_tree(tree2, format=1, outfile=outfile)
 
-def branch_category_layout(trait_name):
-    def layout_fn(node):
-        tv = ete.get_treeview_module()
-        nstyle = tv.NodeStyle()
-        nstyle['size'] = 0
-        nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-        nstyle["hz_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
-        nstyle["vt_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
-        nlabel = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
-        nlabelFace = tv.TextFace(nlabel, fsize=4, fgcolor=ete.get_prop(node, "labelcolor_" + trait_name, "black"))
-        tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
-        node.set_style(nstyle)
-        pass
-    return layout_fn
+def _get_tree_plot_coordinates(tree):
+    root = ete.get_tree_root(tree)
+    xcoord = dict()
+    ycoord = dict()
+    leaf_order = list()
 
-def branch_category_layout_leafonly(trait_name):
-    def layout_fn(node):
-        tv = ete.get_treeview_module()
-        nstyle = tv.NodeStyle()
-        nstyle['size'] = 0
-        nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-        nstyle["hz_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
-        nstyle["vt_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
+    def assign_x(node, x):
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        xcoord[node_id] = x
+        for child in ete.get_children(node):
+            assign_x(child, x + float(child.dist or 0.0))
+
+    def assign_y(node, next_y):
+        node_id = int(ete.get_prop(node, "numerical_label"))
         if ete.is_leaf(node):
-            nlabel = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
-            nlabelFace = tv.TextFace(nlabel, fsize=4, fgcolor=ete.get_prop(node, "labelcolor_" + trait_name, "black"))
-            tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
-        node.set_style(nstyle)
-        pass
-    return layout_fn
+            ycoord[node_id] = float(next_y[0])
+            leaf_order.append(node_id)
+            next_y[0] += 1
+            return ycoord[node_id]
+        children = ete.get_children(node)
+        if len(children) == 0:
+            ycoord[node_id] = float(next_y[0])
+            next_y[0] += 1
+            return ycoord[node_id]
+        child_ys = [assign_y(child, next_y) for child in children]
+        ycoord[node_id] = float(sum(child_ys) / len(child_ys))
+        return ycoord[node_id]
 
-def branch_category_layout_nolabel(trait_name):
-    def layout_fn(node):
-        tv = ete.get_treeview_module()
-        nstyle = tv.NodeStyle()
-        nstyle['size'] = 0
-        nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-        nstyle["hz_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
-        nstyle["vt_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
-        node.set_style(nstyle)
-        pass
-    return layout_fn
+    assign_x(root, 0.0)
+    assign_y(root, [0])
+    return xcoord, ycoord, leaf_order
 
-def is_ete_plottable():
-    tv = ete.get_treeview_module()
-    if tv is None:
-        print('TreeStyle and/or NodeStyle are not available in installed ETE backend. Plotting is skipped.', flush=True)
-        return False
-    if ('DISPLAY' not in os.environ.keys()):
-        print('DISPLAY is not available. Plotting is skipped.', flush=True)
-        return False
-    return True
+
+def _get_nice_scale_length(max_tree_depth):
+    max_tree_depth = float(max_tree_depth)
+    if max_tree_depth <= 0:
+        return 1.0
+    target = max_tree_depth * 0.2
+    exponent = numpy.floor(numpy.log10(target))
+    base = 10 ** exponent
+    normalized = target / base
+    if normalized <= 1.5:
+        scale = 1.0
+    elif normalized <= 3.5:
+        scale = 2.0
+    elif normalized <= 7.5:
+        scale = 5.0
+    else:
+        scale = 10.0
+    return scale * base
+
+
+def _plot_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_node=None):
+    xcoord, ycoord, leaf_order = _get_tree_plot_coordinates(tree)
+    if len(xcoord) == 0:
+        return None
+
+    xvals = numpy.array(list(xcoord.values()), dtype=float)
+    yvals = numpy.array(list(ycoord.values()), dtype=float)
+    x_max = float(xvals.max()) if xvals.shape[0] else 1.0
+    if x_max <= 0:
+        x_max = 1.0
+    xpad = max(0.03, 0.012 * x_max)
+    ypad_top = 0.35
+    ypad_bottom = 0.75
+    num_leaf = max(1, len(leaf_order))
+    # Dense defaults: branch and state trees should be compact in both directions.
+    fig_height = min(28.0, max(1.4, 0.65 + num_leaf * 0.11))
+    fig_width = 5.5
+    if state_by_node is not None:
+        fig_width = 6.2
+    fig, ax = matplotlib.pyplot.subplots(figsize=(fig_width, fig_height))
+
+    for node in tree.traverse():
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        color = ete.get_prop(node, "color_" + trait_name, "black")
+        if not ete.is_leaf(node):
+            children = ete.get_children(node)
+            if len(children) > 0:
+                child_ys = [ycoord[int(ete.get_prop(child, "numerical_label"))] for child in children]
+                ax.plot([xcoord[node_id], xcoord[node_id]], [min(child_ys), max(child_ys)], color=color, lw=1.0)
+        if ete.is_root(node):
+            continue
+        parent_id = int(ete.get_prop(node.up, "numerical_label"))
+        ax.plot([xcoord[parent_id], xcoord[node_id]], [ycoord[node_id], ycoord[node_id]], color=color, lw=1.0)
+
+    for node in tree.traverse():
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        if state_by_node is None:
+            if label == 'no':
+                continue
+            if (label == 'leaf') and (not ete.is_leaf(node)):
+                continue
+            if label not in ['all', 'leaf', 'no']:
+                raise ValueError('Unknown label mode: {}'.format(label))
+            text = (node.name or '') + '|' + str(node_id)
+            font_size = 3.8
+        else:
+            state = str(state_by_node.get(node_id, '-'))
+            if ete.is_leaf(node):
+                text = state + '|' + (node.name or '')
+            else:
+                text = state
+            font_size = 5.4
+        txt_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
+        ax.text(xcoord[node_id] + xpad, ycoord[node_id], text, fontsize=font_size, color=txt_color, va='center', ha='left')
+
+    left_xlim = xvals.min() - xpad * 1.5
+    right_xlim = xvals.max() + xpad * 4.0
+    ax.set_xlim(left_xlim, right_xlim)
+    ax.set_ylim(yvals.min() - ypad_top, yvals.max() + ypad_bottom)
+
+    scale_length = _get_nice_scale_length(x_max)
+    scale_x_start = left_xlim + (right_xlim - left_xlim) * 0.03
+    scale_x_end = scale_x_start + scale_length
+    if scale_x_end > (x_max * 0.95):
+        scale_length = _get_nice_scale_length(x_max * 0.5)
+        scale_x_end = scale_x_start + scale_length
+    scale_y = yvals.max() + ypad_bottom * 0.38
+    scale_tick = 0.07
+    ax.plot([scale_x_start, scale_x_end], [scale_y, scale_y], color='black', linewidth=1.0, zorder=5)
+    ax.plot([scale_x_start, scale_x_start], [scale_y - scale_tick, scale_y + scale_tick], color='black', linewidth=1.0, zorder=5)
+    ax.plot([scale_x_end, scale_x_end], [scale_y - scale_tick, scale_y + scale_tick], color='black', linewidth=1.0, zorder=5)
+    ax.text((scale_x_start + scale_x_end) / 2, scale_y + 0.2, '{:g}'.format(scale_length), va='top', ha='center', fontsize=4.2, color='black')
+
+    ax.invert_yaxis()
+    ax.axis('off')
+    fig.tight_layout()
+    fig.savefig(file_name, format='pdf', transparent=True, dpi=300)
+    matplotlib.pyplot.close(fig)
+    return None
 
 def plot_branch_category(g, file_base, label='all'):
-    if not is_ete_plottable():
-        return None
-    tv = ete.get_treeview_module()
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
     for trait_name in trait_names:
-        ts = tv.TreeStyle()
-        ts.mode = 'r'
-        ts.show_leaf_name = False
-        if label=='all':
-            ts.layout_fn = branch_category_layout(trait_name)
-            ts.branch_vertical_margin = 0
-        elif label=='leaf':
-            ts.layout_fn = branch_category_layout_leafonly(trait_name)
-            ts.branch_vertical_margin = 0
-        elif label=='no':
-            ts.layout_fn = branch_category_layout_nolabel(trait_name)
-            ts.branch_vertical_margin = 1
         file_name = file_base+'_'+trait_name+'.pdf'
         file_name = file_name.replace('_PLACEHOLDER', '')
-        g['tree'].render(file_name=file_name, tree_style=ts, units='mm', w=172)
-
-def branch_state_layout(trait_name):
-    def layout_fn(node):
-        tv = ete.get_treeview_module()
-        nstyle = tv.NodeStyle()
-        nstyle['size'] = 0
-        nstyle["hz_line_width"] = nstyle["vt_line_width"] = 1
-        nstyle["hz_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
-        nstyle["vt_line_color"] = ete.get_prop(node, "color_" + trait_name, "black")
-        if ete.is_leaf(node):
-            nlabel = str(ete.get_prop(node, "state", "-")) + '|' + (node.name or '')
-        else:
-            nlabel = str(ete.get_prop(node, "state", "-"))
-        nlabelFace = tv.TextFace(nlabel, fsize=6, fgcolor=ete.get_prop(node, "labelcolor_" + trait_name, "black"))
-        tv.add_face_to_node(face=nlabelFace, node=node, column=1, aligned=False, position="branch-right")
-        node.set_style(nstyle)
-        pass
-    return layout_fn
+        _plot_tree_matplotlib(tree=g['tree'], trait_name=trait_name, file_name=file_name, label=label, state_by_node=None)
 
 def plot_state_tree(state, orders, mode, g):
     print('Writing ancestral state trees: mode = {}, number of pdf files = {}'.format(mode, state.shape[1]), flush=True)
-    if not is_ete_plottable():
-        return None
-    tv = ete.get_treeview_module()
     if mode=='codon':
         missing_state = '---'
     else:
         missing_state = '-'
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
     for trait_name in trait_names:
-        ts = tv.TreeStyle()
-        ts.mode = 'r'
-        ts.show_leaf_name = False
-        ts.layout_fn = branch_state_layout(trait_name)
         ndigit = int(numpy.log10(state.shape[1]))+1
         for i in numpy.arange(state.shape[1]):
+            state_by_node = dict()
             for node in g['tree'].traverse():
+                node_id = int(ete.get_prop(node, "numerical_label"))
                 if ete.is_root(node):
-                    ete.set_prop(node, "state", missing_state)
+                    state_by_node[node_id] = missing_state
                     continue
-                nlabel = ete.get_prop(node, "numerical_label")
-                max_prob = max(state[nlabel,i,:])
-                index = numpy.where(state[nlabel,i,:]==max_prob)[0]
-                if len(index)==1:
-                    ete.set_prop(node, "state", orders[index[0]])
-                elif (len(index)==0)|(max_prob==0):
-                    ete.set_prop(node, "state", missing_state)
+                max_prob = float(state[node_id,i,:].max())
+                index = numpy.where(state[node_id,i,:]==max_prob)[0]
+                if (len(index)==1) and (max_prob > 0):
+                    state_by_node[node_id] = orders[index[0]]
+                else:
+                    state_by_node[node_id] = missing_state
             file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
             file_name = file_name.replace('_PLACEHOLDER', '')
-            g['tree'].render(file_name=file_name, tree_style=ts, units='px', dpi=300)
+            _plot_tree_matplotlib(
+                tree=g['tree'],
+                trait_name=trait_name,
+                file_name=file_name,
+                label='all',
+                state_by_node=state_by_node,
+            )
 
 def get_num_adjusted_sites(g, node):
     nl = ete.get_prop(node, "numerical_label")

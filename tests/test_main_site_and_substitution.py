@@ -124,6 +124,23 @@ def test_classify_tree_site_categories_prefers_larger_signal():
     assert out["tree_site_category"].tolist() == ["convergent", "divergent", "blank", "divergent"]
 
 
+def test_get_tree_site_display_sites_respects_max_sites_when_one():
+    tree_site_df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [10, 20, 30, 40],
+            "convergent_score": [0.8, 0.7, 0.0, 0.0],
+            "divergent_score": [0.0, 0.0, 0.9, 0.6],
+            "tree_site_category": ["convergent", "convergent", "divergent", "divergent"],
+        }
+    )
+    g = {"tree_site_plot_max_sites": 1}
+    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    plotted = [item for item in out if item["site"] is not None]
+    assert len(plotted) == 1
+    assert plotted[0]["site"] == 30
+    assert plotted[0]["category"] == "divergent"
+
+
 def test_get_tree_plot_coordinates_returns_expected_root_and_leaf_positions(tiny_tree):
     xcoord, ycoord, leaf_order = main_site.get_tree_plot_coordinates(tiny_tree)
     root = ete.get_tree_root(tiny_tree)

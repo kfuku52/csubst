@@ -162,6 +162,13 @@ def test_get_codon_order_index_reorders_positions():
     numpy.testing.assert_array_equal(out, [1, 2, 0])
 
 
+def test_get_codon_order_index_raises_on_missing_codon():
+    order_from = numpy.array(["AAA", "AAC", "AAG"])
+    order_to = numpy.array(["AAA", "AAC", "XXX"])
+    with pytest.raises(ValueError, match="missing"):
+        parser_misc.get_codon_order_index(order_from, order_to)
+
+
 def test_get_exchangeability_codon_order_shape_and_no_stops():
     codons = parser_misc.get_exchangeability_codon_order()
     assert codons.shape == (61,)

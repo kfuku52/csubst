@@ -623,7 +623,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         out_path = os.path.join(g['site_outdir'], outfile)
         df_ad.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         output_paths.append(out_path)
-        df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '→' + df_ad.loc[:,'state_to']
+        df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '->' + df_ad.loc[:,'state_to']
         ax = axes[0,ax_col]
         ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'all'], color='black')
         ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'target'], color=color)
@@ -752,8 +752,22 @@ def get_tree_site_display_sites(tree_site_df, g):
         return display_meta
 
     if (convergent_df.shape[0] > 0) and (divergent_df.shape[0] > 0):
-        max_conv = max(1, max_sites // 2)
-        max_div = max(1, max_sites - max_conv)
+        if max_sites == 1:
+            # Respect max-sites strictly while still preferring the strongest signal.
+            best_conv = float(convergent_df.iloc[0, :].loc['convergent_score'])
+            best_div = float(divergent_df.iloc[0, :].loc['divergent_score'])
+            if best_div > best_conv:
+                max_conv = 0
+                max_div = 1
+            else:
+                max_conv = 1
+                max_div = 0
+        else:
+            max_conv = max(1, max_sites // 2)
+            max_div = max_sites - max_conv
+            if max_div < 1:
+                max_div = 1
+                max_conv = max_sites - 1
     elif convergent_df.shape[0] > 0:
         max_conv = max_sites
         max_div = 0
@@ -846,10 +860,11 @@ def plot_tree_site(df, g):
 
     num_display_site = max(len(display_meta), 1)
     num_leaf = max(len(leaf_order), 1)
-    tree_panel_width = min(max(6.4, 5.0 + x_max * 0.55), 14.0)
-    site_panel_width = min(max(1.8, num_display_site * 0.15), 8.5)
+    # Dense defaults for compact tree/site output.
+    tree_panel_width = min(max(5.0, 4.2 + x_max * 0.42), 10.0)
+    site_panel_width = min(max(1.6, num_display_site * 0.12), 6.5)
     fig_width = tree_panel_width + site_panel_width
-    fig_height = min(max(3.2, num_leaf * 0.18 + 0.7), 11.0)
+    fig_height = min(max(2.5, num_leaf * 0.13 + 0.55), 8.5)
     fg_color = 'firebrick'
     bg_branch_color = '#4d4d4d'
     bg_label_color = '#5f6f7f'
@@ -915,7 +930,7 @@ def plot_tree_site(df, g):
     if len(leaf_order):
         ax_tree.set_ylim(len(leaf_order)-0.5, -0.5)
     left_xlim = -root_stub * 1.5
-    right_xlim = x_max * 1.30 + 0.35
+    right_xlim = x_max * 1.22 + 0.22
     ax_tree.set_xlim(left_xlim, right_xlim)
 
     scale_length = get_nice_scale_length(x_max)

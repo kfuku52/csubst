@@ -308,11 +308,19 @@ def read_exchangeability_matrix(file, codon_orders):
 def get_codon_order_index(order_from, order_to):
     assert len(order_from)==len(order_to), 'Codon order lengths should match. Emprical codon substitution models are currently supported only for the Standard codon table.'
     out = list()
+    missing = list()
     for fr in order_from:
+        found = False
         for i,to in enumerate(order_to):
             if fr==to:
                 out.append(i)
+                found = True
                 break
+        if not found:
+            missing.append(fr)
+    if len(missing) > 0:
+        txt = 'Codons were missing in target order: {}'
+        raise ValueError(txt.format(', '.join(missing)))
     out = numpy.array(out)
     return out
 
