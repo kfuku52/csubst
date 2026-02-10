@@ -14,6 +14,7 @@ from csubst import ete
 TREE_FIG_MIN_HEIGHT = 1.8
 TREE_FIG_HEIGHT_PER_LEAF = 0.10
 TREE_FIG_MAX_HEIGHT = 28.0
+TREE_LINE_CAPSTYLE = 'round'
 
 def add_numerical_node_labels(tree):
     all_leaf_names = ete.get_leaf_names(tree)
@@ -276,8 +277,8 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
         x_node = xcoord[id(node)]
         y_node = ycoord[id(node)]
         v_color,h_color = _get_branch_segment_colors(node=node, trait_name=trait_name)
-        ax.plot([x_parent, x_parent], [y_parent, y_node], color=v_color, linewidth=0.8, solid_capstyle='butt')
-        ax.plot([x_parent, x_node], [y_node, y_node], color=h_color, linewidth=0.8, solid_capstyle='butt')
+        ax.plot([x_parent, x_parent], [y_parent, y_node], color=v_color, linewidth=0.8, solid_capstyle=TREE_LINE_CAPSTYLE)
+        ax.plot([x_parent, x_node], [y_node, y_node], color=h_color, linewidth=0.8, solid_capstyle=TREE_LINE_CAPSTYLE)
     xmax = max(xcoord.values()) if len(xcoord)>0 else 0.0
     xspan = max(xmax, 1.0)
     text_offset = xspan * 0.015
@@ -323,6 +324,9 @@ def plot_branch_category(g, file_base, label='all'):
 def plot_state_tree(state, orders, mode, g):
     print('Writing ancestral state trees: mode = {}, number of pdf files = {}'.format(mode, state.shape[1]), flush=True)
     if not is_ete_plottable():
+        return None
+    if state.shape[1] == 0:
+        print('No sites available for ancestral state tree plotting. Skipping.', flush=True)
         return None
     if mode=='codon':
         missing_state = '---'
@@ -416,20 +420,31 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
             #prop_N = adjusted_site_N / (adjusted_site_S + adjusted_site_N)
             #prop_S = num_S_sub / (num_S_sub + num_N_sub)
             #prop_N = num_N_sub / (num_S_sub + num_N_sub)
-            adjusted_num_S_sub = num_S_sub / adjusted_site_S
-            adjusted_num_N_sub = num_N_sub / adjusted_site_N
-            prop_S = adjusted_num_S_sub / (adjusted_num_S_sub + adjusted_num_N_sub)
-            prop_N = adjusted_num_N_sub / (adjusted_num_S_sub + adjusted_num_N_sub)
-            if num_S_sub<g['float_tol']:
-                sdist = 0
+            if adjusted_site_S <= g['float_tol']:
+                adjusted_num_S_sub = 0
             else:
-                sdist = node.dist * prop_S
-                #node.Sdist = adjusted_site_S / prop_S
-            if num_S_sub<g['float_tol']:
+                adjusted_num_S_sub = num_S_sub / adjusted_site_S
+            if adjusted_site_N <= g['float_tol']:
+                adjusted_num_N_sub = 0
+            else:
+                adjusted_num_N_sub = num_N_sub / adjusted_site_N
+            denom = adjusted_num_S_sub + adjusted_num_N_sub
+            if denom <= g['float_tol']:
+                sdist = 0
                 ndist = 0
             else:
-                ndist = node.dist * prop_N
-                #node.Ndist = adjusted_site_N / prop_N
+                prop_S = adjusted_num_S_sub / denom
+                prop_N = adjusted_num_N_sub / denom
+                if num_S_sub<g['float_tol']:
+                    sdist = 0
+                else:
+                    sdist = node.dist * prop_S
+                    #node.Sdist = adjusted_site_S / prop_S
+                if num_N_sub<g['float_tol']:
+                    ndist = 0
+                else:
+                    ndist = node.dist * prop_N
+                    #node.Ndist = adjusted_site_N / prop_N
             ete.set_prop(node, "Sdist", sdist)
             ete.set_prop(node, "Ndist", ndist)
             ete.set_prop(node, "SNdist", sdist + ndist)
@@ -446,7 +461,9 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
     return g
 
 def read_treefile(g):
-    g['rooted_tree'] = ete.PhyloNode(g['rooted_tree_file'], format=1)
+    with open(g['rooted_tree_file']) as f:
+        rooted_newick = f.read()
+    g['rooted_tree'] = ete.PhyloNode(rooted_newick, format=1)
     assert len(ete.get_children(g['rooted_tree']))==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
     g['rooted_tree'] = standardize_node_names(g['rooted_tree'])
     g['rooted_tree'] = add_numerical_node_labels(g['rooted_tree'])

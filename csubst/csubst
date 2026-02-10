@@ -1,7 +1,9 @@
 #! /usr/bin/env python
 
 import argparse
+import contextlib
 import datetime
+import sys
 import time
 from distutils.util import strtobool
 
@@ -48,7 +50,7 @@ def command_analyze(args):
     print('csubst analyze: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst analyze end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
-if __name__ == "__main__":
+def _main():
     # Start time
     csubst_start = time.time()
     print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
@@ -387,3 +389,9 @@ if __name__ == "__main__":
     # End time
     txt = '\nCSUBST end: {}, Elapsed time = {:,.1f} sec'
     print(txt.format(datetime.datetime.now(datetime.timezone.utc), int(time.time()-csubst_start)), flush=True)
+
+
+if __name__ == "__main__":
+    with open('csubst.log', 'w', buffering=1, encoding='utf-8') as log_file:
+        with contextlib.redirect_stdout(log_file), contextlib.redirect_stderr(log_file):
+            _main()

@@ -99,6 +99,7 @@ def read_input(g):
 def get_mechanistic_instantaneous_rate_matrix(g):
     num_codon = len(g['codon_orders'])
     inst = numpy.ones(shape=(num_codon,num_codon))
+    transition_pairs = {'AG', 'GA', 'CT', 'TC'}
     for i1,c1 in enumerate(g['codon_orders']):
         for i2,c2 in enumerate(g['codon_orders']):
             num_diff_codon_position = sum([ cp1!=cp2 for cp1,cp2 in zip(c1,c2) ])
@@ -116,7 +117,7 @@ def get_mechanistic_instantaneous_rate_matrix(g):
                 num_diff_codon_position = sum([ cp1!=cp2 for cp1,cp2 in zip(c1,c2) ])
                 if (num_diff_codon_position==1):
                     diff_nucs = [ cp1+cp2 for cp1,cp2 in zip(c1,c2) if cp1!=cp2 ][0]
-                    if all([ (dn in ['A','G'])|(dn in ['C','T']) for dn in diff_nucs ]):
+                    if diff_nucs in transition_pairs:
                         inst[i1,i2] *= g['kappa'] # multiply kappa to transition substitutions
     inst = inst.dot(numpy.diag(g['equilibrium_frequency'])).astype(g['float_type']) # pi_j * q_ij
     inst = scale_instantaneous_rate_matrix(inst, g['equilibrium_frequency'])
@@ -132,9 +133,11 @@ def fill_instantaneous_rate_matrix_diagonal(inst):
 def scale_instantaneous_rate_matrix(inst, eq):
     # scaling to satisfy Sum_i Sum_j!=i pi_i*q_ij, equals 1.
     # See Kosiol et al. 2007. https://academic.oup.com/mbe/article/24/7/1464/986344
-    assert inst[0,0]==0, 'Diagonal elements should still be zeros.'
+    diagonal = numpy.diag(inst)
+    assert numpy.all(numpy.isclose(diagonal, 0)), 'Diagonal elements should still be zeros.'
     q_ijxpi_i = numpy.einsum('ad,a->ad', inst, eq)
     scaling_factor = q_ijxpi_i.sum()
+    assert scaling_factor > 0, 'Instantaneous rate matrix scaling factor must be positive.'
     inst /= scaling_factor
     return inst
 
@@ -307,13 +310,18 @@ def read_exchangeability_matrix(file, codon_orders):
 
 def get_codon_order_index(order_from, order_to):
     assert len(order_from)==len(order_to), 'Codon order lengths should match. Emprical codon substitution models are currently supported only for the Standard codon table.'
-    out = list()
-    for fr in order_from:
-        for i,to in enumerate(order_to):
-            if fr==to:
-                out.append(i)
-                break
-    out = numpy.array(out)
+    index_by_codon = dict()
+    for i,to in enumerate(order_to):
+        if to in index_by_codon:
+            raise AssertionError('Duplicate codon found in target order: {}'.format(to))
+        index_by_codon[to] = i
+    missing = [fr for fr in order_from if fr not in index_by_codon]
+    if len(missing) > 0:
+        missing_txt = ','.join(missing[:10])
+        if len(missing) > 10:
+            missing_txt += ',...'
+        raise AssertionError('Codon(s) from source order not found in target order: {}'.format(missing_txt))
+    out = numpy.array([index_by_codon[fr] for fr in order_from], dtype=int)
     return out
 
 def get_exchangeability_codon_order():
@@ -343,7 +351,9 @@ def read_exchangeability_eq_freq(file, g):
 
 def annotate_tree(g, ignore_tree_inconsistency=False):
     g['node_label_tree_file'] = g['iqtree_treefile']
-    g['node_label_tree'] = ete.PhyloNode(g['node_label_tree_file'], format=1)
+    with open(g['node_label_tree_file']) as f:
+        node_label_tree_newick = f.read()
+    g['node_label_tree'] = ete.PhyloNode(node_label_tree_newick, format=1)
     g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
     is_consistent_tree = tree.is_consistent_tree(tree1=g['node_label_tree'], tree2=g['rooted_tree'])
     if is_consistent_tree:

@@ -26,8 +26,11 @@ def combinations_count(n, r):
     return numer // denom
 
 def get_df_clade_size(g, trait_name):
-    num_branch = max([ ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() ])
-    branch_ids = numpy.arange(num_branch)
+    branch_ids = sorted([
+        int(ete.get_prop(n, "numerical_label"))
+        for n in g['tree'].traverse()
+        if not ete.is_root(n)
+    ])
     cols = ['branch_id','size','is_fg_stem_'+trait_name]
     df_clade_size = pandas.DataFrame(index=branch_ids, columns=cols)
     df_clade_size.loc[:,'branch_id'] = branch_ids
@@ -192,31 +195,48 @@ def get_target_ids(lineages, trait_name, g):
             dif = len(lineage_fg_ids) - num_id
         lineage_fg_ids = numpy.array(lineage_fg_ids, dtype=numpy.int64)
         target_ids = numpy.concatenate([target_ids, lineage_fg_ids])
-    target_id = target_ids[target_ids != ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label")]
-    target_id.sort()
+    root_id = ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label")
+    target_ids = target_ids[target_ids != root_id]
+    target_ids.sort()
     return target_ids
 
 def annotate_foreground(lineages, trait_name, g):
     for node in g['tree'].traverse(): # Initialize
         ete.add_features(node, **{'is_fg_'+trait_name: False})
+        ete.add_features(node, **{'foreground_lineage_id_' + trait_name: 0})
         ete.add_features(node, **{'color_'+trait_name: 'black'})
         ete.add_features(node, **{'labelcolor_' + trait_name: 'black'})
     lineage_colors = get_lineage_color_list()
     for i in numpy.arange(len(lineages)):
         fg_leaf_name_set = set(g['fg_leaf_names'][trait_name][i])
         lineage_color = lineage_colors[i % len(lineage_colors)]
+        lineage_prop = 'is_lineage_fg_' + trait_name + '_' + str(i + 1)
+        lineage_target_ids = set()
+        for node in g['tree'].traverse():
+            if ete.is_root(node):
+                continue
+            is_lineage_fg = ete.get_prop(node, lineage_prop, False)
+            if not is_lineage_fg:
+                continue
+            if g['fg_stem_only']:
+                is_parent_lineage_fg = ete.get_prop(node.up, lineage_prop, False)
+                if is_parent_lineage_fg:
+                    continue
+            lineage_target_ids.add(ete.get_prop(node, "numerical_label"))
         for node in g['tree'].traverse():
             if g['fg_stem_only']:
-                if ete.get_prop(node, "numerical_label") in g['target_ids'][trait_name]:
+                if ete.get_prop(node, "numerical_label") in lineage_target_ids:
                     ete.add_features(node, **{'is_fg_'+trait_name: True})
+                    ete.add_features(node, **{'foreground_lineage_id_' + trait_name: int(i + 1)})
                     ete.add_features(node, **{'color_'+trait_name: lineage_color})
                     ete.add_features(node, **{'labelcolor_'+trait_name: lineage_color})
                 if node.name in fg_leaf_name_set:
                     ete.add_features(node, **{'labelcolor_' + trait_name: lineage_color})
             else:
-                is_lineage_fg = ete.get_prop(node, 'is_lineage_fg_' + trait_name + '_' + str(i + 1), False)
+                is_lineage_fg = ete.get_prop(node, lineage_prop, False)
                 if is_lineage_fg == True:
                     ete.add_features(node, **{'is_fg_' + trait_name: True})
+                    ete.add_features(node, **{'foreground_lineage_id_' + trait_name: int(i + 1)})
                     ete.add_features(node, **{'color_' + trait_name: lineage_color})
                     ete.add_features(node, **{'labelcolor_' + trait_name: lineage_color})
     return g['tree']
@@ -266,6 +286,7 @@ def dummy_foreground_annotation(tree, trait_name):
     for node in tree.traverse():
         ete.add_features(node, **{'is_lineage_fg_' + trait_name + '_1': False})
         ete.add_features(node, **{'is_fg_' + trait_name: False})
+        ete.add_features(node, **{'foreground_lineage_id_' + trait_name: 0})
         ete.add_features(node, **{'color_' + trait_name: 'black'})
         ete.add_features(node, **{'labelcolor_' + trait_name: 'black'})
     return tree
@@ -436,11 +457,20 @@ def annotate_b_foreground(b, g):
 
 def get_num_foreground_lineages(tree, trait_name):
     num_fl = 0
+    prefix = 'is_lineage_fg_' + trait_name + '_'
     for node in tree.traverse():
-        for k in node.__dict__.keys():
-            if k.startswith('is_lineage_fg_'+trait_name):
-                num_fl = max(num_fl, int(k.replace('is_lineage_fg_'+trait_name+'_', '')))
-        break
+        if hasattr(node, 'props'):
+            keys = node.props.keys()
+        elif hasattr(node, '__dict__'):
+            keys = node.__dict__.keys()
+        else:
+            keys = []
+        for key in keys:
+            if not key.startswith(prefix):
+                continue
+            suffix = key[len(prefix):]
+            if suffix.isdigit():
+                num_fl = max(num_fl, int(suffix))
     return num_fl
 
 def set_random_foreground_branch(g, trait_name, num_trial=100, sample_original_foreground=False):

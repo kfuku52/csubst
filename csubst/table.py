@@ -1,6 +1,7 @@
 import numpy
 import pandas
 
+import re
 import sys
 import time
 
@@ -94,12 +95,9 @@ def chisq_test(x, total_S, total_N):
         return out[1]
 
 def get_cutoff_stat_bool_array(cb, cutoff_stat_str):
+    cutoff_stat_entries = parse_cutoff_stat(cutoff_stat_str=cutoff_stat_str)
     is_enough_stat = True
-    cutoff_stat_list = [ s.replace('\'', '').replace('\"', '') for s in cutoff_stat_str.split('|') ]
-    for cutoff_stat in cutoff_stat_list:
-        cutoff_stat_list2 = cutoff_stat.split(',')
-        cutoff_stat_exp = cutoff_stat_list2[0]
-        cutoff_stat_value = float(cutoff_stat_list2[1])
+    for cutoff_stat_exp,cutoff_stat_value in cutoff_stat_entries:
         is_col = cb.columns.str.fullmatch(cutoff_stat_exp, na=False)
         if is_col.sum()==0:
             txt = 'The column "{}" was not found in the cb table. '
@@ -110,3 +108,78 @@ def get_cutoff_stat_bool_array(cb, cutoff_stat_str):
         for cutoff_stat_col in cutoff_stat_cols:
             is_enough_stat &= (cb.loc[:,cutoff_stat_col] >= cutoff_stat_value).fillna(False)
     return is_enough_stat
+
+
+def _split_cutoff_stat_tokens(cutoff_stat_str):
+    text = str(cutoff_stat_str)
+    tokens = []
+    current = []
+    depth_paren = 0
+    depth_bracket = 0
+    depth_brace = 0
+    escaped = False
+    for ch in text:
+        if escaped:
+            current.append(ch)
+            escaped = False
+            continue
+        if ch == '\\':
+            current.append(ch)
+            escaped = True
+            continue
+        if ch == '(':
+            depth_paren += 1
+        elif ch == ')' and depth_paren > 0:
+            depth_paren -= 1
+        elif ch == '[':
+            depth_bracket += 1
+        elif ch == ']' and depth_bracket > 0:
+            depth_bracket -= 1
+        elif ch == '{':
+            depth_brace += 1
+        elif ch == '}' and depth_brace > 0:
+            depth_brace -= 1
+        if (ch == '|') and (depth_paren == 0) and (depth_bracket == 0) and (depth_brace == 0):
+            tokens.append(''.join(current).strip())
+            current = []
+            continue
+        current.append(ch)
+    tokens.append(''.join(current).strip())
+    return tokens
+
+
+def parse_cutoff_stat(cutoff_stat_str):
+    cutoff_stat_entries = []
+    cutoff_stat_list = [s.replace('\'', '').replace('\"', '').strip() for s in _split_cutoff_stat_tokens(cutoff_stat_str)]
+    for cutoff_stat in cutoff_stat_list:
+        if cutoff_stat == '':
+            continue
+        cutoff_stat_list2 = cutoff_stat.rsplit(',', 1)
+        if len(cutoff_stat_list2) != 2:
+            txt = 'Invalid --cutoff_stat token "{}". Expected "COLUMN_OR_REGEX,VALUE". Exiting.\n'
+            sys.stderr.write(txt.format(cutoff_stat))
+            sys.exit(1)
+        cutoff_stat_exp = cutoff_stat_list2[0].strip()
+        cutoff_stat_value_txt = cutoff_stat_list2[1].strip()
+        if (cutoff_stat_exp == '') or (cutoff_stat_value_txt == ''):
+            txt = 'Invalid --cutoff_stat token "{}". Empty column/regex or value is not allowed. Exiting.\n'
+            sys.stderr.write(txt.format(cutoff_stat))
+            sys.exit(1)
+        try:
+            re.compile(cutoff_stat_exp)
+        except re.error:
+            txt = 'Invalid cutoff regex "{}" in token "{}". Exiting.\n'
+            sys.stderr.write(txt.format(cutoff_stat_exp, cutoff_stat))
+            sys.exit(1)
+        try:
+            cutoff_stat_value = float(cutoff_stat_value_txt)
+        except ValueError:
+            txt = 'Invalid cutoff value "{}" in token "{}". Exiting.\n'
+            sys.stderr.write(txt.format(cutoff_stat_value_txt, cutoff_stat))
+            sys.exit(1)
+        cutoff_stat_entries.append((cutoff_stat_exp, cutoff_stat_value))
+    if len(cutoff_stat_entries) == 0:
+        txt = 'No valid --cutoff_stat token was found in "{}". Exiting.\n'
+        sys.stderr.write(txt.format(cutoff_stat_str))
+        sys.exit(1)
+    return cutoff_stat_entries

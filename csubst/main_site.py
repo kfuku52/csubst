@@ -16,6 +16,7 @@ from csubst import tree
 from csubst import ete
 
 font_size = 8
+TREE_LINE_CAPSTYLE = 'round'
 matplotlib.rcParams['font.size'] = font_size
 matplotlib.rcParams['font.family'] = 'sans-serif'
 matplotlib.rcParams['font.sans-serif'] = ['Helvetica', 'Arial', 'Nimbus Sans', 'DejaVu Sans']
@@ -44,6 +45,8 @@ def get_state(node, g):
 
 def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
     x_values = df.loc[:,xcol].values - 0.5
+    if x_values.size == 0:
+        return None
     y_values = numpy.ones(x_values.shape) * yvalue
     gap_values = df.loc[:,gapcol].values
     bars = dict()
@@ -673,12 +676,16 @@ def add_site_stats(df_ad, sub_tensor, g, mode, method='tau'):
                     current_row += 1
                     continue
                 if (method=='tau'):
-                    x_max = x_values.max()
-                    x_hat = x_values / x_max
-                    value = (1-x_hat).sum() / (x_values.shape[0] - 1)
+                    if x_values.shape[0] <= 1:
+                        value = 0.0
+                    else:
+                        x_max = x_values.max()
+                        x_hat = x_values / x_max
+                        value = (1-x_hat).sum() / (x_values.shape[0] - 1)
                 elif (method=='hg'):
                     pi = x_values / x_values.sum()
-                    value = - (pi * numpy.log2(pi)).sum()
+                    pi = pi[pi > 0]
+                    value = - (pi * numpy.log2(pi)).sum() if pi.shape[0] > 0 else 0.0
                 elif (method=='tsi'):
                     value = x_values.max() / x_values.sum()
                 elif (method.startswith('rank')):
@@ -892,8 +899,10 @@ def get_tree_site_display_sites(tree_site_df, g):
     convergent_df = convergent_df.sort_values(by=['convergent_score', 'codon_site_alignment'], ascending=[False, True])
     divergent_df = tree_site_df.loc[tree_site_df.loc[:, 'tree_site_category']=='divergent',:]
     divergent_df = divergent_df.sort_values(by=['divergent_score', 'codon_site_alignment'], ascending=[False, True])
+    num_convergent = int(convergent_df.shape[0])
+    num_divergent = int(divergent_df.shape[0])
 
-    if (convergent_df.shape[0] + divergent_df.shape[0]) == 0:
+    if (num_convergent + num_divergent) == 0:
         fallback = tree_site_df.copy()
         fallback.loc[:, 'max_score'] = fallback.loc[:, ['convergent_score', 'divergent_score']].max(axis=1)
         fallback = fallback.sort_values(by=['max_score', 'codon_site_alignment'], ascending=[False, True])
@@ -902,15 +911,37 @@ def get_tree_site_display_sites(tree_site_df, g):
         display_meta = [{'site': int(site), 'category': 'blank'} for site in display_sites]
         return display_meta
 
-    if (convergent_df.shape[0] > 0) and (divergent_df.shape[0] > 0):
-        max_conv = max(1, max_sites // 2)
-        max_div = max(1, max_sites - max_conv)
-    elif convergent_df.shape[0] > 0:
-        max_conv = max_sites
-        max_div = 0
+    if (num_convergent > 0) and (num_divergent > 0):
+        if max_sites == 1:
+            top_conv = float(convergent_df.iloc[0, :].loc['convergent_score'])
+            top_div = float(divergent_df.iloc[0, :].loc['divergent_score'])
+            if top_conv >= top_div:
+                max_conv,max_div = 1,0
+            else:
+                max_conv,max_div = 0,1
+        else:
+            max_conv = max_sites // 2
+            max_div = max_sites - max_conv
+            if max_conv == 0:
+                max_conv,max_div = 1,max_sites-1
+            if max_div == 0:
+                max_conv,max_div = max_sites-1,1
     else:
-        max_conv = 0
-        max_div = max_sites
+        if num_convergent > 0:
+            max_conv,max_div = max_sites,0
+        else:
+            max_conv,max_div = 0,max_sites
+
+    max_conv = min(max_conv, num_convergent)
+    max_div = min(max_div, num_divergent)
+    remaining = max_sites - (max_conv + max_div)
+    if remaining > 0:
+        add_conv = min(remaining, num_convergent - max_conv)
+        max_conv += add_conv
+        remaining -= add_conv
+    if remaining > 0:
+        add_div = min(remaining, num_divergent - max_div)
+        max_div += add_div
 
     convergent_sites = convergent_df.iloc[:max_conv, :].loc[:, 'codon_site_alignment'].astype(int).tolist()
     divergent_sites = divergent_df.iloc[:max_div, :].loc[:, 'codon_site_alignment'].astype(int).tolist()
@@ -921,16 +952,16 @@ def get_tree_site_display_sites(tree_site_df, g):
     return display_meta
 
 def get_highlight_leaf_and_branch_ids(tree, branch_ids):
+    target_branch_ids = set([int(bid) for bid in branch_ids])
     highlight_branch_ids = set()
     highlight_leaf_ids = set()
     for node in tree.traverse():
         node_id = int(ete.get_prop(node, "numerical_label"))
-        if node_id not in branch_ids:
+        if node_id not in target_branch_ids:
             continue
-        for desc in node.traverse():
-            highlight_branch_ids.add(int(ete.get_prop(desc, "numerical_label")))
-        for leaf in ete.get_leaves(node):
-            highlight_leaf_ids.add(int(ete.get_prop(leaf, "numerical_label")))
+        highlight_branch_ids.add(node_id)
+        if ete.is_leaf(node):
+            highlight_leaf_ids.add(node_id)
     return highlight_leaf_ids,highlight_branch_ids
 
 def get_leaf_state_letter(g, leaf_id, codon_site_alignment):
@@ -1024,7 +1055,7 @@ def plot_tree_site(df, g):
             color = fg_color if is_target else bg_branch_color
             linewidth = 2.0 if is_target else 0.8
             ax_tree.plot([xcoord[node_id], xcoord[node_id]], [ycoord[node_id], ycoord[child_id]],
-                         color=color, linewidth=linewidth, zorder=1)
+                         color=color, linewidth=linewidth, zorder=1, solid_capstyle=TREE_LINE_CAPSTYLE)
 
     for node in g['tree'].traverse():
         if ete.is_root(node):
@@ -1035,14 +1066,14 @@ def plot_tree_site(df, g):
         color = fg_color if is_target else bg_branch_color
         linewidth = 2.0 if is_target else 0.8
         ax_tree.plot([xcoord[parent_id], xcoord[node_id]], [ycoord[node_id], ycoord[node_id]],
-                     color=color, linewidth=linewidth, zorder=2)
+                     color=color, linewidth=linewidth, zorder=2, solid_capstyle=TREE_LINE_CAPSTYLE)
 
     root = ete.get_tree_root(g['tree'])
     root_id = int(ete.get_prop(root, "numerical_label"))
     root_stub = max(x_max * 0.03, 0.03)
     root_color = fg_color if (root_id in highlight_branch_ids) else bg_branch_color
     ax_tree.plot([-root_stub, xcoord[root_id]], [ycoord[root_id], ycoord[root_id]],
-                 color=root_color, linewidth=0.8, zorder=2)
+                 color=root_color, linewidth=0.8, zorder=2, solid_capstyle=TREE_LINE_CAPSTYLE)
 
     internal_label_offset = max(x_max * 0.008, 0.008)
     for node in g['tree'].traverse():
@@ -1079,9 +1110,9 @@ def plot_tree_site(df, g):
     else:
         scale_y = -0.1
     scale_tick = 0.08
-    ax_tree.plot([scale_x_start, scale_x_end], [scale_y, scale_y], color='black', linewidth=1.0, zorder=4)
-    ax_tree.plot([scale_x_start, scale_x_start], [scale_y-scale_tick, scale_y+scale_tick], color='black', linewidth=1.0, zorder=4)
-    ax_tree.plot([scale_x_end, scale_x_end], [scale_y-scale_tick, scale_y+scale_tick], color='black', linewidth=1.0, zorder=4)
+    ax_tree.plot([scale_x_start, scale_x_end], [scale_y, scale_y], color='black', linewidth=1.0, zorder=4, solid_capstyle=TREE_LINE_CAPSTYLE)
+    ax_tree.plot([scale_x_start, scale_x_start], [scale_y-scale_tick, scale_y+scale_tick], color='black', linewidth=1.0, zorder=4, solid_capstyle=TREE_LINE_CAPSTYLE)
+    ax_tree.plot([scale_x_end, scale_x_end], [scale_y-scale_tick, scale_y+scale_tick], color='black', linewidth=1.0, zorder=4, solid_capstyle=TREE_LINE_CAPSTYLE)
     ax_tree.text((scale_x_start + scale_x_end) / 2, scale_y + 0.25, '{:g}'.format(scale_length),
                  va='top', ha='center', fontsize=font_size-1, color='black')
 

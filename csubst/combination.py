@@ -20,7 +20,11 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             i += 1
 
 def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
-    rows, cols = numpy.where(numpy.equal(nc_matrix, 1))
+    col_sums = nc_matrix.sum(axis=0)
+    valid_cols = numpy.where(col_sums == arity)[0]
+    if valid_cols.shape[0] == 0:
+        return numpy.zeros(shape=(0, arity), dtype=numpy.int64)
+    rows, cols = numpy.where(numpy.equal(nc_matrix[:, valid_cols], 1))
     unique_cols = numpy.unique(cols)
     ind2  = numpy.arange(arity, dtype=numpy.int64)
     empty_id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int64)
@@ -191,12 +195,12 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             if trait_name == trait_names[0]:
                 id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
         else:
-            if (verbose & is_fg_dependent_col.sum() > 0):
+            if verbose and (is_fg_dependent_col.sum() > 0):
                 txt = 'Removing {:,} (out of {:,}) non-independent foreground branch combinations for {}.'
                 print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0], trait_name), flush=True)
-            nc_matrix = nc_matrix[:,~is_fg_dependent_col]
+            trait_nc_matrix = nc_matrix[:,~is_fg_dependent_col]
             g['fg_dependent_id_combinations'][trait_name] = numpy.array([])
-            trait_id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
+            trait_id_combinations = nc_matrix2id_combinations(trait_nc_matrix, arity, g['threads'])
             id_combinations = numpy.unique(numpy.concatenate((id_combinations, trait_id_combinations), axis=0), axis=0)
     if verbose:
         print('Time elapsed for generating branch combinations: {:,} sec'.format(int(time.time() - start)))
@@ -204,44 +208,48 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     return g,id_combinations
 
 def node_combination_subsamples_rifle(g, arity, rep):
-    all_ids = [ ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() ]
-    sub_ids = g['sub_branches']
-    all_dep_ids = g['dep_ids']
+    sub_ids = set(g['sub_branches'])
+    if (rep <= 0) or (len(sub_ids) < arity):
+        return numpy.zeros(shape=(0, arity), dtype=numpy.int64)
+
+    dep_lookup = dict()
+    for dep_group in g['dep_ids']:
+        dep_group_set = set([int(x) for x in numpy.asarray(dep_group).tolist()])
+        for node_id in dep_group_set:
+            dep_lookup.setdefault(node_id, set()).update(dep_group_set)
+
     num_fail = 0
-    i = 0
-    id_combinations = list()
-    while (i <= rep)&(num_fail <= rep):
-        if num_fail == rep:
-            id_combinations = list()
-            print('Node combination subsampling failed', str(rep), 'times. Exiting.')
-            break
+    selected_combinations = list()
+    seen_combinations = set()
+    while (len(selected_combinations) < rep) and (num_fail < rep):
         selected_ids = set()
-        nonselected_ids = sub_ids
-        dep_ids = set()
-        flag = 0
-        for a in numpy.arange(arity):
-            if len(nonselected_ids)==0:
-                num_fail+=1
-                break
-            else:
-                selected_id = numpy.random.choice(list(nonselected_ids), 1)[0]
-                selected_ids = selected_ids.union(set([selected_id,]))
-                dep_ids = dep_ids.union(all_dep_ids[selected_id])
-                nonselected_ids = all_ids.difference(dep_ids)
-                flag += 1
-        if flag==arity:
-            if selected_id in id_combinations:
+        unavailable_ids = set()
+        for _ in numpy.arange(arity):
+            available_ids = sub_ids.difference(unavailable_ids)
+            if len(available_ids) == 0:
                 num_fail += 1
-            else:
-                id_combinations.append(selected_ids)
-                i += 1
-    id_combinations = numpy.array([ list(ic) for ic in id_combinations ])
-    id_combinations = id_combinations[:rep, :]
-    return id_combinations
+                break
+            selected_id = int(numpy.random.choice(list(available_ids), 1)[0])
+            selected_ids.add(selected_id)
+            unavailable_ids |= dep_lookup.get(selected_id, {selected_id})
+        if len(selected_ids) != arity:
+            continue
+        selected_tuple = tuple(sorted(selected_ids))
+        if selected_tuple in seen_combinations:
+            num_fail += 1
+            continue
+        seen_combinations.add(selected_tuple)
+        selected_combinations.append(selected_tuple)
+
+    if (len(selected_combinations) == 0) and (rep > 0):
+        print('Node combination subsampling failed', str(rep), 'times. Exiting.')
+    return numpy.asarray(selected_combinations, dtype=numpy.int64)
 
 def node_combination_subsamples_shotgun(g, arity, rep):
     all_ids = [ ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() ]
     sub_ids = g['sub_branches']
+    if (rep <= 0) or (len(sub_ids) < arity):
+        return numpy.zeros(shape=(0, arity), dtype=numpy.int64)
     id_combinations = numpy.zeros(shape=(0,arity), dtype=numpy.int64)
     id_combinations_dif = numpy.inf
     round = 1
@@ -268,7 +276,7 @@ def node_combination_subsamples_shotgun(g, arity, rep):
         round += 1
     if id_combinations.shape[0] < rep:
         print('Inefficient subsampling. Exiting node_combinations_subsamples()')
-        id_combinations = numpy.array([])
+        id_combinations = numpy.zeros(shape=(0, arity), dtype=numpy.int64)
     else:
         id_combinations = id_combinations[:rep,:]
     return id_combinations

@@ -19,6 +19,10 @@ from csubst import ete
 from csubst import tree
 
 def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
+    if int(g['max_arity']) < 2:
+        raise ValueError('--max_arity should be >= 2.')
+    if int(g['max_combination']) < 1:
+        raise ValueError('--max_combination should be >= 1.')
     OS_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=OS_tensor, g=g, label='OS')
     ON_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=ON_tensor, g=g, label='ON')
     for current_arity in numpy.arange(2, g['max_arity'] + 1):
@@ -44,7 +48,8 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             fg_columns = cb.columns[cb.columns.str.startswith('is_fg_')].tolist()
             mf_columns = cb.columns[cb.columns.str.startswith('is_mf_')].tolist()
             mg_columns = cb.columns[cb.columns.str.startswith('is_mg_')].tolist()
-            cutoff_stat_exp = [item.split(',')[0] for item in g['cutoff_stat'].split('|')]
+            cutoff_stat_entries = table.parse_cutoff_stat(cutoff_stat_str=g['cutoff_stat'])
+            cutoff_stat_exp = [item[0] for item in cutoff_stat_entries]
             stat_columns = cb.columns[cb.columns.str.fullmatch('|'.join(cutoff_stat_exp), na=False)].tolist()
             cb_passed_columns = id_columns + fg_columns + mf_columns + mg_columns + stat_columns
             if (g['exhaustive_until'] < current_arity):
@@ -58,7 +63,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                     txt = txt.format(current_arity, g['max_combination'], is_stat_enough.sum())
                     sys.stderr.write(txt)
                     cb_passed = cb.loc[is_stat_enough, :].sort_values(by=stat_columns, ascending=False).reset_index(drop=True)
-                    cb_passed = cb_passed.loc[0:g['max_combination'],cb_passed_columns].reset_index(drop=True)
+                    cb_passed = cb_passed.iloc[:g['max_combination'], :].loc[:, cb_passed_columns].reset_index(drop=True)
                 else:
                     cb_passed = cb.loc[is_stat_enough,cb_passed_columns].reset_index(drop=True)
                 if len(set(cb_passed.loc[:,id_columns].values.ravel().tolist())) < current_arity:

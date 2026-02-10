@@ -3,6 +3,87 @@ import pandas
 import pandas.testing as pdt
 
 from csubst import foreground
+from csubst import tree
+from csubst import ete
+
+
+def test_get_num_foreground_lineages_reads_tree_properties():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "is_lineage_fg_traitX_1", True)
+        ete.set_prop(node, "is_lineage_fg_traitX_3", False)
+        # Non-numeric suffix should be ignored.
+        ete.set_prop(node, "is_lineage_fg_traitX_extra", True)
+    assert foreground.get_num_foreground_lineages(tr, "traitX") == 3
+
+
+def test_annotate_foreground_keeps_distinct_lineage_colors_for_stem_only():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,(C:1,D:1)N2:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "fg_stem_only": True,
+        "fg_df": pandas.DataFrame(
+            {
+                "name": ["A", "B", "C", "D"],
+                "PLACEHOLDER": [1, 1, 2, 2],
+            }
+        ),
+    }
+    g["fg_leaf_names"] = {"PLACEHOLDER": [["A", "B"], ["C", "D"]]}
+    g["tree"] = foreground.annotate_lineage_foreground(lineages=numpy.array([1, 2]), trait_name="PLACEHOLDER", g=g)
+    g["tree"] = foreground.annotate_foreground(lineages=numpy.array([1, 2]), trait_name="PLACEHOLDER", g=g)
+
+    nodes_by_name = {n.name: n for n in g["tree"].traverse() if n.name}
+    n1_color = ete.get_prop(nodes_by_name["N1"], "color_PLACEHOLDER")
+    n2_color = ete.get_prop(nodes_by_name["N2"], "color_PLACEHOLDER")
+    n1_lineage = ete.get_prop(nodes_by_name["N1"], "foreground_lineage_id_PLACEHOLDER")
+    n2_lineage = ete.get_prop(nodes_by_name["N2"], "foreground_lineage_id_PLACEHOLDER")
+    assert n1_color != "black"
+    assert n2_color != "black"
+    assert n1_color != n2_color
+    assert n1_lineage != n2_lineage
+    assert {int(n1_lineage), int(n2_lineage)} == {1, 2}
+
+
+def test_get_target_ids_excludes_root_even_for_full_clade_foreground():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    root_id = ete.get_prop(ete.get_tree_root(tr), "numerical_label")
+    g = {
+        "tree": tr,
+        "fg_stem_only": False,
+        "fg_df": pandas.DataFrame({"name": ["A", "B"], "PLACEHOLDER": [1, 1]}),
+        "fg_leaf_names": {"PLACEHOLDER": [["A", "B"]]},
+    }
+    lineages = numpy.array([1])
+    g["tree"] = foreground.annotate_lineage_foreground(lineages=lineages, trait_name="PLACEHOLDER", g=g)
+    target_ids = foreground.get_target_ids(lineages=lineages, trait_name="PLACEHOLDER", g=g)
+    assert int(root_id) not in set(int(x) for x in target_ids.tolist())
+
+
+def test_get_df_clade_size_handles_noncontiguous_branch_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    nodes = {n.name: n for n in tr.traverse() if n.name}
+    reassigned = {
+        "A": 11,
+        "B": 29,
+        "C": 41,
+        "X": 73,
+        "R": 5,
+    }
+    for name,node in nodes.items():
+        ete.set_prop(node, "numerical_label", reassigned[name])
+        ete.set_prop(node, "is_fg_traitA", False)
+    ete.set_prop(nodes["X"], "is_fg_traitA", True)
+    ete.set_prop(nodes["B"], "is_fg_traitA", True)
+    g = {"tree": tr}
+
+    out = foreground.get_df_clade_size(g=g, trait_name="traitA")
+
+    expected_ids = {11, 29, 41, 73}
+    assert set(out.loc[:, "branch_id"].astype(int).tolist()) == expected_ids
+    assert not out.loc[:, "size"].isna().any()
+    assert bool(out.loc[73, "is_fg_stem_traitA"])
+    assert not bool(out.loc[29, "is_fg_stem_traitA"])
 
 
 def test_clade_permutation_uses_observed_stats_when_main_table_has_only_permutations(monkeypatch):

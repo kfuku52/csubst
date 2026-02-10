@@ -537,6 +537,15 @@ def test_get_state_orders():
     assert keys_syn == ["grp"]
     assert orders_syn["grp"] == ["AA", "AB"]
 
+
+def test_add_gapline_empty_df_is_noop():
+    df = pandas.DataFrame({"codon_site_alignment": [], "gap_rate_all": []})
+    fig, ax = main_site.matplotlib.pyplot.subplots()
+    main_site.add_gapline(df=df, gapcol="gap_rate_all", xcol="codon_site_alignment", yvalue=0.5, lw=1, ax=ax)
+    assert len(ax.collections) == 0
+    main_site.matplotlib.pyplot.close(fig)
+
+
 def test_classify_tree_site_categories_prefers_larger_signal():
     df = pandas.DataFrame(
         {
@@ -556,6 +565,47 @@ def test_classify_tree_site_categories_prefers_larger_signal():
     assert out["tree_site_category"].tolist() == ["convergent", "divergent", "blank", "divergent"]
 
 
+def test_get_tree_site_display_sites_respects_max_sites_when_one_and_both_categories_exist():
+    tree_site_df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [11, 22],
+            "convergent_score": [0.91, 0.10],
+            "divergent_score": [0.10, 0.95],
+            "tree_site_category": ["convergent", "divergent"],
+        }
+    )
+    g = {"tree_site_plot_max_sites": 1}
+
+    display_meta = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    site_rows = [row for row in display_meta if row["site"] is not None]
+
+    assert len(site_rows) == 1
+    assert site_rows[0]["site"] == 22
+    assert site_rows[0]["category"] == "divergent"
+    assert all(row["category"] != "separator" for row in display_meta)
+
+
+def test_get_tree_site_display_sites_refills_capacity_from_other_category():
+    tree_site_df = pandas.DataFrame(
+        {
+            "codon_site_alignment": [10, 20, 21, 22, 23, 24],
+            "convergent_score": [0.99, 0.10, 0.09, 0.08, 0.07, 0.06],
+            "divergent_score": [0.01, 0.95, 0.94, 0.93, 0.92, 0.91],
+            "tree_site_category": ["convergent", "divergent", "divergent", "divergent", "divergent", "divergent"],
+        }
+    )
+    g = {"tree_site_plot_max_sites": 4}
+
+    display_meta = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    site_rows = [row for row in display_meta if row["site"] is not None]
+    conv_count = sum(row["category"] == "convergent" for row in site_rows)
+    div_count = sum(row["category"] == "divergent" for row in site_rows)
+
+    assert len(site_rows) == 4
+    assert conv_count == 1
+    assert div_count == 3
+
+
 def test_get_tree_plot_coordinates_returns_expected_root_and_leaf_positions(tiny_tree):
     xcoord, ycoord, leaf_order = main_site.get_tree_plot_coordinates(tiny_tree)
     root = ete.get_tree_root(tiny_tree)
@@ -568,6 +618,24 @@ def test_get_tree_plot_coordinates_returns_expected_root_and_leaf_positions(tiny
     leaf_y = [ycoord[i] for i in leaf_ids]
     assert len(set(leaf_y)) == len(leaf_ids)
     assert set(leaf_order) == set(leaf_ids)
+
+
+def test_get_highlight_leaf_and_branch_ids_marks_only_explicit_targets(tiny_tree):
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tiny_tree.traverse()}
+
+    leaf_ids, branch_ids = main_site.get_highlight_leaf_and_branch_ids(
+        tree=tiny_tree,
+        branch_ids={labels["X"]},
+    )
+    assert branch_ids == {labels["X"]}
+    assert leaf_ids == set()
+
+    leaf_ids, branch_ids = main_site.get_highlight_leaf_and_branch_ids(
+        tree=tiny_tree,
+        branch_ids={labels["A"], labels["X"]},
+    )
+    assert branch_ids == {labels["A"], labels["X"]}
+    assert leaf_ids == {labels["A"]}
 
 
 def test_plot_tree_site_writes_figure_and_category_table(tmp_path, tiny_tree):
@@ -654,6 +722,29 @@ def test_get_df_ad_add_site_stats_and_target_flag():
 
     flagged = main_site.add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, "nsy")
     assert flagged["has_target_high_combinat_prob_site"].tolist() == [True, True]
+
+
+def test_add_site_stats_hg_ignores_zero_probabilities():
+    g = {"amino_acid_orders": numpy.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
+    sub_tensor = numpy.zeros((2, 2, 1, 2, 2), dtype=float)
+    # A->B totals per site = [1, 0], so entropy should be 0, not NaN.
+    sub_tensor[0, 0, 0, 0, 1] = 1.0
+    df_ad = main_site.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
+    out = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="hg")
+    assert pytest.approx(float(out["site_hg"].iloc[0]), abs=1e-12) == 0.0
+    assert pandas.isna(out["site_hg"].iloc[1])
+
+
+def test_add_site_stats_tau_single_site_returns_zero_not_nan():
+    g = {"amino_acid_orders": numpy.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
+    sub_tensor = numpy.zeros((2, 1, 1, 2, 2), dtype=float)
+    # Single-site profile; tau denominator would otherwise be 0.
+    sub_tensor[0, 0, 0, 0, 1] = 1.0
+    sub_tensor[1, 0, 0, 0, 1] = 1.0
+    df_ad = main_site.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
+    out = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="tau")
+    assert pytest.approx(float(out["site_tau"].iloc[0]), abs=1e-12) == 0.0
+    assert pandas.isna(out["site_tau"].iloc[1])
 
 
 def test_get_df_dist_reports_max_distance_for_multi_branch_substitutions(tiny_tree):

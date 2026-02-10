@@ -150,26 +150,31 @@ def check_intermediate_files(g):
 def run_iqtree_ancestral(g, force_notree_run=False):
     file_tree = 'tmp.csubst.nwk'
     tree.write_tree(g['rooted_tree'], outfile=file_tree, add_numerical_label=False)
-    is_consistent = tree.is_consistent_tree_and_aln(g=g)
-    if is_consistent:
-        command = [g['iqtree_exe'], '-s', g['alignment_file'], '-te', file_tree,
-                   '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
-                   '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
-    else:
-        sys.stderr.write('--rooted_tree and --alignment_file are not consistent.\n')
-        if force_notree_run:
-            sys.stderr.write('Running iqtree without tree input to estimate simulation parameters.\n')
-            command = [g['iqtree_exe'], '-s', g['alignment_file'],
+    try:
+        is_consistent = tree.is_consistent_tree_and_aln(g=g)
+        if is_consistent:
+            command = [g['iqtree_exe'], '-s', g['alignment_file'], '-te', file_tree,
                        '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
                        '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
         else:
-            sys.stderr.write('Exiting.\n')
-            sys.exit(1)
-    run_iqtree = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr)
-    assert (run_iqtree.returncode==0), "IQ-TREE did not finish safely: {}".format(run_iqtree.stdout.decode('utf8'))
-    if os.path.exists(g['alignment_file']+'.ckp.gz'):
-        os.remove(g['alignment_file']+'.ckp.gz')
-    os.remove(file_tree)
+            sys.stderr.write('--rooted_tree and --alignment_file are not consistent.\n')
+            if force_notree_run:
+                sys.stderr.write('Running iqtree without tree input to estimate simulation parameters.\n')
+                command = [g['iqtree_exe'], '-s', g['alignment_file'],
+                           '-m', g['iqtree_model'], '--seqtype', 'CODON'+str(g['genetic_code']),
+                           '--threads-max', str(g['threads']), '-T', 'AUTO', '--ancestral', '--rate', '--redo']
+            else:
+                sys.stderr.write('Exiting.\n')
+                sys.exit(1)
+        run_iqtree = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr)
+        if run_iqtree.returncode != 0:
+            msg = 'IQ-TREE did not finish safely (exit code {}).'
+            raise AssertionError(msg.format(run_iqtree.returncode))
+        if os.path.exists(g['alignment_file']+'.ckp.gz'):
+            os.remove(g['alignment_file']+'.ckp.gz')
+    finally:
+        if os.path.exists(file_tree):
+            os.remove(file_tree)
     return None
 
 def read_state(g):
@@ -179,12 +184,21 @@ def read_state(g):
     g['num_input_state'] = state_table.shape[1] - 3
     g['input_state'] = state_table.columns[3:].str.replace('p_','').tolist()
     if g['num_input_state']==4:
-        g['input_data_type'] = 'nuc'
+        raise NotImplementedError(
+            'Nucleotide ancestral-state input is obsolete and no longer supported. '
+            'Use codon input instead.'
+        )
     elif g['num_input_state']==20:
-        g['input_data_type'] = 'pep'
+        raise NotImplementedError(
+            'Protein ancestral-state input is obsolete and no longer supported. '
+            'Use codon input instead.'
+        )
     elif g['num_input_state'] > 20:
         g['input_data_type'] = 'cdn'
         g['codon_orders'] = state_table.columns[3:].str.replace('p_','').values
+    else:
+        msg = 'Unsupported number of input states: {}. Only codon input (>20 states) is supported.'
+        raise AssertionError(msg.format(g['num_input_state']))
     if (g['input_data_type']=='cdn'):
         g['amino_acid_orders'] = sorted(list(set([ c[0] for c in g['codon_table'] if c[0]!='*' ])))
         matrix_groups = OrderedDict()
@@ -322,16 +336,11 @@ def _get_leaf_nonmissing_sites(g, required_leaf_ids):
         seq = ete.get_prop(node, 'sequence', '').upper()
         if seq == '':
             continue
-        if g['input_data_type'] == 'cdn':
-            assert len(seq)%3==0, 'Sequence length is not multiple of 3. Node name = '+node.name
-            for s in numpy.arange(g['num_input_site']):
-                codon = seq[(s*3):((s+1)*3)]
-                codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
-                leaf_nonmissing[nl, s] = (len(codon_index) > 0)
-        elif g['input_data_type'] == 'nuc':
-            for s in numpy.arange(g['num_input_site']):
-                nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)
-                leaf_nonmissing[nl, s] = (len(nuc_index) > 0)
+        assert len(seq)%3==0, 'Sequence length is not multiple of 3. Node name = '+node.name
+        for s in numpy.arange(g['num_input_site']):
+            codon = seq[(s*3):((s+1)*3)]
+            codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
+            leaf_nonmissing[nl, s] = (len(codon_index) > 0)
     return leaf_nonmissing
 
 
@@ -345,30 +354,41 @@ def mask_missing_sites(state_tensor, tree, selected_internal_ids=None, leaf_nonm
             continue
         children = ete.get_children(node)
         sisters = ete.get_sisters(node)
-        child0_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(children[0])], dtype=int)
-        child1_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(children[1])], dtype=int)
-        sister_leaf_nls = numpy.array([ete.get_prop(l, "numerical_label") for l in ete.get_leaves(sisters[0])], dtype=int)
-        if leaf_nonmissing_sites is None:
-            c0 = (state_tensor[child0_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child0_leaf_nonzero
-            c1 = (state_tensor[child1_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_child1_leaf_nonzero
-            s = (state_tensor[sister_leaf_nls,:,:].sum(axis=(0,2))!=0) # is_sister_leaf_nonzero
-        else:
-            c0 = leaf_nonmissing_sites[child0_leaf_nls,:].sum(axis=0) != 0
-            c1 = leaf_nonmissing_sites[child1_leaf_nls,:].sum(axis=0) != 0
-            s = leaf_nonmissing_sites[sister_leaf_nls,:].sum(axis=0) != 0
-        is_nonzero = (c0&c1)|(c0&s)|(c1&s)
+        groups = list(children) + list(sisters)
+        if len(groups) < 2:
+            continue
+        group_nonzero = list()
+        for grp in groups:
+            leaf_nls = numpy.array([int(ete.get_prop(l, "numerical_label")) for l in ete.get_leaves(grp)], dtype=int)
+            if leaf_nls.shape[0] == 0:
+                continue
+            if leaf_nonmissing_sites is None:
+                grp_nonzero = (state_tensor[leaf_nls,:,:].sum(axis=(0,2)) != 0)
+            else:
+                grp_nonzero = (leaf_nonmissing_sites[leaf_nls,:].sum(axis=0) != 0)
+            group_nonzero.append(grp_nonzero)
+        if len(group_nonzero) < 2:
+            continue
+        group_nonzero = numpy.stack(group_nonzero, axis=0)
+        is_nonzero = (group_nonzero.sum(axis=0) >= 2)
         state_tensor[nl,:,:] = numpy.einsum('ij,i->ij', state_tensor[nl,:,:], is_nonzero)
     return state_tensor
 
 
 def get_state_tensor(g, selected_branch_ids=None):
+    if g.get('input_data_type', None) != 'cdn':
+        raise NotImplementedError(
+            'Non-codon input is obsolete and no longer supported. '
+            'Run ancestral reconstruction with a codon model.'
+        )
     ete.link_to_alignment(g['tree'], alignment=g['alignment_file'], alg_format='fasta')
     first_leaf_seq = ete.get_prop(ete.get_leaves(g['tree'])[0], 'sequence', '')
     assert first_leaf_seq != '', 'Failed to map alignment to tree leaves. Check leaf labels in --alignment_file and --rooted_tree_file.'
-    num_codon_alignment = int(len(first_leaf_seq)/3)
+    assert len(first_leaf_seq)%3==0, 'Sequence length is not multiple of 3 in alignment file.'
+    num_alignment_site = int(len(first_leaf_seq)/3)
     err_txt = 'The number of codon sites did not match between the alignment and ancestral states. ' \
               'Delete intermediate files and rerun.'
-    assert num_codon_alignment==g['num_input_site'], err_txt
+    assert num_alignment_site==g['num_input_site'], err_txt
     num_node = len(list(g['tree'].traverse()))
     selected_set, selected_internal_ids, required_leaf_ids = _get_selected_branch_context(
         tree=g['tree'],

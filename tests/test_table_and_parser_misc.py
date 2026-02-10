@@ -99,6 +99,49 @@ def test_get_cutoff_stat_bool_array_exits_on_unknown_column():
         table.get_cutoff_stat_bool_array(cb, "DOES_NOT_EXIST,1.0")
 
 
+def test_get_cutoff_stat_bool_array_accepts_whitespace_around_tokens():
+    cb = pandas.DataFrame(
+        {
+            "OCNany2spe": [1.9, 2.0, 2.1],
+            "omegaCany2spe": [10.0, 4.9, 5.0],
+        }
+    )
+    out = table.get_cutoff_stat_bool_array(cb, " OCNany2spe, 2.0 | omegaCany2spe , 5.0 ")
+    assert out.tolist() == [False, False, True]
+
+
+def test_parse_cutoff_stat_exits_on_malformed_token():
+    with pytest.raises(SystemExit):
+        table.parse_cutoff_stat("OCNany2spe|omegaCany2spe,5.0")
+
+
+def test_parse_cutoff_stat_exits_on_invalid_regex():
+    with pytest.raises(SystemExit):
+        table.parse_cutoff_stat("OCN[any2spe,2.0")
+
+
+def test_parse_cutoff_stat_supports_regex_with_comma_quantifier():
+    out = table.parse_cutoff_stat(r"omegaC.{1,2},5.0")
+    assert out == [(r"omegaC.{1,2}", 5.0)]
+
+
+def test_parse_cutoff_stat_supports_regex_with_alternation_pipe():
+    out = table.parse_cutoff_stat(r"OCN(any|dif)2spe,2.0|omegaCany2spe,5.0")
+    assert out == [(r"OCN(any|dif)2spe", 2.0), ("omegaCany2spe", 5.0)]
+
+
+def test_get_cutoff_stat_bool_array_supports_alternation_pipe_regex():
+    cb = pandas.DataFrame(
+        {
+            "OCNany2spe": [2.0, 1.9, 0.0],
+            "OCNdif2spe": [2.1, 2.2, 0.0],
+            "omegaCany2spe": [5.1, 5.1, 10.0],
+        }
+    )
+    out = table.get_cutoff_stat_bool_array(cb, r"OCN(any|dif)2spe,2.0|omegaCany2spe,5.0")
+    assert out.tolist() == [True, False, False]
+
+
 def test_fill_instantaneous_rate_matrix_diagonal_sets_row_sums_to_zero():
     inst = numpy.array([[0.0, 1.0], [2.0, 0.0]], dtype=float)
     out = parser_misc.fill_instantaneous_rate_matrix_diagonal(inst)
@@ -117,6 +160,18 @@ def test_scale_instantaneous_rate_matrix_matches_manual_scaling():
 def test_scale_instantaneous_rate_matrix_requires_zero_diagonal():
     inst = numpy.array([[1.0, 2.0], [3.0, 4.0]], dtype=float)
     with pytest.raises(AssertionError, match="Diagonal elements"):
+        parser_misc.scale_instantaneous_rate_matrix(inst, numpy.array([0.5, 0.5]))
+
+
+def test_scale_instantaneous_rate_matrix_requires_all_diagonal_elements_zero():
+    inst = numpy.array([[0.0, 2.0], [3.0, 1e-3]], dtype=float)
+    with pytest.raises(AssertionError, match="Diagonal elements"):
+        parser_misc.scale_instantaneous_rate_matrix(inst, numpy.array([0.5, 0.5]))
+
+
+def test_scale_instantaneous_rate_matrix_requires_positive_scaling_factor():
+    inst = numpy.zeros((2, 2), dtype=float)
+    with pytest.raises(AssertionError, match="scaling factor must be positive"):
         parser_misc.scale_instantaneous_rate_matrix(inst, numpy.array([0.5, 0.5]))
 
 
@@ -146,6 +201,20 @@ def test_get_codon_order_index_reorders_positions():
     order_to = numpy.array(["AAG", "AAA", "AAC"])
     out = parser_misc.get_codon_order_index(order_from, order_to)
     numpy.testing.assert_array_equal(out, [1, 2, 0])
+
+
+def test_get_codon_order_index_raises_on_missing_codon():
+    order_from = numpy.array(["AAA", "XXX", "AAC"])
+    order_to = numpy.array(["AAG", "AAA", "AAC"])
+    with pytest.raises(AssertionError, match="not found in target order"):
+        parser_misc.get_codon_order_index(order_from, order_to)
+
+
+def test_get_codon_order_index_raises_on_duplicate_target_codon():
+    order_from = numpy.array(["AAA", "AAC", "AAG"])
+    order_to = numpy.array(["AAA", "AAA", "AAC"])
+    with pytest.raises(AssertionError, match="Duplicate codon"):
+        parser_misc.get_codon_order_index(order_from, order_to)
 
 
 def test_get_exchangeability_codon_order_shape_and_no_stops():
@@ -205,13 +274,28 @@ def test_get_mechanistic_instantaneous_rate_matrix_matches_manual_example():
     out = parser_misc.get_mechanistic_instantaneous_rate_matrix(g)
     expected = numpy.array(
         [
-            [-1.160714285714286, 0.267857142857143, 0.892857142857143],
-            [0.178571428571429, -1.071428571428571, 0.892857142857143],
-            [0.357142857142857, 0.535714285714286, -0.892857142857143],
+            [-1.397058823529412, 0.661764705882353, 0.735294117647059],
+            [0.441176470588235, -1.176470588235294, 0.735294117647059],
+            [0.294117647058824, 0.441176470588235, -0.735294117647059],
         ]
     )
     numpy.testing.assert_allclose(out, expected, atol=1e-12)
     numpy.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0, 0.0], atol=1e-12)
+
+
+def test_get_mechanistic_instantaneous_rate_matrix_applies_kappa_only_to_transitions():
+    g = {
+        "codon_orders": numpy.array(["AAA", "AAG", "AAC"]),
+        "amino_acid_orders": numpy.array(["K", "N"]),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+        "omega": 1.0,
+        "kappa": 5.0,
+        "equilibrium_frequency": numpy.array([1 / 3, 1 / 3, 1 / 3]),
+        "float_type": numpy.float64,
+    }
+    out = parser_misc.get_mechanistic_instantaneous_rate_matrix(g)
+    # AAA->AAG is transition (A<->G), AAA->AAC is transversion (A<->C).
+    assert out[0, 1] > out[0, 2]
 
 
 def test_annotate_tree_handles_none_root_dist(tmp_path):
@@ -222,7 +306,7 @@ def test_annotate_tree_handles_none_root_dist(tmp_path):
 
     g = {
         "iqtree_treefile": str(iqtree_tree_file),
-        "rooted_tree": ete.PhyloNode(str(rooted_tree_file), format=1),
+        "rooted_tree": ete.PhyloNode(rooted_tree_file.read_text(encoding="utf-8"), format=1),
     }
     out = parser_misc.annotate_tree(g)
     assert "tree" in out

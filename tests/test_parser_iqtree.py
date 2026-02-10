@@ -128,6 +128,24 @@ Transition/transversion ratio (kappa): 2.34E+00
     assert g["kappa"] == pytest.approx(2.34)
 
 
+def test_read_state_rejects_nucleotide_input(tmp_path):
+    state_file = tmp_path / "toy_nuc.state.tsv"
+    state_file.write_text(
+        "Node\tSite\tState\tp_A\tp_C\tp_G\tp_T\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(NotImplementedError, match="Nucleotide ancestral-state input is obsolete"):
+        parser_iqtree.read_state({"iqtree_state": str(state_file)})
+
+
+def test_read_state_rejects_protein_input(tmp_path):
+    state_file = tmp_path / "toy_pep.state.tsv"
+    header = "Node\tSite\tState\t" + "\t".join(["p_AA{}".format(i) for i in range(20)]) + "\n"
+    state_file.write_text(header, encoding="utf-8")
+    with pytest.raises(NotImplementedError, match="Protein ancestral-state input is obsolete"):
+        parser_iqtree.read_state({"iqtree_state": str(state_file)})
+
+
 def _make_state_tensor_g(tmp_path, alignment_text):
     alignment_file = tmp_path / "toy.fa"
     state_file = tmp_path / "toy.state.tsv"
@@ -222,3 +240,76 @@ def test_get_state_tensor_selected_branch_ids_match_internal_masking_parity(tmp_
     assert selected.shape == full.shape
     numpy.testing.assert_allclose(selected[labels["N1"], :, :], full[labels["N1"], :, :], atol=1e-12)
     assert selected[labels["C"], :, :].sum() == 0
+
+
+def test_get_state_tensor_rejects_nucleotide_input(tmp_path):
+    alignment_file = tmp_path / "toy_nuc.fa"
+    state_file = tmp_path / "toy_nuc.state.tsv"
+    alignment_file.write_text(
+        ">A\nAC\n"
+        ">B\nGT\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_A\tp_C\tp_G\tp_T\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 4,
+        "input_data_type": "nuc",
+        "input_state": numpy.array(["A", "C", "G", "T"]),
+        "float_type": numpy.float64,
+        "ml_anc": False,
+    }
+    with pytest.raises(NotImplementedError, match="Non-codon input is obsolete"):
+        parser_iqtree.get_state_tensor(g)
+
+
+def test_mask_missing_sites_nonbinary_internal_uses_all_child_groups():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1,C:1)N1:1,D:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    state = numpy.zeros((len(list(tr.traverse())), 1, 1), dtype=float)
+    # Only one child clade (C) and one sister clade (D) have data at this site.
+    state[labels["C"], 0, 0] = 1.0
+    state[labels["D"], 0, 0] = 1.0
+    state[labels["N1"], 0, 0] = 1.0
+    out = parser_iqtree.mask_missing_sites(state_tensor=state, tree=tr)
+    assert out[labels["N1"], 0, 0] == pytest.approx(1.0)
+
+
+def test_run_iqtree_ancestral_nonzero_exit_raises_clear_error_and_cleans_tmp_tree(tmp_path, monkeypatch):
+    alignment_file = tmp_path / "toy.fa"
+    alignment_file.write_text(">A\nAAA\n>B\nAAA\n", encoding="utf-8")
+    rooted_tree = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    g = {
+        "rooted_tree": rooted_tree,
+        "alignment_file": str(alignment_file),
+        "iqtree_exe": "iqtree2",
+        "iqtree_model": "GY",
+        "genetic_code": 1,
+        "threads": 1,
+    }
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(parser_iqtree.tree, "is_consistent_tree_and_aln", lambda g: True)
+
+    def fake_write_tree(tree_obj, outfile, add_numerical_label=False):
+        (tmp_path / outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
+
+    class _FakeProc:
+        def __init__(self, returncode):
+            self.returncode = returncode
+            self.stdout = None
+            self.stderr = None
+
+    monkeypatch.setattr(parser_iqtree.tree, "write_tree", fake_write_tree)
+    monkeypatch.setattr(parser_iqtree.subprocess, "run", lambda *args, **kwargs: _FakeProc(returncode=2))
+
+    with pytest.raises(AssertionError, match="exit code 2"):
+        parser_iqtree.run_iqtree_ancestral(g)
+    assert not (tmp_path / "tmp.csubst.nwk").exists()
