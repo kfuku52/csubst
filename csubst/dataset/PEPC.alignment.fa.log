@@ -1,0 +1,173 @@
+IQ-TREE multicore version 2.3.6 for MacOS Intel 64-bit built Aug  4 2024
+Developed by Bui Quang Minh, Nguyen Lam Tung, Olga Chernomor, Heiko Schmidt,
+Dominik Schrempf, Michael Woodhams, Ly Trong Nhan, Thomas Wong
+
+Host:    Macmini.elecom (AVX2, FMA3, 16 GB RAM)
+Command: iqtree -s csubst/dataset/PEPC.alignment.fa -te tmp.csubst.nwk -m ECMK07+F+R4 --seqtype CODON1 --threads-max 4 -T AUTO --ancestral --rate --redo
+Seed:    874461 (Using SPRNG - Scalable Parallel Random Number Generator)
+Time:    Sat Feb  7 15:43:38 2026
+Kernel:  AVX+FMA - auto-detect threads (2 CPU cores detected)
+
+Reading alignment file csubst/dataset/PEPC.alignment.fa ... Fasta format detected
+Reading fasta file: done in 0.00439906 secs using 90.7% CPU
+Alignment most likely contains DNA/RNA sequences
+Converting to codon sequences with genetic code 1 ...
+WARNING: Sequence Cyrtococcum_patens_AM689877 has ambiguous character NNG at site 46
+WARNING: Sequence Cyrtococcum_patens_AM689878 has ambiguous character NTG at site 316
+WARNING: Sequence Suaeda_eltonica_DQ538354 has ambiguous character NAG at site 412
+WARNING: Sequence Cyperus_eragrostis_FM208065 has ambiguous character NNA at site 886
+WARNING: Sequence Cyperus_eragrostis_FM208066 has ambiguous character NTG at site 931
+WARNING: Sequence Tidestromia_valdesiana_KJ161704 has ambiguous character NNT at site 1327
+WARNING: Sequence Fimbristylis_littoralis_FM208036 has ambiguous character NTC at site 1351
+WARNING: Sequence Cyperus_sanguinolentus_FM208046 has ambiguous character NTC at site 1351
+WARNING: Sequence Phaenosperma_globosum_AM689882 has ambiguous character NNC at site 1375
+WARNING: Sequence Pharus_latifolius_AM689883 has ambiguous character NNC at site 1375
+WARNING: Sequence Streptochaeta_sodiroana_AM689887 has ambiguous character NNC at site 1375
+WARNING: Sequence Arrhenatherum_elatius_AM689890 has ambiguous character NNC at site 1375
+WARNING: Sequence Arundinaria_sp._Hodkinson_s.n._AM689891 has ambiguous character NNC at site 1375
+WARNING: Sequence Microlaena_stipoides_AM689896 has ambiguous character NNC at site 1375
+WARNING: Sequence Hymenachne_amplexicaulis_AM689899 has ambiguous character NNC at site 1375
+WARNING: Sequence Holcus_lanatus_AM690224 has ambiguous character NNG at site 1375
+WARNING: Sequence Fimbristylis_littoralis_FN390834 has ambiguous character NGC at site 1375
+WARNING: Sequence Cyperus_nipponicus_FN390839 has ambiguous character NGC at site 1375
+WARNING: Sequence Cyperus_nipponicus_FN390840 has ambiguous character NGC at site 1375
+WARNING: Sequence Carex_pendula_FM207998 has ambiguous character NNC at site 1438
+WARNING: Sequence Chrysitrix_dodii_FM208000 has ambiguous character NNC at site 1438
+WARNING: Sequence Fimbristylis_littoralis_FM208037 has ambiguous character NNT at site 1438
+WARNING: Sequence Scirpoides_holoschoenus_subsp._thunbergii_FM208059 has ambiguous character NNG at site 1438
+WARNING: Sequence Chrysitrix_dodii_FM208067 has ambiguous character NNT at site 1438
+WARNING: Sequence Cyperus_sanguinolentus_FN390835 has ambiguous character NAG at site 2029
+WARNING: Sequence Cyperus_nipponicus_FN390836 has ambiguous character NAG at site 2029
+WARNING: Sequence Fimbristylis_littoralis_FN390837 has ambiguous character NAG at site 2029
+WARNING: Sequence Scirpoides_holoschoenus_subsp._thunbergii_FN390838 has ambiguous character NAG at site 2029
+WARNING: Sequence Carex_pendula_FN390832 has ambiguous character NTG at site 2161
+WARNING: Sequence Cyrtococcum_patens_AM689877 has ambiguous character ATN at site 2326
+WARNING: Sequence Suaeda_eltonica_DQ538354 has ambiguous character GAY at site 2503
+WARNING: Sequence Carex_pendula_FN390832 has ambiguous character CNN at site 2572
+WARNING: Sequence Scirpoides_holoschoenus_FN390833 has ambiguous character CNN at site 2572
+WARNING: Sequence Chrysitrix_dodii_FM208000 has ambiguous character CTN at site 2719
+WARNING: Sequence Cyperus_sanguinolentus_FM208046 has ambiguous character CTN at site 2719
+WARNING: Sequence Cyperus_eragrostis_FM208065 has ambiguous character GNN at site 2851
+WARNING: Sequence Fimbristylis_littoralis_FN390834 has ambiguous character TNN at site 2854
+WARNING: Sequence Cyperus_eragrostis_FM208066 has ambiguous character ACN at site 2863
+WARNING: Sequence Cyperus_nipponicus_FN390839 has ambiguous character ACN at site 2863
+Alignment has 71 sequences with 971 columns, 966 distinct patterns
+941 parsimony-informative, 15 singleton sites, 15 constant sites
+                                                    Gap/Ambiguity  Composition  p-value
+Analyzing sequences: done in 0.000154018 secs using 246.1% CPU
+   1  Zea_mays_AB012228                                     1.13%    passed     99.58%
+   2  Eleocharis_vivipara_AB085948                          0.41%    passed     35.53%
+   3  Gossypium_hirsutum_AF008939                           0.62%    failed      0.00%
+   4  Flaveria_trinervia_AF248079                           0.62%    failed      0.00%
+   5  Flaveria_trinervia_AF248080                           0.51%    failed      0.19%
+   6  Hydrilla_verticillata_AF271161                        0.41%    failed      0.00%
+   7  Oryza_sativa_Japonica_Group_AF271995                  1.24%    passed     97.35%
+   8  Flaveria_brownii_AF494191                             0.51%    failed      0.00%
+   9  Flaveria_pubescens_AF494192                           0.51%    failed      0.00%
+  10  Setaria_italica_AF495586                              0.72%    failed      0.00%
+  11  Triticum_aestivum_AJ007705                            0.41%    passed     21.63%
+  12  Solanum_tuberosum_AJ011844                            0.72%    failed      0.00%
+  13  Sesbania_rostrata_AJ286750                            1.13%    failed      0.00%
+  14  Oryza_sativa_Japonica_Group_AK066635                  0.51%    failed      0.00%
+  15  Cyrtococcum_patens_AM689877                          22.04%    failed      0.00%
+  16  Cyrtococcum_patens_AM689878                          12.05%    failed      0.00%
+  17  Phragmites_australis_AM689880                         5.97%    failed      0.00%
+  18  Phaenosperma_globosum_AM689882                       54.89%    failed      0.00%
+  19  Pharus_latifolius_AM689883                           54.79%    failed      0.00%
+  20  Streptochaeta_sodiroana_AM689887                     54.79%    failed      0.00%
+  21  Arrhenatherum_elatius_AM689890                       54.89%    failed      0.00%
+  22  Arundinaria_sp._Hodkinson_s.n._AM689891              54.79%    failed      0.00%
+  23  Microlaena_stipoides_AM689896                        54.89%    failed      0.00%
+  24  Hymenachne_amplexicaulis_AM689899                    54.89%    failed      0.00%
+  25  Holcus_lanatus_AM690224                              54.79%    failed      0.00%
+  26  Oryza_sativa_Indica_Group_AY187619                    0.72%    passed     87.89%
+  27  Echinochloa_crus-galli_AY251482                       1.03%    passed     71.65%
+  28  Setaria_italica_AY491400                              1.03%    passed     91.12%
+  29  Alternanthera_pungens_AY950665                        0.51%    failed      0.00%
+  30  Alternanthera_ficoidea_AY950666                       0.51%    failed      0.00%
+  31  Alternanthera_sessilis_AY950667                       0.51%    failed      0.00%
+  32  Bienertia_sinuspersici_DQ538352                       0.41%    failed      0.00%
+  33  Suaeda_aralocaspica_DQ538353                         12.36%    failed      0.00%
+  34  Suaeda_eltonica_DQ538354                             14.62%    failed      0.00%
+  35  Suaeda_linifolia_DQ538355                            30.90%    failed      0.01%
+  36  Citrus_sinensis_EF058158                              0.51%    failed      0.00%
+  37  Carex_pendula_FM207998                               58.81%    passed     39.50%
+  38  Chrysitrix_dodii_FM208000                            56.13%    failed      4.53%
+  39  Fimbristylis_littoralis_FM208036                     55.82%    passed     54.97%
+  40  Fimbristylis_littoralis_FM208037                     58.81%    passed     46.81%
+  41  Cyperus_sanguinolentus_FM208046                      53.14%    failed      0.00%
+  42  Scirpoides_holoschoenus_subsp._thunbergii_FM208059   58.81%    passed     49.58%
+  43  Cyperus_eragrostis_FM208065                          33.06%    passed     49.62%
+  44  Cyperus_eragrostis_FM208066                          34.19%    passed     71.23%
+  45  Chrysitrix_dodii_FM208067                            73.84%    passed     46.23%
+  46  Carex_pendula_FN390832                               85.99%    passed     96.06%
+  47  Scirpoides_holoschoenus_FN390833                     85.48%    passed     58.98%
+  48  Fimbristylis_littoralis_FN390834                     49.64%    passed     12.38%
+  49  Cyperus_sanguinolentus_FN390835                      70.85%    passed     54.58%
+  50  Cyperus_nipponicus_FN390836                          70.85%    passed     49.96%
+  51  Fimbristylis_littoralis_FN390837                     70.75%    failed      0.00%
+  52  Scirpoides_holoschoenus_subsp._thunbergii_FN390838   70.85%    passed     33.56%
+  53  Cyperus_nipponicus_FN390839                          49.12%    passed     53.06%
+  54  Cyperus_nipponicus_FN390840                          49.23%    passed      9.46%
+  55  Tidestromia_valdesiana_KJ161704                      47.37%    passed      8.07%
+  56  Saccharum_hybrid_cultivar_H32-8560_M86661             0.51%    passed     72.13%
+  57  Arabidopsis_thaliana_NM_001036102                     0.41%    failed      0.00%
+  58  Oryza_sativa_Japonica_Group_NM_001050836              4.84%    failed      0.00%
+  59  Zea_mays_X15239                                       0.41%    failed      0.00%
+  60  Sorghum_bicolor_X17379                                1.34%    failed      0.00%
+  61  Sorghum_bicolor_X55664                                1.13%    passed     96.79%
+  62  Sorghum_bicolor_X59925                                1.13%    passed     76.41%
+  63  Zea_mays_X61489                                       0.41%    passed     99.19%
+  64  Vanilla_planifolia_X87148                             1.54%    failed      0.13%
+  65  Amborella_trichopoda_XM_006852360                     0.62%    failed      0.00%
+  66  Beta_vulgaris_subsp._vulgaris_XM_010691525            0.51%    failed      0.00%
+  67  Nymphaea_colorata_XM_031638555                        0.82%    failed      0.00%
+  68  Vitis_riparia_XM_034822303                            0.82%    failed      0.22%
+  69  Flaveria_australasica_Z25853                          0.51%    failed      0.00%
+  70  Flaveria_pringlei_Z48966                              0.51%    failed      0.00%
+  71  Amaranthus_hypochondriacus_Z68125                     0.72%    failed      0.00%
+WARNING: 21 sequences contain more than 50% gaps/ambiguity
+****  TOTAL                                                23.95%  44 sequences failed composition chi2 test (p-value<5%; df=60)
+Reading input tree file tmp.csubst.nwk ... rooted tree
+
+NOTE: 137 MB RAM (0 GB) is required!
+Measuring multi-threading efficiency up to 2 CPU cores
+2 trees examined
+Threads: 1 / Time: 2.372 sec / Speedup: 1.000 / Efficiency: 100% / LogL: -90304
+Threads: 2 / Time: 1.633 sec / Speedup: 1.453 / Efficiency: 73% / LogL: -90304
+BEST NUMBER OF THREADS: 2
+
+Estimate model parameters (epsilon = 0.010)
+1. Initial log-likelihood: -63065.616
+2. Current log-likelihood: -62222.186
+3. Current log-likelihood: -62217.819
+4. Current log-likelihood: -62216.896
+5. Current log-likelihood: -62216.668
+6. Current log-likelihood: -62216.601
+7. Current log-likelihood: -62216.581
+Optimal log-likelihood: -62216.575
+Nonsynonymous/synonymous ratio (omega): 1.000
+Transition/transversion ratio (kappa): 1.000
+Site proportion and rates:  (0.017,0.099) (0.012,0.437) (0.041,0.448) (0.931,1.048)
+Parameters optimization took 7 rounds (44.670 sec)
+Wrote distance file to... 
+BEST SCORE FOUND : -62216.575
+Ancestral state probabilities printed to csubst/dataset/PEPC.alignment.fa.state
+Empirical proportions for each category: 0.018 0.000 0.023 0.960
+Site rates printed to csubst/dataset/PEPC.alignment.fa.rate
+Total tree length: 17.550
+
+Total number of iterations: 0
+CPU time used for tree search: 0.000 sec (0h:0m:0s)
+Wall-clock time used for tree search: 0.000 sec (0h:0m:0s)
+Total CPU time used: 97.506 sec (0h:1m:37s)
+Total wall-clock time used: 51.391 sec (0h:0m:51s)
+
+Analysis results written to: 
+  IQ-TREE report:                csubst/dataset/PEPC.alignment.fa.iqtree
+  Maximum-likelihood tree:       csubst/dataset/PEPC.alignment.fa.treefile
+  Site-specific rates:           csubst/dataset/PEPC.alignment.fa.rate
+  Ancestral state:               csubst/dataset/PEPC.alignment.fa.state
+  Screen log file:               csubst/dataset/PEPC.alignment.fa.log
+
+Date and Time: Sat Feb  7 15:44:30 2026

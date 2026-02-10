@@ -3,9 +3,43 @@ import pandas
 import pandas.testing as pdt
 
 from csubst import foreground
-from csubst import tree
 from csubst import ete
+from csubst import tree
 
+
+def test_get_num_foreground_lineages_uses_compat_props():
+    tr = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    for node in tr.traverse():
+        ete.set_prop(node, "is_lineage_fg_traitA_1", False)
+    root = [n for n in tr.traverse() if ete.is_root(n)][0]
+    ete.set_prop(root, "is_lineage_fg_traitA_3", True)
+    assert foreground.get_num_foreground_lineages(tr, "traitA") == 3
+
+
+def test_annotate_foreground_fg_stem_only_keeps_lineage_specific_stem_colors():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((Nep1:1,Nep2:1)N:1,Ceph:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "fg_stem_only": True,
+        "fg_df": pandas.DataFrame(
+            {
+                "name": ["Nep1", "Nep2", "Ceph"],
+                "traitA": [1, 1, 2],
+            }
+        ),
+    }
+    out = foreground.get_foreground_ids(g=g, write=False)
+    node_by_name = {n.name: n for n in out["tree"].traverse()}
+    trait = "traitA"
+    # Stem branch of lineage 1 (Nep1+Nep2 clade) should remain red.
+    assert ete.get_prop(node_by_name["N"], "color_" + trait) == "red"
+    # Stem branch of lineage 2 (Ceph leaf branch) should be blue.
+    assert ete.get_prop(node_by_name["Ceph"], "color_" + trait) == "blue"
+    # Tip label colors should match lineage colors.
+    assert ete.get_prop(node_by_name["Nep1"], "labelcolor_" + trait) == "red"
+    assert ete.get_prop(node_by_name["Nep2"], "labelcolor_" + trait) == "red"
+    assert ete.get_prop(node_by_name["Ceph"], "labelcolor_" + trait) == "blue"
+ 
 
 def test_get_num_foreground_lineages_reads_tree_properties():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))

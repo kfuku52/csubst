@@ -313,14 +313,14 @@ def get_codon_order_index(order_from, order_to):
     index_by_codon = dict()
     for i,to in enumerate(order_to):
         if to in index_by_codon:
-            raise AssertionError('Duplicate codon found in target order: {}'.format(to))
+            raise ValueError('Duplicate codon found in target order: {}'.format(to))
         index_by_codon[to] = i
     missing = [fr for fr in order_from if fr not in index_by_codon]
     if len(missing) > 0:
         missing_txt = ','.join(missing[:10])
         if len(missing) > 10:
             missing_txt += ',...'
-        raise AssertionError('Codon(s) from source order not found in target order: {}'.format(missing_txt))
+        raise ValueError('Codon(s) from source order not found in target order: {}'.format(missing_txt))
     out = numpy.array([index_by_codon[fr] for fr in order_from], dtype=int)
     return out
 

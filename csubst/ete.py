@@ -6,6 +6,8 @@ ete4 (preferred) or ete3 (fallback for older environments).
 
 from __future__ import annotations
 
+import os
+
 _ete4_import_error = None
 _ete3_import_error = None
 _backend = None
@@ -37,6 +39,12 @@ def backend_name():
 
 def PhyloNode(source, format=1):
     if _backend == "ete4":
+        # ete4 treats path-like strings as filenames and opens them internally
+        # without a context manager in some code paths. Read explicitly here to
+        # avoid leaking file descriptors under strict warning settings.
+        if isinstance(source, (str, os.PathLike)) and os.path.exists(source):
+            with open(source, "r", encoding="utf-8") as handle:
+                source = handle.read()
         return _ete_mod.Tree(source, parser=format)
     return _ete_mod.PhyloNode(source, format=format)
 
@@ -200,22 +208,6 @@ def write_tree(tree, format=1, outfile=None):
 
 
 def get_treeview_module():
-    required = ("TreeStyle", "NodeStyle", "TextFace", "add_face_to_node")
-    if _backend == "ete4":
-        try:
-            from ete4 import treeview as tv  # type: ignore[import-not-found]
-            if all(hasattr(tv, attr) for attr in required):
-                return tv
-        except Exception:  # pragma: no cover - optional feature
-            tv = None
-        # Fallback: use ete3 treeview APIs when ete4 treeview is unavailable.
-        try:
-            import ete3 as ete3_mod  # type: ignore[import-not-found]
-            if all(hasattr(ete3_mod, attr) for attr in required):
-                return ete3_mod
-        except Exception:  # pragma: no cover - optional feature
-            return None
-        return None
-    if all(hasattr(_ete_mod, attr) for attr in required):
-        return _ete_mod
+    # Tree plotting is matplotlib-based in CSUBST; keep this compatibility
+    # function as a stable no-op for callers that still import it.
     return None

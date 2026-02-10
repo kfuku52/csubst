@@ -52,6 +52,72 @@ def test_get_global_parameters_rejects_invalid_chunk_factors():
         param.get_global_parameters(_args(parallel_chunk_factor_reducer=0))
 
 
+def test_get_global_parameters_rejects_nonpositive_threads():
+    with pytest.raises(ValueError, match="threads"):
+        param.get_global_parameters(_args(threads=0))
+    with pytest.raises(ValueError, match="threads"):
+        param.get_global_parameters(_args(threads=-1))
+
+
+def test_get_global_parameters_requires_foreground_for_exhaustive_until_one():
+    with pytest.raises(ValueError, match="exhaustive_until 1"):
+        param.get_global_parameters(_args(exhaustive_until=1, foreground=None))
+
+
+def test_get_global_parameters_requires_foreground_for_clade_permutation():
+    with pytest.raises(ValueError, match="fg_clade_permutation"):
+        param.get_global_parameters(_args(fg_clade_permutation=1, foreground=None))
+
+
+def test_get_global_parameters_rejects_invalid_percent_biased_sub():
+    with pytest.raises(ValueError, match="percent_biased_sub"):
+        param.get_global_parameters(_args(percent_biased_sub=-1))
+    with pytest.raises(ValueError, match="percent_biased_sub"):
+        param.get_global_parameters(_args(percent_biased_sub=100))
+
+
+def test_get_global_parameters_rejects_invalid_tree_site_plot_values():
+    with pytest.raises(ValueError, match="tree_site_plot_max_sites"):
+        param.get_global_parameters(_args(tree_site_plot_max_sites=0))
+    with pytest.raises(ValueError, match="tree_site_plot_min_prob"):
+        param.get_global_parameters(_args(tree_site_plot_min_prob=1.1))
+
+
+def test_get_global_parameters_rejects_invalid_simulate_ranges():
+    with pytest.raises(ValueError, match="num_simulated_site"):
+        param.get_global_parameters(_args(num_simulated_site=0))
+    with pytest.raises(ValueError, match="num_simulated_site"):
+        param.get_global_parameters(_args(num_simulated_site=-2))
+    with pytest.raises(ValueError, match="percent_convergent_site"):
+        param.get_global_parameters(_args(percent_convergent_site=-1))
+    with pytest.raises(ValueError, match="percent_convergent_site"):
+        param.get_global_parameters(_args(percent_convergent_site=101))
+
+
+def test_get_global_parameters_rejects_negative_simulate_scalars():
+    with pytest.raises(ValueError, match="tree_scaling_factor"):
+        param.get_global_parameters(_args(tree_scaling_factor=-0.1))
+    with pytest.raises(ValueError, match="foreground_scaling_factor"):
+        param.get_global_parameters(_args(foreground_scaling_factor=-0.1))
+    with pytest.raises(ValueError, match="background_omega"):
+        param.get_global_parameters(_args(background_omega=-0.1))
+    with pytest.raises(ValueError, match="foreground_omega"):
+        param.get_global_parameters(_args(foreground_omega=-0.1))
+
+
+def test_get_global_parameters_validates_convergent_amino_acids():
+    with pytest.raises(ValueError, match="randomN"):
+        param.get_global_parameters(_args(convergent_amino_acids="random-1"))
+    with pytest.raises(ValueError, match="randomN"):
+        param.get_global_parameters(_args(convergent_amino_acids="randomX"))
+    with pytest.raises(ValueError, match="0 <= N <= 20"):
+        param.get_global_parameters(_args(convergent_amino_acids="random21"))
+    with pytest.raises(ValueError, match="unsupported amino acids"):
+        param.get_global_parameters(_args(convergent_amino_acids="Z"))
+    g = param.get_global_parameters(_args(convergent_amino_acids="AQ"))
+    assert g["convergent_amino_acids"] == "AQ"
+
+
 def test_resolve_sub_tensor_backend_auto_to_dense():
     g = {"sub_tensor_backend": "auto"}
     assert substitution.resolve_sub_tensor_backend(g) == "dense"

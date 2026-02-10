@@ -53,6 +53,20 @@ def test_sort_cb_stats_handles_non_string_column_names_regression():
     assert 999 in out.columns
 
 
+def test_sort_cb_stats_handles_empty_columns_regression():
+    cb_stats = pandas.DataFrame()
+    out = table.sort_cb_stats(cb_stats)
+    assert out.shape == (0, 6)
+    assert out.columns.tolist() == [
+        "arity",
+        "elapsed_sec",
+        "cutoff_stat",
+        "fg_enrichment_factor",
+        "mode",
+        "dSC_calibration",
+    ]
+
+
 def test_set_substitution_dtype_casts_integral_columns_only():
     df = pandas.DataFrame(
         {
@@ -206,14 +220,14 @@ def test_get_codon_order_index_reorders_positions():
 def test_get_codon_order_index_raises_on_missing_codon():
     order_from = numpy.array(["AAA", "XXX", "AAC"])
     order_to = numpy.array(["AAG", "AAA", "AAC"])
-    with pytest.raises(AssertionError, match="not found in target order"):
+    with pytest.raises(ValueError, match="not found in target order|missing"):
         parser_misc.get_codon_order_index(order_from, order_to)
 
 
 def test_get_codon_order_index_raises_on_duplicate_target_codon():
     order_from = numpy.array(["AAA", "AAC", "AAG"])
     order_to = numpy.array(["AAA", "AAA", "AAC"])
-    with pytest.raises(AssertionError, match="Duplicate codon"):
+    with pytest.raises(ValueError, match="Duplicate codon"):
         parser_misc.get_codon_order_index(order_from, order_to)
 
 

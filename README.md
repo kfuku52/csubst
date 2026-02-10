@@ -89,8 +89,6 @@ csubst site \
   --branch_id 23,51
 ```
 
-By default, `csubst site` writes branch-specific outputs under `csubst_site.branch_id*`, including `csubst_site.tree_site.pdf` and `csubst_site.tree_site.tsv`.
-
 For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 
 ## Citation

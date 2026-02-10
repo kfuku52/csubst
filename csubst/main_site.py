@@ -3,6 +3,7 @@ import matplotlib
 import matplotlib.pyplot
 import pandas
 
+import datetime
 import itertools
 import os
 import re
@@ -30,6 +31,59 @@ matplotlib.rc('xtick', labelsize=font_size)
 matplotlib.rc('ytick', labelsize=font_size)
 matplotlib.rc('legend', fontsize=font_size)
 matplotlib.rc('figure', titlesize=font_size)
+
+def bool2yesno(flag):
+    return 'yes' if bool(flag) else 'no'
+
+def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, branch_ids, note=''):
+    site_outdir = os.path.abspath(g['site_outdir'])
+    output_path_abs = os.path.abspath(output_path)
+    exists = os.path.exists(output_path_abs)
+    size_bytes = os.path.getsize(output_path_abs) if exists else -1
+    if output_path_abs.startswith(site_outdir + os.sep):
+        output_file = os.path.relpath(output_path_abs, start=site_outdir)
+    else:
+        output_file = output_path_abs
+    row = {
+        'generated_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'branch_ids': ','.join([str(int(bid)) for bid in numpy.asarray(branch_ids)]),
+        'branch_count': int(len(branch_ids)),
+        'single_branch_mode': bool2yesno(g.get('single_branch_mode', False)),
+        'output_kind': str(output_kind),
+        'output_file': str(output_file),
+        'output_path': output_path_abs,
+        'file_exists': bool2yesno(exists),
+        'file_size_bytes': int(size_bytes),
+        'tree_site_plot': bool2yesno(g.get('tree_site_plot', True)),
+        'site_state_plot': bool2yesno(g.get('site_state_plot', True)),
+        'tree_site_plot_format': str(g.get('tree_site_plot_format', 'pdf')).lower(),
+        'tree_site_plot_min_prob_effective': float(get_tree_site_min_prob(g)),
+        'tree_site_plot_max_sites': int(get_tree_site_plot_max_sites(g)),
+        'pdb_mode': bool2yesno(g.get('pdb', None) is not None),
+        'note': str(note),
+    }
+    manifest_rows.append(row)
+    return manifest_rows
+
+def write_site_output_manifest(manifest_rows, g, branch_ids):
+    manifest_path = os.path.join(g['site_outdir'], 'csubst_site.outputs.tsv')
+    manifest_df = pandas.DataFrame(manifest_rows)
+    if manifest_df.shape[0] > 0:
+        manifest_df = manifest_df.sort_values(by=['output_kind', 'output_file']).reset_index(drop=True)
+    manifest_df.to_csv(manifest_path, sep='\t', index=False, chunksize=10000)
+    add_site_output_manifest_row(
+        manifest_rows=manifest_rows,
+        output_path=manifest_path,
+        output_kind='output_manifest',
+        g=g,
+        branch_ids=branch_ids,
+        note='manifest_self_row',
+    )
+    manifest_df = pandas.DataFrame(manifest_rows)
+    manifest_df = manifest_df.sort_values(by=['output_kind', 'output_file']).reset_index(drop=True)
+    manifest_df.to_csv(manifest_path, sep='\t', index=False, chunksize=10000)
+    print('Writing site output manifest: {}'.format(manifest_path), flush=True)
+    return manifest_path
 
 def get_state(node, g):
     seq = ete.get_prop(node, 'sequence', '').upper()
@@ -400,10 +454,12 @@ def plot_barchart(df, g):
         outbase = os.path.join(g['site_outdir'], 'csubst_site')
     else:
         outbase = g['pdb_outfile_base']
-    fig.savefig(outbase+".pdf", format='pdf', transparent=True)
+    out_path = outbase + ".pdf"
+    fig.savefig(out_path, format='pdf', transparent=True)
     #fig.savefig(outbase+".svg", format='svg', transparent=True)
     print("Nonsynonymous and synonymous substitutions are shown in color and gray, respectively.", flush=True)
     print("Alignment gap sites are indicated by gray scale (0% missing = white, 100% missing = black).", flush=True)
+    return out_path
 
 
 def plot_lineage_tree(g, outbase):
@@ -758,7 +814,11 @@ def get_df_dist(sub_tensor, g, mode):
     return df_dist
 
 def plot_state(ON_tensor, OS_tensor, branch_ids, g):
+    if not bool(g.get('site_state_plot', True)):
+        print('Skipping substitution-pattern summary outputs (--site_state_plot no).', flush=True)
+        return []
     fig,axes = matplotlib.pyplot.subplots(nrows=3, ncols=2, figsize=(7.2, 7.2), sharex=False)
+    output_paths = list()
     outfiles = ['csubst_site.state_N.tsv', 'csubst_site.state_S.tsv']
     colors = ['red','blue']
     ax_cols = [0,1]
@@ -785,7 +845,8 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         df_ad = pandas.merge(df_ad, df_dist, on=['group','state_from','state_to'])
         out_path = os.path.join(g['site_outdir'], outfile)
         df_ad.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
-        df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '→' + df_ad.loc[:,'state_to']
+        output_paths.append(out_path)
+        df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '->' + df_ad.loc[:,'state_to']
         ax = axes[0,ax_col]
         ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'all'], color='black')
         ax.bar(df_ad.loc[:,'xlabel'], df_ad.loc[:,'target'], color=color)
@@ -808,7 +869,11 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
     fig.tight_layout(h_pad=0.5, w_pad=1)
     outbase = os.path.join(g['site_outdir'], 'csubst_site.state')
-    fig.savefig(outbase+".pdf", format='pdf', transparent=True)
+    fig_path = outbase + ".pdf"
+    fig.savefig(fig_path, format='pdf', transparent=True)
+    matplotlib.pyplot.close(fig)
+    output_paths.append(fig_path)
+    return output_paths
 
 def get_tree_site_min_prob(g):
     min_prob = g.get('tree_site_plot_min_prob', -1.0)
@@ -1014,7 +1079,8 @@ def get_nice_scale_length(max_tree_depth):
 
 def plot_tree_site(df, g):
     if not bool(g.get('tree_site_plot', True)):
-        return None
+        print('Skipping tree + site summary outputs (--tree_site_plot no).', flush=True)
+        return []
     tree_site_df,min_prob = classify_tree_site_categories(df=df, g=g)
     display_meta = get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
     xcoord,ycoord,leaf_order = get_tree_plot_coordinates(tree=g['tree'])
@@ -1027,10 +1093,11 @@ def plot_tree_site(df, g):
 
     num_display_site = max(len(display_meta), 1)
     num_leaf = max(len(leaf_order), 1)
-    tree_panel_width = min(max(6.4, 5.0 + x_max * 0.55), 14.0)
-    site_panel_width = min(max(1.8, num_display_site * 0.15), 8.5)
+    # Dense defaults for compact tree/site output.
+    tree_panel_width = min(max(5.0, 4.2 + x_max * 0.42), 10.0)
+    site_panel_width = min(max(1.6, num_display_site * 0.12), 6.5)
     fig_width = tree_panel_width + site_panel_width
-    fig_height = min(max(3.2, num_leaf * 0.18 + 0.7), 11.0)
+    fig_height = min(max(2.5, num_leaf * 0.13 + 0.55), 8.5)
     fg_color = 'firebrick'
     bg_branch_color = '#4d4d4d'
     bg_label_color = '#5f6f7f'
@@ -1096,7 +1163,7 @@ def plot_tree_site(df, g):
     if len(leaf_order):
         ax_tree.set_ylim(len(leaf_order)-0.5, -0.5)
     left_xlim = -root_stub * 1.5
-    right_xlim = x_max * 1.30 + 0.35
+    right_xlim = x_max * 1.22 + 0.22
     ax_tree.set_xlim(left_xlim, right_xlim)
 
     scale_length = get_nice_scale_length(x_max)
@@ -1200,7 +1267,7 @@ def plot_tree_site(df, g):
     table_path = os.path.join(g['site_outdir'], 'csubst_site.tree_site.tsv')
     tree_site_df.to_csv(table_path, sep='\t', index=False, float_format=g['float_format'], chunksize=10000)
     print('Writing tree + site category table: {}'.format(table_path), flush=True)
-    return None
+    return [fig_path, table_path]
 
 def initialize_site_df(num_site):
     df = pandas.DataFrame()
@@ -1684,6 +1751,7 @@ def main_site(g):
             print('Single branch mode. Substitutions, rather than combinatorial substitutions, will be mapped.')
         if not os.path.exists(g['site_outdir']):
             os.makedirs(g['site_outdir'])
+        manifest_rows = list()
         leaf_nn = [ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() if ete.is_leaf(n)]
         num_site = ON_tensor.shape[1]
         df = initialize_site_df(num_site)
@@ -1730,22 +1798,158 @@ def main_site(g):
             df = parser_uniprot.add_uniprot_site_annotations(df=df, g=g)
             g['session_file_path'] = g['pdb_outfile_base']+'.pymol.pse'
             parser_pymol.write_pymol_session(df=df, g=g)
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=g['session_file_path'],
+                output_kind='pymol_session',
+                g=g,
+                branch_ids=g['branch_ids'],
+            )
             if g['pymol_img'] and should_save_pymol_views(g):
                 parser_pymol.save_six_views()
-                parser_pymol.save_6view_pdf(pdf_filename=os.path.join(g['site_outdir'], f'csubst_site.{id_base}.pymol.pdf'))
-        plot_barchart(df, g)
+                pymol_pdf_path = os.path.join(g['site_outdir'], f'csubst_site.{id_base}.pymol.pdf')
+                parser_pymol.save_6view_pdf(pdf_filename=pymol_pdf_path)
+                add_site_output_manifest_row(
+                    manifest_rows=manifest_rows,
+                    output_path=pymol_pdf_path,
+                    output_kind='pymol_summary_pdf',
+                    g=g,
+                    branch_ids=g['branch_ids'],
+                )
+        barchart_path = plot_barchart(df, g)
+        add_site_output_manifest_row(
+            manifest_rows=manifest_rows,
+            output_path=barchart_path,
+            output_kind='site_summary_pdf',
+            g=g,
+            branch_ids=g['branch_ids'],
+        )
+        if should_plot_state(g):
+            state_paths = plot_state(ON_tensor, OS_tensor, g['branch_ids'], g)
+            if len(state_paths):
+                for state_path in state_paths:
+                    file_name = os.path.basename(state_path)
+                    if file_name == 'csubst_site.state.pdf':
+                        output_kind = 'state_pattern_pdf'
+                    elif file_name == 'csubst_site.state_N.tsv':
+                        output_kind = 'state_pattern_nonsyn_tsv'
+                    elif file_name == 'csubst_site.state_S.tsv':
+                        output_kind = 'state_pattern_syn_tsv'
+                    else:
+                        output_kind = 'state_pattern_misc'
+                    add_site_output_manifest_row(
+                        manifest_rows=manifest_rows,
+                        output_path=state_path,
+                        output_kind=output_kind,
+                        g=g,
+                        branch_ids=g['branch_ids'],
+                    )
+            else:
+                add_site_output_manifest_row(
+                    manifest_rows=manifest_rows,
+                    output_path=os.path.join(g['site_outdir'], 'csubst_site.state.pdf'),
+                    output_kind='state_pattern_pdf',
+                    g=g,
+                    branch_ids=g['branch_ids'],
+                    note='skipped_by_site_state_plot',
+                )
+                add_site_output_manifest_row(
+                    manifest_rows=manifest_rows,
+                    output_path=os.path.join(g['site_outdir'], 'csubst_site.state_N.tsv'),
+                    output_kind='state_pattern_nonsyn_tsv',
+                    g=g,
+                    branch_ids=g['branch_ids'],
+                    note='skipped_by_site_state_plot',
+                )
+                add_site_output_manifest_row(
+                    manifest_rows=manifest_rows,
+                    output_path=os.path.join(g['site_outdir'], 'csubst_site.state_S.tsv'),
+                    output_kind='state_pattern_syn_tsv',
+                    g=g,
+                    branch_ids=g['branch_ids'],
+                    note='skipped_by_site_state_plot',
+                )
+        else:
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=os.path.join(g['site_outdir'], 'csubst_site.state.pdf'),
+                output_kind='state_pattern_pdf',
+                g=g,
+                branch_ids=g['branch_ids'],
+                note='skipped_by_mode',
+            )
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=os.path.join(g['site_outdir'], 'csubst_site.state_N.tsv'),
+                output_kind='state_pattern_nonsyn_tsv',
+                g=g,
+                branch_ids=g['branch_ids'],
+                note='skipped_by_mode',
+            )
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=os.path.join(g['site_outdir'], 'csubst_site.state_S.tsv'),
+                output_kind='state_pattern_syn_tsv',
+                g=g,
+                branch_ids=g['branch_ids'],
+                note='skipped_by_mode',
+            )
+        tree_paths = plot_tree_site(df, g)
+        if len(tree_paths):
+            for tree_path in tree_paths:
+                file_name = os.path.basename(tree_path)
+                if file_name.startswith('csubst_site.tree_site.') and file_name.endswith('.tsv'):
+                    output_kind = 'tree_site_table_tsv'
+                elif file_name.startswith('csubst_site.tree_site.'):
+                    output_kind = 'tree_site_plot'
+                else:
+                    output_kind = 'tree_site_misc'
+                add_site_output_manifest_row(
+                    manifest_rows=manifest_rows,
+                    output_path=tree_path,
+                    output_kind=output_kind,
+                    g=g,
+                    branch_ids=g['branch_ids'],
+                )
+        else:
+            tree_format = str(g.get('tree_site_plot_format', 'pdf')).lower()
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=os.path.join(g['site_outdir'], 'csubst_site.tree_site.' + tree_format),
+                output_kind='tree_site_plot',
+                g=g,
+                branch_ids=g['branch_ids'],
+                note='skipped_by_tree_site_plot',
+            )
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=os.path.join(g['site_outdir'], 'csubst_site.tree_site.tsv'),
+                output_kind='tree_site_table_tsv',
+                g=g,
+                branch_ids=g['branch_ids'],
+                note='skipped_by_tree_site_plot',
+            )
         if g['pdb'] is None:
             outbase = os.path.join(g['site_outdir'], 'csubst_site')
         else:
             outbase = g['pdb_outfile_base']
         if str(g.get('mode', '')).lower() == 'lineage':
             plot_lineage_tree(g=g, outbase=outbase)
-        if should_plot_state(g):
-            plot_state(ON_tensor, OS_tensor, g['branch_ids'], g)
         out_path = outbase+'.tsv'
         if g['single_branch_mode']:
             df = combinatorial2single_columns(df)
         df.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        add_site_output_manifest_row(
+            manifest_rows=manifest_rows,
+            output_path=out_path,
+            output_kind='site_table_tsv',
+            g=g,
+            branch_ids=g['branch_ids'],
+        )
+        if bool(g.get('site_output_manifest', True)):
+            write_site_output_manifest(manifest_rows=manifest_rows, g=g, branch_ids=g['branch_ids'])
+        else:
+            print('Skipping site output manifest (--site_output_manifest no).', flush=True)
     print('To visualize the convergence probability on protein structure, please see: https://github.com/kfuku52/csubst/wiki')
     print('')
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]

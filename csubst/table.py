@@ -46,8 +46,13 @@ def sort_cb(cb):
 
 def sort_cb_stats(cb_stats):
     col_order = ['arity', 'elapsed_sec', 'cutoff_stat', 'fg_enrichment_factor', 'mode', 'dSC_calibration', ]
+    if cb_stats is None:
+        return pandas.DataFrame(columns=col_order)
+    if cb_stats.shape[1] == 0:
+        return pandas.DataFrame(columns=col_order)
     str_columns = pandas.Index([str(c) for c in cb_stats.columns])
     col_order += cb_stats.columns[str_columns.str.contains('^num_')].tolist()
+    col_order = [col for col in col_order if col in cb_stats.columns]
     if (len(col_order) < cb_stats.columns.shape[0]):
         col_order += [ col for col in cb_stats.columns if col not in col_order ]
     cb_stats = cb_stats.loc[:,col_order]

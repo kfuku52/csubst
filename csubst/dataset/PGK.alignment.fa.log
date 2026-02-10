@@ -1,0 +1,92 @@
+IQ-TREE multicore version 2.3.6 for MacOS Intel 64-bit built Aug  4 2024
+Developed by Bui Quang Minh, Nguyen Lam Tung, Olga Chernomor, Heiko Schmidt,
+Dominik Schrempf, Michael Woodhams, Ly Trong Nhan, Thomas Wong
+
+Host:    Macmini.elecom (AVX2, FMA3, 16 GB RAM)
+Command: iqtree -s /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa -te tmp.csubst.nwk -m ECMK07+F+R4 --seqtype CODON1 --threads-max 1 -T AUTO --ancestral --rate --redo
+Seed:    264202 (Using SPRNG - Scalable Parallel Random Number Generator)
+Time:    Sat Feb  7 10:09:46 2026
+Kernel:  AVX+FMA - auto-detect threads (2 CPU cores detected)
+
+Reading alignment file /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa ... Fasta format detected
+Reading fasta file: done in 0.00162411 secs using 49.5% CPU
+Alignment most likely contains DNA/RNA sequences
+Converting to codon sequences with genetic code 1 ...
+Alignment has 33 sequences with 417 columns, 405 distinct patterns
+388 parsimony-informative, 14 singleton sites, 15 constant sites
+                                          Gap/Ambiguity  Composition  p-value
+Analyzing sequences: done in 4.31538e-05 secs using 95.01% CPU
+   1  Anolis_carolinensis_ENSACAG00000003255      0.00%    failed      0.00%
+   2  Astyanax_mexicanus_ENSAMXG00000007127       0.00%    passed     86.24%
+   3  Bos_taurus_ENSBTAG00000000894               0.00%    passed     99.67%
+   4  Callithrix_jacchus_ENSCJAG00000022394       0.00%    passed     99.43%
+   5  Callithrix_jacchus_ENSCJAG00000021082       0.00%    passed    100.00%
+   6  Canis_lupus_ENSCAFG00000017270              0.00%    passed    100.00%
+   7  Chinchilla_lanigera_ENSCLAG00000000146      0.00%    passed    100.00%
+   8  Danio_rerio_ENSDARG00000054191              0.00%    passed     26.10%
+   9  Gadus_morhua_ENSGMOG00000013283             1.92%    failed      0.00%
+  10  Gallus_gallus_ENSGALG00000007936            0.00%    passed     89.99%
+  11  Homo_sapiens_ENSG00000170950                0.00%    passed     89.85%
+  12  Homo_sapiens_ENSG00000102144                0.00%    passed    100.00%
+  13  Macaca_mulatta_ENSMMUG00000011998           0.00%    passed     95.04%
+  14  Macaca_mulatta_ENSMMUG00000013725           0.00%    passed     99.84%
+  15  Monodelphis_domestica_ENSMODG00000004055    0.00%    passed     99.85%
+  16  Monodelphis_domestica_ENSMODG00000022821    0.00%    passed     99.66%
+  17  Monodelphis_domestica_ENSMODG00000025017    0.00%    passed     99.83%
+  18  Monodelphis_domestica_ENSMODG00000023385    0.00%    passed     34.85%
+  19  Monodelphis_domestica_ENSMODG00000023304    0.00%    passed     97.47%
+  20  Mus_musculus_ENSMUSG00000031233             0.00%    passed     65.47%
+  21  Mus_musculus_ENSMUSG00000062070             0.00%    passed    100.00%
+  22  Oreochromis_niloticus_ENSONIG00000017337    0.00%    failed      0.00%
+  23  Oryctolagus_cuniculus_ENSOCUG00000014726    0.00%    passed    100.00%
+  24  Oryctolagus_cuniculus_ENSOCUG00000005270    0.00%    passed     92.30%
+  25  Oryctolagus_cuniculus_ENSOCUG00000025100    0.96%    passed     99.97%
+  26  Oryzias_latipes_ENSORLG00000014063          0.00%    failed      0.00%
+  27  Ovis_aries_ENSOARG00000008736               0.00%    passed     96.68%
+  28  Ovis_aries_ENSOARG00000018803               0.00%    passed     99.89%
+  29  Rattus_norvegicus_ENSRNOG00000013600        0.00%    passed     99.57%
+  30  Rattus_norvegicus_ENSRNOG00000058249        0.00%    passed    100.00%
+  31  Sus_scrofa_ENSSSCG00000012440               0.00%    passed    100.00%
+  32  Sus_scrofa_ENSSSCG00000001738               0.00%    passed     75.45%
+  33  Xenopus_tropicalis_ENSXETG00000007447       0.00%    passed      5.89%
+****  TOTAL                                       0.09%  4 sequences failed composition chi2 test (p-value<5%; df=60)
+Reading input tree file tmp.csubst.nwk ... rooted tree
+
+NOTE: 29 MB RAM (0 GB) is required!
+Measuring multi-threading efficiency up to 1 CPU cores
+5 trees examined
+Threads: 1 / Time: 1.176 sec / Speedup: 1.000 / Efficiency: 100% / LogL: -17467
+BEST NUMBER OF THREADS: 1
+
+Estimate model parameters (epsilon = 0.010)
+1. Initial log-likelihood: -13672.031
+2. Current log-likelihood: -13349.849
+3. Current log-likelihood: -13287.140
+4. Current log-likelihood: -13284.171
+5. Current log-likelihood: -13284.156
+Optimal log-likelihood: -13284.152
+Nonsynonymous/synonymous ratio (omega): 1.000
+Transition/transversion ratio (kappa): 1.000
+Site proportion and rates:  (0.009,0.265) (0.032,0.379) (0.759,0.828) (0.200,1.785)
+Parameters optimization took 5 rounds (13.153 sec)
+Wrote distance file to... 
+BEST SCORE FOUND : -13284.152
+Ancestral state probabilities printed to /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.state
+Empirical proportions for each category: 0.000 0.000 0.835 0.165
+Site rates printed to /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.rate
+Total tree length: 7.570
+
+Total number of iterations: 0
+CPU time used for tree search: 0.000 sec (0h:0m:0s)
+Wall-clock time used for tree search: 0.000 sec (0h:0m:0s)
+Total CPU time used: 14.751 sec (0h:0m:14s)
+Total wall-clock time used: 15.009 sec (0h:0m:15s)
+
+Analysis results written to: 
+  IQ-TREE report:                /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.iqtree
+  Maximum-likelihood tree:       /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.treefile
+  Site-specific rates:           /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.rate
+  Ancestral state:               /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.state
+  Screen log file:               /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.log
+
+Date and Time: Sat Feb  7 10:10:01 2026

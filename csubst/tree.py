@@ -1,5 +1,4 @@
 import numpy
-
 import copy
 import itertools
 import re
@@ -190,6 +189,25 @@ def _get_pyplot():
         pass
     import matplotlib.pyplot
     return matplotlib.pyplot
+
+
+def _get_nice_scale_length(max_tree_depth):
+    max_tree_depth = float(max_tree_depth)
+    if max_tree_depth <= 0:
+        return 1.0
+    target = max_tree_depth * 0.2
+    exponent = numpy.floor(numpy.log10(target))
+    base = 10 ** exponent
+    normalized = target / base
+    if normalized <= 1.5:
+        scale = 1.0
+    elif normalized <= 3.5:
+        scale = 2.0
+    elif normalized <= 7.5:
+        scale = 5.0
+    else:
+        scale = 10.0
+    return scale * base
 
 
 def _get_tree_xy(tree):

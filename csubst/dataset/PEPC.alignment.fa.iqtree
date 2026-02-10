@@ -1,0 +1,239 @@
+IQ-TREE 2.3.6 built Aug  4 2024
+
+Input file name: csubst/dataset/PEPC.alignment.fa
+User tree file name: tmp.csubst.nwk
+Type of analysis: tree reconstruction
+Random seed number: 874461
+
+REFERENCES
+----------
+
+To cite IQ-TREE please use:
+
+Bui Quang Minh, Heiko A. Schmidt, Olga Chernomor, Dominik Schrempf,
+Michael D. Woodhams, Arndt von Haeseler, and Robert Lanfear (2020)
+IQ-TREE 2: New models and efficient methods for phylogenetic inference
+in the genomic era. Mol. Biol. Evol., in press.
+https://doi.org/10.1093/molbev/msaa015
+
+SEQUENCE ALIGNMENT
+------------------
+
+Input data: 71 sequences with 971 codon sites
+Number of constant sites: 15 (= 1.5448% of all sites)
+Number of invariant (constant or ambiguous constant) sites: 15 (= 1.5448% of all sites)
+Number of parsimony informative sites: 941
+Number of distinct site patterns: 966
+
+SUBSTITUTION PROCESS
+--------------------
+
+Model of substitution: ECMK07+F+R4
+
+State frequencies: (empirical counts from alignment)
+
+  pi(AAA) = 0.0182  pi(AAC) = 0.0130  pi(AAG) = 0.0346  pi(AAT) = 0.0117
+  pi(ACA) = 0.0144  pi(ACC) = 0.0151  pi(ACG) = 0.0078  pi(ACT) = 0.0149
+  pi(AGA) = 0.0127  pi(AGC) = 0.0062  pi(AGG) = 0.0164  pi(AGT) = 0.0049
+  pi(ATA) = 0.0084  pi(ATC) = 0.0216  pi(ATG) = 0.0255  pi(ATT) = 0.0215
+  pi(CAA) = 0.0149  pi(CAC) = 0.0115  pi(CAG) = 0.0243  pi(CAT) = 0.0134
+  pi(CCA) = 0.0176  pi(CCC) = 0.0105  pi(CCG) = 0.0095  pi(CCT) = 0.0151
+  pi(CGA) = 0.0057  pi(CGC) = 0.0129  pi(CGG) = 0.0099  pi(CGT) = 0.0167
+  pi(CTA) = 0.0074  pi(CTC) = 0.0263  pi(CTG) = 0.0253  pi(CTT) = 0.0283
+  pi(GAA) = 0.0312  pi(GAC) = 0.0280  pi(GAG) = 0.0523  pi(GAT) = 0.0323
+  pi(GCA) = 0.0160  pi(GCC) = 0.0194  pi(GCG) = 0.0109  pi(GCT) = 0.0276
+  pi(GGA) = 0.0158  pi(GGC) = 0.0175  pi(GGG) = 0.0117  pi(GGT) = 0.0156
+  pi(GTA) = 0.0061  pi(GTC) = 0.0157  pi(GTG) = 0.0165  pi(GTT) = 0.0195
+  pi(TAC) = 0.0178  pi(TAT) = 0.0126  pi(TCA) = 0.0124  pi(TCC) = 0.0116
+  pi(TCG) = 0.0072  pi(TCT) = 0.0141  pi(TGC) = 0.0062  pi(TGG) = 0.0153
+  pi(TGT) = 0.0041  pi(TTA) = 0.0072  pi(TTC) = 0.0221  pi(TTG) = 0.0194
+  pi(TTT) = 0.0181
+Model of rate heterogeneity: FreeRate with 4 categories
+Site proportion and rates:  (0.0170,0.0989) (0.0116,0.4370) (0.0407,0.4477) (0.9307,1.0476)
+
+ Category  Relative_rate  Proportion
+  1         0.0989         0.0170
+  2         0.4370         0.0116
+  3         0.4477         0.0407
+  4         1.0476         0.9307
+
+USER TREE
+---------
+
+Log-likelihood of the tree: -62216.5753 (s.e. 963.2801)
+Unconstrained log-likelihood (without tree): -6671.4003
+Number of free parameters (#branches + #model parameters): 205
+Akaike information criterion (AIC) score: 124843.1505
+Corrected Akaike information criterion (AICc) score: 124953.5557
+Bayesian information criterion (BIC) score: 125843.2074
+
+Total tree length (sum of branch lengths): 17.5501
+Sum of internal branch lengths: 6.4077 (36.5109% of tree length)
+
+WARNING: 2 near-zero internal branches (<0.0010) should be treated with caution
+         Such branches are denoted by '**' in the figure below
+
+NOTE: Tree is UNROOTED although outgroup taxon 'Zea_mays_AB012228' is drawn at root
+
+NOTE: Branch lengths are interpreted as number of nucleotide substitutions per codon site!
+      Rescale them by 1/3 if you want to have #nt substitutions per nt site
+
++--Zea_mays_AB012228
+| (Node1)
+|                                                   +------Eleocharis_vivipara_AB085948
+|                                                +--| (Node14)
+|                                                |  |   +--Fimbristylis_littoralis_FM208036
+|                                                |  +---| (Node15)
+|                                                |      +------Fimbristylis_littoralis_FM208037
+|                                             +--| (Node13)
+|                                             |  |     +--------Cyperus_sanguinolentus_FM208046
+|                                             |  |  +--| (Node17)
+|                                             |  |  |  |  +--Cyperus_eragrostis_FM208065
+|                                             |  |  |  +--| (Node18)
+|                                             |  |  |     +--Cyperus_eragrostis_FM208066
+|                                             |  +--| (Node16)
+|                                             |     +--Scirpoides_holoschoenus_subsp._thunbergii_FM208059
+|                                          +--| (Node12)
+|                                          |  +---Carex_pendula_FM207998
+|                                  +-------| (Node11)
+|                                  |       +-----Chrysitrix_dodii_FM208000
+|                               +--| (Node10)
+|                               |  |                      +--Cyperus_nipponicus_FN390839
+|                               |  +----------------------| (Node19)
+|                               |                         +--Cyperus_nipponicus_FN390840
+|                            +--| (Node9)
+|                            |  |              +---------Chrysitrix_dodii_FM208067
+|                            |  |        +-----| (Node21)
+|                            |  |        |     |     +--Carex_pendula_FN390832
+|                            |  |        |     |  +--| (Node23)
+|                            |  |        |     |  |  |  +--Scirpoides_holoschoenus_FN390833
+|                            |  |        |     |  |  +--| (Node24)
+|                            |  |        |     |  |     |  +--Cyperus_sanguinolentus_FN390835
+|                            |  |        |     |  |     +--| (Node25)
+|                            |  |        |     |  |        +--Cyperus_nipponicus_FN390836
+|                            |  |        |     +--| (Node22)
+|                            |  |        |        +----Fimbristylis_littoralis_FN390834
+|                            |  +--------| (Node20)
+|                            |           +-------------Scirpoides_holoschoenus_subsp._thunbergii_FN390838
+|                         +**| (Node8)
+|                         |  +-----------Fimbristylis_littoralis_FN390837
+|                      +--| (Node7)
+|                      |  |                    +---------Gossypium_hirsutum_AF008939
+|                      |  |                 +--| (Node32)
+|                      |  |                 |  |  +-----Citrus_sinensis_EF058158
+|                      |  |                 |  +--| (Node33)
+|                      |  |                 |     +---------------Arabidopsis_thaliana_NM_001036102
+|                      |  |              +--| (Node31)
+|                      |  |              |  |  +----------Sesbania_rostrata_AJ286750
+|                      |  |              |  +--| (Node34)
+|                      |  |              |     +------Vitis_riparia_XM_034822303
+|                      |  |           +--| (Node30)
+|                      |  |           |  |            +---Flaveria_trinervia_AF248079
+|                      |  |           |  |         +--| (Node37)
+|                      |  |           |  |         |  |        +--Flaveria_brownii_AF494191
+|                      |  |           |  |         |  |     +--| (Node40)
+|                      |  |           |  |         |  |     |  +**Flaveria_pubescens_AF494192
+|                      |  |           |  |         |  |  +--| (Node39)
+|                      |  |           |  |         |  |  |  +--Flaveria_australasica_Z25853
+|                      |  |           |  |         |  +--| (Node38)
+|                      |  |           |  |         |     +--Flaveria_pringlei_Z48966
+|                      |  |           |  |  +------| (Node36)
+|                      |  |           |  |  |      +------Flaveria_trinervia_AF248080
+|                      |  |           |  +--| (Node35)
+|                      |  |           |     +-----------Solanum_tuberosum_AJ011844
+|                      |  |        +--| (Node29)
+|                      |  |        |  |                     +--Alternanthera_pungens_AY950665
+|                      |  |        |  |                  +--| (Node45)
+|                      |  |        |  |                  |  +--Alternanthera_ficoidea_AY950666
+|                      |  |        |  |               +--| (Node44)
+|                      |  |        |  |               |  +--Alternanthera_sessilis_AY950667
+|                      |  |        |  |            +--| (Node43)
+|                      |  |        |  |            |  +-------Amaranthus_hypochondriacus_Z68125
+|                      |  |        |  |         +**| (Node42)
+|                      |  |        |  |         |  +------------------Tidestromia_valdesiana_KJ161704
+|                      |  |        |  +---------| (Node41)
+|                      |  |        |            |            +--Bienertia_sinuspersici_DQ538352
+|                      |  |        |            |         +--| (Node49)
+|                      |  |        |            |         |  +--Suaeda_aralocaspica_DQ538353
+|                      |  |        |            |      +--| (Node48)
+|                      |  |        |            |      |  +--Suaeda_linifolia_DQ538355
+|                      |  |        |            |  +---| (Node47)
+|                      |  |        |            |  |   +----Suaeda_eltonica_DQ538354
+|                      |  |        |            +--| (Node46)
+|                      |  |        |               +----Beta_vulgaris_subsp._vulgaris_XM_010691525
+|                      |  |     +--| (Node28)
+|                      |  |     |  |  +------------Amborella_trichopoda_XM_006852360
+|                      |  |     |  +--| (Node50)
+|                      |  |     |     +-----------Nymphaea_colorata_XM_031638555
+|                      |  |  +--| (Node27)
+|                      |  |  |  +--------------Hydrilla_verticillata_AF271161
+|                      |  +--| (Node26)
+|                      |     +-------------------Vanilla_planifolia_X87148
+|                   +--| (Node6)
+|                   |  |      +----Saccharum_hybrid_cultivar_H32-8560_M86661
+|                   |  +------| (Node51)
+|                   |         +-----Oryza_sativa_Japonica_Group_NM_001050836
+|        +----------| (Node5)
+|        |          |        +-----Triticum_aestivum_AJ007705
+|        |          |     +--| (Node53)
+|        |          |     |  |  +--Sorghum_bicolor_X59925
+|        |          |     |  +--| (Node54)
+|        |          |     |     +--Zea_mays_X61489
+|        |          +-----| (Node52)
+|        |                +------Oryza_sativa_Indica_Group_AY187619
+|     +--| (Node4)
+|     |  |                   +-----Setaria_italica_AF495586
+|     |  |                +--| (Node58)
+|     |  |                |  |    +--Zea_mays_X15239
+|     |  |                |  +----| (Node59)
+|     |  |                |       +---Sorghum_bicolor_X17379
+|     |  |             +--| (Node57)
+|     |  |             |  +--Cyrtococcum_patens_AM689877
+|     |  |          +--| (Node56)
+|     |  |          |  +--Phragmites_australis_AM689880
+|     |  +----------| (Node55)
+|     |             |                       +--Oryza_sativa_Japonica_Group_AK066635
+|     |             |                    +--| (Node64)
+|     |             |                    |  +--Microlaena_stipoides_AM689896
+|     |             |                 +--| (Node63)
+|     |             |                 |  |           +--Cyrtococcum_patens_AM689878
+|     |             |                 |  |        +--| (Node68)
+|     |             |                 |  |        |  +--Hymenachne_amplexicaulis_AM689899
+|     |             |                 |  |     +--| (Node67)
+|     |             |                 |  |     |  +---Arrhenatherum_elatius_AM689890
+|     |             |                 |  |  +--| (Node66)
+|     |             |                 |  |  |  +--Phaenosperma_globosum_AM689882
+|     |             |                 |  +--| (Node65)
+|     |             |                 |     +--Arundinaria_sp._Hodkinson_s.n._AM689891
+|     |             |              +--| (Node62)
+|     |             |              |  +-----Pharus_latifolius_AM689883
+|     |             |  +-----------| (Node61)
+|     |             |  |           +---Streptochaeta_sodiroana_AM689887
+|     |             +--| (Node60)
+|     |                +-----Holcus_lanatus_AM690224
+|  +--| (Node3)
+|  |  +---Oryza_sativa_Japonica_Group_AF271995
++--| (Node2)
+|  |  +--Echinochloa_crus-galli_AY251482
+|  +--| (Node69)
+|     +--Setaria_italica_AY491400
+|
++--Sorghum_bicolor_X55664
+
+Tree in newick format:
+
+(Zea_mays_AB012228:0.0438041615,(((((((((((((Eleocharis_vivipara_AB085948:0.2088502516,(Fimbristylis_littoralis_FM208036:0.0426240390,Fimbristylis_littoralis_FM208037:0.2067120910)Node15:0.1214526240)Node14:0.0151571146,((Cyperus_sanguinolentus_FM208046:0.2847076885,(Cyperus_eragrostis_FM208065:0.0630933904,Cyperus_eragrostis_FM208066:0.0682238825)Node18:0.0169427645)Node17:0.0220156741,Scirpoides_holoschoenus_subsp._thunbergii_FM208059:0.0671940941)Node16:0.0628375947)Node13:0.0519007905,Carex_pendula_FM207998:0.1352503313)Node12:0.0341272024,Chrysitrix_dodii_FM208000:0.1892266432)Node11:0.2508939099,(Cyperus_nipponicus_FN390839:0.0249969128,Cyperus_nipponicus_FN390840:0.0551915124)Node19:0.6780932489)Node10:0.0603545768,((Chrysitrix_dodii_FM208067:0.2951262957,((Carex_pendula_FN390832:0.0594571280,(Scirpoides_holoschoenus_FN390833:0.0563126401,(Cyperus_sanguinolentus_FN390835:0.0413778606,Cyperus_nipponicus_FN390836:0.0501815153)Node25:0.0969916751)Node24:0.0549648724)Node23:0.0176136645,Fimbristylis_littoralis_FN390834:0.1518037078)Node22:0.0102433996)Node21:0.1954910187,Scirpoides_holoschoenus_subsp._thunbergii_FN390838:0.4083483568)Node20:0.2631871375)Node9:0.1125578577,Fimbristylis_littoralis_FN390837:0.3513284631)Node8:0.0000060361,(((((((Gossypium_hirsutum_AF008939:0.3076609690,(Citrus_sinensis_EF058158:0.1956240416,Arabidopsis_thaliana_NM_001036102:0.4773129763)Node33:0.0494323505)Node32:0.0433542982,(Sesbania_rostrata_AJ286750:0.3341698781,Vitis_riparia_XM_034822303:0.2124402749)Node34:0.0299968875)Node31:0.0114454573,(((Flaveria_trinervia_AF248079:0.1202000678,(((Flaveria_brownii_AF494191:0.0121625280,Flaveria_pubescens_AF494192:0.0005391937)Node40:0.0388117034,Flaveria_australasica_Z25853:0.0710620077)Node39:0.0084042216,Flaveria_pringlei_Z48966:0.0232459763)Node38:0.1052466104)Node37:0.1150247033,Flaveria_trinervia_AF248080:0.2183868988)Node36:0.2215746646,Solanum_tuberosum_AJ011844:0.3643483054)Node35:0.0692072040)Node30:0.0571998390,(((((Alternanthera_pungens_AY950665:0.0836483867,Alternanthera_ficoidea_AY950666:0.0267136824)Node45:0.0365282199,Alternanthera_sessilis_AY950667:0.0598302298)Node44:0.1149850698,Amaranthus_hypochondriacus_Z68125:0.2425572019)Node43:0.0465983253,Tidestromia_valdesiana_KJ161704:0.5790481470)Node42:0.0000048198,((((Bienertia_sinuspersici_DQ538352:0.0970793699,Suaeda_aralocaspica_DQ538353:0.0293905401)Node49:0.0545942761,Suaeda_linifolia_DQ538355:0.0791727590)Node48:0.0338124120,Suaeda_eltonica_DQ538354:0.1526781510)Node47:0.1349257464,Beta_vulgaris_subsp._vulgaris_XM_010691525:0.1519704419)Node46:0.0079444271)Node41:0.2991260933)Node29:0.0763820118,(Amborella_trichopoda_XM_006852360:0.4071511508,Nymphaea_colorata_XM_031638555:0.3602482851)Node50:0.0673061613)Node28:0.0727336771,Hydrilla_verticillata_AF271161:0.4538494711)Node27:0.0457630601,Vanilla_planifolia_X87148:0.5882481371)Node26:0.0619893461)Node7:0.0183695260,(Saccharum_hybrid_cultivar_H32-8560_M86661:0.1536095389,Oryza_sativa_Japonica_Group_NM_001050836:0.1766792144)Node51:0.2199674566)Node6:0.0433287869,((Triticum_aestivum_AJ007705:0.1890913425,(Sorghum_bicolor_X59925:0.0371883232,Zea_mays_X61489:0.0604040049)Node54:0.1075168828)Node53:0.0761617496,Oryza_sativa_Indica_Group_AY187619:0.2044762132)Node52:0.1856742034)Node5:0.3424746970,((((Setaria_italica_AF495586:0.1802569376,(Zea_mays_X15239:0.0891408195,Sorghum_bicolor_X17379:0.1358726233)Node59:0.1511634213)Node58:0.0468087931,Cyrtococcum_patens_AM689877:0.0490487708)Node57:0.0324910666,Phragmites_australis_AM689880:0.1072148479)Node56:0.0457272988,(((((Oryza_sativa_Japonica_Group_AK066635:0.0850316880,Microlaena_stipoides_AM689896:0.0857535194)Node64:0.0179281816,((((Cyrtococcum_patens_AM689878:0.0471008056,Hymenachne_amplexicaulis_AM689899:0.0575424185)Node68:0.0638890221,Arrhenatherum_elatius_AM689890:0.1371853131)Node67:0.0324240996,Phaenosperma_globosum_AM689882:0.0539776786)Node66:0.0118720416,Arundinaria_sp._Hodkinson_s.n._AM689891:0.0552910518)Node65:0.0122007266)Node63:0.1083596647,Pharus_latifolius_AM689883:0.1777131028)Node62:0.0565695748,Streptochaeta_sodiroana_AM689887:0.1230892155)Node61:0.3669427071,Holcus_lanatus_AM690224:0.1896749121)Node60:0.0268733554)Node55:0.3448823201)Node4:0.0888330902,Oryza_sativa_Japonica_Group_AF271995:0.1346070837)Node3:0.0660014437,(Echinochloa_crus-galli_AY251482:0.0594111166,Setaria_italica_AY491400:0.0670036709)Node69:0.0224068388)Node2:0.0516208502,Sorghum_bicolor_X55664:0.0335249550)Node1;
+
+ALISIM COMMAND
+--------------
+Currently, we only support exporting AliSim commands automatically from the analysis for common models of DNA, Protein, Binary, and Morphological data. To simulate data from other models (mixture, lie-markov, etc), please refer to the User Manual of AliSim. Thanks!
+
+For more information on using AliSim, please visit: www.iqtree.org/doc/AliSim
+
+TIME STAMP
+----------
+
+Date and time: Sat Feb  7 15:44:30 2026
+Total CPU time used: 97.5063 seconds (0h:1m:37s)
+Total wall-clock time used: 51.3953 seconds (0h:0m:51s)
+

@@ -297,8 +297,10 @@ def main_analyze(g):
         #del cb
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
         print('Writing csubst_cb_stats.tsv', flush=True)
-        column_original = g['df_cb_stats_main'].columns.tolist()
-        g['df_cb_stats_main'].columns = g['df_cb_stats_main'].columns.str.replace('_PLACEHOLDER', '')
+        column_original = g['df_cb_stats_main'].columns
+        g['df_cb_stats_main'].columns = pandas.Index(
+            [str(col).replace('_PLACEHOLDER', '') for col in column_original]
+        )
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         g['df_cb_stats_main'].columns = column_original
 

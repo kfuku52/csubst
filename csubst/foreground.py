@@ -169,34 +169,44 @@ def annotate_lineage_foreground(lineages, trait_name, g):
                 ete.add_features(node, **{'is_lineage_fg_'+trait_name+'_'+str(i+1): False})
     return tree
 
+def _get_lineage_target_ids(lineage_index, trait_name, g):
+    fg_leaf_name_set = set(g['fg_leaf_names'][trait_name][lineage_index])
+    lineage_fg_ids = list()
+    root_id = ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label")
+    lineage_flag_key = 'is_lineage_fg_' + trait_name + '_' + str(lineage_index + 1)
+    for node in g['tree'].traverse():
+        node_leaf_name_set = set(ete.get_leaf_names(node))
+        if len(node_leaf_name_set.difference(fg_leaf_name_set)) != 0:
+            continue
+        if ete.is_root(node) or (not g['fg_stem_only']):
+            lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
+        else:
+            is_lineage_fg = ete.get_prop(node, lineage_flag_key, False)
+            is_parent_lineage_fg = ete.get_prop(node.up, lineage_flag_key, False)
+            if (is_lineage_fg == True) & (is_parent_lineage_fg == False):
+                lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
+    dif = 1
+    while dif:
+        num_id = len(lineage_fg_ids)
+        lineage_fg_id_set = set(lineage_fg_ids)
+        for node in g['tree'].traverse():
+            child_ids = [ete.get_prop(child, "numerical_label") for child in ete.get_children(node)]
+            if all([id in lineage_fg_id_set for id in child_ids]) & (len(child_ids) != 0):
+                node_id = ete.get_prop(node, "numerical_label")
+                if node_id not in lineage_fg_id_set:
+                    lineage_fg_ids.append(node_id)
+        dif = len(lineage_fg_ids) - num_id
+    lineage_fg_ids = numpy.unique(numpy.array(lineage_fg_ids, dtype=numpy.int64))
+    lineage_fg_ids = lineage_fg_ids[lineage_fg_ids != root_id]
+    lineage_fg_ids.sort()
+    return lineage_fg_ids
+
 def get_target_ids(lineages, trait_name, g):
     target_ids = numpy.zeros(shape=(0,), dtype=numpy.int64)
     for i in numpy.arange(len(lineages)):
-        fg_leaf_name_set = set(g['fg_leaf_names'][trait_name][i])
-        lineage_fg_ids = list()
-        for node in g['tree'].traverse():
-            node_leaf_name_set = set(ete.get_leaf_names(node))
-            if len(node_leaf_name_set.difference(fg_leaf_name_set)) == 0:
-                if ete.is_root(node) | (not g['fg_stem_only']):
-                    lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
-                else:
-                    is_lineage_fg = ete.get_prop(node, 'is_lineage_fg_' + trait_name + '_' + str(i + 1), False)
-                    is_parent_lineage_fg = ete.get_prop(node.up, 'is_lineage_fg_' + trait_name + '_' + str(i + 1), False)
-                    if (is_lineage_fg == True) & (is_parent_lineage_fg == False):
-                        lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
-        dif = 1
-        while dif:
-            num_id = len(lineage_fg_ids)
-            for node in g['tree'].traverse():
-                child_ids = [ete.get_prop(child, "numerical_label") for child in ete.get_children(node)]
-                if all([id in lineage_fg_ids for id in child_ids]) & (len(child_ids) != 0):
-                    if ete.get_prop(node, "numerical_label") not in lineage_fg_ids:
-                        lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
-            dif = len(lineage_fg_ids) - num_id
-        lineage_fg_ids = numpy.array(lineage_fg_ids, dtype=numpy.int64)
+        lineage_fg_ids = _get_lineage_target_ids(lineage_index=i, trait_name=trait_name, g=g)
         target_ids = numpy.concatenate([target_ids, lineage_fg_ids])
-    root_id = ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label")
-    target_ids = target_ids[target_ids != root_id]
+    target_ids = numpy.unique(target_ids.astype(numpy.int64))
     target_ids.sort()
     return target_ids
 
@@ -211,18 +221,7 @@ def annotate_foreground(lineages, trait_name, g):
         fg_leaf_name_set = set(g['fg_leaf_names'][trait_name][i])
         lineage_color = lineage_colors[i % len(lineage_colors)]
         lineage_prop = 'is_lineage_fg_' + trait_name + '_' + str(i + 1)
-        lineage_target_ids = set()
-        for node in g['tree'].traverse():
-            if ete.is_root(node):
-                continue
-            is_lineage_fg = ete.get_prop(node, lineage_prop, False)
-            if not is_lineage_fg:
-                continue
-            if g['fg_stem_only']:
-                is_parent_lineage_fg = ete.get_prop(node.up, lineage_prop, False)
-                if is_parent_lineage_fg:
-                    continue
-            lineage_target_ids.add(ete.get_prop(node, "numerical_label"))
+        lineage_target_ids = set(_get_lineage_target_ids(lineage_index=i, trait_name=trait_name, g=g).tolist())
         for node in g['tree'].traverse():
             if g['fg_stem_only']:
                 if ete.get_prop(node, "numerical_label") in lineage_target_ids:
