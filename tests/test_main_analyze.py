@@ -15,7 +15,7 @@ def test_cb_search_respects_max_combination_limit(monkeypatch):
         captured["cb_passed"] = cb_passed.copy(deep=True)
         return g, numpy.zeros((0, arity), dtype=numpy.int64)
 
-    def fake_get_cb(id_combinations, sub_tensor, g, attr):
+    def fake_get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
         return pandas.DataFrame({"_unused": [1.0]})
 
     def fake_merge_tables(cbOS, cbON):
@@ -34,7 +34,11 @@ def test_cb_search_respects_max_combination_limit(monkeypatch):
     monkeypatch.setattr(main_analyze.substitution, "get_reducer_sub_tensor", lambda sub_tensor, g, label: sub_tensor)
     monkeypatch.setattr(main_analyze.substitution, "get_cb", fake_get_cb)
     monkeypatch.setattr(main_analyze.table, "merge_tables", fake_merge_tables)
-    monkeypatch.setattr(main_analyze.substitution, "add_dif_stats", lambda cb, tol, prefix: cb)
+    monkeypatch.setattr(
+        main_analyze.substitution,
+        "add_dif_stats",
+        lambda cb, tol, prefix, output_stats=None: cb,
+    )
     monkeypatch.setattr(main_analyze.omega, "calc_omega", lambda cb, OS, ON, g: (cb, g))
     monkeypatch.setattr(main_analyze.substitution, "get_substitutions_per_branch", lambda cb, b, g: cb)
     monkeypatch.setattr(main_analyze.table, "get_linear_regression", lambda cb: cb)
