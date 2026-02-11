@@ -96,6 +96,18 @@ def test_get_linear_regression_residuals_match_manual_solution():
     numpy.testing.assert_allclose(out["OCN_linreg_residual"].to_numpy(), [0.4, -0.2], atol=1e-12)
 
 
+def test_get_linear_regression_skips_missing_mode_columns():
+    cb = pandas.DataFrame(
+        {
+            "OCSany2any": [1.0, 2.0],
+            "OCSany2spe": [2.0, 4.0],
+        }
+    )
+    out = table.get_linear_regression(cb)
+    assert "OCS_linreg_residual" in out.columns
+    assert "OCN_linreg_residual" not in out.columns
+
+
 def test_get_cutoff_stat_bool_array_parses_compound_expression():
     cb = pandas.DataFrame(
         {

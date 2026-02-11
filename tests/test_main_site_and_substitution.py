@@ -988,6 +988,14 @@ def test_add_dif_column_and_add_dif_stats():
     assert "OCSany2dif" in out2.columns
     assert "OCNdif2spe" in out2.columns
 
+    out3 = substitution.add_dif_stats(cb.copy(), tol=1e-6, prefix="OC", output_stats=["dif2dif"])
+    assert "OCSany2dif" in out3.columns
+    assert "OCSspe2dif" in out3.columns
+    assert "OCSdif2dif" in out3.columns
+    assert "OCNany2dif" in out3.columns
+    assert "OCNspe2dif" in out3.columns
+    assert "OCNdif2dif" in out3.columns
+
 
 def test_get_substitution_tensor_syn_matches_manual_groupwise_products():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
@@ -1113,6 +1121,27 @@ def test_get_cb_matches_sum_of_get_cs_per_combination():
         assert pytest.approx(float(row["OCNspe2any"]), abs=1e-12) == float(cs["OCNspe2any"].sum())
         assert pytest.approx(float(row["OCNany2spe"]), abs=1e-12) == float(cs["OCNany2spe"].sum())
         assert pytest.approx(float(row["OCNspe2spe"]), abs=1e-12) == float(cs["OCNspe2spe"].sum())
+
+
+def test_get_cb_selective_base_stats_match_full_columns():
+    sub = _toy_sub_tensor()
+    ids = numpy.array([[2, 0], [1, 2]], dtype=numpy.int64)
+    g = {"threads": 1, "float_type": numpy.float64}
+    full = substitution.get_cb(ids, sub, g, attr="OCN")
+    subset = substitution.get_cb(ids, sub, g, attr="OCN", selected_base_stats=["any2any", "any2spe"])
+
+    assert subset.columns.tolist() == ["branch_id_1", "branch_id_2", "OCNany2any", "OCNany2spe"]
+    merged = full.merge(subset, on=["branch_id_1", "branch_id_2"], suffixes=("_full", "_subset"))
+    numpy.testing.assert_allclose(
+        merged["OCNany2any_full"].to_numpy(),
+        merged["OCNany2any_subset"].to_numpy(),
+        atol=1e-12,
+    )
+    numpy.testing.assert_allclose(
+        merged["OCNany2spe_full"].to_numpy(),
+        merged["OCNany2spe_subset"].to_numpy(),
+        atol=1e-12,
+    )
 
 
 def test_get_cbs_grouped_sum_matches_get_cb():

@@ -82,8 +82,12 @@ def set_substitution_dtype(df):
 def get_linear_regression(cb):
     start = time.time()
     for prefix in ['OCS','OCN']:
-        x = cb.loc[:,prefix+'any2any'].values
-        y = cb.loc[:,prefix+'any2spe'].values
+        col_x = prefix + 'any2any'
+        col_y = prefix + 'any2spe'
+        if not all([col in cb.columns for col in [col_x, col_y]]):
+            continue
+        x = cb.loc[:,col_x].values
+        y = cb.loc[:,col_y].values
         x = x[:,numpy.newaxis]
         coef,residuals,rank,s = numpy.linalg.lstsq(x, y, rcond=None)
         cb.loc[:,prefix+'_linreg_residual'] = y - (x[:,0]*coef[0])

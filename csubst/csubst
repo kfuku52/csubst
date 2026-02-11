@@ -338,6 +338,12 @@ def _main():
                               'e.g., "N_sub_[0-9]+" to specify the number of branch-wise nonsynonymous substitutions '
                               'in all branches. VALUE is the minimum value, '
                               'and branch combinations with smaller values will be excluded.')
+    analyze.add_argument('--output_stat', metavar='STAT1,STAT2,...',
+                         default='any2any,any2dif,any2spe', type=str,
+                         help='default=%(default)s: Comma-delimited combinatorial-substitution statistics '
+                              'to compute and report. Choose from '
+                              'any2any, any2spe, any2dif, dif2any, dif2spe, dif2dif, '
+                              'spe2any, spe2spe, spe2dif.')
     analyze.add_argument('--branch_dist', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Set "yes" to calculate inter-branch distance.')
     # Substitution outputs

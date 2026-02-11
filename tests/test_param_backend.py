@@ -3,6 +3,7 @@ import argparse
 import pytest
 
 from csubst import param
+from csubst import output_stat
 from csubst import substitution
 
 
@@ -50,6 +51,62 @@ def test_get_global_parameters_rejects_invalid_chunk_factors():
         param.get_global_parameters(_args(parallel_chunk_factor=0))
     with pytest.raises(ValueError, match="parallel_chunk_factor_reducer"):
         param.get_global_parameters(_args(parallel_chunk_factor_reducer=0))
+
+
+def test_get_global_parameters_parses_output_stat_and_required_base_stats():
+    g = param.get_global_parameters(_args(output_stat="ANY2ANY,any2dif,any2spe,any2any"))
+    assert g["output_stats"] == ["any2any", "any2dif", "any2spe"]
+    assert g["output_base_stats"] == ["any2any", "any2spe"]
+    assert g["output_dif_stats"] == ["any2dif"]
+
+
+def test_get_global_parameters_tracks_required_intermediate_dif_stats():
+    g = param.get_global_parameters(_args(output_stat="dif2dif"))
+    assert g["output_base_stats"] == ["any2any", "spe2any", "any2spe", "spe2spe"]
+    assert g["output_dif_stats"] == ["any2dif", "dif2dif", "spe2dif"]
+
+
+def test_get_global_parameters_rejects_invalid_output_stat():
+    with pytest.raises(ValueError, match="output_stat"):
+        param.get_global_parameters(_args(output_stat="any2any,not_a_stat"))
+
+
+def test_drop_unrequested_stat_columns_removes_helper_stats():
+    cb = {
+        "OCNany2any": [1.0],
+        "OCNany2dif": [0.5],
+        "OCNany2spe": [0.5],
+        "omegaCany2any": [1.0],
+        "omegaCany2dif": [1.0],
+    }
+    import pandas as pd
+
+    out = output_stat.drop_unrequested_stat_columns(pd.DataFrame(cb), ["any2dif"])
+    assert "OCNany2dif" in out.columns
+    assert "omegaCany2dif" in out.columns
+    assert "OCNany2any" not in out.columns
+    assert "OCNany2spe" not in out.columns
+    assert "omegaCany2any" not in out.columns
+
+
+def test_get_global_parameters_adjusts_default_cutoff_stat_for_output_subset():
+    g = param.get_global_parameters(
+        _args(
+            output_stat="any2any",
+            cutoff_stat="OCNany2spe,2.0|omegaCany2spe,5.0",
+        )
+    )
+    assert g["cutoff_stat"] == "OCNany2any,2.0|omegaCany2any,5.0"
+
+
+def test_get_global_parameters_rejects_incompatible_custom_cutoff_stat():
+    with pytest.raises(ValueError, match='requires --output_stat to include "any2spe"'):
+        param.get_global_parameters(
+            _args(
+                output_stat="any2any",
+                cutoff_stat="OCNany2spe,2.0|omegaCany2any,5.0",
+            )
+        )
 
 
 def test_get_global_parameters_rejects_nonpositive_threads():

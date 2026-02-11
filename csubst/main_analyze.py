@@ -16,6 +16,7 @@ from csubst import sequence
 from csubst import substitution
 from csubst import table
 from csubst import ete
+from csubst import output_stat
 from csubst import tree
 
 def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
@@ -88,16 +89,28 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             print(txt.format(current_arity, current_arity))
             break
         print('Preparing OCS table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbOS = substitution.get_cb(id_combinations, OS_tensor_reducer, g, 'OCS')
+        cbOS = substitution.get_cb(
+            id_combinations,
+            OS_tensor_reducer,
+            g,
+            'OCS',
+            selected_base_stats=g.get('output_base_stats'),
+        )
         print('Preparing OCN table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbON = substitution.get_cb(id_combinations, ON_tensor_reducer, g, 'OCN')
+        cbON = substitution.get_cb(
+            id_combinations,
+            ON_tensor_reducer,
+            g,
+            'OCN',
+            selected_base_stats=g.get('output_base_stats'),
+        )
         cb = table.merge_tables(cbOS, cbON)
         del cbOS, cbON
-        cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='OC')
+        cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='OC', output_stats=g.get('output_stats'))
         cb, g = omega.calc_omega(cb, OS_tensor_reducer, ON_tensor_reducer, g)
         if (g['calibrate_longtail']):
             if (g['exhaustive_until'] >= current_arity):
-                cb = omega.calibrate_dsc(cb)
+                cb = omega.calibrate_dsc(cb, output_stats=g.get('output_stats'))
                 g['df_cb_stats'].at[0, 'dSC_calibration'] = 'Y'
             else:
                 txt = '--calibrate_longtail is deactivated for arity = {}. '
@@ -111,6 +124,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         cb = substitution.get_substitutions_per_branch(cb, b, g)
         #cb = combination.calc_substitution_patterns(cb)
         cb = table.get_linear_regression(cb)
+        cb = output_stat.drop_unrequested_stat_columns(cb, g.get('output_stats'))
         cb, g = foreground.get_foreground_branch_num(cb, g)
         cb = table.sort_cb(cb)
         if write_cb:

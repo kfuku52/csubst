@@ -15,6 +15,7 @@ from csubst import param
 from csubst import ete
 from csubst import substitution
 from csubst import tree
+from csubst import output_stat
 
 def combinations_count(n, r):
     # https://github.com/nkmk/python-snippets/blob/05a53ae96736577906a8805b38bce6cc210fe11f/notebook/combinations_count.py#L1-L14
@@ -539,16 +540,23 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
                     elif stat=='total':
                         g['df_cb_stats'].at[0,col] = cb.loc[is_target,ms].sum()
     if verbose:
-        for SN,anc,des in itertools.product(['S','N'], ['any','dif','spe'], ['any','dif','spe']):
-            key = SN+anc+'2'+des
-            totalON = g['df_cb_stats'].at[0, 'total_OC'+key+'_all']
-            totalEN = g['df_cb_stats'].at[0, 'total_EC'+key+'_all']
-            if totalON==0:
+        oc_total_cols = [
+            col for col in g['df_cb_stats'].columns
+            if str(col).startswith('total_OC') and str(col).endswith('_all')
+        ]
+        for oc_col in sorted(oc_total_cols):
+            key = str(oc_col).replace('total_OC', '').replace('_all', '')
+            ec_col = 'total_EC' + key + '_all'
+            if ec_col not in g['df_cb_stats'].columns:
+                continue
+            total_oc = g['df_cb_stats'].at[0, oc_col]
+            total_ec = g['df_cb_stats'].at[0, ec_col]
+            if total_oc == 0:
                 percent_value = numpy.nan
             else:
-                percent_value = totalEN / totalON * 100
+                percent_value = total_ec / total_oc * 100
             txt = 'Total OC{}/EC{} = {:,.1f}/{:,.1f} (expectation = {:,.1f}% of observation)'
-            print(txt.format(key, key, totalON, totalEN, percent_value))
+            print(txt.format(key, key, total_oc, total_ec, percent_value))
     elapsed_time = int(time.time() - start)
     g['df_cb_stats'].at[0, 'elapsed_sec'] = elapsed_time
     if verbose:
@@ -556,13 +564,30 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
     return g
 
 def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_reducer, ON_tensor_reducer):
-    cbOS = substitution.get_cb(missing_id_combinations, OS_tensor_reducer, g, 'OCS')
-    cbON = substitution.get_cb(missing_id_combinations, ON_tensor_reducer, g, 'OCN')
+    cbOS = substitution.get_cb(
+        missing_id_combinations,
+        OS_tensor_reducer,
+        g,
+        'OCS',
+        selected_base_stats=g.get('output_base_stats'),
+    )
+    cbON = substitution.get_cb(
+        missing_id_combinations,
+        ON_tensor_reducer,
+        g,
+        'OCN',
+        selected_base_stats=g.get('output_base_stats'),
+    )
     cb_missing = table.merge_tables(cbOS, cbON)
-    cb_missing = substitution.add_dif_stats(cb_missing, g['float_tol'], prefix='OC')
+    cb_missing = substitution.add_dif_stats(
+        cb_missing,
+        g['float_tol'],
+        prefix='OC',
+        output_stats=g.get('output_stats'),
+    )
     cb_missing, g = omega.calc_omega(cb_missing, OS_tensor_reducer, ON_tensor_reducer, g)
     if g['calibrate_longtail'] and (g['exhaustive_until'] >= g['current_arity']):
-        cb_missing = omega.calibrate_dsc(cb_missing)
+        cb_missing = omega.calibrate_dsc(cb_missing, output_stats=g.get('output_stats'))
     if g['branch_dist']:
         cb_missing = tree.get_node_distance(
             tree=g['tree'],
@@ -572,6 +597,7 @@ def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_re
         )
     cb_missing = substitution.get_substitutions_per_branch(cb_missing, g['branch_table'], g)
     cb_missing = table.get_linear_regression(cb_missing)
+    cb_missing = output_stat.drop_unrequested_stat_columns(cb_missing, g.get('output_stats'))
     cb_missing, g = get_foreground_branch_num(cb_missing, g)
     cb_missing = table.sort_cb(cb_missing)
     return cb_missing, g

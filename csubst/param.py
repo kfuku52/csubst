@@ -7,6 +7,7 @@ import re
 import sys
 
 from csubst.__init__ import __version__
+from csubst import output_stat
 
 def get_global_parameters(args):
     print('OS: {}'.format(platform.platform()), flush=True)
@@ -159,6 +160,21 @@ def get_global_parameters(args):
         if g['threads'] < 1:
             raise ValueError('--threads should be >= 1.')
         set_num_thread_variables(num_thread=g['threads'])
+    if 'output_stat' in g.keys():
+        g['output_stats'] = output_stat.parse_output_stats(g['output_stat'])
+    else:
+        g['output_stats'] = list(output_stat.ALL_OUTPUT_STATS)
+    g['output_stat'] = ','.join(g['output_stats'])
+    g['output_base_stats'] = output_stat.get_required_base_stats(g['output_stats'])
+    g['output_dif_stats'] = output_stat.get_required_dif_stats(g['output_stats'])
+    if 'cutoff_stat' in g.keys():
+        if str(g['cutoff_stat']) == output_stat.DEFAULT_CUTOFF_STAT:
+            adjusted = output_stat.get_default_cutoff_stat_for_output_stats(g['output_stats'])
+            if adjusted != g['cutoff_stat']:
+                txt = 'Default --cutoff_stat was adjusted to "{}" to match --output_stat.'
+                print(txt.format(adjusted), flush=True)
+                g['cutoff_stat'] = adjusted
+        output_stat.validate_cutoff_stat_compatibility(g['cutoff_stat'], g['output_stats'])
     return g
 
 def initialize_df_cb_stats(g):

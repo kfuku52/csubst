@@ -18,6 +18,7 @@ from csubst import substitution
 from csubst import substitution_sparse
 from csubst import table
 from csubst import ete
+from csubst import output_stat
 
 _UINT8_POPCOUNT = numpy.unpackbits(
     numpy.arange(256, dtype=numpy.uint8)[:, None],
@@ -31,6 +32,14 @@ def _get_cb_ids(cb):
     if not numpy.issubdtype(cb_ids.dtype, numpy.integer):
         cb_ids = cb_ids.astype(numpy.int64)
     return cb_ids
+
+
+def _resolve_requested_output_stats(g):
+    if 'output_stats' in g.keys():
+        return output_stat.parse_output_stats(g['output_stats'])
+    if 'output_stat' in g.keys():
+        return output_stat.parse_output_stats(g['output_stat'])
+    return list(output_stat.ALL_OUTPUT_STATS)
 
 
 def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
@@ -333,6 +342,8 @@ def subroot_E2nan(cb, tree):
     return cb
 
 def get_E(cb, g, ON_tensor, OS_tensor):
+    requested_output_stats = _resolve_requested_output_stats(g)
+    base_stats = output_stat.get_required_base_stats(requested_output_stats)
     if (g['omegaC_method']=='modelfree'):
         ON_gad, ON_ga, ON_gd = substitution.get_group_state_totals(ON_tensor)
         OS_gad, OS_ga, OS_gd = substitution.get_group_state_totals(OS_tensor)
@@ -342,7 +353,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         g['S_ind_nomissing_gad'] = numpy.where(OS_gad!=0)
         g['S_ind_nomissing_ga'] = numpy.where(OS_ga!=0)
         g['S_ind_nomissing_gd'] = numpy.where(OS_gd!=0)
-        for st in ['any2any','any2spe','spe2any','spe2spe']:
+        for st in base_stats:
             cb['ECN'+st] = calc_E_stat(cb, ON_tensor, mode=st, stat='mean', SN='N', g=g)
             cb['ECS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='mean', SN='S', g=g)
     if (g['omegaC_method']=='submodel'):
@@ -353,7 +364,13 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
         print(txt.format(substitution.get_total_substitution(g['EN_tensor'])))
         print('Preparing the ECN table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbEN = substitution.get_cb(cb.loc[:,id_cols].values, g['EN_tensor'], g, 'ECN')
+        cbEN = substitution.get_cb(
+            cb.loc[:,id_cols].values,
+            g['EN_tensor'],
+            g,
+            'ECN',
+            selected_base_stats=base_stats,
+        )
         cb = table.merge_tables(cb, cbEN)
         del state_pepE,cbEN
         state_cdnE = get_exp_state(g=g, mode='cdn')
@@ -362,14 +379,20 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
         print(txt.format(substitution.get_total_substitution(g['ES_tensor'])))
         print('Preparing the ECS table with {:,} process(es).'.format(g['threads']), flush=True)
-        cbES = substitution.get_cb(cb.loc[:,id_cols].values, g['ES_tensor'], g, 'ECS')
+        cbES = substitution.get_cb(
+            cb.loc[:,id_cols].values,
+            g['ES_tensor'],
+            g,
+            'ECS',
+            selected_base_stats=base_stats,
+        )
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
     if g['calc_quantile']:
-        for st in ['any2any','any2spe','spe2any','spe2spe']:
+        for st in base_stats:
             cb['QCN'+st] = calc_E_stat(cb, ON_tensor, mode=st, stat='quantile', SN='N', g=g)
             cb['QCS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='quantile', SN='S', g=g)
-    cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC')
+    cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC', output_stats=requested_output_stats)
     cb = subroot_E2nan(cb, tree=g['tree'])
     return cb
 
@@ -413,11 +436,8 @@ def get_exp_state(g, mode):
     return stateE
 
 def get_omega(cb, g):
-    combinatorial_substitutions = ['any2any','any2spe','any2dif',
-                                   'dif2any','dif2spe','dif2dif',
-                                   'spe2any','spe2spe','spe2dif',
-                                   ]
-    for sub in combinatorial_substitutions:
+    requested_output_stats = _resolve_requested_output_stats(g)
+    for sub in requested_output_stats:
         col_omega = 'omegaC'+sub
         col_N = 'OCN'+sub
         col_EN = 'ECN'+sub
@@ -439,21 +459,22 @@ def get_omega(cb, g):
 
 def get_CoD(cb, g):
     for NS in ['OCN','OCS']:
-        cb.loc[:,NS+'CoD'] = cb[NS+'any2spe'] / cb[NS+'any2dif']
-        is_Nzero = (cb[NS+'any2spe']<g['float_tol'])
-        is_inf = numpy.isinf(cb.loc[:,NS+'CoD'])
+        col_spe = NS + 'any2spe'
+        col_dif = NS + 'any2dif'
+        col_cod = NS + 'CoD'
+        if not all([col in cb.columns for col in [col_spe, col_dif]]):
+            continue
+        cb.loc[:,col_cod] = cb[col_spe] / cb[col_dif]
+        is_Nzero = (cb[col_spe] < g['float_tol'])
+        is_inf = numpy.isinf(cb.loc[:,col_cod])
         if (is_Nzero&is_inf).sum():
-            cb.loc[(is_Nzero&is_inf), NS + 'CoD'] = numpy.nan
+            cb.loc[(is_Nzero&is_inf), col_cod] = numpy.nan
     return cb
 
-def print_cb_stats(cb, prefix):
+def print_cb_stats(cb, prefix, output_stats):
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'Arity = {:,}, {}:'.format(arity, prefix)
-    combinatorial_substitutions = ['any2any','any2spe','any2dif',
-                                   'dif2any','dif2spe','dif2dif',
-                                   'spe2any','spe2spe','spe2dif',
-                                   ]
-    for sub in combinatorial_substitutions:
+    for sub in output_stats:
         col_omega = 'omegaC'+sub
         if not col_omega in cb.columns:
             continue
@@ -465,18 +486,16 @@ def calc_omega(cb, OS_tensor, ON_tensor, g):
     cb = get_E(cb, g, ON_tensor, OS_tensor)
     cb = get_omega(cb, g)
     cb = get_CoD(cb, g)
-    print_cb_stats(cb=cb, prefix='cb')
+    print_cb_stats(cb=cb, prefix='cb', output_stats=_resolve_requested_output_stats(g))
     return(cb, g)
 
-def calibrate_dsc(cb, transformation='quantile'):
+def calibrate_dsc(cb, transformation='quantile', output_stats=None):
     prefix='cb'
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'Arity = {:,}, {}:'.format(arity, prefix)
-    combinatorial_substitutions = ['any2any','any2spe','any2dif',
-                                   'dif2any','dif2spe','dif2dif',
-                                   'spe2any','spe2spe','spe2dif',
-                                   ]
-    for sub in combinatorial_substitutions:
+    if output_stats is None:
+        output_stats = list(output_stat.ALL_OUTPUT_STATS)
+    for sub in output_stats:
         col_dNc = 'dNC'+sub
         col_dSc = 'dSC'+sub
         col_omega = 'omegaC'+sub

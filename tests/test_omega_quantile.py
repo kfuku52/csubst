@@ -1,4 +1,5 @@
 import numpy
+import pandas
 import pytest
 
 from csubst import omega
@@ -63,3 +64,15 @@ def test_resolve_quantile_parallel_plan_keeps_parallel_for_large_workload():
     )
     assert n_jobs == 4
     assert chunk_factor == 4
+
+
+def test_get_cod_skips_when_required_columns_missing():
+    cb = pandas.DataFrame(
+        {
+            "OCNany2spe": [1.0, 2.0],
+            "OCSany2spe": [2.0, 3.0],
+        }
+    )
+    out = omega.get_CoD(cb.copy(), g={"float_tol": 1e-12})
+    assert "OCNCoD" not in out.columns
+    assert "OCSCoD" not in out.columns

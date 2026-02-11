@@ -11,6 +11,32 @@ from csubst import parallel
 from csubst import substitution_cy
 from csubst import substitution_sparse
 from csubst import ete
+from csubst import output_stat
+
+_CB_BASE_SUBSTITUTIONS = ("any2any", "spe2any", "any2spe", "spe2spe")
+
+
+def _resolve_cb_base_substitutions(selected_base_stats=None):
+    if selected_base_stats is None:
+        return list(_CB_BASE_SUBSTITUTIONS)
+    if isinstance(selected_base_stats, str):
+        selected_base_stats = [s for s in selected_base_stats.split(',')]
+    tokens = [str(s).strip().lower() for s in selected_base_stats if str(s).strip() != ""]
+    if len(tokens) == 0:
+        raise ValueError("At least one base statistic should be specified.")
+    invalid = sorted(set(tokens).difference(set(_CB_BASE_SUBSTITUTIONS)))
+    if len(invalid):
+        txt = "Unsupported base statistics: {}. Supported: {}."
+        raise ValueError(txt.format(", ".join(invalid), ", ".join(_CB_BASE_SUBSTITUTIONS)))
+    selected = []
+    seen = set()
+    for token in tokens:
+        if token in seen:
+            continue
+        seen.add(token)
+        selected.append(token)
+    return [s for s in _CB_BASE_SUBSTITUTIONS if s in selected]
+
 
 def resolve_sub_tensor_backend(g):
     if 'resolved_sub_tensor_backend' in g.keys():
@@ -298,7 +324,19 @@ def _get_sparse_branch_tensor(sub_tensor, branch_id):
     return out
 
 
-def _get_sparse_site_vectors(sub_tensor, branch_ids, data_type=numpy.float64, group_block_index=None, row_cache=None):
+def _get_sparse_site_vectors(
+    sub_tensor,
+    branch_ids,
+    data_type=numpy.float64,
+    group_block_index=None,
+    row_cache=None,
+    selected_base_stats=None,
+):
+    selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
+    is_any2any = ("any2any" in selected)
+    is_spe2any = ("spe2any" in selected)
+    is_any2spe = ("any2spe" in selected)
+    is_spe2spe = ("spe2spe" in selected)
     num_site = sub_tensor.num_site
     any2any = numpy.zeros(shape=(num_site,), dtype=data_type)
     spe2any = numpy.zeros(shape=(num_site,), dtype=data_type)
@@ -313,10 +351,14 @@ def _get_sparse_site_vectors(sub_tensor, branch_ids, data_type=numpy.float64, gr
             group_block_index=group_block_index,
             row_cache=row_cache,
         )
-        any2any += sub_sg.sum(axis=(2, 3)).prod(axis=0)
-        spe2any += sub_sg.sum(axis=3).prod(axis=0).sum(axis=1)
-        any2spe += sub_sg.sum(axis=2).prod(axis=0).sum(axis=1)
-        spe2spe += sub_sg.prod(axis=0).sum(axis=(1, 2))
+        if is_any2any:
+            any2any += sub_sg.sum(axis=(2, 3)).prod(axis=0)
+        if is_spe2any:
+            spe2any += sub_sg.sum(axis=3).prod(axis=0).sum(axis=1)
+        if is_any2spe:
+            any2spe += sub_sg.sum(axis=2).prod(axis=0).sum(axis=1)
+        if is_spe2spe:
+            spe2spe += sub_sg.prod(axis=0).sum(axis=(1, 2))
     return any2any, spe2any, any2spe, spe2spe
 
 
@@ -565,8 +607,18 @@ def _resolve_dense_cython_n_jobs(n_jobs, id_combinations, sub_tensor, g, task='c
     print(txt.format(task, num_comb, total_ops, n_jobs, resolved), flush=True)
     return resolved
 
-def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64):
-    if _can_use_cython_dense_cb(
+def sub_tensor2cb(
+    id_combinations,
+    sub_tensor,
+    mmap=False,
+    df_mmap=None,
+    mmap_start=0,
+    float_type=numpy.float64,
+    selected_base_stats=None,
+):
+    selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
+    use_full_stats = (len(selected) == len(_CB_BASE_SUBSTITUTIONS))
+    if use_full_stats and _can_use_cython_dense_cb(
         id_combinations=id_combinations,
         sub_tensor=sub_tensor,
         mmap=mmap,
@@ -594,21 +646,26 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
             data_type = numpy.int32
         else:
             data_type = float_type
-        df = numpy.zeros([id_combinations.shape[0], arity + 4], dtype=data_type)
+        df = numpy.zeros([id_combinations.shape[0], arity + len(selected)], dtype=data_type)
+    stat_col = {stat: arity + i for i, stat in enumerate(selected)}
+    col_any2any = stat_col.get('any2any')
+    col_spe2any = stat_col.get('spe2any')
+    col_any2spe = stat_col.get('any2spe')
+    col_spe2spe = stat_col.get('spe2spe')
     start_time = time.time()
     start = mmap_start
     end = mmap_start + id_combinations.shape[0]
     df[start:end, :arity] = id_combinations[:, :]  # branch_ids
     for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
         sub_combo = sub_tensor[id_combinations[j, :], :, :, :, :]
-        sum_any2any = sub_combo.sum(axis=(3, 4))
-        sum_spe2any = sub_combo.sum(axis=4)
-        sum_any2spe = sub_combo.sum(axis=3)
-        prod_spe2spe = sub_combo.prod(axis=0)
-        df[i, arity+0] += sum_any2any.prod(axis=0).sum() # any2any
-        df[i, arity+1] += sum_spe2any.prod(axis=0).sum() # spe2any
-        df[i, arity+2] += sum_any2spe.prod(axis=0).sum() # any2spe
-        df[i, arity+3] += prod_spe2spe.sum() # spe2spe
+        if col_any2any is not None:
+            df[i, col_any2any] += sub_combo.sum(axis=(3, 4)).prod(axis=0).sum()
+        if col_spe2any is not None:
+            df[i, col_spe2any] += sub_combo.sum(axis=4).prod(axis=0).sum()
+        if col_any2spe is not None:
+            df[i, col_any2spe] += sub_combo.sum(axis=3).prod(axis=0).sum()
+        if col_spe2spe is not None:
+            df[i, col_spe2spe] += sub_combo.prod(axis=0).sum()
         if j % 10000 == 0:
             mmap_end = mmap_start + id_combinations.shape[0]
             txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} sec'
@@ -616,7 +673,16 @@ def sub_tensor2cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_st
     if not mmap:
         return (df)
 
-def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=numpy.float64):
+def sub_tensor2cb_sparse(
+    id_combinations,
+    sub_tensor,
+    mmap=False,
+    df_mmap=None,
+    mmap_start=0,
+    float_type=numpy.float64,
+    selected_base_stats=None,
+):
+    selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
     arity = id_combinations.shape[1]
     if mmap:
         df = df_mmap
@@ -625,7 +691,12 @@ def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, 
             data_type = numpy.int32
         else:
             data_type = float_type
-        df = numpy.zeros([id_combinations.shape[0], arity + 4], dtype=data_type)
+        df = numpy.zeros([id_combinations.shape[0], arity + len(selected)], dtype=data_type)
+    stat_col = {stat: arity + i for i, stat in enumerate(selected)}
+    col_any2any = stat_col.get('any2any')
+    col_spe2any = stat_col.get('spe2any')
+    col_any2spe = stat_col.get('any2spe')
+    col_spe2spe = stat_col.get('spe2spe')
     start_time = time.time()
     start = mmap_start
     end = mmap_start + id_combinations.shape[0]
@@ -639,11 +710,16 @@ def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, 
             data_type=df.dtype,
             group_block_index=group_block_index,
             row_cache=row_cache,
+            selected_base_stats=selected,
         )
-        df[i, arity+0] += any2any.sum()
-        df[i, arity+1] += spe2any.sum()
-        df[i, arity+2] += any2spe.sum()
-        df[i, arity+3] += spe2spe.sum()
+        if col_any2any is not None:
+            df[i, col_any2any] += any2any.sum()
+        if col_spe2any is not None:
+            df[i, col_spe2any] += spe2any.sum()
+        if col_any2spe is not None:
+            df[i, col_any2spe] += any2spe.sum()
+        if col_spe2spe is not None:
+            df[i, col_spe2spe] += spe2spe.sum()
         if j % 10000 == 0:
             mmap_end = mmap_start + id_combinations.shape[0]
             txt = 'cb(sparse): {:,}th in the id range {:,}-{:,}: {:,} sec'
@@ -651,16 +727,17 @@ def sub_tensor2cb_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None, 
     if not mmap:
         return (df)
 
-def _write_cb_chunk_to_mmap(writer, ids, sub_tensor, mmap_out, axis, dtype, mmap_start, float_type):
+def _write_cb_chunk_to_mmap(writer, ids, sub_tensor, mmap_out, axis, dtype, mmap_start, float_type, selected_base_stats):
     df_mmap = numpy.memmap(mmap_out, dtype=dtype, shape=axis, mode='r+')
-    writer(ids, sub_tensor, True, df_mmap, mmap_start, float_type)
+    writer(ids, sub_tensor, True, df_mmap, mmap_start, float_type, selected_base_stats=selected_base_stats)
     df_mmap.flush()
 
-def get_cb(id_combinations, sub_tensor, g, attr):
+def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
     sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cb_'+attr)
     arity = id_combinations.shape[1]
+    selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
     cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
-    cn = cn + [ attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
+    cn = cn + [ attr+subs for subs in selected ]
     writer = sub_tensor2cb_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cb
     n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
     if (writer is sub_tensor2cb) and _can_use_cython_dense_cb(
@@ -670,29 +747,41 @@ def get_cb(id_combinations, sub_tensor, g, attr):
         df_mmap=None,
         float_type=g['float_type'],
     ):
-        n_jobs = _resolve_dense_cython_n_jobs(
-            n_jobs=n_jobs,
-            id_combinations=id_combinations,
-            sub_tensor=sub_tensor,
-            g=g,
-            task='cb',
-        )
+        if len(selected) == len(_CB_BASE_SUBSTITUTIONS):
+            n_jobs = _resolve_dense_cython_n_jobs(
+                n_jobs=n_jobs,
+                id_combinations=id_combinations,
+                sub_tensor=sub_tensor,
+                g=g,
+                task='cb',
+            )
+        else:
+            txt = 'Dense Cython cb reducer is bypassed for selective stats: {}'
+            print(txt.format(','.join(selected)), flush=True)
     if n_jobs == 1:
-        df = writer(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0, float_type=g['float_type'])
+        df = writer(
+            id_combinations,
+            sub_tensor,
+            mmap=False,
+            df_mmap=None,
+            mmap_start=0,
+            float_type=g['float_type'],
+            selected_base_stats=selected,
+        )
         df = pandas.DataFrame(df, columns=cn)
     else:
         chunk_factor = parallel.resolve_chunk_factor(g=g, task='reducer')
         id_chunks,mmap_starts = parallel.get_chunks(id_combinations, n_jobs, chunk_factor=chunk_factor)
         mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
-        axis = (id_combinations.shape[0], arity+4)
+        axis = (id_combinations.shape[0], arity + len(selected))
         my_dtype = sub_tensor.dtype
         if 'bool' in str(my_dtype):
             my_dtype = numpy.int32
         df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         backend = parallel.resolve_parallel_backend(g=g, task='reducer')
         tasks = [
-            (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms, g['float_type'])
+            (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms, g['float_type'], selected)
             for ids, ms in zip(id_chunks, mmap_starts)
         ]
         parallel.run_starmap(
@@ -951,16 +1040,27 @@ def add_dif_column(cb, col_dif, col_any, col_spe, tol):
         cb.loc[is_almost_zero, col_dif] = 0
     return cb
 
-def add_dif_stats(cb, tol, prefix):
+def add_dif_stats(cb, tol, prefix, output_stats=None):
+    if output_stats is None:
+        requested = set([
+            'any2any','spe2any','any2spe','spe2spe',
+            'any2dif','dif2any','dif2spe','spe2dif','dif2dif',
+        ])
+    else:
+        requested = set(output_stat.get_required_dif_stats(output_stats))
     for SN in ['S','N']:
         for anc in ['any','spe']:
-            col_any = prefix+SN+anc+'2any'
-            col_spe = prefix+SN+anc+'2spe'
-            col_dif = prefix+SN+anc+'2dif'
-            cb = add_dif_column(cb, col_dif, col_any, col_spe, tol)
+            stat = anc + '2dif'
+            if stat in requested:
+                col_any = prefix+SN+anc+'2any'
+                col_spe = prefix+SN+anc+'2spe'
+                col_dif = prefix+SN+anc+'2dif'
+                cb = add_dif_column(cb, col_dif, col_any, col_spe, tol)
         for des in ['any','spe','dif']:
-            col_any = prefix+SN+'any2'+des
-            col_spe = prefix+SN+'spe2'+des
-            col_dif = prefix+SN+'dif2'+des
-            cb = add_dif_column(cb, col_dif, col_any, col_spe, tol)
+            stat = 'dif2' + des
+            if stat in requested:
+                col_any = prefix+SN+'any2'+des
+                col_spe = prefix+SN+'spe2'+des
+                col_dif = prefix+SN+'dif2'+des
+                cb = add_dif_column(cb, col_dif, col_any, col_spe, tol)
     return cb
