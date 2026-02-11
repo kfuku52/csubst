@@ -17,8 +17,12 @@ from csubst import parallel
 from csubst import substitution
 from csubst import substitution_sparse
 from csubst import table
-from csubst import omega_cy
 from csubst import ete
+
+_UINT8_POPCOUNT = numpy.unpackbits(
+    numpy.arange(256, dtype=numpy.uint8)[:, None],
+    axis=1,
+).sum(axis=1).astype(numpy.uint8)
 
 
 def _get_cb_ids(cb):
@@ -58,6 +62,105 @@ def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type):
     return tmp_E.sum(axis=1)
 
 
+def _weighted_sample_without_replacement_masks(p, size, niter):
+    p = numpy.asarray(p, dtype=numpy.float64)
+    if p.ndim != 1:
+        raise ValueError('p should be a 1D array.')
+    if size < 0:
+        raise ValueError('size should be >= 0.')
+    positive_sites = numpy.flatnonzero(p > 0)
+    num_positive_sites = positive_sites.shape[0]
+    masks = numpy.zeros(shape=(niter, p.shape[0]), dtype=bool)
+    if (size == 0) or (num_positive_sites == 0):
+        return masks
+    if size > num_positive_sites:
+        txt = 'Sample size ({}) exceeded number of positive-probability sites ({}) in quantile sampling.'
+        raise ValueError(txt.format(size, num_positive_sites))
+    if size == num_positive_sites:
+        masks[:, positive_sites] = True
+        return masks
+    # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
+    positive_weights = p[positive_sites].astype(numpy.float32, copy=False)
+    keys = numpy.random.random((niter, num_positive_sites)).astype(numpy.float32, copy=False)
+    numpy.log(keys, out=keys)
+    keys /= positive_weights
+    kth = num_positive_sites - size
+    sampled_local_indices = numpy.argpartition(keys, kth=kth, axis=1)[:, kth:]
+    sampled_site_indices = positive_sites[sampled_local_indices]
+    row_indices = numpy.arange(niter)[:, None]
+    masks[row_indices, sampled_site_indices] = True
+    return masks
+
+
+def _get_permutations_fast(cb_ids, sub_branches, p, niter):
+    cb_ids = numpy.asarray(cb_ids, dtype=numpy.int64)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if cb_ids.shape[0] == 0:
+        return numpy.zeros((0, niter), dtype=numpy.int32)
+    sub_branches = numpy.asarray(sub_branches, dtype=numpy.int64)
+    if sub_branches.ndim != 1:
+        raise ValueError('sub_branches should be a 1D array.')
+    if sub_branches.shape[0] <= cb_ids.max():
+        raise ValueError('cb_ids contain out-of-range branch IDs.')
+    cb_branch_sizes = sub_branches[cb_ids]
+    is_active_row = (cb_branch_sizes > 0).all(axis=1)
+    if not is_active_row.any():
+        return numpy.zeros((cb_ids.shape[0], niter), dtype=numpy.int32)
+    active_row_indices = numpy.where(is_active_row)[0]
+    active_cb_ids = cb_ids[active_row_indices, :]
+    active_branch_ids, inverse_branch_ids = numpy.unique(active_cb_ids, return_inverse=True)
+    remapped_active_cb_ids = inverse_branch_ids.reshape(active_cb_ids.shape)
+    active_sub_branches = sub_branches[active_branch_ids]
+
+    num_branch = active_sub_branches.shape[0]
+    num_site = p.shape[0]
+    num_packed_site = (num_site + 7) // 8
+    packed_masks = numpy.zeros(shape=(num_branch, niter, num_packed_site), dtype=numpy.uint8)
+    previous_branch_id_by_size = dict()
+    for branch_id in range(num_branch):
+        size = int(active_sub_branches[branch_id])
+        if size == 0:
+            continue
+        if size in previous_branch_id_by_size:
+            prev_branch_id = previous_branch_id_by_size[size]
+            packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, numpy.random.permutation(niter), :]
+            continue
+        previous_branch_id_by_size[size] = branch_id
+        masks = _weighted_sample_without_replacement_masks(p=p, size=size, niter=niter)
+        packed_masks[branch_id, :, :] = numpy.packbits(masks, axis=1)
+
+    arity = remapped_active_cb_ids.shape[1]
+    if arity == 1:
+        active_out = _UINT8_POPCOUNT[packed_masks[remapped_active_cb_ids[:, 0], :, :]].sum(axis=2, dtype=numpy.int32)
+    elif arity == 2:
+        active_out = _UINT8_POPCOUNT[numpy.bitwise_and(
+            packed_masks[remapped_active_cb_ids[:, 0], :, :],
+            packed_masks[remapped_active_cb_ids[:, 1], :, :],
+        )].sum(axis=2, dtype=numpy.int32)
+    else:
+        shared = packed_masks[remapped_active_cb_ids[:, 0], :, :].copy()
+        for col in range(1, arity):
+            shared = numpy.bitwise_and(shared, packed_masks[remapped_active_cb_ids[:, col], :, :])
+        active_out = _UINT8_POPCOUNT[shared].sum(axis=2, dtype=numpy.int32)
+    out = numpy.zeros((cb_ids.shape[0], niter), dtype=numpy.int32)
+    out[active_row_indices, :] = active_out
+    return out
+
+
+def _resolve_quantile_parallel_plan(cb_rows, num_categories, quantile_niter, requested_n_jobs, requested_chunk_factor):
+    n_jobs = int(requested_n_jobs)
+    chunk_factor = int(requested_chunk_factor)
+    if n_jobs <= 1:
+        return 1, max(chunk_factor, 1)
+    # For small branch-set workloads, thread startup and local-buffer reduction dominate.
+    # Fall back to single-thread execution to avoid regressions under --threads > 1.
+    workload = int(cb_rows) * int(num_categories) * int(quantile_niter)
+    if (cb_rows <= 4) or (workload < 20_000_000):
+        return 1, max(chunk_factor, 1)
+    return n_jobs, max(chunk_factor, 4)
+
+
 def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g):
     E_b = numpy.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
     for i,sg,a,d in list_igad:
@@ -95,7 +198,6 @@ def joblib_calc_E_mean(mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_comb
 
 
 def joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
-    array_site = numpy.arange(sub_sg.shape[0])
     for i,sg,a,d in igad_chunk:
         if (a==d):
             continue
@@ -108,7 +210,7 @@ def joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_
         if 'float' in str(sub_branches.dtype):
             # TODO: warn this rounding (only once)
             sub_branches = sub_branches.round().astype(numpy.int64)
-        dfq[:,:] += omega_cy.get_permutations(cb_ids, array_site, sub_branches, p, quantile_niter)
+        dfq[:,:] += _get_permutations_fast(cb_ids, sub_branches, p, quantile_niter)
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i+1, num_gad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
@@ -117,10 +219,10 @@ def _calc_E_mean_chunk_to_mmap(mode, cb_ids, sub_sg, sub_bg, mmap_out, dtype, sh
     joblib_calc_E_mean(mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g)
     dfEb.flush()
 
-def _calc_quantile_chunk_to_mmap(mode, cb_ids, sub_sg, sub_bg, mmap_out, dtype, shape, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
-    dfq = numpy.memmap(filename=mmap_out, dtype=dtype, shape=shape, mode='r+')
-    joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
-    dfq.flush()
+def _calc_quantile_chunk_local(mode, cb_ids, sub_sg, sub_bg, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
+    dfq_local = numpy.zeros(shape=(cb_ids.shape[0], quantile_niter), dtype=numpy.int32)
+    joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq_local, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
+    return dfq_local
 
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g={}):
     if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
@@ -151,8 +253,17 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     list_igad = [ [i,]+list(items) for i,items in zip(range(num_gad_combinat), list_gad) ]
     obs_col = 'OC'+SN+mode
     cb_ids = _get_cb_ids(cb)
-    n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
+    requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
     chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    n_jobs = requested_n_jobs
+    if stat == 'quantile':
+        n_jobs, chunk_factor = _resolve_quantile_parallel_plan(
+            cb_rows=cb.shape[0],
+            num_categories=len(list_igad),
+            quantile_niter=quantile_niter,
+            requested_n_jobs=requested_n_jobs,
+            requested_chunk_factor=chunk_factor,
+        )
     igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
     if stat=='mean':
         if n_jobs == 1:
@@ -179,38 +290,28 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             del dfEb
             if os.path.exists(mmap_out): os.unlink(mmap_out)
     elif stat=='quantile':
-        mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfq.mmap')
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
-        my_dtype = sub_tensor.dtype
-        if 'bool' in str(my_dtype): my_dtype = numpy.int32
         axis = (cb.shape[0], quantile_niter)
-        dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        # TODO distinct thread/process
+        dfq = numpy.zeros(shape=axis, dtype=numpy.int32)
         if n_jobs == 1:
             joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, list_igad, g)
         else:
             tasks = [
-                (mode, cb_ids, sub_sg, sub_bg, mmap_out, my_dtype, axis, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
+                (mode, cb_ids, sub_sg, sub_bg, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
                 for igad_chunk in igad_chunks
             ]
-            parallel.run_starmap(
-                func=_calc_quantile_chunk_to_mmap,
+            chunk_dfs = parallel.run_starmap(
+                func=_calc_quantile_chunk_local,
                 args_iterable=tasks,
                 n_jobs=n_jobs,
                 backend='threading',
             )
-        dfq.flush()
-        del dfq
-        dfq = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='r')
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
-        E_b = numpy.zeros_like(cb.index, dtype=g['float_type'])
-        for i in cb.index:
-            # num_gad_combinat: poisson approximation
-            obs_value = cb.loc[i,obs_col]
-            gt_rank = (dfq[i,:]<obs_value).sum()
-            ge_rank = (dfq[i,:]<=obs_value).sum()
-            corrected_rank = (gt_rank+ge_rank)/2
-            E_b[i] = corrected_rank / quantile_niter
+            for dfq_chunk in chunk_dfs:
+                dfq += dfq_chunk
+        # num_gad_combinat: poisson approximation
+        obs_values = cb.loc[:,obs_col].values.astype(g['float_type'], copy=False)
+        gt_ranks = (dfq < obs_values[:, None]).sum(axis=1, dtype=numpy.int64)
+        ge_ranks = (dfq <= obs_values[:, None]).sum(axis=1, dtype=numpy.int64)
+        E_b = ((gt_ranks + ge_ranks) / 2) / quantile_niter
     return E_b
 
 def subroot_E2nan(cb, tree):
