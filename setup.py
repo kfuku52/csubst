@@ -20,7 +20,7 @@ setup(
     name             = 'csubst',
     version          = version,
     description      = 'Tools for molecular convergence detection in coding sequences',
-    license          = "BSD 3-clause License",
+    license          = "MIT License",
     author           = "Kenji Fukushima",
     author_email     = 'kfuku52@gmail.com',
     url              = 'https://github.com/kfuku52/csubst.git',

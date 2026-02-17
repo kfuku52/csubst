@@ -31,6 +31,30 @@ def test_get_global_parameters_normalizes_sub_tensor_backend_case():
     assert g["sub_tensor_backend"] == "sparse"
 
 
+def test_get_global_parameters_prints_dependency_versions(capsys):
+    param.get_global_parameters(_args())
+    captured = capsys.readouterr()
+    assert "CSUBST dependency versions:" in captured.out
+    assert "CSUBST missing dependency packages:" in captured.out
+    for package_name in param.DEPENDENCY_DISTRIBUTIONS:
+        assert "{}=".format(package_name) in captured.out
+
+
+def test_get_global_parameters_reports_missing_dependency_packages(monkeypatch, capsys):
+    missing_package = param.DEPENDENCY_DISTRIBUTIONS[0]
+
+    def _mock_get_dependency_version(distribution_name):
+        if distribution_name == missing_package:
+            return "not installed"
+        return "1.0.0"
+
+    monkeypatch.setattr(param, "_get_dependency_version", _mock_get_dependency_version)
+    param.get_global_parameters(_args())
+    captured = capsys.readouterr()
+    txt = "CSUBST missing dependency packages: {}".format(missing_package)
+    assert txt in captured.out
+
+
 def test_get_global_parameters_rejects_invalid_sub_tensor_backend():
     with pytest.raises(ValueError, match="sub_tensor_backend"):
         param.get_global_parameters(_args(sub_tensor_backend="not-a-backend"))

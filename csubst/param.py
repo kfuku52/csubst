@@ -5,14 +5,52 @@ import os
 import platform
 import re
 import sys
+try:
+    from importlib import metadata as importlib_metadata
+except ImportError:  # pragma: no cover
+    import importlib_metadata
 
 from csubst.__init__ import __version__
 from csubst import output_stat
+
+DEPENDENCY_DISTRIBUTIONS = (
+    'ete4',
+    'numpy',
+    'scipy',
+    'pandas',
+    'cython',
+    'matplotlib',
+)
+
+
+def _get_dependency_version(distribution_name):
+    try:
+        return importlib_metadata.version(distribution_name)
+    except importlib_metadata.PackageNotFoundError:
+        return 'not installed'
+
+
+def _format_dependency_versions():
+    dep_versions = list()
+    missing_packages = list()
+    for distribution_name in DEPENDENCY_DISTRIBUTIONS:
+        version = _get_dependency_version(distribution_name)
+        dep_versions.append('{}={}'.format(distribution_name, version))
+        if version == 'not installed':
+            missing_packages.append(distribution_name)
+    return ', '.join(dep_versions), missing_packages
+
 
 def get_global_parameters(args):
     print('OS: {}'.format(platform.platform()), flush=True)
     print('Python version: {}'.format(sys.version.replace('\n', ' ')), flush=True)
     print('CSUBST version: {}'.format(__version__), flush=True)
+    dep_versions, missing_packages = _format_dependency_versions()
+    print('CSUBST dependency versions: {}'.format(dep_versions), flush=True)
+    if len(missing_packages):
+        print('CSUBST missing dependency packages: {}'.format(', '.join(missing_packages)), flush=True)
+    else:
+        print('CSUBST missing dependency packages: none', flush=True)
     print('CSUBST command: {}'.format(' '.join(sys.argv)), flush=True)
     print('CSUBST working directory: {}'.format(os.getcwd()), flush=True)
     print('CSUBST bug report: https://github.com/kfuku52/csubst/issues', flush=True)
