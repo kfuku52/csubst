@@ -16,8 +16,6 @@ A skill is a local instruction set stored in a `SKILL.md` file. Use these skills
 
 - `csubst-validation-parity`: Reproducible CSUBST parity/performance validation with peak RAM tracking and deterministic TSV comparisons.  
   file: `.codex/skills/csubst-validation-parity/SKILL.md`
-- `csubst-github-issue-reporting`: Structured issue creation/progress/closure workflow with retry-safe `gh` usage and evidence-first comments.  
-  file: `.codex/skills/csubst-github-issue-reporting/SKILL.md`
 
 ### How to use skills
 

@@ -1,4 +1,0 @@
-interface:
-  display_name: "CSUBST Issue Ops"
-  short_description: "Post robust issue updates with artifacts"
-  default_prompt: "Use this skill to draft and post CSUBST issue comments with reproducible evidence and retry-safe gh operations."

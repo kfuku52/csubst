@@ -137,64 +137,86 @@ def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
         color = bars['color'][i]
         ax.hlines(y=y, xmin=x_start, xmax=x_end, linewidth=lw, color=color, zorder=0)
 
+
+def _zeros_yvalues(num_row):
+    return numpy.zeros(num_row, dtype=float)
+
+
+def _get_yvalues_sub(df, SN):
+    if SN == 'S':
+        yvalues = df.loc[:, 'S_sub'].to_numpy(copy=True)
+        is_enough_value = (yvalues > 0.01)
+        yvalues[is_enough_value] = df.loc[is_enough_value, ['N_sub', 'S_sub']].sum(axis=1).values
+        return yvalues
+    return df.loc[:, 'N_sub'].to_numpy(copy=True)
+
+
+def _get_yvalues_set_expr(df, SN):
+    if SN == 'S':
+        return _zeros_yvalues(df.shape[0])
+    if 'N_set_expr_prob' in df.columns:
+        return df.loc[:, 'N_set_expr_prob'].to_numpy(copy=True)
+    if 'N_set_expr' in df.columns:
+        return df.loc[:, 'N_set_expr'].to_numpy(copy=True).astype(float)
+    return _zeros_yvalues(df.shape[0])
+
+
+def _get_yvalues_set_other(df, SN):
+    if SN == 'S':
+        return _zeros_yvalues(df.shape[0])
+    if 'N_set_other' in df.columns:
+        return df.loc[:, 'N_set_other'].to_numpy(copy=True).astype(float)
+    return _zeros_yvalues(df.shape[0])
+
+
+def _get_yvalues_sub_branch(df, sub_type, SN):
+    branch_id_txt = sub_type.replace('_sub_branch_', '')
+    branch_id = int(branch_id_txt)
+    n_col = 'N_sub_{}'.format(branch_id)
+    s_col = 'S_sub_{}'.format(branch_id)
+    nvalues = df.loc[:, n_col].to_numpy(copy=True) if (n_col in df.columns) else _zeros_yvalues(df.shape[0])
+    svalues = df.loc[:, s_col].to_numpy(copy=True) if (s_col in df.columns) else _zeros_yvalues(df.shape[0])
+    if SN == 'S':
+        yvalues = svalues.copy()
+        is_enough_value = (yvalues > 0.01)
+        yvalues[is_enough_value] = yvalues[is_enough_value] + nvalues[is_enough_value]
+        return yvalues
+    return nvalues
+
+
+def _get_yvalues_sub_target(df, col, SN):
+    if SN == 'S':
+        is_S_cols = df.columns.str.startswith('S_sub_')
+        S_cols = df.columns[is_S_cols]
+        is_y_cols = is_S_cols | df.columns.str.startswith('N_sub_')
+        y_cols = df.columns[is_y_cols]
+        yvalues = df.loc[:, S_cols].sum(axis=1).to_numpy(copy=True)
+        is_enough_value = (yvalues > 0.01)
+        yvalues[is_enough_value] = df.loc[is_enough_value, y_cols].sum(axis=1).values
+        return yvalues
+    y_cols = df.columns[df.columns.str.startswith(col)]
+    return df.loc[:, y_cols].sum(axis=1).values
+
+
+def _get_yvalues_default(df, sub_type, col, SN):
+    if SN == 'S':
+        return df.loc[:, ['OCN' + sub_type, 'OCS' + sub_type]].sum(axis=1).values
+    return df.loc[:, 'OC' + col].values
+
+
 def get_yvalues(df, sub_type, SN):
     col = SN + sub_type
     if sub_type == '_sub':
-        if SN == 'S':
-            yvalues = df.loc[:, 'S' + sub_type].to_numpy(copy=True)
-            is_enough_value = (yvalues > 0.01)
-            yvalues[is_enough_value] = df.loc[is_enough_value, ['N' + sub_type, 'S' + sub_type]].sum(axis=1).values
-        elif SN == 'N':
-            yvalues = df.loc[:, col].to_numpy(copy=True)
-    elif sub_type == '_set_expr':
-        if SN == 'S':
-            yvalues = numpy.zeros(df.shape[0], dtype=float)
-        elif SN == 'N':
-            if 'N_set_expr_prob' in df.columns:
-                yvalues = df.loc[:, 'N_set_expr_prob'].to_numpy(copy=True)
-            elif 'N_set_expr' in df.columns:
-                yvalues = df.loc[:, 'N_set_expr'].to_numpy(copy=True).astype(float)
-            else:
-                yvalues = numpy.zeros(df.shape[0], dtype=float)
-    elif sub_type == '_set_other':
-        if SN == 'S':
-            yvalues = numpy.zeros(df.shape[0], dtype=float)
-        elif SN == 'N':
-            if 'N_set_other' in df.columns:
-                yvalues = df.loc[:, 'N_set_other'].to_numpy(copy=True).astype(float)
-            else:
-                yvalues = numpy.zeros(df.shape[0], dtype=float)
-    elif sub_type.startswith('_sub_branch_'):
-        branch_id_txt = sub_type.replace('_sub_branch_', '')
-        branch_id = int(branch_id_txt)
-        n_col = 'N_sub_{}'.format(branch_id)
-        s_col = 'S_sub_{}'.format(branch_id)
-        nvalues = df.loc[:, n_col].to_numpy(copy=True) if (n_col in df.columns) else numpy.zeros(df.shape[0], dtype=float)
-        svalues = df.loc[:, s_col].to_numpy(copy=True) if (s_col in df.columns) else numpy.zeros(df.shape[0], dtype=float)
-        if SN == 'S':
-            yvalues = svalues.copy()
-            is_enough_value = (yvalues > 0.01)
-            yvalues[is_enough_value] = yvalues[is_enough_value] + nvalues[is_enough_value]
-        elif SN == 'N':
-            yvalues = nvalues
-    elif sub_type=='_sub_':
-        if SN == 'S':
-            is_S_cols = df.columns.str.startswith('S_sub_')
-            S_cols = df.columns[is_S_cols]
-            is_y_cols = is_S_cols | df.columns.str.startswith('N_sub_')
-            y_cols = df.columns[is_y_cols]
-            yvalues = df.loc[:, S_cols].sum(axis=1).to_numpy(copy=True)
-            is_enough_value = (yvalues>0.01)
-            yvalues[is_enough_value] = df.loc[is_enough_value,y_cols].sum(axis=1).values
-        elif SN == 'N':
-            y_cols = df.columns[df.columns.str.startswith(col)]
-            yvalues = df.loc[:, y_cols].sum(axis=1).values
-    else:
-        if SN=='S':
-            yvalues = df.loc[:,['OCN'+sub_type,'OCS'+sub_type]].sum(axis=1).values
-        elif SN=='N':
-            yvalues = df.loc[:, 'OC'+col].values
-    return yvalues
+        return _get_yvalues_sub(df=df, SN=SN)
+    if sub_type == '_set_expr':
+        return _get_yvalues_set_expr(df=df, SN=SN)
+    if sub_type == '_set_other':
+        return _get_yvalues_set_other(df=df, SN=SN)
+    if sub_type.startswith('_sub_branch_'):
+        return _get_yvalues_sub_branch(df=df, sub_type=sub_type, SN=SN)
+    if sub_type == '_sub_':
+        return _get_yvalues_sub_target(df=df, col=col, SN=SN)
+    return _get_yvalues_default(df=df, sub_type=sub_type, col=col, SN=SN)
 
 
 def _oldness_frac_to_rgb(frac):
@@ -326,50 +348,62 @@ def add_substitution_labels(df, SN, sub_type, SN_colors, ax, g):
         ax.text(x=x_value2, y=0.98, s=sub_text, color=SN_colors[SN], fontsize=8, rotation='vertical', ha=ha, va='top')
     return ax
 
+
+def _get_base_sub_types_and_colors():
+    sub_types = {
+        '_sub': 'Branch-wise\nsubstitutions\nin the entire tree',
+        '_sub_': 'Branch-wise\nsubstitutions\nin the targets',
+    }
+    SN_color_all = {
+        '_sub': {'N': 'black', 'S': 'gainsboro'},
+        '_sub_': {'N': 'black', 'S': 'gainsboro'},
+    }
+    return sub_types, SN_color_all
+
+
+def _get_branch_sub_type_key(branch_id):
+    return '_sub_branch_{}'.format(int(branch_id))
+
+
+def _add_branch_sub_types(sub_types, SN_color_all, branch_ids, color_by_branch):
+    for branch_id in branch_ids.tolist():
+        key = _get_branch_sub_type_key(branch_id)
+        sub_types[key] = 'Substitutions in\nbranch_id {}'.format(int(branch_id))
+        SN_color_all[key] = {'N': color_by_branch[int(branch_id)], 'S': 'gainsboro'}
+    return sub_types, SN_color_all
+
+
 def get_plot_sub_types_and_colors(g):
     mode = str(g.get('mode', 'intersection')).lower()
     if mode == 'lineage':
-        sub_types = {
-            '_sub': 'Branch-wise\nsubstitutions\nin the entire tree',
-            '_sub_': 'Branch-wise\nsubstitutions\nin the targets',
-        }
+        sub_types, SN_color_all = _get_base_sub_types_and_colors()
         branch_ids = numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64)
         branch_rgb = _get_lineage_rgb_by_branch(branch_ids=branch_ids.tolist(), g=g)
-        for branch_id in branch_ids.tolist():
-            key = '_sub_branch_{}'.format(int(branch_id))
-            sub_types[key] = 'Substitutions in\nbranch_id {}'.format(int(branch_id))
-        SN_color_all = {
-            '_sub': {'N': 'black', 'S': 'gainsboro'},
-            '_sub_': {'N': 'black', 'S': 'gainsboro'},
-        }
-        for branch_id in branch_ids.tolist():
-            key = '_sub_branch_{}'.format(int(branch_id))
-            SN_color_all[key] = {'N': branch_rgb[int(branch_id)], 'S': 'gainsboro'}
+        sub_types, SN_color_all = _add_branch_sub_types(
+            sub_types=sub_types,
+            SN_color_all=SN_color_all,
+            branch_ids=branch_ids,
+            color_by_branch=branch_rgb,
+        )
     elif mode == 'set':
-        sub_types = {
-            '_sub': 'Branch-wise\nsubstitutions\nin the entire tree',
-            '_sub_': 'Branch-wise\nsubstitutions\nin the targets',
-        }
+        sub_types, SN_color_all = _get_base_sub_types_and_colors()
         tokens = _tokenize_set_expression(g.get('mode_expression', ''))
         branch_ids = _get_set_expression_display_branch_ids(g)
-        for branch_id in branch_ids.tolist():
-            key = '_sub_branch_{}'.format(int(branch_id))
-            sub_types[key] = 'Substitutions in\nbranch_id {}'.format(int(branch_id))
+        branch_black = {int(bid): 'black' for bid in branch_ids.tolist()}
+        sub_types, SN_color_all = _add_branch_sub_types(
+            sub_types=sub_types,
+            SN_color_all=SN_color_all,
+            branch_ids=branch_ids,
+            color_by_branch=branch_black,
+        )
         if 'A' in tokens:
             sub_types['_set_other'] = 'Substitutions in\nA'
         mode_expression = str(g.get('mode_expression', '')).strip()
         if mode_expression == '':
             mode_expression = 'set expression'
         sub_types['_set_expr'] = 'Substitutions in\n{}'.format(mode_expression)
-        SN_color_all = {
-            '_sub': {'N': 'black', 'S': 'gainsboro'},
-            '_sub_': {'N': 'black', 'S': 'gainsboro'},
-            '_set_other': {'N': 'black', 'S': 'gainsboro'},
-            '_set_expr': {'N': 'red', 'S': 'gainsboro'},
-        }
-        for branch_id in branch_ids.tolist():
-            key = '_sub_branch_{}'.format(int(branch_id))
-            SN_color_all[key] = {'N': 'black', 'S': 'gainsboro'}
+        SN_color_all['_set_other'] = {'N': 'black', 'S': 'gainsboro'}
+        SN_color_all['_set_expr'] = {'N': 'red', 'S': 'gainsboro'}
     elif g['single_branch_mode']:
         sub_types = {
             '_sub':'Branch-wise\nsubstitutions\nin the entire tree',
@@ -394,72 +428,139 @@ def get_plot_sub_types_and_colors(g):
         }
     return sub_types,SN_color_all
 
-def plot_barchart(df, g):
-    sub_types,SN_color_all = get_plot_sub_types_and_colors(g)
-    num_row = len(sub_types)
-    fig,axes = matplotlib.pyplot.subplots(nrows=num_row, ncols=1, figsize=(7.2, 1.2*len(sub_types)), sharex=True)
-    axes = axes.flat
-    i = 0
-    NS_ymax = df.loc[:,['N_sub','S_sub']].sum(axis=1).max() + 0.5
-    for sub_type in sub_types.keys():
-        SN_colors = SN_color_all[sub_type]
-        ylabel = sub_types[sub_type]
-        ax = axes[i]
-        for SN in ['S','N']:
-            if sub_type=='_sub':
-                yvalues = get_yvalues(df, sub_type, SN)
-                ax.set_ylim(0, NS_ymax)
-                add_gapline(df=df, gapcol='gap_rate_all', xcol='codon_site_alignment', yvalue=NS_ymax*0.95, lw=3, ax=ax)
-            elif sub_type=='_sub_':
-                yvalues = get_yvalues(df, sub_type, SN)
-                ymax = df.columns.str.startswith('N_sub_').sum()
-                ax.set_ylim(0, ymax)
-                add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=ymax*0.95, lw=3, ax=ax)
-            elif sub_type.startswith('_sub_branch_'):
-                yvalues = get_yvalues(df, sub_type, SN)
-                ax.set_ylim(0, 1.0)
-                add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
-            elif sub_type == '_set_expr':
-                yvalues = get_yvalues(df, sub_type, SN)
-                ymax = max(float(df.loc[:, 'N_set_expr_prob'].max()) if ('N_set_expr_prob' in df.columns) else 1.0, 1.0)
-                ax.set_ylim(0, ymax)
-                add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=ymax*0.95, lw=3, ax=ax)
-            elif sub_type == '_set_other':
-                yvalues = get_yvalues(df, sub_type, SN)
-                ax.set_ylim(0, 1.0)
-                add_gapline(df=df, gapcol='gap_rate_all', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
-            else:
-                yvalues = get_yvalues(df, sub_type, SN)
-                ax.set_ylim(0, 1)
-                ax.axhline(y=0.5, linestyle='--', linewidth=0.5, color='black', zorder=0)
-                add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
-                if (SN=='N')&(g['pdb'] is not None):
-                    ax = add_substitution_labels(df, SN, sub_type, SN_colors, ax, g)
-            ax.set_ylabel(ylabel, fontsize=font_size)
-            xy = pandas.DataFrame({'x':df.loc[:, 'codon_site_alignment'].values, 'y':yvalues})
-            xy2 = xy.loc[(xy['y']>0.01),:]
-            ax.bar(xy2['x'], xy2['y'], color=SN_colors[SN])
-            if (i==num_row-1):
-                ax.set_xlabel('Aligned codon site', fontsize=font_size)
-            else:
-                ax.set_xlabel('', fontsize=font_size)
-            ax.set_xlim(df.loc[:,'codon_site_alignment'].min()-0.5, df.loc[:,'codon_site_alignment'].max()+0.5)
-        i += 1
-    if str(g.get('mode', '')).lower() == 'lineage':
-        fig.tight_layout(h_pad=0.5, w_pad=1, rect=[0, 0.09, 1, 1])
-        _add_lineage_distance_colorbar(fig=fig, g=g)
+
+def _configure_barchart_axis(ax, df, sub_type, g, NS_ymax):
+    enable_substitution_labels = False
+    if sub_type == '_sub':
+        ax.set_ylim(0, NS_ymax)
+        add_gapline(df=df, gapcol='gap_rate_all', xcol='codon_site_alignment', yvalue=NS_ymax * 0.95, lw=3, ax=ax)
+    elif sub_type == '_sub_':
+        ymax = df.columns.str.startswith('N_sub_').sum()
+        ax.set_ylim(0, ymax)
+        add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=ymax * 0.95, lw=3, ax=ax)
+    elif sub_type.startswith('_sub_branch_'):
+        ax.set_ylim(0, 1.0)
+        add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
+    elif sub_type == '_set_expr':
+        ymax = max(float(df.loc[:, 'N_set_expr_prob'].max()) if ('N_set_expr_prob' in df.columns) else 1.0, 1.0)
+        ax.set_ylim(0, ymax)
+        add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=ymax * 0.95, lw=3, ax=ax)
+    elif sub_type == '_set_other':
+        ax.set_ylim(0, 1.0)
+        add_gapline(df=df, gapcol='gap_rate_all', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
     else:
-        fig.tight_layout(h_pad=0.5, w_pad=1)
+        ax.set_ylim(0, 1)
+        ax.axhline(y=0.5, linestyle='--', linewidth=0.5, color='black', zorder=0)
+        add_gapline(df=df, gapcol='gap_rate_target', xcol='codon_site_alignment', yvalue=0.95, lw=3, ax=ax)
+        enable_substitution_labels = True
+    return enable_substitution_labels
+
+
+def _draw_barchart_series(ax, df, sub_type, SN, SN_colors, ylabel, g, NS_ymax, is_last_row):
+    yvalues = get_yvalues(df, sub_type, SN)
+    enable_substitution_labels = _configure_barchart_axis(
+        ax=ax,
+        df=df,
+        sub_type=sub_type,
+        g=g,
+        NS_ymax=NS_ymax,
+    )
+    if enable_substitution_labels and (SN == 'N') and (g['pdb'] is not None):
+        ax = add_substitution_labels(df, SN, sub_type, SN_colors, ax, g)
+    ax.set_ylabel(ylabel, fontsize=font_size)
+    xy = pandas.DataFrame({'x': df.loc[:, 'codon_site_alignment'].values, 'y': yvalues})
+    xy2 = xy.loc[(xy['y'] > 0.01), :]
+    ax.bar(xy2['x'], xy2['y'], color=SN_colors[SN])
+    if is_last_row:
+        ax.set_xlabel('Aligned codon site', fontsize=font_size)
+    else:
+        ax.set_xlabel('', fontsize=font_size)
+    ax.set_xlim(df.loc[:, 'codon_site_alignment'].min() - 0.5, df.loc[:, 'codon_site_alignment'].max() + 0.5)
+    return ax
+
+
+def _draw_barchart_row(ax, df, sub_type, SN_colors, ylabel, g, NS_ymax, is_last_row):
+    for SN in ['S', 'N']:
+        ax = _draw_barchart_series(
+            ax=ax,
+            df=df,
+            sub_type=sub_type,
+            SN=SN,
+            SN_colors=SN_colors,
+            ylabel=ylabel,
+            g=g,
+            NS_ymax=NS_ymax,
+            is_last_row=is_last_row,
+        )
+    return ax
+
+
+def _resolve_barchart_output_base(g):
     if g['pdb'] is None:
-        outbase = os.path.join(g['site_outdir'], 'csubst_site')
-    else:
-        outbase = g['pdb_outfile_base']
+        return os.path.join(g['site_outdir'], 'csubst_site')
+    return g['pdb_outfile_base']
+
+
+def _save_barchart_figure(fig, outbase):
     out_path = outbase + ".pdf"
     fig.savefig(out_path, format='pdf', transparent=True)
     #fig.savefig(outbase+".svg", format='svg', transparent=True)
     print("Nonsynonymous and synonymous substitutions are shown in color and gray, respectively.", flush=True)
     print("Alignment gap sites are indicated by gray scale (0% missing = white, 100% missing = black).", flush=True)
     return out_path
+
+
+def _apply_barchart_layout(fig, g):
+    if str(g.get('mode', '')).lower() == 'lineage':
+        fig.tight_layout(h_pad=0.5, w_pad=1, rect=[0, 0.09, 1, 1])
+        _add_lineage_distance_colorbar(fig=fig, g=g)
+        return fig
+    fig.tight_layout(h_pad=0.5, w_pad=1)
+    return fig
+
+
+def _create_barchart_figure(num_row):
+    fig, axes = matplotlib.pyplot.subplots(
+        nrows=num_row,
+        ncols=1,
+        figsize=(7.2, 1.2 * num_row),
+        sharex=True,
+    )
+    return fig, numpy.atleast_1d(axes).reshape(-1)
+
+
+def _draw_all_barchart_rows(df, g, axes, sub_types, SN_color_all, NS_ymax):
+    num_row = len(sub_types)
+    for i, (sub_type, ylabel) in enumerate(sub_types.items()):
+        _draw_barchart_row(
+            ax=axes[i],
+            df=df,
+            sub_type=sub_type,
+            SN_colors=SN_color_all[sub_type],
+            ylabel=ylabel,
+            g=g,
+            NS_ymax=NS_ymax,
+            is_last_row=(i == num_row - 1),
+        )
+    return axes
+
+
+def plot_barchart(df, g):
+    sub_types, SN_color_all = get_plot_sub_types_and_colors(g)
+    num_row = len(sub_types)
+    fig, axes = _create_barchart_figure(num_row=num_row)
+    NS_ymax = df.loc[:, ['N_sub', 'S_sub']].sum(axis=1).max() + 0.5
+    _draw_all_barchart_rows(
+        df=df,
+        g=g,
+        axes=axes,
+        sub_types=sub_types,
+        SN_color_all=SN_color_all,
+        NS_ymax=NS_ymax,
+    )
+    fig = _apply_barchart_layout(fig=fig, g=g)
+    outbase = _resolve_barchart_output_base(g)
+    return _save_barchart_figure(fig=fig, outbase=outbase)
 
 
 def plot_lineage_tree(g, outbase):
@@ -500,81 +601,173 @@ def extend_site_index_edge(sites, num_extend):
     new_sites = new_sites.drop_duplicates().sort_values().reset_index(drop=True)
     return new_sites
 
+
+def _resolve_window_sizes(num_gene_site, num_site):
+    window_sizes = [100, 50, 10, 5, 4, 3, 2, 1]
+    return [w for w in window_sizes if (w < num_gene_site) & (w < num_site)]
+
+
+def _build_codon_first_state_index(seq, num_gene_site, codon_orders):
+    codon_first_index = numpy.full(shape=(num_gene_site,), fill_value=-1, dtype=numpy.int64)
+    for site in range(num_gene_site):
+        codon = seq[(site * 3):((site + 1) * 3)]
+        codon_index = sequence.get_state_index(codon, codon_orders, genetic_code.ambiguous_table)
+        if len(codon_index) > 0:
+            codon_first_index[site] = int(codon_index[0])
+    return codon_first_index
+
+
+def _get_unassigned_window_context(assigned_gene_index, gene_sites, window_size):
+    unassigned_aln_sites = numpy.where(assigned_gene_index == -1)[0].astype(numpy.int64, copy=False)
+    assigned_gene_sites = assigned_gene_index[assigned_gene_index != -1]
+    unassigned_gene_sites = numpy.setdiff1d(gene_sites, assigned_gene_sites, assume_unique=False)
+    unassigned_gene_sites = pandas.Series(unassigned_gene_sites)
+    extended_unassigned_gene_sites = extend_site_index_edge(unassigned_gene_sites, window_size).to_numpy(
+        dtype=numpy.int64,
+        copy=False,
+    )
+    return unassigned_aln_sites, extended_unassigned_gene_sites
+
+
+def _is_window_state_match(leaf_state_cdn, codon_first_index, uas, ugs, window_size, row_index_cache):
+    codon_index_window = codon_first_index[ugs:(ugs + window_size)]
+    if (codon_index_window < 0).any():
+        # codon may be a stop.
+        return False
+    row_index = row_index_cache.get(window_size, None)
+    if row_index is None:
+        row_index = numpy.arange(window_size, dtype=numpy.int64)
+        row_index_cache[window_size] = row_index
+    leaf_window = leaf_state_cdn[uas:(uas + window_size), :]
+    return bool((leaf_window[row_index, codon_index_window] != 0).all())
+
+
+def _has_smaller_following_gene_index(assigned_gene_index, window_aln_end, window_gene_end):
+    following_gene_index = assigned_gene_index[window_aln_end:]
+    following_gene_index = following_gene_index[following_gene_index != -1]
+    if following_gene_index.shape[0] == 0:
+        return False
+    return bool(following_gene_index.min() < window_gene_end)
+
+
+def _assign_matching_windows_for_size(
+    assigned_gene_index,
+    leaf_state_cdn,
+    codon_first_index,
+    num_site,
+    num_gene_site,
+    window_size,
+    gene_sites,
+    row_index_cache,
+):
+    step_size = max([int(window_size / 5), 1])
+    unassigned_aln_sites, extended_unassigned_gene_sites = _get_unassigned_window_context(
+        assigned_gene_index=assigned_gene_index,
+        gene_sites=gene_sites,
+        window_size=window_size,
+    )
+    txt = 'Window size = {:,}, Number of unassigned alignment site = {:,}'
+    print(txt.format(window_size, unassigned_aln_sites.shape[0]), flush=True)
+    for k, uas in enumerate(unassigned_aln_sites):
+        if (k != 0) and (uas < unassigned_aln_sites[k - 1] + step_size):
+            continue
+        if (uas + window_size > num_site):
+            break
+        for ugs in extended_unassigned_gene_sites:
+            if (ugs + window_size > num_gene_site):
+                break
+            if not _is_window_state_match(
+                leaf_state_cdn=leaf_state_cdn,
+                codon_first_index=codon_first_index,
+                uas=uas,
+                ugs=ugs,
+                window_size=window_size,
+                row_index_cache=row_index_cache,
+            ):
+                continue
+            window_aln_end = uas + window_size - 1
+            window_gene_end = ugs + window_size - 1
+            if _has_smaller_following_gene_index(
+                assigned_gene_index=assigned_gene_index,
+                window_aln_end=window_aln_end,
+                window_gene_end=window_gene_end,
+            ):
+                continue
+            assigned_gene_index[uas:(uas + window_size)] = numpy.arange(ugs, ugs + window_size, dtype=numpy.int64)
+            break
+    return assigned_gene_index
+
+
+def _report_gene_assignment_summary(assigned_gene_index, aln_sites, has_gene_site_in_aln_value):
+    num_gene_site_in_aln = has_gene_site_in_aln_value.sum()
+    is_unassigned = (assigned_gene_index == -1)
+    txt = 'End. Unassigned alignment site = {:,}, Assigned alignment site = {:,}, '
+    txt += 'Alignment site with non-missing gene states: {:,}'
+    print(txt.format(is_unassigned.sum(), (~is_unassigned).sum(), num_gene_site_in_aln), flush=True)
+    if (~is_unassigned).sum() == num_gene_site_in_aln:
+        return
+    gene_site_in_aln = set(aln_sites[has_gene_site_in_aln_value])
+    gene_site_assigned = set(aln_sites[~is_unassigned])
+    only_in_aln = sorted(list(gene_site_in_aln - gene_site_assigned))
+    only_in_assigned = sorted(list(gene_site_assigned - gene_site_in_aln))
+    txt_base = 'Sites only present in '
+    print(txt_base + 'input alignment: {}'.format(','.join([str(v) for v in only_in_aln])), flush=True)
+    print(txt_base + 'untrimmed CDS: {}'.format(','.join([str(v) for v in only_in_assigned])), flush=True)
+
+
+def _build_aln_gene_match_for_leaf(leaf, seq, num_site, g):
+    leaf_nn = ete.get_prop(leaf, "numerical_label")
+    leaf_state_cdn = g['state_cdn'][leaf_nn, :, :]
+    seq = seq.replace('-', '')
+    num_gene_site = int(len(seq) / 3)
+    gene_sites = numpy.arange(num_gene_site, dtype=numpy.int64)
+    aln_sites = numpy.arange(num_site, dtype=numpy.int64)
+    col_leaf = 'codon_site_' + leaf.name
+    assigned_gene_index = numpy.full(shape=(num_site,), fill_value=-1, dtype=numpy.int64)
+    codon_first_index = _build_codon_first_state_index(
+        seq=seq,
+        num_gene_site=num_gene_site,
+        codon_orders=g['codon_orders'],
+    )
+    row_index_cache = dict()
+    window_sizes = _resolve_window_sizes(num_gene_site=num_gene_site, num_site=num_site)
+    for window_size in window_sizes:
+        assigned_gene_index = _assign_matching_windows_for_size(
+            assigned_gene_index=assigned_gene_index,
+            leaf_state_cdn=leaf_state_cdn,
+            codon_first_index=codon_first_index,
+            num_site=num_site,
+            num_gene_site=num_gene_site,
+            window_size=window_size,
+            gene_sites=gene_sites,
+            row_index_cache=row_index_cache,
+        )
+    has_gene_site_in_aln_value = (leaf_state_cdn.sum(axis=1) > 0)
+    _report_gene_assignment_summary(
+        assigned_gene_index=assigned_gene_index,
+        aln_sites=aln_sites,
+        has_gene_site_in_aln_value=has_gene_site_in_aln_value,
+    )
+    aln_gene_match = pandas.DataFrame({
+        'codon_site_alignment': aln_sites,
+        col_leaf: assigned_gene_index,
+    })
+    return aln_gene_match
+
+
 def add_gene_index(df, g):
     seqs = sequence.read_fasta(path=g['untrimmed_cds'])
     num_site = g['state_cdn'].shape[1]
     for leaf in ete.iter_leaves(g['tree']):
-        leaf_nn = ete.get_prop(leaf, "numerical_label")
-        if leaf.name not in seqs.keys():
+        if leaf.name not in seqs:
             continue
         print('Matching untrimmed CDS sequence: {}'.format(leaf.name), flush=True)
-        seq = seqs[leaf.name]
-        seq = seq.replace('-','')
-        num_gene_site = int(len(seq)/3)
-        gene_sites = numpy.arange(num_gene_site)
-        aln_sites = numpy.arange(num_site)
-        col_leaf = 'codon_site_'+leaf.name
-        cols = ['codon_site_alignment',col_leaf]
-        aln_gene_match = pandas.DataFrame(-1, index=aln_sites, columns=cols)
-        aln_gene_match.loc[:,'codon_site_alignment'] = aln_sites
-        window_sizes = [100,50,10,5,4,3,2,1]
-        window_sizes = [ w for w in window_sizes if (w<num_gene_site)&(w<num_site) ]
-        for window_size in window_sizes:
-            step_size = max([int(window_size/5),1])
-            is_unassigned = (aln_gene_match.loc[:,col_leaf]==-1)
-            unassigned_aln_sites = aln_gene_match.loc[is_unassigned,'codon_site_alignment']
-            assigned_gene_sites = aln_gene_match.loc[~is_unassigned,col_leaf]
-            unassinged_gene_sites = set(gene_sites) - set(assigned_gene_sites)
-            unassinged_gene_sites = pandas.Series(sorted(list(unassinged_gene_sites)))
-            extended_unassinged_gene_sites = extend_site_index_edge(unassinged_gene_sites, window_size)
-            txt = 'Window size = {:,}, Number of unassigned alignment site = {:,}'
-            print(txt.format(window_size, unassigned_aln_sites.shape[0]), flush=True)
-            for k,uas in enumerate(unassigned_aln_sites):
-                if k!=0:
-                    if uas < unassigned_aln_sites.iloc[k-1]+step_size:
-                        continue
-                if (uas+window_size>num_site):
-                    break
-                for ugs in extended_unassinged_gene_sites:
-                    if (ugs+window_size>num_gene_site):
-                        break
-                    window_match_flag = True
-                    for window_index in numpy.arange(window_size):
-                        codon = seq[((ugs+window_index)*3):((ugs+window_index+1)*3)]
-                        codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
-                        if len(codon_index)==0:
-                            window_match_flag = False # codon may be a stop.
-                            break
-                        ci = codon_index[0] # Take the first codon if ambiguous
-                        if g['state_cdn'][leaf_nn,uas+window_index,ci]!=0:
-                            continue
-                        else:
-                            window_match_flag = False
-                            break
-                    if window_match_flag:
-                        window_aln_index = numpy.arange(uas, uas+window_size)
-                        window_gene_index = numpy.arange(ugs, ugs+window_size)
-                        following_gene_index = aln_gene_match.loc[window_aln_index.max():,col_leaf]
-                        min_following_gene_index = following_gene_index.loc[following_gene_index!=-1].min()
-                        does_smaller_gene_index_follow = (min_following_gene_index<window_gene_index.max())
-                        if does_smaller_gene_index_follow:
-                            continue
-                        aln_gene_match.loc[window_aln_index,col_leaf] = window_gene_index
-                        break
-        has_gene_site_in_aln_value = (g['state_cdn'][leaf_nn,:,:].sum(axis=1)>0)
-        num_gene_site_in_aln = has_gene_site_in_aln_value.sum()
-        is_unassigned = (aln_gene_match.loc[:,col_leaf]==-1)
-        txt = 'End. Unassigned alignment site = {:,}, Assigned alignment site = {:,}, '
-        txt += 'Alignment site with non-missing gene states: {:,}'
-        print(txt.format(is_unassigned.sum(), (~is_unassigned).sum(), num_gene_site_in_aln), flush=True)
-        if (~is_unassigned).sum()!=num_gene_site_in_aln:
-            gene_site_in_aln = set(aln_sites[has_gene_site_in_aln_value])
-            gene_site_assigned = set(aln_gene_match.loc[~is_unassigned,'codon_site_alignment'])
-            only_in_aln = sorted(list(gene_site_in_aln - gene_site_assigned))
-            only_in_assigned = sorted(list(gene_site_assigned - gene_site_in_aln))
-            txt_base = 'Sites only present in '
-            print(txt_base+'input alignment: {}'.format(','.join([str(v) for v in only_in_aln])), flush=True)
-            print(txt_base+'untrimmed CDS: {}'.format(','.join([str(v) for v in only_in_assigned])), flush=True)
+        aln_gene_match = _build_aln_gene_match_for_leaf(
+            leaf=leaf,
+            seq=seqs[leaf.name],
+            num_site=num_site,
+            g=g,
+        )
         df = pandas.merge(df, aln_gene_match, on='codon_site_alignment', how='left')
         print('', flush=True)
     return df
@@ -595,40 +788,57 @@ def translate(seq, g):
                 break
     return translated_seq
 
+
+def _resolve_chimera_line_for_site(df, codon_site_col, seq_site):
+    is_site = (df.loc[:, codon_site_col] == seq_site)
+    if is_site.sum() == 0:
+        return '\t:{}\t{}\n'.format(seq_site, 'None')
+    Nany2spe = df.loc[is_site, 'OCNany2spe'].values[0]
+    Nany2dif = df.loc[is_site, 'OCNany2dif'].values[0]
+    Nvalue = Nany2spe if (Nany2spe >= Nany2dif) else -Nany2dif
+    return '\t:{}\t{:.4f}\n'.format(seq_site, Nvalue)
+
+
+def _write_chimera_attribute_file(file_name, seq_sites, df, codon_site_col, header):
+    with open(file_name, 'w') as f:
+        f.write(header)
+        for seq_site in seq_sites:
+            line = _resolve_chimera_line_for_site(df=df, codon_site_col=codon_site_col, seq_site=seq_site)
+            f.write(line)
+
+
+def _write_chimera_fasta_for_seq(seq_key, seq, g):
+    translated_seq = translate(seq, g)
+    file_fasta = os.path.join(g['site_outdir'], 'csubst_site_' + seq_key + '.fasta')
+    txt = "Writing amino acid fasta that may be used as a query for homology modeling " \
+          "to obtain .pdb file (e.g., with SWISS-MODEL): {}"
+    print(txt.format(file_fasta))
+    write_fasta(file=file_fasta, label=seq_key, seq=translated_seq)
+
+
 def export2chimera(df, g):
     header='attribute: condivPP\nmatch mode: 1-to-1\nrecipient: residues\nnone handling: None\n'
     seqs = sequence.read_fasta(path=g['untrimmed_cds'])
     for seq_key in seqs.keys():
-        codon_site_col = 'codon_site_'+seq_key
+        codon_site_col = 'codon_site_' + seq_key
         if codon_site_col not in df.columns:
             print('Sequence not be found in csubst inputs. Skipping: {}'.format(seq_key))
             continue
         seq = seqs[seq_key]
-        seq_num_site = int(len(seq)/3)
-        seq_sites = numpy.arange(1, seq_num_site+1)
-        file_name = os.path.join(g['site_outdir'], 'csubst_site_'+seq_key+'.chimera.txt')
+        seq_num_site = int(len(seq) / 3)
+        seq_sites = numpy.arange(1, seq_num_site + 1)
+        file_name = os.path.join(g['site_outdir'], 'csubst_site_' + seq_key + '.chimera.txt')
         txt = 'Writing a file that can be loaded to UCSF Chimera from ' \
               '"Tools -> Structure Analysis -> Define Attribute"'
         print(txt.format(file_name))
-        with open(file_name, 'w') as f:
-            f.write(header)
-            for seq_site in seq_sites:
-                is_site = (df.loc[:,codon_site_col]==seq_site)
-                if is_site.sum()==0:
-                    Nvalue = 'None'
-                    line = '	:{}	{}\n'.format(seq_site, Nvalue)
-                else:
-                    Nany2spe = df.loc[is_site,'OCNany2spe'].values[0]
-                    Nany2dif = df.loc[is_site,'OCNany2dif'].values[0]
-                    Nvalue = Nany2spe if (Nany2spe>=Nany2dif) else -Nany2dif
-                    line = '	:{}	{:.4f}\n'.format(seq_site, Nvalue)
-                f.write(line)
-        translated_seq = translate(seq, g)
-        file_fasta = os.path.join(g['site_outdir'], 'csubst_site_'+seq_key+'.fasta')
-        txt = "Writing amino acid fasta that may be used as a query for homology modeling " \
-              "to obtain .pdb file (e.g., with SWISS-MODEL): {}"
-        print(txt.format(file_fasta))
-        write_fasta(file=file_fasta, label=seq_key, seq=translated_seq)
+        _write_chimera_attribute_file(
+            file_name=file_name,
+            seq_sites=seq_sites,
+            df=df,
+            codon_site_col=codon_site_col,
+            header=header,
+        )
+        _write_chimera_fasta_for_seq(seq_key=seq_key, seq=seq, g=g)
 
 def get_parent_branch_ids(branch_ids, g):
     parent_branch_ids = dict()
@@ -1625,24 +1835,43 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
 
 
 def should_plot_state(g):
-    mode = str(g.get('mode', 'intersection')).lower()
-    return (mode == 'intersection')
+    return _is_intersection_mode(g)
 
 
 def should_save_pymol_views(g):
+    return _is_intersection_mode(g)
+
+
+def _is_intersection_mode(g):
     mode = str(g.get('mode', 'intersection')).lower()
-    return (mode == 'intersection')
+    return mode == 'intersection'
 
 
-def resolve_site_jobs(g):
-    raw_mode = str(g.get('mode', 'intersection')).strip()
+def _parse_mode_and_expression(raw_mode):
     mode_expression = None
     if ',' in raw_mode:
-        mode_prefix,mode_expression = raw_mode.split(',', 1)
+        mode_prefix, mode_expression = raw_mode.split(',', 1)
         mode = mode_prefix.strip().lower()
         mode_expression = mode_expression.strip()
     else:
         mode = raw_mode.lower()
+    return mode, mode_expression
+
+
+def _build_site_outdir(mode, branch_txt, lineage_input_branch_txt=None, mode_expression=None):
+    if mode == 'intersection':
+        return './csubst_site.branch_id' + branch_txt
+    if mode == 'lineage':
+        return './csubst_site.lineage.branch_id' + lineage_input_branch_txt
+    if mode == 'set':
+        mode_expr_label = _get_set_expression_label(mode_expression)
+        return './csubst_site.set.expr' + mode_expr_label
+    return './csubst_site.mode' + mode + '.branch_id' + branch_txt
+
+
+def resolve_site_jobs(g):
+    raw_mode = str(g.get('mode', 'intersection')).strip()
+    mode, mode_expression = _parse_mode_and_expression(raw_mode)
     g['mode'] = mode
     g['mode_expression'] = mode_expression
     node_by_id = _get_node_by_branch_id(g)
@@ -1690,15 +1919,12 @@ def resolve_site_jobs(g):
     for branch_ids in branch_id_list:
         single_branch_mode = (branch_ids.shape[0]==1)
         branch_txt = ','.join([str(int(bid)) for bid in branch_ids.tolist()])
-        if mode == 'intersection':
-            site_outdir = './csubst_site.branch_id'+branch_txt
-        elif mode == 'lineage':
-            site_outdir = './csubst_site.lineage.branch_id'+lineage_input_branch_txt
-        elif mode == 'set':
-            mode_expr_label = _get_set_expression_label(mode_expression)
-            site_outdir = './csubst_site.set.expr'+mode_expr_label
-        else:
-            site_outdir = './csubst_site.mode'+mode+'.branch_id'+branch_txt
+        site_outdir = _build_site_outdir(
+            mode=mode,
+            branch_txt=branch_txt,
+            lineage_input_branch_txt=lineage_input_branch_txt,
+            mode_expression=mode_expression,
+        )
         site_jobs.append({
             'branch_ids': branch_ids,
             'single_branch_mode': single_branch_mode,
@@ -1714,13 +1940,16 @@ def add_branch_id_list(g):
     return resolve_site_jobs(g)
 
 def combinatorial2single_columns(df):
-    for SN in ['OCS','OCN']:
-        for anc in ['any','spe','dif']:
+    drop_cols = list()
+    for SN in ['OCS', 'OCN']:
+        for anc in ['any', 'spe', 'dif']:
             for des in ['any', 'spe', 'dif']:
-                col = SN+anc+'2'+des
+                col = SN + anc + '2' + des
                 if col in df.columns:
-                    df = df.drop(labels=col, axis=1)
-    return df
+                    drop_cols.append(col)
+    if len(drop_cols) == 0:
+        return df
+    return df.drop(labels=drop_cols, axis=1)
 
 def main_site(g):
     if g['pdb'] is not None:

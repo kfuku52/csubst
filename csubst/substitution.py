@@ -14,6 +14,7 @@ from csubst import ete
 from csubst import output_stat
 
 _CB_BASE_SUBSTITUTIONS = ("any2any", "spe2any", "any2spe", "spe2spe")
+_SUB_TENSOR_BACKENDS = ('auto', 'dense', 'sparse')
 
 
 def _resolve_cb_base_substitutions(selected_base_stats=None):
@@ -38,12 +39,92 @@ def _resolve_cb_base_substitutions(selected_base_stats=None):
     return [s for s in _CB_BASE_SUBSTITUTIONS if s in selected]
 
 
+def _resolve_requested_sub_tensor_backend(g):
+    requested = str(g.get('sub_tensor_backend', 'auto')).lower()
+    if requested not in _SUB_TENSOR_BACKENDS:
+        raise ValueError('Invalid sub_tensor_backend: {}'.format(requested))
+    return requested
+
+
+def _get_selected_branch_set(g):
+    selected_branch_ids = g.get('state_loaded_branch_ids', None)
+    if selected_branch_ids is None:
+        return None
+    return set(int(v) for v in numpy.asarray(selected_branch_ids).tolist())
+
+
+def _resolve_output_dtype(source_dtype, default_dtype):
+    if numpy.dtype(source_dtype) == numpy.dtype(bool):
+        return numpy.int32
+    return default_dtype
+
+
+def _resolve_cb_stat_columns(selected, arity):
+    stat_col = {stat: arity + i for i, stat in enumerate(selected)}
+    return (
+        stat_col.get('any2any'),
+        stat_col.get('spe2any'),
+        stat_col.get('any2spe'),
+        stat_col.get('spe2spe'),
+    )
+
+
+def _get_combo_row_bounds(combo_index, num_site, mmap_start):
+    row_start = (combo_index * num_site) + (mmap_start * num_site)
+    row_end = row_start + num_site
+    return row_start, row_end
+
+
+def _remove_file_if_exists(path):
+    if os.path.exists(path):
+        os.unlink(path)
+
+
+def _build_branch_id_columns(arity):
+    return ["branch_id_" + str(num + 1) for num in range(0, arity)]
+
+
+def _resolve_reducer_chunks(id_combinations, n_jobs, g):
+    chunk_factor = parallel.resolve_chunk_factor(g=g, task='reducer')
+    return parallel.get_chunks(id_combinations, n_jobs, chunk_factor=chunk_factor)
+
+
+def _run_parallel_reducer_to_dataframe(write_func, args_iterable, n_jobs, mmap_out, axis, dtype, columns, g):
+    _remove_file_if_exists(mmap_out)
+    df_mmap = numpy.memmap(mmap_out, dtype=dtype, shape=axis, mode='w+')
+    backend = parallel.resolve_parallel_backend(g=g, task='reducer')
+    try:
+        parallel.run_starmap(
+            func=write_func,
+            args_iterable=args_iterable,
+            n_jobs=n_jobs,
+            backend=backend,
+        )
+        df_mmap.flush()
+        df = pandas.DataFrame(df_mmap, columns=columns)
+    finally:
+        del df_mmap
+        _remove_file_if_exists(mmap_out)
+    return df
+
+
+def _initialize_reducer_output_array(mmap, df_mmap, shape, source_dtype, default_dtype):
+    if mmap:
+        return df_mmap
+    out_dtype = _resolve_output_dtype(source_dtype=source_dtype, default_dtype=default_dtype)
+    return numpy.zeros(shape=shape, dtype=out_dtype)
+
+
+def _get_combo_index_range(mmap_start, num_combinations):
+    start = mmap_start
+    end = mmap_start + num_combinations
+    return start, end
+
+
 def resolve_sub_tensor_backend(g):
     if 'resolved_sub_tensor_backend' in g.keys():
         return g['resolved_sub_tensor_backend']
-    requested = str(g.get('sub_tensor_backend', 'auto')).lower()
-    if requested not in ['auto', 'dense', 'sparse']:
-        raise ValueError('Invalid sub_tensor_backend: {}'.format(requested))
+    requested = _resolve_requested_sub_tensor_backend(g)
     if requested in ['auto', 'dense']:
         resolved = 'dense'
     elif requested == 'sparse':
@@ -76,9 +157,7 @@ def estimate_sub_tensor_density(sub_tensor, tol=0):
     return nnz / arr.size
 
 def resolve_reducer_backend(g, sub_tensor=None, label=''):
-    requested = str(g.get('sub_tensor_backend', 'auto')).lower()
-    if requested not in ['auto', 'dense', 'sparse']:
-        raise ValueError('Invalid sub_tensor_backend: {}'.format(requested))
+    requested = _resolve_requested_sub_tensor_backend(g)
     if requested in ['dense', 'sparse']:
         resolved = requested
     else:
@@ -183,11 +262,7 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
     else:
         raise ValueError('Unsupported mode for sparse substitution tensor: {}'.format(mode))
     sparse_entries = defaultdict(lambda: [list(), list(), list()])  # key -> [rows, cols, data]
-    selected_branch_ids = g.get('state_loaded_branch_ids', None)
-    if selected_branch_ids is None:
-        selected_branch_set = None
-    else:
-        selected_branch_set = set([int(v) for v in numpy.asarray(selected_branch_ids).tolist()])
+    selected_branch_set = _get_selected_branch_set(g)
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
@@ -408,11 +483,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g={}, 
     backend = resolve_sub_tensor_backend(g)
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
-    selected_branch_ids = g.get('state_loaded_branch_ids', None)
-    if selected_branch_ids is None:
-        selected_branch_set = None
-    else:
-        selected_branch_set = set([int(v) for v in numpy.asarray(selected_branch_ids).tolist()])
+    selected_branch_set = _get_selected_branch_set(g)
     if backend == 'sparse':
         return _build_sparse_substitution_tensor(
             state_tensor=state_tensor,
@@ -560,31 +631,39 @@ def get_bs(S_tensor, N_tensor):
     df = table.set_substitution_dtype(df=df)
     return(df)
 
-def _can_use_cython_dense_cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, float_type=numpy.float64):
+def _is_cython_dense_arity2_compatible(id_combinations, sub_tensor, mmap=False, df_mmap=None):
     if _is_sparse_sub_tensor(sub_tensor):
         return False
     if id_combinations.shape[1] != 2:
         return False
-    if (id_combinations.dtype.kind not in ['i', 'u']):
+    if id_combinations.dtype.kind not in ['i', 'u']:
         return False
-    if (sub_tensor.dtype != numpy.float64):
-        return False
-    if (float_type != numpy.float64):
+    if sub_tensor.dtype != numpy.float64:
         return False
     if mmap and ((df_mmap is None) or (df_mmap.dtype != numpy.float64)):
+        return False
+    return True
+
+
+def _can_use_cython_dense_cb(id_combinations, sub_tensor, mmap=False, df_mmap=None, float_type=numpy.float64):
+    if not _is_cython_dense_arity2_compatible(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        mmap=mmap,
+        df_mmap=df_mmap,
+    ):
+        return False
+    if float_type != numpy.float64:
         return False
     return hasattr(substitution_cy, 'calc_combinatorial_sub_double_arity2')
 
 def _can_use_cython_dense_cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None):
-    if _is_sparse_sub_tensor(sub_tensor):
-        return False
-    if id_combinations.shape[1] != 2:
-        return False
-    if (id_combinations.dtype.kind not in ['i', 'u']):
-        return False
-    if (sub_tensor.dtype != numpy.float64):
-        return False
-    if mmap and ((df_mmap is None) or (df_mmap.dtype != numpy.float64)):
+    if not _is_cython_dense_arity2_compatible(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        mmap=mmap,
+        df_mmap=df_mmap,
+    ):
         return False
     return hasattr(substitution_cy, 'calc_combinatorial_sub_by_site_double_arity2')
 
@@ -607,6 +686,47 @@ def _resolve_dense_cython_n_jobs(n_jobs, id_combinations, sub_tensor, g, task='c
     print(txt.format(task, num_comb, total_ops, n_jobs, resolved), flush=True)
     return resolved
 
+
+def _resolve_dense_reducer_batch_size(sub_tensor, arity, num_combinations, target_elements=8_000_000):
+    if num_combinations <= 1:
+        return 1
+    combo_elements = (
+        int(arity)
+        * int(sub_tensor.shape[1])
+        * int(sub_tensor.shape[2])
+        * int(sub_tensor.shape[3])
+        * int(sub_tensor.shape[4])
+    )
+    if combo_elements <= 0:
+        return 1
+    batch_size = int(target_elements // combo_elements)
+    if batch_size < 1:
+        batch_size = 1
+    return min(int(num_combinations), batch_size)
+
+
+def _resolve_reducer_progress_step(num_items, min_step=50_000, target_updates=20):
+    if num_items <= 0:
+        return min_step
+    return max(int(num_items // max(target_updates, 1)), int(min_step))
+
+
+def _extract_selected_stats_from_full_cb(full_df, selected, arity):
+    if len(selected) == len(_CB_BASE_SUBSTITUTIONS):
+        return full_df
+    full_stat_cols = {
+        "any2any": arity + 0,
+        "spe2any": arity + 1,
+        "any2spe": arity + 2,
+        "spe2spe": arity + 3,
+    }
+    out = numpy.zeros(shape=(full_df.shape[0], arity + len(selected)), dtype=full_df.dtype)
+    out[:, :arity] = full_df[:, :arity]
+    for i, stat in enumerate(selected):
+        out[:, arity + i] = full_df[:, full_stat_cols[stat]]
+    return out
+
+
 def sub_tensor2cb(
     id_combinations,
     sub_tensor,
@@ -617,14 +737,16 @@ def sub_tensor2cb(
     selected_base_stats=None,
 ):
     selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
+    arity = id_combinations.shape[1]
     use_full_stats = (len(selected) == len(_CB_BASE_SUBSTITUTIONS))
-    if use_full_stats and _can_use_cython_dense_cb(
+    can_use_cython = _can_use_cython_dense_cb(
         id_combinations=id_combinations,
         sub_tensor=sub_tensor,
         mmap=mmap,
         df_mmap=df_mmap,
         float_type=float_type,
-    ):
+    )
+    if can_use_cython and (use_full_stats or (not mmap)):
         try:
             out = substitution_cy.calc_combinatorial_sub_double_arity2(
                 id_combinations=numpy.asarray(id_combinations, dtype=numpy.int64),
@@ -634,42 +756,52 @@ def sub_tensor2cb(
                 df_mmap=df_mmap,
             )
             if not mmap:
-                return out
+                return _extract_selected_stats_from_full_cb(
+                    full_df=out,
+                    selected=selected,
+                    arity=arity,
+                )
             return
         except Exception:
             pass
-    arity = id_combinations.shape[1]
-    if mmap:
-        df = df_mmap
-    else:
-        if (sub_tensor.dtype == bool):
-            data_type = numpy.int32
-        else:
-            data_type = float_type
-        df = numpy.zeros([id_combinations.shape[0], arity + len(selected)], dtype=data_type)
-    stat_col = {stat: arity + i for i, stat in enumerate(selected)}
-    col_any2any = stat_col.get('any2any')
-    col_spe2any = stat_col.get('spe2any')
-    col_any2spe = stat_col.get('any2spe')
-    col_spe2spe = stat_col.get('spe2spe')
+    shape = (id_combinations.shape[0], arity + len(selected))
+    df = _initialize_reducer_output_array(
+        mmap=mmap,
+        df_mmap=df_mmap,
+        shape=shape,
+        source_dtype=sub_tensor.dtype,
+        default_dtype=float_type,
+    )
+    col_any2any, col_spe2any, col_any2spe, col_spe2spe = _resolve_cb_stat_columns(
+        selected=selected,
+        arity=arity,
+    )
     start_time = time.time()
-    start = mmap_start
-    end = mmap_start + id_combinations.shape[0]
+    start, end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
     df[start:end, :arity] = id_combinations[:, :]  # branch_ids
-    for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
-        sub_combo = sub_tensor[id_combinations[j, :], :, :, :, :]
+    progress_step = _resolve_reducer_progress_step(num_items=id_combinations.shape[0])
+    batch_size = _resolve_dense_reducer_batch_size(
+        sub_tensor=sub_tensor,
+        arity=arity,
+        num_combinations=id_combinations.shape[0],
+    )
+    for batch_start in range(0, id_combinations.shape[0], batch_size):
+        batch_end = min(batch_start + batch_size, id_combinations.shape[0])
+        combo_batch = id_combinations[batch_start:batch_end, :]
+        row_slice = slice(start + batch_start, start + batch_end)
+        sub_batch = sub_tensor[combo_batch, :, :, :, :]
         if col_any2any is not None:
-            df[i, col_any2any] += sub_combo.sum(axis=(3, 4)).prod(axis=0).sum()
+            df[row_slice, col_any2any] += sub_batch.sum(axis=(4, 5)).prod(axis=1).sum(axis=(1, 2))
         if col_spe2any is not None:
-            df[i, col_spe2any] += sub_combo.sum(axis=4).prod(axis=0).sum()
+            df[row_slice, col_spe2any] += sub_batch.sum(axis=5).prod(axis=1).sum(axis=(1, 2, 3))
         if col_any2spe is not None:
-            df[i, col_any2spe] += sub_combo.sum(axis=3).prod(axis=0).sum()
+            df[row_slice, col_any2spe] += sub_batch.sum(axis=4).prod(axis=1).sum(axis=(1, 2, 3))
         if col_spe2spe is not None:
-            df[i, col_spe2spe] += sub_combo.prod(axis=0).sum()
-        if j % 10000 == 0:
+            df[row_slice, col_spe2spe] += sub_batch.prod(axis=1).sum(axis=(1, 2, 3, 4))
+        if (batch_start != 0) and (batch_start % progress_step == 0):
             mmap_end = mmap_start + id_combinations.shape[0]
             txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} sec'
-            print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
+            print(txt.format(batch_start, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
     if not mmap:
         return (df)
 
@@ -684,29 +816,29 @@ def sub_tensor2cb_sparse(
 ):
     selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
     arity = id_combinations.shape[1]
-    if mmap:
-        df = df_mmap
-    else:
-        if (sub_tensor.dtype == bool):
-            data_type = numpy.int32
-        else:
-            data_type = float_type
-        df = numpy.zeros([id_combinations.shape[0], arity + len(selected)], dtype=data_type)
-    stat_col = {stat: arity + i for i, stat in enumerate(selected)}
-    col_any2any = stat_col.get('any2any')
-    col_spe2any = stat_col.get('spe2any')
-    col_any2spe = stat_col.get('any2spe')
-    col_spe2spe = stat_col.get('spe2spe')
+    shape = (id_combinations.shape[0], arity + len(selected))
+    df = _initialize_reducer_output_array(
+        mmap=mmap,
+        df_mmap=df_mmap,
+        shape=shape,
+        source_dtype=sub_tensor.dtype,
+        default_dtype=float_type,
+    )
+    col_any2any, col_spe2any, col_any2spe, col_spe2spe = _resolve_cb_stat_columns(
+        selected=selected,
+        arity=arity,
+    )
     start_time = time.time()
-    start = mmap_start
-    end = mmap_start + id_combinations.shape[0]
+    start, end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
     df[start:end, :arity] = id_combinations[:, :]  # branch_ids
     group_block_index = _get_sparse_group_block_index(sub_tensor)
     row_cache = dict()
-    for i,j in zip(numpy.arange(start, end),numpy.arange(id_combinations.shape[0])):
+    progress_step = _resolve_reducer_progress_step(num_items=id_combinations.shape[0])
+    for j, branch_ids in enumerate(id_combinations):
+        i = start + j
         any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
             sub_tensor=sub_tensor,
-            branch_ids=id_combinations[j, :],
+            branch_ids=branch_ids,
             data_type=df.dtype,
             group_block_index=group_block_index,
             row_cache=row_cache,
@@ -720,7 +852,7 @@ def sub_tensor2cb_sparse(
             df[i, col_any2spe] += any2spe.sum()
         if col_spe2spe is not None:
             df[i, col_spe2spe] += spe2spe.sum()
-        if j % 10000 == 0:
+        if (j != 0) and (j % progress_step == 0):
             mmap_end = mmap_start + id_combinations.shape[0]
             txt = 'cb(sparse): {:,}th in the id range {:,}-{:,}: {:,} sec'
             print(txt.format(j, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
@@ -732,13 +864,14 @@ def _write_cb_chunk_to_mmap(writer, ids, sub_tensor, mmap_out, axis, dtype, mmap
     writer(ids, sub_tensor, True, df_mmap, mmap_start, float_type, selected_base_stats=selected_base_stats)
     df_mmap.flush()
 
-def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
-    sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cb_'+attr)
-    arity = id_combinations.shape[1]
-    selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
-    cn = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
-    cn = cn + [ attr+subs for subs in selected ]
+
+def _resolve_cb_writer_and_columns(sub_tensor, attr, arity, selected):
+    columns = _build_branch_id_columns(arity=arity) + [attr + subs for subs in selected]
     writer = sub_tensor2cb_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cb
+    return writer, columns
+
+
+def _resolve_cb_n_jobs(id_combinations, sub_tensor, g, writer, selected):
     n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
     if (writer is sub_tensor2cb) and _can_use_cython_dense_cb(
         id_combinations=id_combinations,
@@ -758,42 +891,78 @@ def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
         else:
             txt = 'Dense Cython cb reducer is bypassed for selective stats: {}'
             print(txt.format(','.join(selected)), flush=True)
+    return n_jobs
+
+
+def _run_cb_single_job(writer, id_combinations, sub_tensor, float_type, selected, columns):
+    df = writer(
+        id_combinations,
+        sub_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=float_type,
+        selected_base_stats=selected,
+    )
+    return pandas.DataFrame(df, columns=columns)
+
+
+def _run_cb_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, selected, columns):
+    n_jobs = _resolve_cb_n_jobs(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        g=g,
+        writer=writer,
+        selected=selected,
+    )
     if n_jobs == 1:
-        df = writer(
-            id_combinations,
-            sub_tensor,
-            mmap=False,
-            df_mmap=None,
-            mmap_start=0,
+        return _run_cb_single_job(
+            writer=writer,
+            id_combinations=id_combinations,
+            sub_tensor=sub_tensor,
             float_type=g['float_type'],
-            selected_base_stats=selected,
+            selected=selected,
+            columns=columns,
         )
-        df = pandas.DataFrame(df, columns=cn)
-    else:
-        chunk_factor = parallel.resolve_chunk_factor(g=g, task='reducer')
-        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, n_jobs, chunk_factor=chunk_factor)
-        mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
-        axis = (id_combinations.shape[0], arity + len(selected))
-        my_dtype = sub_tensor.dtype
-        if 'bool' in str(my_dtype):
-            my_dtype = numpy.int32
-        df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        backend = parallel.resolve_parallel_backend(g=g, task='reducer')
-        tasks = [
-            (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms, g['float_type'], selected)
-            for ids, ms in zip(id_chunks, mmap_starts)
-        ]
-        parallel.run_starmap(
-            func=_write_cb_chunk_to_mmap,
-            args_iterable=tasks,
-            n_jobs=n_jobs,
-            backend=backend,
-        )
-        df_mmap.flush()
-        df = pandas.DataFrame(df_mmap, columns=cn)
-        del df_mmap
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
+    id_chunks, mmap_starts = _resolve_reducer_chunks(id_combinations=id_combinations, n_jobs=n_jobs, g=g)
+    mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
+    axis = (id_combinations.shape[0], arity + len(selected))
+    my_dtype = _resolve_output_dtype(source_dtype=sub_tensor.dtype, default_dtype=sub_tensor.dtype)
+    tasks = [
+        (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms, g['float_type'], selected)
+        for ids, ms in zip(id_chunks, mmap_starts)
+    ]
+    return _run_parallel_reducer_to_dataframe(
+        write_func=_write_cb_chunk_to_mmap,
+        args_iterable=tasks,
+        n_jobs=n_jobs,
+        mmap_out=mmap_out,
+        axis=axis,
+        dtype=my_dtype,
+        columns=columns,
+        g=g,
+    )
+
+
+def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
+    sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cb_'+attr)
+    arity = id_combinations.shape[1]
+    selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
+    writer, columns = _resolve_cb_writer_and_columns(
+        sub_tensor=sub_tensor,
+        attr=attr,
+        arity=arity,
+        selected=selected,
+    )
+    df = _run_cb_parallel_jobs(
+        writer=writer,
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        g=g,
+        arity=arity,
+        selected=selected,
+        columns=columns,
+    )
     df = table.sort_branch_ids(df)
     df = df.dropna()
     if not attr.startswith('EC'):
@@ -823,37 +992,40 @@ def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_s
     arity = id_combinations.shape[1]
     num_site = sub_tensor.shape[1]
     sites = numpy.arange(num_site)
-    if mmap:
-        df = df_mmap
-    else:
-        shape = (int(id_combinations.shape[0]*num_site), arity+5)
-        my_dtype = sub_tensor.dtype
-        if 'bool' in str(my_dtype):
-            my_dtype = numpy.int32
-        df = numpy.zeros(shape=shape, dtype=my_dtype)
-    node=0
+    shape = (int(id_combinations.shape[0] * num_site), arity + 5)
+    df = _initialize_reducer_output_array(
+        mmap=mmap,
+        df_mmap=df_mmap,
+        shape=shape,
+        source_dtype=sub_tensor.dtype,
+        default_dtype=sub_tensor.dtype,
+    )
     start_time = time.time()
-    for i in numpy.arange(id_combinations.shape[0]):
-        row_start = (node*num_site)+(mmap_start*num_site)
-        row_end = ((node+1)*num_site)+(mmap_start*num_site)
-        df[row_start:row_end,:arity] = id_combinations[node,:] # branch_ids
-        df[row_start:row_end,arity] = sites # site
-        ic = id_combinations[i,:]
-        sub_combo = sub_tensor[ic, :, :, :, :]
-        sum_any2any = sub_combo.sum(axis=(3, 4))
-        sum_spe2any = sub_combo.sum(axis=4)
-        sum_any2spe = sub_combo.sum(axis=3)
-        prod_spe2spe = sub_combo.prod(axis=0)
-        df[row_start:row_end,arity+1] += sum_any2any.prod(axis=0).sum(axis=1) #any2any
-        df[row_start:row_end,arity+2] += sum_spe2any.prod(axis=0).sum(axis=(1,2)) #spe2any
-        df[row_start:row_end,arity+3] += sum_any2spe.prod(axis=0).sum(axis=(1,2)) #any2spe
-        df[row_start:row_end,arity+4] += prod_spe2spe.sum(axis=(1,2,3)) #spe2spe
-        if (node%10000==0):
-            mmap_start = mmap_start
+    start, end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
+    progress_step = _resolve_reducer_progress_step(num_items=id_combinations.shape[0])
+    batch_size = _resolve_dense_reducer_batch_size(
+        sub_tensor=sub_tensor,
+        arity=arity,
+        num_combinations=id_combinations.shape[0],
+    )
+    for batch_start in range(0, id_combinations.shape[0], batch_size):
+        batch_end = min(batch_start + batch_size, id_combinations.shape[0])
+        combo_batch = id_combinations[batch_start:batch_end, :]
+        batch_combo_num = combo_batch.shape[0]
+        combo_global_start = start + batch_start
+        row_start = combo_global_start * num_site
+        row_end = row_start + (batch_combo_num * num_site)
+        df[row_start:row_end, :arity] = numpy.repeat(combo_batch, repeats=num_site, axis=0)  # branch_ids
+        df[row_start:row_end, arity] = numpy.tile(sites, batch_combo_num)  # site
+        sub_batch = sub_tensor[combo_batch, :, :, :, :]
+        df[row_start:row_end, arity + 1] += sub_batch.sum(axis=(4, 5)).prod(axis=1).sum(axis=2).reshape(-1)  # any2any
+        df[row_start:row_end, arity + 2] += sub_batch.sum(axis=5).prod(axis=1).sum(axis=(2, 3)).reshape(-1)  # spe2any
+        df[row_start:row_end, arity + 3] += sub_batch.sum(axis=4).prod(axis=1).sum(axis=(2, 3)).reshape(-1)  # any2spe
+        df[row_start:row_end, arity + 4] += sub_batch.prod(axis=1).sum(axis=(2, 3, 4)).reshape(-1)  # spe2spe
+        if (batch_start != 0) and (batch_start % progress_step == 0):
             mmap_end = mmap_start+id_combinations.shape[0]
             txt = 'cbs: {:,}th in the id range {:,}-{:,}: {:,} sec'
-            print(txt.format(node, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
-        node += 1
+            print(txt.format(batch_start, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
     if not mmap:
         return df
 
@@ -861,26 +1033,28 @@ def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None,
     arity = id_combinations.shape[1]
     num_site = sub_tensor.shape[1]
     sites = numpy.arange(num_site)
-    if mmap:
-        df = df_mmap
-    else:
-        shape = (int(id_combinations.shape[0]*num_site), arity+5)
-        my_dtype = sub_tensor.dtype
-        if 'bool' in str(my_dtype):
-            my_dtype = numpy.int32
-        df = numpy.zeros(shape=shape, dtype=my_dtype)
-    node = 0
+    shape = (int(id_combinations.shape[0] * num_site), arity + 5)
+    df = _initialize_reducer_output_array(
+        mmap=mmap,
+        df_mmap=df_mmap,
+        shape=shape,
+        source_dtype=sub_tensor.dtype,
+        default_dtype=sub_tensor.dtype,
+    )
     start_time = time.time()
     group_block_index = _get_sparse_group_block_index(sub_tensor)
     row_cache = dict()
-    for i in numpy.arange(id_combinations.shape[0]):
-        row_start = (node*num_site)+(mmap_start*num_site)
-        row_end = ((node+1)*num_site)+(mmap_start*num_site)
-        df[row_start:row_end,:arity] = id_combinations[node,:] # branch_ids
-        df[row_start:row_end,arity] = sites # site
+    start, end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
+    progress_step = _resolve_reducer_progress_step(num_items=id_combinations.shape[0])
+    for combo_index, combo_branch_ids in enumerate(id_combinations):
+        combo_global_index = start + combo_index
+        row_start = combo_global_index * num_site
+        row_end = row_start + num_site
+        df[row_start:row_end, :arity] = combo_branch_ids  # branch_ids
+        df[row_start:row_end, arity] = sites  # site
         any2any, spe2any, any2spe, spe2spe = _get_sparse_site_vectors(
             sub_tensor=sub_tensor,
-            branch_ids=id_combinations[i, :],
+            branch_ids=combo_branch_ids,
             data_type=df.dtype,
             group_block_index=group_block_index,
             row_cache=row_cache,
@@ -889,11 +1063,10 @@ def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None,
         df[row_start:row_end,arity+2] += spe2any
         df[row_start:row_end,arity+3] += any2spe
         df[row_start:row_end,arity+4] += spe2spe
-        if (node%10000==0):
+        if (combo_index != 0) and (combo_index % progress_step == 0):
             mmap_end = mmap_start+id_combinations.shape[0]
             txt = 'cbs(sparse): {:,}th in the id range {:,}-{:,}: {:,} sec'
-            print(txt.format(node, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
-        node += 1
+            print(txt.format(combo_index, mmap_start, mmap_end, int(time.time() - start_time)), flush=True)
     if not mmap:
         return df
 
@@ -902,14 +1075,17 @@ def _write_cbs_chunk_to_mmap(writer, ids, sub_tensor, mmap_out, axis, dtype, mma
     writer(ids, sub_tensor, True, df_mmap, mmap_start)
     df_mmap.flush()
 
-def get_cbs(id_combinations, sub_tensor, attr, g):
-    sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cbs_'+attr)
-    print("Calculating combinatorial substitutions: attr =", attr, flush=True)
-    arity = id_combinations.shape[1]
-    cn1 = [ "branch_id_" + str(num+1) for num in range(0,arity) ]
-    cn2 = ["site",]
-    cn3 = [ 'OC'+attr+subs for subs in ["any2any","spe2any","any2spe","spe2spe"] ]
+
+def _resolve_cbs_writer_and_columns(sub_tensor, attr, arity):
+    branch_columns = _build_branch_id_columns(arity=arity)
+    site_column = ['site']
+    stat_columns = ['OC' + attr + subs for subs in ["any2any", "spe2any", "any2spe", "spe2spe"]]
+    columns = branch_columns + site_column + stat_columns
     writer = sub_tensor2cbs_sparse if _is_sparse_sub_tensor(sub_tensor) else sub_tensor2cbs
+    return writer, columns
+
+
+def _resolve_cbs_n_jobs(id_combinations, sub_tensor, g, writer):
     n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
     if (writer is sub_tensor2cbs) and _can_use_cython_dense_cbs(
         id_combinations=id_combinations,
@@ -924,34 +1100,65 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
             g=g,
             task='cbs',
         )
+    return n_jobs
+
+
+def _run_cbs_single_job(writer, id_combinations, sub_tensor, columns):
+    df = writer(id_combinations, sub_tensor)
+    return pandas.DataFrame(df, columns=columns)
+
+
+def _run_cbs_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, columns):
+    n_jobs = _resolve_cbs_n_jobs(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        g=g,
+        writer=writer,
+    )
     if n_jobs == 1:
-        df = writer(id_combinations, sub_tensor)
-        df = pandas.DataFrame(df, columns=cn1 + cn2 + cn3)
-    else:
-        chunk_factor = parallel.resolve_chunk_factor(g=g, task='reducer')
-        id_chunks,mmap_starts = parallel.get_chunks(id_combinations, n_jobs, chunk_factor=chunk_factor)
-        mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cbs.out.mmap')
-        if os.path.exists(mmap_out): os.remove(mmap_out)
-        axis = (id_combinations.shape[0]*sub_tensor.shape[1], arity+5)
-        my_dtype = sub_tensor.dtype
-        if 'bool' in str(my_dtype):
-            my_dtype = numpy.int32
-        df_mmap = numpy.memmap(mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-        backend = parallel.resolve_parallel_backend(g=g, task='reducer')
-        tasks = [
-            (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms)
-            for ids, ms in zip(id_chunks, mmap_starts)
-        ]
-        parallel.run_starmap(
-            func=_write_cbs_chunk_to_mmap,
-            args_iterable=tasks,
-            n_jobs=n_jobs,
-            backend=backend,
+        return _run_cbs_single_job(
+            writer=writer,
+            id_combinations=id_combinations,
+            sub_tensor=sub_tensor,
+            columns=columns,
         )
-        df_mmap.flush()
-        df = pandas.DataFrame(df_mmap, columns=cn1 + cn2 + cn3)
-        del df_mmap
-        if os.path.exists(mmap_out): os.remove(mmap_out)
+    id_chunks, mmap_starts = _resolve_reducer_chunks(id_combinations=id_combinations, n_jobs=n_jobs, g=g)
+    mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cbs.out.mmap')
+    axis = (id_combinations.shape[0] * sub_tensor.shape[1], arity + 5)
+    my_dtype = _resolve_output_dtype(source_dtype=sub_tensor.dtype, default_dtype=sub_tensor.dtype)
+    tasks = [
+        (writer, ids, sub_tensor, mmap_out, axis, my_dtype, ms)
+        for ids, ms in zip(id_chunks, mmap_starts)
+    ]
+    return _run_parallel_reducer_to_dataframe(
+        write_func=_write_cbs_chunk_to_mmap,
+        args_iterable=tasks,
+        n_jobs=n_jobs,
+        mmap_out=mmap_out,
+        axis=axis,
+        dtype=my_dtype,
+        columns=columns,
+        g=g,
+    )
+
+
+def get_cbs(id_combinations, sub_tensor, attr, g):
+    sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cbs_'+attr)
+    print("Calculating combinatorial substitutions: attr =", attr, flush=True)
+    arity = id_combinations.shape[1]
+    writer, columns = _resolve_cbs_writer_and_columns(
+        sub_tensor=sub_tensor,
+        attr=attr,
+        arity=arity,
+    )
+    df = _run_cbs_parallel_jobs(
+        writer=writer,
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        g=g,
+        arity=arity,
+        columns=columns,
+    )
     df = df.dropna()
     df = table.sort_branch_ids(df)
     df = table.set_substitution_dtype(df=df)

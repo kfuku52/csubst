@@ -5,6 +5,18 @@ import sys
 
 
 _PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_VALID_PARALLEL_BACKENDS = ('auto', 'multiprocessing', 'threading', 'loky')
+_DEFAULT_AUTO_BACKEND = 'multiprocessing'
+
+
+def _has_shape(input_data):
+    return hasattr(input_data, 'shape')
+
+
+def _slice_chunk(input_data, start, size):
+    if _has_shape(input_data):
+        return input_data[start:start + size, ...]
+    return input_data[start:start + size]
 
 
 def _build_worker_pythonpath():
@@ -57,7 +69,7 @@ def _restore_import_path(old_pythonpath, old_sys_path, changed):
 
 
 def _get_num_items(input_data):
-    if 'shape' in dir(input_data):
+    if _has_shape(input_data):
         return int(input_data.shape[0])
     return int(len(input_data))
 
@@ -76,13 +88,11 @@ def resolve_n_jobs(num_items, threads):
 
 def resolve_parallel_backend(g, task='general'):
     backend = str(g.get('parallel_backend', 'auto')).lower()
-    if backend not in ['auto', 'multiprocessing', 'threading', 'loky']:
+    if backend not in _VALID_PARALLEL_BACKENDS:
         raise ValueError('parallel_backend should be one of auto, multiprocessing, threading, loky.')
     if backend != 'auto':
         return backend
-    if task in ['reducer']:
-        return 'multiprocessing'
-    return 'multiprocessing'
+    return _DEFAULT_AUTO_BACKEND
 
 
 def resolve_joblib_backend(g, task='general'):
@@ -103,8 +113,8 @@ def resolve_chunk_factor(g, task='general'):
 def _normalize_parallel_backend(backend):
     backend = str(backend).lower()
     if backend == 'auto':
-        return 'multiprocessing'
-    if backend in ['multiprocessing', 'threading', 'loky']:
+        return _DEFAULT_AUTO_BACKEND
+    if backend in _VALID_PARALLEL_BACKENDS:
         return backend
     raise ValueError('parallel_backend should be one of auto, multiprocessing, threading, loky.')
 
@@ -158,10 +168,7 @@ def get_chunks(input_data, threads, chunk_factor=1):
     for size in chunk_sizes:
         if size == 0:
             continue
-        if 'shape' in dir(input_data):
-            out_chunks.append(input_data[i:i + size, ...])
-        else:
-            out_chunks.append(input_data[i:i + size])
+        out_chunks.append(_slice_chunk(input_data=input_data, start=i, size=size))
         starts.append(i)
         i += size
     return out_chunks, starts
