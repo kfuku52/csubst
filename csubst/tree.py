@@ -16,21 +16,25 @@ TREE_FIG_MAX_HEIGHT = 28.0
 TREE_LINE_CAPSTYLE = 'round'
 
 def add_numerical_node_labels(tree):
-    all_leaf_names = ete.get_leaf_names(tree)
-    all_leaf_names.sort()
+    all_leaf_names = sorted(ete.get_leaf_names(tree))
     leaf_numerical_labels = dict()
-    for i in range(0, len(all_leaf_names)):
-        leaf_numerical_labels[all_leaf_names[i]] = 2**i
-    numerical_labels = list()
-    for node in tree.traverse():
+    for i, leaf_name in enumerate(all_leaf_names):
+        # Use Python integers to avoid precision loss for >=64 leaves.
+        leaf_numerical_labels[leaf_name] = 1 << i
+
+    nodes = list(tree.traverse())
+    clade_signatures = list()
+    for node in nodes:
         leaf_names = ete.get_leaf_names(node)
-        numerical_labels.append(sum([leaf_numerical_labels[leaf_name] for leaf_name in leaf_names]))
-    argsort_labels = numpy.argsort(numerical_labels)
-    short_labels = numpy.arange(len(argsort_labels))
-    i=0
-    for node in tree.traverse():
-        ete.set_prop(node, "numerical_label", short_labels[argsort_labels == i][0])
-        i+=1
+        clade_signature = sum(leaf_numerical_labels[leaf_name] for leaf_name in leaf_names)
+        clade_signatures.append(clade_signature)
+
+    # Rank node signatures with pure-Python sorting so large integer signatures
+    # remain exact and deterministic across environments.
+    sorted_node_indices = sorted(range(len(nodes)), key=lambda idx: clade_signatures[idx])
+    rank_by_node_index = {node_index: rank for rank, node_index in enumerate(sorted_node_indices)}
+    for node_index, node in enumerate(nodes):
+        ete.set_prop(node, "numerical_label", rank_by_node_index[node_index])
     return tree
 
 def is_consistent_tree(tree1, tree2):

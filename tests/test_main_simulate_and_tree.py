@@ -14,6 +14,25 @@ def test_add_numerical_node_labels_assigns_unique_integers():
     assert sorted(labels) == list(range(len(labels)))
 
 
+def test_add_numerical_node_labels_keeps_root_as_max_for_64_leaves():
+    leaf_names = [f"L{i}" for i in range(64)]
+    tree_txt = f"{leaf_names[0]}:1"
+    for leaf_name in leaf_names[1:]:
+        tree_txt = f"({tree_txt},{leaf_name}:1):1"
+    tr = tree.add_numerical_node_labels(ete.PhyloNode(tree_txt + ";", format=1))
+
+    nodes = list(tr.traverse())
+    labels = [int(ete.get_prop(n, "numerical_label")) for n in nodes]
+    assert sorted(labels) == list(range(len(nodes)))
+
+    root_label = int(ete.get_prop(tr, "numerical_label"))
+    nonroot = [n for n in nodes if not ete.is_root(n)]
+    nonroot_labels = [int(ete.get_prop(n, "numerical_label")) for n in nonroot]
+    assert root_label == len(nodes) - 1
+    assert max(nonroot_labels) == len(nonroot) - 1
+    assert root_label not in nonroot_labels
+
+
 def test_is_consistent_tree_checks_leaf_sets():
     t1 = ete.PhyloNode("(A:1,B:1)R;", format=1)
     t2 = ete.PhyloNode("(B:1,A:1)R2;", format=1)
