@@ -14,6 +14,33 @@ TREE_FIG_MIN_HEIGHT = 1.8
 TREE_FIG_HEIGHT_PER_LEAF = 0.10
 TREE_FIG_MAX_HEIGHT = 28.0
 TREE_LINE_CAPSTYLE = 'round'
+AA_LOGO_MIN_PROB = 0.03
+AA_LOGO_MAX_RESIDUES = 6
+AA_LOGO_MIN_WIDTH = 0.04
+AA_LOGO_WIDTH_RATIO = 0.015
+AA_LOGO_HEIGHT = 0.78
+AA_LOGO_COLORS = {
+    'A': '#1b9e77',
+    'C': '#66a61e',
+    'D': '#d95f02',
+    'E': '#d95f02',
+    'F': '#7570b3',
+    'G': '#1b9e77',
+    'H': '#7570b3',
+    'I': '#e7298a',
+    'K': '#377eb8',
+    'L': '#e7298a',
+    'M': '#e7298a',
+    'N': '#66a61e',
+    'P': '#1b9e77',
+    'Q': '#66a61e',
+    'R': '#377eb8',
+    'S': '#66a61e',
+    'T': '#66a61e',
+    'V': '#e7298a',
+    'W': '#7570b3',
+    'Y': '#7570b3',
+}
 
 def add_numerical_node_labels(tree):
     all_leaf_names = sorted(ete.get_leaf_names(tree))
@@ -195,6 +222,79 @@ def _get_pyplot():
     return matplotlib.pyplot
 
 
+def _get_logo_modules():
+    import matplotlib.font_manager
+    import matplotlib.patches
+    import matplotlib.textpath
+    import matplotlib.transforms
+    font_properties = matplotlib.font_manager.FontProperties(weight='bold')
+    return matplotlib.patches,matplotlib.textpath,matplotlib.transforms,font_properties
+
+
+def _normalize_state_probabilities(probabilities):
+    probs = numpy.asarray(probabilities, dtype=numpy.float64)
+    if probs.size == 0:
+        return None
+    probs = numpy.where(probs < 0, 0.0, probs)
+    probs = numpy.where(numpy.isfinite(probs), probs, 0.0)
+    total = probs.sum()
+    if total <= 0:
+        return None
+    return probs / total
+
+
+def _select_logo_residues(probabilities, orders):
+    probs = _normalize_state_probabilities(probabilities)
+    if probs is None:
+        return list()
+    residues = list()
+    for idx, aa in enumerate(orders):
+        prob = float(probs[idx])
+        if prob >= AA_LOGO_MIN_PROB:
+            residues.append((str(aa), prob))
+    if len(residues)==0:
+        max_idx = int(probs.argmax())
+        residues = [(str(orders[max_idx]), float(probs[max_idx]))]
+    residues = sorted(residues, key=lambda x: x[1], reverse=True)[:AA_LOGO_MAX_RESIDUES]
+    residues = sorted(residues, key=lambda x: x[1])
+    return residues
+
+
+def _draw_aa_logo(ax, x, y, probabilities, orders, logo_width, logo_height,
+                  mpl_patches, mpl_textpath, mpl_transforms, font_properties):
+    residues = _select_logo_residues(probabilities=probabilities, orders=orders)
+    if len(residues)==0:
+        return False
+    total_height = logo_height * sum([r[1] for r in residues])
+    if total_height <= 0:
+        return False
+    y_cursor = y - (total_height / 2.0)
+    for aa,prob in residues:
+        if prob <= 0:
+            continue
+        char = aa[0] if len(aa) else '-'
+        glyph = mpl_textpath.TextPath((0, 0), char, size=1.0, prop=font_properties)
+        bbox = glyph.get_extents()
+        if (bbox.width <= 0) or (bbox.height <= 0):
+            continue
+        target_height = logo_height * prob
+        sx = logo_width / bbox.width
+        sy = target_height / bbox.height
+        x_shift = x - (bbox.x0 * sx) + ((logo_width - (bbox.width * sx)) / 2.0)
+        y_shift = y_cursor - (bbox.y0 * sy)
+        tr = mpl_transforms.Affine2D().scale(sx, sy).translate(x_shift, y_shift) + ax.transData
+        patch = mpl_patches.PathPatch(
+            glyph,
+            transform=tr,
+            lw=0,
+            facecolor=AA_LOGO_COLORS.get(char, 'black'),
+            edgecolor='none',
+        )
+        ax.add_patch(patch)
+        y_cursor += target_height
+    return True
+
+
 def _get_nice_scale_length(max_tree_depth):
     max_tree_depth = float(max_tree_depth)
     if max_tree_depth <= 0:
@@ -267,25 +367,30 @@ def _get_branch_segment_colors(node, trait_name):
     return vertical_color,horizontal_color
 
 
-def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_node=None):
+def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_node=None,
+                            state_prob_by_node=None, state_orders=None, state_mode=None):
     plt = _get_pyplot()
     xcoord,ycoord,leaves = _get_tree_xy(tree)
+    use_aa_logo = (state_mode=='aa') and (state_prob_by_node is not None) and (state_orders is not None)
     labels = []
-    for node in tree.traverse():
-        if state_by_node is None:
-            if label=='no':
-                continue
-            if (label=='leaf') and (not ete.is_leaf(node)):
-                continue
-            txt = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
-            font_size = 4
-        else:
-            nl = ete.get_prop(node, "numerical_label")
-            state_txt = str(state_by_node.get(nl, '-'))
-            txt = state_txt + '|' + (node.name or '') if ete.is_leaf(node) else state_txt
-            font_size = 6
-        labels.append((node, txt, font_size))
-    max_label_len = max([len(lbl[1]) for lbl in labels], default=0)
+    if use_aa_logo:
+        max_label_len = max([len(leaf.name or '') for leaf in leaves], default=0) + 6
+    else:
+        for node in tree.traverse():
+            if state_by_node is None:
+                if label=='no':
+                    continue
+                if (label=='leaf') and (not ete.is_leaf(node)):
+                    continue
+                txt = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
+                font_size = 4
+            else:
+                nl = ete.get_prop(node, "numerical_label")
+                state_txt = str(state_by_node.get(nl, '-'))
+                txt = state_txt + '|' + (node.name or '') if ete.is_leaf(node) else state_txt
+                font_size = 6
+            labels.append((node, txt, font_size))
+        max_label_len = max([len(lbl[1]) for lbl in labels], default=0)
     num_leaves = max(len(leaves), 1)
     fig_height = min(max(TREE_FIG_MIN_HEIGHT, num_leaves * TREE_FIG_HEIGHT_PER_LEAF), TREE_FIG_MAX_HEIGHT)
     fig_width = 7.0 + min(7.0, max_label_len * 0.05)
@@ -304,21 +409,87 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     xmax = max(xcoord.values()) if len(xcoord)>0 else 0.0
     xspan = max(xmax, 1.0)
     text_offset = xspan * 0.015
-    for node,txt,font_size in labels:
-        text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
-        ax.text(
-            xcoord[id(node)] + text_offset,
-            ycoord[id(node)],
-            txt,
-            fontsize=font_size,
-            color=text_color,
-            va='center',
-            ha='left',
-            clip_on=False,
-        )
-    if max_label_len>0:
+    if use_aa_logo:
+        mpl_patches,mpl_textpath,mpl_transforms,font_properties = _get_logo_modules()
+        logo_width = max(AA_LOGO_MIN_WIDTH, xspan * AA_LOGO_WIDTH_RATIO)
+        leaf_name_offset = logo_width + (xspan * 0.01)
+        fallback_leaf_name_offset = xspan * 0.03
+        for node in tree.traverse():
+            node_x = xcoord[id(node)] + text_offset
+            node_y = ycoord[id(node)]
+            text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
+            nl = ete.get_prop(node, "numerical_label")
+            prob = state_prob_by_node.get(nl, None)
+            is_logo_drawn = False
+            if prob is not None:
+                is_logo_drawn = _draw_aa_logo(
+                    ax=ax,
+                    x=node_x,
+                    y=node_y,
+                    probabilities=prob,
+                    orders=state_orders,
+                    logo_width=logo_width,
+                    logo_height=AA_LOGO_HEIGHT,
+                    mpl_patches=mpl_patches,
+                    mpl_textpath=mpl_textpath,
+                    mpl_transforms=mpl_transforms,
+                    font_properties=font_properties,
+                )
+            if not is_logo_drawn:
+                fallback = '-'
+                if state_by_node is not None:
+                    fallback = str(state_by_node.get(nl, '-'))
+                ax.text(
+                    node_x,
+                    node_y,
+                    fallback,
+                    fontsize=6,
+                    color=text_color,
+                    va='center',
+                    ha='left',
+                    clip_on=False,
+                )
+            if ete.is_leaf(node) and (node.name is not None) and (len(node.name) > 0):
+                label_x = node_x + (leaf_name_offset if is_logo_drawn else fallback_leaf_name_offset)
+                ax.text(
+                    label_x,
+                    node_y,
+                    node.name,
+                    fontsize=5,
+                    color=text_color,
+                    va='center',
+                    ha='left',
+                    clip_on=False,
+                )
+        leaf_label_len = max([len(leaf.name or '') for leaf in leaves], default=0)
+        text_space = logo_width + (leaf_label_len * xspan * 0.03) + (xspan * 0.04)
+    elif max_label_len>0:
+        for node,txt,font_size in labels:
+            text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
+            ax.text(
+                xcoord[id(node)] + text_offset,
+                ycoord[id(node)],
+                txt,
+                fontsize=font_size,
+                color=text_color,
+                va='center',
+                ha='left',
+                clip_on=False,
+            )
         text_space = max_label_len * xspan * 0.03
     else:
+        for node,txt,font_size in labels:
+            text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
+            ax.text(
+                xcoord[id(node)] + text_offset,
+                ycoord[id(node)],
+                txt,
+                fontsize=font_size,
+                color=text_color,
+                va='center',
+                ha='left',
+                clip_on=False,
+            )
         text_space = xspan * 0.1
     ax.set_xlim(-xspan * 0.02, xmax + text_space + text_offset)
     ax.set_ylim(-0.5, num_leaves - 0.5)
@@ -343,6 +514,58 @@ def plot_branch_category(g, file_base, label='all'):
             state_by_node=None,
         )
 
+
+def _build_state_maps_for_site(tree, site_state, orders, mode, missing_state):
+    state_by_node = dict()
+    state_prob_by_node = dict() if mode=='aa' else None
+    for node in tree.traverse():
+        nlabel = ete.get_prop(node, "numerical_label")
+        if ete.is_root(node):
+            state_by_node[nlabel] = missing_state
+            if state_prob_by_node is not None:
+                state_prob_by_node[nlabel] = None
+            continue
+        node_state = site_state[nlabel, :]
+        max_prob = float(node_state.max()) if node_state.size > 0 else 0.0
+        if max_prob <= 0:
+            state_by_node[nlabel] = missing_state
+            if state_prob_by_node is not None:
+                state_prob_by_node[nlabel] = None
+            continue
+        index = numpy.where(node_state==max_prob)[0]
+        if len(index)==1:
+            state_by_node[nlabel] = orders[index[0]]
+        else:
+            state_by_node[nlabel] = missing_state
+        if state_prob_by_node is not None:
+            state_prob_by_node[nlabel] = node_state
+    return state_by_node,state_prob_by_node
+
+
+def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, state_chunk, site_indices, ndigit):
+    for local_idx,site_index in enumerate(site_indices):
+        site_state = state_chunk[:, local_idx, :]
+        state_by_node,state_prob_by_node = _build_state_maps_for_site(
+            tree=tree,
+            site_state=site_state,
+            orders=orders,
+            mode=mode,
+            missing_state=missing_state,
+        )
+        file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(int(site_index)+1).zfill(ndigit)+'.pdf'
+        file_name = file_name.replace('_PLACEHOLDER', '')
+        _render_tree_matplotlib(
+            tree=tree,
+            trait_name=trait_name,
+            file_name=file_name,
+            label='all',
+            state_by_node=state_by_node,
+            state_prob_by_node=state_prob_by_node,
+            state_orders=orders if mode=='aa' else None,
+            state_mode=mode,
+        )
+
+
 def plot_state_tree(state, orders, mode, g):
     print('Writing ancestral state trees: mode = {}, number of pdf files = {}'.format(mode, state.shape[1]), flush=True)
     if not is_ete_plottable():
@@ -355,30 +578,41 @@ def plot_state_tree(state, orders, mode, g):
     else:
         missing_state = '-'
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
+    num_site = int(state.shape[1])
+    threads = int(g.get('threads', 1))
     for trait_name in trait_names:
-        ndigit = int(numpy.log10(state.shape[1]))+1
-        for i in numpy.arange(state.shape[1]):
-            state_by_node = dict()
-            for node in g['tree'].traverse():
-                nlabel = ete.get_prop(node, "numerical_label")
-                if ete.is_root(node):
-                    state_by_node[nlabel] = missing_state
-                    continue
-                max_prob = max(state[nlabel,i,:])
-                index = numpy.where(state[nlabel,i,:]==max_prob)[0]
-                if len(index)==1:
-                    state_by_node[nlabel] = orders[index[0]]
-                elif (len(index)==0)|(max_prob==0):
-                    state_by_node[nlabel] = missing_state
-            file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(i+1).zfill(ndigit)+'.pdf'
-            file_name = file_name.replace('_PLACEHOLDER', '')
-            _render_tree_matplotlib(
+        ndigit = int(numpy.log10(num_site))+1
+        n_jobs = parallel.resolve_n_jobs(num_items=num_site, threads=threads)
+        if n_jobs==1:
+            site_indices = numpy.arange(num_site, dtype=numpy.int64)
+            _render_state_tree_chunk(
                 tree=g['tree'],
                 trait_name=trait_name,
-                file_name=file_name,
-                label='all',
-                state_by_node=state_by_node,
+                mode=mode,
+                orders=orders,
+                missing_state=missing_state,
+                state_chunk=state,
+                site_indices=site_indices,
+                ndigit=ndigit,
             )
+            continue
+        backend = parallel.resolve_parallel_backend(g=g, task='plot_state_tree')
+        chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+        site_indices = numpy.arange(num_site, dtype=numpy.int64)
+        site_chunks,_ = parallel.get_chunks(site_indices, threads=n_jobs, chunk_factor=chunk_factor)
+        txt = 'Parallel state-tree plotting: trait = {}, mode = {}, workers = {}, backend = {}, chunks = {}'
+        print(txt.format(trait_name, mode, n_jobs, backend, len(site_chunks)), flush=True)
+        tasks = []
+        for chunk in site_chunks:
+            chunk = numpy.asarray(chunk, dtype=numpy.int64)
+            state_chunk = state[:, chunk, :]
+            tasks.append((g['tree'], trait_name, mode, orders, missing_state, state_chunk, chunk, ndigit))
+        parallel.run_starmap(
+            func=_render_state_tree_chunk,
+            args_iterable=tasks,
+            n_jobs=n_jobs,
+            backend=backend,
+        )
 
 def get_num_adjusted_sites(g, node):
     nl = ete.get_prop(node, "numerical_label")
