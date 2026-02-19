@@ -1,0 +1,160 @@
+IQ-TREE 2.3.6 built Aug  4 2024
+
+Input file name: /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa
+User tree file name: tmp.csubst.nwk
+Type of analysis: tree reconstruction
+Random seed number: 264202
+
+REFERENCES
+----------
+
+To cite IQ-TREE please use:
+
+Bui Quang Minh, Heiko A. Schmidt, Olga Chernomor, Dominik Schrempf,
+Michael D. Woodhams, Arndt von Haeseler, and Robert Lanfear (2020)
+IQ-TREE 2: New models and efficient methods for phylogenetic inference
+in the genomic era. Mol. Biol. Evol., in press.
+https://doi.org/10.1093/molbev/msaa015
+
+SEQUENCE ALIGNMENT
+------------------
+
+Input data: 33 sequences with 417 codon sites
+Number of constant sites: 15 (= 3.59712% of all sites)
+Number of invariant (constant or ambiguous constant) sites: 15 (= 3.59712% of all sites)
+Number of parsimony informative sites: 388
+Number of distinct site patterns: 405
+
+SUBSTITUTION PROCESS
+--------------------
+
+Model of substitution: ECMK07+F+R4
+
+State frequencies: (empirical counts from alignment)
+
+  pi(AAA) = 0.0411  pi(AAC) = 0.0295  pi(AAG) = 0.0590  pi(AAT) = 0.0219
+  pi(ACA) = 0.0049  pi(ACC) = 0.0138  pi(ACG) = 0.0032  pi(ACT) = 0.0188
+  pi(AGA) = 0.0058  pi(AGC) = 0.0166  pi(AGG) = 0.0055  pi(AGT) = 0.0073
+  pi(ATA) = 0.0073  pi(ATC) = 0.0268  pi(ATG) = 0.0351  pi(ATT) = 0.0163
+  pi(CAA) = 0.0059  pi(CAC) = 0.0077  pi(CAG) = 0.0114  pi(CAT) = 0.0070
+  pi(CCA) = 0.0129  pi(CCC) = 0.0073  pi(CCG) = 0.0019  pi(CCT) = 0.0185
+  pi(CGA) = 0.0041  pi(CGC) = 0.0025  pi(CGG) = 0.0055  pi(CGT) = 0.0010
+  pi(CTA) = 0.0065  pi(CTC) = 0.0148  pi(CTG) = 0.0364  pi(CTT) = 0.0127
+  pi(GAA) = 0.0232  pi(GAC) = 0.0317  pi(GAG) = 0.0394  pi(GAT) = 0.0269
+  pi(GCA) = 0.0116  pi(GCC) = 0.0404  pi(GCG) = 0.0036  pi(GCT) = 0.0406
+  pi(GGA) = 0.0268  pi(GGC) = 0.0245  pi(GGG) = 0.0156  pi(GGT) = 0.0284
+  pi(GTA) = 0.0109  pi(GTC) = 0.0252  pi(GTG) = 0.0325  pi(GTT) = 0.0215
+  pi(TAC) = 0.0057  pi(TAT) = 0.0049  pi(TCA) = 0.0038  pi(TCC) = 0.0137
+  pi(TCG) = 0.0013  pi(TCT) = 0.0143  pi(TGC) = 0.0076  pi(TGG) = 0.0098
+  pi(TGT) = 0.0097  pi(TTA) = 0.0044  pi(TTC) = 0.0171  pi(TTG) = 0.0151
+  pi(TTT) = 0.0204
+Model of rate heterogeneity: FreeRate with 4 categories
+Site proportion and rates:  (0.0091,0.2650) (0.0315,0.3789) (0.7594,0.8278) (0.2000,1.7853)
+
+ Category  Relative_rate  Proportion
+  1         0.2650         0.0091
+  2         0.3789         0.0315
+  3         0.8278         0.7594
+  4         1.7853         0.2000
+
+USER TREE
+---------
+
+Log-likelihood of the tree: -13284.1525 (s.e. 296.1788)
+Unconstrained log-likelihood (without tree): -2487.2259
+Number of free parameters (#branches + #model parameters): 129
+Akaike information criterion (AIC) score: 26826.3050
+Corrected Akaike information criterion (AICc) score: 26943.1691
+Bayesian information criterion (BIC) score: 27346.5731
+
+Total tree length (sum of branch lengths): 7.5701
+Sum of internal branch lengths: 2.6640 (35.1914% of tree length)
+
+NOTE: Tree is UNROOTED although outgroup taxon 'Anolis_carolinensis_ENSACAG00000003255' is drawn at root
+
+NOTE: Branch lengths are interpreted as number of nucleotide substitutions per codon site!
+      Rescale them by 1/3 if you want to have #nt substitutions per nt site
+
++--------------------Anolis_carolinensis_ENSACAG00000003255
+| (Node1)
+|                            +---------Astyanax_mexicanus_ENSAMXG00000007127
+|                      +-----| (Node5)
+|                      |     +--------------Danio_rerio_ENSDARG00000054191
+|       +--------------| (Node4)
+|       |              |        +-------------------Gadus_morhua_ENSGMOG00000013283
+|       |              +--------| (Node6)
+|       |                       |    +----------Oreochromis_niloticus_ENSONIG00000017337
+|       |                       +----| (Node7)
+|       |                            +---------Oryzias_latipes_ENSORLG00000014063
+|   +---| (Node3)
+|   |   |                                  +--Bos_taurus_ENSBTAG00000000894
+|   |   |                               +--| (Node16)
+|   |   |                               |  +--Ovis_aries_ENSOARG00000018803
+|   |   |                            +--| (Node15)
+|   |   |                            |  +--Sus_scrofa_ENSSSCG00000012440
+|   |   |                         +--| (Node14)
+|   |   |                         |  +----Canis_lupus_ENSCAFG00000017270
+|   |   |                      +--| (Node13)
+|   |   |                      |  +-----Chinchilla_lanigera_ENSCLAG00000000146
+|   |   |                   +--| (Node12)
+|   |   |                   |  |    +**Oryctolagus_cuniculus_ENSOCUG00000014726
+|   |   |                   |  +----| (Node17)
+|   |   |                   |       +----Oryctolagus_cuniculus_ENSOCUG00000025100
+|   |   |                +--| (Node11)
+|   |   |                |  |  +--Callithrix_jacchus_ENSCJAG00000021082
+|   |   |                |  +--| (Node18)
+|   |   |                |     |  +--Homo_sapiens_ENSG00000102144
+|   |   |                |     +--| (Node19)
+|   |   |                |        +--Macaca_mulatta_ENSMMUG00000013725
+|   |   |            +---| (Node10)
+|   |   |            |   |    +--Mus_musculus_ENSMUSG00000062070
+|   |   |            |   +----| (Node20)
+|   |   |            |        +--Rattus_norvegicus_ENSRNOG00000058249
+|   |   |       +----| (Node9)
+|   |   |       |    |                 +--Callithrix_jacchus_ENSCJAG00000022394
+|   |   |       |    |              +--| (Node23)
+|   |   |       |    |              |  |  +--Homo_sapiens_ENSG00000170950
+|   |   |       |    |              |  +--| (Node24)
+|   |   |       |    |              |     +--Macaca_mulatta_ENSMMUG00000011998
+|   |   |       |    |           +--| (Node22)
+|   |   |       |    |           |  |                +------Mus_musculus_ENSMUSG00000031233
+|   |   |       |    |           |  |  +-------------| (Node26)
+|   |   |       |    |           |  |  |             +----Rattus_norvegicus_ENSRNOG00000013600
+|   |   |       |    |           |  +--| (Node25)
+|   |   |       |    |           |     +---------Oryctolagus_cuniculus_ENSOCUG00000005270
+|   |   |       |    +-----------| (Node21)
+|   |   |       |                |  +-----Ovis_aries_ENSOARG00000008736
+|   |   |       |                +--| (Node27)
+|   |   |       |                   +-------Sus_scrofa_ENSSSCG00000001738
+|   |   +-------| (Node8)
+|   |           |           +--Monodelphis_domestica_ENSMODG00000004055
+|   |           |   +-------| (Node29)
+|   |           |   |       |     +--Monodelphis_domestica_ENSMODG00000022821
+|   |           |   |       |  +--| (Node31)
+|   |           |   |       |  |  +--Monodelphis_domestica_ENSMODG00000025017
+|   |           |   |       +--| (Node30)
+|   |           |   |          +-----Monodelphis_domestica_ENSMODG00000023304
+|   |           +---| (Node28)
+|   |               +------------------------Monodelphis_domestica_ENSMODG00000023385
++---| (Node2)
+|   +-----------------------------Xenopus_tropicalis_ENSXETG00000007447
+|
++-------------------Gallus_gallus_ENSGALG00000007936
+
+Tree in newick format:
+
+(Anolis_carolinensis_ENSACAG00000003255:0.4109784078,((((Astyanax_mexicanus_ENSAMXG00000007127:0.2083922419,Danio_rerio_ENSDARG00000054191:0.3050592119)Node5:0.1227056806,(Gadus_morhua_ENSGMOG00000013283:0.3897537041,(Oreochromis_niloticus_ENSONIG00000017337:0.2224142967,Oryzias_latipes_ENSORLG00000014063:0.2088066855)Node7:0.1137892066)Node6:0.1852110110)Node4:0.2949010638,(((((((((Bos_taurus_ENSBTAG00000000894:0.0143345856,Ovis_aries_ENSOARG00000018803:0.0165979281)Node16:0.0555431748,Sus_scrofa_ENSSSCG00000012440:0.0752387720)Node15:0.0119819761,Canis_lupus_ENSCAFG00000017270:0.0970212213)Node14:0.0273030259,Chinchilla_lanigera_ENSCLAG00000000146:0.1342485287)Node13:0.0036185538,(Oryctolagus_cuniculus_ENSOCUG00000014726:0.0000070737,Oryctolagus_cuniculus_ENSOCUG00000025100:0.0986870030)Node17:0.1050624213)Node12:0.0033569656,(Callithrix_jacchus_ENSCJAG00000021082:0.0421716390,(Homo_sapiens_ENSG00000102144:0.0113629338,Macaca_mulatta_ENSMMUG00000013725:0.0514199993)Node19:0.0081767985)Node18:0.0388085990)Node11:0.0189111640,(Mus_musculus_ENSMUSG00000062070:0.0377182340,Rattus_norvegicus_ENSRNOG00000058249:0.0581273038)Node20:0.1107760000)Node10:0.0778880635,(((Callithrix_jacchus_ENSCJAG00000022394:0.0672602494,(Homo_sapiens_ENSG00000170950:0.0353039136,Macaca_mulatta_ENSMMUG00000011998:0.0362095599)Node24:0.0189049515)Node23:0.0719177009,((Mus_musculus_ENSMUSG00000031233:0.1410486068,Rattus_norvegicus_ENSRNOG00000013600:0.1003213079)Node26:0.2784641364,Oryctolagus_cuniculus_ENSOCUG00000005270:0.2108280990)Node25:0.0207250244)Node22:0.0460446574,(Ovis_aries_ENSOARG00000008736:0.1343211461,Sus_scrofa_ENSSSCG00000001738:0.1666957911)Node27:0.0724323731)Node21:0.2414256893)Node9:0.1072210623,((Monodelphis_domestica_ENSMODG00000004055:0.0263916089,((Monodelphis_domestica_ENSMODG00000022821:0.0049531119,Monodelphis_domestica_ENSMODG00000025017:0.0059416745)Node31:0.0395532721,Monodelphis_domestica_ENSMODG00000023304:0.1284753099)Node30:0.0107601268)Node29:0.1709614402,Monodelphis_domestica_ENSMODG00000023385:0.4917162197)Node28:0.0845252357)Node8:0.1603010449)Node3:0.0853201612,Xenopus_tropicalis_ENSXETG00000007447:0.5880515796)Node2:0.0774186736,Gallus_gallus_ENSGALG00000007936:0.3861973858)Node1;
+
+ALISIM COMMAND
+--------------
+Currently, we only support exporting AliSim commands automatically from the analysis for common models of DNA, Protein, Binary, and Morphological data. To simulate data from other models (mixture, lie-markov, etc), please refer to the User Manual of AliSim. Thanks!
+
+For more information on using AliSim, please visit: www.iqtree.org/doc/AliSim
+
+TIME STAMP
+----------
+
+Date and time: Sat Feb  7 10:10:01 2026
+Total CPU time used: 14.7512 seconds (0h:0m:14s)
+Total wall-clock time used: 15.0113 seconds (0h:0m:15s)
+

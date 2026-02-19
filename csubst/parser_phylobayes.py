@@ -1,4 +1,3 @@
-import ete3
 import numpy
 import pandas
 
@@ -6,9 +5,10 @@ import os
 import itertools
 
 from csubst import tree
+from csubst import ete
 
 def get_node_phylobayes_out(node, files):
-    if node.is_leaf():
+    if ete.is_leaf(node):
         pp_file = [ file for file in files if file.find(node.name+"_"+node.name+".ancstatepostprob") > -1 ]
     else:
         pp_file = [ file for file in files if file.find(".ancstatepostprob") > -1 ]
@@ -44,7 +44,9 @@ def get_pp_N(pp_cdn):
 def get_input_information(g):
     files = os.listdir(g['phylobayes_dir'])
     sample_labels = [file for file in files if "_sample.labels" in file][0]
-    g['tree'] = ete3.PhyloNode(g['phylobayes_dir'] + sample_labels, format=1)
+    with open(g['phylobayes_dir'] + sample_labels) as f:
+        tree_newick = f.read()
+    g['tree'] = ete.PhyloNode(tree_newick, format=1)
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
     g['num_node'] = len(list(g['tree'].traverse()))
     state_files = [ f for f in files if f.endswith('.ancstatepostprob') ]
@@ -82,31 +84,57 @@ def get_input_information(g):
         g['max_synonymous_size'] = max([ len(si) for si in synonymous_indices.values() ])
     return g
 
-def get_state_tensor(g):
+def get_state_tensor(g, selected_branch_ids=None):
     num_node = len(list(g['tree'].traverse()))
+    selected_set = None
+    if selected_branch_ids is not None:
+        selected_set = set([int(v) for v in numpy.asarray(selected_branch_ids).tolist()])
+        root_nn = int(ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label"))
+        selected_set.add(root_nn)
     state_files = [ f for f in os.listdir(g['phylobayes_dir']) if f.endswith('.ancstatepostprob') ]
     print('The number of character states =', g['num_input_state'])
     axis = [num_node, g['num_input_site'], g['num_input_state']]
-    state_tensor = numpy.zeros(axis, dtype=g['float_type'])
+    if selected_set is None:
+        state_tensor = numpy.zeros(tuple(axis), dtype=g['float_type'])
+    else:
+        mmap_tensor = os.path.join(os.getcwd(), 'tmp.csubst.state_tensor.mmap')
+        if os.path.exists(mmap_tensor):
+            os.unlink(mmap_tensor)
+        txt = 'Generating memory map: dtype={}, axis={}, path={}'
+        print(txt.format(g['float_type'], axis, mmap_tensor), flush=True)
+        state_tensor = numpy.memmap(mmap_tensor, dtype=g['float_type'], shape=tuple(axis), mode='w+')
     for node in g['tree'].traverse():
+        nl = int(ete.get_prop(node, "numerical_label"))
+        if (selected_set is not None) and (nl not in selected_set):
+            continue
         pp_file = get_node_phylobayes_out(node=node, files=state_files)
         if len(pp_file) == 1:
             pp_file = pp_file[0]
-            state_tensor[node.numerical_label,:,:] = get_pp_nuc(g['phylobayes_dir'], pp_file)
+            state_tensor[nl,:,:] = get_pp_nuc(g['phylobayes_dir'], pp_file)
         elif (len(pp_file) > 1)&(not isinstance(pp_file, str)):
             raise Exception('Multiple .ancstatepostprob files for the node.',
-                  'node.name =', node.name, 'node.numerical_label =', node.numerical_label,
+                  'node.name =', node.name, 'ete.get_prop(node, "numerical_label") =', ete.get_prop(node, "numerical_label"),
                   'files =', pp_file)
         elif len(pp_file) == 0:
             print('Could not find .ancstatepostprob file for the node.',
-                  'node.name =', node.name, 'node.numerical_label =', node.numerical_label,
-                  'is_root =', node.is_root(), 'is_leaf =', node.is_leaf())
+                  'node.name =', node.name, 'ete.get_prop(node, "numerical_label") =', ete.get_prop(node, "numerical_label"),
+                  'is_root =', ete.is_root(node), 'is_leaf =', ete.is_leaf(node))
     if (g['ml_anc']):
-        idxmax = numpy.argmax(state_tensor, axis=2)
-        state_tensor = numpy.zeros(state_tensor.shape, dtype=bool)
-        for b in numpy.arange(state_tensor.shape[0]):
-            for s in numpy.arange(state_tensor.shape[1]):
-                state_tensor[b,s,idxmax[b,s]] = 1
+        if selected_set is None:
+            idxmax = numpy.argmax(state_tensor, axis=2)
+            state_tensor = numpy.zeros(state_tensor.shape, dtype=bool)
+            for b in numpy.arange(state_tensor.shape[0]):
+                for s in numpy.arange(state_tensor.shape[1]):
+                    state_tensor[b,s,idxmax[b,s]] = 1
+        else:
+            mmap_tensor = os.path.join(os.getcwd(), 'tmp.csubst.state_tensor_ml.mmap')
+            if os.path.exists(mmap_tensor):
+                os.unlink(mmap_tensor)
+            state_tensor2 = numpy.memmap(mmap_tensor, dtype=bool, shape=state_tensor.shape, mode='w+')
+            for b in sorted(selected_set):
+                idxmax = numpy.argmax(state_tensor[b,:,:], axis=1)
+                for s in numpy.arange(state_tensor.shape[1]):
+                    if state_tensor[b,s,:].sum()!=0:
+                        state_tensor2[b,s,idxmax[s]] = True
+            state_tensor = state_tensor2
     return(state_tensor)
-
-

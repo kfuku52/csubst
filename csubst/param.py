@@ -104,7 +104,7 @@ def get_global_parameters(args):
     if 'parallel_backend' in g.keys():
         g['parallel_backend'] = str(g['parallel_backend']).lower()
     else:
-        g['parallel_backend'] = 'multiprocessing'
+        g['parallel_backend'] = 'auto'
     if g['parallel_backend'] not in ['auto', 'multiprocessing', 'threading', 'loky']:
         raise ValueError('--parallel_backend should be one of auto, multiprocessing, threading, loky.')
     if 'parallel_chunk_factor' in g.keys():

@@ -11,6 +11,7 @@ import urllib
 
 from csubst import sequence
 from csubst import parser_pymol
+from csubst import ete
 
 def get_top_hit_ids(my_hits):
     if len(my_hits.descriptions)==0:
@@ -45,8 +46,8 @@ def run_qblast(aa_query, num_display=10, evalue_cutoff=10):
     return top_hit_ids
 
 def get_representative_leaf(node, size='median'):
-    leaves = node.get_leaves()
-    leaf_seqlens = [ len(l.sequence.replace('-', '')) for l in leaves ]
+    leaves = ete.get_leaves(node)
+    leaf_seqlens = [ len(ete.get_prop(l, 'sequence', '').replace('-', '')) for l in leaves ]
     if size=='median':
         ind = numpy.argsort(leaf_seqlens)[len(leaf_seqlens) // 2]
     representative_leaf = leaves[ind]
@@ -65,9 +66,9 @@ def pdb_sequence_search(g):
     print('')
     representative_branch_id = g['branch_ids'][0]
     for node in g['tree'].traverse():
-        if (node.numerical_label==representative_branch_id):
+        if (ete.get_prop(node, "numerical_label")==representative_branch_id):
             representative_leaf = get_representative_leaf(node, size='median')
-            nlabel = representative_leaf.numerical_label
+            nlabel = ete.get_prop(representative_leaf, "numerical_label")
             aa_query = sequence.translate_state(nlabel=nlabel, mode='aa', g=g)
             aa_query = aa_query.replace('-', '')
             break
@@ -113,7 +114,7 @@ def pdb_sequence_search(g):
                         if num_chain <= g['pymol_max_num_chain']:
                             best_hit = hit
                         else:
-                            print(f'Number of chains in {hit_pdb_id} ({num_chain}) is larger than the maximum number of chains allowed (--pymol_max_num_chain {g['pymol_max_num_chain']}). Unsuitable.', flush=True)
+                            print(f'Number of chains in {hit_pdb_id} ({num_chain}) is larger than the maximum number of chains allowed (--pymol_max_num_chain {g["pymol_max_num_chain"]}). Unsuitable.', flush=True)
                 if best_hit is None:
                     print('No suitable hit found in the PDB database.')
                     pdb_id = None

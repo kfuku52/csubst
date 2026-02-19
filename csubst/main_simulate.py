@@ -10,6 +10,7 @@ from csubst import foreground
 from csubst import genetic_code
 from csubst import parser_misc
 from csubst import tree
+from csubst import ete
 
 class suppress_stdout_stderr(object):
     # https://www.semicolonworld.com/question/57657/suppress-stdout-stderr-print-from-python-functions
@@ -43,25 +44,27 @@ class suppress_stdout_stderr(object):
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
-        node.dist = node.dist * scaling_factor
+        node.dist = (node.dist or 0.0) * scaling_factor
     return tree
 
 def get_pyvolve_newick(tree, trait_name):
     for node in tree.traverse():
-        node.dist2 = node.dist
-        node.dist = node.numerical_label
-    newick_txt = tree.write(format=1)
+        ete.set_prop(node, 'dist2', node.dist)
+        node.dist = ete.get_prop(node, "numerical_label")
+    newick_txt = ete.write_tree(tree, format=1)
     for node in tree.traverse():
-        sub_from = str(node.numerical_label)
-        if getattr(node, 'is_fg_'+trait_name):
-            sub_to = str(node.dist2)+'#m'+str(getattr(node, 'foreground_lineage_id_'+trait_name))
+        sub_from = str(ete.get_prop(node, "numerical_label"))
+        is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
+        if is_fg:
+            fg_lineage = ete.get_prop(node, 'foreground_lineage_id_' + trait_name, 0)
+            sub_to = str(ete.get_prop(node, 'dist2')) + '#m' + str(fg_lineage)
         else:
-            sub_to = str(node.dist2)
-        newick_txt = re.sub(':'+sub_from+',', ':'+sub_to+',', newick_txt)
-        newick_txt = re.sub(':'+sub_from+'\)', ':'+sub_to+')', newick_txt)
+            sub_to = str(ete.get_prop(node, 'dist2'))
+        newick_txt = re.sub(r':{}(?=,)'.format(re.escape(sub_from)), ':'+sub_to, newick_txt)
+        newick_txt = re.sub(r':{}(?=\))'.format(re.escape(sub_from)), ':'+sub_to, newick_txt)
     for node in tree.traverse():
-        node.dist = node.dist2
-        node.dist2 = None
+        node.dist = ete.get_prop(node, 'dist2')
+        ete.del_prop(node, 'dist2')
     return newick_txt
 
 def get_pyvolve_codon_order():
@@ -97,13 +100,24 @@ def get_biased_nonsynonymous_substitution_index(biased_aas, codon_table, codon_o
     return biased_cdn_index
 
 def get_biased_amino_acids(convergent_amino_acids, codon_table):
+    amino_acids = numpy.array(sorted(list(set([ item[0] for item in codon_table if item[0] != '*' ]))))
     if convergent_amino_acids.startswith('random'):
-        amino_acids = numpy.array(list(set([ item[0] for item in codon_table if item[0]!='*' ])))
         num_random_aa = int(convergent_amino_acids.replace('random',''))
+        if num_random_aa < 0:
+            raise ValueError('--convergent_amino_acids randomN requires N >= 0.')
+        if num_random_aa > amino_acids.shape[0]:
+            msg = '--convergent_amino_acids random{} exceeds available amino acids ({}).'
+            raise ValueError(msg.format(num_random_aa, amino_acids.shape[0]))
+        if num_random_aa == 0:
+            return numpy.array([], dtype=amino_acids.dtype)
         aa_index = numpy.random.choice(a=numpy.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
         biased_aas = amino_acids[aa_index]
     else:
         biased_aas = numpy.array(list(convergent_amino_acids))
+        invalid = sorted(list(set([aa for aa in biased_aas.tolist() if aa not in amino_acids])))
+        if len(invalid) > 0:
+            invalid_txt = ','.join(invalid)
+            raise ValueError('Unknown amino acid(s) in --convergent_amino_acids: {}'.format(invalid_txt))
     return biased_aas
 
 def get_biased_codon_index(biased_aas, codon_table, codon_order):
@@ -202,14 +216,35 @@ def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, 
     mat = copy.copy(mat)
     diag_bool = numpy.eye(mat.shape[0], dtype=bool)
     mat[diag_bool] = 0
+    if (target_index is None) or (numpy.asarray(target_index).shape[0] == 0) or (len(biased_aas) == 0):
+        dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
+        if dnds == 0:
+            raise ValueError('Cannot rescale nonsynonymous rates: background dN/dS is zero.')
+        omega_scaling_factor = foreground_omega / dnds
+        mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor)
+        return mat
     total_biased_Q_before = get_total_biased_Q(mat, biased_aas, codon_table, codon_orders)
+    if total_biased_Q_before <= 0:
+        raise ValueError('No target-biased nonsynonymous substitutions are available for the selected amino acids.')
     total_nsy_Q_before = get_total_Q(mat, all_nsy_cdn_index)
     scaling_factor = total_nsy_Q_before / total_biased_Q_before / (1-(percent_biased_sub/100))
     mat = rescale_substitution_matrix(mat, target_index, scaling_factor)
     dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
+    if dnds == 0:
+        raise ValueError('Cannot rescale nonsynonymous rates: current dN/dS is zero.')
     omega_scaling_factor = foreground_omega/dnds
     mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor)
     return mat
+
+
+def _validate_simulate_params(g):
+    if int(g['num_simulated_site']) <= 0:
+        raise ValueError('--num_simulated_site must be a positive integer.')
+    if (g['percent_convergent_site'] < 0) or (g['percent_convergent_site'] > 100):
+        raise ValueError('--percent_convergent_site must be within [0, 100].')
+    if (g['percent_biased_sub'] < 0) or (g['percent_biased_sub'] >= 100):
+        raise ValueError('--percent_biased_sub must be within [0, 100).')
+    return None
 
 def evolve_convergent_partitions(g):
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'], trait_name=g['trait_name'])
@@ -301,7 +336,7 @@ def get_pyvolve_tree(tree, foreground_scaling_factor, trait_name):
     if (foreground_scaling_factor!=1):
         print('Foreground branches are rescaled by {}.'.format(foreground_scaling_factor))
     for node in tree.traverse():
-        if getattr(node, 'is_fg_'+trait_name):
+        if ete.get_prop(node, 'is_fg_' + trait_name, False):
             node.dist *= foreground_scaling_factor
     newick_txt = get_pyvolve_newick(tree=tree, trait_name=trait_name)
     pyvolve_tree = pyvolve.read_tree(tree=newick_txt)
@@ -317,29 +352,39 @@ def get_background_Q(g, Q_method):
         background_Q = rescale_substitution_matrix(unscaled_mat, g['all_nsy_cdn_index'], scaling_factor)
     elif (Q_method=='pyvolve'):
         background_Q = generate_Q_matrix(g['eq_freq'], g['background_omega'], g['all_nsy_cdn_index'], g['all_syn_cdn_index'])
+    else:
+        raise ValueError('Unsupported Q matrix method: {}'.format(Q_method))
     return background_Q
 
 def concatenate_alignment(in1, in2, out):
-    seqs = dict()
-    with open(in1, 'r') as f:
-        txt_in1 = f.read()
-    for line in txt_in1.split('\n'):
-        if line.startswith('>'):
-            current_name = line
-            seqs[current_name] = ''
-        else:
-            seqs[current_name] += line
-    with open(in2, 'r') as f:
-        txt_in2 = f.read()
-    for line in txt_in2.split('\n'):
-        if line.startswith('>'):
-            current_name = line
-        else:
-            seqs[current_name] += line
+    def _read_fasta(path):
+        seqs = dict()
+        current_name = None
+        with open(path, 'r') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if line == '':
+                    continue
+                if line.startswith('>'):
+                    current_name = line
+                    if current_name not in seqs:
+                        seqs[current_name] = ''
+                    continue
+                if current_name is None:
+                    raise ValueError('Invalid FASTA format in {}: sequence line appeared before header.'.format(path))
+                seqs[current_name] += line
+        return seqs
+
+    seqs1 = _read_fasta(in1)
+    seqs2 = _read_fasta(in2)
+    if set(seqs1.keys()) != set(seqs2.keys()):
+        missing_in_second = sorted(list(set(seqs1.keys()) - set(seqs2.keys())))
+        missing_in_first = sorted(list(set(seqs2.keys()) - set(seqs1.keys())))
+        txt = 'FASTA headers differ between files. Missing in second: {}; Missing in first: {}'
+        raise ValueError(txt.format(','.join(missing_in_second), ','.join(missing_in_first)))
     with open(out, 'w') as f:
-        for key in seqs.keys():
-            txt = key+'\n'+seqs[key]+'\n'
-            f.write(txt)
+        for key in seqs1.keys():
+            f.write(key + '\n' + seqs1[key] + seqs2[key] + '\n')
     return None
 
 def main_simulate(g, Q_method='csubst'):
@@ -348,19 +393,22 @@ def main_simulate(g, Q_method='csubst'):
     g = parser_misc.generate_intermediate_files(g, force_notree_run=True)
     g = parser_misc.annotate_tree(g, ignore_tree_inconsistency=True)
     g = parser_misc.read_input(g)
-    g = foreground.get_foreground_branch(g, simulate=True)
     g['trait_name'] = 'PLACEHOLDER'
     g['all_syn_cdn_index'] = get_synonymous_codon_substitution_index(g, get_pyvolve_codon_order())
     g['all_nsy_cdn_index'] = get_nonsynonymous_codon_substitution_index(g['all_syn_cdn_index'])
     if (g['num_simulated_site']==-1):
         g['num_simulated_site'] = g['num_input_site']
+    _validate_simulate_params(g)
     if g['optimized_branch_length']:
         g['tree'] = g['tree']
     else:
         g['tree2'] = g['tree']
         g['tree'] = g['rooted_tree']
     g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
-    g['tree'] = foreground.dummy_foreground_annotation(tree=g['tree'], trait_name=g['trait_name'])
+    # Re-annotate the tree chosen for simulation/plotting so lineage colors and
+    # lineage IDs in --foreground are reflected in simulate_branch_id.pdf and
+    # pyvolve model tags.
+    g = foreground.get_foreground_branch(g, simulate=True)
     tree.plot_branch_category(g, file_base='simulate_branch_id', label='all')
     g['background_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=1, trait_name=g['trait_name'])
     g['foreground_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=g['foreground_scaling_factor'], trait_name=g['trait_name'])
@@ -376,9 +424,9 @@ def main_simulate(g, Q_method='csubst'):
     g['num_no_convergent_site'] = int(g['num_simulated_site'] - g['num_convergent_site'])
     txt = '{:,} out of {:,} sites ({:.1f}%) will evolve convergently in the foreground lineages.'
     print(txt.format(g['num_convergent_site'], g['num_simulated_site'], g['percent_convergent_site']))
-    if (g['percent_convergent_site']>0):
+    if (g['num_convergent_site'] > 0):
         evolve_convergent_partitions(g)
-    if (g['percent_convergent_site']<100):
+    if (g['num_no_convergent_site'] > 0):
         evolve_nonconvergent_partition(g)
     file_conv = 'tmp.csubst.simulate_convergent.fa'
     file_noconv = 'tmp.csubst.simulate_nonconvergent.fa'

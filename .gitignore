@@ -1,4 +1,6 @@
-/tests/
+/tests/*
+!/tests/conftest.py
+!/tests/test_*.py
 /data/
 build/*
 csubst/__pycache__

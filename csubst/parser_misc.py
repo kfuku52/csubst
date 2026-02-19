@@ -1,8 +1,7 @@
-import ete3
 import numpy
 
 import itertools
-import pkg_resources
+import pkgutil
 import re
 import sys
 
@@ -10,6 +9,14 @@ from csubst import sequence
 from csubst import parser_phylobayes
 from csubst import parser_iqtree
 from csubst import tree
+from csubst import ete
+
+def _read_package_text(file):
+    txt = pkgutil.get_data('csubst', file)
+    if txt is None:
+        raise FileNotFoundError('Unable to read package data file: {}'.format(file))
+    txt = txt.decode('utf-8')
+    return txt
 
 def generate_intermediate_files(g, force_notree_run=False):
     if (g['infile_type'] == 'phylobayes'):
@@ -92,6 +99,7 @@ def read_input(g):
 def get_mechanistic_instantaneous_rate_matrix(g):
     num_codon = len(g['codon_orders'])
     inst = numpy.ones(shape=(num_codon,num_codon))
+    transition_pairs = {'AG', 'GA', 'CT', 'TC'}
     for i1,c1 in enumerate(g['codon_orders']):
         for i2,c2 in enumerate(g['codon_orders']):
             num_diff_codon_position = sum([ cp1!=cp2 for cp1,cp2 in zip(c1,c2) ])
@@ -109,7 +117,7 @@ def get_mechanistic_instantaneous_rate_matrix(g):
                 num_diff_codon_position = sum([ cp1!=cp2 for cp1,cp2 in zip(c1,c2) ])
                 if (num_diff_codon_position==1):
                     diff_nucs = [ cp1+cp2 for cp1,cp2 in zip(c1,c2) if cp1!=cp2 ][0]
-                    if all([ (dn in ['A','G'])|(dn in ['C','T']) for dn in diff_nucs ]):
+                    if diff_nucs in transition_pairs:
                         inst[i1,i2] *= g['kappa'] # multiply kappa to transition substitutions
     inst = inst.dot(numpy.diag(g['equilibrium_frequency'])).astype(g['float_type']) # pi_j * q_ij
     inst = scale_instantaneous_rate_matrix(inst, g['equilibrium_frequency'])
@@ -125,9 +133,11 @@ def fill_instantaneous_rate_matrix_diagonal(inst):
 def scale_instantaneous_rate_matrix(inst, eq):
     # scaling to satisfy Sum_i Sum_j!=i pi_i*q_ij, equals 1.
     # See Kosiol et al. 2007. https://academic.oup.com/mbe/article/24/7/1464/986344
-    assert inst[0,0]==0, 'Diagonal elements should still be zeros.'
+    diagonal = numpy.diag(inst)
+    assert numpy.all(numpy.isclose(diagonal, 0)), 'Diagonal elements should still be zeros.'
     q_ijxpi_i = numpy.einsum('ad,a->ad', inst, eq)
     scaling_factor = q_ijxpi_i.sum()
+    assert scaling_factor > 0, 'Instantaneous rate matrix scaling factor must be positive.'
     inst /= scaling_factor
     return inst
 
@@ -196,39 +206,97 @@ def get_equilibrium_frequency(g, mode):
         assert abs(eq_pep.sum()-1)<g['float_tol'], txt
         return eq_pep
 
+def _can_use_selective_state_loading(g):
+    if g.get('exhaustive_until', None) != 1:
+        return False, None
+    if g.get('foreground', None) is None:
+        return False, None
+    if not bool(g.get('cb', False)):
+        return False, '--cb is disabled.'
+    blocking_outputs = [name for name in ['b', 's', 'bs', 'cs', 'cbs'] if bool(g.get(name, False))]
+    if len(blocking_outputs) > 0:
+        txt = 'full-tree outputs are enabled ({})'
+        return False, txt.format(', '.join(blocking_outputs))
+    if bool(g.get('plot_state_aa', False)) or bool(g.get('plot_state_codon', False)):
+        return False, 'state-tree plotting is enabled.'
+    if int(g.get('fg_clade_permutation', 0)) > 0:
+        return False, '--fg_clade_permutation is enabled.'
+    return True, None
+
+
+def _get_required_state_branch_ids(g):
+    root_nn = ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label")
+    required = set([int(root_nn)])
+    node_by_id = dict()
+    for node in g['tree'].traverse():
+        node_by_id[int(ete.get_prop(node, "numerical_label"))] = node
+    target_ids = set()
+    for trait_name in g['target_ids'].keys():
+        values = numpy.asarray(g['target_ids'][trait_name], dtype=numpy.int64)
+        target_ids.update([int(v) for v in values.tolist()])
+    for branch_id in target_ids:
+        required.add(branch_id)
+        node = node_by_id.get(branch_id, None)
+        if (node is None) or ete.is_root(node):
+            continue
+        required.add(int(ete.get_prop(node.up, "numerical_label")))
+    required_ids = numpy.array(sorted(required), dtype=numpy.int64)
+    return required_ids
+
+
+def resolve_state_loading(g):
+    g['state_loaded_branch_ids'] = None
+    g['is_state_selective_loading'] = False
+    use_selective, reason = _can_use_selective_state_loading(g)
+    if not use_selective:
+        if (g.get('exhaustive_until', None) == 1) and (g.get('foreground', None) is not None) and (reason is not None):
+            print('Selective state loading disabled: {}'.format(reason), flush=True)
+        return g
+    required_ids = _get_required_state_branch_ids(g)
+    if required_ids.shape[0] == 0:
+        print('Selective state loading disabled: no required branches were found.', flush=True)
+        return g
+    g['state_loaded_branch_ids'] = required_ids
+    g['is_state_selective_loading'] = True
+    txt = 'Selective state loading enabled: loading {:,} nodes out of {:,} total nodes.'
+    print(txt.format(required_ids.shape[0], g['num_node']), flush=True)
+    return g
+
+
 def prep_state(g):
     state_nuc = None
     state_cdn = None
     state_pep = None
+    loaded_branch_ids = g.get('state_loaded_branch_ids', None)
     if (g['infile_type'] == 'phylobayes'):
         from csubst import parser_phylobayes
         if g['input_data_type'] == 'nuc': # obsoleted
-            state_nuc = parser_phylobayes.get_state_tensor(g)
+            state_nuc = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
         elif g['input_data_type'] == 'cdn':
-            state_cdn = parser_phylobayes.get_state_tensor(g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+            state_cdn = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
+            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
     elif (g['infile_type'] == 'iqtree'):
         from csubst import parser_iqtree
         if g['input_data_type'] == 'nuc': # obsoleted
-            state_nuc = parser_iqtree.get_state_tensor(g)
+            state_nuc = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
         elif g['input_data_type'] == 'cdn':
-            state_cdn = parser_iqtree.get_state_tensor(g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+            state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
+            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
     g['state_nuc'] = state_nuc
     g['state_cdn'] = state_cdn
     g['state_pep'] = state_pep
     return g
 
 def read_exchangeability_matrix(file, codon_orders):
-    txt = pkg_resources.resource_string(__name__, file)
-    txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
+    txt = _read_package_text(file=file)
+    txt = txt.replace('\r', '').split('\n')
     txt_mat = txt[0:60]
-    txt_mat = ''.join(txt_mat).split(' ')
-    arr = numpy.array([ float(s) for s in txt_mat if s!='' ], dtype=float)
+    txt_mat = ''.join(txt_mat).split()
+    arr = numpy.array([ float(s) for s in txt_mat ], dtype=float)
     assert (arr.shape[0]==1830), 'This is not a codon substitution matrix.'
     num_state = 61
     mat_exchangeability = numpy.zeros(shape=(num_state,num_state))
@@ -242,13 +310,18 @@ def read_exchangeability_matrix(file, codon_orders):
 
 def get_codon_order_index(order_from, order_to):
     assert len(order_from)==len(order_to), 'Codon order lengths should match. Emprical codon substitution models are currently supported only for the Standard codon table.'
-    out = list()
-    for fr in order_from:
-        for i,to in enumerate(order_to):
-            if fr==to:
-                out.append(i)
-                break
-    out = numpy.array(out)
+    index_by_codon = dict()
+    for i,to in enumerate(order_to):
+        if to in index_by_codon:
+            raise ValueError('Duplicate codon found in target order: {}'.format(to))
+        index_by_codon[to] = i
+    missing = [fr for fr in order_from if fr not in index_by_codon]
+    if len(missing) > 0:
+        missing_txt = ','.join(missing[:10])
+        if len(missing) > 10:
+            missing_txt += ',...'
+        raise ValueError('Codon(s) from source order not found in target order: {}'.format(missing_txt))
+    out = numpy.array([index_by_codon[fr] for fr in order_from], dtype=int)
     return out
 
 def get_exchangeability_codon_order():
@@ -266,10 +339,10 @@ def get_exchangeability_codon_order():
     return exchangeability_codon_order
 
 def read_exchangeability_eq_freq(file, g):
-    txt = pkg_resources.resource_string(__name__, file)
-    txt = str(txt).replace('b\"','').replace('\\r','').split('\\n')
-    freqs = txt[61].split(' ')
-    freqs = numpy.array([ float(s) for s in freqs if s!='' ], dtype=float)
+    txt = _read_package_text(file=file)
+    txt = txt.replace('\r', '').split('\n')
+    freqs = txt[61].split()
+    freqs = numpy.array([ float(s) for s in freqs ], dtype=float)
     assert freqs.shape[0]==61, 'Number of equilibrium frequencies ({}) should be 61.'.format(freqs.shape[0])
     ex_codon_order = get_exchangeability_codon_order()
     codon_order_index = get_codon_order_index(order_from=g['codon_orders'], order_to=ex_codon_order)
@@ -278,7 +351,9 @@ def read_exchangeability_eq_freq(file, g):
 
 def annotate_tree(g, ignore_tree_inconsistency=False):
     g['node_label_tree_file'] = g['iqtree_treefile']
-    g['node_label_tree'] = ete3.PhyloNode(g['node_label_tree_file'], format=1)
+    with open(g['node_label_tree_file']) as f:
+        node_label_tree_newick = f.read()
+    g['node_label_tree'] = ete.PhyloNode(node_label_tree_newick, format=1)
     g['node_label_tree'] = tree.standardize_node_names(g['node_label_tree'])
     is_consistent_tree = tree.is_consistent_tree(tree1=g['node_label_tree'], tree2=g['rooted_tree'])
     if is_consistent_tree:
@@ -292,8 +367,8 @@ def annotate_tree(g, ignore_tree_inconsistency=False):
             sys.stderr.write('Exiting.\n')
             sys.exit(1)
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
-    total_root_tree_len = sum([ n.dist for n in g['rooted_tree'].traverse() ])
-    total_iqtree_len = sum([ n.dist for n in g['node_label_tree'].traverse() ])
+    total_root_tree_len = sum([(n.dist or 0.0) for n in g['rooted_tree'].traverse()])
+    total_iqtree_len = sum([(n.dist or 0.0) for n in g['node_label_tree'].traverse()])
     print('Total branch length of --rooted_tree_file: {:,.4f}'.format(total_root_tree_len))
     print('Total branch length of --iqtree_treefile: {:,.4f}'.format(total_iqtree_len))
     print('')

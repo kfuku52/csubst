@@ -1,4 +1,3 @@
-import joblib
 import numpy
 import pandas
 
@@ -9,6 +8,7 @@ import time
 
 from csubst import parallel
 from csubst import combination_cy
+from csubst import ete
 
 def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
     arity = target_nodes.shape[1] + 1
@@ -20,14 +20,26 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             i += 1
 
 def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
-    rows, cols = numpy.where(numpy.equal(nc_matrix, 1))
+    col_sums = nc_matrix.sum(axis=0)
+    valid_cols = numpy.where(col_sums == arity)[0]
+    if valid_cols.shape[0] == 0:
+        return numpy.zeros(shape=(0, arity), dtype=numpy.int64)
+    rows, cols = numpy.where(numpy.equal(nc_matrix[:, valid_cols], 1))
     unique_cols = numpy.unique(cols)
     ind2  = numpy.arange(arity, dtype=numpy.int64)
     empty_id_combinations = numpy.zeros(shape=(unique_cols.shape[0], arity), dtype=numpy.int64)
-    chunks, starts = parallel.get_chunks(empty_id_combinations, ncpu)
-    out = joblib.Parallel(n_jobs=ncpu, max_nbytes=None, backend='multiprocessing')(
-        joblib.delayed(combination_cy.generate_id_chunk)
-        (chunk, start, arity, ind2, rows, cols, unique_cols) for chunk, start in zip(chunks, starts)
+    if unique_cols.shape[0] == 0:
+        return empty_id_combinations
+    n_jobs = parallel.resolve_n_jobs(num_items=unique_cols.shape[0], threads=ncpu)
+    if n_jobs == 1:
+        return combination_cy.generate_id_chunk(empty_id_combinations, 0, arity, ind2, rows, cols, unique_cols)
+    chunks, starts = parallel.get_chunks(empty_id_combinations, n_jobs)
+    tasks = [(chunk, start, arity, ind2, rows, cols, unique_cols) for chunk, start in zip(chunks, starts)]
+    out = parallel.run_starmap(
+        func=combination_cy.generate_id_chunk,
+        args_iterable=tasks,
+        n_jobs=n_jobs,
+        backend='multiprocessing',
     )
     id_combinations = numpy.concatenate(out)
     return id_combinations
@@ -38,15 +50,14 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
         raise Exception('Only one of target_id_dict, cb_passed, or exhaustive must be set.')
     g['fg_dependent_id_combinations'] = dict()
     tree = g['tree']
+    all_nodes = [node for node in tree.traverse() if not ete.is_root(node)]
     if verbose:
-        all_nodes = [ node for node in tree.traverse() if not node.is_root() ]
         print("Number of all branches: {:,}".format(len(all_nodes)), flush=True)
     if exhaustive:
         target_nodes = list()
-        all_nodes = [node for node in tree.traverse() if not node.is_root()]
         for node in all_nodes:
             if (check_attr is None)|(check_attr in dir(node)):
-                target_nodes.append(node.numerical_label)
+                target_nodes.append(ete.get_prop(node, "numerical_label"))
         target_nodes = numpy.array(target_nodes)
         node_combinations = list(itertools.combinations(target_nodes, arity))
         node_combinations = [ set(nc) for nc in node_combinations ]
@@ -73,11 +84,21 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
-            chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
-            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-                joblib.delayed(node_union)
-                (ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)
-            )
+            n_jobs = parallel.resolve_n_jobs(num_items=len(index_combinations), threads=g['threads'])
+            if n_jobs == 1:
+                node_union(index_combinations, target_id_dict[trait_name], df_mmap, 0)
+            else:
+                chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+                chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
+                # node_union writes into a shared memmap; threads reliably share that memory map.
+                backend = 'threading'
+                tasks = [(ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)]
+                parallel.run_starmap(
+                    func=node_union,
+                    args_iterable=tasks,
+                    n_jobs=n_jobs,
+                    backend=backend,
+                )
             is_valid_combination = (df_mmap.sum(axis=1)!=0)
             if (is_valid_combination.sum()>0):
                 node_combination_dict[trait_name] = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
@@ -120,11 +141,21 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             df_mmap = numpy.memmap(mmap_out, dtype=numpy.int32, shape=axis, mode='w+')
-            chunks,starts = parallel.get_chunks(index_combinations, g['threads'])
-            joblib.Parallel(n_jobs=g['threads'], max_nbytes=None, backend='multiprocessing')(
-                joblib.delayed(node_union)
-                (ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)
-            )
+            n_jobs = parallel.resolve_n_jobs(num_items=len(index_combinations), threads=g['threads'])
+            if n_jobs == 1:
+                node_union(index_combinations, bid_trait, df_mmap, 0)
+            else:
+                chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+                chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
+                # node_union writes into a shared memmap; threads reliably share that memory map.
+                backend = 'threading'
+                tasks = [(ids, bid_trait, df_mmap, ms) for ids, ms in zip(chunks, starts)]
+                parallel.run_starmap(
+                    func=node_union,
+                    args_iterable=tasks,
+                    n_jobs=n_jobs,
+                    backend=backend,
+                )
             is_valid_combination = (df_mmap.sum(axis=1)!=0)
             if (is_valid_combination.sum()>0):
                 node_combinations_dict[trait_name] = numpy.unique(df_mmap[is_valid_combination,:], axis=0)
@@ -164,12 +195,12 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             if trait_name == trait_names[0]:
                 id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
         else:
-            if (verbose & is_fg_dependent_col.sum() > 0):
+            if verbose and (is_fg_dependent_col.sum() > 0):
                 txt = 'Removing {:,} (out of {:,}) non-independent foreground branch combinations for {}.'
                 print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0], trait_name), flush=True)
-            nc_matrix = nc_matrix[:,~is_fg_dependent_col]
+            trait_nc_matrix = nc_matrix[:,~is_fg_dependent_col]
             g['fg_dependent_id_combinations'][trait_name] = numpy.array([])
-            trait_id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
+            trait_id_combinations = nc_matrix2id_combinations(trait_nc_matrix, arity, g['threads'])
             id_combinations = numpy.unique(numpy.concatenate((id_combinations, trait_id_combinations), axis=0), axis=0)
     if verbose:
         print('Time elapsed for generating branch combinations: {:,} sec'.format(int(time.time() - start)))
@@ -177,44 +208,48 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     return g,id_combinations
 
 def node_combination_subsamples_rifle(g, arity, rep):
-    all_ids = [ n.numerical_label for n in g['tree'].traverse() ]
-    sub_ids = g['sub_branches']
-    all_dep_ids = g['dep_ids']
+    sub_ids = set(g['sub_branches'])
+    if (rep <= 0) or (len(sub_ids) < arity):
+        return numpy.zeros(shape=(0, arity), dtype=numpy.int64)
+
+    dep_lookup = dict()
+    for dep_group in g['dep_ids']:
+        dep_group_set = set([int(x) for x in numpy.asarray(dep_group).tolist()])
+        for node_id in dep_group_set:
+            dep_lookup.setdefault(node_id, set()).update(dep_group_set)
+
     num_fail = 0
-    i = 0
-    id_combinations = list()
-    while (i <= rep)&(num_fail <= rep):
-        if num_fail == rep:
-            id_combinations = list()
-            print('Node combination subsampling failed', str(rep), 'times. Exiting.')
-            break
+    selected_combinations = list()
+    seen_combinations = set()
+    while (len(selected_combinations) < rep) and (num_fail < rep):
         selected_ids = set()
-        nonselected_ids = sub_ids
-        dep_ids = set()
-        flag = 0
-        for a in numpy.arange(arity):
-            if len(nonselected_ids)==0:
-                num_fail+=1
-                break
-            else:
-                selected_id = numpy.random.choice(list(nonselected_ids), 1)[0]
-                selected_ids = selected_ids.union(set([selected_id,]))
-                dep_ids = dep_ids.union(all_dep_ids[selected_id])
-                nonselected_ids = all_ids.difference(dep_ids)
-                flag += 1
-        if flag==arity:
-            if selected_id in id_combinations:
+        unavailable_ids = set()
+        for _ in numpy.arange(arity):
+            available_ids = sub_ids.difference(unavailable_ids)
+            if len(available_ids) == 0:
                 num_fail += 1
-            else:
-                id_combinations.append(selected_ids)
-                i += 1
-    id_combinations = numpy.array([ list(ic) for ic in id_combinations ])
-    id_combinations = id_combinations[:rep, :]
-    return id_combinations
+                break
+            selected_id = int(numpy.random.choice(list(available_ids), 1)[0])
+            selected_ids.add(selected_id)
+            unavailable_ids |= dep_lookup.get(selected_id, {selected_id})
+        if len(selected_ids) != arity:
+            continue
+        selected_tuple = tuple(sorted(selected_ids))
+        if selected_tuple in seen_combinations:
+            num_fail += 1
+            continue
+        seen_combinations.add(selected_tuple)
+        selected_combinations.append(selected_tuple)
+
+    if (len(selected_combinations) == 0) and (rep > 0):
+        print('Node combination subsampling failed', str(rep), 'times. Exiting.')
+    return numpy.asarray(selected_combinations, dtype=numpy.int64)
 
 def node_combination_subsamples_shotgun(g, arity, rep):
-    all_ids = [ n.numerical_label for n in g['tree'].traverse() ]
+    all_ids = [ ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() ]
     sub_ids = g['sub_branches']
+    if (rep <= 0) or (len(sub_ids) < arity):
+        return numpy.zeros(shape=(0, arity), dtype=numpy.int64)
     id_combinations = numpy.zeros(shape=(0,arity), dtype=numpy.int64)
     id_combinations_dif = numpy.inf
     round = 1
@@ -241,7 +276,7 @@ def node_combination_subsamples_shotgun(g, arity, rep):
         round += 1
     if id_combinations.shape[0] < rep:
         print('Inefficient subsampling. Exiting node_combinations_subsamples()')
-        id_combinations = numpy.array([])
+        id_combinations = numpy.zeros(shape=(0, arity), dtype=numpy.int64)
     else:
         id_combinations = id_combinations[:rep,:]
     return id_combinations
@@ -267,32 +302,32 @@ def calc_substitution_patterns(cb):
 
 def get_global_dep_ids(g):
     global_dep_ids = list()
-    for leaf in g['tree'].iter_leaves():
-        ancestor_nns = [node.numerical_label for node in leaf.iter_ancestors() if not node.is_root()]
-        dep_id = [leaf.numerical_label, ] + ancestor_nns
+    for leaf in ete.iter_leaves(g['tree']):
+        ancestor_nns = [ete.get_prop(node, "numerical_label") for node in ete.iter_ancestors(leaf) if not ete.is_root(node)]
+        dep_id = [ete.get_prop(leaf, "numerical_label"), ] + ancestor_nns
         dep_id = numpy.sort(numpy.array(dep_id))
         global_dep_ids.append(dep_id)
         if g['exclude_sister_pair']:
             for node in g['tree'].traverse():
-                children = node.get_children()
+                children = ete.get_children(node)
                 if len(children)>1:
-                    dep_id = numpy.sort(numpy.array([ node.numerical_label for node in children ]))
+                    dep_id = numpy.sort(numpy.array([ ete.get_prop(node, "numerical_label") for node in children ]))
                     global_dep_ids.append(dep_id)
-    root_nn = g['tree'].numerical_label
+    root_nn = ete.get_prop(g['tree'], "numerical_label")
     root_state_sum = g['state_cdn'][root_nn, :, :].sum()
     if (root_state_sum == 0):
         print('Ancestral states were not estimated on the root node. Excluding sub-root nodes from the analysis.')
-        subroot_nns = [node.numerical_label for node in g['tree'].get_children()]
+        subroot_nns = [ete.get_prop(node, "numerical_label") for node in ete.get_children(g['tree'])]
         for subroot_nn in subroot_nns:
             for node in g['tree'].traverse():
-                if node.is_root():
+                if ete.is_root(node):
                     continue
-                if subroot_nn == node.numerical_label:
+                if subroot_nn == ete.get_prop(node, "numerical_label"):
                     continue
-                ancestor_nns = [anc.numerical_label for anc in node.iter_ancestors()]
+                ancestor_nns = [ete.get_prop(anc, "numerical_label") for anc in ete.iter_ancestors(node)]
                 if subroot_nn in ancestor_nns:
                     continue
-                global_dep_ids.append(numpy.array([subroot_nn, node.numerical_label]))
+                global_dep_ids.append(numpy.array([subroot_nn, ete.get_prop(node, "numerical_label")]))
     return global_dep_ids
 
 def get_foreground_dep_ids(g):
@@ -304,19 +339,19 @@ def get_foreground_dep_ids(g):
                 fg_lineage_leaf_names = g['fg_leaf_names'][trait_name][i]
                 tmp_fg_dep_ids = list()
                 for node in g['tree'].traverse():
-                    if node.is_root():
+                    if ete.is_root(node):
                         continue
-                    is_all_leaf_lineage_fg = all([ ln in fg_lineage_leaf_names for ln in node.get_leaf_names() ])
+                    is_all_leaf_lineage_fg = all([ln in fg_lineage_leaf_names for ln in ete.get_leaf_names(node)])
                     if not is_all_leaf_lineage_fg:
                         continue
-                    is_up_all_leaf_lineage_fg = all([ ln in fg_lineage_leaf_names for ln in node.up.get_leaf_names() ])
+                    is_up_all_leaf_lineage_fg = all([ln in fg_lineage_leaf_names for ln in ete.get_leaf_names(node.up)])
                     if is_up_all_leaf_lineage_fg:
                         continue
-                    if node.is_leaf():
-                        tmp_fg_dep_ids.append(node.numerical_label)
+                    if ete.is_leaf(node):
+                        tmp_fg_dep_ids.append(ete.get_prop(node, "numerical_label"))
                     else:
-                        descendant_nn = [ n.numerical_label for n in node.get_descendants() ]
-                        tmp_fg_dep_ids += [node.numerical_label,] + descendant_nn
+                        descendant_nn = [ ete.get_prop(n, "numerical_label") for n in ete.get_descendants(node) ]
+                        tmp_fg_dep_ids += [ete.get_prop(node, "numerical_label"),] + descendant_nn
                 if len(tmp_fg_dep_ids)>1:
                     fg_dep_ids[trait_name].append(numpy.sort(numpy.array(tmp_fg_dep_ids)))
             if (g['mg_sister'])|(g['mg_parent']):

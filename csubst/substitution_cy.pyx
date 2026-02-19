@@ -4,6 +4,7 @@ cimport cython
 
 import time
 
+
 @cython.nonecheck(False)
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False) # turn off negative index wrapping for entire function
@@ -32,4 +33,180 @@ cpdef calc_combinatorial_sub_float32(long[:,:] id_combinations, int mmap_start,
             elapsed_sec = int(time.time()) - start_time
             txt = 'cb: {:,}th in the id range {:,}-{:,}: {:,} sec'
             print(txt.format(j, mmap_start, mmap_end, elapsed_sec))
+    return numpy.asarray(df)
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef calc_combinatorial_sub_double_arity2(
+    long[:, :] id_combinations,
+    int mmap_start,
+    numpy.ndarray[numpy.float64_t, ndim=5] sub_tensor,
+    bint mmap,
+    object df_mmap,
+):
+    cdef Py_ssize_t n_comb = id_combinations.shape[0]
+    cdef Py_ssize_t n_site = sub_tensor.shape[1]
+    cdef Py_ssize_t n_group = sub_tensor.shape[2]
+    cdef Py_ssize_t n_from = sub_tensor.shape[3]
+    cdef Py_ssize_t n_to = sub_tensor.shape[4]
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] df
+    cdef double[:, :] dfv
+    cdef Py_ssize_t i, j, s, sg, a, d
+    cdef Py_ssize_t b0, b1
+    cdef Py_ssize_t row
+    cdef double any2any, spe2any, any2spe, spe2spe
+    cdef double sum0, sum1, row0, row1, v0, v1
+    cdef double col0[128]
+    cdef double col1[128]
+    cdef int mmap_end
+    cdef int elapsed_sec
+    cdef int start_time = int(time.time())
+    if id_combinations.shape[1] != 2:
+        raise ValueError('Cython fast path requires arity=2')
+    if n_to > 128:
+        raise ValueError('Cython fast path supports up to 128 derived states')
+    if mmap:
+        df = df_mmap
+    else:
+        df = numpy.zeros((n_comb, 6), dtype=numpy.float64)
+    dfv = df
+    for j in range(n_comb):
+        b0 = <Py_ssize_t>id_combinations[j, 0]
+        b1 = <Py_ssize_t>id_combinations[j, 1]
+        if mmap:
+            row = <Py_ssize_t>mmap_start + j
+        else:
+            row = j
+        dfv[row, 0] = b0
+        dfv[row, 1] = b1
+        any2any = 0.0
+        spe2any = 0.0
+        any2spe = 0.0
+        spe2spe = 0.0
+        for s in range(n_site):
+            for sg in range(n_group):
+                for d in range(n_to):
+                    col0[d] = 0.0
+                    col1[d] = 0.0
+                sum0 = 0.0
+                sum1 = 0.0
+                for a in range(n_from):
+                    row0 = 0.0
+                    row1 = 0.0
+                    for d in range(n_to):
+                        v0 = sub_tensor[b0, s, sg, a, d]
+                        v1 = sub_tensor[b1, s, sg, a, d]
+                        row0 += v0
+                        row1 += v1
+                        col0[d] += v0
+                        col1[d] += v1
+                        spe2spe += v0 * v1
+                    sum0 += row0
+                    sum1 += row1
+                    spe2any += row0 * row1
+                any2any += sum0 * sum1
+                for d in range(n_to):
+                    any2spe += col0[d] * col1[d]
+        dfv[row, 2] += any2any
+        dfv[row, 3] += spe2any
+        dfv[row, 4] += any2spe
+        dfv[row, 5] += spe2spe
+        if j % 10000 == 0:
+            mmap_end = mmap_start + n_comb
+            elapsed_sec = int(time.time()) - start_time
+            txt = 'cb(cython): {:,}th in the id range {:,}-{:,}: {:,} sec'
+            print(txt.format(j, mmap_start, mmap_end, elapsed_sec), flush=True)
+    if mmap:
+        return None
+    return numpy.asarray(df)
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef calc_combinatorial_sub_by_site_double_arity2(
+    long[:, :] id_combinations,
+    int mmap_start,
+    numpy.ndarray[numpy.float64_t, ndim=5] sub_tensor,
+    bint mmap,
+    object df_mmap,
+):
+    cdef Py_ssize_t n_comb = id_combinations.shape[0]
+    cdef Py_ssize_t n_site = sub_tensor.shape[1]
+    cdef Py_ssize_t n_group = sub_tensor.shape[2]
+    cdef Py_ssize_t n_from = sub_tensor.shape[3]
+    cdef Py_ssize_t n_to = sub_tensor.shape[4]
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] df
+    cdef double[:, :] dfv
+    cdef Py_ssize_t j, s, sg, a, d
+    cdef Py_ssize_t b0, b1
+    cdef Py_ssize_t row, row_start
+    cdef double any2any, spe2any, any2spe, spe2spe
+    cdef double sum0, sum1, row0, row1, v0, v1
+    cdef double col0[128]
+    cdef double col1[128]
+    cdef int mmap_end
+    cdef int elapsed_sec
+    cdef int start_time = int(time.time())
+    if id_combinations.shape[1] != 2:
+        raise ValueError('Cython fast path requires arity=2')
+    if n_to > 128:
+        raise ValueError('Cython fast path supports up to 128 derived states')
+    if mmap:
+        df = df_mmap
+    else:
+        df = numpy.zeros((n_comb * n_site, 7), dtype=numpy.float64)
+    dfv = df
+    for j in range(n_comb):
+        b0 = <Py_ssize_t>id_combinations[j, 0]
+        b1 = <Py_ssize_t>id_combinations[j, 1]
+        if mmap:
+            row_start = (<Py_ssize_t>mmap_start + j) * n_site
+        else:
+            row_start = j * n_site
+        for s in range(n_site):
+            row = row_start + s
+            dfv[row, 0] = b0
+            dfv[row, 1] = b1
+            dfv[row, 2] = s
+            any2any = 0.0
+            spe2any = 0.0
+            any2spe = 0.0
+            spe2spe = 0.0
+            for sg in range(n_group):
+                for d in range(n_to):
+                    col0[d] = 0.0
+                    col1[d] = 0.0
+                sum0 = 0.0
+                sum1 = 0.0
+                for a in range(n_from):
+                    row0 = 0.0
+                    row1 = 0.0
+                    for d in range(n_to):
+                        v0 = sub_tensor[b0, s, sg, a, d]
+                        v1 = sub_tensor[b1, s, sg, a, d]
+                        row0 += v0
+                        row1 += v1
+                        col0[d] += v0
+                        col1[d] += v1
+                        spe2spe += v0 * v1
+                    sum0 += row0
+                    sum1 += row1
+                    spe2any += row0 * row1
+                any2any += sum0 * sum1
+                for d in range(n_to):
+                    any2spe += col0[d] * col1[d]
+            dfv[row, 3] += any2any
+            dfv[row, 4] += spe2any
+            dfv[row, 5] += any2spe
+            dfv[row, 6] += spe2spe
+        if j % 10000 == 0:
+            mmap_end = mmap_start + n_comb
+            elapsed_sec = int(time.time()) - start_time
+            txt = 'cbs(cython): {:,}th in the id range {:,}-{:,}: {:,} sec'
+            print(txt.format(j, mmap_start, mmap_end, elapsed_sec), flush=True)
+    if mmap:
+        return None
     return numpy.asarray(df)
