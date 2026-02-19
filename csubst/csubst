@@ -1,18 +1,27 @@
 #! /usr/bin/env python
 
 import argparse
+import contextlib
 import datetime
+import sys
 import time
 from distutils.util import strtobool
 
 from csubst.__init__ import __version__
 from csubst import param
 
+def get_global_parameters_or_exit(args):
+    try:
+        return param.get_global_parameters(args)
+    except (ValueError, AssertionError) as e:
+        sys.stderr.write(str(e).strip() + '\n')
+        sys.exit(2)
+
 def command_dataset(args):
     print('csubst dataset start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
+    g = get_global_parameters_or_exit(args)
     from csubst.main_dataset import main_dataset
-    g = param.get_global_parameters(args)
     main_dataset(g)
     print('csubst dataset: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst dataset end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
@@ -20,8 +29,8 @@ def command_dataset(args):
 def command_simulate(args):
     print('csubst simulate start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
+    g = get_global_parameters_or_exit(args)
     from csubst.main_simulate import main_simulate
-    g = param.get_global_parameters(args)
     main_simulate(g)
     print('csubst simulate: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst simulate end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
@@ -29,8 +38,8 @@ def command_simulate(args):
 def command_site(args):
     print('csubst site start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
+    g = get_global_parameters_or_exit(args)
     from csubst.main_site import main_site
-    g = param.get_global_parameters(args)
     main_site(g)
     print('csubst site: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst site end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
@@ -42,13 +51,13 @@ def command_site(args):
 def command_analyze(args):
     print('csubst analyze start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
+    g = get_global_parameters_or_exit(args)
     from csubst.main_analyze import main_analyze
-    g = param.get_global_parameters(args)
     main_analyze(g)
     print('csubst analyze: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst analyze end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
-if __name__ == "__main__":
+def _main():
     # Start time
     csubst_start = time.time()
     print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
@@ -73,6 +82,21 @@ if __name__ == "__main__":
                        help='default=%(default)s: The number of CPUs for parallel computations.')
     psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
                         help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
+    psr_co.add_argument('--sub_tensor_backend', metavar='auto|dense|sparse', default='auto', type=str,
+                        choices=['auto', 'dense', 'sparse'],
+                        help='default=%(default)s: Backend for substitution tensors. '
+                             '"auto" selects sparse reducers for low-density tensors.')
+    psr_co.add_argument('--sub_tensor_sparse_density_cutoff', metavar='FLOAT', default=0.15, type=float, required=False,
+                        help='default=%(default)s: Density cutoff for --sub_tensor_backend auto. '
+                             'Sparse reducers are selected when estimated substitution tensor density is <= this value.')
+    psr_co.add_argument('--parallel_backend', metavar='auto|multiprocessing|threading|loky', default='multiprocessing', type=str,
+                        choices=['auto', 'multiprocessing', 'threading', 'loky'],
+                        help='default=%(default)s: Backend policy for parallel workloads. '
+                             '"auto" also uses multiprocessing.')
+    psr_co.add_argument('--parallel_chunk_factor', metavar='INT', default=1, type=int, required=False,
+                        help='default=%(default)s: Number of chunks per worker for general parallel workloads.')
+    psr_co.add_argument('--parallel_chunk_factor_reducer', metavar='INT', default=4, type=int, required=False,
+                        help='default=%(default)s: Number of chunks per worker for dense/sparse combinatorial reducers.')
     psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')
 
@@ -186,13 +210,36 @@ if __name__ == "__main__":
     help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps it onto protein structure. '
     help_txt += ' See `csubst site -h`'
     site = subparsers.add_parser('site', help=help_txt, parents=[psr_co,psr_iq,psr_as])
-    site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default=None, required=True, type=str,
+    site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default='', required=False, type=str,
                       help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
                       'Run `csubst analyze` first and select branches of interest. '
-                      'If "fg", all foreground branch pairs will be analyzed.')
-    site.add_argument('--mode', metavar='intersection|total', default='intersection', required=False, type=str,
-                      choices=['intersection','total',],
-                      help='default=%(default)s: Visualization mode. NOT SUPPORTED YET.')
+                      'If "fg", all foreground branch pairs will be analyzed (--mode intersection only). '
+                      '--mode lineage expects ANC,DES, and --mode set ignores --branch_id.')
+    site.add_argument('--mode', metavar='MODE', default='intersection', required=False, type=str,
+                      help='default=%(default)s: Visualization mode. '
+                      '"intersection", visualize combinatorial substitutions in branches specified by --branch_id. '
+                      '"lineage", process branches between ancestor/descendant specified by --branch_id ANC,DES. '
+                      '"set,EXPR", evaluate set operations among branch-wise substitutions (|, -, &, ^). '
+                      'Use "A" for all other non-root branches. '
+                      'e.g. "set,((117|48)-A)".')
+    site.add_argument('--tree_site_plot', metavar='yes|no', default='yes', type=strtobool,
+                      help='default=%(default)s: Generate a matplotlib-based tree + site summary plot.')
+    site.add_argument('--site_state_plot', metavar='yes|no', default='yes', type=strtobool,
+                      help='default=%(default)s: Generate substitution-pattern summary outputs '
+                           '(csubst_site.state.pdf, csubst_site.state_N.tsv, csubst_site.state_S.tsv).')
+    site.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
+                      choices=['pdf', 'png', 'svg'],
+                      help='default=%(default)s: Output format for --tree_site_plot.')
+    site.add_argument('--tree_site_plot_min_prob', metavar='FLOAT', default=-1.0, required=False, type=float,
+                      help='default=%(default)s: Minimum probability threshold for classifying convergent/divergent sites '
+                           'in the tree + site summary. Negative values automatically use '
+                           '--pymol_min_combinat_prob (or --pymol_min_single_prob in single-branch mode).')
+    site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=60, required=False, type=int,
+                      help='default=%(default)s: Maximum number of plotted sites in the tree + site summary '
+                           '(convergent and divergent columns are balanced when both are available).')
+    site.add_argument('--site_output_manifest', metavar='yes|no', default='yes', required=False, type=strtobool,
+                      help='default=%(default)s: Write csubst_site.outputs.tsv with generated files, '
+                           'sizes, branch IDs, and key plotting parameters.')
     site.add_argument('--cb_file', metavar='PATH', default='csubst_cb_2.tsv', required=False, type=str,
                       help='default=%(default)s: PATH to csubst_cb_*.tsv output of csubst analyze.')
     site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,
@@ -249,6 +296,15 @@ if __name__ == "__main__":
                          help='default=%(default)s: Maximum number of chains to visualize. '
                                'If the number of chains in the PDB file is larger than this value, '
                                '--pymol_img will be disabled.')
+    site.add_argument('--uniprot_feature_types', metavar='all|TYPE1,TYPE2,...', default='all', required=False, type=str,
+                      help='default=%(default)s: UniProt feature types to append to csubst_site output. '
+                           'By default ("all"), all available UniProt features are considered. '
+                           'Redundant annotations (including the uniprot_feature_types_* column) are excluded unless '
+                           '--uniprot_include_redundant is "yes". '
+                           'Use a comma-delimited subset to filter (e.g., "Active site,Binding site").')
+    site.add_argument('--uniprot_include_redundant', metavar='yes|no', default='no', required=False, type=strtobool,
+                      help='default=%(default)s: Include site-invariant/redundant UniProt annotations '
+                           '(e.g., accession columns and full-length features such as Chain).')
     site.add_argument('--export2chimera', metavar='yes|no', default='no', required=False, type=strtobool,
                       help='default=%(default)s: Set "yes" to export files for the visualization of '
                            'convergence/divergence probabilities with UCSF Chimera. '
@@ -282,6 +338,12 @@ if __name__ == "__main__":
                               'e.g., "N_sub_[0-9]+" to specify the number of branch-wise nonsynonymous substitutions '
                               'in all branches. VALUE is the minimum value, '
                               'and branch combinations with smaller values will be excluded.')
+    analyze.add_argument('--output_stat', metavar='STAT1,STAT2,...',
+                         default='any2any,any2dif,any2spe', type=str,
+                         help='default=%(default)s: Comma-delimited combinatorial-substitution statistics '
+                              'to compute and report. Choose from '
+                              'any2any, any2spe, any2dif, dif2any, dif2spe, dif2dif, '
+                              'spe2any, spe2spe, spe2dif.')
     analyze.add_argument('--branch_dist', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Set "yes" to calculate inter-branch distance.')
     # Substitution outputs
@@ -346,3 +408,9 @@ if __name__ == "__main__":
     # End time
     txt = '\nCSUBST end: {}, Elapsed time = {:,.1f} sec'
     print(txt.format(datetime.datetime.now(datetime.timezone.utc), int(time.time()-csubst_start)), flush=True)
+
+
+if __name__ == "__main__":
+    with open('csubst.log', 'w', buffering=1, encoding='utf-8') as log_file:
+        with contextlib.redirect_stdout(log_file), contextlib.redirect_stderr(log_file):
+            _main()
