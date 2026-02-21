@@ -32,7 +32,7 @@ The main features of **CSUBST** include:
 ## Installation
 **CSUBST** runs on python 3. Installation via [bioconda](https://anaconda.org/bioconda/csubst) is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
 
-IQ-TREE compatibility: CSUBST supports IQ-TREE 2.x and 3.x outputs. For some IQ-TREE 3 codon runs where `.iqtree` does not print codon `pi(...)` entries, CSUBST estimates empirical codon frequencies directly from the input alignment.
+IQ-TREE compatibility: CSUBST supports IQ-TREE 2.x and 3.x outputs. For some IQ-TREE 3 codon runs where `.iqtree` does not print codon `pi(...)` entries, CSUBST estimates empirical codon frequencies from the input alignment by normalized codon counts (matching IQ-TREE's `State frequencies: (empirical counts from alignment)` convention) [[Minh et al., 2020](https://doi.org/10.1093/molbev/msaa015)]. Ambiguous IUPAC nucleotide symbols are expanded over compatible codons with equal weights [[Cornish-Bowden, 1985](https://doi.org/10.1093/nar/13.9.3021)].
 
 #### Option 1: Installation with `conda`
 ```
@@ -93,6 +93,10 @@ For advanced settings (foreground formats, higher-order search, structure mappin
 
 ## Citation
 Fukushima K, Pollock DD. 2023. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. Nature Ecology & Evolution 7: 155–170. [DOI: 10.1038/s41559-022-01932-7](https://doi.org/10.1038/s41559-022-01932-7)
+
+Minh BQ, Schmidt HA, Chernomor O, Schrempf D, Woodhams MD, von Haeseler A, Lanfear R. 2020. IQ-TREE 2: New models and efficient methods for phylogenetic inference in the genomic era. Molecular Biology and Evolution 37: 1530–1534. [DOI: 10.1093/molbev/msaa015](https://doi.org/10.1093/molbev/msaa015)
+
+Cornish-Bowden A. 1985. Nomenclature for incompletely specified bases in nucleic acid sequences: recommendations 1984. Nucleic Acids Research 13: 3021–3030. [DOI: 10.1093/nar/13.9.3021](https://doi.org/10.1093/nar/13.9.3021)
 
 ## Licensing
 **CSUBST** is MIT-licensed. See [LICENSE](LICENSE) for details.
