@@ -365,9 +365,10 @@ def _main():
     analyze.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Tree plots with per-site ancestral amino acid states. '
                               'This option will generate many pdfs')
-    analyze.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
+    analyze.add_argument('--plot_state_codon', '--plot_state_cdn', dest='plot_state_codon',
+                         metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Tree plots with per-site ancestral codon states. '
-                              'This option will generate many pdfs')
+                              'Alias: --plot_state_cdn. This option will generate many pdfs')
     # Omega_C calculation
     analyze.add_argument('--omegaC_method', metavar='[submodel|modelfree]', default='submodel', type=str,
                          choices=['modelfree','submodel'],
