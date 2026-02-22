@@ -513,6 +513,97 @@ def _get_sparse_branch_tensor(sub_tensor, branch_id):
     return out
 
 
+def _get_sorted_sparse_block_items(sub_tensor):
+    cache = getattr(sub_tensor, '_sorted_block_items', None)
+    if cache is None:
+        cache = tuple(sorted(sub_tensor.blocks.items(), key=lambda kv: kv[0]))
+        setattr(sub_tensor, '_sorted_block_items', cache)
+    return cache
+
+
+def _can_use_cython_sparse_sitewise_row_update(mat, max_prob, max_a, max_d, seen):
+    if substitution_sparse_cy is None:
+        return False
+    if not sp.isspmatrix_csr(mat):
+        return False
+    if mat.data.dtype != np.float64:
+        return False
+    if mat.indices.dtype not in [np.int32, np.int64]:
+        return False
+    if mat.indptr.dtype not in [np.int32, np.int64]:
+        return False
+    if (
+        (not isinstance(max_prob, np.ndarray))
+        or (not isinstance(max_a, np.ndarray))
+        or (not isinstance(max_d, np.ndarray))
+        or (not isinstance(seen, np.ndarray))
+    ):
+        return False
+    if max_prob.dtype != np.float64 or max_a.dtype != np.int64 or max_d.dtype != np.int64 or seen.dtype != np.uint8:
+        return False
+    if max_prob.ndim != 1 or max_a.ndim != 1 or max_d.ndim != 1 or seen.ndim != 1:
+        return False
+    if max_prob.shape[0] != max_a.shape[0] or max_prob.shape[0] != max_d.shape[0] or max_prob.shape[0] != seen.shape[0]:
+        return False
+    return hasattr(substitution_sparse_cy, 'update_sitewise_max_from_csr_row_double')
+
+
+def _get_sparse_branch_sitewise_max_indices(sub_tensor, branch_id, min_sitewise_pp):
+    num_site = int(sub_tensor.num_site)
+    max_prob = np.full(shape=(num_site,), fill_value=-np.inf, dtype=np.float64)
+    max_a = np.full(shape=(num_site,), fill_value=-1, dtype=np.int64)
+    max_d = np.full(shape=(num_site,), fill_value=-1, dtype=np.int64)
+    seen = np.zeros(shape=(num_site,), dtype=np.uint8)
+    branch_id = int(branch_id)
+    for (sg, a, d), mat in _get_sorted_sparse_block_items(sub_tensor):
+        if mat.nnz == 0:
+            continue
+        if _can_use_cython_sparse_sitewise_row_update(
+            mat=mat,
+            max_prob=max_prob,
+            max_a=max_a,
+            max_d=max_d,
+            seen=seen,
+        ):
+            substitution_sparse_cy.update_sitewise_max_from_csr_row_double(
+                indptr=mat.indptr,
+                indices=mat.indices,
+                data=mat.data,
+                branch_id=branch_id,
+                a=int(a),
+                d=int(d),
+                max_prob=max_prob,
+                max_a=max_a,
+                max_d=max_d,
+                seen=seen,
+            )
+            continue
+        start = int(mat.indptr[branch_id])
+        end = int(mat.indptr[branch_id + 1])
+        if start == end:
+            continue
+        cols = mat.indices[start:end]
+        vals = mat.data[start:end]
+        finite = np.isfinite(vals)
+        if not finite.any():
+            continue
+        cols = cols[finite]
+        vals = vals[finite]
+        current = max_prob[cols]
+        better = vals > current
+        if better.any():
+            better_cols = cols[better]
+            max_prob[better_cols] = vals[better]
+            max_a[better_cols] = int(a)
+            max_d[better_cols] = int(d)
+        seen[cols] = 1
+    selected = (seen != 0) & np.isfinite(max_prob) & (max_prob >= float(min_sitewise_pp))
+    if not selected.any():
+        empty = np.array([], dtype=np.int64)
+        return empty, empty, empty
+    return np.where(selected)[0].astype(np.int64, copy=False), max_a[selected], max_d[selected]
+
+
 def _get_sparse_site_vectors(
     sub_tensor,
     branch_ids,
@@ -713,14 +804,31 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
     branch_sub_counts = get_branch_sub_counts(sub_tensor) if _is_sparse_sub_tensor(sub_tensor) else None
     i=0
     for node in g['tree'].traverse():
+        branch_id = int(ete.get_prop(node, "numerical_label"))
         df.at[i,'branch_name'] = getattr(node, 'name')
-        df.at[i,'branch_id'] = ete.get_prop(node, "numerical_label")
+        df.at[i,'branch_id'] = branch_id
         if _is_sparse_sub_tensor(sub_tensor):
-            df.at[i,attr+'_sub'] = branch_sub_counts[ete.get_prop(node, "numerical_label")]
-            branch_tensor = _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=ete.get_prop(node, "numerical_label")) if sitewise else None
+            df.at[i,attr+'_sub'] = branch_sub_counts[branch_id]
+            if sitewise and (attr == 'N'):
+                site_ids, anc_ids, der_ids = _get_sparse_branch_sitewise_max_indices(
+                    sub_tensor=sub_tensor,
+                    branch_id=branch_id,
+                    min_sitewise_pp=min_sitewise_pp,
+                )
+                state_order = g['amino_acid_orders']
+                sub_list = list()
+                for s, anc, der in zip(site_ids.tolist(), anc_ids.tolist(), der_ids.tolist()):
+                    ancestral_state = state_order[int(anc)]
+                    derived_state = state_order[int(der)]
+                    sub_string = ancestral_state + str(int(s) + 1) + derived_state
+                    sub_list.append(sub_string)
+                df.at[i, attr + '_sitewise'] = ','.join(sub_list)
+                i += 1
+                continue
+            branch_tensor = _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=branch_id) if sitewise else None
         else:
-            df.at[i,attr+'_sub'] = np.nansum(sub_tensor[ete.get_prop(node, "numerical_label"),:,:,:,:])
-            branch_tensor = sub_tensor[ete.get_prop(node, "numerical_label"), :, :, :, :] if sitewise else None
+            df.at[i,attr+'_sub'] = np.nansum(sub_tensor[branch_id,:,:,:,:])
+            branch_tensor = sub_tensor[branch_id, :, :, :, :] if sitewise else None
         if sitewise:
             sub_list = list()
             if attr=='N':

@@ -290,6 +290,45 @@ cpdef scatter_branch_row_to_tensor_double(
 @cython.nonecheck(False)
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cpdef update_sitewise_max_from_csr_row_double(
+    numpy.ndarray[index_t, ndim=1] indptr,
+    numpy.ndarray[index_t, ndim=1] indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+    long branch_id,
+    long a,
+    long d,
+    numpy.ndarray[numpy.float64_t, ndim=1] max_prob,
+    numpy.ndarray[numpy.int64_t, ndim=1] max_a,
+    numpy.ndarray[numpy.int64_t, ndim=1] max_d,
+    numpy.ndarray[numpy.uint8_t, ndim=1] seen,
+):
+    cdef Py_ssize_t n_branch = indptr.shape[0] - 1
+    cdef Py_ssize_t start, end, k
+    cdef Py_ssize_t site
+    cdef double v
+    if branch_id < 0 or branch_id >= n_branch:
+        raise ValueError('branch_id is out of range.')
+    if indices.shape[0] != data.shape[0]:
+        raise ValueError('indices and data should have identical length.')
+    if max_prob.shape[0] != max_a.shape[0] or max_prob.shape[0] != max_d.shape[0] or max_prob.shape[0] != seen.shape[0]:
+        raise ValueError('max_prob/max_a/max_d/seen should have identical length.')
+    start = indptr[branch_id]
+    end = indptr[branch_id + 1]
+    for k in range(start, end):
+        site = indices[k]
+        v = data[k]
+        if not isfinite(v):
+            continue
+        if (seen[site] == 0) or (v > max_prob[site]):
+            max_prob[site] = v
+            max_a[site] = a
+            max_d[site] = d
+        seen[site] = 1
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cpdef scan_sitewise_max_indices_double(
     numpy.ndarray[numpy.float64_t, ndim=4] branch_tensor,
     double min_sitewise_pp,

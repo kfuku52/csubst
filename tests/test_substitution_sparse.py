@@ -301,6 +301,61 @@ def test_get_b_sitewise_cython_scan_matches_python_fallback(monkeypatch):
     )
 
 
+def test_get_b_sitewise_sparse_path_matches_dense_reference():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name != ""}
+    num_node = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    dense = np.zeros((num_node, 4, 1, 3, 3), dtype=np.float64)
+    dense[labels["A"], 0, 0, 0, 1] = 0.7
+    dense[labels["A"], 0, 0, 1, 2] = 0.7
+    dense[labels["A"], 2, 0, 2, 1] = 0.9
+    dense[labels["B"], 1, 0, 1, 0] = 0.8
+    dense[labels["B"], 3, 0, 2, 0] = 0.6
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0.0)
+    g = {
+        "tree": tr,
+        "num_node": num_node,
+        "amino_acid_orders": np.array(["A", "B", "C"], dtype=object),
+    }
+
+    dense_ref = substitution.get_b(g=g, sub_tensor=dense, attr="N", sitewise=True, min_sitewise_pp=0.5)
+    sparse_obs = substitution.get_b(g=g, sub_tensor=sparse_tensor, attr="N", sitewise=True, min_sitewise_pp=0.5)
+
+    assert sparse_obs.loc[:, "branch_name"].tolist() == dense_ref.loc[:, "branch_name"].tolist()
+    assert sparse_obs.loc[:, "N_sitewise"].tolist() == dense_ref.loc[:, "N_sitewise"].tolist()
+    np.testing.assert_allclose(
+        sparse_obs.loc[:, ["branch_id", "N_sub"]].to_numpy(dtype=float),
+        dense_ref.loc[:, ["branch_id", "N_sub"]].to_numpy(dtype=float),
+        atol=1e-12,
+    )
+
+
+def test_sparse_branch_sitewise_max_indices_cython_row_update_matches_python_fallback(monkeypatch):
+    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "update_sitewise_max_from_csr_row_double")):
+        pytest.skip("Cython sitewise CSR row-update kernel is unavailable")
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    branch_id = 1
+    min_pp = 0.1
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_sitewise_row_update", lambda *args, **kwargs: False)
+    expected = substitution._get_sparse_branch_sitewise_max_indices(
+        sub_tensor=sparse_tensor,
+        branch_id=branch_id,
+        min_sitewise_pp=min_pp,
+    )
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_sitewise_row_update", lambda *args, **kwargs: True)
+    observed = substitution._get_sparse_branch_sitewise_max_indices(
+        sub_tensor=sparse_tensor,
+        branch_id=branch_id,
+        min_sitewise_pp=min_pp,
+    )
+
+    for exp_arr, obs_arr in zip(expected, observed):
+        np.testing.assert_array_equal(obs_arr, exp_arr)
+
+
 def test_sub_tensor2cb_sparse_cython_fastpath_matches_python_fallback(monkeypatch):
     if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
         pytest.skip("Cython sparse-summary reducer fast path is unavailable")
