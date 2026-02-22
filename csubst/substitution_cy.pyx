@@ -236,16 +236,19 @@ cpdef calc_combinatorial_sub_sparse_summary_double_arity2(
     cdef numpy.ndarray[numpy.float64_t, ndim=4] branch_group_from_site
     cdef numpy.ndarray[numpy.float64_t, ndim=4] branch_group_to_site
     cdef numpy.ndarray[numpy.float64_t, ndim=4] branch_group_pair_site
-    cdef double[:, :, :] totalv
-    cdef double[:, :, :, :] fromv
-    cdef double[:, :, :, :] tov
-    cdef double[:, :, :, :] pairv
-    cdef Py_ssize_t n_group = 0
-    cdef Py_ssize_t n_site = 0
-    cdef Py_ssize_t n_from = 0
-    cdef Py_ssize_t n_to = 0
-    cdef Py_ssize_t n_pair = 0
-    cdef Py_ssize_t j, sg, s, a, d, p, row
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] total2d
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] from2d
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] to2d
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] pair2d
+    cdef double[:, :] totalv
+    cdef double[:, :] fromv
+    cdef double[:, :] tov
+    cdef double[:, :] pairv
+    cdef Py_ssize_t n_total = 0
+    cdef Py_ssize_t n_fromsite = 0
+    cdef Py_ssize_t n_tosite = 0
+    cdef Py_ssize_t n_pairsite = 0
+    cdef Py_ssize_t j, k, row
     cdef Py_ssize_t b0, b1
     cdef double any2any, spe2any, any2spe, spe2spe
     cdef int mmap_end
@@ -261,36 +264,30 @@ cpdef calc_combinatorial_sub_sparse_summary_double_arity2(
         if branch_group_site_total_obj is None:
             raise ValueError('branch_group_site_total is required when calc_any2any is True.')
         branch_group_site_total = branch_group_site_total_obj
-        totalv = branch_group_site_total
-        n_group = branch_group_site_total.shape[1]
-        n_site = branch_group_site_total.shape[2]
+        total2d = branch_group_site_total.reshape((branch_group_site_total.shape[0], -1))
+        totalv = total2d
+        n_total = total2d.shape[1]
     if calc_spe2any:
         if branch_group_from_site_obj is None:
             raise ValueError('branch_group_from_site is required when calc_spe2any is True.')
         branch_group_from_site = branch_group_from_site_obj
-        fromv = branch_group_from_site
-        if n_group == 0:
-            n_group = branch_group_from_site.shape[1]
-            n_site = branch_group_from_site.shape[3]
-        n_from = branch_group_from_site.shape[2]
+        from2d = branch_group_from_site.reshape((branch_group_from_site.shape[0], -1))
+        fromv = from2d
+        n_fromsite = from2d.shape[1]
     if calc_any2spe:
         if branch_group_to_site_obj is None:
             raise ValueError('branch_group_to_site is required when calc_any2spe is True.')
         branch_group_to_site = branch_group_to_site_obj
-        tov = branch_group_to_site
-        if n_group == 0:
-            n_group = branch_group_to_site.shape[1]
-            n_site = branch_group_to_site.shape[3]
-        n_to = branch_group_to_site.shape[2]
+        to2d = branch_group_to_site.reshape((branch_group_to_site.shape[0], -1))
+        tov = to2d
+        n_tosite = to2d.shape[1]
     if calc_spe2spe:
         if branch_group_pair_site_obj is None:
             raise ValueError('branch_group_pair_site is required when calc_spe2spe is True.')
         branch_group_pair_site = branch_group_pair_site_obj
-        pairv = branch_group_pair_site
-        if n_group == 0:
-            n_group = branch_group_pair_site.shape[1]
-            n_site = branch_group_pair_site.shape[3]
-        n_pair = branch_group_pair_site.shape[2]
+        pair2d = branch_group_pair_site.reshape((branch_group_pair_site.shape[0], -1))
+        pairv = pair2d
+        n_pairsite = pair2d.shape[1]
 
     if mmap:
         df = df_mmap
@@ -311,24 +308,17 @@ cpdef calc_combinatorial_sub_sparse_summary_double_arity2(
         any2spe = 0.0
         spe2spe = 0.0
         if calc_any2any:
-            for sg in range(n_group):
-                for s in range(n_site):
-                    any2any += totalv[b0, sg, s] * totalv[b1, sg, s]
+            for k in range(n_total):
+                any2any += totalv[b0, k] * totalv[b1, k]
         if calc_spe2any:
-            for sg in range(n_group):
-                for a in range(n_from):
-                    for s in range(n_site):
-                        spe2any += fromv[b0, sg, a, s] * fromv[b1, sg, a, s]
+            for k in range(n_fromsite):
+                spe2any += fromv[b0, k] * fromv[b1, k]
         if calc_any2spe:
-            for sg in range(n_group):
-                for d in range(n_to):
-                    for s in range(n_site):
-                        any2spe += tov[b0, sg, d, s] * tov[b1, sg, d, s]
+            for k in range(n_tosite):
+                any2spe += tov[b0, k] * tov[b1, k]
         if calc_spe2spe:
-            for sg in range(n_group):
-                for p in range(n_pair):
-                    for s in range(n_site):
-                        spe2spe += pairv[b0, sg, p, s] * pairv[b1, sg, p, s]
+            for k in range(n_pairsite):
+                spe2spe += pairv[b0, k] * pairv[b1, k]
         dfv[row, 2] += any2any
         dfv[row, 3] += spe2any
         dfv[row, 4] += any2spe
