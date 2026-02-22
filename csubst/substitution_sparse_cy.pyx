@@ -3,6 +3,10 @@ cimport numpy
 cimport cython
 from libc.math cimport fabs
 
+ctypedef fused index_t:
+    numpy.int32_t
+    numpy.int64_t
+
 
 @cython.nonecheck(False)
 @cython.boundscheck(False)
@@ -121,3 +125,97 @@ cpdef accumulate_sparse_summary_block_double(
         if need_spe2spe:
             idx = (((row * num_group) + sg) * num_state_pair + pair_index) * num_site + col
             pair_flat[idx] += v
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef accumulate_branch_sub_counts_csr_double(
+    numpy.ndarray[index_t, ndim=1] indptr,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+    numpy.ndarray[numpy.float64_t, ndim=1] out,
+):
+    cdef Py_ssize_t n_branch = out.shape[0]
+    cdef Py_ssize_t row, k
+    cdef Py_ssize_t start, end
+    cdef double total
+    if indptr.shape[0] != (n_branch + 1):
+        raise ValueError('indptr length should be out.shape[0] + 1.')
+    for row in range(n_branch):
+        start = indptr[row]
+        end = indptr[row + 1]
+        total = 0.0
+        for k in range(start, end):
+            total += data[k]
+        out[row] += total
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef accumulate_site_sub_counts_csr_double(
+    numpy.ndarray[index_t, ndim=1] indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+    numpy.ndarray[numpy.float64_t, ndim=1] out,
+):
+    cdef Py_ssize_t nnz = data.shape[0]
+    cdef Py_ssize_t k
+    cdef Py_ssize_t col
+    if indices.shape[0] != nnz:
+        raise ValueError('indices and data should have identical length.')
+    for k in range(nnz):
+        col = indices[k]
+        out[col] += data[k]
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef accumulate_branch_site_row_csr_double(
+    numpy.ndarray[index_t, ndim=1] indptr,
+    numpy.ndarray[index_t, ndim=1] indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+    long branch_id,
+    numpy.ndarray[numpy.float64_t, ndim=1] out,
+):
+    cdef Py_ssize_t n_branch = indptr.shape[0] - 1
+    cdef Py_ssize_t start, end, k
+    cdef Py_ssize_t col
+    if branch_id < 0 or branch_id >= n_branch:
+        raise ValueError('branch_id is out of range.')
+    start = indptr[branch_id]
+    end = indptr[branch_id + 1]
+    for k in range(start, end):
+        col = indices[k]
+        out[col] += data[k]
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef scatter_branch_row_to_tensor_double(
+    numpy.ndarray[index_t, ndim=1] indptr,
+    numpy.ndarray[index_t, ndim=1] indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+    long branch_id,
+    long sg,
+    long a,
+    long d,
+    numpy.ndarray[numpy.float64_t, ndim=4] out,
+):
+    cdef Py_ssize_t n_branch = indptr.shape[0] - 1
+    cdef Py_ssize_t start, end, k
+    cdef Py_ssize_t site
+    if branch_id < 0 or branch_id >= n_branch:
+        raise ValueError('branch_id is out of range.')
+    if sg < 0 or sg >= out.shape[1]:
+        raise ValueError('sg is out of range.')
+    if a < 0 or a >= out.shape[2]:
+        raise ValueError('a is out of range.')
+    if d < 0 or d >= out.shape[3]:
+        raise ValueError('d is out of range.')
+    start = indptr[branch_id]
+    end = indptr[branch_id + 1]
+    for k in range(start, end):
+        site = indices[k]
+        out[site, sg, a, d] = data[k]

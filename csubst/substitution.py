@@ -3,6 +3,7 @@ import pandas as pd
 import scipy.sparse as sp
 
 import os
+import re
 import time
 import warnings
 import inspect
@@ -62,10 +63,43 @@ def _resolve_requested_sub_tensor_backend(g):
 
 
 def _normalize_branch_ids(branch_ids):
-    arr = np.asarray(branch_ids)
+    if branch_ids is None:
+        return np.array([], dtype=np.int64)
+    arr = np.asarray(branch_ids, dtype=object)
+    arr = np.atleast_1d(arr).reshape(-1)
     if arr.size == 0:
         return np.array([], dtype=np.int64)
-    return np.atleast_1d(arr).astype(np.int64, copy=False).reshape(-1)
+    normalized = []
+    for value in arr.tolist():
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('state_loaded_branch_ids should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('state_loaded_branch_ids should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('state_loaded_branch_ids should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64)
+
+
+def _parse_bool_like(value, param_name):
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ['1', 'true', 'yes', 'y', 'on']:
+            return True
+        if normalized in ['0', 'false', 'no', 'n', 'off']:
+            return False
+        txt = '{} should be boolean-like (yes/no, true/false, 1/0).'
+        raise ValueError(txt.format(param_name))
+    return bool(value)
 
 
 def _get_selected_branch_set(g):
@@ -357,11 +391,29 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
     return out
 
 
+def _is_sparse_csr_cython_compatible(mat):
+    if substitution_sparse_cy is None:
+        return False
+    if not sp.isspmatrix_csr(mat):
+        return False
+    if mat.data.dtype != np.float64:
+        return False
+    if mat.indices.dtype not in [np.int32, np.int64]:
+        return False
+    if mat.indptr.dtype not in [np.int32, np.int64]:
+        return False
+    return True
+
+
 def get_branch_sub_counts(sub_tensor):
     if _is_sparse_sub_tensor(sub_tensor):
         out = np.zeros(shape=(sub_tensor.num_branch,), dtype=np.float64)
+        use_cython = hasattr(substitution_sparse_cy, 'accumulate_branch_sub_counts_csr_double') if substitution_sparse_cy is not None else False
         for mat in sub_tensor.blocks.values():
-            out += np.asarray(mat.sum(axis=1)).reshape(-1)
+            if use_cython and _is_sparse_csr_cython_compatible(mat):
+                substitution_sparse_cy.accumulate_branch_sub_counts_csr_double(mat.indptr, mat.data, out)
+            else:
+                out += np.asarray(mat.sum(axis=1)).reshape(-1)
         return out
     return sub_tensor.sum(axis=(1, 2, 3, 4))
 
@@ -369,8 +421,12 @@ def get_branch_sub_counts(sub_tensor):
 def get_site_sub_counts(sub_tensor):
     if _is_sparse_sub_tensor(sub_tensor):
         out = np.zeros(shape=(sub_tensor.num_site,), dtype=np.float64)
+        use_cython = hasattr(substitution_sparse_cy, 'accumulate_site_sub_counts_csr_double') if substitution_sparse_cy is not None else False
         for mat in sub_tensor.blocks.values():
-            out += np.asarray(mat.sum(axis=0)).reshape(-1)
+            if use_cython and _is_sparse_csr_cython_compatible(mat):
+                substitution_sparse_cy.accumulate_site_sub_counts_csr_double(mat.indices, mat.data, out)
+            else:
+                out += np.asarray(mat.sum(axis=0)).reshape(-1)
         return out
     return sub_tensor.sum(axis=(0, 2, 3, 4))
 
@@ -378,11 +434,21 @@ def get_site_sub_counts(sub_tensor):
 def get_branch_site_sub_counts(sub_tensor, branch_id):
     if _is_sparse_sub_tensor(sub_tensor):
         out = np.zeros(shape=(sub_tensor.num_site,), dtype=np.float64)
+        use_cython = hasattr(substitution_sparse_cy, 'accumulate_branch_site_row_csr_double') if substitution_sparse_cy is not None else False
         for mat in sub_tensor.blocks.values():
-            row = mat.getrow(int(branch_id))
-            if row.nnz == 0:
-                continue
-            out[row.indices] += row.data
+            if use_cython and _is_sparse_csr_cython_compatible(mat):
+                substitution_sparse_cy.accumulate_branch_site_row_csr_double(
+                    mat.indptr,
+                    mat.indices,
+                    mat.data,
+                    int(branch_id),
+                    out,
+                )
+            else:
+                row = mat.getrow(int(branch_id))
+                if row.nnz == 0:
+                    continue
+                out[row.indices] += row.data
         return out
     return sub_tensor[branch_id, :, :, :, :].sum(axis=(1, 2, 3))
 
@@ -413,11 +479,24 @@ def _get_sparse_branch_tensor(sub_tensor, branch_id):
         shape=(sub_tensor.num_site, sub_tensor.num_group, sub_tensor.num_state_from, sub_tensor.num_state_to),
         dtype=sub_tensor.dtype,
     )
+    use_cython = hasattr(substitution_sparse_cy, 'scatter_branch_row_to_tensor_double') if substitution_sparse_cy is not None else False
     for (sg, a, d), mat in sub_tensor.blocks.items():
-        row = mat.getrow(int(branch_id))
-        if row.nnz == 0:
-            continue
-        out[row.indices, sg, a, d] = row.data
+        if use_cython and _is_sparse_csr_cython_compatible(mat) and out.dtype == np.float64:
+            substitution_sparse_cy.scatter_branch_row_to_tensor_double(
+                mat.indptr,
+                mat.indices,
+                mat.data,
+                int(branch_id),
+                int(sg),
+                int(a),
+                int(d),
+                out,
+            )
+        else:
+            row = mat.getrow(int(branch_id))
+            if row.nnz == 0:
+                continue
+            out[row.indices, sg, a, d] = row.data
     return out
 
 
@@ -505,6 +584,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
     if g is None:
         raise ValueError('g is required.')
     backend = resolve_sub_tensor_backend(g)
+    ml_anc = _parse_bool_like(g.get('ml_anc', False), 'ml_anc')
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
     selected_branch_set = _get_selected_branch_set(g)
@@ -516,7 +596,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
             g=g,
         )
     sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
-    if (g['ml_anc']=='no'):
+    if not ml_anc:
         sub_tensor[:,:,:,:,:] = np.nan
     if mode=='asis':
         num_state = state_tensor.shape[2]
@@ -550,7 +630,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
 def apply_min_sub_pp(g, sub_tensor):
     if g['min_sub_pp']==0:
         return sub_tensor
-    if (g['ml_anc']):
+    if _parse_bool_like(g.get('ml_anc', False), 'ml_anc'):
         print('--ml_anc is set. --min_sub_pp will not be applied.')
     else:
         if _is_sparse_sub_tensor(sub_tensor):
@@ -1424,10 +1504,13 @@ def get_cbs(id_combinations, sub_tensor, attr, g):
 
 def get_sub_sites(g, sS, sN, state_tensor):
     num_site = sS.shape[0]
-    num_branch = len(list(g['tree'].traverse()))
+    num_branch = int(state_tensor.shape[0])
     g['is_site_nonmissing'] = np.zeros(shape=[num_branch, num_site], dtype=bool)
     for node in g['tree'].traverse():
         nl = ete.get_prop(node, "numerical_label")
+        if (nl < 0) or (nl >= num_branch):
+            txt = 'Branch ID {} is out of bounds for state_tensor with {} branches.'
+            raise ValueError(txt.format(nl, num_branch))
         g['is_site_nonmissing'][nl,:] = (state_tensor[nl,:,:].sum(axis=1)!=0)
     g['sub_sites'] = dict()
     g['sub_sites'][g['asrv']] = np.zeros(shape=[num_branch, num_site], dtype=g['float_type'])
@@ -1471,6 +1554,9 @@ def get_each_sub_sites(sub_sg, mode, sg, a, d, g): # sub_sites for each "sg" gro
         nonadjusted_sub_sites = sub_sg[:, sg]
     for node in g['tree'].traverse():
         nl = ete.get_prop(node, "numerical_label")
+        if (nl < 0) or (nl >= sub_sites.shape[0]):
+            txt = 'Branch ID {} is out of bounds for is_site_nonmissing with {} branches.'
+            raise ValueError(txt.format(nl, sub_sites.shape[0]))
         sub_sites[nl,:] = nonadjusted_sub_sites * g['is_site_nonmissing'][nl,:]
         total_sub_sites = sub_sites[nl,:].sum()
         total_sub_sites = 1 if (total_sub_sites==0) else total_sub_sites

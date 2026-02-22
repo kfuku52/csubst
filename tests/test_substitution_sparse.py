@@ -215,6 +215,31 @@ def test_sparse_cb_summary_arrays_cython_accumulator_matches_python_fallback(mon
         np.testing.assert_allclose(obs_arr, exp_arr, atol=1e-12)
 
 
+def test_sparse_csr_count_and_scatter_cython_kernels_match_python_fallback(monkeypatch):
+    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "accumulate_branch_sub_counts_csr_double")):
+        pytest.skip("Cython sparse CSR helper kernels are unavailable")
+    dense = _toy_dense_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    branch_id = 1
+
+    monkeypatch.setattr(substitution, "_is_sparse_csr_cython_compatible", lambda mat: False)
+    expected_branch = substitution.get_branch_sub_counts(sparse_tensor)
+    expected_site = substitution.get_site_sub_counts(sparse_tensor)
+    expected_branch_site = substitution.get_branch_site_sub_counts(sparse_tensor, branch_id=branch_id)
+    expected_branch_tensor = substitution._get_sparse_branch_tensor(sparse_tensor, branch_id=branch_id)
+
+    monkeypatch.setattr(substitution, "_is_sparse_csr_cython_compatible", lambda mat: True)
+    observed_branch = substitution.get_branch_sub_counts(sparse_tensor)
+    observed_site = substitution.get_site_sub_counts(sparse_tensor)
+    observed_branch_site = substitution.get_branch_site_sub_counts(sparse_tensor, branch_id=branch_id)
+    observed_branch_tensor = substitution._get_sparse_branch_tensor(sparse_tensor, branch_id=branch_id)
+
+    np.testing.assert_allclose(observed_branch, expected_branch, atol=1e-12)
+    np.testing.assert_allclose(observed_site, expected_site, atol=1e-12)
+    np.testing.assert_allclose(observed_branch_site, expected_branch_site, atol=1e-12)
+    np.testing.assert_allclose(observed_branch_tensor, expected_branch_tensor, atol=1e-12)
+
+
 def test_sub_tensor2cb_sparse_cython_fastpath_matches_python_fallback(monkeypatch):
     if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
         pytest.skip("Cython sparse-summary reducer fast path is unavailable")
