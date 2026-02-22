@@ -98,6 +98,15 @@ class SparseSubstitutionTensor:
         if tol < 0:
             raise ValueError('tol should be >= 0.')
         blocks = dict()
+        if _can_use_cython_dense_to_sparse_direct_scan(arr=arr, tol=tol):
+            for sg in range(arr.shape[2]):
+                for a in range(arr.shape[3]):
+                    for d in range(arr.shape[4]):
+                        block = arr[:, :, int(sg), int(a), int(d)]
+                        mat = _dense_block_to_csr(block=block, tol=tol)
+                        if mat.nnz > 0:
+                            blocks[(int(sg), int(a), int(d))] = mat
+            return cls(shape=arr.shape, dtype=arr.dtype, blocks=blocks)
         if tol == 0:
             candidate_mask = np.any(arr != 0, axis=(0, 1))
         else:
@@ -111,6 +120,20 @@ class SparseSubstitutionTensor:
             if mat.nnz > 0:
                 blocks[(int(sg), int(a), int(d))] = mat
         return cls(shape=arr.shape, dtype=arr.dtype, blocks=blocks)
+
+
+def _can_use_cython_dense_to_sparse_direct_scan(arr, tol):
+    if substitution_sparse_cy is None:
+        return False
+    if not isinstance(arr, np.ndarray):
+        return False
+    if arr.dtype != np.float64:
+        return False
+    if arr.ndim != 5:
+        return False
+    if not np.isfinite(tol):
+        return False
+    return True
 
 
 def _can_use_cython_dense_block_to_csr(block, tol):
