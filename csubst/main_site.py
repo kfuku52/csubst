@@ -44,6 +44,7 @@ def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, bra
         output_file = os.path.relpath(output_path_abs, start=site_outdir)
     else:
         output_file = output_path_abs
+    effective_min_prob = float(get_tree_site_min_prob(g))
     row = {
         'generated_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'branch_ids': ','.join([str(int(bid)) for bid in numpy.asarray(branch_ids)]),
@@ -57,7 +58,9 @@ def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, bra
         'tree_site_plot': bool2yesno(g.get('tree_site_plot', True)),
         'site_state_plot': bool2yesno(g.get('site_state_plot', True)),
         'tree_site_plot_format': str(g.get('tree_site_plot_format', 'pdf')).lower(),
-        'tree_site_plot_min_prob_effective': float(get_tree_site_min_prob(g)),
+        'min_prob_effective': effective_min_prob,
+        # Backward-compatible alias for downstream consumers.
+        'tree_site_plot_min_prob_effective': effective_min_prob,
         'tree_site_plot_max_sites': int(get_tree_site_plot_max_sites(g)),
         'pdb_mode': bool2yesno(g.get('pdb', None) is not None),
         'note': str(note),
@@ -87,8 +90,10 @@ def write_site_output_manifest(manifest_rows, g, branch_ids):
 
 def get_state(node, g):
     seq = ete.get_prop(node, 'sequence', '').upper()
-    assert seq != '', 'Leaf sequence not found for node "{}". Check tree/alignment labels.'.format(node.name)
-    assert len(seq)%3==0, 'Sequence length is not multiple of 3. Node name = '+node.name
+    if seq == '':
+        raise AssertionError('Leaf sequence not found for node "{}". Check tree/alignment labels.'.format(node.name))
+    if len(seq) % 3 != 0:
+        raise AssertionError('Sequence length is not multiple of 3. Node name = ' + node.name)
     state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=g['float_type'])
     for s in numpy.arange(g['num_input_site']):
         codon = seq[(s*3):((s+1)*3)]
@@ -317,25 +322,47 @@ def _add_lineage_distance_colorbar(fig, g):
     return None
 
 def get_highest_identity_chain_name(g):
-    from csubst import parser_pymol
+    if ('highest_identity_chain_name' in g) and g['highest_identity_chain_name']:
+        return g
     if 'aa_identity_means' not in g.keys():
+        from csubst import parser_pymol
         g = parser_pymol.calc_aa_identity(g)
-    mean_keys = numpy.array(list(g['aa_identity_means'].keys()))
-    mean_values = numpy.array(list(g['aa_identity_means'].values()))
-    g['highest_identity_chain_name'] = mean_keys[numpy.argmax(mean_values)]
+    aa_identity_means = g.get('aa_identity_means', {})
+    if len(aa_identity_means) == 0:
+        g['highest_identity_chain_name'] = None
+        return g
+    mean_keys = numpy.array(list(aa_identity_means.keys()))
+    mean_values = numpy.array(list(aa_identity_means.values()), dtype=float)
+    is_finite = numpy.isfinite(mean_values)
+    if is_finite.any():
+        finite_keys = mean_keys[is_finite]
+        finite_values = mean_values[is_finite]
+        g['highest_identity_chain_name'] = finite_keys[numpy.argmax(finite_values)]
+    else:
+        g['highest_identity_chain_name'] = mean_keys[0]
     return g
 
 def add_substitution_labels(df, SN, sub_type, SN_colors, ax, g):
     col = 'OC'+ SN + sub_type
-    df_sub = df.loc[(df[col] >= g['pymol_min_combinat_prob']), :].reset_index()
+    df_sub = df.loc[(df[col] >= get_min_combinat_prob(g)), :].reset_index()
+    if df_sub.shape[0] == 0:
+        return ax
+    g = get_highest_identity_chain_name(g)
+    chain_name = g.get('highest_identity_chain_name', None)
+    if not chain_name:
+        print('Skipping substitution labels because no chain identity information was available.', flush=True)
+        return ax
+    chain_col = 'codon_site_pdb_' + chain_name
+    if chain_col not in df_sub.columns:
+        print('Skipping substitution labels because "{}" was not found.'.format(chain_col), flush=True)
+        return ax
     anc_cols = df_sub.columns[df_sub.columns.str.startswith('aa_')&df_sub.columns.str.endswith('_anc')]
     des_cols = anc_cols.str.replace('_anc', '')
     x_min_dist = (df_sub.loc[:,'codon_site_alignment'].max()+1) / 35
     x_offset = (df_sub.loc[:,'codon_site_alignment'].max()+1) / 300
     for i in df_sub.index:
         x_value = df_sub.at[i,'codon_site_alignment']
-        g = get_highest_identity_chain_name(g)
-        chain_site = df_sub.at[i,'codon_site_pdb_'+g['highest_identity_chain_name']]
+        chain_site = df_sub.at[i,chain_col]
         anc_state = '/'.join(df_sub.loc[i,anc_cols].unique())
         des_state = '/'.join(df_sub.loc[i,des_cols].unique())
         sub_text = anc_state+str(chain_site)+des_state
@@ -960,7 +987,11 @@ def add_site_stats(df_ad, sub_tensor, g, mode, method='tau'):
                     ranks = numpy.empty_like(temp)
                     ranks[temp] = numpy.arange(len(x_values))
                     ranks = numpy.abs(ranks - ranks.max())+1
-                    value = x_values[ranks==rank_no]
+                    rank_values = x_values[ranks==rank_no]
+                    if rank_values.shape[0] == 0:
+                        value = 0.0
+                    else:
+                        value = float(rank_values[0])
                 df_ad.loc[current_row,outcol] = value
                 current_row += 1
     return df_ad
@@ -970,6 +1001,7 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
     outcol = 'has_target_high_combinat_prob_site'
     df_ad.loc[:,outcol] = False
     sgad = sub_tensor.sum(axis=0)
+    min_prob = get_min_combinat_prob(g)
     current_row = 0
     for g in numpy.arange(sgad.shape[1]):
         state_key = state_keys[g]
@@ -978,7 +1010,7 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
                 if (i1==i2):
                     continue
                 x_values = sgad[:,g,i1,i2]
-                if (x_values >= 0.5).any():
+                if (x_values >= min_prob).any():
                     df_ad.at[current_row,outcol] = True
                 current_row += 1
     return df_ad
@@ -1085,16 +1117,21 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     output_paths.append(fig_path)
     return output_paths
 
+def get_min_single_prob(g):
+    return float(g.get('min_single_prob', 0.8))
+
+
+def get_min_combinat_prob(g):
+    return float(g.get('min_combinat_prob', 0.5))
+
+
 def get_tree_site_min_prob(g):
-    min_prob = g.get('tree_site_plot_min_prob', -1.0)
-    if min_prob is None:
-        min_prob = -1.0
-    min_prob = float(min_prob)
-    if min_prob >= 0:
-        return min_prob
+    mode = str(g.get('mode', '')).lower()
+    if mode == 'lineage':
+        return get_min_single_prob(g)
     if g.get('single_branch_mode', False):
-        return float(g.get('pymol_min_single_prob', 0.8))
-    return float(g.get('pymol_min_combinat_prob', 0.5))
+        return get_min_single_prob(g)
+    return get_min_combinat_prob(g)
 
 def classify_tree_site_categories(df, g):
     if 'codon_site_alignment' not in df.columns:
@@ -1163,12 +1200,89 @@ def get_tree_plot_coordinates(tree):
     return xcoord,ycoord,leaf_order
 
 def get_tree_site_plot_max_sites(g):
-    max_sites = int(g.get('tree_site_plot_max_sites', 60))
+    max_sites = int(g.get('tree_site_plot_max_sites', 30))
     if max_sites < 1:
         max_sites = 1
     return max_sites
 
-def get_tree_site_display_sites(tree_site_df, g):
+def get_lineage_display_sites(df, g, min_prob, return_total=False):
+    branch_ids = [int(bid) for bid in numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64).tolist()]
+    col_pairs = []
+    for bid in branch_ids:
+        col = 'N_sub_{}'.format(int(bid))
+        if col in df.columns:
+            col_pairs.append((int(bid), col))
+    if len(col_pairs) == 0:
+        if return_total:
+            return [],0
+        return []
+    _, cols = zip(*col_pairs)
+    branch_values = df.loc[:, list(cols)].to_numpy(dtype=float, copy=True)
+    branch_values = numpy.nan_to_num(branch_values, nan=0.0)
+    # Lineage view should show sites meeting or exceeding the configured minimum PP.
+    site_ids = df.loc[:, 'codon_site_alignment'].astype(int).to_numpy(copy=True)
+    max_branch_prob = branch_values.max(axis=1)
+    is_selected = (max_branch_prob >= float(min_prob))
+    if not is_selected.any():
+        if return_total:
+            return [],0
+        return []
+    selected_sites = site_ids[is_selected]
+    selected_scores = max_branch_prob[is_selected]
+    selected_total = int(selected_sites.shape[0])
+    max_sites = get_tree_site_plot_max_sites(g)
+    if selected_sites.shape[0] > max_sites:
+        # Pick strongest foreground-substitution sites first.
+        order = numpy.lexsort((selected_sites, -selected_scores))
+        selected_sites = selected_sites[order[:max_sites]]
+    out_sites = sorted([int(site) for site in selected_sites.tolist()])
+    if return_total:
+        return out_sites,selected_total
+    return out_sites
+
+def get_set_display_sites(df, g, min_prob, return_total=False):
+    if 'codon_site_alignment' not in df.columns:
+        if return_total:
+            return [],0
+        return []
+    if 'N_set_expr_prob' in df.columns:
+        set_scores = df.loc[:, 'N_set_expr_prob'].to_numpy(dtype=float, copy=True)
+        set_scores = numpy.nan_to_num(set_scores, nan=0.0)
+    else:
+        set_scores = numpy.zeros(shape=(df.shape[0],), dtype=float)
+    if 'N_set_expr' in df.columns:
+        set_selected = df.loc[:, 'N_set_expr'].astype(bool).to_numpy(copy=True)
+    else:
+        # Fallback for backward-compatibility with legacy tables.
+        set_selected = (set_scores > float(min_prob))
+    # Guard against inconsistent data where set-selected sites have zero score.
+    set_selected = set_selected & (set_scores > 0.0)
+    if not set_selected.any():
+        if return_total:
+            return [],0
+        return []
+    site_ids = df.loc[:, 'codon_site_alignment'].astype(int).to_numpy(copy=True)
+    selected_sites = site_ids[set_selected]
+    selected_scores = set_scores[set_selected]
+    selected_total = int(selected_sites.shape[0])
+    max_sites = get_tree_site_plot_max_sites(g)
+    if selected_sites.shape[0] > max_sites:
+        order = numpy.lexsort((selected_sites, -selected_scores))
+        selected_sites = selected_sites[order[:max_sites]]
+    out_sites = sorted([int(site) for site in selected_sites.tolist()])
+    if return_total:
+        return out_sites,selected_total
+    return out_sites
+
+def get_tree_site_display_sites(tree_site_df, g, df=None):
+    mode = str(g.get('mode', '')).lower()
+    min_prob = get_tree_site_min_prob(g)
+    if (mode == 'lineage') and (df is not None):
+        lineage_sites = get_lineage_display_sites(df=df, g=g, min_prob=min_prob)
+        return [{'site': int(site), 'category': 'lineage'} for site in lineage_sites]
+    if (mode == 'set') and (df is not None):
+        set_sites = get_set_display_sites(df=df, g=g, min_prob=min_prob)
+        return [{'site': int(site), 'category': 'set'} for site in set_sites]
     max_sites = get_tree_site_plot_max_sites(g)
     convergent_df = tree_site_df.loc[tree_site_df.loc[:, 'tree_site_category']=='convergent',:]
     convergent_df = convergent_df.sort_values(by=['convergent_score', 'codon_site_alignment'], ascending=[False, True])
@@ -1226,18 +1340,229 @@ def get_tree_site_display_sites(tree_site_df, g):
     display_meta += [{'site': int(site), 'category': 'divergent'} for site in divergent_sites]
     return display_meta
 
+
+def get_tree_site_overflow_count(tree_site_df, display_meta, g, df=None):
+    plotted_site_count = int(len([item for item in display_meta if item.get('site', None) is not None]))
+    mode = str(g.get('mode', '')).lower()
+    min_prob = get_tree_site_min_prob(g)
+    if (mode == 'lineage') and (df is not None):
+        _, total_candidate = get_lineage_display_sites(df=df, g=g, min_prob=min_prob, return_total=True)
+        return max(0, int(total_candidate) - plotted_site_count)
+    if (mode == 'set') and (df is not None):
+        _, total_candidate = get_set_display_sites(df=df, g=g, min_prob=min_prob, return_total=True)
+        return max(0, int(total_candidate) - plotted_site_count)
+    num_convergent = int((tree_site_df.loc[:, 'tree_site_category'] == 'convergent').sum())
+    num_divergent = int((tree_site_df.loc[:, 'tree_site_category'] == 'divergent').sum())
+    total_candidate = num_convergent + num_divergent
+    if total_candidate == 0:
+        total_candidate = int(tree_site_df.shape[0])
+    return max(0, int(total_candidate) - plotted_site_count)
+
 def get_highlight_leaf_and_branch_ids(tree, branch_ids):
     target_branch_ids = set([int(bid) for bid in branch_ids])
     highlight_branch_ids = set()
     highlight_leaf_ids = set()
+    node_by_id = {}
     for node in tree.traverse():
         node_id = int(ete.get_prop(node, "numerical_label"))
-        if node_id not in target_branch_ids:
+        node_by_id[node_id] = node
+    for node_id in target_branch_ids:
+        node = node_by_id.get(node_id, None)
+        if node is None:
             continue
         highlight_branch_ids.add(node_id)
         if ete.is_leaf(node):
             highlight_leaf_ids.add(node_id)
+            continue
+        for leaf in ete.iter_leaves(node):
+            leaf_id = int(ete.get_prop(leaf, "numerical_label"))
+            highlight_leaf_ids.add(leaf_id)
     return highlight_leaf_ids,highlight_branch_ids
+
+def get_lineage_site_branch_ids(df, display_meta, g, min_prob):
+    if str(g.get('mode', '')).lower() != 'lineage':
+        return {}
+    branch_ids = [int(bid) for bid in numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64).tolist()]
+    col_pairs = []
+    for bid in branch_ids:
+        col = 'N_sub_{}'.format(int(bid))
+        if col in df.columns:
+            col_pairs.append((int(bid), col))
+    if len(col_pairs) == 0:
+        return {}
+    bids, cols = zip(*col_pairs)
+    branch_values = df.loc[:, list(cols)].to_numpy(dtype=float, copy=True)
+    branch_values = numpy.nan_to_num(branch_values, nan=0.0)
+    site_to_row = {
+        int(site): i for i,site in enumerate(df.loc[:, 'codon_site_alignment'].astype(int).tolist())
+    }
+    out = {}
+    for item in display_meta:
+        site = item.get('site', None)
+        if site is None:
+            continue
+        site = int(site)
+        row_index = site_to_row.get(site, None)
+        if row_index is None:
+            continue
+        row_values = branch_values[row_index, :]
+        selected = [int(bids[i]) for i,v in enumerate(row_values) if float(v) >= float(min_prob)]
+        if len(selected) > 0:
+            out[site] = selected
+    return out
+
+def get_lineage_site_heatmap_values(df, display_meta, g):
+    branch_ids = [int(bid) for bid in numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64).tolist()]
+    if len(branch_ids) == 0:
+        return numpy.zeros((0, 0), dtype=float), []
+    num_site = len(display_meta)
+    values = numpy.full((len(branch_ids), num_site), numpy.nan, dtype=float)
+    if num_site == 0:
+        return values, branch_ids
+    site_to_row = {
+        int(site): i for i,site in enumerate(df.loc[:, 'codon_site_alignment'].astype(int).tolist())
+    }
+    for col_index,item in enumerate(display_meta):
+        site = item.get('site', None)
+        if site is None:
+            continue
+        row_index = site_to_row.get(int(site), None)
+        if row_index is None:
+            continue
+        for row_index_branch,bid in enumerate(branch_ids):
+            col = 'N_sub_{}'.format(int(bid))
+            if col not in df.columns:
+                continue
+            value = float(df.at[row_index, col])
+            if not numpy.isfinite(value):
+                continue
+            values[row_index_branch, col_index] = min(max(value, 0.0), 1.0)
+    return values, branch_ids
+
+
+def draw_lineage_site_heatmap(ax_heat, heat_values, heat_branch_ids, branch_color_by_id, cmap):
+    ax_heat.set_facecolor((1, 1, 1, 0))
+    if heat_values.shape[1] == 0:
+        ax_heat.axis('off')
+        return None
+    masked = numpy.ma.masked_invalid(heat_values)
+    im = ax_heat.imshow(
+        masked,
+        interpolation='nearest',
+        aspect='auto',
+        cmap=cmap,
+        vmin=0.0,
+        vmax=1.0,
+        origin='upper',
+    )
+    ax_heat.set_xlim(-0.5, heat_values.shape[1]-0.5)
+    if heat_values.shape[0] > 0:
+        ax_heat.set_ylim(heat_values.shape[0]-0.5, -0.5)
+        y_ticks = numpy.arange(heat_values.shape[0], dtype=float)
+        ax_heat.set_yticks(y_ticks.tolist())
+        ax_heat.set_yticklabels([str(int(bid)) for bid in heat_branch_ids], fontsize=font_size-1)
+        for tick,bid in zip(ax_heat.get_yticklabels(), heat_branch_ids):
+            tick.set_color(branch_color_by_id.get(int(bid), 'black'))
+    else:
+        ax_heat.set_yticks([])
+    ax_heat.tick_params(axis='x', length=0, labelbottom=False, bottom=False, top=False, labeltop=False)
+    ax_heat.tick_params(axis='y', length=0, pad=1)
+    ax_heat.set_ylabel('Branch ID', fontsize=font_size-1)
+    for spine in ax_heat.spines.values():
+        spine.set_visible(False)
+    return im
+
+
+def add_lineage_heatmap_colorbar(fig, ax_cb_holder, cmap):
+    norm = matplotlib.colors.Normalize(vmin=0.0, vmax=1.0)
+    scalar = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
+    ax_cb_holder.set_facecolor((1, 1, 1, 0))
+    ax_cb_holder.set_xticks([])
+    ax_cb_holder.set_yticks([])
+    for spine in ax_cb_holder.spines.values():
+        spine.set_visible(False)
+    # Keep the scale fixed at 0-1 and place a compact bar near the heatmap edge.
+    cax = ax_cb_holder.inset_axes([0.74, 0.68, 0.14, 0.09])
+    cbar = fig.colorbar(scalar, cax=cax, orientation='horizontal')
+    cbar.set_ticks([0.0, 0.5, 1.0])
+    cbar.ax.xaxis.set_ticks_position('top')
+    cbar.ax.tick_params(labelsize=font_size-1, length=2, labeltop=True, labelbottom=False, pad=1)
+    ax_cb_holder.text(
+        0.81,
+        0.64,
+        'Substitution\nposterior\nprobability',
+        transform=ax_cb_holder.transAxes,
+        ha='center',
+        va='top',
+        fontsize=font_size-2,
+        color='black',
+    )
+    return cbar
+
+
+def add_lineage_site_tick_labels(ax_site, tick_positions, display_meta, site_branch_ids, branch_color_by_id):
+    if len(tick_positions) == 0:
+        return 0.0
+    ax_site.set_xticklabels([''] * len(tick_positions))
+    fig = ax_site.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    text_transform = matplotlib.transforms.blended_transform_factory(ax_site.transData, ax_site.transAxes)
+    width_cache = {}
+    x_nudge_pt = 0.0
+    y_base_offset_pt = 2.0
+    label_fontfamily = 'DejaVu Sans Mono'
+    max_label_height_pt = 0.0
+
+    def _text_width_pt(text):
+        key = (text, font_size, label_fontfamily)
+        if key in width_cache:
+            return width_cache[key]
+        text_artist = matplotlib.text.Text(
+            x=0,
+            y=0,
+            text=text,
+            fontsize=font_size,
+            fontfamily=label_fontfamily,
+        )
+        text_artist.set_figure(fig)
+        bbox = text_artist.get_window_extent(renderer=renderer)
+        width_pt = float(bbox.width) * 72.0 / float(fig.dpi)
+        width_cache[key] = width_pt
+        return width_pt
+
+    for col_index in tick_positions:
+        site = display_meta[col_index].get('site', None)
+        if site is None:
+            continue
+        site = int(site)
+        branch_id_list = [int(bid) for bid in site_branch_ids.get(site, [])]
+        segments = []
+        segments.append(('{}: '.format(site), 'black'))
+        for i,bid in enumerate(branch_id_list):
+            if i > 0:
+                segments.append((',', 'black'))
+            segments.append((str(bid), branch_color_by_id.get(bid, 'black')))
+        y_offset_pt = y_base_offset_pt
+        for seg_text,seg_color in segments:
+            ax_site.annotate(
+                seg_text,
+                xy=(col_index, 1.0),
+                xycoords=text_transform,
+                xytext=(x_nudge_pt, y_offset_pt),
+                textcoords='offset points',
+                ha='center',
+                va='bottom',
+                rotation=90,
+                fontsize=font_size,
+                fontfamily=label_fontfamily,
+                color=seg_color,
+                annotation_clip=False,
+            )
+            y_offset_pt += _text_width_pt(seg_text)
+        if y_offset_pt > max_label_height_pt:
+            max_label_height_pt = y_offset_pt
+    return float(max_label_height_pt)
 
 def get_leaf_state_letter(g, leaf_id, codon_site_alignment):
     site_index = int(codon_site_alignment) - 1
@@ -1292,20 +1617,36 @@ def plot_tree_site(df, g):
         print('Skipping tree + site summary outputs (--tree_site_plot no).', flush=True)
         return []
     tree_site_df,min_prob = classify_tree_site_categories(df=df, g=g)
-    display_meta = get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    display_meta = get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     xcoord,ycoord,leaf_order = get_tree_plot_coordinates(tree=g['tree'])
-    branch_ids = set([int(v) for v in numpy.asarray(g['branch_ids']).tolist()])
+    branch_ids_in_order = [int(v) for v in numpy.asarray(g['branch_ids']).tolist()]
+    branch_ids = set(branch_ids_in_order)
+    mode = str(g.get('mode', '')).lower()
+    show_branch_heatmap = mode in ('lineage', 'set')
+    if mode == 'lineage':
+        branch_color_by_id = _get_lineage_rgb_by_branch(branch_ids=branch_ids_in_order, g=g)
+    else:
+        branch_color_by_id = {int(bid): 'firebrick' for bid in branch_ids_in_order}
     highlight_leaf_ids,highlight_branch_ids = get_highlight_leaf_and_branch_ids(tree=g['tree'], branch_ids=branch_ids)
     x_values = numpy.array(list(xcoord.values()), dtype=float)
     x_max = x_values.max() if x_values.shape[0] else 1.0
     if x_max <= 0:
         x_max = 1.0
+    tip_label_texts = []
+    for leaf in ete.iter_leaves(g['tree']):
+        leaf_id = int(ete.get_prop(leaf, "numerical_label"))
+        tip_label_texts.append((leaf.name or '') + '|' + str(leaf_id))
+    max_tip_label_chars = max([len(txt) for txt in tip_label_texts]) if len(tip_label_texts) > 0 else 1
 
     num_display_site = max(len(display_meta), 1)
     num_leaf = max(len(leaf_order), 1)
     # Dense defaults for compact tree/site output.
-    tree_panel_width = min(max(5.0, 4.2 + x_max * 0.42), 10.0)
-    site_panel_width = min(max(1.6, num_display_site * 0.12), 6.5)
+    base_tree_panel_width = min(max(5.0, 4.2 + x_max * 0.42), 10.0) * 0.5
+    tip_label_width_in = min(max(0.8, max_tip_label_chars * 0.053), 2.8)
+    tree_panel_width = base_tree_panel_width + tip_label_width_in
+    # Keep a constant physical width per displayed alignment column.
+    site_column_width_in = 0.112
+    site_panel_width = max(site_column_width_in, num_display_site * site_column_width_in)
     fig_width = tree_panel_width + site_panel_width
     fig_height = min(max(2.5, num_leaf * 0.13 + 0.55), 8.5)
     fg_color = 'firebrick'
@@ -1314,10 +1655,29 @@ def plot_tree_site(df, g):
     internal_label_color = '#7a7a7a'
     internal_label_size = 4.2
 
-    fig = matplotlib.pyplot.figure(figsize=(fig_width, fig_height))
-    gs = fig.add_gridspec(1, 2, width_ratios=[tree_panel_width, site_panel_width], wspace=0.01)
-    ax_tree = fig.add_subplot(gs[0, 0])
-    ax_site = fig.add_subplot(gs[0, 1], sharey=ax_tree)
+    if show_branch_heatmap:
+        heat_panel_height = min(max(0.55, len(branch_ids_in_order) * 0.12), 1.9)
+        fig_height += heat_panel_height
+        fig = matplotlib.pyplot.figure(figsize=(fig_width, fig_height))
+        gs = fig.add_gridspec(
+            2,
+            2,
+            width_ratios=[tree_panel_width, site_panel_width],
+            height_ratios=[heat_panel_height, fig_height - heat_panel_height],
+            wspace=0.01,
+            hspace=0.14,
+        )
+        ax_cb_holder = fig.add_subplot(gs[0, 0])
+        ax_heat = fig.add_subplot(gs[0, 1])
+        ax_tree = fig.add_subplot(gs[1, 0])
+        ax_site = fig.add_subplot(gs[1, 1], sharey=ax_tree)
+    else:
+        fig = matplotlib.pyplot.figure(figsize=(fig_width, fig_height))
+        gs = fig.add_gridspec(1, 2, width_ratios=[tree_panel_width, site_panel_width], wspace=0.01)
+        ax_tree = fig.add_subplot(gs[0, 0])
+        ax_site = fig.add_subplot(gs[0, 1], sharey=ax_tree)
+        ax_cb_holder = None
+        ax_heat = None
 
     for node in g['tree'].traverse():
         if ete.is_leaf(node):
@@ -1329,7 +1689,10 @@ def plot_tree_site(df, g):
         for child in children:
             child_id = int(ete.get_prop(child, "numerical_label"))
             is_target = ((node_id in highlight_branch_ids) and (child_id in highlight_branch_ids))
-            color = fg_color if is_target else bg_branch_color
+            if is_target:
+                color = branch_color_by_id.get(child_id, branch_color_by_id.get(node_id, fg_color))
+            else:
+                color = bg_branch_color
             linewidth = 2.0 if is_target else 0.8
             ax_tree.plot([xcoord[node_id], xcoord[node_id]], [ycoord[node_id], ycoord[child_id]],
                          color=color, linewidth=linewidth, zorder=1, solid_capstyle=TREE_LINE_CAPSTYLE)
@@ -1340,7 +1703,7 @@ def plot_tree_site(df, g):
         node_id = int(ete.get_prop(node, "numerical_label"))
         parent_id = int(ete.get_prop(node.up, "numerical_label"))
         is_target = node_id in highlight_branch_ids
-        color = fg_color if is_target else bg_branch_color
+        color = branch_color_by_id.get(node_id, fg_color) if is_target else bg_branch_color
         linewidth = 2.0 if is_target else 0.8
         ax_tree.plot([xcoord[parent_id], xcoord[node_id]], [ycoord[node_id], ycoord[node_id]],
                      color=color, linewidth=linewidth, zorder=2, solid_capstyle=TREE_LINE_CAPSTYLE)
@@ -1357,23 +1720,31 @@ def plot_tree_site(df, g):
         if ete.is_leaf(node):
             continue
         node_id = int(ete.get_prop(node, "numerical_label"))
-        node_color = fg_color if (node_id in highlight_branch_ids) else internal_label_color
+        if node_id in highlight_branch_ids:
+            node_color = branch_color_by_id.get(node_id, fg_color)
+        else:
+            node_color = internal_label_color
         ax_tree.text(xcoord[node_id] + internal_label_offset, ycoord[node_id] - 0.08, str(node_id),
                      va='center', ha='left', fontsize=internal_label_size, color=node_color, zorder=4)
 
-    label_offset = x_max * 0.02 + 0.05
+    # Keep labels close to the tree and size the panel by label text length.
+    label_offset = (x_max * 0.02 + 0.04) * 0.85
     for leaf in ete.iter_leaves(g['tree']):
         node_id = int(ete.get_prop(leaf, "numerical_label"))
         label = (leaf.name or '') + '|' + str(node_id)
-        is_target_leaf = node_id in highlight_leaf_ids
-        label_color = fg_color if is_target_leaf else bg_label_color
+        if mode == 'lineage':
+            label_color = bg_label_color
+        else:
+            is_target_leaf = node_id in highlight_leaf_ids
+            label_color = fg_color if is_target_leaf else bg_label_color
         ax_tree.text(x_max + label_offset, ycoord[node_id], label, va='center', ha='left',
                      fontsize=font_size, color=label_color)
 
     if len(leaf_order):
         ax_tree.set_ylim(len(leaf_order)-0.5, -0.5)
     left_xlim = -root_stub * 1.5
-    right_xlim = x_max * 1.22 + 0.22
+    tip_label_data_span = min(max(0.45, max_tip_label_chars * 0.05), 3.0)
+    right_xlim = x_max + tip_label_data_span
     ax_tree.set_xlim(left_xlim, right_xlim)
 
     scale_length = get_nice_scale_length(x_max)
@@ -1393,8 +1764,17 @@ def plot_tree_site(df, g):
     ax_tree.text((scale_x_start + scale_x_end) / 2, scale_y + 0.25, '{:g}'.format(scale_length),
                  va='top', ha='center', fontsize=font_size-1, color='black')
 
-    branch_text = ','.join([str(bid) for bid in sorted(branch_ids)])
-    ax_tree.set_title('Focal branch IDs: {}'.format(branch_text), loc='left')
+    branch_text = ','.join([str(int(bid)) for bid in branch_ids_in_order])
+    title_text = 'Focal branch IDs: {}'.format(branch_text)
+    if mode == 'set':
+        mode_expression = str(g.get('mode_expression', '')).strip()
+        set_stat_type = str(g.get('set_stat_type', '')).strip()
+        if mode_expression != '':
+            if set_stat_type != '':
+                title_text += '; Operation: {} ({})'.format(mode_expression, set_stat_type)
+            else:
+                title_text += '; Operation: {}'.format(mode_expression)
+    ax_tree.set_title(title_text, loc='left')
     ax_tree.axis('off')
 
     aa_colors = get_amino_acid_colors(g)
@@ -1422,18 +1802,81 @@ def plot_tree_site(df, g):
                 ax_site.text(col_idx, ycoord[leaf_id], aa_letter, ha='center', va='center',
                              fontsize=font_size, color=get_text_color_for_background(facecolor))
 
-    ax_site.set_xlim(-0.5, len(display_meta)-0.5)
+    if len(display_meta) == 0:
+        ax_site.set_xlim(-0.5, 0.5)
+    else:
+        ax_site.set_xlim(-0.5, len(display_meta)-0.5)
     if len(leaf_order):
         ax_site.set_ylim(len(leaf_order)-0.5, -0.5)
     tick_positions = [i for i,item in enumerate(display_meta) if item['site'] is not None]
     tick_labels = [str(display_meta[i]['site']) for i in tick_positions]
     ax_site.set_xticks(tick_positions)
-    ax_site.set_xticklabels(tick_labels, rotation=90, fontsize=font_size)
     ax_site.xaxis.tick_top()
-    ax_site.tick_params(axis='x', length=0, pad=1)
+    if mode == 'lineage':
+        # Keep labels separated from the alignment letters.
+        ax_site.tick_params(axis='x', length=0, pad=1)
+    else:
+        ax_site.tick_params(axis='x', length=0, pad=1)
+    ax_site.set_xticklabels(tick_labels, rotation=90, fontsize=font_size)
     ax_site.tick_params(axis='y', left=False, labelleft=False)
     for spine in ax_site.spines.values():
         spine.set_visible(False)
+
+    if show_branch_heatmap:
+        heat_values, heat_branch_ids = get_lineage_site_heatmap_values(
+            df=df,
+            display_meta=display_meta,
+            g=g,
+        )
+        heatmap_cmap = matplotlib.pyplot.get_cmap('viridis')
+        _ = draw_lineage_site_heatmap(
+            ax_heat=ax_heat,
+            heat_values=heat_values,
+            heat_branch_ids=heat_branch_ids,
+            branch_color_by_id=branch_color_by_id,
+            cmap=heatmap_cmap,
+        )
+        _ = add_lineage_heatmap_colorbar(
+            fig=fig,
+            ax_cb_holder=ax_cb_holder,
+            cmap=heatmap_cmap,
+        )
+        ax_heat.set_xlim(ax_site.get_xlim())
+
+    overflow_count = get_tree_site_overflow_count(
+        tree_site_df=tree_site_df,
+        display_meta=display_meta,
+        g=g,
+        df=df,
+    )
+    if overflow_count > 0:
+        overflow_label = '+{} sites with PP > {:.2f}'.format(int(overflow_count), float(min_prob))
+        if show_branch_heatmap:
+            # Place overflow text right below the heatmap panel.
+            ax_heat.text(
+                0.995,
+                -0.02,
+                overflow_label,
+                transform=ax_heat.transAxes,
+                ha='right',
+                va='top',
+                fontsize=font_size,
+                color='black',
+                fontweight='bold',
+                clip_on=False,
+            )
+        else:
+            ax_site.text(
+                0.995,
+                0.005,
+                overflow_label,
+                transform=ax_site.transAxes,
+                ha='right',
+                va='bottom',
+                fontsize=font_size,
+                color='black',
+                fontweight='bold',
+            )
 
     category_columns = {'convergent': list(), 'divergent': list()}
     for i,item in enumerate(display_meta):
@@ -1455,11 +1898,21 @@ def plot_tree_site(df, g):
         ax_site.text(x_center, 1.11, 'Divergent sites\n(N={:,}, PP \u2265 {})'.format(div_count, min_prob_text), transform=text_transform,
                      va='bottom', ha='center', fontsize=font_size, color='black', fontweight='bold')
 
-    fig.subplots_adjust(top=0.86, left=0.04, right=0.99, wspace=0.01)
+    if show_branch_heatmap:
+        fig.subplots_adjust(top=0.94, left=0.04, right=0.99, wspace=0.01, hspace=0.14)
+    else:
+        fig.subplots_adjust(top=0.86, left=0.04, right=0.99, wspace=0.01)
 
     fmt = str(g.get('tree_site_plot_format', 'pdf')).lower()
     fig_path = os.path.join(g['site_outdir'], 'csubst_site.tree_site.' + fmt)
-    fig.savefig(fig_path, format=fmt, transparent=True, dpi=300)
+    fig.savefig(
+        fig_path,
+        format=fmt,
+        transparent=True,
+        dpi=300,
+        bbox_inches='tight',
+        pad_inches=0.02,
+    )
     matplotlib.pyplot.close(fig)
     print('Writing tree + site plot: {}'.format(fig_path), flush=True)
 
@@ -1662,7 +2115,28 @@ def _get_set_expression_label(mode_expression):
     return mode_expr_label
 
 
+def _get_set_mode_stat_type(set_stat_type):
+    stat = str(set_stat_type).strip().lower()
+    allowed = ('any2any', 'any2spe', 'spe2any', 'spe2spe')
+    if stat not in allowed:
+        txt = '--mode set expects one of [{}] as substitution type, got "{}".'
+        raise ValueError(txt.format(','.join(allowed), set_stat_type))
+    return stat
+
+
 def _evaluate_set_expression_boolean(tokens, branch_site_bool):
+    branch_site_prob = {}
+    for key,value in branch_site_bool.items():
+        branch_site_prob[key] = numpy.zeros(shape=value.shape, dtype=float)
+    out_bool,_ = _evaluate_set_expression_boolean_and_prob(
+        tokens=tokens,
+        branch_site_bool=branch_site_bool,
+        branch_site_prob=branch_site_prob,
+    )
+    return out_bool
+
+
+def _evaluate_set_expression_boolean_and_prob(tokens, branch_site_bool, branch_site_prob):
     operators = ['|', '-', '&', '^']
     operand_stack = []
     operator_stack = []
@@ -1672,39 +2146,54 @@ def _evaluate_set_expression_boolean(tokens, branch_site_bool):
         operand_shape = value.shape
         break
     if operand_shape is None:
+        for value in branch_site_prob.values():
+            operand_shape = value.shape
+            break
+    if operand_shape is None:
         raise ValueError('No branch-site values were provided for set expression evaluation.')
+
+    def _get_operand_arrays(token):
+        zero_bool = numpy.zeros(shape=operand_shape, dtype=bool)
+        zero_prob = numpy.zeros(shape=operand_shape, dtype=float)
+        bool_array = branch_site_bool.get(token, zero_bool)
+        prob_array = branch_site_prob.get(token, zero_prob)
+        bool_array = numpy.asarray(bool_array, dtype=bool)
+        prob_array = numpy.asarray(prob_array, dtype=float)
+        bool_array = numpy.where(numpy.isfinite(bool_array), bool_array, False)
+        prob_array = numpy.nan_to_num(prob_array, nan=0.0)
+        return bool_array.copy(),prob_array.copy()
 
     def apply_top_operator():
         if len(operand_stack) < 2:
             raise ValueError('Invalid --mode set expression. Missing operand.')
-        rhs = operand_stack.pop()
-        lhs = operand_stack.pop()
+        rhs_bool,rhs_prob = operand_stack.pop()
+        lhs_bool,lhs_prob = operand_stack.pop()
         op = operator_stack.pop()
+        lhs_prob_eff = numpy.where(lhs_bool, lhs_prob, 0.0)
+        rhs_prob_eff = numpy.where(rhs_bool, rhs_prob, 0.0)
         if op == '|':
-            out = lhs | rhs
+            out_bool = lhs_bool | rhs_bool
+            out_prob = numpy.where(out_bool, numpy.maximum(lhs_prob_eff, rhs_prob_eff), 0.0)
         elif op == '-':
-            out = lhs & (~rhs)
+            out_bool = lhs_bool & (~rhs_bool)
+            out_prob = numpy.where(out_bool, lhs_prob_eff, 0.0)
         elif op == '&':
-            out = lhs & rhs
+            out_bool = lhs_bool & rhs_bool
+            out_prob = numpy.where(out_bool, numpy.minimum(lhs_prob_eff, rhs_prob_eff), 0.0)
         elif op == '^':
-            out = lhs ^ rhs
+            out_bool = lhs_bool ^ rhs_bool
+            out_prob = numpy.where(out_bool, numpy.maximum(lhs_prob_eff, rhs_prob_eff), 0.0)
         else:
             raise ValueError('Invalid operator in --mode set expression: {}'.format(op))
-        operand_stack.append(out)
+        operand_stack.append((out_bool,out_prob))
 
     for token in tokens:
         if expect_operand:
             if isinstance(token, int):
-                if token in branch_site_bool:
-                    operand_stack.append(branch_site_bool[token].copy())
-                else:
-                    operand_stack.append(numpy.zeros(shape=operand_shape, dtype=bool))
+                operand_stack.append(_get_operand_arrays(token))
                 expect_operand = False
             elif token == 'A':
-                if token in branch_site_bool:
-                    operand_stack.append(branch_site_bool[token].copy())
-                else:
-                    operand_stack.append(numpy.zeros(shape=operand_shape, dtype=bool))
+                operand_stack.append(_get_operand_arrays(token))
                 expect_operand = False
             elif token == '(':
                 operator_stack.append(token)
@@ -1732,7 +2221,9 @@ def _evaluate_set_expression_boolean(tokens, branch_site_bool):
         apply_top_operator()
     if len(operand_stack) != 1:
         raise ValueError('Invalid --mode set expression.')
-    return operand_stack[0]
+    out_bool,out_prob = operand_stack[0]
+    out_prob = numpy.where(out_bool, numpy.nan_to_num(out_prob, nan=0.0), 0.0)
+    return out_bool,out_prob
 
 
 def _validate_set_expression_syntax(mode_expression):
@@ -1745,27 +2236,95 @@ def _validate_set_expression_syntax(mode_expression):
     return None
 
 
+def _get_set_stat_channels_from_branch_tensor(branch_tensor, set_stat_type):
+    arr = numpy.nan_to_num(numpy.asarray(branch_tensor, dtype=float), nan=0.0)
+    if arr.ndim != 4:
+        raise ValueError('Branch substitution tensor should be 4D [site,group,anc,des].')
+    if set_stat_type == 'any2any':
+        out = arr.sum(axis=(1, 2, 3))
+        return out[:, numpy.newaxis]
+    if set_stat_type == 'any2spe':
+        return arr.sum(axis=(1, 2))
+    if set_stat_type == 'spe2any':
+        return arr.sum(axis=(1, 3))
+    if set_stat_type == 'spe2spe':
+        return arr.reshape(arr.shape[0], -1)
+    raise ValueError('Unsupported set substitution type: {}'.format(set_stat_type))
+
+
+def _get_empty_set_channel_prob(n_site, set_stat_type, ON_tensor=None):
+    if ON_tensor is None:
+        return numpy.zeros(shape=(n_site, 1), dtype=float)
+    if set_stat_type == 'any2any':
+        n_channel = 1
+    elif set_stat_type == 'any2spe':
+        n_channel = int(ON_tensor.shape[4])
+    elif set_stat_type == 'spe2any':
+        n_channel = int(ON_tensor.shape[3])
+    elif set_stat_type == 'spe2spe':
+        n_channel = int(ON_tensor.shape[2] * ON_tensor.shape[3] * ON_tensor.shape[4])
+    else:
+        raise ValueError('Unsupported set substitution type: {}'.format(set_stat_type))
+    return numpy.zeros(shape=(n_site, n_channel), dtype=float)
+
+
+def _aggregate_set_channels(bool_matrix, prob_matrix):
+    bool_arr = numpy.asarray(bool_matrix, dtype=bool)
+    prob_arr = numpy.nan_to_num(numpy.asarray(prob_matrix, dtype=float), nan=0.0)
+    if bool_arr.ndim == 1:
+        prob_arr = numpy.where(bool_arr, prob_arr, 0.0)
+        return bool_arr, prob_arr
+    selected = bool_arr.any(axis=1)
+    selected_prob = numpy.where(selected, prob_arr.max(axis=1), 0.0)
+    return selected, selected_prob
+
+
 def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
     if str(g.get('mode', '')).lower() != 'set':
         return df
     mode_expression = g.get('mode_expression', None)
     if mode_expression is None:
         raise ValueError('Missing set expression for --mode set.')
+    set_stat_type = _get_set_mode_stat_type(g.get('set_stat_type', None))
     tokens = _tokenize_set_expression(mode_expression)
     branch_ids = _extract_set_expression_branch_ids(mode_expression)
     n_site = df.shape[0]
+    min_single_prob = get_min_single_prob(g)
+    if (ON_tensor is None) and (set_stat_type != 'any2any'):
+        txt = '--mode set,{} requires branch-wise substitution tensors. This type is not available from N_sub_* columns only.'
+        raise ValueError(txt.format(set_stat_type))
     branch_site_bool = dict()
+    branch_site_prob = dict()
+    empty_prob = _get_empty_set_channel_prob(
+        n_site=n_site,
+        set_stat_type=set_stat_type,
+        ON_tensor=ON_tensor,
+    )
     for branch_id in branch_ids.tolist():
-        col = 'N_sub_{}'.format(int(branch_id))
-        if col in df.columns:
-            branch_site_bool[int(branch_id)] = (df.loc[:, col].values >= g['pymol_min_single_prob'])
+        if ON_tensor is not None:
+            bid = int(branch_id)
+            if 0 <= bid < ON_tensor.shape[0]:
+                branch_tensor = ON_tensor[bid, :, :, :, :]
+                n_sub_prob = _get_set_stat_channels_from_branch_tensor(
+                    branch_tensor=branch_tensor,
+                    set_stat_type=set_stat_type,
+                )
+            else:
+                n_sub_prob = empty_prob.copy()
         else:
-            branch_site_bool[int(branch_id)] = numpy.zeros(shape=(n_site,), dtype=bool)
+            col = 'N_sub_{}'.format(int(branch_id))
+            if col in df.columns:
+                base_prob = numpy.nan_to_num(df.loc[:, col].to_numpy(dtype=float, copy=True), nan=0.0)
+                n_sub_prob = base_prob[:, numpy.newaxis]
+            else:
+                n_sub_prob = empty_prob.copy()
+        branch_site_prob[int(branch_id)] = n_sub_prob
+        branch_site_bool[int(branch_id)] = (n_sub_prob >= min_single_prob)
     if 'A' in tokens:
         explicit_ids = set([int(bid) for bid in branch_ids.tolist()])
-        other_bool = numpy.zeros(shape=(n_site,), dtype=bool)
-        n_other_sum = numpy.zeros(shape=(n_site,), dtype=float)
-        s_other_sum = numpy.zeros(shape=(n_site,), dtype=float)
+        other_bool_matrix = numpy.zeros(shape=empty_prob.shape, dtype=bool)
+        n_other_prob_matrix = empty_prob.copy()
+        s_other_prob = numpy.zeros(shape=(n_site,), dtype=float)
         if ('tree' in g) and (g['tree'] is not None) and (ON_tensor is not None):
             node_by_id = _get_node_by_branch_id(g)
             other_branch_ids = sorted([
@@ -1773,16 +2332,22 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
                 if (not ete.is_root(node)) and (int(bid) not in explicit_ids)
             ])
             if len(other_branch_ids) > 0:
-                other_probs = ON_tensor[other_branch_ids, :, :, :, :].sum(axis=(2, 3, 4))
-                if other_probs.ndim == 1:
-                    other_probs = other_probs[numpy.newaxis, :]
-                other_bool = (other_probs >= g['pymol_min_single_prob']).any(axis=0)
-                n_other_sum = other_probs.sum(axis=0)
+                other_prob_rows = []
+                for other_bid in other_branch_ids:
+                    other_tensor = ON_tensor[int(other_bid), :, :, :, :]
+                    other_prob_rows.append(
+                        _get_set_stat_channels_from_branch_tensor(
+                            branch_tensor=other_tensor,
+                            set_stat_type=set_stat_type,
+                        )
+                    )
+                n_other_prob_matrix = numpy.stack(other_prob_rows, axis=0).max(axis=0)
+                other_bool_matrix = (n_other_prob_matrix >= min_single_prob)
                 if OS_tensor is not None:
                     other_syn_probs = OS_tensor[other_branch_ids, :, :, :, :].sum(axis=(2, 3, 4))
                     if other_syn_probs.ndim == 1:
                         other_syn_probs = other_syn_probs[numpy.newaxis, :]
-                    s_other_sum = other_syn_probs.sum(axis=0)
+                    s_other_prob = other_syn_probs.max(axis=0)
         else:
             other_n_cols = []
             other_s_cols = []
@@ -1802,35 +2367,42 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
                     else:
                         other_s_cols.append(col)
             if len(other_n_cols) > 0:
-                other_bool = (df.loc[:, other_n_cols].values >= g['pymol_min_single_prob']).any(axis=1)
-                n_other_sum = df.loc[:, other_n_cols].sum(axis=1).to_numpy(copy=True)
+                other_n_values = df.loc[:, other_n_cols].to_numpy(dtype=float, copy=True)
+                other_n_values = numpy.nan_to_num(other_n_values, nan=0.0)
+                n_other_prob_matrix = other_n_values.max(axis=1)[:, numpy.newaxis]
+                other_bool_matrix = (n_other_prob_matrix >= min_single_prob)
             if len(other_s_cols) > 0:
-                s_other_sum = df.loc[:, other_s_cols].sum(axis=1).to_numpy(copy=True)
-        branch_site_bool['A'] = other_bool.astype(bool)
-        df.loc[:, 'N_set_other'] = other_bool.astype(bool)
-        df.loc[:, 'N_set_other_prob'] = n_other_sum
-        df.loc[:, 'S_set_other_prob'] = s_other_sum
+                other_s_values = df.loc[:, other_s_cols].to_numpy(dtype=float, copy=True)
+                other_s_values = numpy.nan_to_num(other_s_values, nan=0.0)
+                s_other_prob = other_s_values.max(axis=1)
+        branch_site_bool['A'] = other_bool_matrix.astype(bool)
+        branch_site_prob['A'] = n_other_prob_matrix.astype(float)
+        other_bool_arr = numpy.asarray(other_bool_matrix, dtype=bool)
+        other_prob_arr = numpy.nan_to_num(numpy.asarray(n_other_prob_matrix, dtype=float), nan=0.0)
+        if other_bool_arr.ndim == 1:
+            n_set_other_bool = other_bool_arr
+            n_set_other_prob = other_prob_arr
+        else:
+            n_set_other_bool = other_bool_arr.any(axis=1)
+            n_set_other_prob = other_prob_arr.max(axis=1)
+        df.loc[:, 'N_set_other'] = n_set_other_bool.astype(bool)
+        df.loc[:, 'N_set_other_prob'] = n_set_other_prob.astype(float)
+        df.loc[:, 'S_set_other_prob'] = s_other_prob
         # Explicit aliases for easier downstream interpretation in TSV outputs.
         df.loc[:, 'N_set_A'] = df.loc[:, 'N_set_other']
         df.loc[:, 'N_set_A_prob'] = df.loc[:, 'N_set_other_prob']
         df.loc[:, 'S_set_A_prob'] = df.loc[:, 'S_set_other_prob']
-    selected = _evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    selected_matrix,selected_prob_matrix = _evaluate_set_expression_boolean_and_prob(
+        tokens=tokens,
+        branch_site_bool=branch_site_bool,
+        branch_site_prob=branch_site_prob,
+    )
+    selected,selected_prob = _aggregate_set_channels(
+        bool_matrix=selected_matrix,
+        prob_matrix=selected_prob_matrix,
+    )
     df.loc[:, 'N_set_expr'] = selected
-    df.loc[:, 'N_set_expr_prob'] = 0.0
-    selected_any = selected.astype(bool)
-    if selected_any.any():
-        n_sub_cols = df.columns[df.columns.str.startswith('N_sub_')]
-        n_extra = numpy.zeros(shape=(df.shape[0],), dtype=float)
-        if ('A' in tokens) and ('N_set_other_prob' in df.columns):
-            n_extra = df.loc[:, 'N_set_other_prob'].to_numpy(copy=True)
-            if 'N_set_other' in df.columns:
-                n_extra = n_extra * df.loc[:, 'N_set_other'].astype(float).to_numpy(copy=True)
-        if n_sub_cols.shape[0] > 0:
-            df.loc[selected_any, 'N_set_expr_prob'] = (
-                df.loc[selected_any, n_sub_cols].sum(axis=1).values + n_extra[selected_any]
-            )
-        elif ('A' in tokens):
-            df.loc[selected_any, 'N_set_expr_prob'] = n_extra[selected_any]
+    df.loc[:, 'N_set_expr_prob'] = numpy.where(selected, selected_prob, 0.0)
     return df
 
 
@@ -1848,32 +2420,43 @@ def _is_intersection_mode(g):
 
 
 def _parse_mode_and_expression(raw_mode):
+    txt = str(raw_mode).strip()
+    parts = [part.strip() for part in txt.split(',')]
+    mode = parts[0].lower()
     mode_expression = None
-    if ',' in raw_mode:
-        mode_prefix, mode_expression = raw_mode.split(',', 1)
-        mode = mode_prefix.strip().lower()
-        mode_expression = mode_expression.strip()
-    else:
-        mode = raw_mode.lower()
-    return mode, mode_expression
+    set_stat_type = None
+    if mode == 'set':
+        if len(parts) != 3:
+            txt = '--mode set expects --mode "set,<substitution_type>,<expression>", e.g., --mode "set,any2spe,1|3".'
+            raise ValueError(txt)
+        set_stat_type = _get_set_mode_stat_type(parts[1])
+        mode_expression = parts[2]
+        if mode_expression == '':
+            raise ValueError('--mode set expression is empty.')
+    elif len(parts) >= 2:
+        mode_expression = ','.join(parts[1:]).strip()
+    return mode, mode_expression, set_stat_type
 
 
-def _build_site_outdir(mode, branch_txt, lineage_input_branch_txt=None, mode_expression=None):
+def _build_site_outdir(mode, branch_txt, lineage_input_branch_txt=None, mode_expression=None, set_stat_type=None):
     if mode == 'intersection':
         return './csubst_site.branch_id' + branch_txt
     if mode == 'lineage':
         return './csubst_site.lineage.branch_id' + lineage_input_branch_txt
     if mode == 'set':
+        if set_stat_type is None:
+            raise ValueError('Missing set substitution type for --mode set.')
         mode_expr_label = _get_set_expression_label(mode_expression)
-        return './csubst_site.set.expr' + mode_expr_label
+        return './csubst_site.set.' + str(set_stat_type) + '.expr' + mode_expr_label
     return './csubst_site.mode' + mode + '.branch_id' + branch_txt
 
 
 def resolve_site_jobs(g):
     raw_mode = str(g.get('mode', 'intersection')).strip()
-    mode, mode_expression = _parse_mode_and_expression(raw_mode)
+    mode, mode_expression, set_stat_type = _parse_mode_and_expression(raw_mode)
     g['mode'] = mode
     g['mode_expression'] = mode_expression
+    g['set_stat_type'] = set_stat_type
     node_by_id = _get_node_by_branch_id(g)
     branch_id_list = []
     lineage_input_branch_txt = None
@@ -1904,7 +2487,9 @@ def resolve_site_jobs(g):
         branch_id_list = [lineage_branch_ids]
     elif mode=='set':
         if (mode_expression is None) or (mode_expression==''):
-            raise ValueError('--mode set expects an expression, e.g., --mode "set,1|5".')
+            raise ValueError('--mode set expects an expression, e.g., --mode "set,any2any,1|5".')
+        if set_stat_type is None:
+            raise ValueError('--mode set expects a substitution type, e.g., --mode "set,any2any,1|5".')
         _validate_set_expression_syntax(mode_expression=mode_expression)
         expression_branch_ids = _extract_set_expression_branch_ids(mode_expression)
         _validate_existing_branch_ids(expression_branch_ids, node_by_id)
@@ -1924,12 +2509,14 @@ def resolve_site_jobs(g):
             branch_txt=branch_txt,
             lineage_input_branch_txt=lineage_input_branch_txt,
             mode_expression=mode_expression,
+            set_stat_type=set_stat_type,
         )
         site_jobs.append({
             'branch_ids': branch_ids,
             'single_branch_mode': single_branch_mode,
             'site_outdir': site_outdir,
             'mode_expression': mode_expression,
+            'set_stat_type': set_stat_type,
         })
     g['site_jobs'] = site_jobs
     g['branch_id_list'] = [job['branch_ids'] for job in site_jobs]
@@ -1972,10 +2559,11 @@ def main_site(g):
         g['branch_ids'] = branch_ids
         g['site_outdir'] = site_job['site_outdir']
         g['mode_expression'] = site_job.get('mode_expression', g.get('mode_expression', None))
+        g['set_stat_type'] = site_job.get('set_stat_type', g.get('set_stat_type', None))
         txt = '\nProcessing --mode {} with branch IDs: {}'
         print(txt.format(g['mode'], ','.join([str(int(bid)) for bid in branch_ids.tolist()])), flush=True)
         if (g.get('mode_expression', None) is not None) and (str(g.get('mode', '')).lower() == 'set'):
-            print('Set expression: {}'.format(g['mode_expression']), flush=True)
+            print('Set expression ({}): {}'.format(g['set_stat_type'], g['mode_expression']), flush=True)
         if g['single_branch_mode']:
             print('Single branch mode. Substitutions, rather than combinatorial substitutions, will be mapped.')
         if not os.path.exists(g['site_outdir']):

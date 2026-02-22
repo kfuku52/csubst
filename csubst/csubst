@@ -3,12 +3,29 @@
 import argparse
 import contextlib
 import datetime
+import os
 import sys
 import time
-from distutils.util import strtobool
+
+if (__package__ is None) or (__package__ == ''):
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
 
 from csubst.__init__ import __version__
 from csubst import param
+
+
+def strtobool(value):
+    if isinstance(value, bool):
+        return value
+    value = str(value).strip().lower()
+    if value in {'y', 'yes', 't', 'true', 'on', '1'}:
+        return True
+    if value in {'n', 'no', 'f', 'false', 'off', '0'}:
+        return False
+    raise argparse.ArgumentTypeError('invalid truth value: {}'.format(value))
+
 
 def get_global_parameters_or_exit(args):
     try:
@@ -172,7 +189,7 @@ def _main():
     dataset.set_defaults(handler=command_dataset)
 
     # simulate
-    help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
+    help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario (optional; requires pyvolve). See `csubst simulate -h`'
     simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg])
     simulate.add_argument('--background_omega', metavar='FLOAT', default=0.2, type=float,
                           help='default=%(default)s: dN/dS for background branches.')
@@ -219,9 +236,10 @@ def _main():
                       help='default=%(default)s: Visualization mode. '
                       '"intersection", visualize combinatorial substitutions in branches specified by --branch_id. '
                       '"lineage", process branches between ancestor/descendant specified by --branch_id ANC,DES. '
-                      '"set,EXPR", evaluate set operations among branch-wise substitutions (|, -, &, ^). '
+                      '"set,SUBTYPE,EXPR", evaluate set operations among branch-wise substitutions (|, -, &, ^). '
+                      'SUBTYPE: any2any, any2spe, spe2any, or spe2spe. '
                       'Use "A" for all other non-root branches. '
-                      'e.g. "set,((117|48)-A)".')
+                      'e.g. "set,any2any,((117|48)-A)".')
     site.add_argument('--tree_site_plot', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Generate a matplotlib-based tree + site summary plot.')
     site.add_argument('--site_state_plot', metavar='yes|no', default='yes', type=strtobool,
@@ -230,11 +248,13 @@ def _main():
     site.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
                       choices=['pdf', 'png', 'svg'],
                       help='default=%(default)s: Output format for --tree_site_plot.')
-    site.add_argument('--tree_site_plot_min_prob', metavar='FLOAT', default=-1.0, required=False, type=float,
-                      help='default=%(default)s: Minimum probability threshold for classifying convergent/divergent sites '
-                           'in the tree + site summary. Negative values automatically use '
-                           '--pymol_min_combinat_prob (or --pymol_min_single_prob in single-branch mode).')
-    site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=60, required=False, type=int,
+    site.add_argument('--min_single_prob', metavar='FLOAT', default=0.8, required=False, type=float,
+                      help='default=%(default)s: Minimum probability threshold for single-branch substitutions. '
+                           'Shared by site plotting and PyMOL outputs.')
+    site.add_argument('--min_combinat_prob', metavar='FLOAT', default=0.5, required=False, type=float,
+                      help='default=%(default)s: Minimum probability threshold for combinatorial substitutions. '
+                           'Shared by site plotting and PyMOL outputs.')
+    site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=30, required=False, type=int,
                       help='default=%(default)s: Maximum number of plotted sites in the tree + site summary '
                            '(convergent and divergent columns are balanced when both are available).')
     site.add_argument('--site_output_manifest', metavar='yes|no', default='yes', required=False, type=strtobool,
@@ -264,6 +284,8 @@ def _main():
                       help='default=%(default)s: E-value cutoff in the database searches. Applied to MMseqs2 and QBLAST.')
     site.add_argument('--database_minimum_identity', metavar='FLOAT', default=0.25, required=False, type=float,
                       help='default=%(default)s: The minimum sequence identity for the database searches. Applied to MMseqs2. See https://search.rcsb.org/index.html#search-api')
+    site.add_argument('--database_timeout', metavar='FLOAT', default=30.0, required=False, type=float,
+                      help='default=%(default)s: Network timeout in seconds for online structure database requests.')
     site.add_argument('--user_alignment', metavar='PATH', default=None, required=False, type=str,
                       help='default=%(default)s: The user-provided alignment FASTA for the substitution mapping to protein structures.')
     site.add_argument('--remove_solvent', metavar='yes|no', default='yes', type=strtobool,
@@ -282,10 +304,6 @@ def _main():
                       help='default=%(default)s: mafft --op parameter. -1 to use the default value.')
     site.add_argument('--mafft_ep', metavar='FLOAT', default=-1, required=False, type=float,
                       help='default=%(default)s: mafft --ep parameter. -1 to use the default value.')
-    site.add_argument('--pymol_min_combinat_prob', metavar='FLOAT', default=0.5, required=False, type=float,
-                      help='default=%(default)s: Minimum probability of combinatorial substitutions to visualize.')
-    site.add_argument('--pymol_min_single_prob', metavar='FLOAT', default=0.8, required=False, type=float,
-                      help='default=%(default)s: Minimum probability of single substitutions to visualize.')
     site.add_argument('--pymol_gray', metavar='INT', default=80, required=False, type=int,
                       help='default=%(default)s: Gray value for no-substitution sites. 0=black, 100=white')
     site.add_argument('--pymol_transparency', metavar='FLOAT', default=0.65, required=False, type=float,
@@ -401,7 +419,11 @@ def _main():
     args = parser.parse_args()
     #param.set_num_thread_variables(num_thread=args.threads)
     if hasattr(args, 'handler'):
-        args.handler(args)
+        try:
+            args.handler(args)
+        except (ValueError, AssertionError) as e:
+            sys.stderr.write(str(e).strip() + '\n')
+            sys.exit(2)
     else:
         parser.print_help()
 
