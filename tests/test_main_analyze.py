@@ -1,5 +1,5 @@
-import numpy
-import pandas
+import numpy as np
+import pandas as pd
 import pytest
 
 from csubst import main_analyze
@@ -11,15 +11,15 @@ def test_cb_search_respects_max_combination_limit(monkeypatch):
     def fake_get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=False, cb_all=False, arity=2,
                                    check_attr=None, verbose=True):
         if arity == 2:
-            return g, numpy.array([[0, 1]], dtype=numpy.int64)
+            return g, np.array([[0, 1]], dtype=np.int64)
         captured["cb_passed"] = cb_passed.copy(deep=True)
-        return g, numpy.zeros((0, arity), dtype=numpy.int64)
+        return g, np.zeros((0, arity), dtype=np.int64)
 
     def fake_get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
-        return pandas.DataFrame({"_unused": [1.0]})
+        return pd.DataFrame({"_unused": [1.0]})
 
     def fake_merge_tables(cbOS, cbON):
-        return pandas.DataFrame(
+        return pd.DataFrame(
             {
                 "branch_id_1": [10, 11, 12, 13],
                 "branch_id_2": [20, 21, 22, 23],
@@ -58,7 +58,7 @@ def test_cb_search_respects_max_combination_limit(monkeypatch):
         "branch_dist": False,
         "float_format": "%.6f",
         "fg_clade_permutation": 0,
-        "df_cb_stats_main": pandas.DataFrame(),
+        "df_cb_stats_main": pd.DataFrame(),
     }
 
     main_analyze.cb_search(g=g, b=None, OS_tensor=None, ON_tensor=None, id_combinations=None, write_cb=False)

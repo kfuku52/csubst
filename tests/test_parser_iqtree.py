@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import pytest
 
 from csubst import parser_iqtree
@@ -22,8 +22,8 @@ def _get_base_g(tmp_path, iqtree_text, log_text):
         "path_iqtree_iqtree": str(iqtree_file),
         "path_iqtree_log": str(log_file),
         "alignment_file": str(alignment_file),
-        "codon_orders": numpy.array(["AAA", "AAC", "AAG"]),
-        "float_type": numpy.float64,
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
     }
     return g
 
@@ -33,6 +33,37 @@ def test_parse_iqtree_version_text_for_v2_and_v3():
     v3_txt = "IQ-TREE multicore version 3.0.1 for Linux 64-bit built Jan  1 2025"
     assert parser_iqtree._parse_iqtree_version_text(v2_txt) == ("2.3.6", 2)
     assert parser_iqtree._parse_iqtree_version_text(v3_txt) == ("3.0.1", 3)
+
+
+def test_is_version_at_least_handles_numeric_versions():
+    assert parser_iqtree._is_version_at_least("2.0.0", "2.0.0")
+    assert parser_iqtree._is_version_at_least("2.3.6", "2.0.0")
+    assert parser_iqtree._is_version_at_least("3.0.0", "2.0.0")
+    assert not parser_iqtree._is_version_at_least("1.6.12", "2.0.0")
+
+
+def test_check_iqtree_dependency_rejects_nonzero_exit(monkeypatch):
+    class _FakeProc:
+        returncode = 1
+        stdout = b""
+        stderr = b""
+
+    monkeypatch.setattr(parser_iqtree.subprocess, "run", lambda *args, **kwargs: _FakeProc())
+    with pytest.raises(AssertionError, match="iqtree PATH cannot be found"):
+        parser_iqtree.check_iqtree_dependency({"iqtree_exe": "iqtree"})
+
+
+def test_check_iqtree_dependency_handles_non_utf8_version_output(monkeypatch):
+    class _FakeProc:
+        returncode = 0
+        stdout = b"\xff\xfeIQ-TREE multicore version 2.3.6\n"
+        stderr = b""
+
+    monkeypatch.setattr(parser_iqtree.subprocess, "run", lambda *args, **kwargs: _FakeProc())
+    g = {"iqtree_exe": "iqtree"}
+    parser_iqtree.check_iqtree_dependency(g)
+    assert g["iqtree_version"] == "2.3.6"
+    assert g["iqtree_version_major"] == 2
 
 
 def test_read_iqtree_detects_v2_and_parses_equilibrium_frequency(tmp_path):
@@ -47,7 +78,7 @@ Model of substitution: ECMK07+F+R4
     assert g["substitution_model"] == "ECMK07+F+R4"
     assert g["iqtree_output_version_major"] == 2
     assert g["iqtree_parser"] == "iqtree2"
-    numpy.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
+    np.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
 
 
 def test_read_iqtree_detects_v3_and_parses_scientific_notation(tmp_path):
@@ -62,7 +93,7 @@ Model of substitution: ECMK07+F+R4
     assert g["substitution_model"] == "ECMK07+F+R4"
     assert g["iqtree_output_version_major"] == 3
     assert g["iqtree_parser"] == "iqtree3"
-    numpy.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
+    np.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
 
 
 def test_read_iqtree_v3_mixed_exponents_do_not_get_overridden_by_legacy_pattern(tmp_path):
@@ -74,9 +105,9 @@ Model of substitution: ECMK07+F+R4
 """
     g = _get_base_g(tmp_path=tmp_path, iqtree_text=iqtree_text, log_text="")
     g = parser_iqtree.read_iqtree(g, eq=True)
-    expected = numpy.array([2.0e-01, 3.0e-02, 5.0e-03], dtype=float)
+    expected = np.array([2.0e-01, 3.0e-02, 5.0e-03], dtype=float)
     expected /= expected.sum()
-    numpy.testing.assert_allclose(g["equilibrium_frequency"], expected, atol=1e-12)
+    np.testing.assert_allclose(g["equilibrium_frequency"], expected, atol=1e-12)
 
 
 def test_read_iqtree_v3_mixed_spacing_scientific_notation_parses_all_codons_correctly(tmp_path):
@@ -88,7 +119,7 @@ Model of substitution: ECMK07+F+R4
 """
     g = _get_base_g(tmp_path=tmp_path, iqtree_text=iqtree_text, log_text="")
     g = parser_iqtree.read_iqtree(g, eq=True)
-    numpy.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
+    np.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
 
 
 def test_read_iqtree_iqtree2_missing_frequency_raises_clear_error(tmp_path):
@@ -110,7 +141,7 @@ Model of substitution: ECMK07+F+R4
     g = _get_base_g(tmp_path=tmp_path, iqtree_text=iqtree_text, log_text="")
     g = parser_iqtree.read_iqtree(g, eq=True)
     assert g["iqtree_parser"] == "iqtree3"
-    numpy.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
+    np.testing.assert_allclose(g["equilibrium_frequency"], [0.2, 0.3, 0.5], atol=1e-12)
 
 
 def test_read_log_parses_omega_kappa_and_codon_table_from_v3_style_log(tmp_path):
@@ -159,8 +190,8 @@ def _make_state_tensor_g(tmp_path, alignment_text):
         "num_input_site": 2,
         "num_input_state": 3,
         "input_data_type": "cdn",
-        "codon_orders": numpy.array(["AAA", "AAC", "AAG"]),
-        "float_type": numpy.float64,
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
         "ml_anc": False,
     }
 
@@ -173,10 +204,10 @@ def test_get_state_tensor_reads_leaf_sequences_via_ete_compat(tmp_path):
     out = parser_iqtree.get_state_tensor(g)
 
     labels = {n.name: ete.get_prop(n, "numerical_label") for n in g["tree"].traverse()}
-    numpy.testing.assert_allclose(out[labels["A"], 0, :], [1.0, 0.0, 0.0], atol=1e-12)
-    numpy.testing.assert_allclose(out[labels["A"], 1, :], [0.0, 1.0, 0.0], atol=1e-12)
-    numpy.testing.assert_allclose(out[labels["B"], 0, :], [0.0, 0.0, 1.0], atol=1e-12)
-    numpy.testing.assert_allclose(out[labels["B"], 1, :], [0.0, 0.0, 1.0], atol=1e-12)
+    np.testing.assert_allclose(out[labels["A"], 0, :], [1.0, 0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(out[labels["A"], 1, :], [0.0, 1.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(out[labels["B"], 0, :], [0.0, 0.0, 1.0], atol=1e-12)
+    np.testing.assert_allclose(out[labels["B"], 1, :], [0.0, 0.0, 1.0], atol=1e-12)
 
 
 def test_get_state_tensor_raises_when_leaf_sequence_missing(tmp_path):
@@ -197,10 +228,10 @@ def test_get_state_tensor_selected_branch_ids_preserve_global_branch_index(tmp_p
     full = parser_iqtree.get_state_tensor(g)
     selected = parser_iqtree.get_state_tensor(
         g=g,
-        selected_branch_ids=numpy.array([labels["A"]], dtype=numpy.int64),
+        selected_branch_ids=np.array([labels["A"]], dtype=np.int64),
     )
     assert selected.shape == full.shape
-    numpy.testing.assert_allclose(selected[labels["A"], :, :], full[labels["A"], :, :], atol=1e-12)
+    np.testing.assert_allclose(selected[labels["A"], :, :], full[labels["A"], :, :], atol=1e-12)
     assert selected[labels["B"], :, :].sum() == 0
 
 
@@ -227,19 +258,54 @@ def test_get_state_tensor_selected_branch_ids_match_internal_masking_parity(tmp_
         "num_input_site": 2,
         "num_input_state": 3,
         "input_data_type": "cdn",
-        "codon_orders": numpy.array(["AAA", "AAC", "AAG"]),
-        "float_type": numpy.float64,
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
         "ml_anc": False,
     }
     labels = {n.name: ete.get_prop(n, "numerical_label") for n in g["tree"].traverse()}
     full = parser_iqtree.get_state_tensor(g)
     selected = parser_iqtree.get_state_tensor(
         g=g,
-        selected_branch_ids=numpy.array([labels["N1"]], dtype=numpy.int64),
+        selected_branch_ids=np.array([labels["N1"]], dtype=np.int64),
     )
     assert selected.shape == full.shape
-    numpy.testing.assert_allclose(selected[labels["N1"], :, :], full[labels["N1"], :, :], atol=1e-12)
+    np.testing.assert_allclose(selected[labels["N1"], :, :], full[labels["N1"], :, :], atol=1e-12)
     assert selected[labels["C"], :, :].sum() == 0
+
+
+def test_get_selected_branch_context_accepts_scalar_selected_branch_id():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    selected_set, selected_internal_ids, required_leaf_ids = parser_iqtree._get_selected_branch_context(
+        tree=tr,
+        selected_branch_ids=np.int64(labels["N1"]),
+    )
+    root_id = int(ete.get_prop(ete.get_tree_root(tr), "numerical_label"))
+    assert labels["N1"] in selected_set
+    assert root_id in selected_set
+    assert selected_internal_ids == [labels["N1"]]
+    expected_leaf_ids = {
+        int(ete.get_prop(node, "numerical_label"))
+        for node in tr.traverse()
+        if ete.is_leaf(node)
+    }
+    assert required_leaf_ids == expected_leaf_ids
+
+
+def test_get_state_tensor_selected_branch_ids_ignore_unknown_ids_in_ml_mode(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
+    )
+    g["ml_anc"] = True
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in g["tree"].traverse()}
+    selected = parser_iqtree.get_state_tensor(
+        g=g,
+        selected_branch_ids=np.array([labels["A"], 9999], dtype=np.int64),
+    )
+    assert selected.shape[0] == len(list(g["tree"].traverse()))
+    assert selected[labels["A"], :, :].sum() > 0
+    assert selected[labels["B"], :, :].sum() == 0
 
 
 def test_get_state_tensor_rejects_nucleotide_input(tmp_path):
@@ -262,8 +328,8 @@ def test_get_state_tensor_rejects_nucleotide_input(tmp_path):
         "num_input_site": 2,
         "num_input_state": 4,
         "input_data_type": "nuc",
-        "input_state": numpy.array(["A", "C", "G", "T"]),
-        "float_type": numpy.float64,
+        "input_state": np.array(["A", "C", "G", "T"]),
+        "float_type": np.float64,
         "ml_anc": False,
     }
     with pytest.raises(NotImplementedError, match="Non-codon input is obsolete"):
@@ -273,7 +339,7 @@ def test_get_state_tensor_rejects_nucleotide_input(tmp_path):
 def test_mask_missing_sites_nonbinary_internal_uses_all_child_groups():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1,C:1)N1:1,D:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
-    state = numpy.zeros((len(list(tr.traverse())), 1, 1), dtype=float)
+    state = np.zeros((len(list(tr.traverse())), 1, 1), dtype=float)
     # Only one child clade (C) and one sister clade (D) have data at this site.
     state[labels["C"], 0, 0] = 1.0
     state[labels["D"], 0, 0] = 1.0
@@ -312,4 +378,28 @@ def test_run_iqtree_ancestral_nonzero_exit_raises_clear_error_and_cleans_tmp_tre
 
     with pytest.raises(AssertionError, match="exit code 2"):
         parser_iqtree.run_iqtree_ancestral(g)
+    assert not (tmp_path / "tmp.csubst.nwk").exists()
+
+
+def test_run_iqtree_ancestral_rejects_inconsistent_tree_without_force(tmp_path, monkeypatch):
+    alignment_file = tmp_path / "toy.fa"
+    alignment_file.write_text(">A\nAAA\n>B\nAAA\n", encoding="utf-8")
+    rooted_tree = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    g = {
+        "rooted_tree": rooted_tree,
+        "alignment_file": str(alignment_file),
+        "iqtree_exe": "iqtree2",
+        "iqtree_model": "GY",
+        "genetic_code": 1,
+        "threads": 1,
+    }
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(parser_iqtree.tree, "is_consistent_tree_and_aln", lambda g: False)
+
+    def fake_write_tree(tree_obj, outfile, add_numerical_label=False):
+        (tmp_path / outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
+
+    monkeypatch.setattr(parser_iqtree.tree, "write_tree", fake_write_tree)
+    with pytest.raises(ValueError, match="not consistent"):
+        parser_iqtree.run_iqtree_ancestral(g, force_notree_run=False)
     assert not (tmp_path / "tmp.csubst.nwk").exists()

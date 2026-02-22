@@ -4,7 +4,7 @@ import sys
 import tempfile
 import importlib.util
 
-import numpy
+import numpy as np
 import pytest
 
 # Ensure tests import the local checkout rather than an installed csubst package.
@@ -31,4 +31,4 @@ os.environ.setdefault("MPLCONFIGDIR", tempfile.mkdtemp(prefix="mplconfig-"))
 
 @pytest.fixture(autouse=True)
 def _set_random_seed():
-    numpy.random.seed(0)
+    np.random.seed(0)

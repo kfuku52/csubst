@@ -1,5 +1,6 @@
-import numpy
-import pandas
+import numpy as np
+import pandas as pd
+import pytest
 
 from csubst import omega
 from csubst import substitution
@@ -9,7 +10,7 @@ from csubst import ete
 
 def _toy_sub_tensor():
     # shape = [branch, site, group, from, to]
-    sub = numpy.zeros((3, 3, 2, 2, 2), dtype=numpy.float64)
+    sub = np.zeros((3, 3, 2, 2, 2), dtype=np.float64)
     sub[0, 0, 0, 0, 1] = 0.3
     sub[1, 0, 0, 0, 1] = 0.4
     sub[2, 0, 0, 0, 1] = 0.5
@@ -23,7 +24,7 @@ def _toy_sub_tensor():
 
 
 def _toy_cb():
-    return pandas.DataFrame(
+    return pd.DataFrame(
         {
             "branch_id_1": [0, 1],
             "branch_id_2": [1, 2],
@@ -36,12 +37,12 @@ def _toy_g(sub_tensor):
     num_site = sub_tensor.shape[1]
     return {
         "threads": 1,
-        "float_type": numpy.float64,
+        "float_type": np.float64,
         "asrv": "no",
-        "sub_sites": {"no": numpy.ones((num_branch, num_site), dtype=numpy.float64) / num_site},
-        "N_ind_nomissing_gad": numpy.where(sub_tensor.sum(axis=(0, 1)) != 0),
-        "N_ind_nomissing_ga": numpy.where(sub_tensor.sum(axis=(0, 1, 4)) != 0),
-        "N_ind_nomissing_gd": numpy.where(sub_tensor.sum(axis=(0, 1, 3)) != 0),
+        "sub_sites": {"no": np.ones((num_branch, num_site), dtype=np.float64) / num_site},
+        "N_ind_nomissing_gad": np.where(sub_tensor.sum(axis=(0, 1)) != 0),
+        "N_ind_nomissing_ga": np.where(sub_tensor.sum(axis=(0, 1, 4)) != 0),
+        "N_ind_nomissing_gd": np.where(sub_tensor.sum(axis=(0, 1, 3)) != 0),
     }
 
 
@@ -54,7 +55,19 @@ def test_calc_E_stat_mean_sparse_matches_dense_for_all_modes():
     for mode in modes:
         out_dense = omega.calc_E_stat(cb=cb, sub_tensor=dense, mode=mode, stat="mean", SN="N", g=g)
         out_sparse = omega.calc_E_stat(cb=cb, sub_tensor=sparse, mode=mode, stat="mean", SN="N", g=g)
-        numpy.testing.assert_allclose(out_sparse, out_dense, atol=1e-12)
+        np.testing.assert_allclose(out_sparse, out_dense, atol=1e-12)
+
+
+def test_calc_E_stat_requires_g():
+    with pytest.raises(ValueError, match="g is required"):
+        omega.calc_E_stat(
+            cb=_toy_cb(),
+            sub_tensor=_toy_sub_tensor(),
+            mode="any2any",
+            stat="mean",
+            SN="N",
+            g=None,
+        )
 
 
 def test_get_exp_state_uses_branch_distance_props():
@@ -62,17 +75,17 @@ def test_get_exp_state_uses_branch_distance_props():
     labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
     num_node = max(labels.values()) + 1
 
-    state = numpy.zeros((num_node, 1, 2), dtype=numpy.float64)
+    state = np.zeros((num_node, 1, 2), dtype=np.float64)
     state[labels["R"], 0, 0] = 1.0
 
     g = {
         "tree": tr,
         "state_pep": state.copy(),
         "state_cdn": state.copy(),
-        "instantaneous_aa_rate_matrix": numpy.array([[-1.0, 1.0], [1.0, -1.0]], dtype=numpy.float64),
-        "instantaneous_codon_rate_matrix": numpy.array([[-1.0, 1.0], [1.0, -1.0]], dtype=numpy.float64),
-        "iqtree_rate_values": numpy.array([1.0], dtype=numpy.float64),
-        "float_type": numpy.float64,
+        "instantaneous_aa_rate_matrix": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=np.float64),
+        "instantaneous_codon_rate_matrix": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=np.float64),
+        "iqtree_rate_values": np.array([1.0], dtype=np.float64),
+        "float_type": np.float64,
         "float_tol": 1e-12,
     }
 
@@ -86,8 +99,8 @@ def test_get_exp_state_uses_branch_distance_props():
 
     assert pep[labels["A"], 0, :].sum() > 0
     assert cdn[labels["A"], 0, :].sum() > 0
-    numpy.testing.assert_allclose(pep[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
-    numpy.testing.assert_allclose(cdn[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(pep[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(cdn[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
 
 
 def test_calibrate_dsc_skips_substitution_class_without_finite_pairs():
@@ -104,10 +117,10 @@ def test_calibrate_dsc_skips_substitution_class_without_finite_pairs():
     ]
     row = {"branch_id_1": 0}
     for sub in combinatorial_substitutions:
-        row["dNC" + sub] = numpy.nan
-        row["dSC" + sub] = numpy.nan
-        row["omegaC" + sub] = numpy.nan
-    cb = pandas.DataFrame([row])
+        row["dNC" + sub] = np.nan
+        row["dSC" + sub] = np.nan
+        row["omegaC" + sub] = np.nan
+    cb = pd.DataFrame([row])
 
     out = omega.calibrate_dsc(cb=cb.copy())
 

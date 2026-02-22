@@ -1,6 +1,6 @@
 import os
 
-import numpy
+import numpy as np
 
 from csubst import ete
 
@@ -12,8 +12,8 @@ def calc_omega_state(state_nuc, g):  # implement exclude stop codon freq
         raise Exception('The sequence length is not multiple of 3. num_site =', num_nuc_site)
     num_cdn_site = num_nuc_site // 3
     state_columns = g['state_columns']
-    state_cdn = numpy.zeros((num_node, num_cdn_site, len(state_columns)), dtype=state_nuc.dtype)
-    codon_sites = numpy.arange(0, num_nuc_site, 3)
+    state_cdn = np.zeros((num_node, num_cdn_site, len(state_columns)), dtype=state_nuc.dtype)
+    codon_sites = np.arange(0, num_nuc_site, 3)
     for i, (state0, state1, state2) in enumerate(state_columns):
         codon_prob = state_nuc[:, codon_sites + 0, state0]
         codon_prob *= state_nuc[:, codon_sites + 1, state1]
@@ -25,13 +25,20 @@ def calc_omega_state(state_nuc, g):  # implement exclude stop codon freq
 def _initialize_state_array(axis, dtype, mmap_name=None):
     axis = tuple(axis)
     if mmap_name is None:
-        return numpy.zeros(axis, dtype=dtype)
+        return np.zeros(axis, dtype=dtype)
     mmap_path = os.path.join(os.getcwd(), mmap_name)
     if os.path.exists(mmap_path):
         os.unlink(mmap_path)
     txt = 'Generating memory map: dtype={}, axis={}, path={}'
     print(txt.format(dtype, axis, mmap_path), flush=True)
-    return numpy.memmap(mmap_path, dtype=dtype, shape=axis, mode='w+')
+    return np.memmap(mmap_path, dtype=dtype, shape=axis, mode='w+')
+
+
+def _normalize_branch_ids(branch_ids):
+    arr = np.asarray(branch_ids)
+    if arr.size == 0:
+        return np.array([], dtype=np.int64)
+    return np.atleast_1d(arr).astype(np.int64, copy=False).reshape(-1)
 
 
 def cdn2pep_state(state_cdn, g, selected_branch_ids=None):
@@ -50,7 +57,9 @@ def cdn2pep_state(state_cdn, g, selected_branch_ids=None):
             dtype=state_cdn.dtype,
             mmap_name='tmp.csubst.state_pep.mmap',
         )
-        selected_ids = numpy.array(sorted({int(v) for v in selected_branch_ids}), dtype=numpy.int64)
+        selected_ids_all = _normalize_branch_ids(selected_branch_ids)
+        is_valid = (selected_ids_all >= 0) & (selected_ids_all < num_node)
+        selected_ids = np.array(sorted(set(selected_ids_all[is_valid].tolist())), dtype=np.int64)
         selected_state_cdn = state_cdn[selected_ids, :, :]
     for i, aa in enumerate(g['amino_acid_orders']):
         target = selected_state_cdn[:, :, g['synonymous_indices'][aa]].sum(axis=2)
@@ -70,6 +79,8 @@ def translate_state(nlabel, mode, g):
         missing_state = '-'
         state = g['state_pep']
         orders = g['amino_acid_orders']
+    else:
+        raise ValueError('Unsupported translate_state mode: {}'.format(mode))
     seq_out = list()
     for i in range(state.shape[1]):
         if state[nlabel, i, :].max() < g['float_tol']:
@@ -84,7 +95,7 @@ def write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
     aln_out = list()
     branch_id_set = None
     if branch_ids is not None:
-        branch_id_set = set(int(bid) for bid in numpy.asarray(branch_ids).tolist())
+        branch_id_set = set(int(bid) for bid in _normalize_branch_ids(branch_ids))
     if leaf_only:
         nodes = ete.iter_leaves(g['tree'])
     else:
@@ -113,7 +124,7 @@ def get_state_index(state, input_state, ambiguous_table):
         for amb in [a for a in ambiguous_table.keys() if a in state_set]:
             vals = ambiguous_table[amb]
             states = [s.replace(amb, val) for s in states for val in vals]
-    state_index0 = [numpy.where(input_state == s)[0] for s in states]
+    state_index0 = [np.where(input_state == s)[0] for s in states]
     state_index0 = [s for s in state_index0 if s.shape[0] != 0]
     if len(state_index0) == 0:
         return []
@@ -143,6 +154,9 @@ def read_fasta(path):
 
 
 def calc_identity(seq1, seq2):
-    assert len(seq1) == len(seq2), 'Sequence lengths should be identical.'
+    if len(seq1) != len(seq2):
+        raise ValueError('Sequence lengths should be identical.')
+    if len(seq1) == 0:
+        raise ValueError('Sequences should be non-empty.')
     num_same_site = sum(1 for s1, s2 in zip(seq1, seq2) if s1 == s2)
     return num_same_site / len(seq1)

@@ -1,5 +1,5 @@
-import numpy
-import scipy.sparse
+import numpy as np
+import scipy.sparse as sp
 
 
 class SparseSubstitutionTensor:
@@ -7,7 +7,7 @@ class SparseSubstitutionTensor:
         if len(shape) != 5:
             raise ValueError('SparseSubstitutionTensor shape should have 5 dimensions.')
         self.shape = tuple(shape)
-        self.dtype = numpy.dtype(dtype)
+        self.dtype = np.dtype(dtype)
         self.blocks = dict(blocks)
 
     @property
@@ -36,7 +36,7 @@ class SparseSubstitutionTensor:
 
     @property
     def size(self):
-        return int(numpy.prod(self.shape))
+        return int(np.prod(self.shape))
 
     @property
     def density(self):
@@ -45,7 +45,7 @@ class SparseSubstitutionTensor:
         return self.nnz / self.size
 
     def to_dense(self):
-        out = numpy.zeros(shape=self.shape, dtype=self.dtype)
+        out = np.zeros(shape=self.shape, dtype=self.dtype)
         for (sg, a, d), mat in self.blocks.items():
             out[:, :, sg, a, d] = mat.toarray()
         return out
@@ -58,7 +58,7 @@ class SparseSubstitutionTensor:
         key = (int(sg), int(a), int(d))
         mat = self.blocks.get(key)
         if mat is None:
-            return scipy.sparse.csr_matrix((self.num_branch, self.num_site), dtype=self.dtype)
+            return sp.csr_matrix((self.num_branch, self.num_site), dtype=self.dtype)
         return mat
 
     def project_any2any(self, sg):
@@ -88,7 +88,7 @@ class SparseSubstitutionTensor:
 
     @classmethod
     def from_dense(cls, sub_tensor, tol=0):
-        arr = numpy.asarray(sub_tensor)
+        arr = np.asarray(sub_tensor)
         if arr.ndim != 5:
             raise ValueError('sub_tensor should have 5 dimensions: [branch,site,group,from,to].')
         if tol < 0:
@@ -97,10 +97,10 @@ class SparseSubstitutionTensor:
         for sg in range(arr.shape[2]):
             for a in range(arr.shape[3]):
                 for d in range(arr.shape[4]):
-                    block = numpy.array(arr[:, :, sg, a, d], copy=True)
+                    block = np.array(arr[:, :, sg, a, d], copy=True)
                     if tol > 0:
-                        block[numpy.abs(block) <= tol] = 0
-                    mat = scipy.sparse.csr_matrix(block)
+                        block[np.abs(block) <= tol] = 0
+                    mat = sp.csr_matrix(block)
                     if mat.nnz > 0:
                         blocks[(sg, a, d)] = mat
         return cls(shape=arr.shape, dtype=arr.dtype, blocks=blocks)
@@ -108,7 +108,7 @@ class SparseSubstitutionTensor:
 
 def _sum_sparse_mats(mats, nrow, ncol, dtype):
     if len(mats) == 0:
-        return scipy.sparse.csr_matrix((nrow, ncol), dtype=dtype)
+        return sp.csr_matrix((nrow, ncol), dtype=dtype)
     out = mats[0].copy()
     for mat in mats[1:]:
         out = out + mat
@@ -127,29 +127,29 @@ def summarize_sparse_sub_tensor(sparse_tensor, mode):
     num_branch, num_site, num_group, num_state_from, num_state_to = sparse_tensor.shape
     dtype = sparse_tensor.dtype
     if mode == 'spe2spe':
-        sub_bg = numpy.zeros(shape=(num_branch, num_group, num_state_from, num_state_to), dtype=dtype)
-        sub_sg = numpy.zeros(shape=(num_site, num_group, num_state_from, num_state_to), dtype=dtype)
+        sub_bg = np.zeros(shape=(num_branch, num_group, num_state_from, num_state_to), dtype=dtype)
+        sub_sg = np.zeros(shape=(num_site, num_group, num_state_from, num_state_to), dtype=dtype)
         for (sg, a, d), mat in sparse_tensor.blocks.items():
-            sub_bg[:, sg, a, d] = numpy.asarray(mat.sum(axis=1)).reshape(-1)
-            sub_sg[:, sg, a, d] = numpy.asarray(mat.sum(axis=0)).reshape(-1)
+            sub_bg[:, sg, a, d] = np.asarray(mat.sum(axis=1)).reshape(-1)
+            sub_sg[:, sg, a, d] = np.asarray(mat.sum(axis=0)).reshape(-1)
     elif mode == 'spe2any':
-        sub_bg = numpy.zeros(shape=(num_branch, num_group, num_state_from), dtype=dtype)
-        sub_sg = numpy.zeros(shape=(num_site, num_group, num_state_from), dtype=dtype)
+        sub_bg = np.zeros(shape=(num_branch, num_group, num_state_from), dtype=dtype)
+        sub_sg = np.zeros(shape=(num_site, num_group, num_state_from), dtype=dtype)
         for (sg, a, d), mat in sparse_tensor.blocks.items():
-            sub_bg[:, sg, a] += numpy.asarray(mat.sum(axis=1)).reshape(-1)
-            sub_sg[:, sg, a] += numpy.asarray(mat.sum(axis=0)).reshape(-1)
+            sub_bg[:, sg, a] += np.asarray(mat.sum(axis=1)).reshape(-1)
+            sub_sg[:, sg, a] += np.asarray(mat.sum(axis=0)).reshape(-1)
     elif mode == 'any2spe':
-        sub_bg = numpy.zeros(shape=(num_branch, num_group, num_state_to), dtype=dtype)
-        sub_sg = numpy.zeros(shape=(num_site, num_group, num_state_to), dtype=dtype)
+        sub_bg = np.zeros(shape=(num_branch, num_group, num_state_to), dtype=dtype)
+        sub_sg = np.zeros(shape=(num_site, num_group, num_state_to), dtype=dtype)
         for (sg, a, d), mat in sparse_tensor.blocks.items():
-            sub_bg[:, sg, d] += numpy.asarray(mat.sum(axis=1)).reshape(-1)
-            sub_sg[:, sg, d] += numpy.asarray(mat.sum(axis=0)).reshape(-1)
+            sub_bg[:, sg, d] += np.asarray(mat.sum(axis=1)).reshape(-1)
+            sub_sg[:, sg, d] += np.asarray(mat.sum(axis=0)).reshape(-1)
     elif mode == 'any2any':
-        sub_bg = numpy.zeros(shape=(num_branch, num_group), dtype=dtype)
-        sub_sg = numpy.zeros(shape=(num_site, num_group), dtype=dtype)
+        sub_bg = np.zeros(shape=(num_branch, num_group), dtype=dtype)
+        sub_sg = np.zeros(shape=(num_site, num_group), dtype=dtype)
         for (sg, a, d), mat in sparse_tensor.blocks.items():
-            sub_bg[:, sg] += numpy.asarray(mat.sum(axis=1)).reshape(-1)
-            sub_sg[:, sg] += numpy.asarray(mat.sum(axis=0)).reshape(-1)
+            sub_bg[:, sg] += np.asarray(mat.sum(axis=1)).reshape(-1)
+            sub_sg[:, sg] += np.asarray(mat.sum(axis=0)).reshape(-1)
     else:
         raise ValueError('Unsupported mode: {}'.format(mode))
     return sub_bg, sub_sg

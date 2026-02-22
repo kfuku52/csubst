@@ -1,5 +1,5 @@
-import numpy
-import pandas
+import numpy as np
+import pandas as pd
 
 import os
 import platform
@@ -21,6 +21,20 @@ DEPENDENCY_DISTRIBUTIONS = (
     'cython',
     'matplotlib',
 )
+
+
+def _parse_bool_like(value, param_name):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ['1', 'true', 'yes', 'y', 'on']:
+            return True
+        if normalized in ['0', 'false', 'no', 'n', 'off']:
+            return False
+        txt = '{} should be boolean-like (yes/no, true/false, 1/0).'
+        raise ValueError(txt.format(param_name))
+    return bool(value)
 
 
 def _get_dependency_version(distribution_name):
@@ -59,7 +73,8 @@ def get_global_parameters(args):
         g[attr] = getattr(args, attr)
     if 'calc_quantile' in g.keys():
         if g['calc_quantile']:
-            assert g['omegaC_method']=='modelfree', '--calc_quantile "yes" should be used with --omegaC_method "modelfree".'
+            if g['omegaC_method'] != 'modelfree':
+                raise ValueError('--calc_quantile "yes" should be used with --omegaC_method "modelfree".')
     if 'exhaustive_until' in g.keys():
         if (g['exhaustive_until']==1)&(g['foreground'] is None):
             raise ValueError('To enable --exhaustive_until 1, use --foreground')
@@ -81,13 +96,13 @@ def get_global_parameters(args):
             g['iqtree_iqtree'] = g['alignment_file']+'.iqtree'
     if 'float_type' in g.keys():
         if (g['float_type']==16):
-            g['float_type'] = numpy.float16
+            g['float_type'] = np.float16
             g['float_tol'] = 10**-1
         elif (g['float_type']==32):
-            g['float_type'] = numpy.float32
+            g['float_type'] = np.float32
             g['float_tol'] = 10**-3
         elif (g['float_type']==64):
-            g['float_type'] = numpy.float64
+            g['float_type'] = np.float64
             g['float_tol'] = 10**-9
     if 'sub_tensor_backend' in g.keys():
         g['sub_tensor_backend'] = str(g['sub_tensor_backend']).lower()
@@ -135,7 +150,10 @@ def get_global_parameters(args):
             else:
                 g['uniprot_feature_types'] = [ v.strip() for v in value.split(',') if v.strip()!='' ]
     if 'uniprot_include_redundant' in g.keys():
-        g['uniprot_include_redundant'] = bool(g['uniprot_include_redundant'])
+        g['uniprot_include_redundant'] = _parse_bool_like(
+            value=g['uniprot_include_redundant'],
+            param_name='--uniprot_include_redundant',
+        )
     if 'num_simulated_site' in g.keys():
         g['num_simulated_site'] = int(g['num_simulated_site'])
         if (g['num_simulated_site'] != -1) and (g['num_simulated_site'] < 1):
@@ -187,10 +205,46 @@ def get_global_parameters(args):
         g['tree_site_plot_max_sites'] = int(g['tree_site_plot_max_sites'])
         if g['tree_site_plot_max_sites'] < 1:
             raise ValueError('--tree_site_plot_max_sites should be >= 1.')
-    if 'tree_site_plot_min_prob' in g.keys():
-        g['tree_site_plot_min_prob'] = float(g['tree_site_plot_min_prob'])
-        if (g['tree_site_plot_min_prob'] >= 0) and (g['tree_site_plot_min_prob'] > 1):
-            raise ValueError('--tree_site_plot_min_prob should be <= 1 when non-negative.')
+    if 'min_single_prob' in g.keys():
+        g['min_single_prob'] = float(g['min_single_prob'])
+        if (g['min_single_prob'] < 0) or (g['min_single_prob'] > 1):
+            raise ValueError('--min_single_prob should satisfy 0 <= value <= 1.')
+    if 'min_combinat_prob' in g.keys():
+        g['min_combinat_prob'] = float(g['min_combinat_prob'])
+        if (g['min_combinat_prob'] < 0) or (g['min_combinat_prob'] > 1):
+            raise ValueError('--min_combinat_prob should satisfy 0 <= value <= 1.')
+    if 'database_timeout' in g.keys():
+        g['database_timeout'] = float(g['database_timeout'])
+        if g['database_timeout'] <= 0:
+            raise ValueError('--database_timeout should be > 0.')
+    if 'database_evalue_cutoff' in g.keys():
+        g['database_evalue_cutoff'] = float(g['database_evalue_cutoff'])
+        if g['database_evalue_cutoff'] <= 0:
+            raise ValueError('--database_evalue_cutoff should be > 0.')
+    if 'database_minimum_identity' in g.keys():
+        g['database_minimum_identity'] = float(g['database_minimum_identity'])
+        if (g['database_minimum_identity'] < 0) or (g['database_minimum_identity'] > 1):
+            raise ValueError('--database_minimum_identity should satisfy 0 <= value <= 1.')
+    if 'mafft_op' in g.keys():
+        g['mafft_op'] = float(g['mafft_op'])
+        if (g['mafft_op'] != -1) and (g['mafft_op'] < 0):
+            raise ValueError('--mafft_op should be -1 or >= 0.')
+    if 'mafft_ep' in g.keys():
+        g['mafft_ep'] = float(g['mafft_ep'])
+        if (g['mafft_ep'] != -1) and (g['mafft_ep'] < 0):
+            raise ValueError('--mafft_ep should be -1 or >= 0.')
+    if 'pymol_gray' in g.keys():
+        g['pymol_gray'] = int(g['pymol_gray'])
+        if (g['pymol_gray'] < 0) or (g['pymol_gray'] > 100):
+            raise ValueError('--pymol_gray should satisfy 0 <= value <= 100.')
+    if 'pymol_transparency' in g.keys():
+        g['pymol_transparency'] = float(g['pymol_transparency'])
+        if (g['pymol_transparency'] < 0) or (g['pymol_transparency'] > 1):
+            raise ValueError('--pymol_transparency should satisfy 0 <= value <= 1.')
+    if 'pymol_max_num_chain' in g.keys():
+        g['pymol_max_num_chain'] = int(g['pymol_max_num_chain'])
+        if g['pymol_max_num_chain'] < 1:
+            raise ValueError('--pymol_max_num_chain should be >= 1.')
     if 'float_digit' in g.keys():
         g['float_format'] = '%.'+str(g['float_digit'])+'f'
     if 'threads' in g.keys():
@@ -217,7 +271,7 @@ def get_global_parameters(args):
 
 def initialize_df_cb_stats(g):
     cols = ['arity','elapsed_sec','fg_enrichment_factor','mode','dSC_calibration',]
-    g['df_cb_stats'] = pandas.DataFrame(index=[0,], columns=cols)
+    g['df_cb_stats'] = pd.DataFrame(index=[0,], columns=cols)
     g['df_cb_stats']['arity'] = [g['current_arity'],]
     g['df_cb_stats']['cutoff_stat'] = g['cutoff_stat']
     return(g)

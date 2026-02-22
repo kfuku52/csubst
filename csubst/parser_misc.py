@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 
 import itertools
 import pkgutil
@@ -71,13 +71,16 @@ def read_input(g):
         g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'])
     elif (g['substitution_model'].startswith('GY')):
         txt = 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
-        assert (g['omega'] is not None), txt
+        if g['omega'] is None:
+            raise AssertionError(txt)
         txt = 'Estimated kappa is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
-        assert (g['kappa'] is not None), txt
+        if g['kappa'] is None:
+            raise AssertionError(txt)
         g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
     elif (g['substitution_model'].startswith('MG')):
         txt = 'Estimated omega is not available in IQ-TREE\'s log file. Run IQ-TREE with a GY-based model.'
-        assert (g['omega'] is not None), txt
+        if g['omega'] is None:
+            raise AssertionError(txt)
         g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
     g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
     g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
@@ -86,19 +89,22 @@ def read_input(g):
     sum_tensor_syn = g['rate_syn_tensor'].sum()
     sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
     sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
-    assert (sum_tensor_aa - sum_matrix_aa)<g['float_tol'], 'Sum of rates did not match.'
+    if (sum_tensor_aa - sum_matrix_aa) >= g['float_tol']:
+        raise AssertionError('Sum of rates did not match.')
     txt = 'Sum of rates did not match. Check if --codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
     txt = txt.format(g['codon_table'], g['reconstruction_codon_table'])
-    assert (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa)<g['float_tol'], txt
-    numpy.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
+    if (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa) >= g['float_tol']:
+        raise AssertionError(txt)
+    np.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
     q_ij_x_pi_i = g['instantaneous_codon_rate_matrix'][0,1]*g['equilibrium_frequency'][0]
     q_ji_x_pi_j = g['instantaneous_codon_rate_matrix'][1,0]*g['equilibrium_frequency'][1]
-    assert (q_ij_x_pi_i-q_ji_x_pi_j<g['float_tol']), 'Instantaneous codon rate matrix (Q) is not time-reversible.'
+    if (q_ij_x_pi_i - q_ji_x_pi_j) >= g['float_tol']:
+        raise AssertionError('Instantaneous codon rate matrix (Q) is not time-reversible.')
     return g
 
 def get_mechanistic_instantaneous_rate_matrix(g):
     num_codon = len(g['codon_orders'])
-    inst = numpy.ones(shape=(num_codon,num_codon))
+    inst = np.ones(shape=(num_codon,num_codon))
     transition_pairs = {'AG', 'GA', 'CT', 'TC'}
     for i1,c1 in enumerate(g['codon_orders']):
         for i2,c2 in enumerate(g['codon_orders']):
@@ -108,7 +114,7 @@ def get_mechanistic_instantaneous_rate_matrix(g):
     if g['omega'] is not None:
         inst *= g['omega'] # multiply omega for all elements
         for s,aa in enumerate(g['amino_acid_orders']):
-            ind_cdn = numpy.array(g['synonymous_indices'][aa])
+            ind_cdn = np.array(g['synonymous_indices'][aa])
             for i1,i2 in itertools.permutations(ind_cdn, 2):
                 inst[i1,i2] /= g['omega'] # restore rate of synonymous substitutions = 1, so nonsynonymous substitutions are left multiplied by omega
     if g['kappa'] is not None:
@@ -119,13 +125,13 @@ def get_mechanistic_instantaneous_rate_matrix(g):
                     diff_nucs = [ cp1+cp2 for cp1,cp2 in zip(c1,c2) if cp1!=cp2 ][0]
                     if diff_nucs in transition_pairs:
                         inst[i1,i2] *= g['kappa'] # multiply kappa to transition substitutions
-    inst = inst.dot(numpy.diag(g['equilibrium_frequency'])).astype(g['float_type']) # pi_j * q_ij
+    inst = inst.dot(np.diag(g['equilibrium_frequency'])).astype(g['float_type']) # pi_j * q_ij
     inst = scale_instantaneous_rate_matrix(inst, g['equilibrium_frequency'])
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst
 
 def fill_instantaneous_rate_matrix_diagonal(inst):
-    for i in numpy.arange(inst.shape[0]):
+    for i in np.arange(inst.shape[0]):
         inst[i,i] = 0
         inst[i,i] = -inst[i,:].sum()
     return inst
@@ -133,27 +139,29 @@ def fill_instantaneous_rate_matrix_diagonal(inst):
 def scale_instantaneous_rate_matrix(inst, eq):
     # scaling to satisfy Sum_i Sum_j!=i pi_i*q_ij, equals 1.
     # See Kosiol et al. 2007. https://academic.oup.com/mbe/article/24/7/1464/986344
-    diagonal = numpy.diag(inst)
-    assert numpy.all(numpy.isclose(diagonal, 0)), 'Diagonal elements should still be zeros.'
-    q_ijxpi_i = numpy.einsum('ad,a->ad', inst, eq)
+    diagonal = np.diag(inst)
+    if not np.all(np.isclose(diagonal, 0)):
+        raise AssertionError('Diagonal elements should still be zeros.')
+    q_ijxpi_i = np.einsum('ad,a->ad', inst, eq)
     scaling_factor = q_ijxpi_i.sum()
-    assert scaling_factor > 0, 'Instantaneous rate matrix scaling factor must be positive.'
+    if scaling_factor <= 0:
+        raise AssertionError('Instantaneous rate matrix scaling factor must be positive.')
     inst /= scaling_factor
     return inst
 
 def get_rate_tensor(inst, mode, g):
     if mode=='asis':
-        inst2 = numpy.copy(inst)
-        numpy.fill_diagonal(inst2, 0)
-        rate_tensor = numpy.expand_dims(inst2, axis=0)
+        inst2 = np.copy(inst)
+        np.fill_diagonal(inst2, 0)
+        rate_tensor = np.expand_dims(inst2, axis=0)
     elif mode=='syn':
         num_syngroup = len(g['amino_acid_orders'])
         num_state = g['max_synonymous_size']
         axis = (num_syngroup,num_state,num_state)
-        rate_tensor = numpy.zeros(axis, dtype=inst.dtype)
+        rate_tensor = np.zeros(axis, dtype=inst.dtype)
         for s,aa in enumerate(g['amino_acid_orders']):
-            ind_cdn = numpy.array(g['synonymous_indices'][aa])
-            ind_tensor = numpy.arange(len(ind_cdn))
+            ind_cdn = np.array(g['synonymous_indices'][aa])
+            ind_tensor = np.arange(len(ind_cdn))
             for it1,it2 in itertools.permutations(ind_tensor, 2):
                 rate_tensor[s,it1,it2] = inst[ind_cdn[it1],ind_cdn[it2]]
     rate_tensor = rate_tensor.astype(g['float_type'])
@@ -162,7 +170,7 @@ def get_rate_tensor(inst, mode, g):
 def cdn2pep_matrix(inst_cdn, g):
     num_pep_state = len(g['amino_acid_orders'])
     axis = [num_pep_state, num_pep_state]
-    inst_pep = numpy.zeros(axis, dtype=inst_cdn.dtype)
+    inst_pep = np.zeros(axis, dtype=inst_cdn.dtype)
     for i,aa1 in enumerate(g['amino_acid_orders']):
         for j,aa2 in enumerate(g['amino_acid_orders']):
             if aa1==aa2:
@@ -182,7 +190,7 @@ def cdn2pep_matrix(inst_cdn, g):
     return inst_pep
 
 def exchangeability2Q(ex, eq):
-    inst = ex.dot(numpy.diag(eq)).astype(numpy.float64) # pi_j * s_ij. float32 is not enough for Pyvolve
+    inst = ex.dot(np.diag(eq)).astype(np.float64) # pi_j * s_ij. float32 is not enough for Pyvolve
     inst = scale_instantaneous_rate_matrix(inst, eq)
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst
@@ -198,12 +206,13 @@ def get_equilibrium_frequency(g, mode):
         return eq
     elif mode=='pep':
         num_pep_state = len(g['amino_acid_orders'])
-        eq_pep = numpy.zeros([num_pep_state,], dtype=eq.dtype)
+        eq_pep = np.zeros([num_pep_state,], dtype=eq.dtype)
         for i,aa in enumerate(g['amino_acid_orders']):
             aa_indices = g['synonymous_indices'][aa]
             eq_pep[i] = eq[aa_indices].sum()
         txt = 'Equilibrium amino acid frequency should sum to 1.'
-        assert abs(eq_pep.sum()-1)<g['float_tol'], txt
+        if abs(eq_pep.sum()-1) >= g['float_tol']:
+            raise AssertionError(txt)
         return eq_pep
 
 def _can_use_selective_state_loading(g):
@@ -232,7 +241,7 @@ def _get_required_state_branch_ids(g):
         node_by_id[int(ete.get_prop(node, "numerical_label"))] = node
     target_ids = set()
     for trait_name in g['target_ids'].keys():
-        values = numpy.asarray(g['target_ids'][trait_name], dtype=numpy.int64)
+        values = np.asarray(g['target_ids'][trait_name], dtype=np.int64)
         target_ids.update([int(v) for v in values.tolist()])
     for branch_id in target_ids:
         required.add(branch_id)
@@ -240,7 +249,7 @@ def _get_required_state_branch_ids(g):
         if (node is None) or ete.is_root(node):
             continue
         required.add(int(ete.get_prop(node.up, "numerical_label")))
-    required_ids = numpy.array(sorted(required), dtype=numpy.int64)
+    required_ids = np.array(sorted(required), dtype=np.int64)
     return required_ids
 
 
@@ -296,11 +305,12 @@ def read_exchangeability_matrix(file, codon_orders):
     txt = txt.replace('\r', '').split('\n')
     txt_mat = txt[0:60]
     txt_mat = ''.join(txt_mat).split()
-    arr = numpy.array([ float(s) for s in txt_mat ], dtype=float)
-    assert (arr.shape[0]==1830), 'This is not a codon substitution matrix.'
+    arr = np.array([ float(s) for s in txt_mat ], dtype=float)
+    if arr.shape[0] != 1830:
+        raise AssertionError('This is not a codon substitution matrix.')
     num_state = 61
-    mat_exchangeability = numpy.zeros(shape=(num_state,num_state))
-    ind = numpy.tril_indices_from(mat_exchangeability, k=-1)
+    mat_exchangeability = np.zeros(shape=(num_state,num_state))
+    ind = np.tril_indices_from(mat_exchangeability, k=-1)
     mat_exchangeability[ind] = arr
     mat_exchangeability += mat_exchangeability.T
     ex_codon_order = get_exchangeability_codon_order()
@@ -309,7 +319,9 @@ def read_exchangeability_matrix(file, codon_orders):
     return mat_exchangeability
 
 def get_codon_order_index(order_from, order_to):
-    assert len(order_from)==len(order_to), 'Codon order lengths should match. Emprical codon substitution models are currently supported only for the Standard codon table.'
+    if len(order_from) != len(order_to):
+        txt = 'Codon order lengths should match. Emprical codon substitution models are currently supported only for the Standard codon table.'
+        raise AssertionError(txt)
     index_by_codon = dict()
     for i,to in enumerate(order_to):
         if to in index_by_codon:
@@ -321,7 +333,7 @@ def get_codon_order_index(order_from, order_to):
         if len(missing) > 10:
             missing_txt += ',...'
         raise ValueError('Codon(s) from source order not found in target order: {}'.format(missing_txt))
-    out = numpy.array([index_by_codon[fr] for fr in order_from], dtype=int)
+    out = np.array([index_by_codon[fr] for fr in order_from], dtype=int)
     return out
 
 def get_exchangeability_codon_order():
@@ -335,15 +347,16 @@ def get_exchangeability_codon_order():
         'GTG', 'GCT', 'GCC', 'GCA', 'GCG', 'GAT', 'GAC', 'GAA',
         'GAG', 'GGT', 'GGC', 'GGA', 'GGG',
     ]
-    exchangeability_codon_order = numpy.array(exchangeability_codon_order)
+    exchangeability_codon_order = np.array(exchangeability_codon_order)
     return exchangeability_codon_order
 
 def read_exchangeability_eq_freq(file, g):
     txt = _read_package_text(file=file)
     txt = txt.replace('\r', '').split('\n')
     freqs = txt[61].split()
-    freqs = numpy.array([ float(s) for s in freqs ], dtype=float)
-    assert freqs.shape[0]==61, 'Number of equilibrium frequencies ({}) should be 61.'.format(freqs.shape[0])
+    freqs = np.array([ float(s) for s in freqs ], dtype=float)
+    if freqs.shape[0] != 61:
+        raise AssertionError('Number of equilibrium frequencies ({}) should be 61.'.format(freqs.shape[0]))
     ex_codon_order = get_exchangeability_codon_order()
     codon_order_index = get_codon_order_index(order_from=g['codon_orders'], order_to=ex_codon_order)
     freqs = freqs[codon_order_index]
@@ -364,8 +377,7 @@ def annotate_tree(g, ignore_tree_inconsistency=False):
             sys.stderr.write('--rooted_tree will be used.\n')
             g['tree'] = g['rooted_tree']
         else:
-            sys.stderr.write('Exiting.\n')
-            sys.exit(1)
+            raise ValueError('Input tree and iqtree\'s treefile did not have identical leaves.')
     g['tree'] = tree.add_numerical_node_labels(g['tree'])
     total_root_tree_len = sum([(n.dist or 0.0) for n in g['rooted_tree'].traverse()])
     total_iqtree_len = sum([(n.dist or 0.0) for n in g['node_label_tree'].traverse()])

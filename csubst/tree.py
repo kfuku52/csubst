@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import copy
 import itertools
 import re
@@ -72,7 +72,11 @@ def transfer_root(tree_to, tree_from, verbose=False):
     for node in tree_to.traverse():
         if node.dist is None:
             node.dist = 0.0
-    subroot_leaves = [ete.get_leaf_names(n) for n in ete.get_children(tree_from)]
+    subroot_nodes = ete.get_children(tree_from)
+    if len(subroot_nodes) != 2:
+        txt = 'Source tree root should be bifurcating for root transfer (found {} children).'
+        raise ValueError(txt.format(len(subroot_nodes)))
+    subroot_leaves = [ete.get_leaf_names(n) for n in subroot_nodes]
     is_n0_bigger_than_n1 = (len(subroot_leaves[0]) > len(subroot_leaves[1]))
     ingroups = subroot_leaves[0] if is_n0_bigger_than_n1 else subroot_leaves[1]
     outgroups = subroot_leaves[0] if not is_n0_bigger_than_n1 else subroot_leaves[1]
@@ -85,8 +89,7 @@ def transfer_root(tree_to, tree_from, verbose=False):
     else:
         outgroup_ancestor = ete.get_common_ancestor(tree_to, outgroups)
     if not set(outgroups) == set(ete.get_leaf_names(outgroup_ancestor)):
-        sys.stderr.write('No root bipartition found in --infile. Exiting.\n')
-        sys.exit(1)
+        raise ValueError('No root bipartition found in --infile.')
     tree_to.set_outgroup(outgroup_ancestor)
     subroot_to = ete.get_children(tree_to)
     subroot_from = ete.get_children(tree_from)
@@ -106,7 +109,8 @@ def transfer_root(tree_to, tree_from, verbose=False):
 
 def transfer_internal_node_names(tree_to, tree_from):
     rf_dist = tree_to.robinson_foulds(tree_from, expand_polytomies=True)[0]
-    assert rf_dist==0, 'tree topologies are different. RF distance = {}'.format(rf_dist)
+    if rf_dist != 0:
+        raise AssertionError('tree topologies are different. RF distance = {}'.format(rf_dist))
     for to in tree_to.traverse():
         if not ete.is_leaf(to):
             for fr in tree_from.traverse():
@@ -118,9 +122,9 @@ def transfer_internal_node_names(tree_to, tree_from):
 def calc_node_dist_chunk(chunk, start, tree_dict, float_type):
     start_time = time.time()
     nrow = chunk.shape[0]
-    arr_dist = numpy.zeros(shape=(nrow, 3), dtype=float_type)
-    arr_dist[:,0] = numpy.arange(nrow) + start
-    for i in numpy.arange(nrow):
+    arr_dist = np.zeros(shape=(nrow, 3), dtype=float_type)
+    arr_dist[:,0] = np.arange(nrow) + start
+    for i in np.arange(nrow):
         nodes = [ tree_dict[n] for n in chunk[i,:] ]
         node_dists = list()
         node_nums = list()
@@ -162,7 +166,7 @@ def get_node_distance(tree, cb, ncpu, float_type):
             backend='threading',
         )
     cb.loc[:, 'dist_node_num'] = -1
-    cb.loc[:, 'dist_bl'] = numpy.nan
+    cb.loc[:, 'dist_bl'] = np.nan
     for arr_dist in out_list:
         ind = arr_dist[:,0].astype(int)
         cb.loc[ind,'dist_node_num'] = arr_dist[:,1] # This line causes the warning when arr_dist.shape[0] == 1: FutureWarning: In a future version, `df.iloc[:, i] = newvals` will attempt to set the values inplace instead of always setting a new array. To retain the old behavior, use either `df[df.columns[i]] = newvals` or, if columns are non-unique, `df.isetitem(i, newvals)`
@@ -191,7 +195,7 @@ def standardize_node_names(tree):
 def is_internal_node_labeled(tree):
     is_labeled = True
     for node in tree.traverse():
-        if not ete.is_root(node):
+        if (not ete.is_root(node)) and (not ete.is_leaf(node)):
             if not node.name:
                 is_labeled = False
     return is_labeled
@@ -218,8 +222,8 @@ def _get_pyplot():
         matplotlib.use('Agg')
     except Exception:
         pass
-    import matplotlib.pyplot
-    return matplotlib.pyplot
+    import matplotlib.pyplot as plt
+    return plt
 
 
 def _get_logo_modules():
@@ -232,11 +236,11 @@ def _get_logo_modules():
 
 
 def _normalize_state_probabilities(probabilities):
-    probs = numpy.asarray(probabilities, dtype=numpy.float64)
+    probs = np.asarray(probabilities, dtype=np.float64)
     if probs.size == 0:
         return None
-    probs = numpy.where(probs < 0, 0.0, probs)
-    probs = numpy.where(numpy.isfinite(probs), probs, 0.0)
+    probs = np.where(probs < 0, 0.0, probs)
+    probs = np.where(np.isfinite(probs), probs, 0.0)
     total = probs.sum()
     if total <= 0:
         return None
@@ -300,7 +304,7 @@ def _get_nice_scale_length(max_tree_depth):
     if max_tree_depth <= 0:
         return 1.0
     target = max_tree_depth * 0.2
-    exponent = numpy.floor(numpy.log10(target))
+    exponent = np.floor(np.log10(target))
     base = 10 ** exponent
     normalized = target / base
     if normalized <= 1.5:
@@ -532,7 +536,7 @@ def _build_state_maps_for_site(tree, site_state, orders, mode, missing_state):
             if state_prob_by_node is not None:
                 state_prob_by_node[nlabel] = None
             continue
-        index = numpy.where(node_state==max_prob)[0]
+        index = np.where(node_state==max_prob)[0]
         if len(index)==1:
             state_by_node[nlabel] = orders[index[0]]
         else:
@@ -581,10 +585,10 @@ def plot_state_tree(state, orders, mode, g):
     num_site = int(state.shape[1])
     threads = int(g.get('threads', 1))
     for trait_name in trait_names:
-        ndigit = int(numpy.log10(num_site))+1
+        ndigit = int(np.log10(num_site))+1
         n_jobs = parallel.resolve_n_jobs(num_items=num_site, threads=threads)
         if n_jobs==1:
-            site_indices = numpy.arange(num_site, dtype=numpy.int64)
+            site_indices = np.arange(num_site, dtype=np.int64)
             _render_state_tree_chunk(
                 tree=g['tree'],
                 trait_name=trait_name,
@@ -598,13 +602,13 @@ def plot_state_tree(state, orders, mode, g):
             continue
         backend = parallel.resolve_parallel_backend(g=g, task='plot_state_tree')
         chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
-        site_indices = numpy.arange(num_site, dtype=numpy.int64)
+        site_indices = np.arange(num_site, dtype=np.int64)
         site_chunks,_ = parallel.get_chunks(site_indices, threads=n_jobs, chunk_factor=chunk_factor)
         txt = 'Parallel state-tree plotting: trait = {}, mode = {}, workers = {}, backend = {}, chunks = {}'
         print(txt.format(trait_name, mode, n_jobs, backend, len(site_chunks)), flush=True)
         tasks = []
         for chunk in site_chunks:
-            chunk = numpy.asarray(chunk, dtype=numpy.int64)
+            chunk = np.asarray(chunk, dtype=np.int64)
             state_chunk = state[:, chunk, :]
             tasks.append((g['tree'], trait_name, mode, orders, missing_state, state_chunk, chunk, ndigit))
         parallel.run_starmap(
@@ -618,16 +622,21 @@ def get_num_adjusted_sites(g, node):
     nl = ete.get_prop(node, "numerical_label")
     parent = ete.get_prop(node.up, "numerical_label")
     child_states = g['state_cdn'][nl,:,:]
-    parent_states = g['state_cdn'][parent,:,:]
-    is_child_present = numpy.expand_dims(child_states.sum(axis=1)!=0, axis=1)
+    parent_states = g['state_cdn'][parent,:,:].copy()
+    is_child_present = np.expand_dims(child_states.sum(axis=1)!=0, axis=1)
     parent_states *= is_child_present
     codon_counts = parent_states.sum(axis=0)
-    scaled_Q = numpy.copy(g['instantaneous_codon_rate_matrix'])
-    numpy.fill_diagonal(scaled_Q, 0)
-    scaled_Q = scaled_Q / numpy.expand_dims(scaled_Q.sum(axis=1), axis=1)
+    scaled_Q = np.copy(g['instantaneous_codon_rate_matrix'])
+    np.fill_diagonal(scaled_Q, 0)
+    row_sums = scaled_Q.sum(axis=1)
+    nonzero_rows = row_sums > 0
+    if nonzero_rows.any():
+        scaled_Q[nonzero_rows, :] = scaled_Q[nonzero_rows, :] / np.expand_dims(row_sums[nonzero_rows], axis=1)
+    if (~nonzero_rows).any():
+        scaled_Q[~nonzero_rows, :] = 0
     adjusted_site_S = 0
     adjusted_site_N = 0
-    for i in numpy.arange(codon_counts.shape[0]):
+    for i in np.arange(codon_counts.shape[0]):
         codon = g['codon_orders'][i]
         amino_acid = [ val[0] for val in g['codon_table'] if val[1]==codon ][0]
         synonymous_codons = [ val[1] for val in g['codon_table'] if val[0]==amino_acid ]
@@ -720,7 +729,8 @@ def read_treefile(g):
     with open(g['rooted_tree_file']) as f:
         rooted_newick = f.read()
     g['rooted_tree'] = ete.PhyloNode(rooted_newick, format=1)
-    assert len(ete.get_children(g['rooted_tree']))==2, 'The input tree may be unrooted: {}'.format(g['rooted_tree_file'])
+    if len(ete.get_children(g['rooted_tree'])) != 2:
+        raise AssertionError('The input tree may be unrooted: {}'.format(g['rooted_tree_file']))
     g['rooted_tree'] = standardize_node_names(g['rooted_tree'])
     g['rooted_tree'] = add_numerical_node_labels(g['rooted_tree'])
     g['num_node'] = len(list(g['rooted_tree'].traverse()))

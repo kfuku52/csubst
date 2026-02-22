@@ -1,6 +1,6 @@
 import os
-import numpy
-import pandas
+import numpy as np
+import pandas as pd
 import pytest
 
 from csubst import foreground
@@ -31,7 +31,7 @@ def test_rgb_to_hex_rounding_matches_manual_conversion():
 
 
 def test_rgb_to_hex_rejects_values_larger_than_one():
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="between 0 and 1"):
         utility.rgb_to_hex(1.1, 0.0, 0.0)
 
 
@@ -44,12 +44,12 @@ def test_get_chunks_for_python_list():
 
 
 def test_get_chunks_for_numpy_array():
-    arr = numpy.arange(10).reshape(5, 2)
+    arr = np.arange(10).reshape(5, 2)
     chunks, starts = parallel.get_chunks(arr, threads=2)
     assert [c.shape for c in chunks] == [(2, 2), (3, 2)]
     assert starts == [0, 2]
-    numpy.testing.assert_array_equal(chunks[0], arr[:2, :])
-    numpy.testing.assert_array_equal(chunks[1], arr[2:, :])
+    np.testing.assert_array_equal(chunks[0], arr[:2, :])
+    np.testing.assert_array_equal(chunks[1], arr[2:, :])
 
 
 def test_get_chunks_avoids_empty_chunks_when_threads_exceed_items():
@@ -96,7 +96,7 @@ def test_run_starmap_threading_backend_works():
 
 def test_calc_omega_state_matches_manual_tensor_product():
     g = {"state_columns": [[0, 0, 0], [0, 0, 1]]}
-    state_nuc = numpy.array(
+    state_nuc = np.array(
         [
             [
                 [1.0, 0.0],  # codon 1, pos 1
@@ -109,34 +109,34 @@ def test_calc_omega_state_matches_manual_tensor_product():
         ],
         dtype=float,
     )
-    expected = numpy.array([[[0.7, 0.3], [0.2, 0.8]]], dtype=float)
+    expected = np.array([[[0.7, 0.3], [0.2, 0.8]]], dtype=float)
     out = sequence.calc_omega_state(state_nuc=state_nuc, g=g)
-    numpy.testing.assert_allclose(out, expected, atol=1e-12)
+    np.testing.assert_allclose(out, expected, atol=1e-12)
 
 
 def test_calc_omega_state_rejects_non_triplet_length():
     g = {"state_columns": [[0, 0, 0]]}
-    state_nuc = numpy.zeros((1, 4, 2), dtype=float)
+    state_nuc = np.zeros((1, 4, 2), dtype=float)
     with pytest.raises(Exception, match="not multiple of 3"):
         sequence.calc_omega_state(state_nuc=state_nuc, g=g)
 
 
 def test_cdn2pep_state_sums_synonymous_codons():
     g = {
-        "amino_acid_orders": numpy.array(["K", "N"]),
+        "amino_acid_orders": np.array(["K", "N"]),
         "synonymous_indices": {"K": [0], "N": [1]},
     }
-    state_cdn = numpy.array([[[0.7, 0.3], [0.2, 0.8]]], dtype=float)
+    state_cdn = np.array([[[0.7, 0.3], [0.2, 0.8]]], dtype=float)
     out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
-    numpy.testing.assert_allclose(out, state_cdn, atol=1e-12)
+    np.testing.assert_allclose(out, state_cdn, atol=1e-12)
 
 
 def test_cdn2pep_state_selected_branch_ids_keeps_global_branch_index():
     g = {
-        "amino_acid_orders": numpy.array(["K", "N"]),
+        "amino_acid_orders": np.array(["K", "N"]),
         "synonymous_indices": {"K": [0, 1], "N": [2]},
     }
-    state_cdn = numpy.array(
+    state_cdn = np.array(
         [
             [[0.2, 0.3, 0.5], [0.0, 0.0, 1.0]],
             [[0.1, 0.4, 0.5], [0.6, 0.2, 0.2]],
@@ -145,34 +145,93 @@ def test_cdn2pep_state_selected_branch_ids_keeps_global_branch_index():
         ],
         dtype=float,
     )
-    selected = numpy.array([1, 3], dtype=numpy.int64)
+    selected = np.array([1, 3], dtype=np.int64)
     out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=selected)
-    expected_selected = numpy.zeros((2, 2, 2), dtype=float)
+    expected_selected = np.zeros((2, 2, 2), dtype=float)
     expected_selected[:, :, 0] = state_cdn[selected, :, :][:, :, [0, 1]].sum(axis=2)
     expected_selected[:, :, 1] = state_cdn[selected, :, 2]
-    numpy.testing.assert_allclose(out[selected, :, :], expected_selected, atol=1e-12)
+    np.testing.assert_allclose(out[selected, :, :], expected_selected, atol=1e-12)
     assert out[0, :, :].sum() == 0
     assert out[2, :, :].sum() == 0
+
+
+def test_cdn2pep_state_selected_branch_ids_accepts_scalar_numpy_integer():
+    g = {
+        "amino_acid_orders": np.array(["K", "N"]),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+    }
+    state_cdn = np.array(
+        [
+            [[0.2, 0.3, 0.5]],
+            [[0.1, 0.4, 0.5]],
+            [[0.9, 0.0, 0.1]],
+        ],
+        dtype=float,
+    )
+    selected = np.int64(1)
+    out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=selected)
+    expected = np.zeros((3, 1, 2), dtype=float)
+    expected[1, 0, 0] = state_cdn[1, 0, [0, 1]].sum()
+    expected[1, 0, 1] = state_cdn[1, 0, 2]
+    np.testing.assert_allclose(out, expected, atol=1e-12)
+
+
+def test_cdn2pep_state_selected_branch_ids_ignores_negative_and_out_of_range_ids():
+    g = {
+        "amino_acid_orders": np.array(["K", "N"]),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+    }
+    state_cdn = np.array(
+        [
+            [[0.2, 0.3, 0.5]],
+            [[0.1, 0.4, 0.5]],
+            [[0.9, 0.0, 0.1]],
+        ],
+        dtype=float,
+    )
+    selected = np.array([1, -1, 999], dtype=np.int64)
+    out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=selected)
+    expected = np.zeros((3, 1, 2), dtype=float)
+    expected[1, 0, 0] = state_cdn[1, 0, [0, 1]].sum()
+    expected[1, 0, 1] = state_cdn[1, 0, 2]
+    np.testing.assert_allclose(out, expected, atol=1e-12)
 
 
 def test_translate_state_handles_missing_states():
     g = {
         "float_tol": 1e-12,
-        "codon_orders": numpy.array(["AAA", "AAT"]),
-        "amino_acid_orders": numpy.array(["K", "N"]),
-        "state_cdn": numpy.array([[[0.1, 0.9], [0.0, 0.0]]], dtype=float),
-        "state_pep": numpy.array([[[0.1, 0.9], [0.0, 0.0]]], dtype=float),
+        "codon_orders": np.array(["AAA", "AAT"]),
+        "amino_acid_orders": np.array(["K", "N"]),
+        "state_cdn": np.array([[[0.1, 0.9], [0.0, 0.0]]], dtype=float),
+        "state_pep": np.array([[[0.1, 0.9], [0.0, 0.0]]], dtype=float),
     }
     assert sequence.translate_state(0, "codon", g) == "AAT---"
     assert sequence.translate_state(0, "aa", g) == "N-"
 
 
+def test_translate_state_rejects_unknown_mode():
+    g = {
+        "float_tol": 1e-12,
+        "codon_orders": np.array(["AAA"]),
+        "amino_acid_orders": np.array(["K"]),
+        "state_cdn": np.array([[[1.0]]], dtype=float),
+        "state_pep": np.array([[[1.0]]], dtype=float),
+    }
+    with pytest.raises(ValueError, match="Unsupported translate_state mode"):
+        sequence.translate_state(0, "protein", g)
+
+
 def test_get_state_index_with_ambiguity_gap_and_unknown():
-    input_state = numpy.array(["AAA", "AAG", "AAT", "AAC"])
+    input_state = np.array(["AAA", "AAG", "AAT", "AAC"])
     out = sequence.get_state_index("AAN", input_state, genetic_code.ambiguous_table)
     assert sorted(out) == [0, 1, 2, 3]
     assert sequence.get_state_index("-", input_state, genetic_code.ambiguous_table) == []
     assert sequence.get_state_index("XZZ", input_state, genetic_code.ambiguous_table) == []
+
+
+def test_get_codon_table_rejects_unknown_ncbi_id():
+    with pytest.raises(ValueError, match="Unsupported NCBI codon table ID"):
+        genetic_code.get_codon_table(999)
 
 
 def test_read_fasta_and_calc_identity(tmp_path):
@@ -184,8 +243,13 @@ def test_read_fasta_and_calc_identity(tmp_path):
 
 
 def test_calc_identity_requires_equal_length():
-    with pytest.raises(AssertionError, match="identical"):
+    with pytest.raises(ValueError, match="identical"):
         sequence.calc_identity("AAA", "AA")
+
+
+def test_calc_identity_rejects_empty_sequences():
+    with pytest.raises(ValueError, match="non-empty"):
+        sequence.calc_identity("", "")
 
 
 def test_combinations_count_matches_hand_calculation():
@@ -193,3 +257,13 @@ def test_combinations_count_matches_hand_calculation():
     assert foreground.combinations_count(5, 2) == 10
     # Symmetry nCr == nC(n-r)
     assert foreground.combinations_count(8, 6) == foreground.combinations_count(8, 2)
+
+
+def test_combinations_count_out_of_range_r_returns_zero():
+    assert foreground.combinations_count(5, 6) == 0
+    assert foreground.combinations_count(5, -1) == 0
+
+
+def test_combinations_count_rejects_negative_n():
+    with pytest.raises(ValueError, match=">= 0"):
+        foreground.combinations_count(-1, 1)

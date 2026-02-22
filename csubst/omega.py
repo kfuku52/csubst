@@ -4,7 +4,7 @@
 #    my_class.mp_simple_method()
 #    my_class.wait()
 
-import numpy
+import numpy as np
 import scipy.stats as stats
 from scipy.linalg import expm
 
@@ -20,17 +20,17 @@ from csubst import table
 from csubst import ete
 from csubst import output_stat
 
-_UINT8_POPCOUNT = numpy.unpackbits(
-    numpy.arange(256, dtype=numpy.uint8)[:, None],
+_UINT8_POPCOUNT = np.unpackbits(
+    np.arange(256, dtype=np.uint8)[:, None],
     axis=1,
-).sum(axis=1).astype(numpy.uint8)
+).sum(axis=1).astype(np.uint8)
 
 
 def _get_cb_ids(cb):
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
     cb_ids = cb.loc[:, bid_columns].values
-    if not numpy.issubdtype(cb_ids.dtype, numpy.integer):
-        cb_ids = cb_ids.astype(numpy.int64)
+    if not np.issubdtype(cb_ids.dtype, np.integer):
+        cb_ids = cb_ids.astype(np.int64)
     return cb_ids
 
 
@@ -64,7 +64,7 @@ def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type):
         tmp_E = sub_sites[bid1, :] * sub_branches[bid1, None]
         tmp_E *= sub_sites[bid2, :] * sub_branches[bid2, None]
         return tmp_E.sum(axis=1)
-    tmp_E = numpy.ones(shape=(cb_ids.shape[0], sub_sites.shape[1]), dtype=float_type)
+    tmp_E = np.ones(shape=(cb_ids.shape[0], sub_sites.shape[1]), dtype=float_type)
     for col in range(cb_ids.shape[1]):
         bids = cb_ids[:, col]
         tmp_E *= sub_sites[bids, :] * sub_branches[bids, None]
@@ -72,14 +72,14 @@ def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type):
 
 
 def _weighted_sample_without_replacement_masks(p, size, niter):
-    p = numpy.asarray(p, dtype=numpy.float64)
+    p = np.asarray(p, dtype=np.float64)
     if p.ndim != 1:
         raise ValueError('p should be a 1D array.')
     if size < 0:
         raise ValueError('size should be >= 0.')
-    positive_sites = numpy.flatnonzero(p > 0)
+    positive_sites = np.flatnonzero(p > 0)
     num_positive_sites = positive_sites.shape[0]
-    masks = numpy.zeros(shape=(niter, p.shape[0]), dtype=bool)
+    masks = np.zeros(shape=(niter, p.shape[0]), dtype=bool)
     if (size == 0) or (num_positive_sites == 0):
         return masks
     if size > num_positive_sites:
@@ -89,25 +89,25 @@ def _weighted_sample_without_replacement_masks(p, size, niter):
         masks[:, positive_sites] = True
         return masks
     # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
-    positive_weights = p[positive_sites].astype(numpy.float32, copy=False)
-    keys = numpy.random.random((niter, num_positive_sites)).astype(numpy.float32, copy=False)
-    numpy.log(keys, out=keys)
+    positive_weights = p[positive_sites].astype(np.float32, copy=False)
+    keys = np.random.random((niter, num_positive_sites)).astype(np.float32, copy=False)
+    np.log(keys, out=keys)
     keys /= positive_weights
     kth = num_positive_sites - size
-    sampled_local_indices = numpy.argpartition(keys, kth=kth, axis=1)[:, kth:]
+    sampled_local_indices = np.argpartition(keys, kth=kth, axis=1)[:, kth:]
     sampled_site_indices = positive_sites[sampled_local_indices]
-    row_indices = numpy.arange(niter)[:, None]
+    row_indices = np.arange(niter)[:, None]
     masks[row_indices, sampled_site_indices] = True
     return masks
 
 
 def _get_permutations_fast(cb_ids, sub_branches, p, niter):
-    cb_ids = numpy.asarray(cb_ids, dtype=numpy.int64)
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
     if cb_ids.ndim != 2:
         raise ValueError('cb_ids should be a 2D array.')
     if cb_ids.shape[0] == 0:
-        return numpy.zeros((0, niter), dtype=numpy.int32)
-    sub_branches = numpy.asarray(sub_branches, dtype=numpy.int64)
+        return np.zeros((0, niter), dtype=np.int32)
+    sub_branches = np.asarray(sub_branches, dtype=np.int64)
     if sub_branches.ndim != 1:
         raise ValueError('sub_branches should be a 1D array.')
     if sub_branches.shape[0] <= cb_ids.max():
@@ -115,17 +115,17 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
     cb_branch_sizes = sub_branches[cb_ids]
     is_active_row = (cb_branch_sizes > 0).all(axis=1)
     if not is_active_row.any():
-        return numpy.zeros((cb_ids.shape[0], niter), dtype=numpy.int32)
-    active_row_indices = numpy.where(is_active_row)[0]
+        return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
+    active_row_indices = np.where(is_active_row)[0]
     active_cb_ids = cb_ids[active_row_indices, :]
-    active_branch_ids, inverse_branch_ids = numpy.unique(active_cb_ids, return_inverse=True)
+    active_branch_ids, inverse_branch_ids = np.unique(active_cb_ids, return_inverse=True)
     remapped_active_cb_ids = inverse_branch_ids.reshape(active_cb_ids.shape)
     active_sub_branches = sub_branches[active_branch_ids]
 
     num_branch = active_sub_branches.shape[0]
     num_site = p.shape[0]
     num_packed_site = (num_site + 7) // 8
-    packed_masks = numpy.zeros(shape=(num_branch, niter, num_packed_site), dtype=numpy.uint8)
+    packed_masks = np.zeros(shape=(num_branch, niter, num_packed_site), dtype=np.uint8)
     previous_branch_id_by_size = dict()
     for branch_id in range(num_branch):
         size = int(active_sub_branches[branch_id])
@@ -133,26 +133,26 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
             continue
         if size in previous_branch_id_by_size:
             prev_branch_id = previous_branch_id_by_size[size]
-            packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, numpy.random.permutation(niter), :]
+            packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
             continue
         previous_branch_id_by_size[size] = branch_id
         masks = _weighted_sample_without_replacement_masks(p=p, size=size, niter=niter)
-        packed_masks[branch_id, :, :] = numpy.packbits(masks, axis=1)
+        packed_masks[branch_id, :, :] = np.packbits(masks, axis=1)
 
     arity = remapped_active_cb_ids.shape[1]
     if arity == 1:
-        active_out = _UINT8_POPCOUNT[packed_masks[remapped_active_cb_ids[:, 0], :, :]].sum(axis=2, dtype=numpy.int32)
+        active_out = _UINT8_POPCOUNT[packed_masks[remapped_active_cb_ids[:, 0], :, :]].sum(axis=2, dtype=np.int32)
     elif arity == 2:
-        active_out = _UINT8_POPCOUNT[numpy.bitwise_and(
+        active_out = _UINT8_POPCOUNT[np.bitwise_and(
             packed_masks[remapped_active_cb_ids[:, 0], :, :],
             packed_masks[remapped_active_cb_ids[:, 1], :, :],
-        )].sum(axis=2, dtype=numpy.int32)
+        )].sum(axis=2, dtype=np.int32)
     else:
         shared = packed_masks[remapped_active_cb_ids[:, 0], :, :].copy()
         for col in range(1, arity):
-            shared = numpy.bitwise_and(shared, packed_masks[remapped_active_cb_ids[:, col], :, :])
-        active_out = _UINT8_POPCOUNT[shared].sum(axis=2, dtype=numpy.int32)
-    out = numpy.zeros((cb_ids.shape[0], niter), dtype=numpy.int32)
+            shared = np.bitwise_and(shared, packed_masks[remapped_active_cb_ids[:, col], :, :])
+        active_out = _UINT8_POPCOUNT[shared].sum(axis=2, dtype=np.int32)
+    out = np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
     out[active_row_indices, :] = active_out
     return out
 
@@ -171,7 +171,7 @@ def _resolve_quantile_parallel_plan(cb_rows, num_categories, quantile_niter, req
 
 
 def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g):
-    E_b = numpy.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
+    E_b = np.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
     for i,sg,a,d in list_igad:
         if (a==d):
             continue
@@ -218,22 +218,24 @@ def joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_
         pm_start = time.time()
         if 'float' in str(sub_branches.dtype):
             # TODO: warn this rounding (only once)
-            sub_branches = sub_branches.round().astype(numpy.int64)
+            sub_branches = sub_branches.round().astype(np.int64)
         dfq[:,:] += _get_permutations_fast(cb_ids, sub_branches, p, quantile_niter)
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i+1, num_gad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
 def _calc_E_mean_chunk_to_mmap(mode, cb_ids, sub_sg, sub_bg, mmap_out, dtype, shape, obs_col, num_gad_combinat, igad_chunk, g):
-    dfEb = numpy.memmap(filename=mmap_out, dtype=dtype, shape=shape, mode='r+')
+    dfEb = np.memmap(filename=mmap_out, dtype=dtype, shape=shape, mode='r+')
     joblib_calc_E_mean(mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g)
     dfEb.flush()
 
 def _calc_quantile_chunk_local(mode, cb_ids, sub_sg, sub_bg, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
-    dfq_local = numpy.zeros(shape=(cb_ids.shape[0], quantile_niter), dtype=numpy.int32)
+    dfq_local = np.zeros(shape=(cb_ids.shape[0], quantile_niter), dtype=np.int32)
     joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq_local, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
     return dfq_local
 
-def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g={}):
+def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g=None):
+    if g is None:
+        raise ValueError('g is required.')
     if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
         sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor=sub_tensor, mode=mode)
     if mode=='spe2spe':
@@ -255,7 +257,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         if not isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
             sub_bg = sub_tensor.sum(axis=(1, 3, 4)) # branch, matrix_group
             sub_sg = sub_tensor.sum(axis=(0, 3, 4)) # site, matrix_group
-        list_gad = list(itertools.product(numpy.arange(sub_tensor.shape[2]), ['any2',], ['2any',]))
+        list_gad = list(itertools.product(np.arange(sub_tensor.shape[2]), ['any2',], ['2any',]))
     num_gad_combinat = len(list_gad)
     txt = 'E{}{}: Total number of substitution categories after NaN removals: {}'
     print(txt.format(SN, mode, num_gad_combinat))
@@ -283,7 +285,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             axis = (cb.shape[0],)
-            dfEb = numpy.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
+            dfEb = np.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
             tasks = [
                 (mode, cb_ids, sub_sg, sub_bg, mmap_out, my_dtype, axis, obs_col, num_gad_combinat, igad_chunk, g)
                 for igad_chunk in igad_chunks
@@ -300,7 +302,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             if os.path.exists(mmap_out): os.unlink(mmap_out)
     elif stat=='quantile':
         axis = (cb.shape[0], quantile_niter)
-        dfq = numpy.zeros(shape=axis, dtype=numpy.int32)
+        dfq = np.zeros(shape=axis, dtype=np.int32)
         if n_jobs == 1:
             joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, list_igad, g)
         else:
@@ -318,8 +320,8 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
                 dfq += dfq_chunk
         # num_gad_combinat: poisson approximation
         obs_values = cb.loc[:,obs_col].values.astype(g['float_type'], copy=False)
-        gt_ranks = (dfq < obs_values[:, None]).sum(axis=1, dtype=numpy.int64)
-        ge_ranks = (dfq <= obs_values[:, None]).sum(axis=1, dtype=numpy.int64)
+        gt_ranks = (dfq < obs_values[:, None]).sum(axis=1, dtype=np.int64)
+        ge_ranks = (dfq <= obs_values[:, None]).sum(axis=1, dtype=np.int64)
         E_b = ((gt_ranks + ge_ranks) / 2) / quantile_niter
     return E_b
 
@@ -338,7 +340,7 @@ def subroot_E2nan(cb, tree):
             continue
         for id_col in id_cols:
             is_node = (cb.loc[:,id_col]==ete.get_prop(node, "numerical_label"))
-            cb.loc[is_node,E_cols] = numpy.nan
+            cb.loc[is_node,E_cols] = np.nan
     return cb
 
 def get_E(cb, g, ON_tensor, OS_tensor):
@@ -347,12 +349,12 @@ def get_E(cb, g, ON_tensor, OS_tensor):
     if (g['omegaC_method']=='modelfree'):
         ON_gad, ON_ga, ON_gd = substitution.get_group_state_totals(ON_tensor)
         OS_gad, OS_ga, OS_gd = substitution.get_group_state_totals(OS_tensor)
-        g['N_ind_nomissing_gad'] = numpy.where(ON_gad!=0)
-        g['N_ind_nomissing_ga'] = numpy.where(ON_ga!=0)
-        g['N_ind_nomissing_gd'] = numpy.where(ON_gd!=0)
-        g['S_ind_nomissing_gad'] = numpy.where(OS_gad!=0)
-        g['S_ind_nomissing_ga'] = numpy.where(OS_ga!=0)
-        g['S_ind_nomissing_gd'] = numpy.where(OS_gd!=0)
+        g['N_ind_nomissing_gad'] = np.where(ON_gad!=0)
+        g['N_ind_nomissing_ga'] = np.where(ON_ga!=0)
+        g['N_ind_nomissing_gd'] = np.where(ON_gd!=0)
+        g['S_ind_nomissing_gad'] = np.where(OS_gad!=0)
+        g['S_ind_nomissing_ga'] = np.where(OS_ga!=0)
+        g['S_ind_nomissing_gd'] = np.where(OS_gd!=0)
         for st in base_stats:
             cb['ECN'+st] = calc_E_stat(cb, ON_tensor, mode=st, stat='mean', SN='N', g=g)
             cb['ECS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='mean', SN='S', g=g)
@@ -403,7 +405,7 @@ def get_exp_state(g, mode):
     elif mode=='pep':
         state = g['state_pep'].astype(g['float_type'])
         inst = g['instantaneous_aa_rate_matrix']
-    stateE = numpy.zeros_like(state, dtype=g['float_type'])
+    stateE = np.zeros_like(state, dtype=g['float_type'])
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
@@ -419,20 +421,21 @@ def get_exp_state(g, mode):
         if parent_nl>stateE.shape[0]:
             continue # Skip if parent is the root node
         inst_bl = inst * branch_length
-        for site_rate in numpy.unique(g['iqtree_rate_values']):
+        for site_rate in np.unique(g['iqtree_rate_values']):
             inst_bl_site = inst_bl * site_rate
             # Confirmed this implementation (with expm) correctly replicated the example in this instruction (Huelsenbeck, 2012)
             # https://molevolworkshop.github.io/faculty/huelsenbeck/pdf/WoodsHoleHandout.pdf
             transition_prob = expm(inst_bl_site)
-            site_indices = numpy.where(g['iqtree_rate_values']==site_rate)[0]
+            site_indices = np.where(g['iqtree_rate_values']==site_rate)[0]
             for s in site_indices:
-                expected_transition_ad = numpy.einsum('a,ad->ad', state[parent_nl,s,:], transition_prob)
+                expected_transition_ad = np.einsum('a,ad->ad', state[parent_nl,s,:], transition_prob)
                 if expected_transition_ad.sum()-1>g['float_tol']:
                     expected_transition_ad /= expected_transition_ad.sum()
                 expected_derived_state = expected_transition_ad.sum(axis=0)
                 stateE[nl,s,:] = expected_derived_state
     max_stateE = stateE.sum(axis=(2)).max()
-    assert (max_stateE-1)<g['float_tol'], 'Total probability of expected states should not exceed 1. {}'.format(max_stateE)
+    if (max_stateE - 1) >= g['float_tol']:
+        raise AssertionError('Total probability of expected states should not exceed 1. {}'.format(max_stateE))
     return stateE
 
 def get_omega(cb, g):
@@ -466,9 +469,9 @@ def get_CoD(cb, g):
             continue
         cb.loc[:,col_cod] = cb[col_spe] / cb[col_dif]
         is_Nzero = (cb[col_spe] < g['float_tol'])
-        is_inf = numpy.isinf(cb.loc[:,col_cod])
+        is_inf = np.isinf(cb.loc[:,col_cod])
         if (is_Nzero&is_inf).sum():
-            cb.loc[(is_Nzero&is_inf), col_cod] = numpy.nan
+            cb.loc[(is_Nzero&is_inf), col_cod] = np.nan
     return cb
 
 def print_cb_stats(cb, prefix, output_stats):
@@ -503,8 +506,8 @@ def calibrate_dsc(cb, transformation='quantile', output_stats=None):
         col_noncalibrated_omega = 'omegaC'+sub+'_nocalib'
         if not all([col in cb.columns for col in [col_dNc, col_dSc, col_omega]]):
             continue
-        dNc_values = cb.loc[:,col_dNc].replace([numpy.inf, -numpy.inf], numpy.nan)
-        uncorrected_dSc_values = cb.loc[:,col_dSc].replace([numpy.inf, -numpy.inf], numpy.nan)
+        dNc_values = cb.loc[:,col_dNc].replace([np.inf, -np.inf], np.nan)
+        uncorrected_dSc_values = cb.loc[:,col_dSc].replace([np.inf, -np.inf], np.nan)
         is_na = (uncorrected_dSc_values.isnull() | dNc_values.isnull())
         if is_na.all():
             txt = 'dSc calibration could not be applied: {} (no finite dNc/dSc pairs)\n'
@@ -523,11 +526,11 @@ def calibrate_dsc(cb, transformation='quantile', output_stats=None):
             alpha,loc,beta = stats.gamma.fit(dNc_values_wo_na)
             cb.loc[~is_na,col_dSc] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
         elif (transformation=='quantile'):
-            cb.loc[~is_na,col_dSc] = numpy.quantile(dNc_values_wo_na, quantiles)
+            cb.loc[~is_na,col_dSc] = np.quantile(dNc_values_wo_na, quantiles)
         noncalibrated_dSc_values = cb.loc[:,col_noncalibrated_dSc].values
         is_nocalib_higher = (noncalibrated_dSc_values>cb.loc[:,col_dSc]).fillna(False)
         cb.loc[is_nocalib_higher,col_dSc] = noncalibrated_dSc_values[is_nocalib_higher]
-        cb.loc[:,col_omega] = numpy.nan
+        cb.loc[:,col_omega] = np.nan
         cb.loc[:,col_omega] = cb.loc[:,col_dNc] / cb.loc[:,col_dSc]
         median_value = cb.loc[:,col_omega].median()
         txt = '{} median {} ({:,}/{:,} branch combinations were corrected for dNc vs dSc distribution ranges): {:.3f}'

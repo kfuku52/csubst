@@ -1,5 +1,6 @@
-import numpy
-import pandas
+import builtins
+import numpy as np
+import pandas as pd
 import pytest
 import warnings
 
@@ -57,11 +58,45 @@ def test_transfer_internal_node_names_copies_labels_by_topology():
     assert name_by_leafset[("B", "C")] == "X"
 
 
+def test_transfer_internal_node_names_rejects_different_topologies():
+    tree_to = ete.PhyloNode("((A:1,B:1):1,(C:1,D:1):1);", format=1)
+    tree_from = ete.PhyloNode("((A:1,C:1):1,(B:1,D:1):1);", format=1)
+    with pytest.raises(AssertionError, match="RF distance"):
+        tree.transfer_internal_node_names(tree_to, tree_from)
+
+
+def test_transfer_root_rejects_missing_root_bipartition():
+    tree_to = ete.PhyloNode("((A:1,C:1):1,(B:1,D:1):1);", format=1)
+    tree_from = ete.PhyloNode("((A:1,B:1):1,(C:1,D:1):1);", format=1)
+    with pytest.raises(ValueError, match="No root bipartition"):
+        tree.transfer_root(tree_to=tree_to, tree_from=tree_from)
+
+
+def test_transfer_root_rejects_non_bifurcating_source_root():
+    tree_to = ete.PhyloNode("((A:1,B:1):1,C:1);", format=1)
+    tree_from = ete.PhyloNode("(A:1,B:1,C:1);", format=1)
+    with pytest.raises(ValueError, match="bifurcating"):
+        tree.transfer_root(tree_to=tree_to, tree_from=tree_from)
+
+
+def test_read_treefile_rejects_unrooted_tree(tmp_path):
+    tree_file = tmp_path / "unrooted.nwk"
+    tree_file.write_text("(A:1,B:1,C:1);", encoding="utf-8")
+    with pytest.raises(AssertionError, match="may be unrooted"):
+        tree.read_treefile({"rooted_tree_file": str(tree_file)})
+
+
 def test_is_internal_node_labeled():
     labeled = ete.PhyloNode("(A:1,B:1)R;", format=1)
     unlabeled = ete.PhyloNode("(A:1,(B:1,C:1):1)R;", format=1)
     assert tree.is_internal_node_labeled(labeled)
     assert not tree.is_internal_node_labeled(unlabeled)
+
+
+def test_is_internal_node_labeled_ignores_leaf_labels():
+    tr = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    ete.get_leaves(tr)[0].name = ""
+    assert tree.is_internal_node_labeled(tr)
 
 
 def test_plot_branch_category_writes_pdf_with_matplotlib(tmp_path):
@@ -74,7 +109,7 @@ def test_plot_branch_category_writes_pdf_with_matplotlib(tmp_path):
     ete.set_prop(b_node, "labelcolor_trait", "red")
     g = {
         "tree": tr,
-        "fg_df": pandas.DataFrame({"lineage_id": [1], "trait": ["B"]}),
+        "fg_df": pd.DataFrame({"lineage_id": [1], "trait": ["B"]}),
     }
     out_base = tmp_path / "branch_plot"
     tree.plot_branch_category(g, file_base=str(out_base), label="all")
@@ -89,7 +124,7 @@ def test_plot_state_tree_writes_site_pdfs_with_matplotlib(tmp_path, monkeypatch)
         ete.set_prop(node, "color_trait", "black")
         ete.set_prop(node, "labelcolor_trait", "black")
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
-    state = numpy.zeros((len(labels), 2, 2), dtype=float)
+    state = np.zeros((len(labels), 2, 2), dtype=float)
     state[labels["A"], 0, :] = [1.0, 0.0]
     state[labels["A"], 1, :] = [0.0, 1.0]
     state[labels["B"], 0, :] = [0.0, 1.0]
@@ -100,13 +135,32 @@ def test_plot_state_tree_writes_site_pdfs_with_matplotlib(tmp_path, monkeypatch)
     state[labels["X"], 1, :] = [0.0, 0.0]  # Zero max should render as missing state.
     g = {
         "tree": tr,
-        "fg_df": pandas.DataFrame({"lineage_id": [1], "trait": ["B"]}),
+        "fg_df": pd.DataFrame({"lineage_id": [1], "trait": ["B"]}),
     }
     monkeypatch.chdir(tmp_path)
-    tree.plot_state_tree(state=state, orders=numpy.array(["K", "N"]), mode="aa", g=g)
+    tree.plot_state_tree(state=state, orders=np.array(["K", "N"]), mode="aa", g=g)
     out_files = sorted(tmp_path.glob("csubst_state_trait_aa_*.pdf"))
     assert [p.name for p in out_files] == ["csubst_state_trait_aa_1.pdf", "csubst_state_trait_aa_2.pdf"]
     assert all(p.stat().st_size > 0 for p in out_files)
+
+
+def test_get_num_adjusted_sites_does_not_mutate_parent_state_tensor():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    nodes = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    a_node = [n for n in tr.traverse() if n.name == "A"][0]
+    state_cdn = np.zeros((len(nodes), 1, 2), dtype=float)
+    state_cdn[nodes["R"], 0, :] = [0.6, 0.4]
+    state_cdn[nodes["A"], 0, :] = [0.0, 0.0]
+    state_cdn[nodes["B"], 0, :] = [1.0, 0.0]
+    g = {
+        "state_cdn": state_cdn.copy(),
+        "codon_orders": np.array(["AAA", "AAG"]),
+        "codon_table": [["K", "AAA"], ["K", "AAG"]],
+        "instantaneous_codon_rate_matrix": np.array([[0.0, 1.0], [1.0, 0.0]], dtype=float),
+    }
+    parent_before = g["state_cdn"][nodes["R"], :, :].copy()
+    tree.get_num_adjusted_sites(g=g, node=a_node)
+    np.testing.assert_allclose(g["state_cdn"][nodes["R"], :, :], parent_before, atol=1e-12)
 
 
 def test_get_nice_scale_length_returns_expected_steps():
@@ -124,47 +178,47 @@ def test_get_pyvolve_codon_order_contains_61_sense_codons():
 def test_get_codons_extracts_expected_members():
     codon_table = [["K", "AAA"], ["K", "AAG"], ["N", "AAC"], ["*", "TAA"]]
     out = main_simulate.get_codons("K", codon_table)
-    numpy.testing.assert_array_equal(out, ["AAA", "AAG"])
+    np.testing.assert_array_equal(out, ["AAA", "AAG"])
 
 
 def test_biased_index_helpers_match_manual_pairs():
     codon_table = [["K", "AAA"], ["K", "AAG"], ["N", "AAC"], ["*", "TAA"]]
-    codon_order = numpy.array(["AAA", "AAG", "AAC"])
-    biased_aas = numpy.array(["K"])
+    codon_order = np.array(["AAA", "AAG", "AAC"])
+    biased_aas = np.array(["K"])
     nsy_idx = main_simulate.get_biased_nonsynonymous_substitution_index(biased_aas, codon_table, codon_order)
-    numpy.testing.assert_array_equal(nsy_idx, [[2, 0], [2, 1]])
+    np.testing.assert_array_equal(nsy_idx, [[2, 0], [2, 1]])
     cdn_idx = main_simulate.get_biased_codon_index(biased_aas, codon_table, codon_order)
-    numpy.testing.assert_array_equal(cdn_idx, [[0], [1]])
+    np.testing.assert_array_equal(cdn_idx, [[0], [1]])
 
 
 def test_get_synonymous_codon_substitution_index_manual_count():
     g = {"codon_table": [["K", "AAA"], ["K", "AAG"], ["N", "AAC"]]}
-    codon_order = numpy.array(["AAA", "AAG", "AAC"])
+    codon_order = np.array(["AAA", "AAG", "AAC"])
     out = main_simulate.get_synonymous_codon_substitution_index(g, codon_order)
-    numpy.testing.assert_array_equal(out, [[0, 1], [1, 0]])
+    np.testing.assert_array_equal(out, [[0, 1], [1, 0]])
 
 
 def test_get_total_Q_sums_requested_entries():
-    mat = numpy.array([[0.0, 1.0], [2.0, 0.0]])
-    idx = numpy.array([[0, 1], [1, 0]])
+    mat = np.array([[0.0, 1.0], [2.0, 0.0]])
+    idx = np.array([[0, 1], [1, 0]])
     assert main_simulate.get_total_Q(mat, idx) == 3.0
 
 
 def test_rescale_substitution_matrix_preserves_total_and_zero_row_sum():
-    mat = numpy.array([[0.0, 2.0, 1.0], [3.0, 0.0, 4.0], [5.0, 6.0, 0.0]])
-    idx = numpy.array([[0, 1], [1, 2]])
+    mat = np.array([[0.0, 2.0, 1.0], [3.0, 0.0, 4.0], [5.0, 6.0, 0.0]])
+    idx = np.array([[0, 1], [1, 2]])
     out = main_simulate.rescale_substitution_matrix(mat, idx, scaling_factor=2.0)
-    offdiag_before = mat[~numpy.eye(mat.shape[0], dtype=bool)].sum()
-    offdiag_after = out[~numpy.eye(out.shape[0], dtype=bool)].sum()
+    offdiag_before = mat[~np.eye(mat.shape[0], dtype=bool)].sum()
+    offdiag_after = out[~np.eye(out.shape[0], dtype=bool)].sum()
     assert pytest.approx(offdiag_after, rel=0, abs=1e-12) == offdiag_before
-    numpy.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0, 0.0], atol=1e-12)
 
 
 def test_bias_eq_freq_scales_and_renormalizes():
-    eq = numpy.array([0.2, 0.3, 0.5], dtype=float)
-    out = main_simulate.bias_eq_freq(eq, biased_cdn_index=numpy.array([[0], [1]]), convergence_intensity_factor=2.0)
+    eq = np.array([0.2, 0.3, 0.5], dtype=float)
+    out = main_simulate.bias_eq_freq(eq, biased_cdn_index=np.array([[0], [1]]), convergence_intensity_factor=2.0)
     # pre-normalization: [0.4, 0.6, 0.5] -> normalized by 1.5
-    numpy.testing.assert_allclose(out, [4 / 15, 6 / 15, 5 / 15], atol=1e-12)
+    np.testing.assert_allclose(out, [4 / 15, 6 / 15, 5 / 15], atol=1e-12)
 
 
 def test_get_biased_amino_acids_rejects_oversized_random_request():
@@ -180,50 +234,50 @@ def test_get_biased_amino_acids_rejects_unknown_symbol():
 
 
 def test_apply_percent_biased_sub_preserves_foreground_omega():
-    mat = numpy.array(
+    mat = np.array(
         [[-1.0, 0.5, 0.5], [0.5, -1.0, 0.5], [0.5, 0.5, -1.0]],
         dtype=float,
     )
-    all_syn = numpy.array([[0, 1], [1, 0]])
-    all_nsy = numpy.array([[0, 2], [1, 2], [2, 0], [2, 1]])
+    all_syn = np.array([[0, 1], [1, 0]])
+    all_nsy = np.array([[0, 2], [1, 2], [2, 0], [2, 1]])
     codon_table = [["K", "AAA"], ["K", "AAG"], ["N", "AAC"]]
     out = main_simulate.apply_percent_biased_sub(
         mat=mat,
         percent_biased_sub=20,
-        target_index=numpy.array([[2, 0], [2, 1]]),
-        biased_aas=numpy.array(["K"]),
+        target_index=np.array([[2, 0], [2, 1]]),
+        biased_aas=np.array(["K"]),
         codon_table=codon_table,
-        codon_orders=numpy.array(["AAA", "AAG", "AAC"]),
+        codon_orders=np.array(["AAA", "AAG", "AAC"]),
         all_nsy_cdn_index=all_nsy,
         all_syn_cdn_index=all_syn,
         foreground_omega=2.0,
     )
     dnds = main_simulate.get_total_Q(out, all_nsy) / main_simulate.get_total_Q(out, all_syn)
     assert pytest.approx(dnds, rel=0, abs=1e-12) == 2.0
-    numpy.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0, 0.0], atol=1e-12)
 
 
 def test_apply_percent_biased_sub_with_no_targets_rescales_omega_without_nan():
-    mat = numpy.array(
+    mat = np.array(
         [[-1.0, 0.5, 0.5], [0.5, -1.0, 0.5], [0.5, 0.5, -1.0]],
         dtype=float,
     )
-    all_syn = numpy.array([[0, 1], [1, 0]])
-    all_nsy = numpy.array([[0, 2], [1, 2], [2, 0], [2, 1]])
+    all_syn = np.array([[0, 1], [1, 0]])
+    all_nsy = np.array([[0, 2], [1, 2], [2, 0], [2, 1]])
     codon_table = [["K", "AAA"], ["K", "AAG"], ["N", "AAC"]]
     out = main_simulate.apply_percent_biased_sub(
         mat=mat,
         percent_biased_sub=20,
-        target_index=numpy.zeros((0, 2), dtype=int),
-        biased_aas=numpy.array([], dtype=str),
+        target_index=np.zeros((0, 2), dtype=int),
+        biased_aas=np.array([], dtype=str),
         codon_table=codon_table,
-        codon_orders=numpy.array(["AAA", "AAG", "AAC"]),
+        codon_orders=np.array(["AAA", "AAG", "AAC"]),
         all_nsy_cdn_index=all_nsy,
         all_syn_cdn_index=all_syn,
         foreground_omega=2.0,
     )
     dnds = main_simulate.get_total_Q(out, all_nsy) / main_simulate.get_total_Q(out, all_syn)
-    assert numpy.isfinite(out).all()
+    assert np.isfinite(out).all()
     assert pytest.approx(dnds, rel=0, abs=1e-12) == 2.0
 
 
@@ -292,7 +346,7 @@ def test_plot_branch_category_writes_pdf_with_matplotlib_backend(tmp_path):
         ete.set_prop(node, "labelcolor_PLACEHOLDER", "black")
     g = {
         "tree": tr,
-        "fg_df": pandas.DataFrame(columns=["name", "PLACEHOLDER"]),
+        "fg_df": pd.DataFrame(columns=["name", "PLACEHOLDER"]),
     }
     outbase = tmp_path / "csubst_branch_id"
     tree.plot_branch_category(g=g, file_base=str(outbase), label="all")
@@ -305,10 +359,10 @@ def test_plot_state_tree_zero_sites_is_noop(tmp_path, monkeypatch):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     g = {
         "tree": tr,
-        "fg_df": pandas.DataFrame(columns=["name", "PLACEHOLDER"]),
+        "fg_df": pd.DataFrame(columns=["name", "PLACEHOLDER"]),
     }
-    state = numpy.zeros((3, 0, 2), dtype=float)
-    orders = numpy.array(["A", "B"])
+    state = np.zeros((3, 0, 2), dtype=float)
+    orders = np.array(["A", "B"])
     monkeypatch.chdir(tmp_path)
     tree.plot_state_tree(state=state, orders=orders, mode="aa", g=g)
     assert list(tmp_path.glob("csubst_state_*.pdf")) == []
@@ -331,7 +385,7 @@ def test_main_simulate_plot_uses_foreground_annotation(monkeypatch):
         return local_g
 
     def fake_get_foreground_branch(local_g, simulate=False):
-        local_g["fg_df"] = pandas.DataFrame({"name": ["A"], "PLACEHOLDER": [1]})
+        local_g["fg_df"] = pd.DataFrame({"name": ["A"], "PLACEHOLDER": [1]})
         for node in local_g["tree"].traverse():
             if node.name == "A":
                 ete.set_prop(node, "is_fg_PLACEHOLDER", True)
@@ -375,6 +429,23 @@ def test_main_simulate_plot_uses_foreground_annotation(monkeypatch):
     assert captured["colored"] is True
 
 
+def test_require_pyvolve_raises_clear_optional_dependency_message(monkeypatch):
+    original_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "pyvolve":
+            raise ModuleNotFoundError("No module named 'pyvolve'")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(main_simulate, "_PYVOLVE", None)
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    with pytest.raises(ModuleNotFoundError, match=r'optional dependency for `csubst simulate`'):
+        main_simulate._require_pyvolve()
+    with pytest.raises(ModuleNotFoundError, match=r'csubst\[simulate\]'):
+        main_simulate._require_pyvolve()
+
+
 def test_foreground_stem_vertical_segment_is_not_colored():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(B:1,(A:1,C:1)X:1)R;", format=1))
     by_name = {n.name: n for n in tr.traverse() if n.name}
@@ -416,11 +487,11 @@ def test_rescale_branch_length_adjusted_site_keeps_ndist_when_only_nonsynonymous
     num_nodes = len(list(tr.traverse()))
     g = {
         "tree": tr,
-        "state_cdn": numpy.ones((num_nodes, 1, 1), dtype=float),
+        "state_cdn": np.ones((num_nodes, 1, 1), dtype=float),
         "float_tol": 1e-12,
     }
-    os_counts = numpy.zeros(num_nodes, dtype=float)
-    on_counts = numpy.zeros(num_nodes, dtype=float)
+    os_counts = np.zeros(num_nodes, dtype=float)
+    on_counts = np.zeros(num_nodes, dtype=float)
     on_counts[a_nl] = 5.0
     os_tensor = object()
     on_tensor = object()
@@ -453,11 +524,11 @@ def test_rescale_branch_length_adjusted_site_keeps_nonzero_component_when_other_
     num_nodes = len(list(tr.traverse()))
     g = {
         "tree": tr,
-        "state_cdn": numpy.ones((num_nodes, 1, 1), dtype=float),
+        "state_cdn": np.ones((num_nodes, 1, 1), dtype=float),
         "float_tol": 1e-12,
     }
-    os_counts = numpy.zeros(num_nodes, dtype=float)
-    on_counts = numpy.zeros(num_nodes, dtype=float)
+    os_counts = np.zeros(num_nodes, dtype=float)
+    on_counts = np.zeros(num_nodes, dtype=float)
     on_counts[a_nl] = 3.0
     os_tensor = object()
     on_tensor = object()

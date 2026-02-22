@@ -1,6 +1,6 @@
-import numpy
-import matplotlib.pyplot
-import pandas
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
 import pymol
 
 from Bio import SeqIO
@@ -48,7 +48,16 @@ def write_mafft_alignment(g):
     cmd_mafft += ['--add', tmp_pdb_fasta, 'tmp.csubst.leaf.aa.fa',]
     print('Running MAFFT to align the PDB sequence with the input alignment.', flush=True)
     print('Command: {}'.format(' '.join(cmd_mafft)), flush=True)
-    out_mafft = subprocess.run(cmd_mafft, stdout=subprocess.PIPE)
+    try:
+        out_mafft = subprocess.run(cmd_mafft, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError as exc:
+        raise AssertionError('mafft PATH cannot be found: {}'.format(g['mafft_exe'])) from exc
+    if out_mafft.returncode != 0:
+        stderr_text = out_mafft.stderr.decode('utf8', errors='replace').strip()
+        if stderr_text == '':
+            stderr_text = 'unknown error'
+        txt = 'MAFFT failed with exit code {}: {}'
+        raise RuntimeError(txt.format(out_mafft.returncode, stderr_text))
     with open(g['mafft_add_fasta'], 'w') as f:
         f.write(out_mafft.stdout.decode('utf8'))
     print('')
@@ -83,9 +92,8 @@ def write_mafft_alignment(g):
     )
     print('', flush=True)
     if os.path.getsize(g['mafft_add_fasta'])==0:
-        sys.stderr.write('File size of {} is 0. A wrong ID might be specified in --pdb.\n'.format(g['mafft_add_fasta']))
-        sys.stderr.write('Exiting.\n')
-        sys.exit(1)
+        txt = 'File size of {} is 0. A wrong ID might be specified in --pdb.'
+        raise ValueError(txt.format(g['mafft_add_fasta']))
 
 def get_residue_numberings():
     out = dict()
@@ -99,24 +107,26 @@ def get_residue_numberings():
             pymol.cmd.iterate(selection=txt_selection, expression='stored.residues.append(resi)')
             residue_numbers = [ int(x) for x in pymol.stored.residues if not bool(re.search('[a-zA-Z]', x)) ]
             residue_numbers = sorted(list(set(residue_numbers))) # Drop occasionally observed duplications
-            residue_iloc = numpy.arange(len(residue_numbers)) + 1
+            residue_iloc = np.arange(len(residue_numbers)) + 1
             col1 = 'codon_site_'+object_name+'_'+ch
             col2 = 'codon_site_pdb_'+object_name+'_'+ch
             dict_tmp = {col1:residue_iloc, col2:residue_numbers}
-            df_tmp = pandas.DataFrame(dict_tmp)
+            df_tmp = pd.DataFrame(dict_tmp)
             out[object_name+'_'+ch] = df_tmp
     return out
 
 def add_pdb_residue_numbering(df):
     residue_numberings = get_residue_numberings()
-    object_names = pymol.cmd.get_names()
+    object_names = [on for on in pymol.cmd.get_names() if not on.endswith('_pol_conts')]
     for object_name in object_names:
         for ch in pymol.cmd.get_chains(object_name):
             key = object_name+'_'+ch
+            if key not in residue_numberings:
+                continue
             if residue_numberings[key].shape[0]==0:
                 continue
             if 'codon_site_'+key in df.columns:
-                df = pandas.merge(df, residue_numberings[key], on='codon_site_'+key, how='left')
+                df = pd.merge(df, residue_numberings[key], on='codon_site_'+key, how='left')
                 df['codon_site_pdb_'+key] = df['codon_site_pdb_'+key].fillna(0).astype(int)
     print('The column "codon_site_**ID**" indicates the positions of codons/amino acids in the sequence "**ID**" in the input alignment. 0 = missing site.')
     print('The column "codon_site_pdb_**ID**" indicates the positions of codons/amino acids in the sequence "**ID**" in the PDB file. 0 = missing site.')
@@ -128,18 +138,26 @@ def add_coordinate_from_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'
         map_str = f.read()
     map_list = map_str.split('>')[1:]
     for map_item in map_list:
-        seq_name = re.sub('\n.*', '', map_item)
-        seq_csv = re.sub(seq_name+'\n', '', map_item)
-        if seq_csv.count('\n')==1: # empty data
+        map_lines = map_item.splitlines()
+        if len(map_lines)==0:
+            continue
+        seq_name = map_lines[0]
+        seq_csv = '\n'.join(map_lines[1:])
+        if seq_csv.strip()=='': # empty data
             df.loc[:,'codon_site_'+seq_name] = 0
             df.loc[:,'aa_'+seq_name] = 0
         else:
-            df_tmp = pandas.read_csv(StringIO(seq_csv), comment='#', header=None)
+            try:
+                df_tmp = pd.read_csv(StringIO(seq_csv), comment='#', header=None)
+            except pd.errors.EmptyDataError:
+                df.loc[:, 'codon_site_'+seq_name] = 0
+                df.loc[:, 'aa_'+seq_name] = 0
+                continue
             df_tmp.columns = ['aa_'+seq_name, 'codon_site_'+seq_name, 'codon_site_alignment']
             is_missing_in_aln = (df_tmp['codon_site_alignment']==' -')
             df_tmp = df_tmp.loc[~is_missing_in_aln,:]
             df_tmp['codon_site_alignment'] = df_tmp['codon_site_alignment'].astype(int)
-            df = pandas.merge(df, df_tmp, on='codon_site_alignment', how='left')
+            df = pd.merge(df, df_tmp, on='codon_site_alignment', how='left')
             df['codon_site_'+seq_name] = df['codon_site_'+seq_name].fillna(0).astype(int)
             df['aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
     return df
@@ -150,8 +168,10 @@ def add_coordinate_from_user_alignment(df, user_alignment):
     tmp_pdb_fasta = 'tmp.csubst.pdb_seq.fa'
     with open(tmp_pdb_fasta, 'w') as f:
         f.write(pdb_fasta)
-    pdb_seqs = list(SeqIO.parse(open(tmp_pdb_fasta, 'r'), 'fasta'))
-    user_seqs = list(SeqIO.parse(open(user_alignment, 'r'), 'fasta'))
+    with open(tmp_pdb_fasta, 'r') as f:
+        pdb_seqs = list(SeqIO.parse(f, 'fasta'))
+    with open(user_alignment, 'r') as f:
+        user_seqs = list(SeqIO.parse(f, 'fasta'))
     for user_seq in user_seqs:
         for pdb_seq in pdb_seqs:
             if user_seq.name!=pdb_seq.name:
@@ -161,13 +181,17 @@ def add_coordinate_from_user_alignment(df, user_alignment):
             user_seq_counter = 0
             pdb_seq_counter = 0
             txt = 'The alignment length should match between --alignment_file ({} sites) and --user_alignment ({} sites)'
-            assert len(user_seq_str)==df.shape[0], txt.format(df.shape[0], len(user_seq_str))
+            if len(user_seq_str) != df.shape[0]:
+                raise ValueError(txt.format(df.shape[0], len(user_seq_str)))
             df['aa_' + user_seq.name] = ''
             df['codon_site_' + user_seq.name] = 0
             while user_seq_counter <= df.shape[0]-1:
                 if user_seq_str[user_seq_counter]=='-':
                     user_seq_counter += 1
                     continue
+                if pdb_seq_counter >= len(pdb_seq_str):
+                    txt = 'Unable to map --user_alignment residue at position {} for sequence "{}" to the PDB sequence "{}".'
+                    raise ValueError(txt.format(user_seq_counter + 1, user_seq.name, pdb_seq.name))
                 if user_seq_str[user_seq_counter]==pdb_seq_str[pdb_seq_counter]:
                     df.at[user_seq_counter, 'aa_' + user_seq.name] = user_seq_str[user_seq_counter]
                     df.at[user_seq_counter, 'codon_site_' + user_seq.name] = pdb_seq_counter + 1
@@ -180,7 +204,7 @@ def add_coordinate_from_user_alignment(df, user_alignment):
 def calc_aa_identity(g):
     seqs = sequence.read_fasta(path=g['mafft_add_fasta'])
     seqnames = list(seqs.keys())
-    pdb_base = re.sub('\..*', '', os.path.basename(g['pdb']))
+    pdb_base = re.sub(r'\..*', '', os.path.basename(g['pdb']))
     pdb_seqnames = [ sn for sn in seqnames if sn.startswith(pdb_base) ]
     other_seqnames = [ sn for sn in seqnames if not sn.startswith(pdb_base) ]
     aa_identity_values = dict()
@@ -189,10 +213,13 @@ def calc_aa_identity(g):
         for other_seqname in other_seqnames:
             aa_identity = sequence.calc_identity(seq1=seqs[pdb_seqname], seq2=seqs[other_seqname])
             aa_identity_values[pdb_seqname].append(aa_identity)
-        aa_identity_values[pdb_seqname] = numpy.array(aa_identity_values[pdb_seqname])
+        aa_identity_values[pdb_seqname] = np.array(aa_identity_values[pdb_seqname])
     aa_identity_means = dict()
     for pdb_seqname in pdb_seqnames:
-        aa_identity_means[pdb_seqname] = aa_identity_values[pdb_seqname].mean()
+        if aa_identity_values[pdb_seqname].shape[0] == 0:
+            aa_identity_means[pdb_seqname] = np.nan
+        else:
+            aa_identity_means[pdb_seqname] = aa_identity_values[pdb_seqname].mean()
     aa_ranges = dict()
     for pdb_seqname in pdb_seqnames:
         alphabet_sites = [ m.start() for m in re.finditer('[a-zA-Z]', seqs[pdb_seqname]) ]
@@ -211,6 +238,10 @@ def calc_aa_identity(g):
 def mask_subunit(g):
     g = calc_aa_identity(g)
     pdb_seqnames = list(g['aa_identity_means'].keys())
+    if len(pdb_seqnames) == 0:
+        txt = 'No sequence with PDB basename prefix was found in {}. Skipping subunit masking.'
+        print(txt.format(g['mafft_add_fasta']), flush=True)
+        return None
     nucleic_chains = pymol.cmd.get_chains('polymer.nucleic')
     colors = ['wheat','slate','salmon','brightorange','violet','olive',
               'firebrick','pink','marine','density','cyan','chocolate','teal',]
@@ -221,13 +252,12 @@ def mask_subunit(g):
         pymol.cmd.do('color pink, resn '+nucleotide)
     if len(pdb_seqnames)==1:
         return None
-    max_aa_identity_mean = max(g['aa_identity_means'].values())
-    for pdb_seqname in pdb_seqnames:
-        aa_identity_mean = g['aa_identity_means'][pdb_seqname]
-        if abs(max_aa_identity_mean-aa_identity_mean)<g['float_tol']:
-            max_pdb_seqname = pdb_seqname
-            max_spans = g['aa_spans'][pdb_seqname]
-            break
+    finite_identity_items = [item for item in g['aa_identity_means'].items() if np.isfinite(item[1])]
+    if len(finite_identity_items) > 0:
+        max_pdb_seqname = max(finite_identity_items, key=lambda item: item[1])[0]
+    else:
+        max_pdb_seqname = pdb_seqnames[0]
+    max_spans = g['aa_spans'][max_pdb_seqname]
     i = 0
     for pdb_seqname in pdb_seqnames:
         if pdb_seqname==max_pdb_seqname:
@@ -237,7 +267,7 @@ def mask_subunit(g):
         is_nonoverlapping_C_side = (max_spans[0] > spans[1])
         if (is_nonoverlapping_N_side|is_nonoverlapping_C_side):
             continue
-        chain = pdb_seqname.replace(g['pdb']+'_', '')
+        chain = pdb_seqname.rsplit('_', 1)[-1]
         print('Masking chain {}'.format(chain), flush=True)
         if spans[1]==0: # End position = 0 if no protein in the chain
             continue
@@ -254,12 +284,18 @@ def set_color_gray(object_names, residue_numberings, gray_value):
             continue
         for ch in pymol.cmd.get_chains(object_name):
             key = object_name+'_'+ch
+            if key not in residue_numberings:
+                continue
             codon_site_pdb = residue_numberings[key].loc[:,'codon_site_pdb_'+key]
             is_nonzero = (codon_site_pdb!=0)
+            if not is_nonzero.any():
+                continue
             residue_start = codon_site_pdb.loc[is_nonzero].min()
             residue_end = codon_site_pdb.loc[is_nonzero].max()
+            if pd.isna(residue_start) or pd.isna(residue_end):
+                continue
             cmd_color = "color gray{}, {} and chain {} and resi {:}-{:}"
-            pymol.cmd.do(cmd_color.format(gray_value, object_name, ch, residue_start, residue_end))
+            pymol.cmd.do(cmd_color.format(gray_value, object_name, ch, int(residue_start), int(residue_end)))
 
 
 def _paint_sites_with_hex(object_name, chain_id, sites, hex_value, label):
@@ -361,6 +397,14 @@ def _get_lineage_hex_by_branch(branch_ids, g):
     return out
 
 
+def _normalize_branch_ids(branch_ids):
+    arr = np.asarray(branch_ids)
+    if arr.size == 0:
+        return []
+    arr = np.atleast_1d(arr).reshape(-1)
+    return [int(v) for v in arr.tolist()]
+
+
 def set_substitution_colors(df, g, object_names, N_sub_cols):
     for object_name in object_names:
         if object_name.endswith('_pol_conts'):
@@ -396,7 +440,7 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                     if codon_site==0:
                         continue
                     total_sub = float(df.loc[i,N_sub_cols].sum())
-                    if total_sub < g['pymol_min_single_prob']:
+                    if total_sub < float(g.get('min_single_prob', 0.8)):
                         continue
                     site_values[codon_site] = max(site_values.get(codon_site, 0.0), total_sub)
                 _paint_intensity_sites(
@@ -407,27 +451,33 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 )
                 continue
             if mode=='lineage':
-                lineage_branch_ids = [int(bid) for bid in numpy.asarray(g['branch_ids']).tolist()]
+                lineage_branch_ids = _normalize_branch_ids(g.get('branch_ids', []))
+                if len(lineage_branch_ids) == 0:
+                    print('Skipping site painting. No branch IDs were provided for lineage mode.', flush=True)
+                    continue
+                lineage_pairs = [(bid, 'N_sub_' + str(bid)) for bid in lineage_branch_ids if ('N_sub_' + str(bid)) in df.columns]
+                if len(lineage_pairs) == 0:
+                    print('Skipping site painting. No N_sub_* columns matched lineage branch IDs.', flush=True)
+                    continue
+                lineage_branch_ids = [bid for bid,_ in lineage_pairs]
+                lineage_cols = [col for _,col in lineage_pairs]
                 branch_hex = _get_lineage_hex_by_branch(lineage_branch_ids, g=g)
                 site_by_branch = {bid: [] for bid in lineage_branch_ids}
-                lineage_min_prob = min(
-                    float(g.get('pymol_min_single_prob', 0.8)),
-                    float(g.get('pymol_min_combinat_prob', 0.5)),
-                )
+                lineage_min_prob = float(g.get('min_single_prob', 0.8))
                 for i in df.index:
                     codon_site = int(df.at[i,codon_site_col])
                     if codon_site==0:
                         continue
-                    vals = df.loc[i,N_sub_cols].to_numpy(dtype=float)
+                    vals = df.loc[i, lineage_cols].to_numpy(dtype=float)
                     if vals.shape[0]==0:
                         continue
-                    qualifying = numpy.where(vals >= lineage_min_prob)[0]
+                    qualifying = np.where(vals >= lineage_min_prob)[0]
                     if qualifying.shape[0]==0:
                         continue
                     # Stratigraphy mode: assign a site to the oldest lineage branch
                     # with sufficiently high substitution probability.
                     selected_index = int(qualifying.min())
-                    branch_id = lineage_branch_ids[min(selected_index, len(lineage_branch_ids)-1)]
+                    branch_id = lineage_branch_ids[selected_index]
                     site_by_branch[branch_id].append(codon_site)
                 for branch_id in lineage_branch_ids:
                     label = 'lineage_branch_{}'.format(branch_id)
@@ -450,11 +500,11 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 prob_single_sub = df.loc[i,N_sub_cols].max()
                 if codon_site==0:
                     continue
-                elif (prob_Nany2spe>=g['pymol_min_combinat_prob'])&(prob_Nany2dif<=prob_Nany2spe):
+                elif (prob_Nany2spe>=float(g.get('min_combinat_prob', 0.5)))&(prob_Nany2dif<=prob_Nany2spe):
                     color_sites['OCNany2spe'].append(codon_site)
-                elif (prob_Nany2dif>=g['pymol_min_combinat_prob'])&(prob_Nany2dif>prob_Nany2spe):
+                elif (prob_Nany2dif>=float(g.get('min_combinat_prob', 0.5)))&(prob_Nany2dif>prob_Nany2spe):
                     color_sites['OCNany2dif'].append(codon_site)
-                elif (prob_single_sub>=g['pymol_min_single_prob']):
+                elif (prob_single_sub>=float(g.get('min_single_prob', 0.8))):
                     color_sites['single_sub'].append(codon_site)
             if g['single_branch_mode']:
                 color_sites['single_branch_N'] = copy.deepcopy(color_sites['single_sub'])
@@ -633,7 +683,7 @@ def save_6view_pdf(image_prefix='tmp.csubst.pymol',
         directions = ['pos_x','neg_x','pos_y','neg_y','pos_z','neg_z']
 
     # Create a figure with 3 rows & 2 columns
-    fig, axes = matplotlib.pyplot.subplots(nrows=3, ncols=2, figsize=(7.2, 9.7))
+    fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(7.2, 9.7))
 
     for idx, direction in enumerate(directions):
         row = idx // 2
@@ -659,9 +709,9 @@ def save_6view_pdf(image_prefix='tmp.csubst.pymol',
         # Optionally label each subplot
         ax.set_title(direction)
 
-    matplotlib.pyplot.tight_layout()
-    matplotlib.pyplot.savefig(pdf_filename)
-    matplotlib.pyplot.close(fig)
+    plt.tight_layout()
+    plt.savefig(pdf_filename)
+    plt.close(fig)
     print(f"Saved 6-view PDF as {pdf_filename}")
     return None
 

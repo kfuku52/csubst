@@ -1,5 +1,5 @@
-import numpy
-import pandas
+import numpy as np
+import pandas as pd
 
 import os
 import shutil
@@ -26,7 +26,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         raise ValueError('--max_combination should be >= 1.')
     OS_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=OS_tensor, g=g, label='OS')
     ON_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=ON_tensor, g=g, label='ON')
-    for current_arity in numpy.arange(2, g['max_arity'] + 1):
+    for current_arity in np.arange(2, g['max_arity'] + 1):
         start = time.time()
         g['current_arity'] = current_arity
         g = param.initialize_df_cb_stats(g)
@@ -68,7 +68,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                 else:
                     cb_passed = cb.loc[is_stat_enough,cb_passed_columns].reset_index(drop=True)
                 if len(set(cb_passed.loc[:,id_columns].values.ravel().tolist())) < current_arity:
-                    cb = pandas.DataFrame()
+                    cb = pd.DataFrame()
                     txt = 'Arity (K) = {:,}: No branch combination satisfied --cutoff_stat. Ending higher-order search at K = {:,}.'
                     print(txt.format(current_arity, current_arity))
                     break
@@ -84,7 +84,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         else:
             raise Exception('Invalid arity: {}'.format(current_arity))
         if id_combinations.shape[0] == 0:
-            cb = pandas.DataFrame()
+            cb = pd.DataFrame()
             txt = 'Arity (K) = {:,}: No branch combination satisfied phylogenetic independence. Ending higher-order search at K = {:,}.'
             print(txt.format(current_arity, current_arity))
             break
@@ -144,7 +144,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                 ON_tensor_reducer=ON_tensor_reducer,
             )
         g['df_cb_stats'] = g['df_cb_stats'].loc[:, sorted(g['df_cb_stats'].columns.tolist())]
-        g['df_cb_stats_main'] = pandas.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+        g['df_cb_stats_main'] = pd.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
         if current_arity == g['max_arity']:
             txt = 'Maximum arity (K = {:,}) reached. Ending higher-order search of branch combinations.'
             print(txt.format(g['max_arity']))
@@ -192,10 +192,10 @@ def main_analyze(g):
         os.chdir('..')
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
-    sub_branches = numpy.where(substitution.get_branch_sub_counts(ON_tensor) != 0)[0].tolist()
+    sub_branches = np.where(substitution.get_branch_sub_counts(ON_tensor) != 0)[0].tolist()
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
-    sub_branches = list(set(sub_branches).union(set(numpy.where(substitution.get_branch_sub_counts(OS_tensor) != 0)[0].tolist())))
+    sub_branches = list(set(sub_branches).union(set(np.where(substitution.get_branch_sub_counts(OS_tensor) != 0)[0].tolist())))
     g['sub_branches'] = sub_branches
     g = tree.rescale_branch_length(g, OS_tensor, ON_tensor)
     id_combinations = None
@@ -249,7 +249,7 @@ def main_analyze(g):
         bOS = substitution.get_b(g=g, sub_tensor=OS_tensor, attr='S', sitewise=False)
         bON = substitution.get_b(g=g, sub_tensor=ON_tensor, attr='N', sitewise=True)
         b = table.merge_tables(bOS, bON)
-        b.loc[:,'branch_length'] = numpy.nan
+        b.loc[:,'branch_length'] = np.nan
         for node in g['tree'].traverse():
             b.loc[ete.get_prop(node, "numerical_label"),'branch_length'] = node.dist
         txt = 'Number of {} patterns among {:,} branches={:,}, min={:,.1f}, max={:,.1f}'
@@ -304,7 +304,7 @@ def main_analyze(g):
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if (g['cb']):
-        g['df_cb_stats_main'] = pandas.DataFrame()
+        g['df_cb_stats_main'] = pd.DataFrame()
         g,cb = cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True)
         #if (g['fg_clade_permutation']>0):
         #    g = foreground.clade_permutation(cb, g)
@@ -312,7 +312,7 @@ def main_analyze(g):
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
         print('Writing csubst_cb_stats.tsv', flush=True)
         column_original = g['df_cb_stats_main'].columns
-        g['df_cb_stats_main'].columns = pandas.Index(
+        g['df_cb_stats_main'].columns = pd.Index(
             [str(col).replace('_PLACEHOLDER', '') for col in column_original]
         )
         g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)

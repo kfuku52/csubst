@@ -1,7 +1,7 @@
-import numpy
+import numpy as np
 import matplotlib
-import matplotlib.pyplot
-import pandas
+import matplotlib.pyplot as plt
+import pandas as pd
 
 import datetime
 import itertools
@@ -35,11 +35,28 @@ matplotlib.rc('figure', titlesize=font_size)
 def bool2yesno(flag):
     return 'yes' if bool(flag) else 'no'
 
+
+def _normalize_branch_ids(branch_ids):
+    if branch_ids is None:
+        return np.array([], dtype=np.int64)
+    values = np.asarray(branch_ids)
+    if values.ndim == 0:
+        scalar = values.item()
+        if isinstance(scalar, (list, tuple, set, np.ndarray)):
+            values = np.asarray(list(scalar))
+    if values.size == 0:
+        return np.array([], dtype=np.int64)
+    try:
+        return np.atleast_1d(values).astype(np.int64, copy=False).reshape(-1)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('branch_ids should be integer-like.') from exc
+
 def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, branch_ids, note=''):
     site_outdir = os.path.abspath(g['site_outdir'])
     output_path_abs = os.path.abspath(output_path)
     exists = os.path.exists(output_path_abs)
     size_bytes = os.path.getsize(output_path_abs) if exists else -1
+    normalized_branch_ids = _normalize_branch_ids(branch_ids)
     if output_path_abs.startswith(site_outdir + os.sep):
         output_file = os.path.relpath(output_path_abs, start=site_outdir)
     else:
@@ -47,8 +64,8 @@ def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, bra
     effective_min_prob = float(get_tree_site_min_prob(g))
     row = {
         'generated_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        'branch_ids': ','.join([str(int(bid)) for bid in numpy.asarray(branch_ids)]),
-        'branch_count': int(len(branch_ids)),
+        'branch_ids': ','.join([str(int(bid)) for bid in normalized_branch_ids.tolist()]),
+        'branch_count': int(normalized_branch_ids.shape[0]),
         'single_branch_mode': bool2yesno(g.get('single_branch_mode', False)),
         'output_kind': str(output_kind),
         'output_file': str(output_file),
@@ -70,7 +87,7 @@ def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, bra
 
 def write_site_output_manifest(manifest_rows, g, branch_ids):
     manifest_path = os.path.join(g['site_outdir'], 'csubst_site.outputs.tsv')
-    manifest_df = pandas.DataFrame(manifest_rows)
+    manifest_df = pd.DataFrame(manifest_rows)
     if manifest_df.shape[0] > 0:
         manifest_df = manifest_df.sort_values(by=['output_kind', 'output_file']).reset_index(drop=True)
     manifest_df.to_csv(manifest_path, sep='\t', index=False, chunksize=10000)
@@ -82,7 +99,7 @@ def write_site_output_manifest(manifest_rows, g, branch_ids):
         branch_ids=branch_ids,
         note='manifest_self_row',
     )
-    manifest_df = pandas.DataFrame(manifest_rows)
+    manifest_df = pd.DataFrame(manifest_rows)
     manifest_df = manifest_df.sort_values(by=['output_kind', 'output_file']).reset_index(drop=True)
     manifest_df.to_csv(manifest_path, sep='\t', index=False, chunksize=10000)
     print('Writing site output manifest: {}'.format(manifest_path), flush=True)
@@ -94,8 +111,8 @@ def get_state(node, g):
         raise AssertionError('Leaf sequence not found for node "{}". Check tree/alignment labels.'.format(node.name))
     if len(seq) % 3 != 0:
         raise AssertionError('Sequence length is not multiple of 3. Node name = ' + node.name)
-    state_matrix = numpy.zeros([g['num_input_site'], g['num_input_state']], dtype=g['float_type'])
-    for s in numpy.arange(g['num_input_site']):
+    state_matrix = np.zeros([g['num_input_site'], g['num_input_state']], dtype=g['float_type'])
+    for s in np.arange(g['num_input_site']):
         codon = seq[(s*3):((s+1)*3)]
         codon_index = sequence.get_state_index(state=codon, input_state=g['codon_orders'], ambiguous_table=genetic_code.ambiguous_table)
         for ci in codon_index:
@@ -106,7 +123,7 @@ def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
     x_values = df.loc[:,xcol].values - 0.5
     if x_values.size == 0:
         return None
-    y_values = numpy.ones(x_values.shape) * yvalue
+    y_values = np.ones(x_values.shape) * yvalue
     gap_values = df.loc[:,gapcol].values
     bars = dict()
     bars['x_start'] = list()
@@ -117,7 +134,7 @@ def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
     current_x = x_values[0]
     current_y = y_values[0]
     current_gap = gap_values[0]
-    i_ranges = numpy.arange(len(x_values))
+    i_ranges = np.arange(len(x_values))
     i_end = i_ranges[-1]
     for i in i_ranges:
         x_value = x_values[i]
@@ -135,7 +152,7 @@ def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
             current_x = x_value
             current_y = y_value
             current_gap = gap_value
-    for i in numpy.arange(len(bars['x_start'])):
+    for i in np.arange(len(bars['x_start'])):
         y = bars['y'][i]
         x_start = bars['x_start'][i]
         x_end = bars['x_end'][i]
@@ -144,7 +161,7 @@ def add_gapline(df, gapcol, xcol, yvalue, lw, ax):
 
 
 def _zeros_yvalues(num_row):
-    return numpy.zeros(num_row, dtype=float)
+    return np.zeros(num_row, dtype=float)
 
 
 def _get_yvalues_sub(df, SN):
@@ -287,7 +304,7 @@ def _get_lineage_rgb_by_branch(branch_ids, g):
 
 
 def _add_lineage_distance_colorbar(fig, g):
-    branch_ids = [int(bid) for bid in numpy.asarray(g.get('branch_ids', [])).tolist()]
+    branch_ids = _normalize_branch_ids(g.get('branch_ids', [])).tolist()
     if len(branch_ids)==0:
         return None
     mid_dists,is_actual = _get_lineage_midpoint_distances(branch_ids=branch_ids, g=g)
@@ -331,13 +348,13 @@ def get_highest_identity_chain_name(g):
     if len(aa_identity_means) == 0:
         g['highest_identity_chain_name'] = None
         return g
-    mean_keys = numpy.array(list(aa_identity_means.keys()))
-    mean_values = numpy.array(list(aa_identity_means.values()), dtype=float)
-    is_finite = numpy.isfinite(mean_values)
+    mean_keys = np.array(list(aa_identity_means.keys()))
+    mean_values = np.array(list(aa_identity_means.values()), dtype=float)
+    is_finite = np.isfinite(mean_values)
     if is_finite.any():
         finite_keys = mean_keys[is_finite]
         finite_values = mean_values[is_finite]
-        g['highest_identity_chain_name'] = finite_keys[numpy.argmax(finite_values)]
+        g['highest_identity_chain_name'] = finite_keys[np.argmax(finite_values)]
     else:
         g['highest_identity_chain_name'] = mean_keys[0]
     return g
@@ -393,7 +410,7 @@ def _get_branch_sub_type_key(branch_id):
 
 
 def _add_branch_sub_types(sub_types, SN_color_all, branch_ids, color_by_branch):
-    for branch_id in branch_ids.tolist():
+    for branch_id in _normalize_branch_ids(branch_ids).tolist():
         key = _get_branch_sub_type_key(branch_id)
         sub_types[key] = 'Substitutions in\nbranch_id {}'.format(int(branch_id))
         SN_color_all[key] = {'N': color_by_branch[int(branch_id)], 'S': 'gainsboro'}
@@ -404,7 +421,7 @@ def get_plot_sub_types_and_colors(g):
     mode = str(g.get('mode', 'intersection')).lower()
     if mode == 'lineage':
         sub_types, SN_color_all = _get_base_sub_types_and_colors()
-        branch_ids = numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64)
+        branch_ids = _normalize_branch_ids(g.get('branch_ids', []))
         branch_rgb = _get_lineage_rgb_by_branch(branch_ids=branch_ids.tolist(), g=g)
         sub_types, SN_color_all = _add_branch_sub_types(
             sub_types=sub_types,
@@ -495,7 +512,7 @@ def _draw_barchart_series(ax, df, sub_type, SN, SN_colors, ylabel, g, NS_ymax, i
     if enable_substitution_labels and (SN == 'N') and (g['pdb'] is not None):
         ax = add_substitution_labels(df, SN, sub_type, SN_colors, ax, g)
     ax.set_ylabel(ylabel, fontsize=font_size)
-    xy = pandas.DataFrame({'x': df.loc[:, 'codon_site_alignment'].values, 'y': yvalues})
+    xy = pd.DataFrame({'x': df.loc[:, 'codon_site_alignment'].values, 'y': yvalues})
     xy2 = xy.loc[(xy['y'] > 0.01), :]
     ax.bar(xy2['x'], xy2['y'], color=SN_colors[SN])
     if is_last_row:
@@ -547,13 +564,13 @@ def _apply_barchart_layout(fig, g):
 
 
 def _create_barchart_figure(num_row):
-    fig, axes = matplotlib.pyplot.subplots(
+    fig, axes = plt.subplots(
         nrows=num_row,
         ncols=1,
         figsize=(7.2, 1.2 * num_row),
         sharex=True,
     )
-    return fig, numpy.atleast_1d(axes).reshape(-1)
+    return fig, np.atleast_1d(axes).reshape(-1)
 
 
 def _draw_all_barchart_rows(df, g, axes, sub_types, SN_color_all, NS_ymax):
@@ -593,7 +610,7 @@ def plot_barchart(df, g):
 def plot_lineage_tree(g, outbase):
     if str(g.get('mode', '')).lower() != 'lineage':
         return None
-    branch_ids = numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64)
+    branch_ids = _normalize_branch_ids(g.get('branch_ids', []))
     if branch_ids.shape[0]==0:
         return None
     branch_rgb = _get_lineage_rgb_by_branch(branch_ids=branch_ids.tolist(), g=g)
@@ -605,7 +622,7 @@ def plot_lineage_tree(g, outbase):
         ete.set_prop(node, 'labelcolor_PLACEHOLDER', node_color)
     plot_g = {
         'tree': g['tree'],
-        'fg_df': pandas.DataFrame(columns=['name', 'PLACEHOLDER']),
+        'fg_df': pd.DataFrame(columns=['name', 'PLACEHOLDER']),
     }
     tree.plot_branch_category(g=plot_g, file_base=outbase+'.tree', label='all')
     return None
@@ -618,12 +635,12 @@ def get_gapsite_rate(state_tensor):
 
 def extend_site_index_edge(sites, num_extend):
     new_sites = sites.copy()
-    to_append_base = pandas.Series(-1 - numpy.arange(num_extend))
+    to_append_base = pd.Series(-1 - np.arange(num_extend))
     for i in sites.index[1:]:
         if sites.loc[i]-1 == sites.loc[i-1]:
             continue
         to_append = to_append_base + sites.loc[i]
-        new_sites = pandas.concat([new_sites, to_append], ignore_index=True)
+        new_sites = pd.concat([new_sites, to_append], ignore_index=True)
     new_sites = new_sites.loc[new_sites>=0]
     new_sites = new_sites.drop_duplicates().sort_values().reset_index(drop=True)
     return new_sites
@@ -635,7 +652,7 @@ def _resolve_window_sizes(num_gene_site, num_site):
 
 
 def _build_codon_first_state_index(seq, num_gene_site, codon_orders):
-    codon_first_index = numpy.full(shape=(num_gene_site,), fill_value=-1, dtype=numpy.int64)
+    codon_first_index = np.full(shape=(num_gene_site,), fill_value=-1, dtype=np.int64)
     for site in range(num_gene_site):
         codon = seq[(site * 3):((site + 1) * 3)]
         codon_index = sequence.get_state_index(codon, codon_orders, genetic_code.ambiguous_table)
@@ -645,12 +662,12 @@ def _build_codon_first_state_index(seq, num_gene_site, codon_orders):
 
 
 def _get_unassigned_window_context(assigned_gene_index, gene_sites, window_size):
-    unassigned_aln_sites = numpy.where(assigned_gene_index == -1)[0].astype(numpy.int64, copy=False)
+    unassigned_aln_sites = np.where(assigned_gene_index == -1)[0].astype(np.int64, copy=False)
     assigned_gene_sites = assigned_gene_index[assigned_gene_index != -1]
-    unassigned_gene_sites = numpy.setdiff1d(gene_sites, assigned_gene_sites, assume_unique=False)
-    unassigned_gene_sites = pandas.Series(unassigned_gene_sites)
+    unassigned_gene_sites = np.setdiff1d(gene_sites, assigned_gene_sites, assume_unique=False)
+    unassigned_gene_sites = pd.Series(unassigned_gene_sites)
     extended_unassigned_gene_sites = extend_site_index_edge(unassigned_gene_sites, window_size).to_numpy(
-        dtype=numpy.int64,
+        dtype=np.int64,
         copy=False,
     )
     return unassigned_aln_sites, extended_unassigned_gene_sites
@@ -663,7 +680,7 @@ def _is_window_state_match(leaf_state_cdn, codon_first_index, uas, ugs, window_s
         return False
     row_index = row_index_cache.get(window_size, None)
     if row_index is None:
-        row_index = numpy.arange(window_size, dtype=numpy.int64)
+        row_index = np.arange(window_size, dtype=np.int64)
         row_index_cache[window_size] = row_index
     leaf_window = leaf_state_cdn[uas:(uas + window_size), :]
     return bool((leaf_window[row_index, codon_index_window] != 0).all())
@@ -720,7 +737,7 @@ def _assign_matching_windows_for_size(
                 window_gene_end=window_gene_end,
             ):
                 continue
-            assigned_gene_index[uas:(uas + window_size)] = numpy.arange(ugs, ugs + window_size, dtype=numpy.int64)
+            assigned_gene_index[uas:(uas + window_size)] = np.arange(ugs, ugs + window_size, dtype=np.int64)
             break
     return assigned_gene_index
 
@@ -747,10 +764,10 @@ def _build_aln_gene_match_for_leaf(leaf, seq, num_site, g):
     leaf_state_cdn = g['state_cdn'][leaf_nn, :, :]
     seq = seq.replace('-', '')
     num_gene_site = int(len(seq) / 3)
-    gene_sites = numpy.arange(num_gene_site, dtype=numpy.int64)
-    aln_sites = numpy.arange(num_site, dtype=numpy.int64)
+    gene_sites = np.arange(num_gene_site, dtype=np.int64)
+    aln_sites = np.arange(num_site, dtype=np.int64)
     col_leaf = 'codon_site_' + leaf.name
-    assigned_gene_index = numpy.full(shape=(num_site,), fill_value=-1, dtype=numpy.int64)
+    assigned_gene_index = np.full(shape=(num_site,), fill_value=-1, dtype=np.int64)
     codon_first_index = _build_codon_first_state_index(
         seq=seq,
         num_gene_site=num_gene_site,
@@ -775,7 +792,7 @@ def _build_aln_gene_match_for_leaf(leaf, seq, num_site, g):
         aln_sites=aln_sites,
         has_gene_site_in_aln_value=has_gene_site_in_aln_value,
     )
-    aln_gene_match = pandas.DataFrame({
+    aln_gene_match = pd.DataFrame({
         'codon_site_alignment': aln_sites,
         col_leaf: assigned_gene_index,
     })
@@ -795,7 +812,7 @@ def add_gene_index(df, g):
             num_site=num_site,
             g=g,
         )
-        df = pandas.merge(df, aln_gene_match, on='codon_site_alignment', how='left')
+        df = pd.merge(df, aln_gene_match, on='codon_site_alignment', how='left')
         print('', flush=True)
     return df
 
@@ -807,7 +824,7 @@ def write_fasta(file, label, seq):
 def translate(seq, g):
     translated_seq = ''
     num_site = int(len(seq)/3)
-    for s in numpy.arange(num_site):
+    for s in np.arange(num_site):
         codon = seq[(s*3):((s+1)*3)]
         for aa in g['matrix_groups'].keys():
             if codon in g['matrix_groups'][aa]:
@@ -853,7 +870,7 @@ def export2chimera(df, g):
             continue
         seq = seqs[seq_key]
         seq_num_site = int(len(seq) / 3)
-        seq_sites = numpy.arange(1, seq_num_site + 1)
+        seq_sites = np.arange(1, seq_num_site + 1)
         file_name = os.path.join(g['site_outdir'], 'csubst_site_' + seq_key + '.chimera.txt')
         txt = 'Writing a file that can be loaded to UCSF Chimera from ' \
               '"Tools -> Structure Analysis -> Define Attribute"'
@@ -903,9 +920,9 @@ def add_states(df, branch_ids, g, add_hydrophobicity=True):
             'E':223.0, 'Q':225.0, 'G':104.0, 'H':224.0, 'I':197.0,
             'L':201.0, 'K':236.0, 'M':224.0, 'F':240.0, 'P':159.0,
             'S':155.0, 'T':172.0, 'W':285.0, 'Y':263.0, 'V':174.0,
-            '':numpy.nan,
+            '':np.nan,
         }
-        df_aa_hydrophobicity_empirical = pandas.DataFrame({
+        df_aa_hydrophobicity_empirical = pd.DataFrame({
             'aa':aa_hydrophobicity_empirical.keys(),
             'hydrophobicity': aa_hydrophobicity_empirical.values(),
         })
@@ -913,7 +930,7 @@ def add_states(df, branch_ids, g, add_hydrophobicity=True):
         for aa_col in aa_cols:
             hp_col = aa_col+'_'+'hydrophobicity'
             df_aa_hydrophobicity_empirical.columns = [aa_col, hp_col]
-            df = pandas.merge(df, df_aa_hydrophobicity_empirical, on=aa_col, how='left', sort=False)
+            df = pd.merge(df, df_aa_hydrophobicity_empirical, on=aa_col, how='left', sort=False)
         print('')
     return df
 
@@ -930,20 +947,20 @@ def get_df_ad(sub_tensor, g, mode):
     gad = sub_tensor.sum(axis=(0,1))
     cols = ['group','state_from','state_to','value']
     nrow = sum([ len(v)**2-len(v) for v in state_orders.values() ])
-    df_ad = pandas.DataFrame(numpy.zeros(shape=(nrow, len(cols))))
+    df_ad = pd.DataFrame(np.zeros(shape=(nrow, len(cols))))
     df_ad.columns = cols
     df_ad['group'] = df_ad['group'].astype('str')
     df_ad['state_from'] = df_ad['state_from'].astype('str')
     df_ad['state_to'] = df_ad['state_to'].astype('str')
     current_row = 0
-    for g in numpy.arange(gad.shape[0]):
+    for g in np.arange(gad.shape[0]):
         state_key = state_keys[g]
         for i1,state1 in enumerate(state_orders[state_key]):
             for i2,state2 in enumerate(state_orders[state_key]):
                 if (i1==i2):
                     continue
                 total_prob = gad[g,i1,i2]
-                if (numpy.isnan(total_prob)):
+                if (np.isnan(total_prob)):
                     txt = 'Total probability should not be NaN: {}-to-{} substitutions\n'
                     sys.stderr.write(txt.format(state1, state2))
                 df_ad.loc[current_row,:] = [state_key, state1, state2, total_prob]
@@ -955,10 +972,10 @@ def add_site_stats(df_ad, sub_tensor, g, mode, method='tau'):
     # https://academic.oup.com/bib/article/18/2/205/2562739
     state_orders,state_keys = get_state_orders(g, mode)
     outcol = 'site_'+method
-    df_ad.loc[:,outcol] = numpy.nan
+    df_ad.loc[:,outcol] = np.nan
     sgad = sub_tensor.sum(axis=0)
     current_row = 0
-    for g in numpy.arange(sgad.shape[1]):
+    for g in np.arange(sgad.shape[1]):
         state_key = state_keys[g]
         for i1,state1 in enumerate(state_orders[state_key]):
             for i2,state2 in enumerate(state_orders[state_key]):
@@ -978,15 +995,15 @@ def add_site_stats(df_ad, sub_tensor, g, mode, method='tau'):
                 elif (method=='hg'):
                     pi = x_values / x_values.sum()
                     pi = pi[pi > 0]
-                    value = - (pi * numpy.log2(pi)).sum() if pi.shape[0] > 0 else 0.0
+                    value = - (pi * np.log2(pi)).sum() if pi.shape[0] > 0 else 0.0
                 elif (method=='tsi'):
                     value = x_values.max() / x_values.sum()
                 elif (method.startswith('rank')):
                     rank_no = int(method.replace('rank', ''))
                     temp = x_values.argsort()
-                    ranks = numpy.empty_like(temp)
-                    ranks[temp] = numpy.arange(len(x_values))
-                    ranks = numpy.abs(ranks - ranks.max())+1
+                    ranks = np.empty_like(temp)
+                    ranks[temp] = np.arange(len(x_values))
+                    ranks = np.abs(ranks - ranks.max())+1
                     rank_values = x_values[ranks==rank_no]
                     if rank_values.shape[0] == 0:
                         value = 0.0
@@ -1003,7 +1020,7 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
     sgad = sub_tensor.sum(axis=0)
     min_prob = get_min_combinat_prob(g)
     current_row = 0
-    for g in numpy.arange(sgad.shape[1]):
+    for g in np.arange(sgad.shape[1]):
         state_key = state_keys[g]
         for i1,state1 in enumerate(state_orders[state_key]):
             for i2,state2 in enumerate(state_orders[state_key]):
@@ -1021,13 +1038,13 @@ def get_df_dist(sub_tensor, g, mode):
         tree_dict[ete.get_prop(node, "numerical_label")] = node
     state_orders, state_keys = get_state_orders(g, mode)
     cols = ['group','state_from','state_to','max_dist_bl']
-    inds = numpy.arange(numpy.array(sub_tensor.shape[2:]).prod()-sub_tensor.shape[4])
-    df_dist = pandas.DataFrame(columns=cols, index=inds)
+    inds = np.arange(np.array(sub_tensor.shape[2:]).prod()-sub_tensor.shape[4])
+    df_dist = pd.DataFrame(columns=cols, index=inds)
     bgad = sub_tensor.sum(axis=1)
-    b_index = numpy.arange(bgad.shape[0])
-    g_index = numpy.arange(bgad.shape[1])
-    a_index = numpy.arange(bgad.shape[2])
-    d_index = numpy.arange(bgad.shape[3])
+    b_index = np.arange(bgad.shape[0])
+    g_index = np.arange(bgad.shape[1])
+    a_index = np.arange(bgad.shape[2])
+    d_index = np.arange(bgad.shape[3])
     current_row = 0
     for g,a,d in itertools.product(g_index, a_index, d_index):
         if (a==d):
@@ -1040,9 +1057,9 @@ def get_df_dist(sub_tensor, g, mode):
         has_enough_sub = (bgad[:,g,a,d] >= 0.5)
         branch_ids = b_index[has_enough_sub]
         if branch_ids.shape[0]==0:
-            interbranch_dist = numpy.nan
+            interbranch_dist = np.nan
         elif branch_ids.shape[0]==1:
-            interbranch_dist = numpy.nan
+            interbranch_dist = np.nan
         elif branch_ids.shape[0]>=2:
             node_dists = list()
             nodes = [ tree_dict[n] for n in branch_ids ]
@@ -1059,7 +1076,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     if not bool(g.get('site_state_plot', True)):
         print('Skipping substitution-pattern summary outputs (--site_state_plot no).', flush=True)
         return []
-    fig,axes = matplotlib.pyplot.subplots(nrows=3, ncols=2, figsize=(7.2, 7.2), sharex=False)
+    fig,axes = plt.subplots(nrows=3, ncols=2, figsize=(7.2, 7.2), sharex=False)
     output_paths = list()
     outfiles = ['csubst_site.state_N.tsv', 'csubst_site.state_S.tsv']
     colors = ['red','blue']
@@ -1068,7 +1085,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     iter_items = zip(ax_cols,['nsy','syn'],[ON_tensor,OS_tensor],outfiles,colors,titles)
     for ax_col,mode,sub_tensor,outfile,color,title in iter_items:
         sub_target = sub_tensor[branch_ids,:,:,:,:]
-        sub_target_combinat = numpy.expand_dims(sub_target.prod(axis=0), axis=0)
+        sub_target_combinat = np.expand_dims(sub_target.prod(axis=0), axis=0)
         df_ad = get_df_ad(sub_tensor=sub_tensor, g=g, mode=mode)
         df_ad_target = get_df_ad(sub_tensor=sub_target, g=g, mode=mode)
         df_ad_combinat = get_df_ad(sub_tensor=sub_target_combinat, g=g, mode=mode)
@@ -1084,7 +1101,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
         df_dist = get_df_dist(sub_tensor=sub_tensor, g=g, mode=mode)
         df_dist_target = get_df_dist(sub_tensor=sub_target, g=g, mode=mode)
-        df_ad = pandas.merge(df_ad, df_dist, on=['group','state_from','state_to'])
+        df_ad = pd.merge(df_ad, df_dist, on=['group','state_from','state_to'])
         out_path = os.path.join(g['site_outdir'], outfile)
         df_ad.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         output_paths.append(out_path)
@@ -1097,14 +1114,14 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         ax.set_ylabel('Total substitution\nprobabilities', fontsize=font_size)
         ax.set_title(title, fontsize=font_size)
         ax = axes[1,ax_col]
-        bins = numpy.arange(21)/20
+        bins = np.arange(21)/20
         ax.hist(x=df_ad.loc[:,'site_tsi'].dropna(), bins=bins, color='black')
         is_it = (df_ad.loc[:,'has_target_high_combinat_prob_site'])
         ax.hist(x=df_ad.loc[is_it,'site_tsi'].dropna(), bins=bins, color=color)
         ax.set_xlabel('Site specificity index', fontsize=font_size)
         ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
         ax = axes[2,ax_col]
-        bins = numpy.arange(21) / 20 * df_dist.loc[:,'max_dist_bl'].max()
+        bins = np.arange(21) / 20 * df_dist.loc[:,'max_dist_bl'].max()
         ax.hist(x=df_dist.loc[:, 'max_dist_bl'].dropna(), bins=bins, color='black')
         #ax.hist(x=df_dist_target.loc[:, 'max_dist_bl'].dropna(), bins=bins, color=color)
         ax.set_xlabel('Max inter-branch distance of substitution category', fontsize=font_size)
@@ -1113,7 +1130,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     outbase = os.path.join(g['site_outdir'], 'csubst_site.state')
     fig_path = outbase + ".pdf"
     fig.savefig(fig_path, format='pdf', transparent=True)
-    matplotlib.pyplot.close(fig)
+    plt.close(fig)
     output_paths.append(fig_path)
     return output_paths
 
@@ -1139,15 +1156,15 @@ def classify_tree_site_categories(df, g):
     min_prob = get_tree_site_min_prob(g)
     num_site = df.shape[0]
     if g.get('single_branch_mode', False):
-        convergent_score = df.loc[:, 'N_sub'].values if 'N_sub' in df.columns else numpy.zeros(num_site)
-        divergent_score = numpy.zeros(num_site, dtype=float)
+        convergent_score = df.loc[:, 'N_sub'].values if 'N_sub' in df.columns else np.zeros(num_site)
+        divergent_score = np.zeros(num_site, dtype=float)
     else:
-        convergent_score = df.loc[:, 'OCNany2spe'].values if 'OCNany2spe' in df.columns else numpy.zeros(num_site)
-        divergent_score = df.loc[:, 'OCNany2dif'].values if 'OCNany2dif' in df.columns else numpy.zeros(num_site)
-    convergent_score = numpy.nan_to_num(convergent_score.astype(float), nan=0.0)
-    divergent_score = numpy.nan_to_num(divergent_score.astype(float), nan=0.0)
+        convergent_score = df.loc[:, 'OCNany2spe'].values if 'OCNany2spe' in df.columns else np.zeros(num_site)
+        divergent_score = df.loc[:, 'OCNany2dif'].values if 'OCNany2dif' in df.columns else np.zeros(num_site)
+    convergent_score = np.nan_to_num(convergent_score.astype(float), nan=0.0)
+    divergent_score = np.nan_to_num(divergent_score.astype(float), nan=0.0)
 
-    category = numpy.full(shape=(num_site,), fill_value='blank', dtype=object)
+    category = np.full(shape=(num_site,), fill_value='blank', dtype=object)
     is_convergent = (convergent_score >= min_prob)
     is_divergent = (divergent_score >= min_prob)
     category[is_convergent] = 'convergent'
@@ -1157,7 +1174,7 @@ def classify_tree_site_categories(df, g):
     category[is_both & (convergent_score >= divergent_score)] = 'convergent'
     category[is_both & (convergent_score < divergent_score)] = 'divergent'
 
-    out = pandas.DataFrame({
+    out = pd.DataFrame({
         'codon_site_alignment': df.loc[:, 'codon_site_alignment'].values,
         'convergent_score': convergent_score,
         'divergent_score': divergent_score,
@@ -1206,7 +1223,7 @@ def get_tree_site_plot_max_sites(g):
     return max_sites
 
 def get_lineage_display_sites(df, g, min_prob, return_total=False):
-    branch_ids = [int(bid) for bid in numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64).tolist()]
+    branch_ids = _normalize_branch_ids(g.get('branch_ids', [])).tolist()
     col_pairs = []
     for bid in branch_ids:
         col = 'N_sub_{}'.format(int(bid))
@@ -1218,7 +1235,7 @@ def get_lineage_display_sites(df, g, min_prob, return_total=False):
         return []
     _, cols = zip(*col_pairs)
     branch_values = df.loc[:, list(cols)].to_numpy(dtype=float, copy=True)
-    branch_values = numpy.nan_to_num(branch_values, nan=0.0)
+    branch_values = np.nan_to_num(branch_values, nan=0.0)
     # Lineage view should show sites meeting or exceeding the configured minimum PP.
     site_ids = df.loc[:, 'codon_site_alignment'].astype(int).to_numpy(copy=True)
     max_branch_prob = branch_values.max(axis=1)
@@ -1233,7 +1250,7 @@ def get_lineage_display_sites(df, g, min_prob, return_total=False):
     max_sites = get_tree_site_plot_max_sites(g)
     if selected_sites.shape[0] > max_sites:
         # Pick strongest foreground-substitution sites first.
-        order = numpy.lexsort((selected_sites, -selected_scores))
+        order = np.lexsort((selected_sites, -selected_scores))
         selected_sites = selected_sites[order[:max_sites]]
     out_sites = sorted([int(site) for site in selected_sites.tolist()])
     if return_total:
@@ -1247,9 +1264,9 @@ def get_set_display_sites(df, g, min_prob, return_total=False):
         return []
     if 'N_set_expr_prob' in df.columns:
         set_scores = df.loc[:, 'N_set_expr_prob'].to_numpy(dtype=float, copy=True)
-        set_scores = numpy.nan_to_num(set_scores, nan=0.0)
+        set_scores = np.nan_to_num(set_scores, nan=0.0)
     else:
-        set_scores = numpy.zeros(shape=(df.shape[0],), dtype=float)
+        set_scores = np.zeros(shape=(df.shape[0],), dtype=float)
     if 'N_set_expr' in df.columns:
         set_selected = df.loc[:, 'N_set_expr'].astype(bool).to_numpy(copy=True)
     else:
@@ -1267,7 +1284,7 @@ def get_set_display_sites(df, g, min_prob, return_total=False):
     selected_total = int(selected_sites.shape[0])
     max_sites = get_tree_site_plot_max_sites(g)
     if selected_sites.shape[0] > max_sites:
-        order = numpy.lexsort((selected_sites, -selected_scores))
+        order = np.lexsort((selected_sites, -selected_scores))
         selected_sites = selected_sites[order[:max_sites]]
     out_sites = sorted([int(site) for site in selected_sites.tolist()])
     if return_total:
@@ -1382,7 +1399,7 @@ def get_highlight_leaf_and_branch_ids(tree, branch_ids):
 def get_lineage_site_branch_ids(df, display_meta, g, min_prob):
     if str(g.get('mode', '')).lower() != 'lineage':
         return {}
-    branch_ids = [int(bid) for bid in numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64).tolist()]
+    branch_ids = _normalize_branch_ids(g.get('branch_ids', [])).tolist()
     col_pairs = []
     for bid in branch_ids:
         col = 'N_sub_{}'.format(int(bid))
@@ -1392,7 +1409,7 @@ def get_lineage_site_branch_ids(df, display_meta, g, min_prob):
         return {}
     bids, cols = zip(*col_pairs)
     branch_values = df.loc[:, list(cols)].to_numpy(dtype=float, copy=True)
-    branch_values = numpy.nan_to_num(branch_values, nan=0.0)
+    branch_values = np.nan_to_num(branch_values, nan=0.0)
     site_to_row = {
         int(site): i for i,site in enumerate(df.loc[:, 'codon_site_alignment'].astype(int).tolist())
     }
@@ -1412,11 +1429,11 @@ def get_lineage_site_branch_ids(df, display_meta, g, min_prob):
     return out
 
 def get_lineage_site_heatmap_values(df, display_meta, g):
-    branch_ids = [int(bid) for bid in numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64).tolist()]
+    branch_ids = _normalize_branch_ids(g.get('branch_ids', [])).tolist()
     if len(branch_ids) == 0:
-        return numpy.zeros((0, 0), dtype=float), []
+        return np.zeros((0, 0), dtype=float), []
     num_site = len(display_meta)
-    values = numpy.full((len(branch_ids), num_site), numpy.nan, dtype=float)
+    values = np.full((len(branch_ids), num_site), np.nan, dtype=float)
     if num_site == 0:
         return values, branch_ids
     site_to_row = {
@@ -1434,7 +1451,7 @@ def get_lineage_site_heatmap_values(df, display_meta, g):
             if col not in df.columns:
                 continue
             value = float(df.at[row_index, col])
-            if not numpy.isfinite(value):
+            if not np.isfinite(value):
                 continue
             values[row_index_branch, col_index] = min(max(value, 0.0), 1.0)
     return values, branch_ids
@@ -1445,7 +1462,7 @@ def draw_lineage_site_heatmap(ax_heat, heat_values, heat_branch_ids, branch_colo
     if heat_values.shape[1] == 0:
         ax_heat.axis('off')
         return None
-    masked = numpy.ma.masked_invalid(heat_values)
+    masked = np.ma.masked_invalid(heat_values)
     im = ax_heat.imshow(
         masked,
         interpolation='nearest',
@@ -1458,7 +1475,7 @@ def draw_lineage_site_heatmap(ax_heat, heat_values, heat_branch_ids, branch_colo
     ax_heat.set_xlim(-0.5, heat_values.shape[1]-0.5)
     if heat_values.shape[0] > 0:
         ax_heat.set_ylim(heat_values.shape[0]-0.5, -0.5)
-        y_ticks = numpy.arange(heat_values.shape[0], dtype=float)
+        y_ticks = np.arange(heat_values.shape[0], dtype=float)
         ax_heat.set_yticks(y_ticks.tolist())
         ax_heat.set_yticklabels([str(int(bid)) for bid in heat_branch_ids], fontsize=font_size-1)
         for tick,bid in zip(ax_heat.get_yticklabels(), heat_branch_ids):
@@ -1569,15 +1586,15 @@ def get_leaf_state_letter(g, leaf_id, codon_site_alignment):
     if (site_index < 0) or (site_index >= g['state_pep'].shape[1]):
         return ''
     state_values = g['state_pep'][leaf_id, site_index, :]
-    if numpy.nan_to_num(state_values, nan=0.0).sum() == 0:
+    if np.nan_to_num(state_values, nan=0.0).sum() == 0:
         return ''
-    max_index = int(numpy.argmax(state_values))
+    max_index = int(np.argmax(state_values))
     if max_index >= len(g['amino_acid_orders']):
         return ''
     return str(g['amino_acid_orders'][max_index])
 
 def get_amino_acid_colors(g):
-    tab20 = matplotlib.pyplot.get_cmap('tab20')
+    tab20 = plt.get_cmap('tab20')
     aa_colors = {aa: tab20(i % 20) for i,aa in enumerate(g['amino_acid_orders'])}
     aa_colors[''] = (1.0, 1.0, 1.0, 1.0)
     # Match frequent residues in existing prototype style.
@@ -1599,7 +1616,7 @@ def get_nice_scale_length(max_tree_depth):
     target = max_tree_depth * 0.12
     if target <= 0:
         return 1.0
-    exponent = numpy.floor(numpy.log10(target))
+    exponent = np.floor(np.log10(target))
     base = 10 ** exponent
     normalized = target / base
     if normalized <= 1.5:
@@ -1619,7 +1636,7 @@ def plot_tree_site(df, g):
     tree_site_df,min_prob = classify_tree_site_categories(df=df, g=g)
     display_meta = get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     xcoord,ycoord,leaf_order = get_tree_plot_coordinates(tree=g['tree'])
-    branch_ids_in_order = [int(v) for v in numpy.asarray(g['branch_ids']).tolist()]
+    branch_ids_in_order = _normalize_branch_ids(g['branch_ids']).tolist()
     branch_ids = set(branch_ids_in_order)
     mode = str(g.get('mode', '')).lower()
     show_branch_heatmap = mode in ('lineage', 'set')
@@ -1628,7 +1645,7 @@ def plot_tree_site(df, g):
     else:
         branch_color_by_id = {int(bid): 'firebrick' for bid in branch_ids_in_order}
     highlight_leaf_ids,highlight_branch_ids = get_highlight_leaf_and_branch_ids(tree=g['tree'], branch_ids=branch_ids)
-    x_values = numpy.array(list(xcoord.values()), dtype=float)
+    x_values = np.array(list(xcoord.values()), dtype=float)
     x_max = x_values.max() if x_values.shape[0] else 1.0
     if x_max <= 0:
         x_max = 1.0
@@ -1658,7 +1675,7 @@ def plot_tree_site(df, g):
     if show_branch_heatmap:
         heat_panel_height = min(max(0.55, len(branch_ids_in_order) * 0.12), 1.9)
         fig_height += heat_panel_height
-        fig = matplotlib.pyplot.figure(figsize=(fig_width, fig_height))
+        fig = plt.figure(figsize=(fig_width, fig_height))
         gs = fig.add_gridspec(
             2,
             2,
@@ -1672,7 +1689,7 @@ def plot_tree_site(df, g):
         ax_tree = fig.add_subplot(gs[1, 0])
         ax_site = fig.add_subplot(gs[1, 1], sharey=ax_tree)
     else:
-        fig = matplotlib.pyplot.figure(figsize=(fig_width, fig_height))
+        fig = plt.figure(figsize=(fig_width, fig_height))
         gs = fig.add_gridspec(1, 2, width_ratios=[tree_panel_width, site_panel_width], wspace=0.01)
         ax_tree = fig.add_subplot(gs[0, 0])
         ax_site = fig.add_subplot(gs[0, 1], sharey=ax_tree)
@@ -1828,7 +1845,7 @@ def plot_tree_site(df, g):
             display_meta=display_meta,
             g=g,
         )
-        heatmap_cmap = matplotlib.pyplot.get_cmap('viridis')
+        heatmap_cmap = plt.get_cmap('viridis')
         _ = draw_lineage_site_heatmap(
             ax_heat=ax_heat,
             heat_values=heat_values,
@@ -1913,11 +1930,11 @@ def plot_tree_site(df, g):
         bbox_inches='tight',
         pad_inches=0.02,
     )
-    matplotlib.pyplot.close(fig)
+    plt.close(fig)
     print('Writing tree + site plot: {}'.format(fig_path), flush=True)
 
     tree_site_df.loc[:, 'is_plotted'] = False
-    tree_site_df.loc[:, 'plot_order'] = numpy.nan
+    tree_site_df.loc[:, 'plot_order'] = np.nan
     current_order = 1
     for item in display_meta:
         site = item['site']
@@ -1933,22 +1950,22 @@ def plot_tree_site(df, g):
     return [fig_path, table_path]
 
 def initialize_site_df(num_site):
-    df = pandas.DataFrame()
-    df.loc[:,'codon_site_alignment'] = numpy.arange(num_site)
+    df = pd.DataFrame()
+    df.loc[:,'codon_site_alignment'] = np.arange(num_site)
     df.loc[:,'nuc_site_alignment'] = ((df.loc[:,'codon_site_alignment']+1) * 3) - 2
     return df
 
 def add_cs_info(df, branch_ids, sub_tensor, attr):
-    cs = substitution.get_cs(id_combinations=branch_ids[numpy.newaxis,:], sub_tensor=sub_tensor, attr=attr)
+    cs = substitution.get_cs(id_combinations=branch_ids[np.newaxis,:], sub_tensor=sub_tensor, attr=attr)
     cs.columns = cs.columns.str.replace('site','codon_site_alignment')
-    df = pandas.merge(df, cs, on='codon_site_alignment')
+    df = pd.merge(df, cs, on='codon_site_alignment')
     df.loc[:,'OC'+attr+'any2dif'] = df.loc[:,'OC'+attr+'any2any'] - df.loc[:,'OC'+attr+'any2spe']
     return df
 
 def add_site_info(df, sub_tensor, attr):
     s = substitution.get_s(sub_tensor, attr=attr)
     s.columns = s.columns.str.replace('site','codon_site_alignment')
-    df = pandas.merge(df, s, on='codon_site_alignment')
+    df = pd.merge(df, s, on='codon_site_alignment')
     return df
 
 def add_branch_sub_prob(df, branch_ids, sub_tensor, attr):
@@ -1964,7 +1981,7 @@ def _parse_branch_ids(branch_id_text):
     if len(values)==0:
         raise ValueError('No branch ID was specified in --branch_id.')
     try:
-        branch_ids = numpy.array([int(v) for v in values], dtype=numpy.int64)
+        branch_ids = np.array([int(v) for v in values], dtype=np.int64)
     except ValueError as exc:
         raise ValueError('--branch_id should be a comma-delimited list of integers.') from exc
     return branch_ids
@@ -1979,7 +1996,8 @@ def _get_node_by_branch_id(g):
 
 
 def _validate_existing_branch_ids(branch_ids, node_by_id):
-    missing_ids = [int(bid) for bid in branch_ids.tolist() if int(bid) not in node_by_id]
+    normalized_branch_ids = _normalize_branch_ids(branch_ids).tolist()
+    missing_ids = [int(bid) for bid in normalized_branch_ids if int(bid) not in node_by_id]
     if len(missing_ids)>0:
         txt = '--branch_id contains unknown branch IDs: {}'
         raise ValueError(txt.format(','.join([str(bid) for bid in sorted(missing_ids)])))
@@ -1987,14 +2005,15 @@ def _validate_existing_branch_ids(branch_ids, node_by_id):
 
 def _validate_nonroot_branch_ids(branch_ids, node_by_id):
     _validate_existing_branch_ids(branch_ids, node_by_id)
-    root_ids = [int(bid) for bid in branch_ids.tolist() if ete.is_root(node_by_id[int(bid)])]
+    normalized_branch_ids = _normalize_branch_ids(branch_ids).tolist()
+    root_ids = [int(bid) for bid in normalized_branch_ids if ete.is_root(node_by_id[int(bid)])]
     if len(root_ids)>0:
         txt = '--branch_id should not include root branch IDs: {}'
         raise ValueError(txt.format(','.join([str(bid) for bid in sorted(root_ids)])))
 
 
 def _read_foreground_branch_combinations(g, node_by_id):
-    cb = pandas.read_csv(g['cb_file'], sep="\t", index_col=False, header=0)
+    cb = pd.read_csv(g['cb_file'], sep="\t", index_col=False, header=0)
     bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
     if bid_cols.shape[0]==0:
         raise ValueError('No branch_id_* columns were found in --cb_file.')
@@ -2004,7 +2023,7 @@ def _read_foreground_branch_combinations(g, node_by_id):
     cb_fg = cb.loc[(cb.loc[:,is_fg_col]=='Y').any(axis=1),:]
     branch_id_list = []
     for i in cb_fg.index:
-        bids = cb_fg.loc[i,bid_cols].values.astype(numpy.int64)
+        bids = cb_fg.loc[i,bid_cols].values.astype(np.int64)
         _validate_nonroot_branch_ids(bids, node_by_id)
         branch_id_list.append(bids)
     if len(branch_id_list)==0:
@@ -2027,7 +2046,7 @@ def _resolve_lineage_branch_ids(ancestor_id, descendant_id, node_by_id):
             raise ValueError(txt)
         node = node.up
     lineage_branch_ids = lineage_branch_ids[::-1]
-    return numpy.array(lineage_branch_ids, dtype=numpy.int64)
+    return np.array(lineage_branch_ids, dtype=np.int64)
 
 
 def _tokenize_set_expression(mode_expression):
@@ -2065,14 +2084,14 @@ def _extract_set_expression_branch_ids(mode_expression):
     branch_ids = sorted(set([token for token in tokens if isinstance(token, int)]))
     if len(branch_ids)==0:
         raise ValueError('--mode set expression should include at least one branch ID.')
-    return numpy.array(branch_ids, dtype=numpy.int64)
+    return np.array(branch_ids, dtype=np.int64)
 
 
 def _get_set_expression_display_branch_ids(g):
     mode_expression = g.get('mode_expression', None)
-    branch_ids = [int(bid) for bid in numpy.asarray(g.get('branch_ids', []), dtype=numpy.int64).tolist()]
+    branch_ids = _normalize_branch_ids(g.get('branch_ids', [])).tolist()
     if mode_expression is None:
-        return numpy.array(branch_ids, dtype=numpy.int64)
+        return np.array(branch_ids, dtype=np.int64)
     tokens = _tokenize_set_expression(mode_expression)
     target_set = set(branch_ids)
     out = []
@@ -2088,7 +2107,7 @@ def _get_set_expression_display_branch_ids(g):
         if bid not in seen:
             out.append(bid)
             seen.add(bid)
-    return numpy.array(out, dtype=numpy.int64)
+    return np.array(out, dtype=np.int64)
 
 
 def _get_set_expression_label(mode_expression):
@@ -2127,7 +2146,7 @@ def _get_set_mode_stat_type(set_stat_type):
 def _evaluate_set_expression_boolean(tokens, branch_site_bool):
     branch_site_prob = {}
     for key,value in branch_site_bool.items():
-        branch_site_prob[key] = numpy.zeros(shape=value.shape, dtype=float)
+        branch_site_prob[key] = np.zeros(shape=value.shape, dtype=float)
     out_bool,_ = _evaluate_set_expression_boolean_and_prob(
         tokens=tokens,
         branch_site_bool=branch_site_bool,
@@ -2153,14 +2172,14 @@ def _evaluate_set_expression_boolean_and_prob(tokens, branch_site_bool, branch_s
         raise ValueError('No branch-site values were provided for set expression evaluation.')
 
     def _get_operand_arrays(token):
-        zero_bool = numpy.zeros(shape=operand_shape, dtype=bool)
-        zero_prob = numpy.zeros(shape=operand_shape, dtype=float)
+        zero_bool = np.zeros(shape=operand_shape, dtype=bool)
+        zero_prob = np.zeros(shape=operand_shape, dtype=float)
         bool_array = branch_site_bool.get(token, zero_bool)
         prob_array = branch_site_prob.get(token, zero_prob)
-        bool_array = numpy.asarray(bool_array, dtype=bool)
-        prob_array = numpy.asarray(prob_array, dtype=float)
-        bool_array = numpy.where(numpy.isfinite(bool_array), bool_array, False)
-        prob_array = numpy.nan_to_num(prob_array, nan=0.0)
+        bool_array = np.asarray(bool_array, dtype=bool)
+        prob_array = np.asarray(prob_array, dtype=float)
+        bool_array = np.where(np.isfinite(bool_array), bool_array, False)
+        prob_array = np.nan_to_num(prob_array, nan=0.0)
         return bool_array.copy(),prob_array.copy()
 
     def apply_top_operator():
@@ -2169,20 +2188,20 @@ def _evaluate_set_expression_boolean_and_prob(tokens, branch_site_bool, branch_s
         rhs_bool,rhs_prob = operand_stack.pop()
         lhs_bool,lhs_prob = operand_stack.pop()
         op = operator_stack.pop()
-        lhs_prob_eff = numpy.where(lhs_bool, lhs_prob, 0.0)
-        rhs_prob_eff = numpy.where(rhs_bool, rhs_prob, 0.0)
+        lhs_prob_eff = np.where(lhs_bool, lhs_prob, 0.0)
+        rhs_prob_eff = np.where(rhs_bool, rhs_prob, 0.0)
         if op == '|':
             out_bool = lhs_bool | rhs_bool
-            out_prob = numpy.where(out_bool, numpy.maximum(lhs_prob_eff, rhs_prob_eff), 0.0)
+            out_prob = np.where(out_bool, np.maximum(lhs_prob_eff, rhs_prob_eff), 0.0)
         elif op == '-':
             out_bool = lhs_bool & (~rhs_bool)
-            out_prob = numpy.where(out_bool, lhs_prob_eff, 0.0)
+            out_prob = np.where(out_bool, lhs_prob_eff, 0.0)
         elif op == '&':
             out_bool = lhs_bool & rhs_bool
-            out_prob = numpy.where(out_bool, numpy.minimum(lhs_prob_eff, rhs_prob_eff), 0.0)
+            out_prob = np.where(out_bool, np.minimum(lhs_prob_eff, rhs_prob_eff), 0.0)
         elif op == '^':
             out_bool = lhs_bool ^ rhs_bool
-            out_prob = numpy.where(out_bool, numpy.maximum(lhs_prob_eff, rhs_prob_eff), 0.0)
+            out_prob = np.where(out_bool, np.maximum(lhs_prob_eff, rhs_prob_eff), 0.0)
         else:
             raise ValueError('Invalid operator in --mode set expression: {}'.format(op))
         operand_stack.append((out_bool,out_prob))
@@ -2222,27 +2241,27 @@ def _evaluate_set_expression_boolean_and_prob(tokens, branch_site_bool, branch_s
     if len(operand_stack) != 1:
         raise ValueError('Invalid --mode set expression.')
     out_bool,out_prob = operand_stack[0]
-    out_prob = numpy.where(out_bool, numpy.nan_to_num(out_prob, nan=0.0), 0.0)
+    out_prob = np.where(out_bool, np.nan_to_num(out_prob, nan=0.0), 0.0)
     return out_bool,out_prob
 
 
 def _validate_set_expression_syntax(mode_expression):
     tokens = _tokenize_set_expression(mode_expression)
     branch_ids = _extract_set_expression_branch_ids(mode_expression)
-    branch_site_bool = {int(branch_id): numpy.zeros(shape=(1,), dtype=bool) for branch_id in branch_ids.tolist()}
+    branch_site_bool = {int(branch_id): np.zeros(shape=(1,), dtype=bool) for branch_id in branch_ids.tolist()}
     if 'A' in tokens:
-        branch_site_bool['A'] = numpy.zeros(shape=(1,), dtype=bool)
+        branch_site_bool['A'] = np.zeros(shape=(1,), dtype=bool)
     _evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
     return None
 
 
 def _get_set_stat_channels_from_branch_tensor(branch_tensor, set_stat_type):
-    arr = numpy.nan_to_num(numpy.asarray(branch_tensor, dtype=float), nan=0.0)
+    arr = np.nan_to_num(np.asarray(branch_tensor, dtype=float), nan=0.0)
     if arr.ndim != 4:
         raise ValueError('Branch substitution tensor should be 4D [site,group,anc,des].')
     if set_stat_type == 'any2any':
         out = arr.sum(axis=(1, 2, 3))
-        return out[:, numpy.newaxis]
+        return out[:, np.newaxis]
     if set_stat_type == 'any2spe':
         return arr.sum(axis=(1, 2))
     if set_stat_type == 'spe2any':
@@ -2254,7 +2273,7 @@ def _get_set_stat_channels_from_branch_tensor(branch_tensor, set_stat_type):
 
 def _get_empty_set_channel_prob(n_site, set_stat_type, ON_tensor=None):
     if ON_tensor is None:
-        return numpy.zeros(shape=(n_site, 1), dtype=float)
+        return np.zeros(shape=(n_site, 1), dtype=float)
     if set_stat_type == 'any2any':
         n_channel = 1
     elif set_stat_type == 'any2spe':
@@ -2265,17 +2284,17 @@ def _get_empty_set_channel_prob(n_site, set_stat_type, ON_tensor=None):
         n_channel = int(ON_tensor.shape[2] * ON_tensor.shape[3] * ON_tensor.shape[4])
     else:
         raise ValueError('Unsupported set substitution type: {}'.format(set_stat_type))
-    return numpy.zeros(shape=(n_site, n_channel), dtype=float)
+    return np.zeros(shape=(n_site, n_channel), dtype=float)
 
 
 def _aggregate_set_channels(bool_matrix, prob_matrix):
-    bool_arr = numpy.asarray(bool_matrix, dtype=bool)
-    prob_arr = numpy.nan_to_num(numpy.asarray(prob_matrix, dtype=float), nan=0.0)
+    bool_arr = np.asarray(bool_matrix, dtype=bool)
+    prob_arr = np.nan_to_num(np.asarray(prob_matrix, dtype=float), nan=0.0)
     if bool_arr.ndim == 1:
-        prob_arr = numpy.where(bool_arr, prob_arr, 0.0)
+        prob_arr = np.where(bool_arr, prob_arr, 0.0)
         return bool_arr, prob_arr
     selected = bool_arr.any(axis=1)
-    selected_prob = numpy.where(selected, prob_arr.max(axis=1), 0.0)
+    selected_prob = np.where(selected, prob_arr.max(axis=1), 0.0)
     return selected, selected_prob
 
 
@@ -2314,17 +2333,17 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
         else:
             col = 'N_sub_{}'.format(int(branch_id))
             if col in df.columns:
-                base_prob = numpy.nan_to_num(df.loc[:, col].to_numpy(dtype=float, copy=True), nan=0.0)
-                n_sub_prob = base_prob[:, numpy.newaxis]
+                base_prob = np.nan_to_num(df.loc[:, col].to_numpy(dtype=float, copy=True), nan=0.0)
+                n_sub_prob = base_prob[:, np.newaxis]
             else:
                 n_sub_prob = empty_prob.copy()
         branch_site_prob[int(branch_id)] = n_sub_prob
         branch_site_bool[int(branch_id)] = (n_sub_prob >= min_single_prob)
     if 'A' in tokens:
         explicit_ids = set([int(bid) for bid in branch_ids.tolist()])
-        other_bool_matrix = numpy.zeros(shape=empty_prob.shape, dtype=bool)
+        other_bool_matrix = np.zeros(shape=empty_prob.shape, dtype=bool)
         n_other_prob_matrix = empty_prob.copy()
-        s_other_prob = numpy.zeros(shape=(n_site,), dtype=float)
+        s_other_prob = np.zeros(shape=(n_site,), dtype=float)
         if ('tree' in g) and (g['tree'] is not None) and (ON_tensor is not None):
             node_by_id = _get_node_by_branch_id(g)
             other_branch_ids = sorted([
@@ -2341,12 +2360,12 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
                             set_stat_type=set_stat_type,
                         )
                     )
-                n_other_prob_matrix = numpy.stack(other_prob_rows, axis=0).max(axis=0)
+                n_other_prob_matrix = np.stack(other_prob_rows, axis=0).max(axis=0)
                 other_bool_matrix = (n_other_prob_matrix >= min_single_prob)
                 if OS_tensor is not None:
                     other_syn_probs = OS_tensor[other_branch_ids, :, :, :, :].sum(axis=(2, 3, 4))
                     if other_syn_probs.ndim == 1:
-                        other_syn_probs = other_syn_probs[numpy.newaxis, :]
+                        other_syn_probs = other_syn_probs[np.newaxis, :]
                     s_other_prob = other_syn_probs.max(axis=0)
         else:
             other_n_cols = []
@@ -2368,17 +2387,17 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
                         other_s_cols.append(col)
             if len(other_n_cols) > 0:
                 other_n_values = df.loc[:, other_n_cols].to_numpy(dtype=float, copy=True)
-                other_n_values = numpy.nan_to_num(other_n_values, nan=0.0)
-                n_other_prob_matrix = other_n_values.max(axis=1)[:, numpy.newaxis]
+                other_n_values = np.nan_to_num(other_n_values, nan=0.0)
+                n_other_prob_matrix = other_n_values.max(axis=1)[:, np.newaxis]
                 other_bool_matrix = (n_other_prob_matrix >= min_single_prob)
             if len(other_s_cols) > 0:
                 other_s_values = df.loc[:, other_s_cols].to_numpy(dtype=float, copy=True)
-                other_s_values = numpy.nan_to_num(other_s_values, nan=0.0)
+                other_s_values = np.nan_to_num(other_s_values, nan=0.0)
                 s_other_prob = other_s_values.max(axis=1)
         branch_site_bool['A'] = other_bool_matrix.astype(bool)
         branch_site_prob['A'] = n_other_prob_matrix.astype(float)
-        other_bool_arr = numpy.asarray(other_bool_matrix, dtype=bool)
-        other_prob_arr = numpy.nan_to_num(numpy.asarray(n_other_prob_matrix, dtype=float), nan=0.0)
+        other_bool_arr = np.asarray(other_bool_matrix, dtype=bool)
+        other_prob_arr = np.nan_to_num(np.asarray(n_other_prob_matrix, dtype=float), nan=0.0)
         if other_bool_arr.ndim == 1:
             n_set_other_bool = other_bool_arr
             n_set_other_prob = other_prob_arr
@@ -2402,7 +2421,7 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
         prob_matrix=selected_prob_matrix,
     )
     df.loc[:, 'N_set_expr'] = selected
-    df.loc[:, 'N_set_expr_prob'] = numpy.where(selected, selected_prob, 0.0)
+    df.loc[:, 'N_set_expr_prob'] = np.where(selected, selected_prob, 0.0)
     return df
 
 
@@ -2496,12 +2515,13 @@ def resolve_site_jobs(g):
         selected_nonroot = [bid for bid in expression_branch_ids.tolist() if not ete.is_root(node_by_id[int(bid)])]
         if len(selected_nonroot)==0:
             raise ValueError('--mode set expression should include at least one non-root branch ID.')
-        branch_id_list = [numpy.array(sorted(selected_nonroot), dtype=numpy.int64)]
+        branch_id_list = [np.array(sorted(selected_nonroot), dtype=np.int64)]
     else:
         raise ValueError('--mode should be one of intersection,lineage,set or set,<expr>.')
 
     site_jobs = []
     for branch_ids in branch_id_list:
+        branch_ids = _normalize_branch_ids(branch_ids)
         single_branch_mode = (branch_ids.shape[0]==1)
         branch_txt = ','.join([str(int(bid)) for bid in branch_ids.tolist()])
         site_outdir = _build_site_outdir(
@@ -2554,7 +2574,7 @@ def main_site(g):
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
     g = resolve_site_jobs(g)
     for site_job in g['site_jobs']:
-        branch_ids = site_job['branch_ids']
+        branch_ids = _normalize_branch_ids(site_job['branch_ids'])
         g['single_branch_mode'] = site_job['single_branch_mode']
         g['branch_ids'] = branch_ids
         g['site_outdir'] = site_job['site_outdir']

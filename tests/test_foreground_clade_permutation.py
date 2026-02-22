@@ -1,6 +1,8 @@
-import numpy
-import pandas
+import numpy as np
+import pandas as pd
 import pandas.testing as pdt
+import pytest
+import warnings
 
 from csubst import foreground
 from csubst import ete
@@ -21,7 +23,7 @@ def test_annotate_foreground_fg_stem_only_keeps_lineage_specific_stem_colors():
     g = {
         "tree": tr,
         "fg_stem_only": True,
-        "fg_df": pandas.DataFrame(
+        "fg_df": pd.DataFrame(
             {
                 "name": ["Nep1", "Nep2", "Ceph"],
                 "traitA": [1, 1, 2],
@@ -56,7 +58,7 @@ def test_annotate_foreground_keeps_distinct_lineage_colors_for_stem_only():
     g = {
         "tree": tr,
         "fg_stem_only": True,
-        "fg_df": pandas.DataFrame(
+        "fg_df": pd.DataFrame(
             {
                 "name": ["A", "B", "C", "D"],
                 "PLACEHOLDER": [1, 1, 2, 2],
@@ -64,8 +66,8 @@ def test_annotate_foreground_keeps_distinct_lineage_colors_for_stem_only():
         ),
     }
     g["fg_leaf_names"] = {"PLACEHOLDER": [["A", "B"], ["C", "D"]]}
-    g["tree"] = foreground.annotate_lineage_foreground(lineages=numpy.array([1, 2]), trait_name="PLACEHOLDER", g=g)
-    g["tree"] = foreground.annotate_foreground(lineages=numpy.array([1, 2]), trait_name="PLACEHOLDER", g=g)
+    g["tree"] = foreground.annotate_lineage_foreground(lineages=np.array([1, 2]), trait_name="PLACEHOLDER", g=g)
+    g["tree"] = foreground.annotate_foreground(lineages=np.array([1, 2]), trait_name="PLACEHOLDER", g=g)
 
     nodes_by_name = {n.name: n for n in g["tree"].traverse() if n.name}
     n1_color = ete.get_prop(nodes_by_name["N1"], "color_PLACEHOLDER")
@@ -85,10 +87,10 @@ def test_get_target_ids_excludes_root_even_for_full_clade_foreground():
     g = {
         "tree": tr,
         "fg_stem_only": False,
-        "fg_df": pandas.DataFrame({"name": ["A", "B"], "PLACEHOLDER": [1, 1]}),
+        "fg_df": pd.DataFrame({"name": ["A", "B"], "PLACEHOLDER": [1, 1]}),
         "fg_leaf_names": {"PLACEHOLDER": [["A", "B"]]},
     }
-    lineages = numpy.array([1])
+    lineages = np.array([1])
     g["tree"] = foreground.annotate_lineage_foreground(lineages=lineages, trait_name="PLACEHOLDER", g=g)
     target_ids = foreground.get_target_ids(lineages=lineages, trait_name="PLACEHOLDER", g=g)
     assert int(root_id) not in set(int(x) for x in target_ids.tolist())
@@ -120,8 +122,22 @@ def test_get_df_clade_size_handles_noncontiguous_branch_ids():
     assert not bool(out.loc[29, "is_fg_stem_traitA"])
 
 
+def test_randomize_foreground_flags_without_sample_original_preserves_target_count():
+    np.random.seed(1)
+    before = np.array([True, False, False, True, False], dtype=bool)
+    out = foreground._randomize_foreground_flags(before_randomization=before, sample_original_foreground=False)
+    assert int(out.sum()) == int(before.sum())
+    assert not out[np.where(before)[0]].any()
+
+
+def test_randomize_foreground_flags_without_sample_original_raises_when_candidates_insufficient():
+    before = np.array([True, True, False], dtype=bool)
+    with pytest.raises(ValueError, match="Not enough non-foreground clades"):
+        foreground._randomize_foreground_flags(before_randomization=before, sample_original_foreground=False)
+
+
 def test_clade_permutation_uses_observed_stats_when_main_table_has_only_permutations(monkeypatch):
-    observed = pandas.DataFrame(
+    observed = pd.DataFrame(
         {
             "arity": [2],
             "mode": ["foreground"],
@@ -130,22 +146,22 @@ def test_clade_permutation_uses_observed_stats_when_main_table_has_only_permutat
         }
     )
     g = {
-        "fg_df": pandas.DataFrame({"name": ["tip1"], "traitA": [1]}),
+        "fg_df": pd.DataFrame({"name": ["tip1"], "traitA": [1]}),
         "df_cb_stats": observed.copy(deep=True),
-        "df_cb_stats_main": pandas.DataFrame(),
+        "df_cb_stats_main": pd.DataFrame(),
         "fg_clade_permutation": 1,
         "current_arity": 2,
         "cutoff_stat": "dist_bl>0",
     }
-    cb = pandas.DataFrame({"branch_id_1": [1], "branch_id_2": [2]})
+    cb = pd.DataFrame({"branch_id_1": [1], "branch_id_2": [2]})
 
     def fake_initialize_df_cb_stats(local_g):
-        local_g["df_cb_stats"] = pandas.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
+        local_g["df_cb_stats"] = pd.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
         return local_g
 
     def fake_set_random_foreground_branch(local_g, trait_name):
-        local_g["r_fg_ids"] = {trait_name: numpy.array([10, 11], dtype=numpy.int64)}
-        return local_g, numpy.array([[1, 2]], dtype=numpy.int64)
+        local_g["r_fg_ids"] = {trait_name: np.array([10, 11], dtype=np.int64)}
+        return local_g, np.array([[1, 2]], dtype=np.int64)
 
     def fake_add_median_cb_stats(local_g, rcb, current_arity, start, verbose=False):
         local_g["df_cb_stats"].loc[:, "arity"] = current_arity
@@ -165,7 +181,7 @@ def test_clade_permutation_uses_observed_stats_when_main_table_has_only_permutat
 
 
 def test_clade_permutation_iterates_all_traits_in_fg_format2(monkeypatch):
-    observed = pandas.DataFrame(
+    observed = pd.DataFrame(
         {
             "arity": [2],
             "mode": ["foreground"],
@@ -176,24 +192,24 @@ def test_clade_permutation_iterates_all_traits_in_fg_format2(monkeypatch):
         }
     )
     g = {
-        "fg_df": pandas.DataFrame({"name": ["tip1"], "traitA": [1], "traitB": [0]}),
+        "fg_df": pd.DataFrame({"name": ["tip1"], "traitA": [1], "traitB": [0]}),
         "df_cb_stats": observed.copy(deep=True),
-        "df_cb_stats_main": pandas.DataFrame(),
+        "df_cb_stats_main": pd.DataFrame(),
         "fg_clade_permutation": 1,
         "current_arity": 2,
         "cutoff_stat": "dist_bl>0",
     }
-    cb = pandas.DataFrame({"branch_id_1": [1], "branch_id_2": [2]})
+    cb = pd.DataFrame({"branch_id_1": [1], "branch_id_2": [2]})
     called_traits = []
 
     def fake_initialize_df_cb_stats(local_g):
-        local_g["df_cb_stats"] = pandas.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
+        local_g["df_cb_stats"] = pd.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
         return local_g
 
     def fake_set_random_foreground_branch(local_g, trait_name, num_trial=100, sample_original_foreground=False):
         called_traits.append(trait_name)
-        local_g["r_fg_ids"] = {trait_name: numpy.array([21, 22], dtype=numpy.int64)}
-        return local_g, numpy.array([[1, 2]], dtype=numpy.int64)
+        local_g["r_fg_ids"] = {trait_name: np.array([21, 22], dtype=np.int64)}
+        return local_g, np.array([[1, 2]], dtype=np.int64)
 
     def fake_add_median_cb_stats(local_g, rcb, current_arity, start, verbose=False):
         local_g["df_cb_stats"].loc[:, "arity"] = current_arity
@@ -201,8 +217,8 @@ def test_clade_permutation_iterates_all_traits_in_fg_format2(monkeypatch):
         assert len(trait_cols) == 1
         focal_trait = trait_cols[0].replace("is_fg_", "")
         for trait_name in ["traitA", "traitB"]:
-            local_g["df_cb_stats"].loc[:, "median_omegaCany2spe_fg_" + trait_name] = numpy.nan
-            local_g["df_cb_stats"].loc[:, "total_OCNany2spe_fg_" + trait_name] = numpy.nan
+            local_g["df_cb_stats"].loc[:, "median_omegaCany2spe_fg_" + trait_name] = np.nan
+            local_g["df_cb_stats"].loc[:, "total_OCNany2spe_fg_" + trait_name] = np.nan
         local_g["df_cb_stats"].loc[:, "median_omegaCany2spe_fg_" + focal_trait] = 1.0
         local_g["df_cb_stats"].loc[:, "total_OCNany2spe_fg_" + focal_trait] = 3.0
         return local_g
@@ -221,7 +237,7 @@ def test_clade_permutation_iterates_all_traits_in_fg_format2(monkeypatch):
 
 
 def test_clade_permutation_continues_when_randomization_fails(monkeypatch):
-    observed = pandas.DataFrame(
+    observed = pd.DataFrame(
         {
             "arity": [2],
             "mode": ["foreground"],
@@ -230,17 +246,17 @@ def test_clade_permutation_continues_when_randomization_fails(monkeypatch):
         }
     )
     g = {
-        "fg_df": pandas.DataFrame({"name": ["tip1"], "traitA": [1]}),
+        "fg_df": pd.DataFrame({"name": ["tip1"], "traitA": [1]}),
         "df_cb_stats": observed.copy(deep=True),
-        "df_cb_stats_main": pandas.DataFrame(),
+        "df_cb_stats_main": pd.DataFrame(),
         "fg_clade_permutation": 1,
         "current_arity": 2,
         "cutoff_stat": "dist_bl>0",
     }
-    cb = pandas.DataFrame({"branch_id_1": [1], "branch_id_2": [2]})
+    cb = pd.DataFrame({"branch_id_1": [1], "branch_id_2": [2]})
 
     def fake_initialize_df_cb_stats(local_g):
-        local_g["df_cb_stats"] = pandas.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
+        local_g["df_cb_stats"] = pd.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
         return local_g
 
     def fake_set_random_foreground_branch(local_g, trait_name, num_trial=100, sample_original_foreground=False):
@@ -259,7 +275,7 @@ def test_clade_permutation_continues_when_randomization_fails(monkeypatch):
 
 
 def test_clade_permutation_retries_with_sample_original_foreground(monkeypatch):
-    observed = pandas.DataFrame(
+    observed = pd.DataFrame(
         {
             "arity": [2],
             "mode": ["foreground"],
@@ -268,26 +284,26 @@ def test_clade_permutation_retries_with_sample_original_foreground(monkeypatch):
         }
     )
     g = {
-        "fg_df": pandas.DataFrame({"name": ["tip1"], "traitA": [1]}),
+        "fg_df": pd.DataFrame({"name": ["tip1"], "traitA": [1]}),
         "df_cb_stats": observed.copy(deep=True),
-        "df_cb_stats_main": pandas.DataFrame(),
+        "df_cb_stats_main": pd.DataFrame(),
         "fg_clade_permutation": 1,
         "current_arity": 2,
         "cutoff_stat": "dist_bl>0",
     }
-    cb = pandas.DataFrame({"branch_id_1": [1], "branch_id_2": [2]})
+    cb = pd.DataFrame({"branch_id_1": [1], "branch_id_2": [2]})
     sampled_flags = []
 
     def fake_initialize_df_cb_stats(local_g):
-        local_g["df_cb_stats"] = pandas.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
+        local_g["df_cb_stats"] = pd.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
         return local_g
 
     def fake_set_random_foreground_branch(local_g, trait_name, num_trial=100, sample_original_foreground=False):
         sampled_flags.append(sample_original_foreground)
         if not sample_original_foreground:
             raise Exception("strict mode failed")
-        local_g["r_fg_ids"] = {trait_name: numpy.array([1, 2], dtype=numpy.int64)}
-        return local_g, numpy.array([[1, 2]], dtype=numpy.int64)
+        local_g["r_fg_ids"] = {trait_name: np.array([1, 2], dtype=np.int64)}
+        return local_g, np.array([[1, 2]], dtype=np.int64)
 
     def fake_add_median_cb_stats(local_g, rcb, current_arity, start, verbose=False):
         local_g["df_cb_stats"].loc[:, "arity"] = current_arity
@@ -307,7 +323,7 @@ def test_clade_permutation_retries_with_sample_original_foreground(monkeypatch):
 
 
 def test_clade_permutation_recomputes_missing_randomized_combinations(monkeypatch, capsys):
-    observed = pandas.DataFrame(
+    observed = pd.DataFrame(
         {
             "arity": [2],
             "mode": ["foreground"],
@@ -316,28 +332,28 @@ def test_clade_permutation_recomputes_missing_randomized_combinations(monkeypatc
         }
     )
     g = {
-        "fg_df": pandas.DataFrame({"name": ["tip1"], "traitA": [1]}),
+        "fg_df": pd.DataFrame({"name": ["tip1"], "traitA": [1]}),
         "df_cb_stats": observed.copy(deep=True),
-        "df_cb_stats_main": pandas.DataFrame(),
+        "df_cb_stats_main": pd.DataFrame(),
         "fg_clade_permutation": 1,
         "current_arity": 2,
         "cutoff_stat": "dist_bl>0",
     }
-    cb = pandas.DataFrame({"branch_id_1": [1], "branch_id_2": [2], "dummy": [0.0]})
+    cb = pd.DataFrame({"branch_id_1": [1], "branch_id_2": [2], "dummy": [0.0]})
     recompute_calls = []
 
     def fake_initialize_df_cb_stats(local_g):
-        local_g["df_cb_stats"] = pandas.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
+        local_g["df_cb_stats"] = pd.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
         return local_g
 
     def fake_set_random_foreground_branch(local_g, trait_name, num_trial=100, sample_original_foreground=False):
-        local_g["r_fg_ids"] = {trait_name: numpy.array([1, 2], dtype=numpy.int64)}
+        local_g["r_fg_ids"] = {trait_name: np.array([1, 2], dtype=np.int64)}
         # include one combination that is missing from cb to trigger recomputation
-        return local_g, numpy.array([[1, 2], [2, 3]], dtype=numpy.int64)
+        return local_g, np.array([[1, 2], [2, 3]], dtype=np.int64)
 
     def fake_recompute_missing(g, missing_id_combinations, OS_tensor_reducer, ON_tensor_reducer):
         recompute_calls.append(missing_id_combinations.tolist())
-        cb_missing = pandas.DataFrame({"branch_id_1": [2], "branch_id_2": [3], "dummy": [1.0]})
+        cb_missing = pd.DataFrame({"branch_id_1": [2], "branch_id_2": [3], "dummy": [1.0]})
         return cb_missing, g
 
     def fake_add_median_cb_stats(local_g, rcb, current_arity, start, verbose=False):
@@ -367,7 +383,7 @@ def test_clade_permutation_recomputes_missing_randomized_combinations(monkeypatc
 
 
 def test_clade_permutation_reports_dropped_without_recomputation(monkeypatch, capsys):
-    observed = pandas.DataFrame(
+    observed = pd.DataFrame(
         {
             "arity": [2],
             "mode": ["foreground"],
@@ -376,22 +392,22 @@ def test_clade_permutation_reports_dropped_without_recomputation(monkeypatch, ca
         }
     )
     g = {
-        "fg_df": pandas.DataFrame({"name": ["tip1"], "traitA": [1]}),
+        "fg_df": pd.DataFrame({"name": ["tip1"], "traitA": [1]}),
         "df_cb_stats": observed.copy(deep=True),
-        "df_cb_stats_main": pandas.DataFrame(),
+        "df_cb_stats_main": pd.DataFrame(),
         "fg_clade_permutation": 1,
         "current_arity": 2,
         "cutoff_stat": "dist_bl>0",
     }
-    cb = pandas.DataFrame({"branch_id_1": [1], "branch_id_2": [2], "dummy": [0.0]})
+    cb = pd.DataFrame({"branch_id_1": [1], "branch_id_2": [2], "dummy": [0.0]})
 
     def fake_initialize_df_cb_stats(local_g):
-        local_g["df_cb_stats"] = pandas.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
+        local_g["df_cb_stats"] = pd.DataFrame({"arity": [local_g["current_arity"]], "mode": [""]})
         return local_g
 
     def fake_set_random_foreground_branch(local_g, trait_name, num_trial=100, sample_original_foreground=False):
-        local_g["r_fg_ids"] = {trait_name: numpy.array([1, 2], dtype=numpy.int64)}
-        return local_g, numpy.array([[1, 2], [2, 3]], dtype=numpy.int64)
+        local_g["r_fg_ids"] = {trait_name: np.array([1, 2], dtype=np.int64)}
+        return local_g, np.array([[1, 2], [2, 3]], dtype=np.int64)
 
     def fake_add_median_cb_stats(local_g, rcb, current_arity, start, verbose=False):
         # without recomputation only one row survives from the merge
@@ -410,3 +426,33 @@ def test_clade_permutation_reports_dropped_without_recomputation(monkeypatch, ca
     assert out["df_cb_stats_main"].shape[0] == 1
     captured = capsys.readouterr()
     assert "permuted foreground branch combinations were dropped" in captured.out
+
+
+def test_report_permutation_clade_permutation_ocn_excludes_inf_from_mean_std(capsys):
+    g = {
+        "df_cb_stats_main": pd.DataFrame(
+            {
+                "arity": [2, 2, 2],
+                "mode": [
+                    "randomization_traitA_iter1",
+                    "randomization_traitA_iter2",
+                    "randomization_traitA_iter3",
+                ],
+                "total_OCNany2spe_fg_traitA": [1.0, np.inf, 3.0],
+            }
+        )
+    }
+    is_arity_perm = g["df_cb_stats_main"].loc[:, "arity"] == 2
+    is_stat_permutation = g["df_cb_stats_main"].loc[:, "mode"].astype(str).str.startswith("randomization_traitA_")
+    with warnings.catch_warnings(record=True) as captured_warnings:
+        warnings.simplefilter("always")
+        foreground._report_permutation_clade_permutation_ocn(
+            g=g,
+            trait_name="traitA",
+            obs_ocn_col="total_OCNany2spe_fg_traitA",
+            is_arity_perm=is_arity_perm,
+            is_stat_permutation=is_stat_permutation,
+        )
+    assert not any("invalid value encountered" in str(w.message) for w in captured_warnings)
+    out = capsys.readouterr().out
+    assert "Trait traitA: Total OCNany2spe in permutation lineages = 3.0; 2.0 ± 1.0" in out

@@ -1,5 +1,6 @@
-import pandas
+import pandas as pd
 
+import os
 import re
 
 
@@ -28,7 +29,8 @@ def _normalize_feature_types(feature_types):
 def _extract_accession_from_seq_name(seq_name):
     patterns = [
         r"AF-([A-Z0-9]+)-F[0-9]+",  # AlphaFold
-        r"(^|[^A-Z0-9])([A-Z][0-9][A-Z0-9]{3}[0-9])([^A-Z0-9]|$)",  # common UniProt accession
+        r"(^|[^A-Z0-9])([OPQ][0-9][A-Z0-9]{3}[0-9])([^A-Z0-9]|$)",  # legacy 6-char UniProt accession
+        r"(^|[^A-Z0-9])([A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})([^A-Z0-9]|$)",  # 6/10-char UniProt accession
     ]
     for pattern in patterns:
         match = re.search(pattern, seq_name, flags=re.IGNORECASE)
@@ -72,15 +74,17 @@ def resolve_uniprot_accession(seq_name, pdb_id=None):
     accession = _extract_accession_from_seq_name(seq_name=seq_name)
     if accession is not None:
         return accession
-    if pdb_id is None:
-        return None
     chain_id = seq_name.rsplit("_", 1)[-1] if "_" in seq_name else None
-    if chain_id is None:
+    if (chain_id is None) or (chain_id == ""):
         return None
     pdb_code = seq_name.split("_", 1)[0]
-    is_pdb_code = bool(re.fullmatch(r"[0-9][A-Za-z0-9]{3}", pdb_code))
-    if not is_pdb_code:
-        return None
+    if not bool(re.fullmatch(r"[0-9][A-Za-z0-9]{3}", pdb_code)):
+        if pdb_id is None:
+            return None
+        pdb_base = os.path.basename(str(pdb_id))
+        pdb_code = re.sub(r"\..*$", "", pdb_base)
+        if not bool(re.fullmatch(r"[0-9][A-Za-z0-9]{3}", pdb_code)):
+            return None
     return _resolve_uniprot_accession_from_rcsb(pdb_code=pdb_code, chain_id=chain_id)
 
 
@@ -129,13 +133,23 @@ def _filter_features(features, feature_types):
 def _get_mapped_sites(df, col_site):
     mapped_sites = set()
     for value in df.loc[:, col_site].tolist():
-        if pandas.isna(value):
-            continue
-        site = int(value)
-        if site <= 0:
+        site = _parse_positive_site(value)
+        if site is None:
             continue
         mapped_sites.add(site)
     return mapped_sites
+
+
+def _parse_positive_site(value):
+    if pd.isna(value):
+        return None
+    try:
+        site = int(value)
+    except (TypeError, ValueError):
+        return None
+    if site <= 0:
+        return None
+    return site
 
 
 def _filter_redundant_features(features, mapped_sites):
@@ -209,11 +223,8 @@ def add_uniprot_site_annotations(df, g):
         df.loc[:, col_desc] = ""
 
         for i in df.index:
-            site = df.at[i, col_site]
-            if pandas.isna(site):
-                continue
-            site = int(site)
-            if site <= 0:
+            site = _parse_positive_site(df.at[i, col_site])
+            if site is None:
                 continue
             site_features = feature_map.get(site, [])
             if len(site_features) == 0:
