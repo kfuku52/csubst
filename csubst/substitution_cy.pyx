@@ -341,3 +341,34 @@ cpdef calc_combinatorial_sub_sparse_summary_double_arity2(
     if mmap:
         return None
     return numpy.asarray(df)
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef fill_sub_tensor_asis_branch_double(
+    numpy.ndarray[numpy.float64_t, ndim=2] parent_matrix,
+    numpy.ndarray[numpy.float64_t, ndim=2] child_matrix,
+    numpy.ndarray[numpy.float64_t, ndim=3] out_branch_group,
+):
+    cdef Py_ssize_t n_site = parent_matrix.shape[0]
+    cdef Py_ssize_t n_state = parent_matrix.shape[1]
+    cdef double[:, :] parent_mv = parent_matrix
+    cdef double[:, :] child_mv = child_matrix
+    cdef double[:, :, :] out_mv = out_branch_group
+    cdef Py_ssize_t s, a, d
+    cdef double pa
+    cdef double cd
+    if child_matrix.shape[0] != n_site or child_matrix.shape[1] != n_state:
+        raise ValueError('child_matrix shape should match parent_matrix shape.')
+    if out_branch_group.shape[0] != n_site or out_branch_group.shape[1] != n_state or out_branch_group.shape[2] != n_state:
+        raise ValueError('out_branch_group shape should be [site,state,state] with matching state/site sizes.')
+    for s in range(n_site):
+        for a in range(n_state):
+            pa = parent_mv[s, a]
+            for d in range(n_state):
+                if a == d:
+                    out_mv[s, a, d] = 0.0
+                else:
+                    cd = child_mv[s, d]
+                    out_mv[s, a, d] = pa * cd

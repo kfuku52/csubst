@@ -623,9 +623,23 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
         if state_tensor_anc[parent, :, :].sum()<g['float_tol']:
             continue
         if mode=='asis':
-            sub_matrix = np.einsum("sa,sd,ad->sad", state_tensor_anc[parent,:,:], state_tensor[child,:,:], diag_zero)
-            # s=site, a=ancestral, d=derived
-            sub_tensor[child, :, 0, :, :] = sub_matrix
+            parent_matrix = state_tensor_anc[parent, :, :]
+            child_matrix = state_tensor[child, :, :]
+            out_branch_group = sub_tensor[child, :, 0, :, :]
+            if _can_use_cython_asis_sub_tensor_fill(
+                parent_matrix=parent_matrix,
+                child_matrix=child_matrix,
+                out_branch_group=out_branch_group,
+            ):
+                substitution_cy.fill_sub_tensor_asis_branch_double(
+                    parent_matrix=parent_matrix,
+                    child_matrix=child_matrix,
+                    out_branch_group=out_branch_group,
+                )
+            else:
+                sub_matrix = np.einsum("sa,sd,ad->sad", parent_matrix, child_matrix, diag_zero)
+                # s=site, a=ancestral, d=derived
+                out_branch_group[:, :, :] = sub_matrix
         elif mode=='syn':
             for s,aa in enumerate(g['amino_acid_orders']):
                 ind = np.array(g['synonymous_indices'][aa])
@@ -798,6 +812,28 @@ def _can_use_cython_dense_cbs(id_combinations, sub_tensor, mmap=False, df_mmap=N
     ):
         return False
     return hasattr(substitution_cy, 'calc_combinatorial_sub_by_site_double_arity2')
+
+
+def _can_use_cython_asis_sub_tensor_fill(parent_matrix, child_matrix, out_branch_group):
+    if not hasattr(substitution_cy, 'fill_sub_tensor_asis_branch_double'):
+        return False
+    if (
+        (not isinstance(parent_matrix, np.ndarray))
+        or (not isinstance(child_matrix, np.ndarray))
+        or (not isinstance(out_branch_group, np.ndarray))
+    ):
+        return False
+    if parent_matrix.dtype != np.float64 or child_matrix.dtype != np.float64 or out_branch_group.dtype != np.float64:
+        return False
+    if parent_matrix.ndim != 2 or child_matrix.ndim != 2 or out_branch_group.ndim != 3:
+        return False
+    if parent_matrix.shape != child_matrix.shape:
+        return False
+    expected_shape = (parent_matrix.shape[0], parent_matrix.shape[1], parent_matrix.shape[1])
+    if out_branch_group.shape != expected_shape:
+        return False
+    return True
+
 
 def _resolve_dense_cython_n_jobs(n_jobs, id_combinations, sub_tensor, g, task='cb'):
     if n_jobs <= 1:
