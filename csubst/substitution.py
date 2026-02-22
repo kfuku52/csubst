@@ -613,6 +613,8 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
     if mode=='asis':
         num_state = state_tensor.shape[2]
         diag_zero = np.diag([-1] * num_state) + 1
+    elif mode=='syn':
+        syn_index_matrix, syn_group_sizes = _get_syn_group_index_cache(g)
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
@@ -641,14 +643,32 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
                 # s=site, a=ancestral, d=derived
                 out_branch_group[:, :, :] = sub_matrix
         elif mode=='syn':
-            for s,aa in enumerate(g['amino_acid_orders']):
-                ind = np.array(g['synonymous_indices'][aa])
-                size = len(ind)
-                diag_zero = np.diag([-1] * size) + 1
-                parent_matrix = state_tensor_anc[parent, :, ind] # axis is swapped, shape=[state,site]
-                child_matrix = state_tensor[child, :, ind] # axis is swapped, shape=[state,site]
-                sub_matrix = np.einsum("as,ds,ad->sad", parent_matrix, child_matrix, diag_zero)
-                sub_tensor[child, :, s, :size, :size] = sub_matrix
+            parent_matrix = state_tensor_anc[parent, :, :]
+            child_matrix = state_tensor[child, :, :]
+            out_branch_tensor = sub_tensor[child, :, :, :, :]
+            if _can_use_cython_syn_sub_tensor_fill(
+                parent_matrix=parent_matrix,
+                child_matrix=child_matrix,
+                syn_index_matrix=syn_index_matrix,
+                syn_group_sizes=syn_group_sizes,
+                out_branch_tensor=out_branch_tensor,
+            ):
+                substitution_cy.fill_sub_tensor_syn_branch_double(
+                    parent_matrix=parent_matrix,
+                    child_matrix=child_matrix,
+                    syn_index_matrix=syn_index_matrix,
+                    syn_group_sizes=syn_group_sizes,
+                    out_branch_tensor=out_branch_tensor,
+                )
+            else:
+                for s,aa in enumerate(g['amino_acid_orders']):
+                    ind = np.array(g['synonymous_indices'][aa])
+                    size = len(ind)
+                    diag_zero = np.diag([-1] * size) + 1
+                    parent_group_matrix = state_tensor_anc[parent, :, ind] # axis is swapped, shape=[state,site]
+                    child_group_matrix = state_tensor[child, :, ind] # axis is swapped, shape=[state,site]
+                    sub_matrix = np.einsum("as,ds,ad->sad", parent_group_matrix, child_group_matrix, diag_zero)
+                    sub_tensor[child, :, s, :size, :size] = sub_matrix
     if np.isnan(sub_tensor).any():
         sub_tensor = np.nan_to_num(sub_tensor, nan=0, copy=False)
     return sub_tensor
@@ -831,6 +851,60 @@ def _can_use_cython_asis_sub_tensor_fill(parent_matrix, child_matrix, out_branch
         return False
     expected_shape = (parent_matrix.shape[0], parent_matrix.shape[1], parent_matrix.shape[1])
     if out_branch_group.shape != expected_shape:
+        return False
+    return True
+
+
+def _get_syn_group_index_cache(g):
+    cache = g.get('_syn_group_index_cache', None)
+    if cache is not None:
+        return cache
+    aa_orders = list(g['amino_acid_orders'])
+    max_syn = int(g['max_synonymous_size'])
+    index_matrix = np.full(shape=(len(aa_orders), max_syn), fill_value=-1, dtype=np.int64)
+    group_sizes = np.zeros(shape=(len(aa_orders),), dtype=np.int64)
+    for sg, aa in enumerate(aa_orders):
+        ind = np.asarray(g['synonymous_indices'][aa], dtype=np.int64).reshape(-1)
+        if ind.shape[0] > max_syn:
+            txt = 'Synonymous group "{}" size ({}) exceeded max_synonymous_size ({}).'
+            raise ValueError(txt.format(aa, ind.shape[0], max_syn))
+        if ind.shape[0] == 0:
+            continue
+        index_matrix[sg, :ind.shape[0]] = ind
+        group_sizes[sg] = ind.shape[0]
+    cache = (index_matrix, group_sizes)
+    g['_syn_group_index_cache'] = cache
+    return cache
+
+
+def _can_use_cython_syn_sub_tensor_fill(parent_matrix, child_matrix, syn_index_matrix, syn_group_sizes, out_branch_tensor):
+    if not hasattr(substitution_cy, 'fill_sub_tensor_syn_branch_double'):
+        return False
+    if (
+        (not isinstance(parent_matrix, np.ndarray))
+        or (not isinstance(child_matrix, np.ndarray))
+        or (not isinstance(syn_index_matrix, np.ndarray))
+        or (not isinstance(syn_group_sizes, np.ndarray))
+        or (not isinstance(out_branch_tensor, np.ndarray))
+    ):
+        return False
+    if parent_matrix.dtype != np.float64 or child_matrix.dtype != np.float64 or out_branch_tensor.dtype != np.float64:
+        return False
+    if syn_index_matrix.dtype != np.int64 or syn_group_sizes.dtype != np.int64:
+        return False
+    if parent_matrix.ndim != 2 or child_matrix.ndim != 2:
+        return False
+    if syn_index_matrix.ndim != 2 or syn_group_sizes.ndim != 1 or out_branch_tensor.ndim != 4:
+        return False
+    if parent_matrix.shape != child_matrix.shape:
+        return False
+    if out_branch_tensor.shape[0] != parent_matrix.shape[0]:
+        return False
+    if out_branch_tensor.shape[1] != syn_group_sizes.shape[0]:
+        return False
+    if syn_index_matrix.shape[0] != syn_group_sizes.shape[0]:
+        return False
+    if syn_index_matrix.shape[1] > out_branch_tensor.shape[2] or syn_index_matrix.shape[1] > out_branch_tensor.shape[3]:
         return False
     return True
 

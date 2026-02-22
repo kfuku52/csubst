@@ -372,3 +372,50 @@ cpdef fill_sub_tensor_asis_branch_double(
                 else:
                     cd = child_mv[s, d]
                     out_mv[s, a, d] = pa * cd
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef fill_sub_tensor_syn_branch_double(
+    numpy.ndarray[numpy.float64_t, ndim=2] parent_matrix,
+    numpy.ndarray[numpy.float64_t, ndim=2] child_matrix,
+    numpy.ndarray[numpy.int64_t, ndim=2] syn_index_matrix,
+    numpy.ndarray[numpy.int64_t, ndim=1] syn_group_sizes,
+    numpy.ndarray[numpy.float64_t, ndim=4] out_branch_tensor,
+):
+    cdef Py_ssize_t n_site = parent_matrix.shape[0]
+    cdef Py_ssize_t n_state = parent_matrix.shape[1]
+    cdef Py_ssize_t n_group = syn_group_sizes.shape[0]
+    cdef Py_ssize_t max_syn = syn_index_matrix.shape[1]
+    cdef double[:, :] parent_mv = parent_matrix
+    cdef double[:, :] child_mv = child_matrix
+    cdef long[:, :] idx_mv = syn_index_matrix
+    cdef long[:] size_mv = syn_group_sizes
+    cdef double[:, :, :, :] out_mv = out_branch_tensor
+    cdef Py_ssize_t sg, s, ai, di
+    cdef Py_ssize_t size
+    cdef Py_ssize_t anc_state, der_state
+    cdef double pa
+
+    if child_matrix.shape[0] != n_site or child_matrix.shape[1] != n_state:
+        raise ValueError('child_matrix shape should match parent_matrix shape.')
+    if out_branch_tensor.shape[0] != n_site or out_branch_tensor.shape[1] != n_group:
+        raise ValueError('out_branch_tensor first two dimensions should be [site,group].')
+    if out_branch_tensor.shape[2] < max_syn or out_branch_tensor.shape[3] < max_syn:
+        raise ValueError('out_branch_tensor synonymous dimensions should cover max syn group size.')
+
+    for sg in range(n_group):
+        size = size_mv[sg]
+        if size <= 1:
+            continue
+        for s in range(n_site):
+            for ai in range(size):
+                anc_state = idx_mv[sg, ai]
+                pa = parent_mv[s, anc_state]
+                for di in range(size):
+                    if ai == di:
+                        out_mv[s, sg, ai, di] = 0.0
+                    else:
+                        der_state = idx_mv[sg, di]
+                        out_mv[s, sg, ai, di] = pa * child_mv[s, der_state]

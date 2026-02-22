@@ -621,6 +621,61 @@ def test_get_substitution_tensor_cython_asis_fill_matches_python_fallback(monkey
             cython_mmap.unlink()
 
 
+def test_get_substitution_tensor_cython_syn_fill_matches_python_fallback(monkeypatch):
+    if not hasattr(substitution_cy, "fill_sub_tensor_syn_branch_double"):
+        pytest.skip("Cython syn fill kernel is unavailable")
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    state = np.zeros((3, 3, 4), dtype=np.float64)
+    state[labels["R"], :, :] = [
+        [0.6, 0.4, 0.0, 0.0],
+        [0.1, 0.9, 0.0, 0.0],
+        [0.0, 0.0, 0.3, 0.7],
+    ]
+    state[labels["A"], :, :] = [
+        [0.2, 0.8, 0.0, 0.0],
+        [0.7, 0.3, 0.0, 0.0],
+        [0.0, 0.0, 0.4, 0.6],
+    ]
+    state[labels["B"], :, :] = [
+        [0.9, 0.1, 0.0, 0.0],
+        [0.2, 0.8, 0.0, 0.0],
+        [0.0, 0.0, 0.6, 0.4],
+    ]
+    base_g = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "sub_tensor_backend": "dense",
+        "amino_acid_orders": np.array(["AA0", "AA1"], dtype=object),
+        "synonymous_indices": {"AA0": [0, 1], "AA1": [2, 3]},
+        "max_synonymous_size": 2,
+    }
+    fallback_mmap = Path("tmp.csubst.sub_tensor.toy_syn_fallback.mmap")
+    cython_mmap = Path("tmp.csubst.sub_tensor.toy_syn_cython.mmap")
+    try:
+        monkeypatch.setattr(substitution, "_can_use_cython_syn_sub_tensor_fill", lambda *args, **kwargs: False)
+        expected = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="syn",
+            g=dict(base_g),
+            mmap_attr="toy_syn_fallback",
+        )
+        monkeypatch.setattr(substitution, "_can_use_cython_syn_sub_tensor_fill", lambda *args, **kwargs: True)
+        observed = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="syn",
+            g=dict(base_g),
+            mmap_attr="toy_syn_cython",
+        )
+        np.testing.assert_allclose(observed, expected, atol=1e-12)
+    finally:
+        if fallback_mmap.exists():
+            fallback_mmap.unlink()
+        if cython_mmap.exists():
+            cython_mmap.unlink()
+
+
 def test_apply_min_sub_pp_sparse_matches_dense():
     dense = _toy_reducer_tensor()
     sparse = substitution.dense_to_sparse_sub_tensor(dense.copy(), tol=0)
