@@ -60,14 +60,22 @@ def write_mafft_alignment(g):
         raise RuntimeError(txt.format(out_mafft.returncode, stderr_text))
     with open(g['mafft_add_fasta'], 'w') as f:
         f.write(out_mafft.stdout.decode('utf8'))
+    if os.path.getsize(g['mafft_add_fasta'])==0:
+        txt = 'File size of {} is 0. A wrong ID might be specified in --pdb.'
+        raise ValueError(txt.format(g['mafft_add_fasta']))
     print('')
+    map_generated = False
     for i in range(10):
         if os.path.exists(mafft_map_file):
             print('MAFFT alignment file was generated: {}'.format(g['mafft_add_fasta']), flush=True)
+            map_generated = True
             break
         else:
             print('MAFFT alignment file not detected. Waiting {:} sec'.format(i+1), flush=True)
             time.sleep(1)
+    if not map_generated:
+        txt = 'MAFFT map output file was not generated: {}'
+        raise RuntimeError(txt.format(mafft_map_file))
     print(
         "Since CSUBST does not automatically exclude poorly aligned regions, "
         "please carefully check the MAFFT alignment file before interpreting substitution events.",
@@ -91,9 +99,6 @@ def write_mafft_alignment(g):
         flush=True
     )
     print('', flush=True)
-    if os.path.getsize(g['mafft_add_fasta'])==0:
-        txt = 'File size of {} is 0. A wrong ID might be specified in --pdb.'
-        raise ValueError(txt.format(g['mafft_add_fasta']))
 
 def get_residue_numberings():
     out = dict()
@@ -145,21 +150,51 @@ def add_coordinate_from_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'
         seq_csv = '\n'.join(map_lines[1:])
         if seq_csv.strip()=='': # empty data
             df.loc[:,'codon_site_'+seq_name] = 0
-            df.loc[:,'aa_'+seq_name] = 0
+            df.loc[:,'aa_'+seq_name] = ''
         else:
             try:
                 df_tmp = pd.read_csv(StringIO(seq_csv), comment='#', header=None)
             except pd.errors.EmptyDataError:
                 df.loc[:, 'codon_site_'+seq_name] = 0
-                df.loc[:, 'aa_'+seq_name] = 0
+                df.loc[:, 'aa_'+seq_name] = ''
                 continue
             df_tmp.columns = ['aa_'+seq_name, 'codon_site_'+seq_name, 'codon_site_alignment']
-            is_missing_in_aln = (df_tmp['codon_site_alignment']==' -')
-            df_tmp = df_tmp.loc[~is_missing_in_aln,:]
-            df_tmp['codon_site_alignment'] = df_tmp['codon_site_alignment'].astype(int)
+            aln_site_str = df_tmp['codon_site_alignment'].astype(str).str.strip()
+            is_missing_in_aln = aln_site_str.isin(['', '-'])
+            df_tmp = df_tmp.loc[~is_missing_in_aln, :].copy()
+            if df_tmp.shape[0] == 0:
+                df.loc[:, 'codon_site_'+seq_name] = 0
+                df.loc[:, 'aa_'+seq_name] = ''
+                continue
+            aln_sites = pd.to_numeric(df_tmp['codon_site_alignment'], errors='coerce')
+            if aln_sites.isna().any():
+                invalid_values = df_tmp.loc[aln_sites.isna(), 'codon_site_alignment'].astype(str).tolist()
+                invalid_txt = ','.join(invalid_values[:5])
+                if len(invalid_values) > 5:
+                    invalid_txt += ',...'
+                txt = 'Invalid codon_site_alignment value(s) in {} for sequence {}: {}'
+                raise ValueError(txt.format(mafft_map_file, seq_name, invalid_txt))
+            df_tmp = df_tmp.drop(columns=['codon_site_alignment']).assign(
+                codon_site_alignment=aln_sites.astype(np.int64).to_numpy(copy=False)
+            )
             df = pd.merge(df, df_tmp, on='codon_site_alignment', how='left')
-            df['codon_site_'+seq_name] = df['codon_site_'+seq_name].fillna(0).astype(int)
-            df['aa_'+seq_name] = df.loc[:,'aa_'+seq_name].fillna('')
+            codon_col = 'codon_site_' + seq_name
+            aa_col = 'aa_' + seq_name
+            codon_raw = df[codon_col]
+            codon_text = codon_raw.astype(str).str.strip()
+            is_missing_codon = codon_raw.isna() | codon_text.isin(['', '-'])
+            codon_numeric = pd.to_numeric(codon_raw, errors='coerce')
+            is_invalid_codon = (~is_missing_codon) & codon_numeric.isna()
+            if is_invalid_codon.any():
+                invalid_values = df.loc[is_invalid_codon, codon_col].astype(str).tolist()
+                invalid_txt = ','.join(invalid_values[:5])
+                if len(invalid_values) > 5:
+                    invalid_txt += ',...'
+                txt = 'Invalid codon_site value(s) in {} for sequence {}: {}'
+                raise ValueError(txt.format(mafft_map_file, seq_name, invalid_txt))
+            df[codon_col] = codon_numeric.fillna(0).astype(int)
+            df[aa_col] = df.loc[:, aa_col].fillna('')
+            df.loc[df[codon_col] == 0, aa_col] = ''
     return df
 
 def add_coordinate_from_user_alignment(df, user_alignment):
@@ -172,20 +207,23 @@ def add_coordinate_from_user_alignment(df, user_alignment):
         pdb_seqs = list(SeqIO.parse(f, 'fasta'))
     with open(user_alignment, 'r') as f:
         user_seqs = list(SeqIO.parse(f, 'fasta'))
+    num_matched_sequences = 0
     for user_seq in user_seqs:
         for pdb_seq in pdb_seqs:
             if user_seq.name!=pdb_seq.name:
                 continue
-            user_seq_str = str(user_seq.seq).replace('\n', '')
-            pdb_seq_str = str(pdb_seq.seq).replace('\n', '')
+            num_matched_sequences += 1
+            user_seq_str = str(user_seq.seq).replace('\n', '').upper()
+            pdb_seq_str = str(pdb_seq.seq).replace('\n', '').upper()
             user_seq_counter = 0
             pdb_seq_counter = 0
+            row_labels = df.index.to_list()
             txt = 'The alignment length should match between --alignment_file ({} sites) and --user_alignment ({} sites)'
-            if len(user_seq_str) != df.shape[0]:
-                raise ValueError(txt.format(df.shape[0], len(user_seq_str)))
+            if len(user_seq_str) != len(row_labels):
+                raise ValueError(txt.format(len(row_labels), len(user_seq_str)))
             df['aa_' + user_seq.name] = ''
             df['codon_site_' + user_seq.name] = 0
-            while user_seq_counter <= df.shape[0]-1:
+            while user_seq_counter <= (len(row_labels) - 1):
                 if user_seq_str[user_seq_counter]=='-':
                     user_seq_counter += 1
                     continue
@@ -193,12 +231,18 @@ def add_coordinate_from_user_alignment(df, user_alignment):
                     txt = 'Unable to map --user_alignment residue at position {} for sequence "{}" to the PDB sequence "{}".'
                     raise ValueError(txt.format(user_seq_counter + 1, user_seq.name, pdb_seq.name))
                 if user_seq_str[user_seq_counter]==pdb_seq_str[pdb_seq_counter]:
-                    df.at[user_seq_counter, 'aa_' + user_seq.name] = user_seq_str[user_seq_counter]
-                    df.at[user_seq_counter, 'codon_site_' + user_seq.name] = pdb_seq_counter + 1
+                    row_label = row_labels[user_seq_counter]
+                    df.at[row_label, 'aa_' + user_seq.name] = user_seq_str[user_seq_counter]
+                    df.at[row_label, 'codon_site_' + user_seq.name] = pdb_seq_counter + 1
                     user_seq_counter += 1
                     pdb_seq_counter += 1
                 else:
                     pdb_seq_counter += 1
+    if num_matched_sequences == 0:
+        pdb_names = sorted([seq.name for seq in pdb_seqs])
+        user_names = sorted([seq.name for seq in user_seqs])
+        txt = 'No sequence name overlap was found between PDB-derived sequences ({}) and --user_alignment sequences ({}).'
+        raise ValueError(txt.format(','.join(pdb_names), ','.join(user_names)))
     return df
 
 def calc_aa_identity(g):
@@ -398,11 +442,69 @@ def _get_lineage_hex_by_branch(branch_ids, g):
 
 
 def _normalize_branch_ids(branch_ids):
-    arr = np.asarray(branch_ids)
+    if branch_ids is None:
+        return []
+    arr = np.asarray(branch_ids, dtype=object)
+    arr = np.atleast_1d(arr).reshape(-1)
     if arr.size == 0:
         return []
-    arr = np.atleast_1d(arr).reshape(-1)
-    return [int(v) for v in arr.tolist()]
+    normalized = []
+    for value in arr.tolist():
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('branch_ids should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('branch_ids should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('branch_ids should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return normalized
+
+
+def _parse_positive_site(value):
+    if pd.isna(value):
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return None
+    if isinstance(value, (int, np.integer)):
+        site = int(value)
+    elif isinstance(value, (float, np.floating)):
+        if (not np.isfinite(value)) or (not float(value).is_integer()):
+            return None
+        site = int(value)
+    else:
+        value_txt = str(value).strip()
+        if value_txt == '':
+            return None
+        if not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt)):
+            return None
+        site = int(float(value_txt))
+    if site <= 0:
+        return None
+    return site
+
+
+def _parse_bool_like(value):
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if pd.isna(value):
+        return False
+    if isinstance(value, (int, np.integer, float, np.floating)):
+        if not np.isfinite(float(value)):
+            return False
+        return bool(float(value) != 0.0)
+    txt = str(value).strip().lower()
+    if txt in ['1', 'true', 'yes', 'y', 'on']:
+        return True
+    if txt in ['0', 'false', 'no', 'n', 'off', '', 'none', 'nan', 'na']:
+        return False
+    return False
 
 
 def set_substitution_colors(df, g, object_names, N_sub_cols):
@@ -420,10 +522,10 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                     continue
                 selected_sites = []
                 for i in df.index:
-                    codon_site = int(df.at[i,codon_site_col])
-                    if codon_site==0:
+                    codon_site = _parse_positive_site(df.at[i, codon_site_col])
+                    if codon_site is None:
                         continue
-                    if bool(df.at[i,'N_set_expr']):
+                    if _parse_bool_like(df.at[i, 'N_set_expr']):
                         selected_sites.append(codon_site)
                 _paint_sites_with_hex(
                     object_name=object_name,
@@ -436,8 +538,8 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             if mode=='total':
                 site_values = dict()
                 for i in df.index:
-                    codon_site = int(df.at[i,codon_site_col])
-                    if codon_site==0:
+                    codon_site = _parse_positive_site(df.at[i, codon_site_col])
+                    if codon_site is None:
                         continue
                     total_sub = float(df.loc[i,N_sub_cols].sum())
                     if total_sub < float(g.get('min_single_prob', 0.8)):
@@ -465,8 +567,8 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 site_by_branch = {bid: [] for bid in lineage_branch_ids}
                 lineage_min_prob = float(g.get('min_single_prob', 0.8))
                 for i in df.index:
-                    codon_site = int(df.at[i,codon_site_col])
-                    if codon_site==0:
+                    codon_site = _parse_positive_site(df.at[i, codon_site_col])
+                    if codon_site is None:
                         continue
                     vals = df.loc[i, lineage_cols].to_numpy(dtype=float)
                     if vals.shape[0]==0:
@@ -493,18 +595,27 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             color_sites['OCNany2spe'] = []
             color_sites['OCNany2dif'] = []
             color_sites['single_sub'] = []
+            has_any2spe = ('OCNany2spe' in df.columns)
+            has_any2dif = ('OCNany2dif' in df.columns)
+            min_combinat_prob = float(g.get('min_combinat_prob', 0.5))
+            min_single_prob = float(g.get('min_single_prob', 0.8))
             for i in df.index:
-                codon_site = int(df.at[i,codon_site_col])
-                prob_Nany2spe = df.at[i,'OCNany2spe']
-                prob_Nany2dif = df.at[i,'OCNany2dif']
-                prob_single_sub = df.loc[i,N_sub_cols].max()
-                if codon_site==0:
+                codon_site = _parse_positive_site(df.at[i, codon_site_col])
+                prob_Nany2spe = float(df.at[i,'OCNany2spe']) if has_any2spe else 0.0
+                prob_Nany2dif = float(df.at[i,'OCNany2dif']) if has_any2dif else 0.0
+                if len(N_sub_cols) == 0:
+                    prob_single_sub = 0.0
+                else:
+                    prob_single_sub = float(df.loc[i,N_sub_cols].max())
+                    if not np.isfinite(prob_single_sub):
+                        prob_single_sub = 0.0
+                if codon_site is None:
                     continue
-                elif (prob_Nany2spe>=float(g.get('min_combinat_prob', 0.5)))&(prob_Nany2dif<=prob_Nany2spe):
+                elif (prob_Nany2spe>=min_combinat_prob)&(prob_Nany2dif<=prob_Nany2spe):
                     color_sites['OCNany2spe'].append(codon_site)
-                elif (prob_Nany2dif>=float(g.get('min_combinat_prob', 0.5)))&(prob_Nany2dif>prob_Nany2spe):
+                elif (prob_Nany2dif>=min_combinat_prob)&(prob_Nany2dif>prob_Nany2spe):
                     color_sites['OCNany2dif'].append(codon_site)
-                elif (prob_single_sub>=float(g.get('min_single_prob', 0.8))):
+                elif (prob_single_sub>=min_single_prob):
                     color_sites['single_sub'].append(codon_site)
             if g['single_branch_mode']:
                 color_sites['single_branch_N'] = copy.deepcopy(color_sites['single_sub'])
@@ -700,7 +811,7 @@ def save_6view_pdf(image_prefix='tmp.csubst.pymol',
             continue
         
         # Read and show image
-        img = matplotlib.image.imread(img_file)
+        img = plt.imread(img_file)
         ax.imshow(img)
         
         # Remove axes ticks

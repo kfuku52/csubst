@@ -33,3 +33,23 @@ def test_simulate_invalid_percent_biased_sub_fails_cleanly():
     assert proc.returncode == 2
     assert "--percent_biased_sub should be between 0 and <100." in log_text
     assert "Traceback" not in log_text
+
+
+def test_site_deprecated_probability_options_are_rejected():
+    proc, log_text = _run_cli("site", "--branch_id", "0", "--tree_site_plot_min_prob", "0.5")
+    assert proc.returncode == 2
+    assert "unrecognized arguments: --tree_site_plot_min_prob 0.5" in log_text
+
+
+def test_cli_entrypoint_runs_from_repo_root_without_pythonpath():
+    repo_root = Path(__file__).resolve().parents[1]
+    cmd = [sys.executable, str(repo_root / "csubst" / "csubst"), "--help"]
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    proc = subprocess.run(
+        cmd, cwd=str(repo_root), env=env, capture_output=True, text=True
+    )
+    assert proc.returncode == 0
+    combined = (proc.stdout or "") + (proc.stderr or "")
+    assert "ModuleNotFoundError" not in combined
+    assert "No module named 'csubst'" not in combined

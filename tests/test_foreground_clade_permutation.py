@@ -9,6 +9,15 @@ from csubst import ete
 from csubst import tree
 
 
+def test_normalize_branch_ids_rejects_non_integer_like_values():
+    with pytest.raises(ValueError, match="integer-like"):
+        foreground._normalize_branch_ids([1.5])
+    with pytest.raises(ValueError, match="integer-like"):
+        foreground._normalize_branch_ids(["2.5"])
+    with pytest.raises(ValueError, match="integer-like"):
+        foreground._normalize_branch_ids([True])
+
+
 def test_get_num_foreground_lineages_uses_compat_props():
     tr = ete.PhyloNode("(A:1,B:1)R;", format=1)
     for node in tr.traverse():
@@ -16,6 +25,66 @@ def test_get_num_foreground_lineages_uses_compat_props():
     root = [n for n in tr.traverse() if ete.is_root(n)][0]
     ete.set_prop(root, "is_lineage_fg_traitA_3", True)
     assert foreground.get_num_foreground_lineages(tr, "traitA") == 3
+
+
+def test_read_foreground_file_rejects_invalid_fg_format1_shape(tmp_path):
+    foreground_file = tmp_path / "foreground.tsv"
+    foreground_file.write_text("1\tA\tEXTRA\n", encoding="utf-8")
+    g = {"foreground": str(foreground_file), "fg_format": 1}
+    with pytest.raises(ValueError, match="--fg_format 1"):
+        foreground.read_foreground_file(g)
+
+
+def test_read_foreground_file_rejects_invalid_fg_format2_shape(tmp_path):
+    foreground_file = tmp_path / "foreground.tsv"
+    foreground_file.write_text("name\nA\n", encoding="utf-8")
+    g = {"foreground": str(foreground_file), "fg_format": 2}
+    with pytest.raises(ValueError, match="--fg_format 2"):
+        foreground.read_foreground_file(g)
+
+
+def test_build_clade_permutation_mode_accepts_scalar_randomized_branch_id():
+    out = foreground._build_clade_permutation_mode(
+        trait_name="traitA",
+        iteration=1,
+        randomized_bids=np.int64(42),
+        sample_original_foreground=False,
+    )
+    assert out == "randomization_traitA_iter1_bid42"
+
+
+def test_set_target_label_column_accepts_scalar_positive_index():
+    df = pd.DataFrame({"x": [1, 2, 3]}, index=[10, 11, 12])
+    out = foreground._set_target_label_column(
+        df=df.copy(),
+        column_name="is_target",
+        positive_index=np.int64(11),
+    )
+    assert out.loc[10, "is_target"] == "N"
+    assert out.loc[11, "is_target"] == "Y"
+    assert out.loc[12, "is_target"] == "N"
+
+
+def test_set_target_label_column_prefers_branch_id_column_over_index_labels():
+    # index labels intentionally do not match the branch_id values.
+    df = pd.DataFrame(
+        {"branch_id": [2, 0, 1], "x": [1, 2, 3]},
+        index=[0, 1, 2],
+    )
+    out = foreground._set_target_label_column(
+        df=df.copy(),
+        column_name="is_target",
+        positive_index=np.int64(1),
+    )
+    assert out.loc[0, "is_target"] == "N"
+    assert out.loc[1, "is_target"] == "N"
+    assert out.loc[2, "is_target"] == "Y"
+
+
+def test_count_branch_memberships_accepts_scalar_ids():
+    cb = pd.DataFrame({"branch_id_1": [1, 2], "branch_id_2": [3, 4]})
+    out = foreground._count_branch_memberships(cb=cb, bid_cols=["branch_id_1", "branch_id_2"], ids=np.int64(3))
+    assert out.tolist() == [1, 0]
 
 
 def test_annotate_foreground_fg_stem_only_keeps_lineage_specific_stem_colors():
@@ -120,6 +189,25 @@ def test_get_df_clade_size_handles_noncontiguous_branch_ids():
     assert not out.loc[:, "size"].isna().any()
     assert bool(out.loc[73, "is_fg_stem_traitA"])
     assert not bool(out.loc[29, "is_fg_stem_traitA"])
+
+
+def test_get_marginal_branch_accepts_scalar_target_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    for node in tr.traverse():
+        ete.set_prop(node, "is_fg_traitA", False)
+    ete.set_prop(next(n for n in tr.traverse() if n.name == "B"), "is_fg_traitA", True)
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"name": ["A", "B", "C"], "traitA": [0, 1, 0]}),
+        "target_ids": {"traitA": np.int64(labels["B"])},
+        "mg_parent": False,
+        "mg_sister": True,
+        "mg_sister_stem_only": True,
+    }
+    out = foreground.get_marginal_branch(g)
+    assert set(out["mg_ids"]["traitA"].tolist()) == {labels["C"]}
+    assert set(out["target_ids"]["traitA"].tolist()) == {labels["B"], labels["C"]}
 
 
 def test_randomize_foreground_flags_without_sample_original_preserves_target_count():
@@ -456,3 +544,15 @@ def test_report_permutation_clade_permutation_ocn_excludes_inf_from_mean_std(cap
     assert not any("invalid value encountered" in str(w.message) for w in captured_warnings)
     out = capsys.readouterr().out
     assert "Trait traitA: Total OCNany2spe in permutation lineages = 3.0; 2.0 ± 1.0" in out
+
+
+def test_is_valid_clade_permutation_stat_row_handles_empty_stats_dataframe(capsys):
+    g = {
+        "df_cb_stats": pd.DataFrame(columns=["median_omegaCany2spe_fg_traitA"]),
+    }
+    ok = foreground._is_valid_clade_permutation_stat_row(
+        g=g,
+        trait_name="traitA",
+        rid_combinations=np.array([[1, 2]], dtype=np.int64),
+    )
+    assert ok is False

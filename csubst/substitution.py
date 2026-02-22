@@ -1016,6 +1016,20 @@ def _can_use_cython_sparse_summary_accumulator(rows, cols, vals):
     return hasattr(substitution_sparse_cy, 'accumulate_sparse_summary_block_double')
 
 
+def _can_use_cython_sparse_summary_csr_accumulator(mat):
+    if substitution_sparse_cy is None:
+        return False
+    if not sp.isspmatrix_csr(mat):
+        return False
+    if mat.data.dtype != np.float64:
+        return False
+    if mat.indices.dtype not in [np.int32, np.int64]:
+        return False
+    if mat.indptr.dtype not in [np.int32, np.int64]:
+        return False
+    return hasattr(substitution_sparse_cy, 'accumulate_sparse_summary_block_csr_double')
+
+
 def _get_sparse_cb_summary_arrays(sub_tensor, selected):
     need_any2any = ('any2any' in selected)
     need_spe2any = ('spe2any' in selected)
@@ -1066,17 +1080,13 @@ def _get_sparse_cb_summary_arrays(sub_tensor, selected):
         )
         pair_flat = branch_group_pair_site.reshape(-1)
     for (sg, a, d), mat in sub_tensor.blocks.items():
-        coo = mat.tocoo(copy=False)
-        if coo.nnz == 0:
+        if mat.nnz == 0:
             continue
-        rows = np.asarray(coo.row, dtype=np.int64)
-        cols = np.asarray(coo.col, dtype=np.int64)
-        vals = np.asarray(coo.data, dtype=np.float64)
-        if _can_use_cython_sparse_summary_accumulator(rows=rows, cols=cols, vals=vals):
-            substitution_sparse_cy.accumulate_sparse_summary_block_double(
-                rows=rows,
-                cols=cols,
-                vals=vals,
+        if _can_use_cython_sparse_summary_csr_accumulator(mat=mat):
+            substitution_sparse_cy.accumulate_sparse_summary_block_csr_double(
+                indptr=mat.indptr,
+                indices=mat.indices,
+                vals=mat.data,
                 sg=int(sg),
                 a=int(a),
                 d=int(d),
@@ -1094,6 +1104,32 @@ def _get_sparse_cb_summary_arrays(sub_tensor, selected):
                 need_spe2spe=need_spe2spe,
             )
         else:
+            coo = mat.tocoo(copy=False)
+            rows = np.asarray(coo.row, dtype=np.int64)
+            cols = np.asarray(coo.col, dtype=np.int64)
+            vals = np.asarray(coo.data, dtype=np.float64)
+            if _can_use_cython_sparse_summary_accumulator(rows=rows, cols=cols, vals=vals):
+                substitution_sparse_cy.accumulate_sparse_summary_block_double(
+                    rows=rows,
+                    cols=cols,
+                    vals=vals,
+                    sg=int(sg),
+                    a=int(a),
+                    d=int(d),
+                    num_group=num_group,
+                    num_site=num_site,
+                    num_state_from=num_state_from,
+                    num_state_to=num_state_to,
+                    total_flat_obj=total_flat,
+                    from_flat_obj=from_flat,
+                    to_flat_obj=to_flat,
+                    pair_flat_obj=pair_flat,
+                    need_any2any=need_any2any,
+                    need_spe2any=need_spe2any,
+                    need_any2spe=need_any2spe,
+                    need_spe2spe=need_spe2spe,
+                )
+                continue
             if need_any2any:
                 ind = ((rows * num_group) + int(sg)) * num_site + cols
                 np.add.at(total_flat, ind, vals)

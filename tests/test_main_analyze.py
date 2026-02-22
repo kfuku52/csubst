@@ -1,8 +1,11 @@
+import os
 import numpy as np
 import pandas as pd
 import pytest
 
 from csubst import main_analyze
+from csubst import tree
+from csubst import ete
 
 
 def test_cb_search_respects_max_combination_limit(monkeypatch):
@@ -84,3 +87,40 @@ def test_cb_search_rejects_invalid_max_combination():
     }
     with pytest.raises(ValueError, match="--max_combination should be >= 1"):
         main_analyze.cb_search(g=g, b=None, OS_tensor=None, ON_tensor=None, id_combinations=None, write_cb=False)
+
+
+def test_annotate_branch_length_column_uses_branch_id_mapping_not_index():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:2)X:3,C:4)R;", format=1))
+    by_name = {n.name: n for n in tr.traverse()}
+    rows = [
+        {"branch_id": int(ete.get_prop(by_name["R"], "numerical_label")), "dummy": 1.0},
+        {"branch_id": int(ete.get_prop(by_name["A"], "numerical_label")), "dummy": 2.0},
+        {"branch_id": int(ete.get_prop(by_name["X"], "numerical_label")), "dummy": 3.0},
+    ]
+    # Intentionally scramble index labels so index!=branch_id.
+    b = pd.DataFrame(rows, index=[100, 101, 102])
+    out = main_analyze._annotate_branch_length_column(b=b.copy(), tree_obj=tr)
+    for row in out.itertuples(index=False):
+        node = next(n for n in tr.traverse() if int(ete.get_prop(n, "numerical_label")) == int(row.branch_id))
+        expected = 0.0 if (node.dist is None) else float(node.dist)
+        assert row.branch_length == pytest.approx(expected, abs=1e-12)
+
+
+def test_plot_state_tree_in_directory_restores_cwd_after_plot_error(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    original_cwd = os.getcwd()
+
+    def fake_plot_state_tree(state, orders, mode, g):
+        raise RuntimeError("plot failed")
+
+    monkeypatch.setattr(main_analyze.tree, "plot_state_tree", fake_plot_state_tree)
+    with pytest.raises(RuntimeError, match="plot failed"):
+        main_analyze._plot_state_tree_in_directory(
+            output_dir="csubst_plot_state_aa",
+            state=np.zeros((1, 0, 1), dtype=float),
+            orders=np.array([], dtype=str),
+            mode="aa",
+            g={},
+        )
+    assert os.getcwd() == original_cwd
+    assert (tmp_path / "csubst_plot_state_aa").exists()

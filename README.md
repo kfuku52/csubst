@@ -44,6 +44,12 @@ conda install bioconda::csubst
 # IQ-TREE should be installed separately: https://iqtree.github.io/
 pip install numpy cython # NumPy and Cython should be available upon csubst installation
 pip install git+https://github.com/kfuku52/csubst
+
+# Optional dependency for `csubst simulate`:
+# If you install from a local clone:
+#   pip install ".[simulate]"
+# Or install the optional backend explicitly:
+#   pip install pyvolve
 ```
 
 ## Test run
@@ -61,7 +67,7 @@ CSUBST provides four main subcommands:
 - `csubst dataset`: generate bundled example datasets (e.g., `PGK`, `PEPC`).
 - `csubst analyze`: run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
 - `csubst site`: compute site-wise combinatorial substitutions for selected branch combinations, generate tree + site summary plots, and optionally map sites to protein structures.
-- `csubst simulate`: simulate codon sequence evolution under user-defined convergent scenarios.
+- `csubst simulate` (optional; requires `pyvolve`): simulate codon sequence evolution under user-defined convergent scenarios.
 
 Get available commands and options:
 

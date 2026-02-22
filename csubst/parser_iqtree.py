@@ -408,6 +408,24 @@ def _initialize_state_tensor(axis, dtype, selective, mmap_name):
     return np.memmap(mmap_tensor, dtype=dtype, shape=axis, mode='w+')
 
 
+def _get_num_node_axis(tree_obj):
+    node_ids = list()
+    for node in tree_obj.traverse():
+        nl = ete.get_prop(node, "numerical_label")
+        if isinstance(nl, (bool, np.bool_)):
+            raise ValueError('numerical_label should be an integer.')
+        try:
+            nl_int = int(nl)
+        except (TypeError, ValueError) as exc:
+            raise ValueError('numerical_label should be an integer.') from exc
+        if nl_int < 0:
+            raise ValueError('numerical_label should be non-negative.')
+        node_ids.append(nl_int)
+    if len(node_ids) == 0:
+        return 0
+    return max(node_ids) + 1
+
+
 def _normalize_selected_branch_ids(selected_branch_ids):
     if selected_branch_ids is None:
         return np.array([], dtype=np.int64)
@@ -465,7 +483,7 @@ def _get_selected_branch_context(tree, selected_branch_ids):
 
 
 def _get_leaf_nonmissing_sites(g, required_leaf_ids):
-    num_node = len(list(g['tree'].traverse()))
+    num_node = _get_num_node_axis(g['tree'])
     leaf_nonmissing = np.zeros(shape=(num_node, g['num_input_site']), dtype=bool)
     if len(required_leaf_ids) == 0:
         return leaf_nonmissing
@@ -475,6 +493,9 @@ def _get_leaf_nonmissing_sites(g, required_leaf_ids):
         nl = int(ete.get_prop(node, "numerical_label"))
         if nl not in required_leaf_ids:
             continue
+        if (nl < 0) or (nl >= num_node):
+            txt = 'Leaf branch ID {} is out of bounds for state tensor axis {}.'
+            raise ValueError(txt.format(nl, num_node))
         seq = ete.get_prop(node, 'sequence', '').upper()
         if seq == '':
             continue
@@ -596,7 +617,7 @@ def get_state_tensor(g, selected_branch_ids=None):
               'Delete intermediate files and rerun.'
     if num_alignment_site != g['num_input_site']:
         raise AssertionError(err_txt)
-    num_node = len(list(g['tree'].traverse()))
+    num_node = _get_num_node_axis(g['tree'])
     selected_set, selected_internal_ids, required_leaf_ids = _get_selected_branch_context(
         tree=g['tree'],
         selected_branch_ids=selected_branch_ids,
@@ -647,6 +668,9 @@ def get_state_tensor(g, selected_branch_ids=None):
         if ete.is_root(node):
             continue
         nl = int(ete.get_prop(node, "numerical_label"))
+        if (nl < 0) or (nl >= num_node):
+            txt = 'Branch ID {} is out of bounds for state tensor axis {}.'
+            raise ValueError(txt.format(nl, num_node))
         if (selected_set is not None) and (nl not in selected_set):
             continue
         elif ete.is_leaf(node):

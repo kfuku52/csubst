@@ -30,10 +30,36 @@ def _get_node_by_branch_id(g):
     return node_by_id
 
 
+def _normalize_branch_ids(branch_ids):
+    if branch_ids is None:
+        return np.array([], dtype=np.int64)
+    values = np.asarray(branch_ids)
+    values = np.atleast_1d(values).reshape(-1)
+    if values.size == 0:
+        return np.array([], dtype=np.int64)
+    normalized = []
+    for value in values.tolist():
+        if isinstance(value, bool):
+            raise ValueError('Branch IDs should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('Branch IDs should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('Branch IDs should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64)
+
+
 def _count_branch_memberships(cb, bid_cols, ids):
     if len(bid_cols) == 0:
         return np.zeros(shape=(cb.shape[0],), dtype=np.int64)
-    id_list = list(ids)
+    id_list = _normalize_branch_ids(ids).tolist()
     if len(id_list) == 0:
         return np.zeros(shape=(cb.shape[0],), dtype=np.int64)
     bid_matrix = cb.loc[:, bid_cols].to_numpy(copy=False)
@@ -70,8 +96,16 @@ def _assign_trait_labels(cb, trait_name, arity):
 
 def _set_target_label_column(df, column_name, positive_index, positive='Y', negative='N'):
     df.loc[:, column_name] = negative
-    if len(positive_index) > 0:
-        df.loc[positive_index, column_name] = positive
+    normalized_index = _normalize_branch_ids(positive_index)
+    if normalized_index.shape[0] == 0:
+        return df
+    if 'branch_id' in df.columns:
+        is_target = df.loc[:, 'branch_id'].isin(normalized_index.tolist())
+        df.loc[is_target, column_name] = positive
+        return df
+    valid_labels = [int(v) for v in normalized_index.tolist() if int(v) in df.index]
+    if len(valid_labels) > 0:
+        df.loc[valid_labels, column_name] = positive
     return df
 
 
@@ -361,7 +395,7 @@ def read_foreground_file(g):
         if fg_df.shape[1]!=2:
             txt = 'With --fg_format 1, --foreground file should be a tab-separated two-column table without header. '
             txt += 'First column = lineage IDs; Second column = Regex-compatible sequence names'
-            raise Exception(txt)
+            raise ValueError(txt)
         fg_df = fg_df.iloc[:,[1,0]]
         fg_df.columns = ['name','PLACEHOLDER']
     elif g['fg_format'] == 2:
@@ -370,7 +404,7 @@ def read_foreground_file(g):
             txt = 'With --fg_format 2, --foreground file should be a tab-separated table with a header line and 2 or more columns. '
             txt += 'Header names should be "name", "TRAIT1", "TRAIT2", ..., where any trait names are allowed. '
             txt += 'First column = Regex-compatible sequence names; Second column and after = lineage IDs (0 = background)'
-            raise Exception(txt)
+            raise ValueError(txt)
         fg_df.columns = ['name'] + fg_df.columns[1:len(fg_df.columns)].tolist()
         txt = 'Trait names in --foreground file: {}'.format(', '.join(fg_df.columns[1:len(fg_df.columns)].tolist()))
         print(txt, flush=True)
@@ -433,7 +467,12 @@ def randomize_foreground_branch(g, trait_name, sample_original_foreground=False)
     print_num_possible_permuted_combinations(r_df_clade_size, trait_name, sample_original_foreground)
     g['r_target_ids'][trait_name] = get_new_foreground_ids(r_df_clade_size, g)
     g['r_fg_ids'][trait_name] = copy.deepcopy(g['r_target_ids'][trait_name])
-    new_fg_leaf_names = [ete.get_leaf_names(n) for n in g['tree'].traverse() if ete.get_prop(n, "numerical_label") in g['r_fg_ids'][trait_name]]
+    randomized_fg_id_set = set(_normalize_branch_ids(g['r_fg_ids'][trait_name]).tolist())
+    new_fg_leaf_names = [
+        ete.get_leaf_names(n)
+        for n in g['tree'].traverse()
+        if ete.get_prop(n, "numerical_label") in randomized_fg_id_set
+    ]
     new_fg_leaf_names = list(itertools.chain(*new_fg_leaf_names))
     new_fg_leaf_names = list(set(new_fg_leaf_names))
     g['r_fg_leaf_names'][trait_name] = new_fg_leaf_names
@@ -443,6 +482,7 @@ def get_marginal_branch(g):
     g['mg_ids'] = dict()
     for trait_name in _get_trait_names(g):
         g['mg_ids'][trait_name] = list()
+        target_ids = _normalize_branch_ids(g['target_ids'][trait_name])
         for node in g['tree'].traverse():
             if ete.is_root(node):
                 continue
@@ -465,9 +505,9 @@ def get_marginal_branch(g):
                             is_sister_des_fg = ete.get_prop(sister_des, 'is_fg_' + trait_name, False)
                             if is_sister_des_fg==False:
                                 g['mg_ids'][trait_name].append(ete.get_prop(sister_des, "numerical_label"))
-        concat_ids = list(set(g['mg_ids'][trait_name])-set(g['target_ids'][trait_name]))
+        concat_ids = list(set(g['mg_ids'][trait_name]) - set(target_ids.tolist()))
         g['mg_ids'][trait_name] = np.array(concat_ids, dtype=np.int64)
-        g['target_ids'][trait_name] = np.concatenate([g['target_ids'][trait_name], g['mg_ids'][trait_name]])
+        g['target_ids'][trait_name] = np.concatenate([target_ids, g['mg_ids'][trait_name]])
         for node in g['tree'].traverse():
             if ete.get_prop(node, "numerical_label") in g['mg_ids'][trait_name]:
                 ete.add_features(node, **{'is_marginal_'+trait_name: True})
@@ -592,7 +632,7 @@ def _raise_foreground_permutation_failure(num_trial, sample_original_foreground)
         txt = 'Foreground branch permutation failed {:,} times even when allowing sampling from original foreground clades.'
     else:
         txt = 'Foreground branch permutation failed {:,} times. There may not be enough numbers of "similar" clades.'
-    raise Exception(txt.format(num_trial))
+    raise ValueError(txt.format(num_trial))
 
 
 def set_random_foreground_branch(g, trait_name, num_trial=100, sample_original_foreground=False):
@@ -815,7 +855,8 @@ def _build_clade_permutation_mode(trait_name, iteration, randomized_bids, sample
     mode = _clade_permutation_mode_prefix(trait_name) + 'iter' + str(iteration)
     if sample_original_foreground:
         mode += '_sampleorig'
-    mode += '_bid' + ','.join(np.asarray(randomized_bids).astype(str))
+    normalized_bids = _normalize_branch_ids(randomized_bids)
+    mode += '_bid' + ','.join(normalized_bids.astype(str).tolist())
     return mode
 
 
@@ -839,7 +880,12 @@ def _is_valid_clade_permutation_stat_row(g, trait_name, rid_combinations):
         txt = 'omegaCany2spe could not be obtained for trait "{}"; skipping this clade permutation trial.\n'
         sys.stderr.write(txt.format(trait_name))
         return False
-    if pd.isna(g['df_cb_stats'].loc[:, omega_col].values[0]):
+    omega_values = g['df_cb_stats'].loc[:, omega_col].values
+    if omega_values.shape[0] == 0:
+        txt = 'No clade-permutation stats row was available for trait "{}"; skipping this clade permutation trial.\n'
+        sys.stderr.write(txt.format(trait_name))
+        return False
+    if pd.isna(omega_values[0]):
         print('OmegaCany2spe could not be obtained for permuted foregrounds:')
         print(rid_combinations)
         print('')

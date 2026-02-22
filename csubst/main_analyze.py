@@ -19,6 +19,19 @@ from csubst import ete
 from csubst import output_stat
 from csubst import tree
 
+
+def _plot_state_tree_in_directory(output_dir, state, orders, mode, g):
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
+    os.mkdir(output_dir)
+    cwd = os.getcwd()
+    try:
+        os.chdir(output_dir)
+        tree.plot_state_tree(state=state, orders=orders, mode=mode, g=g)
+    finally:
+        os.chdir(cwd)
+
+
 def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
     if int(g['max_arity']) < 2:
         raise ValueError('--max_arity should be >= 2.')
@@ -82,7 +95,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                 g,id_combinations = combination.get_node_combinations(g=g, cb_passed=cb_passed, cb_all=True,
                                                                       arity=current_arity, check_attr='name')
         else:
-            raise Exception('Invalid arity: {}'.format(current_arity))
+            raise ValueError('Invalid arity: {}'.format(current_arity))
         if id_combinations.shape[0] == 0:
             cb = pd.DataFrame()
             txt = 'Arity (K) = {:,}: No branch combination satisfied phylogenetic independence. Ending higher-order search at K = {:,}.'
@@ -151,6 +164,17 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             break
     return g,cb
 
+
+def _annotate_branch_length_column(b, tree_obj):
+    branch_length_by_id = {}
+    for node in tree_obj.traverse():
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        node_dist = 0.0 if (node.dist is None) else float(node.dist)
+        branch_length_by_id[node_id] = node_dist
+    b.loc[:, 'branch_length'] = b.loc[:, 'branch_id'].map(branch_length_by_id)
+    return b
+
+
 def main_analyze(g):
     start = time.time()
     print("Reading and parsing input files.", flush=True)
@@ -177,19 +201,21 @@ def main_analyze(g):
         tree.plot_branch_category(g, file_base='csubst_branch_id_leaf', label='leaf')
         tree.plot_branch_category(g, file_base='csubst_branch_id_nolabel', label='no')
     if g['plot_state_aa']:
-        if os.path.exists('csubst_plot_state_aa'):
-            shutil.rmtree('csubst_plot_state_aa')
-        os.mkdir('csubst_plot_state_aa')
-        os.chdir('csubst_plot_state_aa')
-        tree.plot_state_tree(state=g['state_pep'], orders=g['amino_acid_orders'], mode='aa', g=g)
-        os.chdir('..')
+        _plot_state_tree_in_directory(
+            output_dir='csubst_plot_state_aa',
+            state=g['state_pep'],
+            orders=g['amino_acid_orders'],
+            mode='aa',
+            g=g,
+        )
     if g['plot_state_codon']:
-        if os.path.exists('csubst_plot_state_codon'):
-            shutil.rmtree('csubst_plot_state_codon')
-        os.mkdir('csubst_plot_state_codon')
-        os.chdir('csubst_plot_state_codon')
-        tree.plot_state_tree(state=g['state_cdn'], orders=g['codon_orders'], mode='codon', g=g)
-        os.chdir('..')
+        _plot_state_tree_in_directory(
+            output_dir='csubst_plot_state_codon',
+            state=g['state_cdn'],
+            orders=g['codon_orders'],
+            mode='codon',
+            g=g,
+        )
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
     sub_branches = np.where(substitution.get_branch_sub_counts(ON_tensor) != 0)[0].tolist()
@@ -249,9 +275,7 @@ def main_analyze(g):
         bOS = substitution.get_b(g=g, sub_tensor=OS_tensor, attr='S', sitewise=False)
         bON = substitution.get_b(g=g, sub_tensor=ON_tensor, attr='N', sitewise=True)
         b = table.merge_tables(bOS, bON)
-        b.loc[:,'branch_length'] = np.nan
-        for node in g['tree'].traverse():
-            b.loc[ete.get_prop(node, "numerical_label"),'branch_length'] = node.dist
+        b = _annotate_branch_length_column(b=b, tree_obj=g['tree'])
         txt = 'Number of {} patterns among {:,} branches={:,}, min={:,.1f}, max={:,.1f}'
         for key in ['S_sub', 'N_sub']:
             p = b.loc[:, key].drop_duplicates().values

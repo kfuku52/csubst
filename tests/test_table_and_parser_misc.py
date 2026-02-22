@@ -26,6 +26,49 @@ def test_sort_branch_ids_sorts_within_rows_and_by_row():
     assert out["branch_id_2"].dtype.kind in "iu"
 
 
+def test_sort_branch_ids_without_branch_columns_sorts_by_site_only():
+    df = pd.DataFrame(
+        {
+            "site": [3, 1, 2],
+            "value": [30, 10, 20],
+        }
+    )
+    out = table.sort_branch_ids(df.copy())
+    assert out["site"].tolist() == [1, 2, 3]
+    assert out["value"].tolist() == [10, 20, 30]
+    assert out["site"].dtype.kind in "iu"
+
+
+def test_sort_branch_ids_without_branch_or_site_columns_returns_input_order():
+    df = pd.DataFrame({"value": [3, 1, 2]})
+    out = table.sort_branch_ids(df.copy())
+    assert out["value"].tolist() == [3, 1, 2]
+
+
+def test_sort_branch_ids_rejects_non_integer_like_branch_values():
+    df = pd.DataFrame(
+        {
+            "branch_id_1": [1.5, 2],
+            "branch_id_2": [3, 4],
+            "site": [1, 2],
+        }
+    )
+    with pytest.raises(ValueError, match="integer-like"):
+        table.sort_branch_ids(df.copy())
+
+
+def test_sort_branch_ids_rejects_non_integer_like_site_values():
+    df = pd.DataFrame(
+        {
+            "branch_id_1": [1, 2],
+            "branch_id_2": [3, 4],
+            "site": ["1", "2.5"],
+        }
+    )
+    with pytest.raises(ValueError, match="integer-like"):
+        table.sort_branch_ids(df.copy())
+
+
 def test_sort_cb_stats_handles_non_string_column_names_regression():
     # Regression target inspired by issue #74.
     cb_stats = pd.DataFrame(
@@ -165,6 +208,12 @@ def test_parse_cutoff_stat_rejects_invalid_regex():
         table.parse_cutoff_stat("OCN[any2spe,2.0")
 
 
+@pytest.mark.parametrize("value_text", ["nan", "inf", "-inf"])
+def test_parse_cutoff_stat_rejects_non_finite_cutoff_value(value_text):
+    with pytest.raises(ValueError, match="finite"):
+        table.parse_cutoff_stat("OCNany2spe,{}".format(value_text))
+
+
 def test_parse_cutoff_stat_supports_regex_with_comma_quantifier():
     out = table.parse_cutoff_stat(r"omegaC.{1,2},5.0")
     assert out == [(r"omegaC.{1,2}", 5.0)]
@@ -241,6 +290,17 @@ def test_get_equilibrium_frequency_for_codon_and_amino_acid_modes():
     np.testing.assert_allclose(eq_pep, [0.5, 0.5], atol=1e-12)
 
 
+def test_get_equilibrium_frequency_rejects_unknown_mode():
+    g = {
+        "equilibrium_frequency": np.array([0.2, 0.3, 0.5]),
+        "amino_acid_orders": np.array(["K", "N"]),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+        "float_tol": 1e-12,
+    }
+    with pytest.raises(ValueError, match="Unsupported equilibrium-frequency mode"):
+        parser_misc.get_equilibrium_frequency(g, "unknown")
+
+
 def test_get_codon_order_index_reorders_positions():
     order_from = np.array(["AAA", "AAC", "AAG"])
     order_to = np.array(["AAG", "AAA", "AAC"])
@@ -262,10 +322,24 @@ def test_get_codon_order_index_raises_on_duplicate_target_codon():
         parser_misc.get_codon_order_index(order_from, order_to)
 
 
+def test_get_codon_order_index_raises_on_duplicate_source_codon():
+    order_from = np.array(["AAA", "AAA", "AAC"])
+    order_to = np.array(["AAA", "AAC", "AAG"])
+    with pytest.raises(ValueError, match="source order"):
+        parser_misc.get_codon_order_index(order_from, order_to)
+
+
 def test_get_exchangeability_codon_order_shape_and_no_stops():
     codons = parser_misc.get_exchangeability_codon_order()
     assert codons.shape == (61,)
     assert set(["TAA", "TAG", "TGA"]).isdisjoint(set(codons))
+
+
+def test_read_exchangeability_eq_freq_rejects_truncated_file(monkeypatch):
+    monkeypatch.setattr(parser_misc, "_read_package_text", lambda file: "line0\nline1")
+    g = {"codon_orders": parser_misc.get_exchangeability_codon_order()}
+    with pytest.raises(AssertionError, match="expected equilibrium frequencies"):
+        parser_misc.read_exchangeability_eq_freq(file="dummy", g=g)
 
 
 def test_get_rate_tensor_for_asis_and_syn_modes():
@@ -291,6 +365,21 @@ def test_get_rate_tensor_for_asis_and_syn_modes():
         np.array([[[0.0, 0.2], [0.3, 0.0]], [[0.0, 0.0], [0.0, 0.0]]]),
         atol=1e-12,
     )
+
+
+def test_get_rate_tensor_rejects_unknown_mode():
+    inst = np.array(
+        [[-1.0, 0.2], [0.3, -0.3]],
+        dtype=float,
+    )
+    g = {
+        "amino_acid_orders": np.array(["K"]),
+        "synonymous_indices": {"K": [0, 1]},
+        "max_synonymous_size": 2,
+        "float_type": np.float64,
+    }
+    with pytest.raises(ValueError, match="Unsupported rate-tensor mode"):
+        parser_misc.get_rate_tensor(inst, "unknown", g)
 
 
 def test_cdn2pep_matrix_matches_manual_group_sum():
@@ -341,6 +430,25 @@ def test_get_mechanistic_instantaneous_rate_matrix_applies_kappa_only_to_transit
     out = parser_misc.get_mechanistic_instantaneous_rate_matrix(g)
     # AAA->AAG is transition (A<->G), AAA->AAC is transversion (A<->C).
     assert out[0, 1] > out[0, 2]
+
+
+def test_get_mechanistic_instantaneous_rate_matrix_supports_zero_omega_without_nan():
+    g = {
+        "codon_orders": np.array(["AAA", "AAG", "AAC"]),
+        "amino_acid_orders": np.array(["K", "N"]),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+        "omega": 0.0,
+        "kappa": None,
+        "equilibrium_frequency": np.array([1 / 3, 1 / 3, 1 / 3]),
+        "float_type": np.float64,
+    }
+    out = parser_misc.get_mechanistic_instantaneous_rate_matrix(g)
+    assert np.isfinite(out).all()
+    np.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0, 0.0], atol=1e-12)
+    assert out[0, 2] == pytest.approx(0.0, abs=1e-12)
+    assert out[1, 2] == pytest.approx(0.0, abs=1e-12)
+    assert out[2, 0] == pytest.approx(0.0, abs=1e-12)
+    assert out[2, 1] == pytest.approx(0.0, abs=1e-12)
 
 
 def test_annotate_tree_handles_none_root_dist(tmp_path):
@@ -398,6 +506,48 @@ def test_resolve_state_loading_enables_selective_mode_with_targeted_cb_only():
     )
 
 
+def test_get_required_state_branch_ids_accepts_scalar_target_id():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    g = {
+        "tree": tr,
+        "target_ids": {"trait1": np.int64(labels["N1"])},
+    }
+    out = parser_misc._get_required_state_branch_ids(g)
+    np.testing.assert_array_equal(out, np.array(sorted([labels["R"], labels["N1"]]), dtype=np.int64))
+
+
+def test_get_required_state_branch_ids_ignores_none_target_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    g = {
+        "tree": tr,
+        "target_ids": {"trait1": None, "trait2": np.array([labels["N1"]], dtype=np.int64)},
+    }
+    out = parser_misc._get_required_state_branch_ids(g)
+    np.testing.assert_array_equal(out, np.array(sorted([labels["R"], labels["N1"]]), dtype=np.int64))
+
+
+def test_get_required_state_branch_ids_rejects_non_integer_target_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "target_ids": {"trait1": np.array(["x"])},
+    }
+    with pytest.raises(ValueError, match="integer-like"):
+        parser_misc._get_required_state_branch_ids(g)
+
+
+def test_get_required_state_branch_ids_rejects_non_integer_float_target_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "target_ids": {"trait1": np.array([1.5])},
+    }
+    with pytest.raises(ValueError, match="integer-like"):
+        parser_misc._get_required_state_branch_ids(g)
+
+
 def test_resolve_state_loading_disables_selective_mode_when_full_tree_outputs_requested():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     g = {
@@ -419,3 +569,60 @@ def test_resolve_state_loading_disables_selective_mode_when_full_tree_outputs_re
     out = parser_misc.resolve_state_loading(g)
     assert out["is_state_selective_loading"] is False
     assert out["state_loaded_branch_ids"] is None
+
+
+def test_read_input_submodel_rejects_unsupported_substitution_model(monkeypatch):
+    def fake_get_input_information(local_g):
+        local_g["substitution_model"] = "UNSUPPORTED+F+R4"
+        return local_g
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_input_information", fake_get_input_information)
+    g = {
+        "infile_type": "iqtree",
+        "omegaC_method": "submodel",
+    }
+    with pytest.raises(ValueError, match="Unsupported substitution model"):
+        parser_misc.read_input(g)
+
+
+def test_read_input_submodel_detects_reverse_signed_rate_sum_mismatch(monkeypatch):
+    def fake_get_input_information(local_g):
+        local_g.update(
+            {
+                "substitution_model": "GY+F+R4",
+                "omega": 1.0,
+                "kappa": 1.0,
+                "equilibrium_frequency": np.array([0.5, 0.5], dtype=float),
+            }
+        )
+        return local_g
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_input_information", fake_get_input_information)
+    monkeypatch.setattr(
+        parser_misc,
+        "get_mechanistic_instantaneous_rate_matrix",
+        lambda g: np.array([[-0.75, 0.75], [0.75, -0.75]], dtype=float),
+    )
+    monkeypatch.setattr(
+        parser_misc,
+        "cdn2pep_matrix",
+        lambda inst_cdn, g: np.array([[-2.0, 2.0], [2.0, -2.0]], dtype=float),
+    )
+
+    def fake_get_rate_tensor(inst, mode, g):
+        if mode == "syn":
+            return np.array([[[1.0, 0.0], [0.0, 0.0]]], dtype=float)
+        if mode == "asis":
+            return np.array([[[0.0, 0.5], [0.0, 0.0]]], dtype=float)
+        raise AssertionError("unexpected mode")
+
+    monkeypatch.setattr(parser_misc, "get_rate_tensor", fake_get_rate_tensor)
+    monkeypatch.setattr(parser_misc.np, "savetxt", lambda *args, **kwargs: None)
+
+    g = {
+        "infile_type": "iqtree",
+        "omegaC_method": "submodel",
+        "float_tol": 1e-12,
+    }
+    with pytest.raises(AssertionError, match="Sum of rates did not match"):
+        parser_misc.read_input(g)

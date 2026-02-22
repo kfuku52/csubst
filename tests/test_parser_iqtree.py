@@ -474,6 +474,61 @@ def test_get_state_tensor_selected_internal_rejects_required_leaf_length_mismatc
         )
 
 
+def test_get_leaf_nonmissing_sites_handles_noncontiguous_branch_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    reassigned = {"A": 11, "B": 29, "C": 41, "N1": 73, "R": 5}
+    for node in tr.traverse():
+        ete.set_prop(node, "numerical_label", reassigned[node.name])
+        if ete.is_leaf(node):
+            ete.set_prop(node, "sequence", "AAAAAC")
+    g = {"tree": tr, "num_input_site": 2, "codon_orders": np.array(["AAA", "AAC", "AAG"])}
+    required_leaf_ids = {11, 29, 41}
+    out = parser_iqtree._get_leaf_nonmissing_sites(g=g, required_leaf_ids=required_leaf_ids)
+    assert out.shape == (74, 2)
+    assert not out[0, :].any()
+    for leaf_id in sorted(required_leaf_ids):
+        assert out[leaf_id, :].all()
+
+
+def test_get_state_tensor_selected_internal_handles_noncontiguous_branch_ids(tmp_path):
+    alignment_file = tmp_path / "toy_noncontig.fa"
+    state_file = tmp_path / "toy_noncontig.state.tsv"
+    alignment_file.write_text(
+        ">A\nAAAAAC\n"
+        ">B\nAAGAAG\n"
+        ">C\nAAAAAC\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "N1\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    reassigned = {"A": 11, "B": 29, "C": 41, "N1": 73, "R": 5}
+    for node in tr.traverse():
+        ete.set_prop(node, "numerical_label", reassigned[node.name])
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
+        "ml_anc": False,
+    }
+    out = parser_iqtree.get_state_tensor(
+        g=g,
+        selected_branch_ids=np.array([73], dtype=np.int64),
+    )
+    assert out.shape == (74, 2, 3)
+    np.testing.assert_allclose(out[73, 0, :], [1.0, 0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(out[73, 1, :], [0.0, 1.0, 0.0], atol=1e-12)
+
+
 def test_get_state_tensor_maps_internal_rows_by_site_label_not_file_order(tmp_path):
     alignment_file = tmp_path / "toy_siteorder.fa"
     state_file = tmp_path / "toy_siteorder.state.tsv"

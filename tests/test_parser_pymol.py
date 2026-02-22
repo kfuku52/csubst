@@ -41,6 +41,47 @@ def test_add_coordinate_from_user_alignment_raises_descriptive_error_on_unmappab
         parser_pymol.add_coordinate_from_user_alignment(df=df, user_alignment=str(user_alignment))
 
 
+def test_add_coordinate_from_user_alignment_raises_when_sequence_names_do_not_overlap(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    user_alignment = tmp_path / "user.fa"
+    user_alignment.write_text(">y_B\nAAAA\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [1, 2, 3, 4]})
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError, match="No sequence name overlap"):
+        parser_pymol.add_coordinate_from_user_alignment(df=df, user_alignment=str(user_alignment))
+
+
+def test_add_coordinate_from_user_alignment_is_case_insensitive(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAaAa\n",
+    )
+    user_alignment = tmp_path / "user.fa"
+    user_alignment.write_text(">x_A\naaaa\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [1, 2, 3, 4]})
+    monkeypatch.chdir(tmp_path)
+    out = parser_pymol.add_coordinate_from_user_alignment(df=df, user_alignment=str(user_alignment))
+    assert out["codon_site_x_A"].tolist() == [1, 2, 3, 4]
+    assert out["aa_x_A"].tolist() == ["A", "A", "A", "A"]
+
+
+def test_add_coordinate_from_user_alignment_handles_non_default_dataframe_index(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    user_alignment = tmp_path / "user.fa"
+    user_alignment.write_text(">x_A\nAAAA\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [1, 2, 3, 4]}, index=[10, 11, 12, 13])
+    monkeypatch.chdir(tmp_path)
+    out = parser_pymol.add_coordinate_from_user_alignment(df=df, user_alignment=str(user_alignment))
+    assert out.loc[[10, 11, 12, 13], "codon_site_x_A"].tolist() == [1, 2, 3, 4]
+    assert out.loc[[10, 11, 12, 13], "aa_x_A"].tolist() == ["A", "A", "A", "A"]
+
+
 def test_mask_subunit_handles_nan_identity_means_without_crashing(tmp_path, monkeypatch):
     parser_pymol = _import_parser_pymol_with_fake_pymol(
         monkeypatch=monkeypatch,
@@ -147,6 +188,32 @@ def test_write_mafft_alignment_raises_on_mafft_nonzero_exit(tmp_path, monkeypatc
         parser_pymol.write_mafft_alignment(g)
 
 
+def test_write_mafft_alignment_raises_when_mapout_file_is_missing(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    g = {
+        "mafft_exe": "mafft",
+        "mafft_op": -1,
+        "mafft_ep": -1,
+        "mafft_add_fasta": str(tmp_path / "add.fa"),
+        "pdb": "1abc",
+    }
+
+    class _Proc:
+        stdout = b">x_A\nAAAA\n"
+        stderr = b""
+        returncode = 0
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(parser_pymol.sequence, "write_alignment", lambda outfile, mode, g, leaf_only: None)
+    monkeypatch.setattr(parser_pymol.subprocess, "run", lambda *args, **kwargs: _Proc())
+    monkeypatch.setattr(parser_pymol.time, "sleep", lambda *_args, **_kwargs: None)
+    with pytest.raises(RuntimeError, match="map output file was not generated"):
+        parser_pymol.write_mafft_alignment(g)
+
+
 def test_write_mafft_alignment_raises_clear_error_when_mafft_executable_missing(tmp_path, monkeypatch):
     parser_pymol = _import_parser_pymol_with_fake_pymol(
         monkeypatch=monkeypatch,
@@ -225,6 +292,69 @@ def test_add_coordinate_from_mafft_map_handles_regex_characters_in_sequence_name
     assert out["aa_A[1"].tolist() == ["A"]
 
 
+def test_add_coordinate_from_mafft_map_empty_entry_keeps_aa_column_as_empty_string(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    map_file = tmp_path / "tmp.csubst.pdb_seq.fa.map"
+    map_file.write_text(">A_empty\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [1, 2]})
+    out = parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file=str(map_file))
+    assert out["codon_site_A_empty"].tolist() == [0, 0]
+    assert out["aa_A_empty"].tolist() == ["", ""]
+
+
+def test_add_coordinate_from_mafft_map_treats_dash_without_space_as_missing(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    map_file = tmp_path / "tmp.csubst.pdb_seq.fa.map"
+    map_file.write_text(">A\nA,1,-\nC,2,2\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [1, 2]})
+    out = parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file=str(map_file))
+    assert out["codon_site_A"].tolist() == [0, 2]
+    assert out["aa_A"].tolist() == ["", "C"]
+
+
+def test_add_coordinate_from_mafft_map_rejects_non_numeric_alignment_site(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    map_file = tmp_path / "tmp.csubst.pdb_seq.fa.map"
+    map_file.write_text(">A\nA,1,not_a_number\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [1]})
+    with pytest.raises(ValueError, match="Invalid codon_site_alignment value"):
+        parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file=str(map_file))
+
+
+def test_add_coordinate_from_mafft_map_treats_dash_codon_site_as_missing(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    map_file = tmp_path / "tmp.csubst.pdb_seq.fa.map"
+    map_file.write_text(">A\nA,-,2\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [1, 2]})
+    out = parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file=str(map_file))
+    assert out["codon_site_A"].tolist() == [0, 0]
+    assert out["aa_A"].tolist() == ["", ""]
+
+
+def test_add_coordinate_from_mafft_map_rejects_non_numeric_codon_site(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    map_file = tmp_path / "tmp.csubst.pdb_seq.fa.map"
+    map_file.write_text(">A\nA,not_a_number,2\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [2]})
+    with pytest.raises(ValueError, match="Invalid codon_site value"):
+        parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file=str(map_file))
+
+
 def test_set_color_gray_skips_chains_without_nonzero_sites(monkeypatch):
     commands = []
     parser_pymol = _import_parser_pymol_with_fake_pymol(
@@ -242,6 +372,104 @@ def test_set_color_gray_skips_chains_without_nonzero_sites(monkeypatch):
         gray_value=80,
     )
     assert commands == []
+
+
+def test_set_substitution_colors_handles_missing_any2dif_column(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": [5],
+            "OCNany2spe": [0.1],
+            "N_sub_1": [0.9],
+        }
+    )
+    g = {
+        "mode": "intersection",
+        "min_combinat_prob": 0.5,
+        "min_single_prob": 0.8,
+        "single_branch_mode": False,
+    }
+    n_sub_cols = df.columns[df.columns.str.startswith("N_sub_")]
+    parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=n_sub_cols)
+    assert any("resi 5" in cmd for cmd in commands)
+
+
+def test_set_substitution_colors_set_mode_parses_string_booleans_safely(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": [5, 6],
+            "N_set_expr": ["False", "True"],
+        }
+    )
+    g = {"mode": "set"}
+    parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=pd.Index([]))
+    assert any("resi 6" in cmd for cmd in commands)
+    assert not any("resi 5" in cmd for cmd in commands)
+
+
+def test_set_substitution_colors_handles_empty_n_sub_columns(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": [6],
+            "OCNany2spe": [0.0],
+            "OCNany2dif": [0.0],
+        }
+    )
+    g = {
+        "mode": "intersection",
+        "min_combinat_prob": 0.5,
+        "min_single_prob": 0.8,
+        "single_branch_mode": False,
+    }
+    parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=pd.Index([]))
+    assert commands == []
+
+
+def test_set_substitution_colors_skips_non_integer_or_missing_codon_sites(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": ["", np.nan, "4.5", "7.0"],
+            "OCNany2spe": [0.9, 0.9, 0.9, 0.9],
+            "N_sub_1": [0.9, 0.9, 0.9, 0.9],
+        }
+    )
+    g = {
+        "mode": "intersection",
+        "min_combinat_prob": 0.5,
+        "min_single_prob": 0.8,
+        "single_branch_mode": False,
+    }
+    n_sub_cols = df.columns[df.columns.str.startswith("N_sub_")]
+    parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=n_sub_cols)
+    assert any("resi 7" in cmd for cmd in commands)
+    assert not any("resi 4" in cmd for cmd in commands)
 
 
 def test_set_substitution_colors_lineage_respects_min_single_prob(monkeypatch):
@@ -318,6 +546,76 @@ def test_set_substitution_colors_lineage_handles_empty_branch_ids_without_crashi
     n_sub_cols = df.columns[df.columns.str.startswith("N_sub_")]
     parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=n_sub_cols)
     assert commands == []
+
+
+def test_set_substitution_colors_lineage_handles_none_branch_ids_without_crashing(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": [5],
+            "N_sub_1": [0.9],
+        }
+    )
+    g = {
+        "mode": "lineage",
+        "branch_ids": None,
+        "min_single_prob": 0.8,
+        "tree": None,
+    }
+    n_sub_cols = df.columns[df.columns.str.startswith("N_sub_")]
+    parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=n_sub_cols)
+    assert commands == []
+
+
+def test_set_substitution_colors_lineage_rejects_non_integer_branch_ids(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": [5],
+            "N_sub_1": [0.9],
+        }
+    )
+    g = {
+        "mode": "lineage",
+        "branch_ids": np.array([1.5]),
+        "min_single_prob": 0.8,
+        "tree": None,
+    }
+    n_sub_cols = df.columns[df.columns.str.startswith("N_sub_")]
+    with pytest.raises(ValueError, match="integer-like"):
+        parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=n_sub_cols)
+
+
+def test_save_6view_pdf_creates_pdf_without_nameerror(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    directions = ["pos_x", "neg_x", "pos_y", "neg_y", "pos_z", "neg_z"]
+    image_prefix = tmp_path / "tmp.csubst.pymol"
+    for direction in directions:
+        image_path = tmp_path / f"tmp.csubst.pymol_{direction}.png"
+        parser_pymol.plt.imsave(str(image_path), np.zeros((8, 8, 3), dtype=np.float32))
+    pdf_path = tmp_path / "sixview.pdf"
+    parser_pymol.save_6view_pdf(
+        image_prefix=str(image_prefix),
+        directions=directions,
+        pdf_filename=str(pdf_path),
+    )
+    assert pdf_path.exists()
+    assert pdf_path.stat().st_size > 0
 
 
 def test_set_substitution_colors_lineage_uses_only_listed_branch_columns(monkeypatch):

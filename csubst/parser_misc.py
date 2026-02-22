@@ -20,7 +20,7 @@ def _read_package_text(file):
 
 def generate_intermediate_files(g, force_notree_run=False):
     if (g['infile_type'] == 'phylobayes'):
-        raise Exception("PhyloBayes is not supported.")
+        raise ValueError("PhyloBayes is not supported.")
     elif (g['infile_type'] == 'iqtree'):
         g,all_exist = parser_iqtree.check_intermediate_files(g)
         if (all_exist)&(not g['iqtree_redo']):
@@ -82,6 +82,9 @@ def read_input(g):
         if g['omega'] is None:
             raise AssertionError(txt)
         g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
+    else:
+        txt = 'Unsupported substitution model for --omegaC_method submodel: {}'
+        raise ValueError(txt.format(g['substitution_model']))
     g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
     g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
     g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
@@ -89,16 +92,16 @@ def read_input(g):
     sum_tensor_syn = g['rate_syn_tensor'].sum()
     sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
     sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
-    if (sum_tensor_aa - sum_matrix_aa) >= g['float_tol']:
+    if abs(sum_tensor_aa - sum_matrix_aa) >= g['float_tol']:
         raise AssertionError('Sum of rates did not match.')
     txt = 'Sum of rates did not match. Check if --codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
     txt = txt.format(g['codon_table'], g['reconstruction_codon_table'])
-    if (sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa) >= g['float_tol']:
+    if abs(sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa) >= g['float_tol']:
         raise AssertionError(txt)
     np.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
     q_ij_x_pi_i = g['instantaneous_codon_rate_matrix'][0,1]*g['equilibrium_frequency'][0]
     q_ji_x_pi_j = g['instantaneous_codon_rate_matrix'][1,0]*g['equilibrium_frequency'][1]
-    if (q_ij_x_pi_i - q_ji_x_pi_j) >= g['float_tol']:
+    if abs(q_ij_x_pi_i - q_ji_x_pi_j) >= g['float_tol']:
         raise AssertionError('Instantaneous codon rate matrix (Q) is not time-reversible.')
     return g
 
@@ -111,12 +114,19 @@ def get_mechanistic_instantaneous_rate_matrix(g):
             num_diff_codon_position = sum([ cp1!=cp2 for cp1,cp2 in zip(c1,c2) ])
             if (num_diff_codon_position!=1):
                 inst[i1,i2] = 0 # prohibit double substitutions
+    is_single_substitution = (inst != 0)
     if g['omega'] is not None:
-        inst *= g['omega'] # multiply omega for all elements
-        for s,aa in enumerate(g['amino_acid_orders']):
+        omega = float(g['omega'])
+        if omega < 0:
+            raise ValueError('omega should be >= 0.')
+        if omega != 1.0:
+            inst *= omega # nonsynonymous substitutions are scaled by omega
+        # Keep synonymous substitutions at 1.0 (where codon transitions are allowed).
+        for aa in g['amino_acid_orders']:
             ind_cdn = np.array(g['synonymous_indices'][aa])
             for i1,i2 in itertools.permutations(ind_cdn, 2):
-                inst[i1,i2] /= g['omega'] # restore rate of synonymous substitutions = 1, so nonsynonymous substitutions are left multiplied by omega
+                if is_single_substitution[i1,i2]:
+                    inst[i1,i2] = 1.0
     if g['kappa'] is not None:
         for i1,c1 in enumerate(g['codon_orders']):
             for i2,c2 in enumerate(g['codon_orders']):
@@ -164,6 +174,8 @@ def get_rate_tensor(inst, mode, g):
             ind_tensor = np.arange(len(ind_cdn))
             for it1,it2 in itertools.permutations(ind_tensor, 2):
                 rate_tensor[s,it1,it2] = inst[ind_cdn[it1],ind_cdn[it2]]
+    else:
+        raise ValueError('Unsupported rate-tensor mode: {}'.format(mode))
     rate_tensor = rate_tensor.astype(g['float_type'])
     return rate_tensor
 
@@ -214,6 +226,8 @@ def get_equilibrium_frequency(g, mode):
         if abs(eq_pep.sum()-1) >= g['float_tol']:
             raise AssertionError(txt)
         return eq_pep
+    else:
+        raise ValueError('Unsupported equilibrium-frequency mode: {}'.format(mode))
 
 def _can_use_selective_state_loading(g):
     if g.get('exhaustive_until', None) != 1:
@@ -233,6 +247,32 @@ def _can_use_selective_state_loading(g):
     return True, None
 
 
+def _normalize_branch_ids(branch_ids):
+    if branch_ids is None:
+        return np.array([], dtype=np.int64)
+    values = np.asarray(branch_ids, dtype=object)
+    flat_values = np.atleast_1d(values).reshape(-1)
+    if flat_values.size == 0:
+        return np.array([], dtype=np.int64)
+    normalized = []
+    for value in flat_values.tolist():
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('target_ids should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('target_ids should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('target_ids should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64)
+
+
 def _get_required_state_branch_ids(g):
     root_nn = ete.get_prop(ete.get_tree_root(g['tree']), "numerical_label")
     required = set([int(root_nn)])
@@ -241,7 +281,7 @@ def _get_required_state_branch_ids(g):
         node_by_id[int(ete.get_prop(node, "numerical_label"))] = node
     target_ids = set()
     for trait_name in g['target_ids'].keys():
-        values = np.asarray(g['target_ids'][trait_name], dtype=np.int64)
+        values = _normalize_branch_ids(g['target_ids'][trait_name])
         target_ids.update([int(v) for v in values.tolist()])
     for branch_id in target_ids:
         required.add(branch_id)
@@ -322,6 +362,13 @@ def get_codon_order_index(order_from, order_to):
     if len(order_from) != len(order_to):
         txt = 'Codon order lengths should match. Emprical codon substitution models are currently supported only for the Standard codon table.'
         raise AssertionError(txt)
+    source_codon_list = [str(fr) for fr in order_from]
+    if len(source_codon_list) != len(set(source_codon_list)):
+        duplicate_codons = sorted(list(set([c for c in source_codon_list if source_codon_list.count(c) > 1])))
+        duplicate_txt = ','.join(duplicate_codons[:10])
+        if len(duplicate_codons) > 10:
+            duplicate_txt += ',...'
+        raise ValueError('Duplicate codon found in source order: {}'.format(duplicate_txt))
     index_by_codon = dict()
     for i,to in enumerate(order_to):
         if to in index_by_codon:
@@ -353,6 +400,9 @@ def get_exchangeability_codon_order():
 def read_exchangeability_eq_freq(file, g):
     txt = _read_package_text(file=file)
     txt = txt.replace('\r', '').split('\n')
+    if len(txt) <= 61:
+        txt = 'Exchangeability file format is invalid: expected equilibrium frequencies on line 62.'
+        raise AssertionError(txt)
     freqs = txt[61].split()
     freqs = np.array([ float(s) for s in freqs ], dtype=float)
     if freqs.shape[0] != 61:

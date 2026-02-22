@@ -82,19 +82,50 @@ def is_url_valid(url, timeout=30):
         with urllib.request.urlopen(request, timeout=timeout):
             pass
         return True
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+    except urllib.error.HTTPError as exc:
+        try:
+            exc.close()
+        except Exception:
+            pass
+        # Some servers reject HEAD even when GET is available.
+        if int(getattr(exc, 'code', 0)) in [403, 405, 501]:
+            get_request = urllib.request.Request(url)
+            get_request.get_method = lambda: 'GET'
+            try:
+                with urllib.request.urlopen(get_request, timeout=timeout):
+                    pass
+                return True
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+                return False
+        return False
+    except (urllib.error.URLError, TimeoutError):
         return False
 
 
 def _normalize_branch_ids(branch_ids):
-    values = np.asarray(branch_ids)
-    if values.size == 0:
+    if branch_ids is None:
         return list()
-    values = np.atleast_1d(values).reshape(-1)
-    try:
-        return [int(v) for v in values.tolist()]
-    except (TypeError, ValueError) as exc:
-        raise ValueError('branch_ids should be integer-like.') from exc
+    values = np.asarray(branch_ids, dtype=object)
+    flat_values = np.atleast_1d(values).reshape(-1)
+    if flat_values.size == 0:
+        return list()
+    normalized = []
+    for value in flat_values.tolist():
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('branch_ids should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('branch_ids should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('branch_ids should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return normalized
 
 
 def pdb_sequence_search(g):

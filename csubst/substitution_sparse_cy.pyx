@@ -130,6 +130,72 @@ cpdef accumulate_sparse_summary_block_double(
 @cython.nonecheck(False)
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cpdef accumulate_sparse_summary_block_csr_double(
+    numpy.ndarray[index_t, ndim=1] indptr,
+    numpy.ndarray[index_t, ndim=1] indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] vals,
+    long sg,
+    long a,
+    long d,
+    long num_group,
+    long num_site,
+    long num_state_from,
+    long num_state_to,
+    object total_flat_obj,
+    object from_flat_obj,
+    object to_flat_obj,
+    object pair_flat_obj,
+    bint need_any2any,
+    bint need_spe2any,
+    bint need_any2spe,
+    bint need_spe2spe,
+):
+    cdef Py_ssize_t n_branch = indptr.shape[0] - 1
+    cdef Py_ssize_t row, k
+    cdef Py_ssize_t start, end
+    cdef Py_ssize_t col
+    cdef double v
+    cdef double[:] total_flat
+    cdef double[:] from_flat
+    cdef double[:] to_flat
+    cdef double[:] pair_flat
+    cdef Py_ssize_t idx
+    cdef long pair_index, num_state_pair
+    if indices.shape[0] != vals.shape[0]:
+        raise ValueError('indices and vals should have identical length.')
+    if need_any2any:
+        total_flat = total_flat_obj
+    if need_spe2any:
+        from_flat = from_flat_obj
+    if need_any2spe:
+        to_flat = to_flat_obj
+    if need_spe2spe:
+        pair_flat = pair_flat_obj
+        num_state_pair = num_state_from * num_state_to
+        pair_index = a * num_state_to + d
+    for row in range(n_branch):
+        start = indptr[row]
+        end = indptr[row + 1]
+        for k in range(start, end):
+            col = indices[k]
+            v = vals[k]
+            if need_any2any:
+                idx = ((row * num_group) + sg) * num_site + col
+                total_flat[idx] += v
+            if need_spe2any:
+                idx = (((row * num_group) + sg) * num_state_from + a) * num_site + col
+                from_flat[idx] += v
+            if need_any2spe:
+                idx = (((row * num_group) + sg) * num_state_to + d) * num_site + col
+                to_flat[idx] += v
+            if need_spe2spe:
+                idx = (((row * num_group) + sg) * num_state_pair + pair_index) * num_site + col
+                pair_flat[idx] += v
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cpdef accumulate_branch_sub_counts_csr_double(
     numpy.ndarray[index_t, ndim=1] indptr,
     numpy.ndarray[numpy.float64_t, ndim=1] data,

@@ -39,17 +39,33 @@ def bool2yesno(flag):
 def _normalize_branch_ids(branch_ids):
     if branch_ids is None:
         return np.array([], dtype=np.int64)
-    values = np.asarray(branch_ids)
+    values = np.asarray(branch_ids, dtype=object)
     if values.ndim == 0:
         scalar = values.item()
         if isinstance(scalar, (list, tuple, set, np.ndarray)):
-            values = np.asarray(list(scalar))
-    if values.size == 0:
+            values = np.asarray(list(scalar), dtype=object)
+        else:
+            values = np.asarray([scalar], dtype=object)
+    flat_values = np.atleast_1d(values).reshape(-1)
+    if flat_values.size == 0:
         return np.array([], dtype=np.int64)
-    try:
-        return np.atleast_1d(values).astype(np.int64, copy=False).reshape(-1)
-    except (TypeError, ValueError) as exc:
-        raise ValueError('branch_ids should be integer-like.') from exc
+    normalized = []
+    for value in flat_values.tolist():
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('branch_ids should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('branch_ids should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('branch_ids should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64)
 
 def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, branch_ids, note=''):
     site_outdir = os.path.abspath(g['site_outdir'])
@@ -629,6 +645,8 @@ def plot_lineage_tree(g, outbase):
 
 
 def get_gapsite_rate(state_tensor):
+    if state_tensor.shape[0] == 0:
+        return np.zeros(shape=(state_tensor.shape[1],), dtype=float)
     num_gapsite = (state_tensor.sum(axis=2)==0).sum(axis=0)
     gapsite_rate = num_gapsite / state_tensor.shape[0]
     return gapsite_rate
@@ -762,7 +780,10 @@ def _report_gene_assignment_summary(assigned_gene_index, aln_sites, has_gene_sit
 def _build_aln_gene_match_for_leaf(leaf, seq, num_site, g):
     leaf_nn = ete.get_prop(leaf, "numerical_label")
     leaf_state_cdn = g['state_cdn'][leaf_nn, :, :]
-    seq = seq.replace('-', '')
+    seq = str(seq).replace('-', '').upper()
+    if (len(seq) % 3) != 0:
+        txt = 'Untrimmed CDS sequence length for "{}" should be multiple of 3 (length={}).'
+        raise ValueError(txt.format(leaf.name, len(seq)))
     num_gene_site = int(len(seq) / 3)
     gene_sites = np.arange(num_gene_site, dtype=np.int64)
     aln_sites = np.arange(num_site, dtype=np.int64)
@@ -822,14 +843,22 @@ def write_fasta(file, label, seq):
         f.write(seq+'\n')
 
 def translate(seq, g):
+    if (len(seq) % 3) != 0:
+        txt = 'Input CDS sequence length should be multiple of 3 for translation (length={}).'
+        raise ValueError(txt.format(len(seq)))
     translated_seq = ''
     num_site = int(len(seq)/3)
+    codon_to_aa = dict()
+    for aa, codons in g['matrix_groups'].items():
+        for codon in codons:
+            codon_to_aa[str(codon).upper()] = aa
     for s in np.arange(num_site):
-        codon = seq[(s*3):((s+1)*3)]
-        for aa in g['matrix_groups'].keys():
-            if codon in g['matrix_groups'][aa]:
-                translated_seq += aa
-                break
+        codon = seq[(s*3):((s+1)*3)].upper()
+        aa = codon_to_aa.get(codon, None)
+        if aa is None:
+            txt = 'Unknown codon "{}" was found at codon site {} during translation.'
+            raise ValueError(txt.format(codon, s + 1))
+        translated_seq += aa
     return translated_seq
 
 
@@ -837,8 +866,14 @@ def _resolve_chimera_line_for_site(df, codon_site_col, seq_site):
     is_site = (df.loc[:, codon_site_col] == seq_site)
     if is_site.sum() == 0:
         return '\t:{}\t{}\n'.format(seq_site, 'None')
-    Nany2spe = df.loc[is_site, 'OCNany2spe'].values[0]
-    Nany2dif = df.loc[is_site, 'OCNany2dif'].values[0]
+    if 'OCNany2spe' in df.columns:
+        Nany2spe = float(df.loc[is_site, 'OCNany2spe'].fillna(0).values[0])
+    else:
+        Nany2spe = 0.0
+    if 'OCNany2dif' in df.columns:
+        Nany2dif = float(df.loc[is_site, 'OCNany2dif'].fillna(0).values[0])
+    else:
+        Nany2dif = 0.0
     Nvalue = Nany2spe if (Nany2spe >= Nany2dif) else -Nany2dif
     return '\t:{}\t{:.4f}\n'.format(seq_site, Nvalue)
 
@@ -869,7 +904,10 @@ def export2chimera(df, g):
             print('Sequence not be found in csubst inputs. Skipping: {}'.format(seq_key))
             continue
         seq = seqs[seq_key]
-        seq_num_site = int(len(seq) / 3)
+        if (len(seq) % 3) != 0:
+            txt = 'Untrimmed CDS sequence length for "{}" should be multiple of 3 for Chimera export (length={}).'
+            raise ValueError(txt.format(seq_key, len(seq)))
+        seq_num_site = len(seq) // 3
         seq_sites = np.arange(1, seq_num_site + 1)
         file_name = os.path.join(g['site_outdir'], 'csubst_site_' + seq_key + '.chimera.txt')
         txt = 'Writing a file that can be loaded to UCSF Chimera from ' \
@@ -908,8 +946,14 @@ def add_states(df, branch_ids, g, add_hydrophobicity=True):
         for bid in branch_ids:
             anc_col = seqtype2+'_'+str(bid)+'_anc'
             df.loc[:,anc_col] = ''
+            parent_bid = parent_branch_ids.get(int(bid), None)
+            if parent_bid is None:
+                continue
+            parent_bid = int(parent_bid)
+            if (parent_bid < 0) or (parent_bid >= g['state_'+seqtype].shape[0]):
+                continue
             for i in df.index:
-                anc_states = g['state_'+seqtype][parent_branch_ids[bid],i,:]
+                anc_states = g['state_'+seqtype][parent_bid,i,:]
                 if not anc_states.max()==0:
                     ml_anc_state = g[order_key][anc_states.argmax()]
                     df.at[i,anc_col] = ml_anc_state
@@ -1984,7 +2028,21 @@ def _parse_branch_ids(branch_id_text):
         branch_ids = np.array([int(v) for v in values], dtype=np.int64)
     except ValueError as exc:
         raise ValueError('--branch_id should be a comma-delimited list of integers.') from exc
+    unique_ids, counts = np.unique(branch_ids, return_counts=True)
+    duplicated_ids = unique_ids[counts > 1]
+    if duplicated_ids.shape[0] > 0:
+        txt = '--branch_id contains duplicate IDs: {}'
+        raise ValueError(txt.format(','.join([str(int(v)) for v in duplicated_ids.tolist()])))
     return branch_ids
+
+
+def _is_truthy_fg_value(value):
+    if pd.isna(value):
+        return False
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    value_txt = str(value).strip().lower()
+    return value_txt in ['y', 'yes', 'true', '1', 't']
 
 
 def _get_node_by_branch_id(g):
@@ -2020,10 +2078,11 @@ def _read_foreground_branch_combinations(g, node_by_id):
     is_fg_col = cb.columns.str.startswith('is_fg')
     if is_fg_col.sum()==0:
         raise ValueError('No is_fg* columns were found in --cb_file.')
-    cb_fg = cb.loc[(cb.loc[:,is_fg_col]=='Y').any(axis=1),:]
+    fg_mask = cb.loc[:, is_fg_col].apply(lambda col: col.map(_is_truthy_fg_value))
+    cb_fg = cb.loc[fg_mask.any(axis=1), :]
     branch_id_list = []
     for i in cb_fg.index:
-        bids = cb_fg.loc[i,bid_cols].values.astype(np.int64)
+        bids = _normalize_branch_ids(cb_fg.loc[i, bid_cols].values)
         _validate_nonroot_branch_ids(bids, node_by_id)
         branch_id_list.append(bids)
     if len(branch_id_list)==0:
@@ -2155,8 +2214,41 @@ def _evaluate_set_expression_boolean(tokens, branch_site_bool):
     return out_bool
 
 
+def _validate_set_expression_unambiguous_order(tokens):
+    operators = {'|', '-', '&', '^'}
+    expression_txt = ''.join([str(t) for t in tokens])
+
+    def _validate_operator_sequence(operator_sequence):
+        if len(operator_sequence) <= 1:
+            return None
+        unique_ops = set(operator_sequence)
+        if (len(unique_ops) == 1) and (operator_sequence[0] in {'|', '&'}):
+            return None
+        txt = 'Ambiguous --mode set expression. Use parentheses so operator order is explicit: {}'
+        raise ValueError(txt.format(expression_txt))
+
+    operator_stack = [[]]
+    for token in tokens:
+        if token == '(':
+            operator_stack.append([])
+            continue
+        if token == ')':
+            if len(operator_stack) <= 1:
+                raise ValueError('Unbalanced parentheses in --mode set expression.')
+            operator_sequence = operator_stack.pop()
+            _validate_operator_sequence(operator_sequence=operator_sequence)
+            continue
+        if token in operators:
+            operator_stack[-1].append(token)
+    if len(operator_stack) != 1:
+        raise ValueError('Unbalanced parentheses in --mode set expression.')
+    _validate_operator_sequence(operator_sequence=operator_stack[0])
+    return None
+
+
 def _evaluate_set_expression_boolean_and_prob(tokens, branch_site_bool, branch_site_prob):
     operators = ['|', '-', '&', '^']
+    _validate_set_expression_unambiguous_order(tokens=tokens)
     operand_stack = []
     operator_stack = []
     expect_operand = True

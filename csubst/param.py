@@ -167,6 +167,14 @@ def get_global_parameters(args):
             value=g['uniprot_include_redundant'],
             param_name='--uniprot_include_redundant',
         )
+    if 'export2chimera' in g.keys():
+        export2chimera = _parse_bool_like(
+            value=g['export2chimera'],
+            param_name='--export2chimera',
+        )
+        g['export2chimera'] = export2chimera
+        if export2chimera and (g.get('untrimmed_cds', None) in [None, '']):
+            raise ValueError('--export2chimera "yes" requires --untrimmed_cds.')
     if 'num_simulated_site' in g.keys():
         g['num_simulated_site'] = int(g['num_simulated_site'])
         if (g['num_simulated_site'] != -1) and (g['num_simulated_site'] < 1):

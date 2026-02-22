@@ -7,6 +7,32 @@ import time
 
 from scipy.stats import chi2_contingency
 
+
+def _normalize_integer_like(values, column_name):
+    arr = np.asarray(values, dtype=object).reshape(-1)
+    normalized = []
+    for value in arr.tolist():
+        if pd.isna(value):
+            raise ValueError('Column "{}" contains missing values.'.format(column_name))
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('Column "{}" should be integer-like.'.format(column_name))
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('Column "{}" should be integer-like.'.format(column_name))
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if value_txt == '':
+            raise ValueError('Column "{}" contains blank values.'.format(column_name))
+        if not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt)):
+            raise ValueError('Column "{}" should be integer-like.'.format(column_name))
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64)
+
+
 def sort_branch_ids(df):
     swap_columns = df.columns[df.columns.str.startswith('branch_id')].tolist()
     if len(swap_columns)>1:
@@ -15,9 +41,11 @@ def sort_branch_ids(df):
         df.loc[:,swap_columns] = swap_values
     if 'site' in df.columns:
         swap_columns.append('site')
+    if len(swap_columns) == 0:
+        return df
     df = df.sort_values(by=swap_columns)
     for cn in swap_columns:
-        df[cn] = df[cn].astype(int)
+        df[cn] = _normalize_integer_like(values=df.loc[:, cn].to_numpy(copy=False), column_name=cn)
     return df
 
 def sort_cb(cb):
@@ -182,6 +210,9 @@ def parse_cutoff_stat(cutoff_stat_str):
             cutoff_stat_value = float(cutoff_stat_value_txt)
         except ValueError:
             txt = 'Invalid cutoff value "{}" in token "{}".'
+            raise ValueError(txt.format(cutoff_stat_value_txt, cutoff_stat))
+        if not np.isfinite(cutoff_stat_value):
+            txt = 'Invalid cutoff value "{}" in token "{}". A finite numeric value is required.'
             raise ValueError(txt.format(cutoff_stat_value_txt, cutoff_stat))
         cutoff_stat_entries.append((cutoff_stat_exp, cutoff_stat_value))
     if len(cutoff_stat_entries) == 0:

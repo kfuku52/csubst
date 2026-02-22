@@ -9,3 +9,5 @@ csubst/*.c
 csubst/.DS_Store
 .DS_Store
 .vscode/
+csubst.log
+tmp.csubst.*

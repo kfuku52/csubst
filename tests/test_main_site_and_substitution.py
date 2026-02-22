@@ -6,9 +6,13 @@ from pathlib import Path
 
 from csubst import main_site
 from csubst import substitution
-from csubst import substitution_cy
 from csubst import tree
 from csubst import ete
+
+try:
+    from csubst import substitution_cy
+except ImportError:  # pragma: no cover - optional Cython extension
+    substitution_cy = None
 
 
 @pytest.fixture
@@ -42,6 +46,12 @@ def test_get_gapsite_rate_matches_manual_count():
     # site-wise gap rates: [0/3, 2/3, 1/3]
     out = main_site.get_gapsite_rate(state_tensor)
     np.testing.assert_allclose(out, [0.0, 2.0 / 3.0, 1.0 / 3.0], atol=1e-12)
+
+
+def test_get_gapsite_rate_returns_zero_when_branch_axis_is_empty():
+    state_tensor = np.zeros((0, 3, 2), dtype=float)
+    out = main_site.get_gapsite_rate(state_tensor)
+    np.testing.assert_allclose(out, [0.0, 0.0, 0.0], atol=1e-12)
 
 
 def test_extend_site_index_edge_fills_missing_edges():
@@ -381,6 +391,51 @@ def test_translate_and_write_fasta(tmp_path):
     assert out.read_text(encoding="utf-8") == ">sample\nKN\n"
 
 
+def test_translate_rejects_non_triplet_sequence_length():
+    g = {"matrix_groups": {"K": ["AAA"]}}
+    with pytest.raises(ValueError, match="multiple of 3"):
+        main_site.translate("AAAAA", g)
+
+
+def test_translate_rejects_unknown_codon():
+    g = {"matrix_groups": {"K": ["AAA"]}}
+    with pytest.raises(ValueError, match='Unknown codon "AAT"'):
+        main_site.translate("AAT", g)
+
+
+def test_resolve_chimera_line_for_site_handles_missing_any2dif_column():
+    df = pd.DataFrame({"codon_site_seq1": [1], "OCNany2spe": [0.25]})
+    out = main_site._resolve_chimera_line_for_site(df=df, codon_site_col="codon_site_seq1", seq_site=1)
+    assert out == "\t:1\t0.2500\n"
+
+
+def test_resolve_chimera_line_for_site_handles_missing_any2spe_column():
+    df = pd.DataFrame({"codon_site_seq1": [1], "OCNany2dif": [0.4]})
+    out = main_site._resolve_chimera_line_for_site(df=df, codon_site_col="codon_site_seq1", seq_site=1)
+    assert out == "\t:1\t-0.4000\n"
+
+
+def test_export2chimera_rejects_non_triplet_sequence_before_writing(tmp_path):
+    cds = tmp_path / "untrimmed.fa"
+    cds.write_text(">seq1\nAAAA\n", encoding="utf-8")
+    df = pd.DataFrame(
+        {
+            "codon_site_seq1": [1],
+            "OCNany2spe": [0.3],
+            "OCNany2dif": [0.1],
+        }
+    )
+    g = {
+        "untrimmed_cds": str(cds),
+        "site_outdir": str(tmp_path),
+        "matrix_groups": {"K": ["AAA"]},
+    }
+    with pytest.raises(ValueError, match='multiple of 3 for Chimera export'):
+        main_site.export2chimera(df=df, g=g)
+    assert not (tmp_path / "csubst_site_seq1.chimera.txt").exists()
+    assert not (tmp_path / "csubst_site_seq1.fasta").exists()
+
+
 def test_get_parent_branch_ids(tiny_tree):
     bids = []
     for node in tiny_tree.traverse():
@@ -393,6 +448,39 @@ def test_get_parent_branch_ids(tiny_tree):
     assert set(out.values()) == {x_id}
 
 
+def test_build_aln_gene_match_for_leaf_rejects_non_triplet_untrimmed_cds():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    leaf_a = [n for n in tr.traverse() if n.name == "A"][0]
+    num_node = len(list(tr.traverse()))
+    g = {
+        "state_cdn": np.zeros((num_node, 1, 1), dtype=float),
+        "codon_orders": np.array(["AAA"]),
+    }
+    with pytest.raises(ValueError, match='length for "A" should be multiple of 3'):
+        main_site._build_aln_gene_match_for_leaf(leaf=leaf_a, seq="AAAA", num_site=1, g=g)
+
+
+def test_add_states_handles_root_branch_without_parent_index_error(tiny_tree):
+    root_id = int(ete.get_prop(tiny_tree, "numerical_label"))
+    num_node = max(int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()) + 1
+    num_site = 5
+    state_cdn = np.zeros((num_node, num_site, 2), dtype=float)
+    state_pep = np.zeros((num_node, num_site, 2), dtype=float)
+    state_cdn[root_id, :, 0] = 1.0
+    state_pep[root_id, :, 0] = 1.0
+    df = pd.DataFrame({"site": np.arange(num_site, dtype=int)})
+    g = {
+        "tree": tiny_tree,
+        "state_cdn": state_cdn,
+        "state_pep": state_pep,
+        "codon_orders": np.array(["AAA", "AAG"]),
+        "amino_acid_orders": np.array(["K", "N"]),
+    }
+    out = main_site.add_states(df=df, branch_ids=np.array([root_id], dtype=np.int64), g=g, add_hydrophobicity=False)
+    assert (out["cdn_{}_anc".format(root_id)] == "").all()
+    assert (out["aa_{}_anc".format(root_id)] == "").all()
+
+
 def test_resolve_site_jobs_intersection_mode_preserves_branch_set_and_outdir_prefix(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "intersection", "branch_id": "{},{}".format(labels["A"], labels["C"])}
@@ -400,6 +488,20 @@ def test_resolve_site_jobs_intersection_mode_preserves_branch_set_and_outdir_pre
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
     assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.branch_id")
+
+
+def test_resolve_site_jobs_rejects_duplicate_branch_ids(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {"tree": tiny_tree, "mode": "intersection", "branch_id": "{},{}".format(labels["A"], labels["A"])}
+    with pytest.raises(ValueError, match="duplicate IDs"):
+        main_site.resolve_site_jobs(g)
+
+
+def test_normalize_branch_ids_rejects_non_integer_like_values():
+    with pytest.raises(ValueError, match="integer-like"):
+        main_site._normalize_branch_ids(np.array([1.5]))
+    with pytest.raises(ValueError, match="integer-like"):
+        main_site._normalize_branch_ids(np.array([True]))
 
 
 def test_resolve_site_jobs_lineage_mode_returns_ancestor_to_descendant_path(tiny_tree):
@@ -489,6 +591,65 @@ def test_resolve_site_jobs_set_mode_rejects_invalid_stat_type(tiny_tree):
     g = {"tree": tiny_tree, "mode": "set,unknown,{}|{}".format(labels["A"], labels["B"])}
     with pytest.raises(ValueError, match="any2any,any2spe,spe2any,spe2spe"):
         main_site.resolve_site_jobs(g)
+
+
+def test_set_expression_requires_parentheses_for_multiple_operators():
+    branch_site_bool = {
+        1: np.array([True, True, False, False], dtype=bool),
+        2: np.array([True, False, True, False], dtype=bool),
+        3: np.array([False, True, True, False], dtype=bool),
+    }
+    tokens = main_site._tokenize_set_expression("1|2&3")
+    with pytest.raises(ValueError, match="Ambiguous --mode set expression"):
+        main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+
+
+def test_set_expression_accepts_same_operator_or_chain_without_parentheses():
+    branch_site_bool = {
+        1: np.array([True, False, False], dtype=bool),
+        2: np.array([True, True, False], dtype=bool),
+        3: np.array([True, False, True], dtype=bool),
+    }
+    tokens = main_site._tokenize_set_expression("1|2|3")
+    out = main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    expected = branch_site_bool[1] | branch_site_bool[2] | branch_site_bool[3]
+    np.testing.assert_array_equal(out, expected)
+
+
+def test_set_expression_accepts_same_operator_and_chain_without_parentheses():
+    branch_site_bool = {
+        1: np.array([True, False, True, False], dtype=bool),
+        2: np.array([True, True, False, False], dtype=bool),
+        3: np.array([True, True, True, False], dtype=bool),
+    }
+    tokens = main_site._tokenize_set_expression("1&2&3")
+    out = main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    expected = branch_site_bool[1] & branch_site_bool[2] & branch_site_bool[3]
+    np.testing.assert_array_equal(out, expected)
+
+
+@pytest.mark.parametrize("mode_expression", ["1^2^3", "1-2-3"])
+def test_set_expression_rejects_same_operator_chain_for_xor_and_difference(mode_expression):
+    branch_site_bool = {
+        1: np.array([True, False, False], dtype=bool),
+        2: np.array([True, True, False], dtype=bool),
+        3: np.array([True, False, True], dtype=bool),
+    }
+    tokens = main_site._tokenize_set_expression(mode_expression)
+    with pytest.raises(ValueError, match="Ambiguous --mode set expression"):
+        main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+
+
+def test_set_expression_accepts_parenthesized_order():
+    branch_site_bool = {
+        1: np.array([True, True, False, False], dtype=bool),
+        2: np.array([True, False, True, False], dtype=bool),
+        3: np.array([False, True, True, False], dtype=bool),
+    }
+    tokens = main_site._tokenize_set_expression("1|(2&3)")
+    out = main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    expected = branch_site_bool[1] | (branch_site_bool[2] & branch_site_bool[3])
+    np.testing.assert_array_equal(out, expected)
 
 
 def test_add_set_mode_columns_evaluates_set_expression():
@@ -643,6 +804,48 @@ def test_resolve_site_jobs_intersection_fg_reads_cb_file(tmp_path, tiny_tree):
     out = main_site.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
+
+
+@pytest.mark.parametrize("fg_value", ["y", "yes", "true", "1", True])
+def test_resolve_site_jobs_intersection_fg_accepts_truthy_fg_values(tmp_path, tiny_tree, fg_value):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    cb_path = tmp_path / "cb.tsv"
+    pd.DataFrame(
+        {
+            "branch_id_1": [labels["A"], labels["B"]],
+            "branch_id_2": [labels["C"], labels["C"]],
+            "is_fg_demo": [fg_value, "N"],
+        }
+    ).to_csv(cb_path, sep="\t", index=False)
+    g = {
+        "tree": tiny_tree,
+        "mode": "intersection",
+        "branch_id": "fg",
+        "cb_file": str(cb_path),
+    }
+    out = main_site.resolve_site_jobs(g)
+    assert len(out["site_jobs"]) == 1
+    np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
+
+
+def test_resolve_site_jobs_intersection_fg_rejects_non_integer_branch_ids(tmp_path, tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    cb_path = tmp_path / "cb.tsv"
+    pd.DataFrame(
+        {
+            "branch_id_1": [float(labels["A"]) + 0.5],
+            "branch_id_2": [labels["C"]],
+            "is_fg_demo": ["Y"],
+        }
+    ).to_csv(cb_path, sep="\t", index=False)
+    g = {
+        "tree": tiny_tree,
+        "mode": "intersection",
+        "branch_id": "fg",
+        "cb_file": str(cb_path),
+    }
+    with pytest.raises(ValueError, match="integer-like"):
+        main_site.resolve_site_jobs(g)
 
 
 def test_get_state_orders():
@@ -1560,6 +1763,38 @@ def test_apply_min_sub_pp_threshold():
     np.testing.assert_allclose(out, [[[[[0.0, 0.4], [0.0, 0.5]]]]], atol=1e-12)
 
 
+def test_apply_min_sub_pp_parses_ml_anc_string_no_as_false():
+    g = {"min_sub_pp": 0.3, "ml_anc": "no"}
+    sub = np.array([[[[[0.2, 0.4], [0.1, 0.5]]]]], dtype=float)
+    out = substitution.apply_min_sub_pp(g, sub)
+    np.testing.assert_allclose(out, [[[[[0.0, 0.4], [0.0, 0.5]]]]], atol=1e-12)
+
+
+def test_get_substitution_tensor_treats_ml_anc_string_no_same_as_false(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    state = np.zeros((3, 1, 2), dtype=float)
+    state[labels["R"], 0, :] = [1.0, 0.0]
+    state[labels["A"], 0, :] = [0.0, 1.0]
+    state[labels["B"], 0, :] = [1.0, 0.0]
+
+    def _init_with_ones(state_tensor, mode, g, mmap_attr, dtype=None):
+        dtype = state_tensor.dtype if dtype is None else dtype
+        if mode != "asis":
+            raise AssertionError("unexpected mode")
+        axis = (state_tensor.shape[0], state_tensor.shape[1], 1, state_tensor.shape[2], state_tensor.shape[2])
+        return np.ones(shape=axis, dtype=dtype)
+
+    monkeypatch.setattr(substitution, "initialize_substitution_tensor", _init_with_ones)
+
+    g_bool = {"tree": tr, "ml_anc": False, "float_tol": 1e-12, "sub_tensor_backend": "dense"}
+    g_str = {"tree": tr, "ml_anc": "no", "float_tol": 1e-12, "sub_tensor_backend": "dense"}
+    out_bool = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g_bool, mmap_attr="toy_bool")
+    out_str = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g_str, mmap_attr="toy_str")
+    np.testing.assert_allclose(out_bool, out_str, atol=1e-12)
+    np.testing.assert_allclose(out_bool[labels["R"], :, :, :, :], 0.0, atol=1e-12)
+
+
 def test_get_s_get_cs_and_get_bs_match_manual_values():
     # shape = [branch, site, group, from, to]
     sub = np.zeros((2, 2, 1, 2, 2), dtype=float)
@@ -1594,6 +1829,59 @@ def test_get_b_uses_tree_numerical_labels_for_branch_ids(tiny_tree):
     expected_ids = sorted([ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()])
     assert out["branch_id"].tolist() == expected_ids
     assert set(out["branch_name"]) == set([n.name for n in tiny_tree.traverse()])
+
+
+def test_get_b_sitewise_skips_nan_only_sites_without_crashing(tiny_tree):
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
+    sub = np.zeros((num_node, 1, 1, 2, 2), dtype=float)
+    a_id = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if n.name == "A"][0]
+    sub[a_id, 0, 0, :, :] = np.nan
+    out = substitution.get_b(
+        g={"tree": tiny_tree, "num_node": num_node, "amino_acid_orders": ["A", "B"]},
+        sub_tensor=sub,
+        attr="N",
+        sitewise=True,
+    )
+    assert "N_sitewise" in out.columns
+    assert out.loc[out["branch_id"] == a_id, "N_sitewise"].iloc[0] == ""
+
+
+def test_get_sub_sites_handles_noncontiguous_branch_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    reassigned = {"A": 11, "B": 29, "C": 41, "X": 73, "R": 5}
+    for node in tr.traverse():
+        ete.set_prop(node, "numerical_label", reassigned[node.name])
+    num_branch = max(reassigned.values()) + 1
+    num_site = 3
+    state_tensor = np.zeros((num_branch, num_site, 2), dtype=float)
+    for node in tr.traverse():
+        nl = int(ete.get_prop(node, "numerical_label"))
+        state_tensor[nl, :, :] = 1.0
+    sS = pd.DataFrame({"S_sub": [1.0, 2.0, 3.0]})
+    sN = pd.DataFrame({"N_sub": [1.0, 1.0, 1.0]})
+    g = {"tree": tr, "asrv": "pool", "float_type": np.float64}
+
+    out = substitution.get_sub_sites(g=g, sS=sS, sN=sN, state_tensor=state_tensor)
+
+    assert out["is_site_nonmissing"].shape == (num_branch, num_site)
+    assert out["sub_sites"]["pool"].shape == (num_branch, num_site)
+    assert not out["is_site_nonmissing"][0, :].any()
+    for node in tr.traverse():
+        nl = int(ete.get_prop(node, "numerical_label"))
+        assert out["is_site_nonmissing"][nl, :].all()
+        np.testing.assert_allclose(out["sub_sites"]["pool"][nl, :].sum(), 1.0, atol=1e-12)
+
+
+def test_get_sub_sites_raises_when_tree_branch_id_exceeds_state_tensor_axis():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "numerical_label", int(ete.get_prop(node, "numerical_label")) + 10)
+    state_tensor = np.zeros((3, 2, 2), dtype=float)
+    sS = pd.DataFrame({"S_sub": [1.0, 1.0]})
+    sN = pd.DataFrame({"N_sub": [1.0, 1.0]})
+    g = {"tree": tr, "asrv": "pool", "float_type": np.float64}
+    with pytest.raises(ValueError, match="out of bounds"):
+        substitution.get_sub_sites(g=g, sS=sS, sN=sN, state_tensor=state_tensor)
 
 
 def test_add_dif_column_and_add_dif_stats():
@@ -1668,6 +1956,11 @@ def test_get_substitution_tensor_requires_g():
 def test_get_selected_branch_set_accepts_scalar_state_loaded_branch_ids():
     out = substitution._get_selected_branch_set({"state_loaded_branch_ids": np.int64(7)})
     assert out == {7}
+
+
+def test_get_selected_branch_set_rejects_non_integer_state_loaded_branch_ids():
+    with pytest.raises(ValueError, match="integer-like"):
+        substitution._get_selected_branch_set({"state_loaded_branch_ids": np.array([1.5])})
 
 
 def _toy_sub_tensor():

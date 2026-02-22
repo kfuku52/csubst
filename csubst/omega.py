@@ -10,6 +10,7 @@ from scipy.linalg import expm
 
 import itertools
 import os
+import re
 import sys
 import time
 
@@ -32,10 +33,36 @@ _UINT8_POPCOUNT = np.unpackbits(
 
 def _get_cb_ids(cb):
     bid_columns = cb.columns[cb.columns.str.startswith('branch_id_')]
-    cb_ids = cb.loc[:, bid_columns].values
-    if not np.issubdtype(cb_ids.dtype, np.integer):
-        cb_ids = cb_ids.astype(np.int64)
-    return cb_ids
+    if bid_columns.shape[0] == 0:
+        raise ValueError('cb should contain at least one branch_id_ column.')
+    cb_ids = cb.loc[:, bid_columns].to_numpy(copy=False, dtype=object)
+    if cb_ids.size == 0:
+        return np.zeros(shape=cb_ids.shape, dtype=np.int64)
+    normalized = []
+    for value in cb_ids.reshape(-1).tolist():
+        if value is None:
+            raise ValueError('branch_id columns should be integer-like.')
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('branch_id columns should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            if int(value) < 0:
+                raise ValueError('branch_id columns should be non-negative integers.')
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('branch_id columns should be integer-like.')
+            if int(value) < 0:
+                raise ValueError('branch_id columns should be non-negative integers.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('branch_id columns should be integer-like.')
+        if int(float(value_txt)) < 0:
+            raise ValueError('branch_id columns should be non-negative integers.')
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64).reshape(cb_ids.shape)
 
 
 def _resolve_requested_output_stats(g):
@@ -151,6 +178,8 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
         raise ValueError('cb_ids should be a 2D array.')
     if cb_ids.shape[0] == 0:
         return np.zeros((0, niter), dtype=np.int32)
+    if (cb_ids < 0).any():
+        raise ValueError('cb_ids should be non-negative.')
     sub_branches = np.asarray(sub_branches, dtype=np.int64)
     if sub_branches.ndim != 1:
         raise ValueError('sub_branches should be a 1D array.')

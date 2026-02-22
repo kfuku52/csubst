@@ -1,3 +1,6 @@
+import re
+
+
 ALL_OUTPUT_STATS = (
     "any2any",
     "any2spe",
@@ -131,28 +134,69 @@ def get_default_cutoff_stat_for_output_stats(output_stats):
 def validate_cutoff_stat_compatibility(cutoff_stat, output_stats):
     stats = set(parse_output_stats(output_stats, default=DEFAULT_OUTPUT_STATS))
     known_suffixes = set(ALL_OUTPUT_STATS)
-    known_prefixes = ("OCN", "OCS", "ECN", "ECS", "omegaC", "dNC", "dSC")
-    regex_chars = set("^$[](){}|?*+\\.")
-    for token in str(cutoff_stat).split("|"):
+    known_prefixes = ("OCN", "OCS", "ECN", "ECS", "omegaC", "dNC", "dSC", "QCN", "QCS")
+    for token in _split_cutoff_stat_tokens(cutoff_stat):
         token = token.strip()
         if token == "":
             continue
-        parts = token.split(",")
-        if len(parts) < 2:
+        parts = token.rsplit(",", 1)
+        if len(parts) != 2:
             continue
-        stat = parts[0].strip()
-        if stat == "":
+        stat_exp = parts[0].strip()
+        if stat_exp == "":
             continue
-        if any([c in regex_chars for c in stat]):
+        try:
+            re.compile(stat_exp)
+        except re.error:
             continue
+        matched_suffixes = set()
         for prefix in known_prefixes:
-            if not stat.startswith(prefix):
-                continue
-            suffix = stat[len(prefix):]
-            if (suffix in known_suffixes) and (suffix not in stats):
-                txt = '--cutoff_stat "{}" requires --output_stat to include "{}".'
-                raise ValueError(txt.format(stat, suffix))
-            break
+            for suffix in known_suffixes:
+                stat_col = prefix + suffix
+                if re.fullmatch(stat_exp, stat_col):
+                    matched_suffixes.add(suffix)
+        missing_suffixes = sorted([suffix for suffix in matched_suffixes if suffix not in stats])
+        if len(missing_suffixes) > 0:
+            txt = '--cutoff_stat "{}" requires --output_stat to include "{}".'
+            raise ValueError(txt.format(stat_exp, ",".join(missing_suffixes)))
+
+
+def _split_cutoff_stat_tokens(cutoff_stat_str):
+    text = str(cutoff_stat_str)
+    tokens = []
+    current = []
+    depth_paren = 0
+    depth_bracket = 0
+    depth_brace = 0
+    escaped = False
+    for ch in text:
+        if escaped:
+            current.append(ch)
+            escaped = False
+            continue
+        if ch == '\\':
+            current.append(ch)
+            escaped = True
+            continue
+        if ch == '(':
+            depth_paren += 1
+        elif ch == ')' and depth_paren > 0:
+            depth_paren -= 1
+        elif ch == '[':
+            depth_bracket += 1
+        elif ch == ']' and depth_bracket > 0:
+            depth_bracket -= 1
+        elif ch == '{':
+            depth_brace += 1
+        elif ch == '}' and depth_brace > 0:
+            depth_brace -= 1
+        if (ch == '|') and (depth_paren == 0) and (depth_bracket == 0) and (depth_brace == 0):
+            tokens.append(''.join(current).strip())
+            current = []
+            continue
+        current.append(ch)
+    tokens.append(''.join(current).strip())
+    return tokens
 
 
 def drop_unrequested_stat_columns(df, output_stats):

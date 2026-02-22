@@ -197,6 +197,16 @@ def test_cdn2pep_state_selected_branch_ids_ignores_negative_and_out_of_range_ids
     np.testing.assert_allclose(out, expected, atol=1e-12)
 
 
+def test_cdn2pep_state_rejects_non_integer_selected_branch_ids():
+    g = {
+        "amino_acid_orders": np.array(["K", "N"]),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+    }
+    state_cdn = np.array([[[0.2, 0.3, 0.5]]], dtype=float)
+    with pytest.raises(ValueError, match="integer-like"):
+        sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=np.array([0.5]))
+
+
 def test_translate_state_handles_missing_states():
     g = {
         "float_tol": 1e-12,
@@ -229,6 +239,12 @@ def test_get_state_index_with_ambiguity_gap_and_unknown():
     assert sequence.get_state_index("XZZ", input_state, genetic_code.ambiguous_table) == []
 
 
+def test_get_state_index_expands_repeated_ambiguous_positions():
+    input_state = np.array(["AAA", "AAG", "GAA", "GAG"])
+    out = sequence.get_state_index("RAR", input_state, genetic_code.ambiguous_table)
+    assert sorted(out) == [0, 1, 2, 3]
+
+
 def test_get_codon_table_rejects_unknown_ncbi_id():
     with pytest.raises(ValueError, match="Unsupported NCBI codon table ID"):
         genetic_code.get_codon_table(999)
@@ -240,6 +256,20 @@ def test_read_fasta_and_calc_identity(tmp_path):
     seqs = sequence.read_fasta(str(fasta))
     assert seqs == {"s1": "AAAA", "s2": "AATA"}
     assert sequence.calc_identity("AATA", "AACA") == 0.75
+
+
+def test_read_fasta_rejects_duplicate_headers(tmp_path):
+    fasta = tmp_path / "dup.fa"
+    fasta.write_text(">s1\nAAAA\n>s1\nTTTT\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Duplicate FASTA header"):
+        sequence.read_fasta(str(fasta))
+
+
+def test_read_fasta_rejects_sequence_before_first_header(tmp_path):
+    fasta = tmp_path / "invalid.fa"
+    fasta.write_text("AAAA\n>s1\nTTTT\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="sequence line appeared before header"):
+        sequence.read_fasta(str(fasta))
 
 
 def test_calc_identity_requires_equal_length():

@@ -1,4 +1,6 @@
 import os
+import itertools
+import re
 
 import numpy as np
 
@@ -9,7 +11,7 @@ def calc_omega_state(state_nuc, g):  # implement exclude stop codon freq
     num_node = state_nuc.shape[0]
     num_nuc_site = state_nuc.shape[1]
     if num_nuc_site % 3 != 0:
-        raise Exception('The sequence length is not multiple of 3. num_site =', num_nuc_site)
+        raise ValueError('The sequence length is not multiple of 3. num_site = {}'.format(num_nuc_site))
     num_cdn_site = num_nuc_site // 3
     state_columns = g['state_columns']
     state_cdn = np.zeros((num_node, num_cdn_site, len(state_columns)), dtype=state_nuc.dtype)
@@ -35,10 +37,29 @@ def _initialize_state_array(axis, dtype, mmap_name=None):
 
 
 def _normalize_branch_ids(branch_ids):
-    arr = np.asarray(branch_ids)
+    if branch_ids is None:
+        return np.array([], dtype=np.int64)
+    arr = np.asarray(branch_ids, dtype=object)
+    arr = np.atleast_1d(arr).reshape(-1)
     if arr.size == 0:
         return np.array([], dtype=np.int64)
-    return np.atleast_1d(arr).astype(np.int64, copy=False).reshape(-1)
+    normalized = []
+    for value in arr.tolist():
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('selected_branch_ids should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('selected_branch_ids should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('selected_branch_ids should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64)
 
 
 def cdn2pep_state(state_cdn, g, selected_branch_ids=None):
@@ -115,15 +136,17 @@ def write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
 
 
 def get_state_index(state, input_state, ambiguous_table):
+    state = str(state).upper()
     if ('-' in state) or (state == 'NNN') or (state == 'N'):
         return []
-    states = [state]
-    state_set = set(list(state))
-    key_set = set(ambiguous_table.keys())
-    if len(state_set.intersection(key_set)) > 0:
-        for amb in [a for a in ambiguous_table.keys() if a in state_set]:
-            vals = ambiguous_table[amb]
-            states = [s.replace(amb, val) for s in states for val in vals]
+    state_options = []
+    for state_char in state:
+        if state_char in ambiguous_table:
+            state_options.append([str(c).upper() for c in ambiguous_table[state_char]])
+        else:
+            state_options.append([state_char])
+    states = [''.join(chars) for chars in itertools.product(*state_options)]
+    states = list(dict.fromkeys(states))
     state_index0 = [np.where(input_state == s)[0] for s in states]
     state_index0 = [s for s in state_index0 if s.shape[0] != 0]
     if len(state_index0) == 0:
@@ -136,18 +159,31 @@ def read_fasta(path):
     seq_dict = dict()
     seq_name = None
     seq_parts = list()
+    seen_names = set()
     with open(path, mode='r') as f:
-        for line in f:
+        for line_no, line in enumerate(f, start=1):
             line = line.rstrip('\n')
             if line.startswith('>'):
                 if seq_name is not None:
                     seq_dict[seq_name] = ''.join(seq_parts)
-                seq_name = line[1:]
+                seq_name = line[1:].strip()
+                if seq_name == '':
+                    txt = 'Invalid FASTA header in {} at line {}: sequence name is empty.'
+                    raise ValueError(txt.format(path, line_no))
+                if seq_name in seen_names:
+                    txt = 'Duplicate FASTA header "{}" found in {} at line {}.'
+                    raise ValueError(txt.format(seq_name, path, line_no))
+                seen_names.add(seq_name)
                 seq_parts = list()
                 continue
             if seq_name is None:
+                if line.strip() == '':
+                    continue
+                txt = 'Invalid FASTA format in {} at line {}: sequence line appeared before header.'
+                raise ValueError(txt.format(path, line_no))
+            if line.strip() == '':
                 continue
-            seq_parts.append(line)
+            seq_parts.append(line.strip())
     if seq_name is not None:
         seq_dict[seq_name] = ''.join(seq_parts)
     return seq_dict

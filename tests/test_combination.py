@@ -1,9 +1,19 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from csubst import combination
 from csubst import tree
 from csubst import ete
+
+
+def test_normalize_node_ids_rejects_non_integer_like_values():
+    with pytest.raises(ValueError, match="integer-like"):
+        combination._normalize_node_ids([1.5])
+    with pytest.raises(ValueError, match="integer-like"):
+        combination._normalize_node_ids(["2.5"])
+    with pytest.raises(ValueError, match="integer-like"):
+        combination._normalize_node_ids([True])
 
 
 def test_get_node_combinations_target_dict_verbose_false():
@@ -31,6 +41,119 @@ def test_get_node_combinations_target_dict_verbose_false():
     assert "fg_dependent_id_combinations" in out_g
     assert id_combinations.shape == (1, 2)
     assert set(id_combinations[0].tolist()) == set(leaf_ids)
+
+
+def test_get_node_combinations_target_dict_rejects_non_integer_2d_target_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1,C:1)R;", format=1))
+    non_root_ids = [ete.get_prop(n, "numerical_label") for n in tr.traverse() if not ete.is_root(n)]
+    g = {
+        "tree": tr,
+        "dep_ids": [np.array([bid], dtype=np.int64) for bid in non_root_ids],
+        "fg_dep_ids": {"traitA": []},
+        "fg_df": pd.DataFrame({"name": ["A", "B", "C"], "traitA": [1, 1, 1]}),
+        "threads": 1,
+        "exhaustive_until": 1,
+    }
+    target_id_dict = {
+        "traitA": np.array(
+            [
+                [non_root_ids[0]],
+                [float(non_root_ids[1]) + 0.5],
+            ],
+            dtype=float,
+        )
+    }
+    with pytest.raises(ValueError, match="integer-like"):
+        combination.get_node_combinations(
+            g=g,
+            target_id_dict=target_id_dict,
+            arity=2,
+            check_attr="name",
+            verbose=False,
+        )
+
+
+def test_get_node_combinations_cb_passed_rejects_non_integer_branch_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1,C:1,D:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    g = {
+        "tree": tr,
+        "dep_ids": [np.array([labels["A"]], dtype=np.int64)],
+        "fg_dep_ids": {"traitA": []},
+        "fg_df": pd.DataFrame({"name": ["A", "B", "C", "D"], "traitA": [1, 1, 1, 1]}),
+        "threads": 1,
+        "exhaustive_until": 2,
+    }
+    cb_passed = pd.DataFrame(
+        {
+            "branch_id_1": [labels["A"], labels["A"]],
+            "branch_id_2": [labels["B"], float(labels["C"]) + 0.5],
+            "is_fg_traitA": ["Y", "Y"],
+            "is_mf_traitA": ["N", "N"],
+            "is_mg_traitA": ["N", "N"],
+        }
+    )
+    with pytest.raises(ValueError, match="integer-like"):
+        combination.get_node_combinations(
+            g=g,
+            cb_passed=cb_passed,
+            cb_all=False,
+            arity=2,
+            check_attr="name",
+            verbose=False,
+        )
+
+
+def test_get_node_combinations_requires_exactly_one_selector():
+    with pytest.raises(ValueError, match="Only one of target_id_dict, cb_passed, or exhaustive"):
+        combination.get_node_combinations(g={}, target_id_dict=None, cb_passed=None, exhaustive=False, verbose=False)
+
+
+def test_get_node_combinations_target_dict_accepts_scalar_dep_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    non_root_ids = [ete.get_prop(n, "numerical_label") for n in tr.traverse() if not ete.is_root(n)]
+    leaf_ids = [ete.get_prop(n, "numerical_label") for n in ete.iter_leaves(tr)]
+    g = {
+        "tree": tr,
+        "dep_ids": [np.int64(bid) for bid in non_root_ids],
+        "fg_dep_ids": {"traitA": []},
+        "fg_df": pd.DataFrame({"name": ["A", "B"], "traitA": [1, 1]}),
+        "threads": 1,
+        "exhaustive_until": 1,
+    }
+    target_id_dict = {"traitA": np.array(leaf_ids, dtype=np.int64)}
+    _, id_combinations = combination.get_node_combinations(
+        g=g,
+        target_id_dict=target_id_dict,
+        arity=2,
+        check_attr="name",
+        verbose=False,
+    )
+    assert id_combinations.shape == (1, 2)
+    assert set(id_combinations[0].tolist()) == set(leaf_ids)
+
+
+def test_get_node_combinations_target_dict_accepts_scalar_target_id():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    non_root_ids = [ete.get_prop(n, "numerical_label") for n in tr.traverse() if not ete.is_root(n)]
+    g = {
+        "tree": tr,
+        "dep_ids": [np.array([bid], dtype=np.int64) for bid in non_root_ids],
+        "fg_dep_ids": {"traitA": []},
+        "fg_df": pd.DataFrame({"name": ["A", "B"], "traitA": [1, 1]}),
+        "threads": 1,
+        "exhaustive_until": 1,
+    }
+    target_id_dict = {"traitA": np.int64(non_root_ids[0])}
+    _, id_combinations = combination.get_node_combinations(
+        g=g,
+        target_id_dict=target_id_dict,
+        arity=2,
+        check_attr="name",
+        verbose=False,
+    )
+    assert id_combinations.shape == (0, 2)
+    assert id_combinations.dtype == np.int64
 
 
 def test_get_node_combinations_target_dict_uses_threading_for_union(monkeypatch):
@@ -68,6 +191,37 @@ def test_get_node_combinations_target_dict_uses_threading_for_union(monkeypatch)
     node_union_calls = [backend for func_name, backend in calls if func_name == "node_union"]
     assert node_union_calls
     assert all(backend == "threading" for backend in node_union_calls)
+
+
+def test_get_node_combinations_handles_noncontiguous_branch_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    reassigned = {"A": 11, "B": 29, "C": 41, "X": 73, "R": 5}
+    for node in tr.traverse():
+        ete.set_prop(node, "numerical_label", reassigned[node.name])
+    non_root_ids = [
+        int(ete.get_prop(node, "numerical_label"))
+        for node in tr.traverse()
+        if not ete.is_root(node)
+    ]
+    g = {
+        "tree": tr,
+        "dep_ids": [np.array([bid], dtype=np.int64) for bid in non_root_ids],
+        "fg_dep_ids": {"traitA": []},
+        "fg_df": pd.DataFrame({"name": ["A", "B", "C"], "traitA": [1, 1, 1]}),
+        "threads": 1,
+        "exhaustive_until": 1,
+    }
+    target_id_dict = {"traitA": np.array([11, 29, 41], dtype=np.int64)}
+    _, id_combinations = combination.get_node_combinations(
+        g=g,
+        target_id_dict=target_id_dict,
+        arity=2,
+        check_attr="name",
+        verbose=False,
+    )
+    observed = {tuple(sorted(row.tolist())) for row in id_combinations}
+    expected = {(11, 29), (11, 41), (29, 41)}
+    assert observed == expected
 
 
 def test_get_node_combinations_cb_passed_uses_threading_for_union(monkeypatch):
@@ -135,6 +289,30 @@ def test_node_combination_subsamples_rifle_handles_dep_ids_list_without_crashing
     assert len({tuple(sorted(row.tolist())) for row in id_combinations}) == 2
 
 
+def test_node_combination_subsamples_rifle_accepts_scalar_dep_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1,C:1,D:1)R;", format=1))
+    sub_ids = [ete.get_prop(n, "numerical_label") for n in ete.iter_leaves(tr)]
+    g = {
+        "tree": tr,
+        "sub_branches": sub_ids,
+        "dep_ids": [np.int64(bid) for bid in sub_ids],
+    }
+    np.random.seed(0)
+    id_combinations = combination.node_combination_subsamples_rifle(g=g, arity=2, rep=2)
+    assert id_combinations.shape == (2, 2)
+    assert id_combinations.dtype == np.int64
+    assert set(id_combinations.ravel().tolist()).issubset(set(sub_ids))
+
+
+def test_node_combination_subsamples_rifle_rejects_non_integer_sub_branches():
+    g = {
+        "sub_branches": [1.5, 2, 3],
+        "dep_ids": [np.array([1], dtype=np.int64), np.array([2], dtype=np.int64), np.array([3], dtype=np.int64)],
+    }
+    with pytest.raises(ValueError, match="integer-like"):
+        combination.node_combination_subsamples_rifle(g=g, arity=2, rep=2)
+
+
 def test_node_combination_subsamples_rifle_tolerates_initial_duplicate_trials(monkeypatch):
     g = {
         "sub_branches": [1, 2, 3],
@@ -167,6 +345,25 @@ def test_node_combination_subsamples_shotgun_returns_2d_empty_when_no_independen
 
     assert id_combinations.shape == (0, 2)
     assert id_combinations.dtype == np.int64
+
+
+def test_node_combination_subsamples_shotgun_handles_noncontiguous_branch_ids():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    reassigned = {"A": 11, "B": 29, "C": 41, "X": 73, "R": 5}
+    for node in tr.traverse():
+        ete.set_prop(node, "numerical_label", reassigned[node.name])
+    sub_ids = [11, 29, 41, 73]
+    g = {
+        "tree": tr,
+        "sub_branches": sub_ids,
+        "dep_ids": [np.array([bid], dtype=np.int64) for bid in sub_ids],
+    }
+    np.random.seed(0)
+    id_combinations = combination.node_combination_subsamples_shotgun(g=g, arity=2, rep=5)
+    assert id_combinations.shape == (5, 2)
+    assert id_combinations.dtype == np.int64
+    assert set(id_combinations.ravel().tolist()).issubset(set(sub_ids))
+    assert len({tuple(sorted(row.tolist())) for row in id_combinations}) == 5
 
 
 def test_get_node_combinations_cb_passed_multi_trait_does_not_overprune_between_traits():

@@ -4,6 +4,20 @@ import os
 import re
 
 
+def _parse_bool_like(value, param_name):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ["1", "true", "yes", "y", "on"]:
+            return True
+        if normalized in ["0", "false", "no", "n", "off"]:
+            return False
+        txt = "{} should be boolean-like (yes/no, true/false, 1/0)."
+        raise ValueError(txt.format(param_name))
+    return bool(value)
+
+
 def _http_get_json(url, timeout=30):
     import requests
 
@@ -20,7 +34,13 @@ def _normalize_feature_types(feature_types):
         if (value == "") or (value.lower() in ["all", "*"]):
             return None
         feature_types = [ft.strip() for ft in value.split(",")]
-    out = [ft for ft in feature_types if ft != ""]
+    out = []
+    for ft in feature_types:
+        if ft is None:
+            continue
+        ft_txt = str(ft).strip()
+        if ft_txt != "":
+            out.append(ft_txt)
     if len(out) == 0:
         return None
     return out
@@ -97,8 +117,10 @@ def get_uniprot_features(accession):
         return []
     features = []
     for feature in uni.get("features", []):
-        feature_type = feature.get("type", "")
-        desc = feature.get("description", "")
+        feature_type = str(feature.get("type", "") or "").strip()
+        if feature_type == "":
+            continue
+        desc = str(feature.get("description", "") or "").strip()
         location = feature.get("location", {})
         start = location.get("start", {}).get("value")
         end = location.get("end", {}).get("value")
@@ -127,7 +149,12 @@ def _filter_features(features, feature_types):
     if feature_types is None:
         return features
     allowed = set([ft.lower() for ft in feature_types])
-    return [f for f in features if f["type"].lower() in allowed]
+    out = []
+    for feature in features:
+        feature_type = str(feature.get("type", "") or "").strip().lower()
+        if feature_type in allowed:
+            out.append(feature)
+    return out
 
 
 def _get_mapped_sites(df, col_site):
@@ -143,10 +170,24 @@ def _get_mapped_sites(df, col_site):
 def _parse_positive_site(value):
     if pd.isna(value):
         return None
-    try:
-        site = int(value)
-    except (TypeError, ValueError):
+    if isinstance(value, bool):
         return None
+    if isinstance(value, (int,)):
+        site = int(value)
+    elif isinstance(value, float):
+        if (not pd.notna(value)) or (not float(value).is_integer()):
+            return None
+        site = int(value)
+    else:
+        value_txt = str(value).strip()
+        if value_txt == "":
+            return None
+        if not bool(re.fullmatch(r"[+-]?[0-9]+(?:\.0+)?", value_txt)):
+            return None
+        try:
+            site = int(float(value_txt))
+        except (TypeError, ValueError):
+            return None
     if site <= 0:
         return None
     return site
@@ -180,7 +221,10 @@ def add_uniprot_site_annotations(df, g):
     if "_uniprot_feature_cache" not in g:
         g["_uniprot_feature_cache"] = {}
     feature_types = g.get("uniprot_feature_types", None)
-    include_redundant = bool(g.get("uniprot_include_redundant", False))
+    include_redundant = _parse_bool_like(
+        value=g.get("uniprot_include_redundant", False),
+        param_name="uniprot_include_redundant",
+    )
     for seq_col in seq_cols:
         seq_name = seq_col.replace("codon_site_pdb_", "")
         col_site = "codon_site_" + seq_name
@@ -208,10 +252,27 @@ def add_uniprot_site_annotations(df, g):
                 )
         feature_map = {}
         for feature in features:
-            for pos in range(feature["start"], feature["end"] + 1):
+            feature_type = str(feature.get("type", "") or "").strip()
+            if feature_type == "":
+                continue
+            desc = str(feature.get("description", "") or "").strip()
+            try:
+                start = int(feature.get("start"))
+                end = int(feature.get("end"))
+            except (TypeError, ValueError):
+                continue
+            if (start <= 0) or (end <= 0) or (end < start):
+                continue
+            normalized_feature = {
+                "type": feature_type,
+                "description": desc,
+                "start": start,
+                "end": end,
+            }
+            for pos in range(start, end + 1):
                 if pos not in feature_map:
                     feature_map[pos] = []
-                feature_map[pos].append(feature)
+                feature_map[pos].append(normalized_feature)
 
         col_acc = "uniprot_acc_" + seq_name
         col_count = "uniprot_feature_count_" + seq_name

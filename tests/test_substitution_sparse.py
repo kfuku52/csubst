@@ -195,17 +195,42 @@ def test_sparse_cb_summary_arrays_include_spe2spe_channel():
 
 
 def test_sparse_cb_summary_arrays_cython_accumulator_matches_python_fallback(monkeypatch):
-    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "accumulate_sparse_summary_block_double")):
+    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "accumulate_sparse_summary_block_csr_double")):
         pytest.skip("Cython sparse-summary accumulator is unavailable")
     dense = _toy_reducer_tensor()
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
     selected = ["any2any", "spe2any", "any2spe", "spe2spe"]
 
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_summary_csr_accumulator", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_cython_sparse_summary_accumulator", lambda *args, **kwargs: False)
     expected = substitution._get_sparse_cb_summary_arrays(sparse_tensor, selected)
     substitution._clear_sparse_cb_summary_arrays(sparse_tensor, selected)
 
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_summary_csr_accumulator", lambda *args, **kwargs: True)
     monkeypatch.setattr(substitution, "_can_use_cython_sparse_summary_accumulator", lambda *args, **kwargs: True)
+    observed = substitution._get_sparse_cb_summary_arrays(sparse_tensor, selected)
+
+    for exp_arr, obs_arr in zip(expected, observed):
+        if exp_arr is None:
+            assert obs_arr is None
+            continue
+        np.testing.assert_allclose(obs_arr, exp_arr, atol=1e-12)
+
+
+def test_sparse_cb_summary_arrays_csr_cython_accumulator_matches_existing_cython_path(monkeypatch):
+    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "accumulate_sparse_summary_block_csr_double")):
+        pytest.skip("Cython sparse-summary CSR accumulator is unavailable")
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    selected = ["any2any", "spe2any", "any2spe", "spe2spe"]
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_summary_csr_accumulator", lambda *args, **kwargs: False)
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_summary_accumulator", lambda *args, **kwargs: True)
+    expected = substitution._get_sparse_cb_summary_arrays(sparse_tensor, selected)
+    substitution._clear_sparse_cb_summary_arrays(sparse_tensor, selected)
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_summary_csr_accumulator", lambda *args, **kwargs: True)
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_summary_accumulator", lambda *args, **kwargs: False)
     observed = substitution._get_sparse_cb_summary_arrays(sparse_tensor, selected)
 
     for exp_arr, obs_arr in zip(expected, observed):

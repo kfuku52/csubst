@@ -3,12 +3,76 @@ import pandas as pd
 
 import itertools
 import os
+import re
 import sys
 import time
 
 from csubst import parallel
 from csubst import combination_cy
 from csubst import ete
+
+
+def _normalize_node_ids(node_ids):
+    if node_ids is None:
+        return np.array([], dtype=np.int64)
+    values = np.asarray(node_ids)
+    if values.ndim == 0:
+        scalar = values.item()
+        if isinstance(scalar, (list, tuple, set, np.ndarray)):
+            values = np.asarray(list(scalar))
+    values = np.atleast_1d(values).reshape(-1)
+    if values.size == 0:
+        return np.array([], dtype=np.int64)
+    normalized = []
+    for value in values.tolist():
+        if isinstance(value, bool):
+            raise ValueError('Dependency node IDs should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('Dependency node IDs should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('Dependency node IDs should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64)
+
+
+def _build_node_id_to_row(node_ids):
+    normalized_ids = _normalize_node_ids(node_ids)
+    unique_ids = np.unique(normalized_ids)
+    if unique_ids.shape[0] != normalized_ids.shape[0]:
+        raise ValueError('Node IDs should be unique.')
+    return normalized_ids, {int(node_id): i for i, node_id in enumerate(normalized_ids.tolist())}
+
+
+def _map_node_ids_to_rows(node_ids, id_to_row, context):
+    mapped = []
+    missing = []
+    for node_id in _normalize_node_ids(node_ids).tolist():
+        row = id_to_row.get(int(node_id), None)
+        if row is None:
+            missing.append(int(node_id))
+            continue
+        mapped.append(int(row))
+    if len(missing) > 0:
+        missing_txt = ', '.join([str(v) for v in sorted(set(missing))])
+        txt = '{} contain node IDs that are not present in the tree: {}'
+        raise ValueError(txt.format(context, missing_txt))
+    return np.array(mapped, dtype=np.int64)
+
+
+def _map_row_combinations_to_node_ids(row_combinations, node_ids):
+    row_combinations = np.asarray(row_combinations, dtype=np.int64)
+    if row_combinations.size == 0:
+        arity = row_combinations.shape[1] if row_combinations.ndim == 2 else 0
+        return np.zeros(shape=(0, arity), dtype=np.int64)
+    return node_ids[row_combinations]
+
 
 def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
     arity = target_nodes.shape[1] + 1
@@ -47,10 +111,11 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
 def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=False, cb_all=False, arity=2,
                           check_attr=None, verbose=True):
     if sum([target_id_dict is not None, cb_passed is not None, exhaustive])!=1:
-        raise Exception('Only one of target_id_dict, cb_passed, or exhaustive must be set.')
+        raise ValueError('Only one of target_id_dict, cb_passed, or exhaustive must be set.')
     g['fg_dependent_id_combinations'] = dict()
     tree = g['tree']
     all_nodes = [node for node in tree.traverse() if not ete.is_root(node)]
+    all_node_ids, node_id_to_row = _build_node_id_to_row([ete.get_prop(node, "numerical_label") for node in all_nodes])
     if verbose:
         print("Number of all branches: {:,}".format(len(all_nodes)), flush=True)
     if exhaustive:
@@ -67,9 +132,15 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
         node_combination_dict = dict()
         is_all_trait_no_branch_combination = True
         for trait_name in trait_names:
-            if (target_id_dict[trait_name].shape.__len__()==1):
-                target_id_dict[trait_name] = np.expand_dims(target_id_dict[trait_name], axis=1)
-            index_combinations = list(itertools.combinations(np.arange(target_id_dict[trait_name].shape[0]), 2))
+            trait_target_nodes = np.asarray(target_id_dict[trait_name])
+            if trait_target_nodes.ndim <= 1:
+                trait_target_nodes = np.expand_dims(_normalize_node_ids(trait_target_nodes), axis=1)
+            elif trait_target_nodes.ndim == 2:
+                original_shape = trait_target_nodes.shape
+                trait_target_nodes = _normalize_node_ids(trait_target_nodes.reshape(-1)).reshape(original_shape)
+            else:
+                raise ValueError('target_id_dict values should be 1D or 2D arrays.')
+            index_combinations = list(itertools.combinations(np.arange(trait_target_nodes.shape[0]), 2))
             if len(index_combinations) > 0:
                 is_all_trait_no_branch_combination = False
                 if verbose:
@@ -86,13 +157,13 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             df_mmap = np.memmap(mmap_out, dtype=np.int32, shape=axis, mode='w+')
             n_jobs = parallel.resolve_n_jobs(num_items=len(index_combinations), threads=g['threads'])
             if n_jobs == 1:
-                node_union(index_combinations, target_id_dict[trait_name], df_mmap, 0)
+                node_union(index_combinations, trait_target_nodes, df_mmap, 0)
             else:
                 chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
                 chunks, starts = parallel.get_chunks(index_combinations, n_jobs, chunk_factor=chunk_factor)
                 # node_union writes into a shared memmap; threads reliably share that memory map.
                 backend = 'threading'
-                tasks = [(ids, target_id_dict[trait_name], df_mmap, ms) for ids, ms in zip(chunks, starts)]
+                tasks = [(ids, trait_target_nodes, df_mmap, ms) for ids, ms in zip(chunks, starts)]
                 parallel.run_starmap(
                     func=node_union,
                     args_iterable=tasks,
@@ -126,7 +197,11 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 is_trait |= (cb_passed.loc[:,'is_fg_'+trait_name]=='Y')
                 is_trait |= (cb_passed.loc[:,'is_mf_'+trait_name]=='Y')
                 is_trait |= (cb_passed.loc[:,'is_mg_'+trait_name]=='Y')
-            bid_trait = cb_passed.loc[is_trait,bid_cols].values
+            bid_trait = cb_passed.loc[is_trait,bid_cols].to_numpy(copy=False)
+            if bid_trait.size > 0:
+                bid_trait = _normalize_node_ids(bid_trait.reshape(-1)).reshape(bid_trait.shape)
+            else:
+                bid_trait = np.zeros(shape=(0, len(bid_cols)), dtype=np.int64)
             index_combinations = list(itertools.combinations(np.arange(bid_trait.shape[0]), 2))
             if len(index_combinations) > 0:
                 is_all_trait_no_branch_combination = False
@@ -171,10 +246,22 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
         print("Number of all branch combinations before independency check: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = np.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=bool)
     for i in np.arange(node_combinations.shape[0]):
-        nc_matrix[node_combinations[i,:],i] = True
-    is_dependent_col = False
+        row_indices = _map_node_ids_to_rows(
+            node_ids=node_combinations[i, :],
+            id_to_row=node_id_to_row,
+            context='Node combinations',
+        )
+        nc_matrix[row_indices, i] = True
+    is_dependent_col = np.zeros(shape=(nc_matrix.shape[1],), dtype=bool)
     for dep_id in g['dep_ids']:
-        is_dependent_col = (is_dependent_col)|(nc_matrix[dep_id,:].sum(axis=0)>1)
+        dep_indices = _map_node_ids_to_rows(
+            node_ids=dep_id,
+            id_to_row=node_id_to_row,
+            context='Dependency groups',
+        )
+        if dep_indices.shape[0] == 0:
+            continue
+        is_dependent_col |= (nc_matrix[dep_indices, :].sum(axis=0) > 1)
     if verbose:
         print('Number of non-independent branch combinations to be removed: {:,}'.format(is_dependent_col.sum()), flush=True)
     nc_matrix = nc_matrix[:,~is_dependent_col]
@@ -184,23 +271,42 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     for trait_name in trait_names:
         is_fg_dependent_col = np.zeros(shape=(nc_matrix.shape[1],), dtype=bool)
         for fg_dep_id in g['fg_dep_ids'][trait_name]:
-            is_fg_dependent_col |= (nc_matrix[fg_dep_id, :].sum(axis=0) > 1)
+            dep_indices = _map_node_ids_to_rows(
+                node_ids=fg_dep_id,
+                id_to_row=node_id_to_row,
+                context='Foreground dependency groups',
+            )
+            if dep_indices.shape[0] == 0:
+                continue
+            is_fg_dependent_col |= (nc_matrix[dep_indices, :].sum(axis=0) > 1)
         if (g['exhaustive_until']>=arity):
             if verbose:
                 txt = 'Number of non-independent foreground branch combinations to be non-foreground-marked for {}: {:,} / {:,}'
                 print(txt.format(trait_name, is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
             fg_dep_nc_matrix = np.copy(nc_matrix)
             fg_dep_nc_matrix[:,~is_fg_dependent_col] = False
-            g['fg_dependent_id_combinations'][trait_name] = nc_matrix2id_combinations(fg_dep_nc_matrix, arity, g['threads'])
+            fg_dep_rows = nc_matrix2id_combinations(fg_dep_nc_matrix, arity, g['threads'])
+            g['fg_dependent_id_combinations'][trait_name] = _map_row_combinations_to_node_ids(
+                row_combinations=fg_dep_rows,
+                node_ids=all_node_ids,
+            )
             if trait_name == trait_names[0]:
-                id_combinations = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
+                id_rows = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
+                id_combinations = _map_row_combinations_to_node_ids(
+                    row_combinations=id_rows,
+                    node_ids=all_node_ids,
+                )
         else:
             if verbose and (is_fg_dependent_col.sum() > 0):
                 txt = 'Removing {:,} (out of {:,}) non-independent foreground branch combinations for {}.'
                 print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0], trait_name), flush=True)
             trait_nc_matrix = nc_matrix[:,~is_fg_dependent_col]
             g['fg_dependent_id_combinations'][trait_name] = np.array([])
-            trait_id_combinations = nc_matrix2id_combinations(trait_nc_matrix, arity, g['threads'])
+            trait_rows = nc_matrix2id_combinations(trait_nc_matrix, arity, g['threads'])
+            trait_id_combinations = _map_row_combinations_to_node_ids(
+                row_combinations=trait_rows,
+                node_ids=all_node_ids,
+            )
             id_combinations = np.unique(np.concatenate((id_combinations, trait_id_combinations), axis=0), axis=0)
     if verbose:
         print('Time elapsed for generating branch combinations: {:,} sec'.format(int(time.time() - start)))
@@ -208,13 +314,15 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     return g,id_combinations
 
 def node_combination_subsamples_rifle(g, arity, rep):
-    sub_ids = set(g['sub_branches'])
+    sub_ids = set(_normalize_node_ids(g['sub_branches']).tolist())
     if (rep <= 0) or (len(sub_ids) < arity):
         return np.zeros(shape=(0, arity), dtype=np.int64)
 
     dep_lookup = dict()
     for dep_group in g['dep_ids']:
-        dep_group_set = set([int(x) for x in np.asarray(dep_group).tolist()])
+        dep_group_set = set([int(x) for x in _normalize_node_ids(dep_group).tolist()])
+        if len(dep_group_set) == 0:
+            continue
         for node_id in dep_group_set:
             dep_lookup.setdefault(node_id, set()).update(dep_group_set)
 
@@ -248,8 +356,13 @@ def node_combination_subsamples_rifle(g, arity, rep):
     return np.asarray(selected_combinations, dtype=np.int64)
 
 def node_combination_subsamples_shotgun(g, arity, rep):
-    all_ids = [ ete.get_prop(n, "numerical_label") for n in g['tree'].traverse() ]
-    sub_ids = g['sub_branches']
+    all_ids, node_id_to_row = _build_node_id_to_row([ete.get_prop(n, "numerical_label") for n in g['tree'].traverse()])
+    sub_ids = _normalize_node_ids(g['sub_branches'])
+    sub_rows = _map_node_ids_to_rows(
+        node_ids=sub_ids,
+        id_to_row=node_id_to_row,
+        context='sub_branches',
+    )
     if (rep <= 0) or (len(sub_ids) < arity):
         return np.zeros(shape=(0, arity), dtype=np.int64)
     id_combinations = np.zeros(shape=(0,arity), dtype=np.int64)
@@ -258,17 +371,24 @@ def node_combination_subsamples_shotgun(g, arity, rep):
     while (id_combinations.shape[0] < rep)&(id_combinations_dif > rep/200):
         ss_matrix = np.zeros(shape=(len(all_ids), rep), dtype=bool, order='C')
         for i in np.arange(rep):
-            ind = np.random.choice(a=sub_ids, size=arity, replace=False)
+            ind = np.random.choice(a=sub_rows, size=arity, replace=False)
             ss_matrix[ind,i] = 1
-        is_dependent_col = False
+        is_dependent_col = np.zeros(shape=(ss_matrix.shape[1],), dtype=bool)
         for dep_id in g['dep_ids']:
-            is_dependent_col = (is_dependent_col)|(ss_matrix[dep_id,:].sum(axis=0)>1)
+            dep_indices = _map_node_ids_to_rows(
+                node_ids=dep_id,
+                id_to_row=node_id_to_row,
+                context='Dependency groups',
+            )
+            if dep_indices.shape[0] == 0:
+                continue
+            is_dependent_col |= (ss_matrix[dep_indices, :].sum(axis=0) > 1)
         ss_matrix = ss_matrix[:,~is_dependent_col]
         rows,cols = np.where(ss_matrix==1)
         unique_cols = np.unique(cols)
         tmp_id_combinations = np.zeros(shape=(unique_cols.shape[0], arity), dtype=np.int64)
-        for i in unique_cols:
-            tmp_id_combinations[i,:] = rows[cols==i]
+        for j, col in enumerate(unique_cols.tolist()):
+            tmp_id_combinations[j,:] = all_ids[rows[cols==col]]
         previous_num = id_combinations.shape[0]
         id_combinations = np.concatenate((id_combinations, tmp_id_combinations), axis=0)
         id_combinations.sort(axis=1)

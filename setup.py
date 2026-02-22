@@ -25,9 +25,12 @@ setup(
     author_email     = 'kfuku52@gmail.com',
     url              = 'https://github.com/kfuku52/csubst.git',
     keywords         = 'molecular convergence',
-    python_requires  = '>=3.1',
+    python_requires  = '>=3.10',
     packages         = find_packages(),
     install_requires = ['ete4>=4.3.0','numpy','scipy','pandas','cython','matplotlib'],
+    extras_require   = {
+                            'simulate': ['pyvolve',],
+    },
     scripts          = ['csubst/csubst',],
     setup_requires   = ['setuptools>=18.0','cython'],
     ext_modules      = cythonize(
