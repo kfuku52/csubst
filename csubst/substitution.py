@@ -12,6 +12,10 @@ from csubst import table
 from csubst import parallel
 from csubst import substitution_cy
 from csubst import substitution_sparse
+try:
+    from csubst import substitution_sparse_cy
+except Exception:  # pragma: no cover - Cython extension is optional
+    substitution_sparse_cy = None
 from csubst import ete
 from csubst import output_stat
 
@@ -591,7 +595,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
             if attr=='N':
                 state_order = g['amino_acid_orders']
             elif attr=='S':
-                raise Exception('This function is not supported for synonymous substitutions.')
+                raise ValueError('This function is not supported for synonymous substitutions.')
             for s in range(sub_tensor.shape[1]):
                 site_values = branch_tensor[s, :, :, :]
                 if not np.isfinite(site_values).any():
@@ -781,6 +785,24 @@ def _sparse_summary_fastpath_supports_spe2spe():
     return ('branch_group_pair_site_obj' in params) and ('calc_spe2spe' in params)
 
 
+def _can_use_cython_sparse_summary_accumulator(rows, cols, vals):
+    if substitution_sparse_cy is None:
+        return False
+    if not isinstance(rows, np.ndarray) or not isinstance(cols, np.ndarray) or not isinstance(vals, np.ndarray):
+        return False
+    if rows.dtype != np.int64:
+        return False
+    if cols.dtype != np.int64:
+        return False
+    if vals.dtype != np.float64:
+        return False
+    if rows.ndim != 1 or cols.ndim != 1 or vals.ndim != 1:
+        return False
+    if rows.shape[0] != cols.shape[0] or rows.shape[0] != vals.shape[0]:
+        return False
+    return hasattr(substitution_sparse_cy, 'accumulate_sparse_summary_block_double')
+
+
 def _get_sparse_cb_summary_arrays(sub_tensor, selected):
     need_any2any = ('any2any' in selected)
     need_spe2any = ('spe2any' in selected)
@@ -837,19 +859,41 @@ def _get_sparse_cb_summary_arrays(sub_tensor, selected):
         rows = np.asarray(coo.row, dtype=np.int64)
         cols = np.asarray(coo.col, dtype=np.int64)
         vals = np.asarray(coo.data, dtype=np.float64)
-        if need_any2any:
-            ind = ((rows * num_group) + int(sg)) * num_site + cols
-            np.add.at(total_flat, ind, vals)
-        if need_spe2any:
-            ind = (((rows * num_group) + int(sg)) * num_state_from + int(a)) * num_site + cols
-            np.add.at(from_flat, ind, vals)
-        if need_any2spe:
-            ind = (((rows * num_group) + int(sg)) * num_state_to + int(d)) * num_site + cols
-            np.add.at(to_flat, ind, vals)
-        if need_spe2spe:
-            pair_index = int(a) * num_state_to + int(d)
-            ind = (((rows * num_group) + int(sg)) * num_state_pair + pair_index) * num_site + cols
-            np.add.at(pair_flat, ind, vals)
+        if _can_use_cython_sparse_summary_accumulator(rows=rows, cols=cols, vals=vals):
+            substitution_sparse_cy.accumulate_sparse_summary_block_double(
+                rows=rows,
+                cols=cols,
+                vals=vals,
+                sg=int(sg),
+                a=int(a),
+                d=int(d),
+                num_group=num_group,
+                num_site=num_site,
+                num_state_from=num_state_from,
+                num_state_to=num_state_to,
+                total_flat_obj=total_flat,
+                from_flat_obj=from_flat,
+                to_flat_obj=to_flat,
+                pair_flat_obj=pair_flat,
+                need_any2any=need_any2any,
+                need_spe2any=need_spe2any,
+                need_any2spe=need_any2spe,
+                need_spe2spe=need_spe2spe,
+            )
+        else:
+            if need_any2any:
+                ind = ((rows * num_group) + int(sg)) * num_site + cols
+                np.add.at(total_flat, ind, vals)
+            if need_spe2any:
+                ind = (((rows * num_group) + int(sg)) * num_state_from + int(a)) * num_site + cols
+                np.add.at(from_flat, ind, vals)
+            if need_any2spe:
+                ind = (((rows * num_group) + int(sg)) * num_state_to + int(d)) * num_site + cols
+                np.add.at(to_flat, ind, vals)
+            if need_spe2spe:
+                pair_index = int(a) * num_state_to + int(d)
+                ind = (((rows * num_group) + int(sg)) * num_state_pair + pair_index) * num_site + cols
+                np.add.at(pair_flat, ind, vals)
     out = (branch_group_site_total, branch_group_from_site, branch_group_to_site, branch_group_pair_site)
     cache[key] = out
     setattr(sub_tensor, '_cb_sparse_summary_cache', cache)
