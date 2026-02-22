@@ -240,6 +240,42 @@ def test_sparse_csr_count_and_scatter_cython_kernels_match_python_fallback(monke
     np.testing.assert_allclose(observed_branch_tensor, expected_branch_tensor, atol=1e-12)
 
 
+def test_get_b_sitewise_cython_scan_matches_python_fallback(monkeypatch):
+    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "scan_sitewise_max_indices_double")):
+        pytest.skip("Cython sitewise max scan kernel is unavailable")
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    label_by_name = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name != ""}
+    num_node = max(label_by_name.values()) + 1
+    dense = np.zeros((num_node, 3, 1, 3, 3), dtype=np.float64)
+    dense[label_by_name["A"], 0, 0, 0, 1] = 0.6
+    dense[label_by_name["A"], 0, 0, 1, 2] = 0.6
+    dense[label_by_name["A"], 1, 0, 2, 1] = 0.4
+    dense[label_by_name["A"], 2, 0, 1, 0] = np.nan
+    dense[label_by_name["B"], 1, 0, 2, 0] = 0.8
+    dense[label_by_name["N1"], 2, 0, 1, 2] = 0.7
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    g = {
+        "tree": tr,
+        "num_node": num_node,
+        "amino_acid_orders": np.array(["A", "B", "C"], dtype=object),
+    }
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sitewise_max_scan", lambda *args, **kwargs: False)
+    expected = substitution.get_b(g=g, sub_tensor=sparse_tensor, attr="N", sitewise=True, min_sitewise_pp=0.5)
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sitewise_max_scan", lambda *args, **kwargs: True)
+    observed = substitution.get_b(g=g, sub_tensor=sparse_tensor, attr="N", sitewise=True, min_sitewise_pp=0.5)
+
+    assert observed.columns.tolist() == expected.columns.tolist()
+    assert observed.loc[:, "branch_name"].tolist() == expected.loc[:, "branch_name"].tolist()
+    assert observed.loc[:, "N_sitewise"].tolist() == expected.loc[:, "N_sitewise"].tolist()
+    np.testing.assert_allclose(
+        observed.loc[:, ["branch_id", "N_sub"]].to_numpy(dtype=float),
+        expected.loc[:, ["branch_id", "N_sub"]].to_numpy(dtype=float),
+        atol=1e-12,
+    )
+
+
 def test_sub_tensor2cb_sparse_cython_fastpath_matches_python_fallback(monkeypatch):
     if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
         pytest.skip("Cython sparse-summary reducer fast path is unavailable")

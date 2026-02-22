@@ -405,6 +405,18 @@ def _is_sparse_csr_cython_compatible(mat):
     return True
 
 
+def _can_use_cython_sitewise_max_scan(branch_tensor):
+    if substitution_sparse_cy is None:
+        return False
+    if not isinstance(branch_tensor, np.ndarray):
+        return False
+    if branch_tensor.dtype != np.float64:
+        return False
+    if branch_tensor.ndim != 4:
+        return False
+    return hasattr(substitution_sparse_cy, 'scan_sitewise_max_indices_double')
+
+
 def get_branch_sub_counts(sub_tensor):
     if _is_sparse_sub_tensor(sub_tensor):
         out = np.zeros(shape=(sub_tensor.num_branch,), dtype=np.float64)
@@ -676,20 +688,31 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
                 state_order = g['amino_acid_orders']
             elif attr=='S':
                 raise ValueError('This function is not supported for synonymous substitutions.')
-            for s in range(sub_tensor.shape[1]):
-                site_values = branch_tensor[s, :, :, :]
-                if not np.isfinite(site_values).any():
-                    continue
-                max_value = np.nanmax(site_values)
-                if (not np.isfinite(max_value)) or (max_value < min_sitewise_pp):
-                    continue
-                max_idx = np.where(site_values == max_value)
-                if (max_idx[1].shape[0] == 0) or (max_idx[2].shape[0] == 0):
-                    continue
-                ancestral_state = state_order[max_idx[1][0]]
-                derived_state = state_order[max_idx[2][0]]
-                sub_string = ancestral_state+str(s+1)+derived_state
-                sub_list.append(sub_string)
+            if _can_use_cython_sitewise_max_scan(branch_tensor=branch_tensor):
+                site_ids, anc_ids, der_ids = substitution_sparse_cy.scan_sitewise_max_indices_double(
+                    branch_tensor=branch_tensor,
+                    min_sitewise_pp=float(min_sitewise_pp),
+                )
+                for s, anc, der in zip(site_ids.tolist(), anc_ids.tolist(), der_ids.tolist()):
+                    ancestral_state = state_order[int(anc)]
+                    derived_state = state_order[int(der)]
+                    sub_string = ancestral_state + str(int(s) + 1) + derived_state
+                    sub_list.append(sub_string)
+            else:
+                for s in range(sub_tensor.shape[1]):
+                    site_values = branch_tensor[s, :, :, :]
+                    if not np.isfinite(site_values).any():
+                        continue
+                    max_value = np.nanmax(site_values)
+                    if (not np.isfinite(max_value)) or (max_value < min_sitewise_pp):
+                        continue
+                    max_idx = np.where(site_values == max_value)
+                    if (max_idx[1].shape[0] == 0) or (max_idx[2].shape[0] == 0):
+                        continue
+                    ancestral_state = state_order[max_idx[1][0]]
+                    derived_state = state_order[max_idx[2][0]]
+                    sub_string = ancestral_state+str(s+1)+derived_state
+                    sub_list.append(sub_string)
             df.at[i, attr + '_sitewise'] = ','.join(sub_list)
         i+=1
     df = df.dropna(axis=0)

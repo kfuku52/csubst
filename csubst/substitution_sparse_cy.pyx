@@ -1,7 +1,7 @@
 import numpy
 cimport numpy
 cimport cython
-from libc.math cimport fabs
+from libc.math cimport fabs, isfinite
 
 ctypedef fused index_t:
     numpy.int32_t
@@ -219,3 +219,64 @@ cpdef scatter_branch_row_to_tensor_double(
     for k in range(start, end):
         site = indices[k]
         out[site, sg, a, d] = data[k]
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef scan_sitewise_max_indices_double(
+    numpy.ndarray[numpy.float64_t, ndim=4] branch_tensor,
+    double min_sitewise_pp,
+):
+    cdef Py_ssize_t n_site = branch_tensor.shape[0]
+    cdef Py_ssize_t n_group = branch_tensor.shape[1]
+    cdef Py_ssize_t n_from = branch_tensor.shape[2]
+    cdef Py_ssize_t n_to = branch_tensor.shape[3]
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] site_idx
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] anc_idx
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] der_idx
+    cdef long[:] site_mv
+    cdef long[:] anc_mv
+    cdef long[:] der_mv
+    cdef double[:, :, :, :] tv = branch_tensor
+    cdef Py_ssize_t s, sg, a, d, out_count
+    cdef double v
+    cdef double max_val
+    cdef bint has_finite
+    cdef long best_a, best_d
+
+    site_idx = numpy.empty(n_site, dtype=numpy.int64)
+    anc_idx = numpy.empty(n_site, dtype=numpy.int64)
+    der_idx = numpy.empty(n_site, dtype=numpy.int64)
+    site_mv = site_idx
+    anc_mv = anc_idx
+    der_mv = der_idx
+    out_count = 0
+
+    for s in range(n_site):
+        has_finite = False
+        max_val = 0.0
+        best_a = -1
+        best_d = -1
+        for sg in range(n_group):
+            for a in range(n_from):
+                for d in range(n_to):
+                    v = tv[s, sg, a, d]
+                    if not isfinite(v):
+                        continue
+                    if (not has_finite) or (v > max_val):
+                        has_finite = True
+                        max_val = v
+                        best_a = <long>a
+                        best_d = <long>d
+        if has_finite and isfinite(max_val) and (max_val >= min_sitewise_pp):
+            site_mv[out_count] = <long>s
+            anc_mv[out_count] = best_a
+            der_mv[out_count] = best_d
+            out_count += 1
+
+    return (
+        numpy.asarray(site_idx[:out_count]),
+        numpy.asarray(anc_idx[:out_count]),
+        numpy.asarray(der_idx[:out_count]),
+    )
