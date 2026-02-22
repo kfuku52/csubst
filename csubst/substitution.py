@@ -319,6 +319,7 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
         raise ValueError('Unsupported mode for sparse substitution tensor: {}'.format(mode))
     sparse_entries = defaultdict(lambda: [list(), list(), list()])  # key -> [rows, cols, data]
     selected_branch_set = _get_selected_branch_set(g)
+    parent_state_mass = state_tensor_anc.sum(axis=(1, 2))
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
@@ -326,7 +327,7 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
         if (selected_branch_set is not None) and (child not in selected_branch_set):
             continue
         parent = ete.get_prop(node.up, "numerical_label")
-        if state_tensor_anc[parent, :, :].sum() < g['float_tol']:
+        if parent_state_mass[parent] < g['float_tol']:
             continue
         parent_matrix = state_tensor_anc[parent, :, :]
         child_matrix = state_tensor[child, :, :]
@@ -610,9 +611,10 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
     sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
     if not ml_anc:
         sub_tensor[:,:,:,:,:] = np.nan
+    parent_state_mass = state_tensor_anc.sum(axis=(1, 2))
+    diag_zero = None
     if mode=='asis':
-        num_state = state_tensor.shape[2]
-        diag_zero = np.diag([-1] * num_state) + 1
+        pass
     elif mode=='syn':
         syn_index_matrix, syn_group_sizes = _get_syn_group_index_cache(g)
     for node in g['tree'].traverse():
@@ -622,7 +624,7 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
         if (selected_branch_set is not None) and (child not in selected_branch_set):
             continue
         parent = ete.get_prop(node.up, "numerical_label")
-        if state_tensor_anc[parent, :, :].sum()<g['float_tol']:
+        if parent_state_mass[parent] < g['float_tol']:
             continue
         if mode=='asis':
             parent_matrix = state_tensor_anc[parent, :, :]
@@ -639,6 +641,9 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
                     out_branch_group=out_branch_group,
                 )
             else:
+                if diag_zero is None:
+                    num_state = state_tensor.shape[2]
+                    diag_zero = np.diag([-1] * num_state) + 1
                 sub_matrix = np.einsum("sa,sd,ad->sad", parent_matrix, child_matrix, diag_zero)
                 # s=site, a=ancestral, d=derived
                 out_branch_group[:, :, :] = sub_matrix
