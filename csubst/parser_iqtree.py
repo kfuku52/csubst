@@ -12,6 +12,10 @@ from csubst import genetic_code
 from csubst import sequence
 from csubst import tree
 from csubst import ete
+try:
+    from csubst import parser_iqtree_cy
+except Exception:  # pragma: no cover - Cython extension is optional
+    parser_iqtree_cy = None
 
 
 def _parse_version_tuple(version_text):
@@ -19,6 +23,63 @@ def _parse_version_tuple(version_text):
     if len(parts) == 0:
         return (0,)
     return tuple(int(p) for p in parts)
+
+
+def _encode_unambiguous_codon(codon):
+    if (not isinstance(codon, str)) or (len(codon) != 3):
+        return -1
+    nuc2code = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
+    try:
+        return (nuc2code[codon[0]] * 16) + (nuc2code[codon[1]] * 4) + nuc2code[codon[2]]
+    except KeyError:
+        return -1
+
+
+def _build_unambiguous_codon_lookup(codon_orders):
+    lookup = np.full(64, -1, dtype=np.int64)
+    for idx, codon in enumerate(np.asarray(codon_orders, dtype=object).tolist()):
+        code = _encode_unambiguous_codon(str(codon).upper())
+        if code >= 0:
+            lookup[code] = int(idx)
+    return lookup
+
+
+def _can_use_cython_leaf_codon_fill(state_matrix, codon_lookup):
+    if parser_iqtree_cy is None:
+        return False
+    if not isinstance(state_matrix, np.ndarray):
+        return False
+    if not isinstance(codon_lookup, np.ndarray):
+        return False
+    if state_matrix.dtype != np.float64:
+        return False
+    if codon_lookup.dtype != np.int64:
+        return False
+    if codon_lookup.shape != (64,):
+        return False
+    if state_matrix.ndim != 2:
+        return False
+    return hasattr(parser_iqtree_cy, 'fill_leaf_state_matrix_codon_unambiguous')
+
+
+def _fill_leaf_state_matrix_codon(seq, state_matrix, g, codon_lookup):
+    num_codon_site = state_matrix.shape[0]
+    unresolved_sites = np.arange(num_codon_site, dtype=np.int64)
+    if _can_use_cython_leaf_codon_fill(state_matrix=state_matrix, codon_lookup=codon_lookup):
+        unresolved_mask = parser_iqtree_cy.fill_leaf_state_matrix_codon_unambiguous(
+            seq.encode('ascii'),
+            state_matrix,
+            codon_lookup,
+        )
+        unresolved_sites = np.where(unresolved_mask != 0)[0]
+    for s in unresolved_sites:
+        codon = seq[(s * 3):((s + 1) * 3)]
+        codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
+        if len(codon_index) == 0:
+            continue
+        weight = 1 / len(codon_index)
+        for ci in codon_index:
+            state_matrix[s, ci] = weight
 
 
 def _is_version_at_least(version_text, minimum_text):
@@ -47,7 +108,7 @@ def _parse_iqtree_version_text(txt):
     return None, None
 
 def _read_text(path):
-    with open(path) as f:
+    with open(path, encoding='utf-8', errors='replace') as f:
         return f.read()
 
 def detect_iqtree_output_version(g):
@@ -223,6 +284,13 @@ def read_state(g):
     elif g['num_input_state'] > 20:
         g['input_data_type'] = 'cdn'
         g['codon_orders'] = state_table.columns[3:].str.replace('p_','').values
+        codon_orders_list = [str(c) for c in g['codon_orders'].tolist()]
+        if len(codon_orders_list) != len(set(codon_orders_list)):
+            duplicate_codons = sorted(list(set([c for c in codon_orders_list if codon_orders_list.count(c) > 1])))
+            duplicate_txt = ','.join(duplicate_codons[:10])
+            if len(duplicate_codons) > 10:
+                duplicate_txt += ',...'
+            raise ValueError('Duplicate codon state columns were found in .state file: {}'.format(duplicate_txt))
     else:
         msg = 'Unsupported number of input states: {}. Only codon input (>20 states) is supported.'
         raise AssertionError(msg.format(g['num_input_state']))
@@ -246,10 +314,29 @@ def read_state(g):
     return g
 
 def read_rate(g):
-    rate_sites = pd.read_csv(g['path_iqtree_rate'], sep='\t', header=0, comment='#')
-    rate_sites = rate_sites.loc[:,'C_Rate'].values
-    if rate_sites.shape[0]==0:
-        rate_sites = np.ones(g['num_input_site'])
+    rate_table = pd.read_csv(g['path_iqtree_rate'], sep='\t', header=0, comment='#')
+    rate_table.columns = [str(col).strip() for col in rate_table.columns]
+    if rate_table.shape[0] == 0:
+        return np.ones(g['num_input_site'])
+    column_by_lower = {str(col).lower(): str(col) for col in rate_table.columns}
+    if 'c_rate' in column_by_lower:
+        rate_col = column_by_lower['c_rate']
+    elif 'rate' in column_by_lower:
+        rate_col = column_by_lower['rate']
+        txt = 'Using "Rate" column from IQ-TREE rate file because "C_Rate" was not found.'
+        print(txt, flush=True)
+    else:
+        available_cols = ','.join([str(c) for c in rate_table.columns.tolist()])
+        txt = 'Unable to find site-rate column ("C_Rate" or "Rate") in {}. Columns: {}'
+        raise ValueError(txt.format(g['path_iqtree_rate'], available_cols))
+    rate_sites = pd.to_numeric(rate_table.loc[:, rate_col], errors='coerce').to_numpy(dtype=float)
+    if not np.isfinite(rate_sites).all():
+        txt = 'Non-finite site-rate value(s) were found in {} column of {}.'
+        raise ValueError(txt.format(rate_col, g['path_iqtree_rate']))
+    expected_sites = int(g['num_input_site'])
+    if rate_sites.shape[0] != expected_sites:
+        txt = 'The number of site-rate rows in {} ({}) did not match num_input_site ({}).'
+        raise ValueError(txt.format(g['path_iqtree_rate'], rate_sites.shape[0], expected_sites))
     return rate_sites
 
 def read_iqtree(g, eq=True):
@@ -322,10 +409,29 @@ def _initialize_state_tensor(axis, dtype, selective, mmap_name):
 
 
 def _normalize_selected_branch_ids(selected_branch_ids):
-    arr = np.asarray(selected_branch_ids)
+    if selected_branch_ids is None:
+        return np.array([], dtype=np.int64)
+    arr = np.asarray(selected_branch_ids, dtype=object)
+    arr = np.atleast_1d(arr).reshape(-1)
     if arr.size == 0:
         return np.array([], dtype=np.int64)
-    return np.atleast_1d(arr).astype(np.int64, copy=False).reshape(-1)
+    normalized = []
+    for value in arr.tolist():
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError('selected_branch_ids should be integer-like.')
+        if isinstance(value, (int, np.integer)):
+            normalized.append(int(value))
+            continue
+        if isinstance(value, (float, np.floating)):
+            if (not np.isfinite(value)) or (not float(value).is_integer()):
+                raise ValueError('selected_branch_ids should be integer-like.')
+            normalized.append(int(value))
+            continue
+        value_txt = str(value).strip()
+        if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
+            raise ValueError('selected_branch_ids should be integer-like.')
+        normalized.append(int(float(value_txt)))
+    return np.array(normalized, dtype=np.int64)
 
 
 def _get_selected_branch_context(tree, selected_branch_ids):
@@ -374,7 +480,12 @@ def _get_leaf_nonmissing_sites(g, required_leaf_ids):
             continue
         if (len(seq) % 3) != 0:
             raise AssertionError('Sequence length is not multiple of 3. Node name = ' + node.name)
-        for s in np.arange(g['num_input_site']):
+        num_codon_site = len(seq) // 3
+        if num_codon_site != g['num_input_site']:
+            msg = 'Codon site count did not match alignment size for leaf "{}". '
+            msg += 'Expected {}, observed {}.'
+            raise AssertionError(msg.format(node.name, g['num_input_site'], num_codon_site))
+        for s in np.arange(num_codon_site):
             codon = seq[(s*3):((s+1)*3)]
             codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
             leaf_nonmissing[nl, s] = (len(codon_index) > 0)
@@ -410,6 +521,61 @@ def mask_missing_sites(state_tensor, tree, selected_internal_ids=None, leaf_nonm
         is_nonzero = (group_nonzero.sum(axis=0) >= 2)
         state_tensor[nl,:,:] = np.einsum('ij,i->ij', state_tensor[nl,:,:], is_nonzero)
     return state_tensor
+
+
+def _validate_state_table_node_site_rows(state_table, expected_num_site):
+    if state_table.shape[0] == 0:
+        return state_table, np.array([], dtype=np.int64)
+    required_columns = ['Node', 'Site', 'State']
+    missing_columns = [col for col in required_columns if col not in state_table.columns]
+    if len(missing_columns) > 0:
+        txt = '.state file is missing required column(s): {}.'
+        raise ValueError(txt.format(','.join(missing_columns)))
+    site_values = pd.to_numeric(state_table.loc[:, 'Site'], errors='coerce')
+    site_values_arr = site_values.to_numpy(dtype=float)
+    if not np.isfinite(site_values_arr).all():
+        raise ValueError('Non-numeric Site value(s) were found in .state file.')
+    rounded_site_values = np.round(site_values_arr)
+    if not np.isclose(site_values_arr, rounded_site_values, rtol=0.0, atol=1e-12).all():
+        raise ValueError('Non-integer Site value(s) were found in .state file.')
+    state_table = state_table.copy()
+    state_table.loc[:, 'Site'] = rounded_site_values.astype(np.int64)
+    is_duplicate_node_site = state_table.loc[:, ['Node', 'Site']].duplicated(keep=False)
+    if is_duplicate_node_site.any():
+        duplicated = state_table.loc[is_duplicate_node_site, ['Node', 'Site']].drop_duplicates()
+        duplicated_examples = duplicated.head(10).to_dict(orient='records')
+        duplicated_txt = ', '.join(['{}:{}'.format(d['Node'], int(d['Site'])) for d in duplicated_examples])
+        if duplicated.shape[0] > 10:
+            duplicated_txt += ',...'
+        txt = 'Duplicate Node/Site row(s) were found in .state file: {}'
+        raise ValueError(txt.format(duplicated_txt))
+    expected_num_site = int(expected_num_site)
+    site_count_by_node = state_table.groupby('Node', sort=False)['Site'].nunique()
+    invalid_nodes = site_count_by_node[site_count_by_node != expected_num_site]
+    if invalid_nodes.shape[0] > 0:
+        invalid_examples = invalid_nodes.head(10)
+        invalid_txt = ', '.join(['{}:{}'.format(node, int(count)) for node, count in invalid_examples.items()])
+        if invalid_nodes.shape[0] > 10:
+            invalid_txt += ',...'
+        txt = 'Unexpected number of unique Site rows in .state file. '
+        txt += 'Expected {} sites per node; observed {}'
+        raise ValueError(txt.format(expected_num_site, invalid_txt))
+    site_labels = np.sort(state_table.loc[:, 'Site'].unique())
+    if site_labels.shape[0] != expected_num_site:
+        txt = 'Unexpected number of unique Site labels in .state file. '
+        txt += 'Expected {}, observed {}.'
+        raise ValueError(txt.format(expected_num_site, site_labels.shape[0]))
+    expected_site_set = frozenset(site_labels.tolist())
+    node_site_set = state_table.groupby('Node', sort=False)['Site'].apply(lambda s: frozenset(s.tolist()))
+    mismatched_nodes = node_site_set[node_site_set != expected_site_set]
+    if mismatched_nodes.shape[0] > 0:
+        mismatch_examples = mismatched_nodes.head(10)
+        mismatch_txt = ', '.join([str(node) for node in mismatch_examples.index.tolist()])
+        if mismatched_nodes.shape[0] > 10:
+            mismatch_txt += ',...'
+        txt = 'Inconsistent Site label sets were found among nodes in .state file: {}'
+        raise ValueError(txt.format(mismatch_txt))
+    return state_table, site_labels
 
 
 def get_state_tensor(g, selected_branch_ids=None):
@@ -448,13 +614,23 @@ def get_state_tensor(g, selected_branch_ids=None):
             state_table = state_table.iloc[0:0,:].copy()
         else:
             state_table = state_table.loc[state_table.loc[:, 'Node'].isin(target_internal_names), :].copy()
+    state_table, site_labels = _validate_state_table_node_site_rows(
+        state_table=state_table,
+        expected_num_site=g['num_input_site'],
+    )
     state_columns = state_table.columns[3:]
     if state_table.shape[0] > 0:
         is_missing = (state_table.loc[:,'State']=='???') | (state_table.loc[:,'State']=='?')
         state_table.loc[is_missing, state_columns] = 0
         state_table_by_node = dict()
+        site_index_by_label = {int(site_label): i for i, site_label in enumerate(site_labels.tolist())}
         for node_name, tmp in state_table.groupby('Node', sort=False):
-            state_table_by_node[node_name] = tmp.loc[:, state_columns].to_numpy(dtype=g['float_type'], copy=False)
+            state_matrix = np.zeros(shape=(g['num_input_site'], g['num_input_state']), dtype=g['float_type'])
+            row_values = tmp.loc[:, state_columns].to_numpy(dtype=g['float_type'], copy=False)
+            row_sites = tmp.loc[:, 'Site'].to_numpy(dtype=np.int64, copy=False)
+            row_indices = np.array([site_index_by_label[int(site)] for site in row_sites], dtype=np.int64)
+            state_matrix[row_indices, :] = row_values
+            state_table_by_node[node_name] = state_matrix
     else:
         state_table_by_node = dict()
     axis = [num_node, g['num_input_site'], g['num_input_state']]
@@ -464,6 +640,9 @@ def get_state_tensor(g, selected_branch_ids=None):
         selective=(selected_set is not None),
         mmap_name='tmp.csubst.state_tensor.mmap',
     )
+    codon_lookup = None
+    if g['input_data_type'] == 'cdn':
+        codon_lookup = _build_unambiguous_codon_lookup(g['codon_orders'])
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
@@ -479,11 +658,17 @@ def get_state_tensor(g, selected_branch_ids=None):
             if g['input_data_type']=='cdn':
                 if (len(seq) % 3) != 0:
                     raise AssertionError('Sequence length is not multiple of 3. Node name = ' + node.name)
-                for s in np.arange(int(len(seq)/3)):
-                    codon = seq[(s*3):((s+1)*3)]
-                    codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
-                    for ci in codon_index:
-                        state_matrix[s,ci] = 1/len(codon_index)
+                num_codon_site = len(seq) // 3
+                if num_codon_site != g['num_input_site']:
+                    msg = 'Codon site count did not match alignment size for leaf "{}". '
+                    msg += 'Expected {}, observed {}.'
+                    raise AssertionError(msg.format(node.name, g['num_input_site'], num_codon_site))
+                _fill_leaf_state_matrix_codon(
+                    seq=seq,
+                    state_matrix=state_matrix,
+                    g=g,
+                    codon_lookup=codon_lookup,
+                )
             elif g['input_data_type']=='nuc':
                 for s in np.arange(len(seq)):
                     nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)

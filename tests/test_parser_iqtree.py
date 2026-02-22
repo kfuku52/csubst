@@ -35,6 +35,15 @@ def test_parse_iqtree_version_text_for_v2_and_v3():
     assert parser_iqtree._parse_iqtree_version_text(v3_txt) == ("3.0.1", 3)
 
 
+def test_detect_iqtree_output_version_handles_non_utf8_iqtree_file(tmp_path):
+    iqtree_file = tmp_path / "sample.iqtree"
+    iqtree_file.write_bytes(b"\xff\xfeIQ-TREE multicore version 2.3.6 for Linux 64-bit\n")
+    g = {"path_iqtree_iqtree": str(iqtree_file), "path_iqtree_log": str(tmp_path / "missing.log")}
+    out = parser_iqtree.detect_iqtree_output_version(g)
+    assert out["iqtree_output_version"] == "2.3.6"
+    assert out["iqtree_output_version_major"] == 2
+
+
 def test_is_version_at_least_handles_numeric_versions():
     assert parser_iqtree._is_version_at_least("2.0.0", "2.0.0")
     assert parser_iqtree._is_version_at_least("2.3.6", "2.0.0")
@@ -177,6 +186,85 @@ def test_read_state_rejects_protein_input(tmp_path):
         parser_iqtree.read_state({"iqtree_state": str(state_file)})
 
 
+def test_read_state_rejects_duplicate_codon_columns(tmp_path):
+    state_file = tmp_path / "toy_dup.state.tsv"
+    codon_cols = ["p_C{:02d}".format(i) for i in range(20)] + ["p_AAA", "p_p_AAA"]
+    header = "Node\tSite\tState\t" + "\t".join(codon_cols) + "\n"
+    state_file.write_text(header, encoding="utf-8")
+    with pytest.raises(ValueError, match="Duplicate codon state columns"):
+        parser_iqtree.read_state({"iqtree_state": str(state_file)})
+
+
+def test_read_rate_falls_back_to_rate_column_when_c_rate_is_missing(tmp_path):
+    rate_file = tmp_path / "toy.rate"
+    rate_file.write_text(
+        "Site\tRate\n"
+        "1\t0.5\n"
+        "2\t1.5\n",
+        encoding="utf-8",
+    )
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 2}
+    out = parser_iqtree.read_rate(g)
+    np.testing.assert_allclose(out, [0.5, 1.5], atol=1e-12)
+
+
+def test_read_rate_accepts_whitespace_padded_column_name(tmp_path):
+    rate_file = tmp_path / "toy.rate"
+    rate_file.write_text(
+        "Site\t C_Rate \n"
+        "1\t0.25\n",
+        encoding="utf-8",
+    )
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 1}
+    out = parser_iqtree.read_rate(g)
+    np.testing.assert_allclose(out, [0.25], atol=1e-12)
+
+
+def test_read_rate_accepts_case_insensitive_c_rate_header(tmp_path):
+    rate_file = tmp_path / "toy.rate"
+    rate_file.write_text(
+        "Site\tc_rate\n"
+        "1\t0.75\n",
+        encoding="utf-8",
+    )
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 1}
+    out = parser_iqtree.read_rate(g)
+    np.testing.assert_allclose(out, [0.75], atol=1e-12)
+
+
+def test_read_rate_rejects_missing_rate_columns(tmp_path):
+    rate_file = tmp_path / "toy.rate"
+    rate_file.write_text(
+        "Site\tFoo\n"
+        "1\t0.5\n",
+        encoding="utf-8",
+    )
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 1}
+    with pytest.raises(ValueError, match="C_Rate"):
+        parser_iqtree.read_rate(g)
+
+
+def test_read_rate_uses_num_input_site_when_rate_file_has_no_rows(tmp_path):
+    rate_file = tmp_path / "toy.rate"
+    rate_file.write_text("Site\tC_Rate\n", encoding="utf-8")
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 3}
+    out = parser_iqtree.read_rate(g)
+    np.testing.assert_allclose(out, [1.0, 1.0, 1.0], atol=1e-12)
+
+
+def test_read_rate_rejects_site_count_mismatch(tmp_path):
+    rate_file = tmp_path / "toy.rate"
+    rate_file.write_text(
+        "Site\tC_Rate\n"
+        "1\t0.5\n"
+        "2\t1.5\n",
+        encoding="utf-8",
+    )
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 3}
+    with pytest.raises(ValueError, match="did not match num_input_site"):
+        parser_iqtree.read_rate(g)
+
+
 def _make_state_tensor_g(tmp_path, alignment_text):
     alignment_file = tmp_path / "toy.fa"
     state_file = tmp_path / "toy.state.tsv"
@@ -194,6 +282,41 @@ def _make_state_tensor_g(tmp_path, alignment_text):
         "float_type": np.float64,
         "ml_anc": False,
     }
+
+
+def test_build_unambiguous_codon_lookup_marks_known_codons():
+    lookup = parser_iqtree._build_unambiguous_codon_lookup(np.array(["AAA", "AAC", "AAG"], dtype=object))
+    assert lookup.shape == (64,)
+    assert lookup[parser_iqtree._encode_unambiguous_codon("AAA")] == 0
+    assert lookup[parser_iqtree._encode_unambiguous_codon("AAC")] == 1
+    assert lookup[parser_iqtree._encode_unambiguous_codon("AAG")] == 2
+
+
+def test_fill_leaf_state_matrix_codon_handles_ambiguous_fallback():
+    g = {"codon_orders": np.array(["AAA", "AAC", "AAG"], dtype=object)}
+    lookup = parser_iqtree._build_unambiguous_codon_lookup(g["codon_orders"])
+    state_matrix = np.zeros((3, 3), dtype=np.float64)
+    parser_iqtree._fill_leaf_state_matrix_codon(seq="AAAAARAAG", state_matrix=state_matrix, g=g, codon_lookup=lookup)
+    np.testing.assert_allclose(state_matrix[0, :], [1.0, 0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(state_matrix[1, :], [0.5, 0.0, 0.5], atol=1e-12)
+    np.testing.assert_allclose(state_matrix[2, :], [0.0, 0.0, 1.0], atol=1e-12)
+
+
+def test_fill_leaf_state_matrix_codon_cython_matches_python_fallback(monkeypatch):
+    if (parser_iqtree.parser_iqtree_cy is None) or (not hasattr(parser_iqtree.parser_iqtree_cy, "fill_leaf_state_matrix_codon_unambiguous")):
+        pytest.skip("Cython parser_iqtree fast path is unavailable")
+    g = {"codon_orders": np.array(["AAA", "AAC", "AAG"], dtype=object)}
+    lookup = parser_iqtree._build_unambiguous_codon_lookup(g["codon_orders"])
+    seq = "AAAAACNNN"
+
+    monkeypatch.setattr(parser_iqtree, "_can_use_cython_leaf_codon_fill", lambda *args, **kwargs: False)
+    expected = np.zeros((3, 3), dtype=np.float64)
+    parser_iqtree._fill_leaf_state_matrix_codon(seq=seq, state_matrix=expected, g=g, codon_lookup=lookup)
+
+    monkeypatch.setattr(parser_iqtree, "_can_use_cython_leaf_codon_fill", lambda *args, **kwargs: True)
+    observed = np.zeros((3, 3), dtype=np.float64)
+    parser_iqtree._fill_leaf_state_matrix_codon(seq=seq, state_matrix=observed, g=g, codon_lookup=lookup)
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
 
 
 def test_get_state_tensor_reads_leaf_sequences_via_ete_compat(tmp_path):
@@ -216,6 +339,49 @@ def test_get_state_tensor_raises_when_leaf_sequence_missing(tmp_path):
         alignment_text=">A\nAAAAAC\n",
     )
     with pytest.raises(AssertionError):
+        parser_iqtree.get_state_tensor(g)
+
+
+def test_get_state_tensor_rejects_leaf_sequence_length_mismatch(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAA\n",
+    )
+    with pytest.raises(AssertionError, match="Codon site count did not match alignment size"):
+        parser_iqtree.get_state_tensor(g)
+
+
+def test_get_state_tensor_rejects_duplicate_node_site_rows(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
+    )
+    state_file = tmp_path / "toy.state.tsv"
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "R\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "R\t1\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    g["path_iqtree_state"] = str(state_file)
+    with pytest.raises(ValueError, match="Duplicate Node/Site"):
+        parser_iqtree.get_state_tensor(g)
+
+
+def test_get_state_tensor_rejects_non_integer_site_values(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
+    )
+    state_file = tmp_path / "toy_noninteger.state.tsv"
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "R\t1.5\tAAA\t1.0\t0.0\t0.0\n"
+        "R\t2.0\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    g["path_iqtree_state"] = str(state_file)
+    with pytest.raises(ValueError, match="Non-integer Site"):
         parser_iqtree.get_state_tensor(g)
 
 
@@ -273,6 +439,74 @@ def test_get_state_tensor_selected_branch_ids_match_internal_masking_parity(tmp_
     assert selected[labels["C"], :, :].sum() == 0
 
 
+def test_get_state_tensor_selected_internal_rejects_required_leaf_length_mismatch(tmp_path):
+    alignment_file = tmp_path / "toy_internal_badlen.fa"
+    state_file = tmp_path / "toy_internal_badlen.state.tsv"
+    alignment_file.write_text(
+        ">A\nAAAAAC\n"
+        ">B\nAAA\n"
+        ">C\nAAAAAC\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "N1\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
+        "ml_anc": False,
+    }
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    with pytest.raises(AssertionError, match="Codon site count did not match alignment size"):
+        parser_iqtree.get_state_tensor(
+            g=g,
+            selected_branch_ids=np.array([labels["N1"]], dtype=np.int64),
+        )
+
+
+def test_get_state_tensor_maps_internal_rows_by_site_label_not_file_order(tmp_path):
+    alignment_file = tmp_path / "toy_siteorder.fa"
+    state_file = tmp_path / "toy_siteorder.state.tsv"
+    alignment_file.write_text(
+        ">A\nAAAAAC\n"
+        ">B\nAAAAAC\n"
+        ">C\nAAAAAC\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n"
+        "N1\t1\tAAG\t0.0\t0.0\t1.0\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
+        "ml_anc": False,
+    }
+    out = parser_iqtree.get_state_tensor(g)
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    np.testing.assert_allclose(out[labels["N1"], 0, :], [0.0, 0.0, 1.0], atol=1e-12)
+    np.testing.assert_allclose(out[labels["N1"], 1, :], [0.0, 1.0, 0.0], atol=1e-12)
+
+
 def test_get_selected_branch_context_accepts_scalar_selected_branch_id():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
@@ -290,6 +524,15 @@ def test_get_selected_branch_context_accepts_scalar_selected_branch_id():
         if ete.is_leaf(node)
     }
     assert required_leaf_ids == expected_leaf_ids
+
+
+def test_get_selected_branch_context_rejects_non_integer_selected_branch_id():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    with pytest.raises(ValueError, match="integer-like"):
+        parser_iqtree._get_selected_branch_context(
+            tree=tr,
+            selected_branch_ids=np.array([1.5]),
+        )
 
 
 def test_get_state_tensor_selected_branch_ids_ignore_unknown_ids_in_ml_mode(tmp_path):
