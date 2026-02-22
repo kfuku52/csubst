@@ -19,6 +19,10 @@ from csubst import substitution_sparse
 from csubst import table
 from csubst import ete
 from csubst import output_stat
+try:
+    from csubst import omega_cy
+except Exception:  # pragma: no cover - Cython extension is optional
+    omega_cy = None
 
 _UINT8_POPCOUNT = np.unpackbits(
     np.arange(256, dtype=np.uint8)[:, None],
@@ -40,6 +44,46 @@ def _resolve_requested_output_stats(g):
     if 'output_stat' in g.keys():
         return output_stat.parse_output_stats(g['output_stat'])
     return list(output_stat.ALL_OUTPUT_STATS)
+
+
+def _can_use_cython_expected_state(parent_state_block, transition_prob):
+    if omega_cy is None:
+        return False
+    if not isinstance(parent_state_block, np.ndarray):
+        return False
+    if not isinstance(transition_prob, np.ndarray):
+        return False
+    if parent_state_block.dtype != np.float64:
+        return False
+    if transition_prob.dtype != np.float64:
+        return False
+    if parent_state_block.ndim != 2:
+        return False
+    if transition_prob.ndim != 2:
+        return False
+    if transition_prob.shape[0] != transition_prob.shape[1]:
+        return False
+    if parent_state_block.shape[1] != transition_prob.shape[0]:
+        return False
+    # For larger state spaces, NumPy/BLAS matmul is typically faster.
+    if parent_state_block.shape[1] > 8:
+        return False
+    return True
+
+
+def _project_expected_state_block(parent_state_block, transition_prob, float_tol):
+    if _can_use_cython_expected_state(parent_state_block, transition_prob):
+        return omega_cy.project_expected_state_block_double(
+            parent_state_block=parent_state_block,
+            transition_prob=transition_prob,
+            float_tol=float(float_tol),
+        )
+    expected_state_block = parent_state_block @ transition_prob
+    expected_sum = expected_state_block.sum(axis=1)
+    is_over = (expected_sum - 1) > float_tol
+    if is_over.any():
+        expected_state_block[is_over, :] /= expected_sum[is_over][:, None]
+    return expected_state_block
 
 
 def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
@@ -124,6 +168,9 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
 
     num_branch = active_sub_branches.shape[0]
     num_site = p.shape[0]
+    num_positive_sites = int((p > 0).sum())
+    if num_positive_sites == 0:
+        return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
     num_packed_site = (num_site + 7) // 8
     packed_masks = np.zeros(shape=(num_branch, niter, num_packed_site), dtype=np.uint8)
     previous_branch_id_by_size = dict()
@@ -131,6 +178,10 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
         size = int(active_sub_branches[branch_id])
         if size == 0:
             continue
+        # Rounding from floating substitution counts can slightly exceed the
+        # number of positive-probability sites. Cap to valid bounds.
+        if size > num_positive_sites:
+            size = num_positive_sites
         if size in previous_branch_id_by_size:
             prev_branch_id = previous_branch_id_by_size[size]
             packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
@@ -236,6 +287,12 @@ def _calc_quantile_chunk_local(mode, cb_ids, sub_sg, sub_bg, quantile_niter, obs
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g=None):
     if g is None:
         raise ValueError('g is required.')
+    supported_modes = {'spe2spe', 'spe2any', 'any2spe', 'any2any'}
+    if mode not in supported_modes:
+        raise ValueError('Unsupported E-stat mode: {}'.format(mode))
+    supported_stats = {'mean', 'quantile'}
+    if stat not in supported_stats:
+        raise ValueError('Unsupported E-stat summary statistic: {}'.format(stat))
     if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
         sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor=sub_tensor, mode=mode)
     if mode=='spe2spe':
@@ -405,7 +462,14 @@ def get_exp_state(g, mode):
     elif mode=='pep':
         state = g['state_pep'].astype(g['float_type'])
         inst = g['instantaneous_aa_rate_matrix']
+    else:
+        raise ValueError('Unsupported expected-state mode: {}'.format(mode))
     stateE = np.zeros_like(state, dtype=g['float_type'])
+    rate_values = np.asarray(g['iqtree_rate_values'], dtype=g['float_type'])
+    if rate_values.ndim != 1:
+        rate_values = rate_values.reshape(-1)
+    unique_site_rates, inverse_rate_indices = np.unique(rate_values, return_inverse=True)
+    rate_site_indices = [np.where(inverse_rate_indices == i)[0] for i in range(unique_site_rates.shape[0])]
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
@@ -413,26 +477,31 @@ def get_exp_state(g, mode):
             branch_length = ete.get_prop(node, 'SNdist', 0)
         elif mode=='pep':
             branch_length = ete.get_prop(node, 'Ndist', 0)
+        else:
+            raise ValueError('Unsupported expected-state mode: {}'.format(mode))
         branch_length = max(branch_length, 0)
         if branch_length<g['float_tol']:
             continue # Skip if no substitution
         nl = ete.get_prop(node, "numerical_label")
         parent_nl = ete.get_prop(node.up, "numerical_label")
-        if parent_nl>stateE.shape[0]:
-            continue # Skip if parent is the root node
+        if (parent_nl < 0) or (parent_nl >= stateE.shape[0]):
+            continue
+        if (nl < 0) or (nl >= stateE.shape[0]):
+            continue
         inst_bl = inst * branch_length
-        for site_rate in np.unique(g['iqtree_rate_values']):
+        for site_rate, site_indices in zip(unique_site_rates, rate_site_indices):
+            if site_indices.shape[0] == 0:
+                continue
             inst_bl_site = inst_bl * site_rate
             # Confirmed this implementation (with expm) correctly replicated the example in this instruction (Huelsenbeck, 2012)
             # https://molevolworkshop.github.io/faculty/huelsenbeck/pdf/WoodsHoleHandout.pdf
             transition_prob = expm(inst_bl_site)
-            site_indices = np.where(g['iqtree_rate_values']==site_rate)[0]
-            for s in site_indices:
-                expected_transition_ad = np.einsum('a,ad->ad', state[parent_nl,s,:], transition_prob)
-                if expected_transition_ad.sum()-1>g['float_tol']:
-                    expected_transition_ad /= expected_transition_ad.sum()
-                expected_derived_state = expected_transition_ad.sum(axis=0)
-                stateE[nl,s,:] = expected_derived_state
+            parent_state_block = state[parent_nl, site_indices, :]
+            stateE[nl, site_indices, :] = _project_expected_state_block(
+                parent_state_block=parent_state_block,
+                transition_prob=transition_prob,
+                float_tol=g['float_tol'],
+            )
     max_stateE = stateE.sum(axis=(2)).max()
     if (max_stateE - 1) >= g['float_tol']:
         raise AssertionError('Total probability of expected states should not exceed 1. {}'.format(max_stateE))

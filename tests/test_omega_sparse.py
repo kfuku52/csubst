@@ -70,6 +70,34 @@ def test_calc_E_stat_requires_g():
         )
 
 
+def test_calc_E_stat_rejects_unknown_mode():
+    dense = _toy_sub_tensor()
+    g = _toy_g(dense)
+    with pytest.raises(ValueError, match="Unsupported E-stat mode"):
+        omega.calc_E_stat(
+            cb=_toy_cb(),
+            sub_tensor=dense,
+            mode="unknown",
+            stat="mean",
+            SN="N",
+            g=g,
+        )
+
+
+def test_calc_E_stat_rejects_unknown_summary_statistic():
+    dense = _toy_sub_tensor()
+    g = _toy_g(dense)
+    with pytest.raises(ValueError, match="Unsupported E-stat summary statistic"):
+        omega.calc_E_stat(
+            cb=_toy_cb(),
+            sub_tensor=dense,
+            mode="any2any",
+            stat="median",
+            SN="N",
+            g=g,
+        )
+
+
 def test_get_exp_state_uses_branch_distance_props():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
@@ -101,6 +129,98 @@ def test_get_exp_state_uses_branch_distance_props():
     assert cdn[labels["A"], 0, :].sum() > 0
     np.testing.assert_allclose(pep[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
     np.testing.assert_allclose(cdn[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
+
+
+def test_get_exp_state_rejects_unknown_mode():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_node = len(list(tr.traverse()))
+    state = np.zeros((num_node, 1, 2), dtype=np.float64)
+    g = {
+        "tree": tr,
+        "state_pep": state.copy(),
+        "state_cdn": state.copy(),
+        "instantaneous_aa_rate_matrix": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=np.float64),
+        "instantaneous_codon_rate_matrix": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=np.float64),
+        "iqtree_rate_values": np.array([1.0], dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+    }
+    with pytest.raises(ValueError, match="Unsupported expected-state mode"):
+        omega.get_exp_state(g=g, mode="unknown")
+
+
+def test_project_expected_state_block_matches_numpy_fallback(monkeypatch):
+    rng = np.random.default_rng(0)
+    parent = rng.random((7, 4), dtype=np.float64)
+    parent /= parent.sum(axis=1, keepdims=True)
+    trans = rng.random((4, 4), dtype=np.float64)
+    trans /= trans.sum(axis=1, keepdims=True)
+
+    out_default = omega._project_expected_state_block(
+        parent_state_block=parent,
+        transition_prob=trans,
+        float_tol=1e-12,
+    )
+    monkeypatch.setattr(omega, "_can_use_cython_expected_state", lambda *_args, **_kwargs: False)
+    out_numpy = omega._project_expected_state_block(
+        parent_state_block=parent,
+        transition_prob=trans,
+        float_tol=1e-12,
+    )
+    np.testing.assert_allclose(out_default, out_numpy, atol=1e-12)
+
+
+def test_can_use_cython_expected_state_rejects_large_state_space():
+    parent = np.full((2, 20), 1.0 / 20.0, dtype=np.float64)
+    trans = np.eye(20, dtype=np.float64)
+    assert omega._can_use_cython_expected_state(parent, trans) is False
+
+
+def test_get_exp_state_matches_numpy_fallback(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1):1,C:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    rng = np.random.default_rng(1)
+    state = rng.random((num_node, 6, 4), dtype=np.float64)
+    state /= state.sum(axis=2, keepdims=True)
+
+    g = {
+        "tree": tr,
+        "state_pep": state.copy(),
+        "state_cdn": state.copy(),
+        "instantaneous_aa_rate_matrix": np.array(
+            [
+                [-1.5, 0.5, 0.5, 0.5],
+                [0.2, -1.2, 0.6, 0.4],
+                [0.4, 0.3, -1.1, 0.4],
+                [0.3, 0.5, 0.2, -1.0],
+            ],
+            dtype=np.float64,
+        ),
+        "instantaneous_codon_rate_matrix": np.array(
+            [
+                [-1.5, 0.5, 0.5, 0.5],
+                [0.2, -1.2, 0.6, 0.4],
+                [0.4, 0.3, -1.1, 0.4],
+                [0.3, 0.5, 0.2, -1.0],
+            ],
+            dtype=np.float64,
+        ),
+        "iqtree_rate_values": np.array([0.5, 1.0, 1.0, 0.25, 0.5, 1.0], dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+    }
+
+    for node in tr.traverse():
+        if ete.is_root(node):
+            continue
+        ete.set_prop(node, "Ndist", 0.2)
+        ete.set_prop(node, "SNdist", 0.2)
+
+    out_default = omega.get_exp_state(g=g, mode="pep")
+    monkeypatch.setattr(omega, "_can_use_cython_expected_state", lambda *_args, **_kwargs: False)
+    out_numpy = omega.get_exp_state(g=g, mode="pep")
+    np.testing.assert_allclose(out_default, out_numpy, atol=1e-12)
 
 
 def test_calibrate_dsc_skips_substitution_class_without_finite_pairs():
