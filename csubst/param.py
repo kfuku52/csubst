@@ -12,6 +12,7 @@ except ImportError:  # pragma: no cover
 
 from csubst.__init__ import __version__
 from csubst import output_stat
+from csubst import table
 
 DEPENDENCY_DISTRIBUTIONS = (
     'ete4',
@@ -35,6 +36,12 @@ def _parse_bool_like(value, param_name):
         txt = '{} should be boolean-like (yes/no, true/false, 1/0).'
         raise ValueError(txt.format(param_name))
     return bool(value)
+
+
+def _require_finite_float(value, param_name):
+    if not np.isfinite(value):
+        raise ValueError('{} should be a finite number.'.format(param_name))
+    return value
 
 
 def _get_dependency_version(distribution_name):
@@ -95,6 +102,7 @@ def get_global_parameters(args):
         if (g['iqtree_iqtree']=='infer'):
             g['iqtree_iqtree'] = g['alignment_file']+'.iqtree'
     if 'float_type' in g.keys():
+        g['float_type'] = int(g['float_type'])
         if (g['float_type']==16):
             g['float_type'] = np.float16
             g['float_tol'] = 10**-1
@@ -104,6 +112,8 @@ def get_global_parameters(args):
         elif (g['float_type']==64):
             g['float_type'] = np.float64
             g['float_tol'] = 10**-9
+        else:
+            raise ValueError('--float_type should be one of 16, 32, 64.')
     if 'sub_tensor_backend' in g.keys():
         g['sub_tensor_backend'] = str(g['sub_tensor_backend']).lower()
     else:
@@ -111,7 +121,10 @@ def get_global_parameters(args):
     if g['sub_tensor_backend'] not in ['auto', 'dense', 'sparse']:
         raise ValueError('--sub_tensor_backend should be one of auto, dense, sparse.')
     if 'sub_tensor_sparse_density_cutoff' in g.keys():
-        g['sub_tensor_sparse_density_cutoff'] = float(g['sub_tensor_sparse_density_cutoff'])
+        g['sub_tensor_sparse_density_cutoff'] = _require_finite_float(
+            value=float(g['sub_tensor_sparse_density_cutoff']),
+            param_name='--sub_tensor_sparse_density_cutoff',
+        )
     else:
         g['sub_tensor_sparse_density_cutoff'] = 0.15
     if (g['sub_tensor_sparse_density_cutoff'] < 0) or (g['sub_tensor_sparse_density_cutoff'] > 1):
@@ -159,23 +172,38 @@ def get_global_parameters(args):
         if (g['num_simulated_site'] != -1) and (g['num_simulated_site'] < 1):
             raise ValueError('--num_simulated_site should be -1 or >= 1.')
     if 'percent_convergent_site' in g.keys():
-        g['percent_convergent_site'] = float(g['percent_convergent_site'])
+        g['percent_convergent_site'] = _require_finite_float(
+            value=float(g['percent_convergent_site']),
+            param_name='--percent_convergent_site',
+        )
         if (g['percent_convergent_site'] < 0) or (g['percent_convergent_site'] > 100):
             raise ValueError('--percent_convergent_site should be between 0 and 100.')
     if 'tree_scaling_factor' in g.keys():
-        g['tree_scaling_factor'] = float(g['tree_scaling_factor'])
+        g['tree_scaling_factor'] = _require_finite_float(
+            value=float(g['tree_scaling_factor']),
+            param_name='--tree_scaling_factor',
+        )
         if g['tree_scaling_factor'] < 0:
             raise ValueError('--tree_scaling_factor should be >= 0.')
     if 'foreground_scaling_factor' in g.keys():
-        g['foreground_scaling_factor'] = float(g['foreground_scaling_factor'])
+        g['foreground_scaling_factor'] = _require_finite_float(
+            value=float(g['foreground_scaling_factor']),
+            param_name='--foreground_scaling_factor',
+        )
         if g['foreground_scaling_factor'] < 0:
             raise ValueError('--foreground_scaling_factor should be >= 0.')
     if 'background_omega' in g.keys():
-        g['background_omega'] = float(g['background_omega'])
+        g['background_omega'] = _require_finite_float(
+            value=float(g['background_omega']),
+            param_name='--background_omega',
+        )
         if g['background_omega'] < 0:
             raise ValueError('--background_omega should be >= 0.')
     if 'foreground_omega' in g.keys():
-        g['foreground_omega'] = float(g['foreground_omega'])
+        g['foreground_omega'] = _require_finite_float(
+            value=float(g['foreground_omega']),
+            param_name='--foreground_omega',
+        )
         if g['foreground_omega'] < 0:
             raise ValueError('--foreground_omega should be >= 0.')
     if 'convergent_amino_acids' in g.keys():
@@ -198,39 +226,70 @@ def get_global_parameters(args):
                 raise ValueError('--convergent_amino_acids contains unsupported amino acids: {}.'.format(','.join(invalid_aas)))
         g['convergent_amino_acids'] = conv_aa
     if 'percent_biased_sub' in g.keys():
-        g['percent_biased_sub'] = float(g['percent_biased_sub'])
+        g['percent_biased_sub'] = _require_finite_float(
+            value=float(g['percent_biased_sub']),
+            param_name='--percent_biased_sub',
+        )
         if (g['percent_biased_sub'] < 0) or (g['percent_biased_sub'] >= 100):
             raise ValueError('--percent_biased_sub should be between 0 and <100.')
     if 'tree_site_plot_max_sites' in g.keys():
         g['tree_site_plot_max_sites'] = int(g['tree_site_plot_max_sites'])
         if g['tree_site_plot_max_sites'] < 1:
             raise ValueError('--tree_site_plot_max_sites should be >= 1.')
+    if 'tree_site_plot_min_prob' in g.keys():
+        g['tree_site_plot_min_prob'] = _require_finite_float(
+            value=float(g['tree_site_plot_min_prob']),
+            param_name='--tree_site_plot_min_prob',
+        )
+        if (g['tree_site_plot_min_prob'] < 0) or (g['tree_site_plot_min_prob'] > 1):
+            raise ValueError('--tree_site_plot_min_prob should satisfy 0 <= value <= 1.')
     if 'min_single_prob' in g.keys():
-        g['min_single_prob'] = float(g['min_single_prob'])
+        g['min_single_prob'] = _require_finite_float(
+            value=float(g['min_single_prob']),
+            param_name='--min_single_prob',
+        )
         if (g['min_single_prob'] < 0) or (g['min_single_prob'] > 1):
             raise ValueError('--min_single_prob should satisfy 0 <= value <= 1.')
     if 'min_combinat_prob' in g.keys():
-        g['min_combinat_prob'] = float(g['min_combinat_prob'])
+        g['min_combinat_prob'] = _require_finite_float(
+            value=float(g['min_combinat_prob']),
+            param_name='--min_combinat_prob',
+        )
         if (g['min_combinat_prob'] < 0) or (g['min_combinat_prob'] > 1):
             raise ValueError('--min_combinat_prob should satisfy 0 <= value <= 1.')
     if 'database_timeout' in g.keys():
-        g['database_timeout'] = float(g['database_timeout'])
+        g['database_timeout'] = _require_finite_float(
+            value=float(g['database_timeout']),
+            param_name='--database_timeout',
+        )
         if g['database_timeout'] <= 0:
             raise ValueError('--database_timeout should be > 0.')
     if 'database_evalue_cutoff' in g.keys():
-        g['database_evalue_cutoff'] = float(g['database_evalue_cutoff'])
+        g['database_evalue_cutoff'] = _require_finite_float(
+            value=float(g['database_evalue_cutoff']),
+            param_name='--database_evalue_cutoff',
+        )
         if g['database_evalue_cutoff'] <= 0:
             raise ValueError('--database_evalue_cutoff should be > 0.')
     if 'database_minimum_identity' in g.keys():
-        g['database_minimum_identity'] = float(g['database_minimum_identity'])
+        g['database_minimum_identity'] = _require_finite_float(
+            value=float(g['database_minimum_identity']),
+            param_name='--database_minimum_identity',
+        )
         if (g['database_minimum_identity'] < 0) or (g['database_minimum_identity'] > 1):
             raise ValueError('--database_minimum_identity should satisfy 0 <= value <= 1.')
     if 'mafft_op' in g.keys():
-        g['mafft_op'] = float(g['mafft_op'])
+        g['mafft_op'] = _require_finite_float(
+            value=float(g['mafft_op']),
+            param_name='--mafft_op',
+        )
         if (g['mafft_op'] != -1) and (g['mafft_op'] < 0):
             raise ValueError('--mafft_op should be -1 or >= 0.')
     if 'mafft_ep' in g.keys():
-        g['mafft_ep'] = float(g['mafft_ep'])
+        g['mafft_ep'] = _require_finite_float(
+            value=float(g['mafft_ep']),
+            param_name='--mafft_ep',
+        )
         if (g['mafft_ep'] != -1) and (g['mafft_ep'] < 0):
             raise ValueError('--mafft_ep should be -1 or >= 0.')
     if 'pymol_gray' in g.keys():
@@ -238,7 +297,10 @@ def get_global_parameters(args):
         if (g['pymol_gray'] < 0) or (g['pymol_gray'] > 100):
             raise ValueError('--pymol_gray should satisfy 0 <= value <= 100.')
     if 'pymol_transparency' in g.keys():
-        g['pymol_transparency'] = float(g['pymol_transparency'])
+        g['pymol_transparency'] = _require_finite_float(
+            value=float(g['pymol_transparency']),
+            param_name='--pymol_transparency',
+        )
         if (g['pymol_transparency'] < 0) or (g['pymol_transparency'] > 1):
             raise ValueError('--pymol_transparency should satisfy 0 <= value <= 1.')
     if 'pymol_max_num_chain' in g.keys():
@@ -267,6 +329,8 @@ def get_global_parameters(args):
                 print(txt.format(adjusted), flush=True)
                 g['cutoff_stat'] = adjusted
         output_stat.validate_cutoff_stat_compatibility(g['cutoff_stat'], g['output_stats'])
+        # Fail fast on malformed cutoff tokens/regex/value ranges.
+        table.parse_cutoff_stat(cutoff_stat_str=g['cutoff_stat'])
     return g
 
 def initialize_df_cb_stats(g):

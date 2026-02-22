@@ -6,9 +6,8 @@
 import unittest
 
 def get_codon_table_obsolete(codon_file):
-    f = open(codon_file)
-    lines = f.readlines()
-    f.close()
+    with open(codon_file) as f:
+        lines = f.readlines()
     codon_table = []
     for line in lines:
         line_split = line.replace("\n", "").split(" ")
@@ -418,7 +417,12 @@ def get_codon_table(ncbi_id):
             'start_codons':['TTG', 'CTG', 'ATG']
         }
     ]
-    selected_ct = [ct for ct in codon_tables if ct['id'] == ncbi_id][0]
+    matched_tables = [ct for ct in codon_tables if ct['id'] == ncbi_id]
+    if len(matched_tables) == 0:
+        available_ids = sorted([ct['id'] for ct in codon_tables])
+        txt = 'Unsupported NCBI codon table ID: {}. Available IDs: {}.'
+        raise ValueError(txt.format(ncbi_id, ','.join([str(cid) for cid in available_ids])))
+    selected_ct = matched_tables[0]
     ct = selected_ct['table']
     for sc in selected_ct['stop_codons']:
         ct.update({sc:'*'})
