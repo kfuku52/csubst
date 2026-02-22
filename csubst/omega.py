@@ -98,6 +98,34 @@ def _can_use_cython_expected_state(parent_state_block, transition_prob):
     return True
 
 
+def _can_use_cython_tmp_E_sum(cb_ids, sub_sites, sub_branches):
+    if omega_cy is None:
+        return False
+    if not isinstance(cb_ids, np.ndarray):
+        return False
+    if not isinstance(sub_sites, np.ndarray):
+        return False
+    if not isinstance(sub_branches, np.ndarray):
+        return False
+    if cb_ids.dtype != np.int64:
+        return False
+    if sub_sites.dtype != np.float64:
+        return False
+    if sub_branches.dtype != np.float64:
+        return False
+    if cb_ids.ndim != 2:
+        return False
+    if sub_sites.ndim != 2:
+        return False
+    if sub_branches.ndim != 1:
+        return False
+    if sub_sites.shape[0] != sub_branches.shape[0]:
+        return False
+    if cb_ids.shape[1] == 0:
+        return False
+    return True
+
+
 def _project_expected_state_block(parent_state_block, transition_prob, float_tol):
     if _can_use_cython_expected_state(parent_state_block, transition_prob):
         return omega_cy.project_expected_state_block_double(
@@ -125,6 +153,15 @@ def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
 
 
 def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type):
+    if _can_use_cython_tmp_E_sum(cb_ids=cb_ids, sub_sites=sub_sites, sub_branches=sub_branches):
+        try:
+            return omega_cy.calc_tmp_E_sum_double(
+                cb_ids=cb_ids,
+                sub_sites=sub_sites,
+                sub_branches=sub_branches,
+            )
+        except Exception:
+            pass
     if (cb_ids.shape[1] == 1):
         bids = cb_ids[:, 0]
         tmp_E = sub_sites[bids, :] * sub_branches[bids, None]

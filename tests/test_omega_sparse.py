@@ -170,6 +170,34 @@ def test_project_expected_state_block_matches_numpy_fallback(monkeypatch):
     np.testing.assert_allclose(out_default, out_numpy, atol=1e-12)
 
 
+def test_calc_tmp_E_sum_matches_numpy_fallback(monkeypatch):
+    rng = np.random.default_rng(4)
+    sub_sites = rng.random((9, 31), dtype=np.float64)
+    sub_branches = rng.random(9, dtype=np.float64)
+    cb_ids = rng.integers(0, 9, size=(12, 3), dtype=np.int64)
+    out_default = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        sub_branches=sub_branches,
+        float_type=np.float64,
+    )
+    monkeypatch.setattr(omega, "_can_use_cython_tmp_E_sum", lambda *_args, **_kwargs: False)
+    out_numpy = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        sub_branches=sub_branches,
+        float_type=np.float64,
+    )
+    np.testing.assert_allclose(out_default, out_numpy, atol=1e-12)
+
+
+def test_can_use_cython_tmp_E_sum_rejects_non_float64_inputs():
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    sub_sites = np.array([[0.1, 0.2], [0.3, 0.4]], dtype=np.float32)
+    sub_branches = np.array([0.5, 0.6], dtype=np.float64)
+    assert omega._can_use_cython_tmp_E_sum(cb_ids, sub_sites, sub_branches) is False
+
+
 def test_can_use_cython_expected_state_rejects_large_state_space():
     parent = np.full((2, 20), 1.0 / 20.0, dtype=np.float64)
     trans = np.eye(20, dtype=np.float64)

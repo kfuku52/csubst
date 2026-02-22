@@ -77,3 +77,50 @@ cpdef project_expected_state_block_double(
             for d in range(num_state):
                 expected_mv[i, d] /= row_sum
     return expected_state_block
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef calc_tmp_E_sum_double(
+    numpy.ndarray[numpy.int64_t, ndim=2] cb_ids,
+    numpy.ndarray[numpy.float64_t, ndim=2] sub_sites,
+    numpy.ndarray[numpy.float64_t, ndim=1] sub_branches,
+):
+    cdef Py_ssize_t num_cb = cb_ids.shape[0]
+    cdef Py_ssize_t arity = cb_ids.shape[1]
+    cdef Py_ssize_t num_branch = sub_sites.shape[0]
+    cdef Py_ssize_t num_site = sub_sites.shape[1]
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] out
+    cdef long[:, :] cb_mv
+    cdef double[:, :] site_mv
+    cdef double[:] branch_mv
+    cdef double[:] out_mv
+    cdef Py_ssize_t i, j, b
+    cdef long bid
+    cdef double total, prod
+
+    if sub_branches.shape[0] != num_branch:
+        raise ValueError('sub_sites and sub_branches shape mismatch.')
+    out = numpy.zeros((num_cb,), dtype=numpy.float64)
+    if num_cb == 0:
+        return out
+    if arity <= 0:
+        raise ValueError('cb_ids should have at least one column.')
+
+    cb_mv = cb_ids
+    site_mv = sub_sites
+    branch_mv = sub_branches
+    out_mv = out
+    for i in range(num_cb):
+        total = 0.0
+        for j in range(num_site):
+            prod = 1.0
+            for b in range(arity):
+                bid = cb_mv[i, b]
+                if (bid < 0) or (bid >= num_branch):
+                    raise ValueError('cb_ids contain out-of-range branch ID.')
+                prod *= site_mv[bid, j] * branch_mv[bid]
+            total += prod
+        out_mv[i] = total
+    return out
