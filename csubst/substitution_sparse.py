@@ -1,5 +1,9 @@
 import numpy as np
 import scipy.sparse as sp
+try:
+    from csubst import substitution_sparse_cy
+except Exception:  # pragma: no cover - Cython extension is optional
+    substitution_sparse_cy = None
 
 
 class SparseSubstitutionTensor:
@@ -94,16 +98,53 @@ class SparseSubstitutionTensor:
         if tol < 0:
             raise ValueError('tol should be >= 0.')
         blocks = dict()
-        for sg in range(arr.shape[2]):
-            for a in range(arr.shape[3]):
-                for d in range(arr.shape[4]):
-                    block = np.array(arr[:, :, sg, a, d], copy=True)
-                    if tol > 0:
-                        block[np.abs(block) <= tol] = 0
-                    mat = sp.csr_matrix(block)
-                    if mat.nnz > 0:
-                        blocks[(sg, a, d)] = mat
+        if tol == 0:
+            candidate_mask = np.any(arr != 0, axis=(0, 1))
+        else:
+            with np.errstate(invalid='ignore'):
+                candidate_mask = np.any(np.abs(arr) > tol, axis=(0, 1))
+            candidate_mask |= np.any(np.isnan(arr), axis=(0, 1))
+        candidate_indices = np.argwhere(candidate_mask)
+        for sg, a, d in candidate_indices:
+            block = arr[:, :, int(sg), int(a), int(d)]
+            mat = _dense_block_to_csr(block=block, tol=tol)
+            if mat.nnz > 0:
+                blocks[(int(sg), int(a), int(d))] = mat
         return cls(shape=arr.shape, dtype=arr.dtype, blocks=blocks)
+
+
+def _can_use_cython_dense_block_to_csr(block, tol):
+    if substitution_sparse_cy is None:
+        return False
+    if not isinstance(block, np.ndarray):
+        return False
+    if block.dtype != np.float64:
+        return False
+    if block.ndim != 2:
+        return False
+    if not np.isfinite(tol):
+        return False
+    return True
+
+
+def _dense_block_to_csr(block, tol):
+    if _can_use_cython_dense_block_to_csr(block=block, tol=tol):
+        data, indices, indptr = substitution_sparse_cy.dense_block_to_csr_arrays_double(
+            block,
+            float(tol),
+        )
+        if data.size == 0:
+            return sp.csr_matrix(block.shape, dtype=block.dtype)
+        return sp.csr_matrix(
+            (data, indices, indptr),
+            shape=block.shape,
+            dtype=block.dtype,
+        )
+    if tol > 0:
+        dense_block = np.array(block, copy=True)
+        dense_block[np.abs(dense_block) <= tol] = 0
+        return sp.csr_matrix(dense_block)
+    return sp.csr_matrix(block)
 
 
 def _sum_sparse_mats(mats, nrow, ncol, dtype):

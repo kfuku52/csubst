@@ -8,6 +8,11 @@ from csubst import substitution_cy
 from csubst import tree
 from csubst import ete
 
+try:
+    from csubst import substitution_sparse_cy
+except ImportError:  # pragma: no cover - optional Cython extension
+    substitution_sparse_cy = None
+
 
 def _toy_dense_tensor():
     # shape = [branch, site, group, from, to]
@@ -40,6 +45,34 @@ def test_dense_to_sparse_applies_tolerance():
 
     assert sparse_tensor.nnz == nnz_before
     assert restored[0, 0, 0, 2, 2] == 0
+
+
+def test_dense_to_sparse_preserves_nan_values_with_tolerance():
+    dense = np.zeros((2, 2, 1, 1, 1), dtype=np.float64)
+    dense[0, 0, 0, 0, 0] = np.nan
+    dense[1, 1, 0, 0, 0] = 1e-12
+
+    sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(dense, tol=1e-9)
+    restored = sparse_tensor.to_dense()
+
+    assert np.isnan(restored[0, 0, 0, 0, 0])
+    assert restored[1, 1, 0, 0, 0] == 0
+
+
+def test_dense_to_sparse_cython_path_matches_python_fallback(monkeypatch):
+    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "dense_block_to_csr_arrays_double")):
+        pytest.skip("Cython substitution_sparse fast path is unavailable")
+    dense = _toy_dense_tensor()
+    dense[0, 0, 0, 2, 2] = 1e-12
+
+    monkeypatch.setattr(substitution_sparse, "_can_use_cython_dense_block_to_csr", lambda *args, **kwargs: False)
+    expected = substitution_sparse.dense_to_sparse_substitution_tensor(dense, tol=1e-9)
+
+    monkeypatch.setattr(substitution_sparse, "_can_use_cython_dense_block_to_csr", lambda *args, **kwargs: True)
+    observed = substitution_sparse.dense_to_sparse_substitution_tensor(dense, tol=1e-9)
+
+    np.testing.assert_allclose(observed.to_dense(), expected.to_dense(), atol=1e-12)
+    assert observed.nnz == expected.nnz
 
 
 def test_sparse_projections_match_dense_reductions():
