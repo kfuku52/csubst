@@ -33,6 +33,23 @@ def _normalize_integer_like(values, column_name):
     return np.array(normalized, dtype=np.int64)
 
 
+def _cast_integer_like_column(values, column_name):
+    arr = np.asarray(values)
+    if arr.ndim == 0:
+        arr = arr.reshape(1)
+    kind = arr.dtype.kind
+    if kind in ['i', 'u']:
+        return arr.astype(np.int64, copy=False)
+    if kind == 'f':
+        if not np.isfinite(arr).all():
+            raise ValueError('Column "{}" contains missing values.'.format(column_name))
+        rounded = np.round(arr)
+        if not np.isclose(arr, rounded, rtol=0.0, atol=1e-12).all():
+            raise ValueError('Column "{}" should be integer-like.'.format(column_name))
+        return rounded.astype(np.int64, copy=False)
+    return _normalize_integer_like(values=arr, column_name=column_name)
+
+
 def sort_branch_ids(df):
     swap_columns = df.columns[df.columns.str.startswith('branch_id')].tolist()
     if len(swap_columns)>1:
@@ -45,7 +62,7 @@ def sort_branch_ids(df):
         return df
     df = df.sort_values(by=swap_columns)
     for cn in swap_columns:
-        df[cn] = _normalize_integer_like(values=df.loc[:, cn].to_numpy(copy=False), column_name=cn)
+        df[cn] = _cast_integer_like_column(values=df.loc[:, cn].to_numpy(copy=False), column_name=cn)
     return df
 
 def sort_cb(cb):
