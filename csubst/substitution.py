@@ -5,6 +5,7 @@ import scipy.sparse as sp
 import os
 import time
 import warnings
+import inspect
 from collections import defaultdict
 
 from csubst import table
@@ -583,7 +584,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
             df.at[i,attr+'_sub'] = branch_sub_counts[ete.get_prop(node, "numerical_label")]
             branch_tensor = _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=ete.get_prop(node, "numerical_label")) if sitewise else None
         else:
-            df.at[i,attr+'_sub'] = sub_tensor[ete.get_prop(node, "numerical_label"),:,:,:,:].sum()
+            df.at[i,attr+'_sub'] = np.nansum(sub_tensor[ete.get_prop(node, "numerical_label"),:,:,:,:])
             branch_tensor = sub_tensor[ete.get_prop(node, "numerical_label"), :, :, :, :] if sitewise else None
         if sitewise:
             sub_list = list()
@@ -592,10 +593,15 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
             elif attr=='S':
                 raise Exception('This function is not supported for synonymous substitutions.')
             for s in range(sub_tensor.shape[1]):
-                max_value = branch_tensor[s, :, :, :].max()
-                if max_value < min_sitewise_pp:
+                site_values = branch_tensor[s, :, :, :]
+                if not np.isfinite(site_values).any():
                     continue
-                max_idx = np.where(branch_tensor[s, :, :, :]==max_value)
+                max_value = np.nanmax(site_values)
+                if (not np.isfinite(max_value)) or (max_value < min_sitewise_pp):
+                    continue
+                max_idx = np.where(site_values == max_value)
+                if (max_idx[1].shape[0] == 0) or (max_idx[2].shape[0] == 0):
+                    continue
                 ancestral_state = state_order[max_idx[1][0]]
                 derived_state = state_order[max_idx[2][0]]
                 sub_string = ancestral_state+str(s+1)+derived_state
@@ -746,6 +752,162 @@ def _extract_selected_stats_from_full_cb(full_df, selected, arity):
     return out
 
 
+def _can_use_cython_sparse_cb_summary(id_combinations, sub_tensor, selected):
+    if not _is_sparse_sub_tensor(sub_tensor):
+        return False
+    if not hasattr(substitution_cy, 'calc_combinatorial_sub_sparse_summary_double_arity2'):
+        return False
+    if id_combinations.shape[1] != 2:
+        return False
+    if id_combinations.dtype.kind not in ['i', 'u']:
+        return False
+    if ('spe2spe' in selected) and (not _sparse_summary_fastpath_supports_spe2spe()):
+        return False
+    return True
+
+
+def _get_sparse_summary_fastpath_param_names():
+    func = getattr(substitution_cy, 'calc_combinatorial_sub_sparse_summary_double_arity2', None)
+    if func is None:
+        return tuple()
+    try:
+        return tuple(inspect.signature(func).parameters.keys())
+    except (TypeError, ValueError):
+        return tuple()
+
+
+def _sparse_summary_fastpath_supports_spe2spe():
+    params = _get_sparse_summary_fastpath_param_names()
+    return ('branch_group_pair_site_obj' in params) and ('calc_spe2spe' in params)
+
+
+def _get_sparse_cb_summary_arrays(sub_tensor, selected):
+    need_any2any = ('any2any' in selected)
+    need_spe2any = ('spe2any' in selected)
+    need_any2spe = ('any2spe' in selected)
+    need_spe2spe = ('spe2spe' in selected)
+    key = (need_any2any, need_spe2any, need_any2spe, need_spe2spe)
+    cache = getattr(sub_tensor, '_cb_sparse_summary_cache', None)
+    if cache is None:
+        cache = dict()
+    if key in cache:
+        return cache[key]
+    num_branch = int(sub_tensor.num_branch)
+    num_site = int(sub_tensor.num_site)
+    num_group = int(sub_tensor.num_group)
+    num_state_from = int(sub_tensor.num_state_from)
+    num_state_to = int(sub_tensor.num_state_to)
+    num_state_pair = int(num_state_from * num_state_to)
+    branch_group_site_total = None
+    branch_group_from_site = None
+    branch_group_to_site = None
+    branch_group_pair_site = None
+    total_flat = None
+    from_flat = None
+    to_flat = None
+    pair_flat = None
+    if need_any2any:
+        branch_group_site_total = np.zeros(
+            shape=(num_branch, num_group, num_site),
+            dtype=np.float64,
+        )
+        total_flat = branch_group_site_total.reshape(-1)
+    if need_spe2any:
+        branch_group_from_site = np.zeros(
+            shape=(num_branch, num_group, num_state_from, num_site),
+            dtype=np.float64,
+        )
+        from_flat = branch_group_from_site.reshape(-1)
+    if need_any2spe:
+        branch_group_to_site = np.zeros(
+            shape=(num_branch, num_group, num_state_to, num_site),
+            dtype=np.float64,
+        )
+        to_flat = branch_group_to_site.reshape(-1)
+    if need_spe2spe:
+        branch_group_pair_site = np.zeros(
+            shape=(num_branch, num_group, num_state_pair, num_site),
+            dtype=np.float64,
+        )
+        pair_flat = branch_group_pair_site.reshape(-1)
+    for (sg, a, d), mat in sub_tensor.blocks.items():
+        coo = mat.tocoo(copy=False)
+        if coo.nnz == 0:
+            continue
+        rows = np.asarray(coo.row, dtype=np.int64)
+        cols = np.asarray(coo.col, dtype=np.int64)
+        vals = np.asarray(coo.data, dtype=np.float64)
+        if need_any2any:
+            ind = ((rows * num_group) + int(sg)) * num_site + cols
+            np.add.at(total_flat, ind, vals)
+        if need_spe2any:
+            ind = (((rows * num_group) + int(sg)) * num_state_from + int(a)) * num_site + cols
+            np.add.at(from_flat, ind, vals)
+        if need_any2spe:
+            ind = (((rows * num_group) + int(sg)) * num_state_to + int(d)) * num_site + cols
+            np.add.at(to_flat, ind, vals)
+        if need_spe2spe:
+            pair_index = int(a) * num_state_to + int(d)
+            ind = (((rows * num_group) + int(sg)) * num_state_pair + pair_index) * num_site + cols
+            np.add.at(pair_flat, ind, vals)
+    out = (branch_group_site_total, branch_group_from_site, branch_group_to_site, branch_group_pair_site)
+    cache[key] = out
+    setattr(sub_tensor, '_cb_sparse_summary_cache', cache)
+    return out
+
+
+def _clear_sparse_cb_summary_arrays(sub_tensor, selected):
+    need_any2any = ('any2any' in selected)
+    need_spe2any = ('spe2any' in selected)
+    need_any2spe = ('any2spe' in selected)
+    need_spe2spe = ('spe2spe' in selected)
+    key = (need_any2any, need_spe2any, need_any2spe, need_spe2spe)
+    cache = getattr(sub_tensor, '_cb_sparse_summary_cache', None)
+    if isinstance(cache, dict) and (key in cache):
+        cache.pop(key, None)
+
+
+def _run_sparse_cb_summary_cython(
+    id_combinations,
+    selected,
+    mmap,
+    df_mmap,
+    mmap_start,
+    float_type,
+    branch_group_site_total,
+    branch_group_from_site,
+    branch_group_to_site,
+    branch_group_pair_site,
+):
+    arity = id_combinations.shape[1]
+    kwargs = dict(
+        id_combinations=np.asarray(id_combinations, dtype=np.int64),
+        mmap_start=0,
+        branch_group_site_total_obj=branch_group_site_total,
+        branch_group_from_site_obj=branch_group_from_site,
+        branch_group_to_site_obj=branch_group_to_site,
+        mmap=False,
+        df_mmap=None,
+        calc_any2any=('any2any' in selected),
+        calc_spe2any=('spe2any' in selected),
+        calc_any2spe=('any2spe' in selected),
+    )
+    if _sparse_summary_fastpath_supports_spe2spe():
+        kwargs['branch_group_pair_site_obj'] = branch_group_pair_site
+        kwargs['calc_spe2spe'] = ('spe2spe' in selected)
+    out_full = substitution_cy.calc_combinatorial_sub_sparse_summary_double_arity2(**kwargs)
+    selected_df = _extract_selected_stats_from_full_cb(
+        full_df=np.asarray(out_full, dtype=np.float64),
+        selected=selected,
+        arity=arity,
+    )
+    if mmap:
+        row_start, row_end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
+        df_mmap[row_start:row_end, :] = selected_df.astype(df_mmap.dtype, copy=False)
+        return None
+    return selected_df.astype(float_type, copy=False)
+
+
 def sub_tensor2cb(
     id_combinations,
     sub_tensor,
@@ -843,6 +1005,39 @@ def sub_tensor2cb_sparse(
         source_dtype=sub_tensor.dtype,
         default_dtype=float_type,
     )
+    if _can_use_cython_sparse_cb_summary(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+        selected=selected,
+    ):
+        try:
+            summary_arrays = _get_sparse_cb_summary_arrays(
+                sub_tensor=sub_tensor,
+                selected=selected,
+            )
+            branch_group_site_total = summary_arrays[0]
+            branch_group_from_site = summary_arrays[1]
+            branch_group_to_site = summary_arrays[2]
+            branch_group_pair_site = summary_arrays[3] if len(summary_arrays) > 3 else None
+            out = _run_sparse_cb_summary_cython(
+                id_combinations=id_combinations,
+                selected=selected,
+                mmap=mmap,
+                df_mmap=df_mmap,
+                mmap_start=mmap_start,
+                float_type=float_type,
+                branch_group_site_total=branch_group_site_total,
+                branch_group_from_site=branch_group_from_site,
+                branch_group_to_site=branch_group_to_site,
+                branch_group_pair_site=branch_group_pair_site,
+            )
+            _clear_sparse_cb_summary_arrays(sub_tensor=sub_tensor, selected=selected)
+            if not mmap:
+                return out
+            return
+        except Exception as exc:
+            _clear_sparse_cb_summary_arrays(sub_tensor=sub_tensor, selected=selected)
+            _warn_cython_fallback('sub_tensor2cb_sparse', exc)
     col_any2any, col_spe2any, col_any2spe, col_spe2spe = _resolve_cb_stat_columns(
         selected=selected,
         arity=arity,

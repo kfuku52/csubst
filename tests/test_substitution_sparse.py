@@ -1,8 +1,10 @@
 import numpy as np
 from pathlib import Path
+import pytest
 
 from csubst import substitution
 from csubst import substitution_sparse
+from csubst import substitution_cy
 from csubst import tree
 from csubst import ete
 
@@ -117,6 +119,149 @@ def test_get_cb_sparse_matches_dense():
     out_dense = substitution.get_cb(ids, dense, g, attr="OCN")
     out_sparse = substitution.get_cb(ids, sparse_tensor, g, attr="OCN")
     np.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
+
+
+def test_get_cb_sparse_selective_base_stats_matches_dense():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.array([[2, 0], [1, 2]], dtype=np.int64)
+    g = {"threads": 1, "float_type": np.float64}
+    selected = ["any2any", "any2spe"]
+    out_dense = substitution.get_cb(ids, dense, g, attr="OCN", selected_base_stats=selected)
+    out_sparse = substitution.get_cb(ids, sparse_tensor, g, attr="OCN", selected_base_stats=selected)
+    assert out_sparse.columns.tolist() == ["branch_id_1", "branch_id_2", "OCNany2any", "OCNany2spe"]
+    np.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
+
+
+def test_sparse_cb_summary_arrays_match_dense_reductions():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    selected = ["any2any", "spe2any", "any2spe"]
+    total, from_site, to_site, pair_site = substitution._get_sparse_cb_summary_arrays(sparse_tensor, selected)
+
+    expected_total = dense.sum(axis=(3, 4)).transpose(0, 2, 1)
+    expected_from_site = dense.sum(axis=4).transpose(0, 2, 3, 1)
+    expected_to_site = dense.sum(axis=3).transpose(0, 2, 3, 1)
+    np.testing.assert_allclose(total, expected_total, atol=1e-12)
+    np.testing.assert_allclose(from_site, expected_from_site, atol=1e-12)
+    np.testing.assert_allclose(to_site, expected_to_site, atol=1e-12)
+    assert pair_site is None
+
+
+def test_sparse_cb_summary_arrays_include_spe2spe_channel():
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    selected = ["spe2spe"]
+    total, from_site, to_site, pair_site = substitution._get_sparse_cb_summary_arrays(sparse_tensor, selected)
+
+    assert total is None
+    assert from_site is None
+    assert to_site is None
+    expected_pair_site = dense.reshape(dense.shape[0], dense.shape[1], dense.shape[2], -1).transpose(0, 2, 3, 1)
+    np.testing.assert_allclose(pair_site, expected_pair_site, atol=1e-12)
+
+
+def test_sub_tensor2cb_sparse_cython_fastpath_matches_python_fallback(monkeypatch):
+    if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
+        pytest.skip("Cython sparse-summary reducer fast path is unavailable")
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.array([[2, 0], [1, 2], [0, 1]], dtype=np.int64)
+    selected = ["any2any", "spe2any", "any2spe"]
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    expected = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: True)
+    observed = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sub_tensor2cb_sparse_cython_fastpath_supports_spe2spe(monkeypatch):
+    if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
+        pytest.skip("Cython sparse-summary reducer fast path is unavailable")
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.array([[2, 0], [1, 2], [0, 1]], dtype=np.int64)
+    selected = ["any2any", "spe2any", "any2spe", "spe2spe"]
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    expected = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: True)
+    observed = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sub_tensor2cb_sparse_cython_failure_warns_and_falls_back(monkeypatch):
+    if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
+        pytest.skip("Cython sparse-summary reducer fast path is unavailable")
+    dense = _toy_reducer_tensor()
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.array([[2, 0], [1, 2]], dtype=np.int64)
+    selected = ["any2any", "any2spe"]
+
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    expected = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+
+    monkeypatch.setattr(substitution, "_CYTHON_FALLBACK_WARNED", set())
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: True)
+
+    def _raise_cython(*args, **kwargs):
+        raise RuntimeError("forced-sparse-fastpath-failure")
+
+    monkeypatch.setattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2", _raise_cython)
+    with pytest.warns(RuntimeWarning, match='Cython fast path "sub_tensor2cb_sparse" failed'):
+        observed = substitution.sub_tensor2cb_sparse(
+            ids,
+            sparse_tensor,
+            mmap=False,
+            df_mmap=None,
+            mmap_start=0,
+            float_type=np.float64,
+            selected_base_stats=selected,
+        )
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
 
 
 def test_get_cb_threading_matches_single_thread_for_dense_and_sparse():
