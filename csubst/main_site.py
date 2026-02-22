@@ -2660,7 +2660,7 @@ def main_site(g):
     g = parser_misc.annotate_tree(g)
     g = parser_misc.read_input(g)
     g = parser_misc.prep_state(g)
-    ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
+    ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)

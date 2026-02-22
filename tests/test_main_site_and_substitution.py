@@ -1846,6 +1846,25 @@ def test_get_b_sitewise_skips_nan_only_sites_without_crashing(tiny_tree):
     assert out.loc[out["branch_id"] == a_id, "N_sitewise"].iloc[0] == ""
 
 
+def test_get_b_sitewise_uses_nonsyn_state_orders_when_available(tiny_tree):
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
+    sub = np.zeros((num_node, 1, 1, 2, 2), dtype=float)
+    a_id = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if n.name == "A"][0]
+    sub[a_id, 0, 0, 0, 1] = 0.9
+    out = substitution.get_b(
+        g={
+            "tree": tiny_tree,
+            "num_node": num_node,
+            "amino_acid_orders": ["A", "B"],
+            "nonsyn_state_orders": ["grpX", "grpY"],
+        },
+        sub_tensor=sub,
+        attr="N",
+        sitewise=True,
+    )
+    assert out.loc[out["branch_id"] == a_id, "N_sitewise"].iloc[0] == "grpX1grpY"
+
+
 def test_get_sub_sites_handles_noncontiguous_branch_ids():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
     reassigned = {"A": 11, "B": 29, "C": 41, "X": 73, "R": 5}

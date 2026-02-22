@@ -131,6 +131,17 @@ def test_cdn2pep_state_sums_synonymous_codons():
     np.testing.assert_allclose(out, state_cdn, atol=1e-12)
 
 
+def test_cdn2nsy_state_sums_recoded_codon_groups():
+    g = {
+        "nonsyn_state_orders": np.array(["AG", "C"]),
+        "nonsynonymous_indices": {"AG": [0, 1], "C": [2]},
+    }
+    state_cdn = np.array([[[0.3, 0.4, 0.3], [0.1, 0.2, 0.7]]], dtype=float)
+    out = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g)
+    expected = np.array([[[0.7, 0.3], [0.3, 0.7]]], dtype=float)
+    np.testing.assert_allclose(out, expected, atol=1e-12)
+
+
 def test_cdn2pep_state_selected_branch_ids_keeps_global_branch_index():
     g = {
         "amino_acid_orders": np.array(["K", "N"]),

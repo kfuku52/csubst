@@ -483,9 +483,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             cb['ECS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='mean', SN='S', g=g)
     if (g['omegaC_method']=='submodel'):
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
-        state_pepE = get_exp_state(g=g, mode='pep')
+        state_nsyE = get_exp_state(g=g, mode='nsy')
         if (g['current_arity']==2):
-            g['EN_tensor'] = substitution.get_substitution_tensor(state_pepE, g['state_pep'], mode='asis', g=g, mmap_attr='EN')
+            g['EN_tensor'] = substitution.get_substitution_tensor(state_nsyE, g['state_nsy'], mode='asis', g=g, mmap_attr='EN')
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
         print(txt.format(substitution.get_total_substitution(g['EN_tensor'])))
         print('Preparing the ECN table with {:,} process(es).'.format(g['threads']), flush=True)
@@ -497,7 +497,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             selected_base_stats=base_stats,
         )
         cb = table.merge_tables(cb, cbEN)
-        del state_pepE,cbEN
+        del state_nsyE,cbEN
         state_cdnE = get_exp_state(g=g, mode='cdn')
         if (g['current_arity'] == 2):
             g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
@@ -528,6 +528,9 @@ def get_exp_state(g, mode):
     elif mode=='pep':
         state = g['state_pep'].astype(g['float_type'])
         inst = g['instantaneous_aa_rate_matrix']
+    elif mode=='nsy':
+        state = g['state_nsy'].astype(g['float_type'])
+        inst = g['instantaneous_nsy_rate_matrix']
     else:
         raise ValueError('Unsupported expected-state mode: {}'.format(mode))
     stateE = np.zeros_like(state, dtype=g['float_type'])
@@ -541,7 +544,7 @@ def get_exp_state(g, mode):
             continue
         if mode=='cdn':
             branch_length = ete.get_prop(node, 'SNdist', 0)
-        elif mode=='pep':
+        elif mode in ['pep', 'nsy']:
             branch_length = ete.get_prop(node, 'Ndist', 0)
         else:
             raise ValueError('Unsupported expected-state mode: {}'.format(mode))

@@ -8,6 +8,7 @@ import sys
 from csubst import sequence
 from csubst import parser_phylobayes
 from csubst import parser_iqtree
+from csubst import recoding
 from csubst import tree
 from csubst import ete
 
@@ -48,8 +49,16 @@ def read_input(g):
     elif (g['infile_type'] == 'iqtree'):
         g = parser_iqtree.get_input_information(g)
     if ('omegaC_method' not in g.keys()):
+        g = recoding.initialize_nonsyn_groups(g)
+        if g['nonsyn_recode'] != 'none':
+            txt = 'Applying nonsynonymous recoding scheme: {}'
+            print(txt.format(g['nonsyn_recode']))
         return g
     if (g['omegaC_method']!='submodel'):
+        g = recoding.initialize_nonsyn_groups(g)
+        if g['nonsyn_recode'] != 'none':
+            txt = 'Applying nonsynonymous recoding scheme: {}'
+            print(txt.format(g['nonsyn_recode']))
         return g
     base_model = re.sub(r'\+G.*', '', g['substitution_model'])
     base_model = re.sub(r'\+R.*', '', base_model)
@@ -85,15 +94,25 @@ def read_input(g):
     else:
         txt = 'Unsupported substitution model for --omegaC_method submodel: {}'
         raise ValueError(txt.format(g['substitution_model']))
+    g = recoding.initialize_nonsyn_groups(g)
+    if g['nonsyn_recode'] != 'none':
+        txt = 'Applying nonsynonymous recoding scheme: {}'
+        print(txt.format(g['nonsyn_recode']))
     g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
+    g['instantaneous_nsy_rate_matrix'] = cdn2nsy_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
     g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
     g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
+    g['rate_nsy_tensor'] = get_rate_tensor(inst=g['instantaneous_nsy_rate_matrix'], mode='asis', g=g)
     sum_tensor_aa = g['rate_aa_tensor'].sum()
+    sum_tensor_nsy = g['rate_nsy_tensor'].sum()
     sum_tensor_syn = g['rate_syn_tensor'].sum()
     sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
+    sum_matrix_nsy = g['instantaneous_nsy_rate_matrix'][g['instantaneous_nsy_rate_matrix']>0].sum()
     sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
     if abs(sum_tensor_aa - sum_matrix_aa) >= g['float_tol']:
         raise AssertionError('Sum of rates did not match.')
+    if (g['nonsyn_recode'] != 'none') and (abs(sum_tensor_nsy - sum_matrix_nsy) >= g['float_tol']):
+        raise AssertionError('Sum of recoded nonsynonymous rates did not match.')
     txt = 'Sum of rates did not match. Check if --codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
     txt = txt.format(g['codon_table'], g['reconstruction_codon_table'])
     if abs(sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa) >= g['float_tol']:
@@ -179,27 +198,45 @@ def get_rate_tensor(inst, mode, g):
     rate_tensor = rate_tensor.astype(g['float_type'])
     return rate_tensor
 
-def cdn2pep_matrix(inst_cdn, g):
-    num_pep_state = len(g['amino_acid_orders'])
-    axis = [num_pep_state, num_pep_state]
-    inst_pep = np.zeros(axis, dtype=inst_cdn.dtype)
-    for i,aa1 in enumerate(g['amino_acid_orders']):
-        for j,aa2 in enumerate(g['amino_acid_orders']):
-            if aa1==aa2:
+def _cdn2group_matrix(inst_cdn, group_orders, group_indices):
+    group_orders = [str(order) for order in group_orders]
+    num_group = len(group_orders)
+    inst_group = np.zeros([num_group, num_group], dtype=inst_cdn.dtype)
+    for i, group_from in enumerate(group_orders):
+        idx_from = np.asarray(group_indices[group_from], dtype=np.int64).reshape(-1)
+        if idx_from.shape[0] == 0:
+            continue
+        for j, group_to in enumerate(group_orders):
+            if group_from == group_to:
                 continue
-            val = 0
-            aa1_indices = g['synonymous_indices'][aa1]
-            aa2_indices = g['synonymous_indices'][aa2]
-            for aa1_ind,aa2_ind in itertools.product(aa1_indices, aa2_indices):
-                val += inst_cdn[aa1_ind,aa2_ind]
-            inst_pep[i,j] = val
-    inst_pep = fill_instantaneous_rate_matrix_diagonal(inst_pep)
+            idx_to = np.asarray(group_indices[group_to], dtype=np.int64).reshape(-1)
+            if idx_to.shape[0] == 0:
+                continue
+            inst_group[i, j] = inst_cdn[np.ix_(idx_from, idx_to)].sum()
+    inst_group = fill_instantaneous_rate_matrix_diagonal(inst_group)
+    return inst_group
+
+
+def cdn2pep_matrix(inst_cdn, g):
+    inst_pep = _cdn2group_matrix(
+        inst_cdn=inst_cdn,
+        group_orders=g['amino_acid_orders'],
+        group_indices=g['synonymous_indices'],
+    )
     # Following lines were commented out because this shouldn't be readjusted.
     # Branch lengths are subst/codon.
     # If readjusted, we have to provide subst/aa to calculate expected nonsynonymous convergence.
     #eq_pep = get_equilibrium_frequency(g, mode='pep')
     #inst_pep = scale_instantaneous_rate_matrix(inst_pep, eq_pep)
     return inst_pep
+
+
+def cdn2nsy_matrix(inst_cdn, g):
+    return _cdn2group_matrix(
+        inst_cdn=inst_cdn,
+        group_orders=g['nonsyn_state_orders'],
+        group_indices=g['nonsynonymous_indices'],
+    )
 
 def exchangeability2Q(ex, eq):
     inst = ex.dot(np.diag(eq)).astype(np.float64) # pi_j * s_ij. float32 is not enough for Pyvolve
@@ -316,6 +353,7 @@ def prep_state(g):
     state_nuc = None
     state_cdn = None
     state_pep = None
+    state_nsy = None
     loaded_branch_ids = g.get('state_loaded_branch_ids', None)
     if (g['infile_type'] == 'phylobayes'):
         from csubst import parser_phylobayes
@@ -323,21 +361,26 @@ def prep_state(g):
             state_nuc = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+            state_nsy = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
         elif g['input_data_type'] == 'cdn':
             state_cdn = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+            state_nsy = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
     elif (g['infile_type'] == 'iqtree'):
         from csubst import parser_iqtree
         if g['input_data_type'] == 'nuc': # obsoleted
             state_nuc = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+            state_nsy = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
         elif g['input_data_type'] == 'cdn':
             state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+            state_nsy = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
     g['state_nuc'] = state_nuc
     g['state_cdn'] = state_cdn
     g['state_pep'] = state_pep
+    g['state_nsy'] = state_nsy
     return g
 
 def read_exchangeability_matrix(file, codon_orders):

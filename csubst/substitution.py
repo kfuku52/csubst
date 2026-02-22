@@ -832,7 +832,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
         if sitewise:
             sub_list = list()
             if attr=='N':
-                state_order = g['amino_acid_orders']
+                state_order = g.get('nonsyn_state_orders', g.get('amino_acid_orders', []))
             elif attr=='S':
                 raise ValueError('This function is not supported for synonymous substitutions.')
             if _can_use_cython_sitewise_max_scan(branch_tensor=branch_tensor):

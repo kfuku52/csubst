@@ -216,7 +216,7 @@ def main_analyze(g):
             mode='codon',
             g=g,
         )
-    ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='N')
+    ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
     sub_branches = np.where(substitution.get_branch_sub_counts(ON_tensor) != 0)[0].tolist()
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
@@ -268,6 +268,7 @@ def main_analyze(g):
     if (g['omegaC_method']!='submodel'):
         g['state_cdn'] = None
         g['state_pep'] = None
+        g['state_nsy'] = None
 
     if (g['b']) | (g['cb']):
         start = time.time()

@@ -395,6 +395,24 @@ def test_cdn2pep_matrix_matches_manual_group_sum():
     np.testing.assert_allclose(out, np.array([[-1.2, 1.2], [1.1, -1.1]]), atol=1e-12)
 
 
+def test_cdn2nsy_matrix_matches_manual_recoded_group_sum():
+    inst_cdn = np.array(
+        [
+            [-1.2, 0.2, 1.0, 0.0],
+            [0.1, -0.7, 0.3, 0.3],
+            [0.4, 0.2, -0.8, 0.2],
+            [0.0, 0.5, 0.1, -0.6],
+        ],
+        dtype=float,
+    )
+    g = {
+        "nonsyn_state_orders": np.array(["AG", "C"], dtype=object),
+        "nonsynonymous_indices": {"AG": [0, 1, 2], "C": [3]},
+    }
+    out = parser_misc.cdn2nsy_matrix(inst_cdn, g)
+    np.testing.assert_allclose(out, np.array([[-0.5, 0.5], [0.6, -0.6]]), atol=1e-12)
+
+
 def test_get_mechanistic_instantaneous_rate_matrix_matches_manual_example():
     g = {
         "codon_orders": np.array(["AAA", "AAG", "AAC"]),
@@ -593,6 +611,10 @@ def test_read_input_submodel_detects_reverse_signed_rate_sum_mismatch(monkeypatc
                 "omega": 1.0,
                 "kappa": 1.0,
                 "equilibrium_frequency": np.array([0.5, 0.5], dtype=float),
+                "codon_orders": np.array(["AAA", "AAC"]),
+                "amino_acid_orders": np.array(["K", "N"]),
+                "synonymous_indices": {"K": [0], "N": [1]},
+                "matrix_groups": {"K": ["AAA"], "N": ["AAC"]},
             }
         )
         return local_g

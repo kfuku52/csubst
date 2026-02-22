@@ -131,6 +131,27 @@ def test_get_exp_state_uses_branch_distance_props():
     np.testing.assert_allclose(cdn[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
 
 
+def test_get_exp_state_nsy_uses_nonsynonymous_rate_matrix():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    state = np.zeros((num_node, 1, 2), dtype=np.float64)
+    state[labels["R"], 0, 0] = 1.0
+    g = {
+        "tree": tr,
+        "state_nsy": state.copy(),
+        "instantaneous_nsy_rate_matrix": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=np.float64),
+        "iqtree_rate_values": np.array([1.0], dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+    }
+    a_node = [n for n in tr.traverse() if n.name == "A"][0]
+    ete.set_prop(a_node, "Ndist", 0.5)
+    out = omega.get_exp_state(g=g, mode="nsy")
+    assert out[labels["A"], 0, :].sum() > 0
+    np.testing.assert_allclose(out[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
+
+
 def test_get_exp_state_rejects_unknown_mode():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))

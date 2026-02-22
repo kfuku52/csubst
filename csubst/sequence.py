@@ -62,11 +62,11 @@ def _normalize_branch_ids(branch_ids):
     return np.array(normalized, dtype=np.int64)
 
 
-def cdn2pep_state(state_cdn, g, selected_branch_ids=None):
+def _cdn2group_state(state_cdn, group_orders, group_indices, selected_branch_ids=None, mmap_name=None):
     num_node = state_cdn.shape[0]
     num_cdn_site = state_cdn.shape[1]
     num_pep_site = num_cdn_site
-    num_pep_state = len(g['amino_acid_orders'])
+    num_pep_state = len(group_orders)
     axis = [num_node, num_pep_site, num_pep_state]
     selected_ids = None
     selected_state_cdn = state_cdn
@@ -76,19 +76,39 @@ def cdn2pep_state(state_cdn, g, selected_branch_ids=None):
         state_pep = _initialize_state_array(
             axis=axis,
             dtype=state_cdn.dtype,
-            mmap_name='tmp.csubst.state_pep.mmap',
+            mmap_name=mmap_name,
         )
         selected_ids_all = _normalize_branch_ids(selected_branch_ids)
         is_valid = (selected_ids_all >= 0) & (selected_ids_all < num_node)
         selected_ids = np.array(sorted(set(selected_ids_all[is_valid].tolist())), dtype=np.int64)
         selected_state_cdn = state_cdn[selected_ids, :, :]
-    for i, aa in enumerate(g['amino_acid_orders']):
-        target = selected_state_cdn[:, :, g['synonymous_indices'][aa]].sum(axis=2)
+    for i, state_name in enumerate(group_orders):
+        target = selected_state_cdn[:, :, group_indices[state_name]].sum(axis=2)
         if selected_ids is None:
             state_pep[:, :, i] = target
         else:
             state_pep[selected_ids, :, i] = target
     return state_pep
+
+
+def cdn2pep_state(state_cdn, g, selected_branch_ids=None):
+    return _cdn2group_state(
+        state_cdn=state_cdn,
+        group_orders=g['amino_acid_orders'],
+        group_indices=g['synonymous_indices'],
+        selected_branch_ids=selected_branch_ids,
+        mmap_name='tmp.csubst.state_pep.mmap',
+    )
+
+
+def cdn2nsy_state(state_cdn, g, selected_branch_ids=None):
+    return _cdn2group_state(
+        state_cdn=state_cdn,
+        group_orders=g['nonsyn_state_orders'],
+        group_indices=g['nonsynonymous_indices'],
+        selected_branch_ids=selected_branch_ids,
+        mmap_name='tmp.csubst.state_nsy.mmap',
+    )
 
 
 def translate_state(nlabel, mode, g):

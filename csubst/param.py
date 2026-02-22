@@ -12,6 +12,7 @@ except ImportError:  # pragma: no cover
 
 from csubst.__init__ import __version__
 from csubst import output_stat
+from csubst import recoding
 from csubst import table
 
 DEPENDENCY_DISTRIBUTIONS = (
@@ -322,6 +323,10 @@ def get_global_parameters(args):
         if g['threads'] < 1:
             raise ValueError('--threads should be >= 1.')
         set_num_thread_variables(num_thread=g['threads'])
+    if 'nonsyn_recode' in g.keys():
+        g['nonsyn_recode'] = recoding.normalize_nonsyn_recode(g['nonsyn_recode'])
+    else:
+        g['nonsyn_recode'] = 'none'
     if 'output_stat' in g.keys():
         g['output_stats'] = output_stat.parse_output_stats(g['output_stat'])
     else:

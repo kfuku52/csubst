@@ -146,6 +146,10 @@ def _main():
     psr_as.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,
                          help='default=%(default)s: The minimum posterior probability of single substitutions to count. '
                               'Set 0 for a counting without binarization. Omitted if --ml_anc is set to "yes".')
+    psr_as.add_argument('--nonsyn_recode', metavar='none|dayhoff6|sr6|kgb6|sr4|dayhoff9|dayhoff12|dayhoff15|dayhoff18',
+                        default='none', type=str,
+                        help='default=%(default)s: Recoding scheme for nonsynonymous-state calculations. '
+                             'Use "none" for standard 20 amino-acid states.')
 
     # shared: PhyloBayes inputs, but PhyloBayes is no longer supported.
     psr_pb = argparse.ArgumentParser(add_help=False)
