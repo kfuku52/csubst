@@ -718,6 +718,84 @@ def test_read_input_submodel_detects_reverse_signed_rate_sum_mismatch(monkeypatc
         parser_misc.read_input(g)
 
 
+def test_prep_state_3di20_translate_uses_translate_builder(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 2, 3), dtype=float)
+    state_cdn[:, :, 0] = 1.0
+    state_pep = np.zeros((num_node, 2, 20), dtype=float)
+    state_pep[:, :, 0] = 1.0
+    state_nsy = np.zeros((num_node, 2, 20), dtype=float)
+    state_nsy[:, :, 1] = 1.0
+    state_orders = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_state_tensor", lambda g, selected_branch_ids=None: state_cdn)
+    monkeypatch.setattr(sequence, "cdn2pep_state", lambda state_cdn, g, selected_branch_ids=None: state_pep)
+    monkeypatch.setattr(
+        sequence,
+        "cdn2nsy_state",
+        lambda state_cdn, g, selected_branch_ids=None: (_ for _ in ()).throw(AssertionError("unexpected cdn2nsy")),
+    )
+    called = {"translate": False}
+
+    def _fake_translate_builder(g, state_pep, selected_branch_ids=None):
+        called["translate"] = True
+        return state_nsy, state_orders, {1: "VV", 2: "VV"}
+
+    monkeypatch.setattr(parser_misc.structural_alphabet, "build_3di_state_from_state_pep", _fake_translate_builder)
+    g = {
+        "tree": tr,
+        "infile_type": "iqtree",
+        "input_data_type": "cdn",
+        "nonsyn_recode": "3di20",
+        "sa_asr_mode": "translate",
+    }
+    out = parser_misc.prep_state(g)
+    assert called["translate"] is True
+    assert out["state_nsy"].shape == state_nsy.shape
+    assert out["nonsyn_state_orders"].tolist() == state_orders.tolist()
+    assert "_3di_alignment_by_branch_id" in out
+
+
+def test_prep_state_3di20_direct_uses_direct_builder(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 2, 3), dtype=float)
+    state_cdn[:, :, 0] = 1.0
+    state_pep = np.zeros((num_node, 2, 20), dtype=float)
+    state_pep[:, :, 0] = 1.0
+    state_nsy = np.zeros((num_node, 2, 20), dtype=float)
+    state_nsy[:, :, 2] = 1.0
+    state_orders = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_state_tensor", lambda g, selected_branch_ids=None: state_cdn)
+    monkeypatch.setattr(sequence, "cdn2pep_state", lambda state_cdn, g, selected_branch_ids=None: state_pep)
+    monkeypatch.setattr(
+        parser_misc.structural_alphabet,
+        "build_3di_state_from_state_pep",
+        lambda g, state_pep, selected_branch_ids=None: (_ for _ in ()).throw(AssertionError("unexpected translate")),
+    )
+    called = {"direct": False}
+
+    def _fake_direct_builder(g, selected_branch_ids=None, predictor=None):
+        called["direct"] = True
+        return state_nsy, state_orders, {"A": "VV", "B": "VV"}
+
+    monkeypatch.setattr(parser_misc.structural_alphabet, "build_3di_state_direct", _fake_direct_builder)
+    g = {
+        "tree": tr,
+        "infile_type": "iqtree",
+        "input_data_type": "cdn",
+        "nonsyn_recode": "3di20",
+        "sa_asr_mode": "direct",
+    }
+    out = parser_misc.prep_state(g)
+    assert called["direct"] is True
+    assert out["state_nsy"].shape == state_nsy.shape
+    assert out["nonsyn_state_orders"].tolist() == state_orders.tolist()
+    assert "_3di_tip_alignment_by_leaf" in out
+
+
 def test_map_internal_site_indices_defaults_to_identity_without_mapping():
     g = {}
     out = parser_misc.map_internal_site_indices(site_indices=np.array([0, 2, 4], dtype=np.int64), g=g)

@@ -40,6 +40,12 @@ AUTO_RECODING_SCHEMES = OrderedDict(
 
 _RECODING_ALIASES = {
     "no": "no",
+    "3di": "3di20",
+    "3di20": "3di20",
+    "threedi": "3di20",
+    "threedi20": "3di20",
+    "structuralalphabet": "3di20",
+    "structural_alphabet": "3di20",
     "dayhoff6": "dayhoff6",
     "dayhoff-6": "dayhoff6",
     "dayhoff_6": "dayhoff6",
@@ -78,7 +84,9 @@ _RECODING_ALIASES = {
     "ais6": "kgbauto6",
 }
 
-SUPPORTED_RECODINGS = tuple(["no"] + list(RECODING_SCHEMES.keys()) + list(AUTO_RECODING_SCHEMES.keys()))
+SUPPORTED_RECODINGS = tuple(
+    ["no", "3di20"] + list(RECODING_SCHEMES.keys()) + list(AUTO_RECODING_SCHEMES.keys())
+)
 
 
 def _validate_scheme(name, groups):
@@ -1069,7 +1077,7 @@ def initialize_nonsyn_groups(g):
     if len(missing_keys) > 0:
         txt = "Missing required key(s) for nonsynonymous recoding initialization: {}"
         raise ValueError(txt.format(", ".join(missing_keys)))
-    if recode == "no":
+    if recode in ["no", "3di20"]:
         state_orders, index_map, codon_map, members, aa_to_state = _copy_nonsyn_groups_from_amino_acids(g)
     else:
         state_orders, index_map, codon_map, members, aa_to_state = _build_recoded_groups(g, scheme_name=recode)
@@ -1091,7 +1099,7 @@ def _join_values(values):
 
 def write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv"):
     recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
-    if recode == "no":
+    if recode in ["no", "3di20"]:
         return None
     required_keys = [
         "amino_acid_orders",
@@ -1155,6 +1163,8 @@ def write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv"):
 def _get_scheme_groups_for_pca(g):
     groups_by_scheme = OrderedDict()
     groups_by_scheme["no"] = tuple([str(aa) for aa in _CANONICAL_AA])
+    # 3Di20 has 20 states and does not define AA co-clustering; represent as singleton states.
+    groups_by_scheme["3di20"] = tuple([str(aa) for aa in _CANONICAL_AA])
     for scheme_name, groups in RECODING_SCHEMES.items():
         groups_by_scheme[str(scheme_name)] = tuple([str(group) for group in groups])
     recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))

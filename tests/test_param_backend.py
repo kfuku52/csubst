@@ -228,6 +228,16 @@ def test_get_global_parameters_rejects_nonpositive_threads():
         param.get_global_parameters(_args(threads=-1))
 
 
+def test_get_global_parameters_parses_download_prostt5_bool():
+    g = param.get_global_parameters(_args(download_prostt5="yes"))
+    assert g["download_prostt5"] is True
+
+
+def test_get_global_parameters_rejects_invalid_download_prostt5_bool():
+    with pytest.raises(ValueError, match="download_prostt5"):
+        param.get_global_parameters(_args(download_prostt5="maybe"))
+
+
 def test_get_global_parameters_requires_foreground_for_exhaustive_until_one():
     with pytest.raises(ValueError, match="exhaustive_until 1"):
         param.get_global_parameters(_args(exhaustive_until=1, foreground=None))
@@ -296,6 +306,71 @@ def test_get_global_parameters_rejects_invalid_drop_invariant_tip_sites_string()
         param.get_global_parameters(_args(drop_invariant_tip_sites="true"))
     with pytest.raises(ValueError, match="drop_invariant_tip_sites"):
         param.get_global_parameters(_args(drop_invariant_tip_sites="false"))
+
+
+def test_get_global_parameters_parses_sa_asr_mode_values():
+    g_default = param.get_global_parameters(_args())
+    g_translate = param.get_global_parameters(_args(sa_asr_mode="translate"))
+    g_direct = param.get_global_parameters(_args(sa_asr_mode="direct"))
+    assert g_default["sa_asr_mode"] == "translate"
+    assert g_translate["sa_asr_mode"] == "translate"
+    assert g_direct["sa_asr_mode"] == "direct"
+
+
+def test_get_global_parameters_rejects_invalid_sa_asr_mode():
+    with pytest.raises(ValueError, match="sa_asr_mode"):
+        param.get_global_parameters(_args(sa_asr_mode="invalid"))
+    with pytest.raises(ValueError, match="sa_iqtree_model"):
+        param.get_global_parameters(_args(sa_iqtree_model=""))
+
+
+def test_get_global_parameters_parses_prostt5_options():
+    g = param.get_global_parameters(
+        _args(
+            prostt5_local_dir=" /tmp/prostt5 ",
+            prostt5_no_download="yes",
+        )
+    )
+    assert g["prostt5_local_dir"] == "/tmp/prostt5"
+    assert g["prostt5_no_download"] is True
+
+
+def test_get_global_parameters_rejects_invalid_prostt5_no_download():
+    with pytest.raises(ValueError, match="prostt5_no_download"):
+        param.get_global_parameters(_args(prostt5_no_download="maybe"))
+
+
+def test_get_global_parameters_requires_full_cds_alignment_for_3di20():
+    with pytest.raises(ValueError, match="full_cds_alignment_file"):
+        param.get_global_parameters(_args(nonsyn_recode="3di20"))
+
+
+def test_get_global_parameters_disables_alignment_file_for_3di20():
+    with pytest.raises(ValueError, match="alignment_file is disabled"):
+        param.get_global_parameters(
+            _args(
+                nonsyn_recode="3di20",
+                alignment_file="trimmed.fa",
+                full_cds_alignment_file="full.fa",
+            )
+        )
+    g = param.get_global_parameters(
+        _args(
+            nonsyn_recode="3di20",
+            alignment_file="",
+            full_cds_alignment_file="full.fa",
+        )
+    )
+    assert g["alignment_file"] == "full.fa"
+    g_alias = param.get_global_parameters(
+        _args(
+            nonsyn_recode="3di",
+            alignment_file="",
+            full_cds_alignment_file="full_alias.fa",
+        )
+    )
+    assert g_alias["nonsyn_recode"] == "3di20"
+    assert g_alias["alignment_file"] == "full_alias.fa"
 
 
 def test_get_global_parameters_validates_database_timeout():

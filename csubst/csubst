@@ -97,6 +97,9 @@ def _main():
     psr_co = argparse.ArgumentParser(add_help=False)
     psr_co.add_argument('--alignment_file', metavar='PATH', default='', type=str,
                        help='default=%(default)s: PATH to in-frame codon alignment (FASTA format).')
+    psr_co.add_argument('--full_cds_alignment_file', metavar='PATH', default='', type=str,
+                       help='default=%(default)s: PATH to aligned full-length CDS FASTA. '
+                            'Required when --nonsyn_recode is "3di20".')
     psr_co.add_argument('--rooted_tree_file', metavar='PATH', default='', type=str,
                        help='default=%(default)s: PATH to input rooted tree (Newick format). Tip labels should be consistent with --alignment_file.')
     psr_co.add_argument('--genetic_code', metavar='INTEGER', type=int, required=False, default=1,
@@ -197,11 +200,27 @@ def _main():
                              'When dropping is enabled, csubst_site_index_map.tsv is written to map retained internal '
                              'site indices to original alignment positions.')
     psr_rc = argparse.ArgumentParser(add_help=False)
-    psr_rc.add_argument('--nonsyn_recode', metavar='no|dayhoff6|sr6|kgb6|sr4|dayhoff9|dayhoff12|dayhoff15|dayhoff18|srchisq6|kgbauto6',
+    psr_rc.add_argument('--nonsyn_recode', metavar='no|3di20|dayhoff6|sr6|kgb6|sr4|dayhoff9|dayhoff12|dayhoff15|dayhoff18|srchisq6|kgbauto6',
                         default='no', type=str,
                         help='default=%(default)s: Recoding scheme for nonsynonymous-state calculations. '
                              'Use "no" for standard 20 amino-acid states. '
+                             '"3di20" enables structural-alphabet (3Di) recoding via ProstT5. '
                              '"srchisq6" and "kgbauto6" infer 6-state groupings from alignment composition.')
+    psr_rc.add_argument('--sa_asr_mode', metavar='translate|direct', default='translate', type=str,
+                        help='default=%(default)s: Structural-alphabet ancestral-state mode for --nonsyn_recode 3di20. '
+                             '"translate" converts ML amino-acid states to 3Di via ProstT5. '
+                             '"direct" runs direct 3Di ancestral-state reconstruction with IQ-TREE.')
+    psr_rc.add_argument('--prostt5_model', metavar='STR', default='Rostlab/ProstT5', type=str,
+                        help='default=%(default)s: ProstT5 model identifier used for --nonsyn_recode 3di20.')
+    psr_rc.add_argument('--prostt5_local_dir', metavar='PATH', default='', type=str,
+                        help='default=%(default)s: Optional local directory containing ProstT5 files. '
+                             'If provided, it is used instead of --prostt5_model.')
+    psr_rc.add_argument('--prostt5_no_download', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Set "yes" to disable automatic ProstT5 download and require local files.')
+    psr_rc.add_argument('--prostt5_device', metavar='auto|cpu|cuda', default='auto', type=str,
+                        help='default=%(default)s: Device for ProstT5 inference.')
+    psr_rc.add_argument('--sa_iqtree_model', metavar='STR', default='GTR20', type=str,
+                        help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20.')
 
     # shared: PhyloBayes inputs, but PhyloBayes is no longer supported.
     psr_pb = argparse.ArgumentParser(add_help=False)
@@ -482,6 +501,8 @@ def _main():
                          help='default=%(default)s: Write per-site ancestral codon state trees into csubst_plot_state_codon/.')
     inspect.add_argument('--plot_nonsyn_recode_pca', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Write csubst_nonsyn_recoding_pca.png from input alignment.')
+    inspect.add_argument('--download_prostt5', metavar='yes|no', default='no', type=strtobool,
+                         help='default=%(default)s: Download/check ProstT5 model files and exit.')
     inspect.set_defaults(handler=command_inspect)
 
     # Handler

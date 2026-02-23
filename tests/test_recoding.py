@@ -57,6 +57,8 @@ def _toy_auto_grouping_g():
 
 def test_normalize_nonsyn_recode_accepts_aliases():
     assert recoding.normalize_nonsyn_recode("no") == "no"
+    assert recoding.normalize_nonsyn_recode("3di") == "3di20"
+    assert recoding.normalize_nonsyn_recode("threedi20") == "3di20"
     assert recoding.normalize_nonsyn_recode("dayhoff-6") == "dayhoff6"
     assert recoding.normalize_nonsyn_recode("SR_6") == "sr6"
     assert recoding.normalize_nonsyn_recode("sr-chi-sq") == "srchisq6"
@@ -77,6 +79,16 @@ def test_initialize_nonsyn_groups_no_copies_amino_acid_groups():
     assert out["nonsyn_recode"] == "no"
     assert out["nonsyn_state_orders"].tolist() == out["amino_acid_orders"].tolist()
     assert out["max_nonsynonymous_size"] == 1
+    for aa in out["amino_acid_orders"]:
+        assert out["nonsynonymous_indices"][aa] == out["synonymous_indices"][aa]
+
+
+def test_initialize_nonsyn_groups_3di20_uses_aa_group_mapping():
+    g = _toy_grouping_g()
+    g["nonsyn_recode"] = "3di20"
+    out = recoding.initialize_nonsyn_groups(g)
+    assert out["nonsyn_recode"] == "3di20"
+    assert out["nonsyn_state_orders"].tolist() == out["amino_acid_orders"].tolist()
     for aa in out["amino_acid_orders"]:
         assert out["nonsynonymous_indices"][aa] == out["synonymous_indices"][aa]
 

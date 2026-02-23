@@ -236,3 +236,21 @@ def test_main_inspect_uses_recoded_state_for_state_aa_outputs(tmp_path, monkeypa
     main_inspect.main_inspect(g)
     assert ("csubst_alignment_aa.fa", "nsy") in alignment_calls
     assert ("csubst_plot_state_aa", "nsy", ("AC", "DE")) in plot_calls
+
+
+def test_main_inspect_download_prostt5_exits_before_input_loading(monkeypatch):
+    call_log = []
+
+    def fake_ensure(g):
+        local_g = g
+        call_log.append(("ensure", str(local_g.get("prostt5_model", ""))))
+        return "/tmp/prostt5-cache"
+
+    def fail_if_called(_g):
+        raise AssertionError("read_treefile should not be called in --download_prostt5 mode.")
+
+    monkeypatch.setattr(main_inspect.structural_alphabet, "ensure_prostt5_model_files", fake_ensure)
+    monkeypatch.setattr(main_inspect.tree, "read_treefile", fail_if_called)
+    g = {"download_prostt5": True, "prostt5_model": "Rostlab/ProstT5"}
+    main_inspect.main_inspect(g)
+    assert call_log == [("ensure", "Rostlab/ProstT5")]

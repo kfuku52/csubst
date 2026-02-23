@@ -218,6 +218,8 @@ def main_analyze(g):
         print(txt.format(loaded_branch_ids.shape[0]), flush=True)
     sequence.write_alignment('csubst_alignment_codon.fa', mode='codon', g=g, branch_ids=loaded_branch_ids)
     sequence.write_alignment('csubst_alignment_aa.fa', mode='aa', g=g, branch_ids=loaded_branch_ids)
+    if str(g.get('nonsyn_recode', 'no')).strip().lower() == '3di20':
+        sequence.write_alignment('csubst_alignment_3di.fa', mode='nsy', g=g, branch_ids=loaded_branch_ids)
     g = combination.get_dep_ids(g)
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)

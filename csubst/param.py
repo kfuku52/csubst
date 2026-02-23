@@ -79,6 +79,30 @@ def get_global_parameters(args):
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:
         g[attr] = getattr(args, attr)
+    if 'full_cds_alignment_file' in g.keys():
+        if g['full_cds_alignment_file'] is None:
+            g['full_cds_alignment_file'] = ''
+        else:
+            g['full_cds_alignment_file'] = str(g['full_cds_alignment_file']).strip()
+    else:
+        g['full_cds_alignment_file'] = ''
+    if 'alignment_file' in g.keys():
+        if g['alignment_file'] is None:
+            g['alignment_file'] = ''
+        else:
+            g['alignment_file'] = str(g['alignment_file']).strip()
+    raw_recode_token = str(g.get('nonsyn_recode', 'no')).strip()
+    try:
+        raw_recode_normalized = recoding.normalize_nonsyn_recode(raw_recode_token)
+    except ValueError:
+        raw_recode_normalized = None
+    if raw_recode_normalized == '3di20':
+        full_path = str(g.get('full_cds_alignment_file', '')).strip()
+        if full_path != '':
+            if g.get('alignment_file', '') not in ['', full_path]:
+                txt = '--alignment_file is disabled when --nonsyn_recode is 3di20. Use --full_cds_alignment_file.'
+                raise ValueError(txt)
+            g['alignment_file'] = full_path
     if 'calc_quantile' in g.keys():
         if g['calc_quantile']:
             if g['omegaC_method'] != 'modelfree':
@@ -392,6 +416,52 @@ def get_global_parameters(args):
         g['nonsyn_recode'] = recoding.normalize_nonsyn_recode(g['nonsyn_recode'])
     else:
         g['nonsyn_recode'] = 'no'
+    if 'sa_asr_mode' in g.keys():
+        g['sa_asr_mode'] = str(g['sa_asr_mode']).strip().lower()
+    else:
+        g['sa_asr_mode'] = 'translate'
+    if g['sa_asr_mode'] not in ['translate', 'direct']:
+        raise ValueError('--sa_asr_mode should be one of translate, direct.')
+    if 'prostt5_model' not in g.keys():
+        g['prostt5_model'] = 'Rostlab/ProstT5'
+    g['prostt5_model'] = str(g['prostt5_model']).strip()
+    if g['prostt5_model'] == '':
+        raise ValueError('--prostt5_model should be non-empty.')
+    if 'prostt5_local_dir' not in g.keys():
+        g['prostt5_local_dir'] = ''
+    if g['prostt5_local_dir'] is None:
+        g['prostt5_local_dir'] = ''
+    g['prostt5_local_dir'] = str(g['prostt5_local_dir']).strip()
+    if 'prostt5_no_download' not in g.keys():
+        g['prostt5_no_download'] = False
+    g['prostt5_no_download'] = _parse_bool_like(
+        value=g['prostt5_no_download'],
+        param_name='--prostt5_no_download',
+    )
+    if 'download_prostt5' not in g.keys():
+        g['download_prostt5'] = False
+    g['download_prostt5'] = _parse_bool_like(
+        value=g['download_prostt5'],
+        param_name='--download_prostt5',
+    )
+    if 'prostt5_device' not in g.keys():
+        g['prostt5_device'] = 'auto'
+    g['prostt5_device'] = str(g['prostt5_device']).strip().lower()
+    if g['prostt5_device'] not in ['auto', 'cpu', 'cuda']:
+        raise ValueError('--prostt5_device should be one of auto, cpu, cuda.')
+    if 'sa_iqtree_model' not in g.keys():
+        g['sa_iqtree_model'] = 'GTR20'
+    g['sa_iqtree_model'] = str(g['sa_iqtree_model']).strip()
+    if g['sa_iqtree_model'] == '':
+        raise ValueError('--sa_iqtree_model should be non-empty.')
+    if g['nonsyn_recode'] == '3di20':
+        full_path = str(g.get('full_cds_alignment_file', '')).strip()
+        if full_path == '':
+            raise ValueError('--nonsyn_recode 3di20 requires --full_cds_alignment_file.')
+        if g.get('alignment_file', '') not in ['', full_path]:
+            txt = '--alignment_file is disabled when --nonsyn_recode is 3di20. Use --full_cds_alignment_file.'
+            raise ValueError(txt)
+        g['alignment_file'] = full_path
     if 'output_stat' in g.keys():
         g['output_stats'] = output_stat.parse_output_stats(g['output_stat'])
     else:

@@ -10,6 +10,7 @@ from csubst import foreground
 from csubst import genetic_code
 from csubst import parser_misc
 from csubst import sequence
+from csubst import structural_alphabet
 from csubst import tree
 
 
@@ -122,6 +123,12 @@ def _get_aa_state_view_for_inspect(g):
 
 def main_inspect(g):
     start = time.time()
+    if bool(g.get("download_prostt5", False)):
+        model_source = structural_alphabet.ensure_prostt5_model_files(g=g)
+        print("ProstT5 model files are ready: {}".format(model_source), flush=True)
+        elapsed_time = int(time.time() - start)
+        print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
+        return
     print("Reading and parsing input files.", flush=True)
     g["codon_table"] = genetic_code.get_codon_table(ncbi_id=g["genetic_code"])
     g = tree.read_treefile(g)
@@ -136,6 +143,8 @@ def main_inspect(g):
     sequence.write_alignment("csubst_alignment_codon.fa", mode="codon", g=g, branch_ids=loaded_branch_ids)
     aa_state, aa_orders, aa_mode = _get_aa_state_view_for_inspect(g)
     sequence.write_alignment("csubst_alignment_aa.fa", mode=aa_mode, g=g, branch_ids=loaded_branch_ids)
+    if str(g.get("nonsyn_recode", "no")).strip().lower() == "3di20":
+        sequence.write_alignment("csubst_alignment_3di.fa", mode="nsy", g=g, branch_ids=loaded_branch_ids)
 
     tree.write_tree(g["tree"])
     tree.plot_branch_category(g, file_base="csubst_branch_id", label="all")

@@ -12,6 +12,7 @@ from csubst import sequence
 from csubst import parser_phylobayes
 from csubst import parser_iqtree
 from csubst import recoding
+from csubst import structural_alphabet
 from csubst import tree
 from csubst import ete
 
@@ -22,6 +23,15 @@ def _initialize_and_report_nonsyn_recode(g):
     if g["nonsyn_recode"] != "no":
         txt = "Applying nonsynonymous recoding scheme: {}"
         print(txt.format(g["nonsyn_recode"]))
+        if g["nonsyn_recode"] == "3di20":
+            txt = "3Di mode: --sa_asr_mode={}, ProstT5 model={}, direct IQ-TREE model={}"
+            print(
+                txt.format(
+                    g.get("sa_asr_mode", "translate"),
+                    g.get("prostt5_model", "Rostlab/ProstT5"),
+                    g.get("sa_iqtree_model", "GTR20"),
+                )
+            )
         recoding.write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv")
     if write_pca:
         recoding.write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.png")
@@ -707,28 +717,56 @@ def prep_state(g):
     state_pep = None
     state_nsy = None
     loaded_branch_ids = g.get('state_loaded_branch_ids', None)
+
+    def _resolve_state_nsy(state_cdn_local, state_pep_local):
+        if g.get('nonsyn_recode', 'no') != '3di20':
+            return sequence.cdn2nsy_state(
+                state_cdn=state_cdn_local,
+                g=g,
+                selected_branch_ids=loaded_branch_ids,
+            )
+        sa_mode = str(g.get('sa_asr_mode', 'translate')).strip().lower()
+        if sa_mode == 'translate':
+            state_nsy_local, state_orders, aligned_3di = structural_alphabet.build_3di_state_from_state_pep(
+                g=g,
+                state_pep=state_pep_local,
+                selected_branch_ids=loaded_branch_ids,
+            )
+            g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
+            g['_3di_alignment_by_branch_id'] = aligned_3di
+            return state_nsy_local
+        if sa_mode == 'direct':
+            state_nsy_local, state_orders, tip_3di = structural_alphabet.build_3di_state_direct(
+                g=g,
+                selected_branch_ids=loaded_branch_ids,
+            )
+            g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
+            g['_3di_tip_alignment_by_leaf'] = tip_3di
+            return state_nsy_local
+        raise ValueError('--sa_asr_mode should be one of translate, direct.')
+
     if (g['infile_type'] == 'phylobayes'):
         from csubst import parser_phylobayes
         if g['input_data_type'] == 'nuc': # obsoleted
             state_nuc = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-            state_nsy = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
         elif g['input_data_type'] == 'cdn':
             state_cdn = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-            state_nsy = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
     elif (g['infile_type'] == 'iqtree'):
         from csubst import parser_iqtree
         if g['input_data_type'] == 'nuc': # obsoleted
             state_nuc = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-            state_nsy = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
         elif g['input_data_type'] == 'cdn':
             state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-            state_nsy = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
     g['state_nuc'] = state_nuc
     g['state_cdn'] = state_cdn
     g['state_pep'] = state_pep
