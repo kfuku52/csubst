@@ -74,6 +74,15 @@ def command_analyze(args):
     print('csubst analyze: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst analyze end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
+def command_inspect(args):
+    print('csubst inspect start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    g = get_global_parameters_or_exit(args)
+    from csubst.main_inspect import main_inspect
+    main_inspect(g)
+    print('csubst inspect: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst inspect end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
 def _main():
     # Start time
     csubst_start = time.time()
@@ -106,6 +115,9 @@ def _main():
     psr_co.add_argument('--sub_tensor_sparse_density_cutoff', metavar='FLOAT', default=0.15, type=float, required=False,
                         help='default=%(default)s: Density cutoff for --sub_tensor_backend auto. '
                              'Sparse reducers are selected when estimated substitution tensor density is <= this value.')
+    psr_co.add_argument('--sub_tensor_auto_sparse_min_elements', metavar='INT', default=100000000, type=int, required=False,
+                        help='default=%(default)s: For --sub_tensor_backend auto, build sparse substitution tensors '
+                             'when estimated tensor elements (branch x site x group x from x to) are >= this threshold.')
     psr_co.add_argument('--parallel_backend', metavar='auto|multiprocessing|threading|loky', default='auto', type=str,
                         choices=['auto', 'multiprocessing', 'threading', 'loky'],
                         help='default=%(default)s: Backend policy for parallel workloads. '
@@ -114,6 +126,35 @@ def _main():
                         help='default=%(default)s: Number of chunks per worker for general parallel workloads.')
     psr_co.add_argument('--parallel_chunk_factor_reducer', metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of chunks per worker for dense/sparse combinatorial reducers.')
+    psr_co.add_argument('--parallel_min_items_sub_tensor', metavar='INT', default=256, type=int, required=False,
+                        help='default=%(default)s: Minimum number of branch pairs to enable parallel substitution-tensor generation.')
+    psr_co.add_argument('--parallel_min_items_per_job_sub_tensor', metavar='INT', default=64, type=int, required=False,
+                        help='default=%(default)s: Minimum branch pairs assigned per worker in substitution-tensor generation.')
+    psr_co.add_argument('--parallel_min_items_node_union', metavar='INT', default=20000, type=int, required=False,
+                        help='default=%(default)s: Minimum pair-union workload to enable parallel node-union in branch-combination generation.')
+    psr_co.add_argument('--parallel_min_items_per_job_node_union', metavar='INT', default=5000, type=int, required=False,
+                        help='default=%(default)s: Minimum pair-unions assigned per worker in node-union.')
+    psr_co.add_argument('--parallel_min_items_nc_matrix', metavar='INT', default=100000, type=int, required=False,
+                        help='default=%(default)s: Minimum number of branch combinations to enable parallel nc-matrix population.')
+    psr_co.add_argument('--parallel_min_items_per_job_nc_matrix', metavar='INT', default=25000, type=int, required=False,
+                        help='default=%(default)s: Minimum branch combinations assigned per worker in nc-matrix population.')
+    psr_co.add_argument('--parallel_min_items_cb', metavar='INT', default=20000, type=int, required=False,
+                        help='default=%(default)s: Minimum number of branch combinations to enable parallel cb reducers.')
+    psr_co.add_argument('--parallel_min_items_per_job_cb', metavar='INT', default=5000, type=int, required=False,
+                        help='default=%(default)s: Minimum branch combinations assigned per worker in cb reducers.')
+    psr_co.add_argument('--parallel_min_rows_cbs', metavar='INT', default=200000, type=int, required=False,
+                        help='default=%(default)s: Minimum number of output rows (combination x site) to enable parallel cbs reducers.')
+    psr_co.add_argument('--parallel_min_rows_per_job_cbs', metavar='INT', default=50000, type=int, required=False,
+                        help='default=%(default)s: Minimum cbs output rows assigned per worker.')
+    psr_co.add_argument('--parallel_min_items_branch_dist', metavar='INT', default=20000, type=int, required=False,
+                        help='default=%(default)s: Minimum number of branch combinations to enable parallel branch-distance calculation.')
+    psr_co.add_argument('--parallel_min_items_per_job_branch_dist', metavar='INT', default=5000, type=int, required=False,
+                        help='default=%(default)s: Minimum branch combinations assigned per worker in branch-distance calculation.')
+    psr_co.add_argument('--parallel_min_items_expected_state', metavar='INT', default=50000000, type=int, required=False,
+                        help='default=%(default)s: Minimum estimated expected-state workload '
+                             '(branch x site x state x state) to enable parallel expected-state projection.')
+    psr_co.add_argument('--parallel_min_items_per_job_expected_state', metavar='INT', default=10000000, type=int, required=False,
+                        help='default=%(default)s: Minimum estimated expected-state workload per worker.')
     psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')
 
@@ -146,6 +187,21 @@ def _main():
     psr_as.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,
                          help='default=%(default)s: The minimum posterior probability of single substitutions to count. '
                               'Set 0 for a counting without binarization. Omitted if --ml_anc is set to "yes".')
+    psr_as.add_argument('--drop_invariant_tip_sites', metavar='no|tip_invariant|zero_sub_mass', default='tip_invariant', type=str,
+                        help='default=%(default)s: Site-drop criterion before substitution-tensor generation. '
+                             '"no" disables site dropping. '
+                             '"tip_invariant" drops codon sites invariant across non-missing tips '
+                             '(including sites with only one unambiguous tip codon). '
+                             '"zero_sub_mass" drops only sites guaranteed to have zero observed substitution mass '
+                             '(both N and S) across analyzed branches. '
+                             'When dropping is enabled, csubst_site_index_map.tsv is written to map retained internal '
+                             'site indices to original alignment positions.')
+    psr_rc = argparse.ArgumentParser(add_help=False)
+    psr_rc.add_argument('--nonsyn_recode', metavar='no|dayhoff6|sr6|kgb6|sr4|dayhoff9|dayhoff12|dayhoff15|dayhoff18|srchisq6|kgbauto6',
+                        default='no', type=str,
+                        help='default=%(default)s: Recoding scheme for nonsynonymous-state calculations. '
+                             'Use "no" for standard 20 amino-acid states. '
+                             '"srchisq6" and "kgbauto6" infer 6-state groupings from alignment composition.')
 
     # shared: PhyloBayes inputs, but PhyloBayes is no longer supported.
     psr_pb = argparse.ArgumentParser(add_help=False)
@@ -226,7 +282,7 @@ def _main():
     # site
     help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps it onto protein structure. '
     help_txt += ' See `csubst site -h`'
-    site = subparsers.add_parser('site', help=help_txt, parents=[psr_co,psr_iq,psr_as])
+    site = subparsers.add_parser('site', help=help_txt, parents=[psr_co,psr_iq,psr_as,psr_rc])
     site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default='', required=False, type=str,
                       help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
                       'Run `csubst analyze` first and select branches of interest. '
@@ -237,9 +293,9 @@ def _main():
                       '"intersection", visualize combinatorial substitutions in branches specified by --branch_id. '
                       '"lineage", process branches between ancestor/descendant specified by --branch_id ANC,DES. '
                       '"set,SUBTYPE,EXPR", evaluate set operations among branch-wise substitutions (|, -, &, ^). '
-                      'SUBTYPE: any2any, any2spe, spe2any, or spe2spe. '
+                      'SUBTYPE: any or spe. '
                       'Use "A" for all other non-root branches. '
-                      'e.g. "set,any2any,((117|48)-A)".')
+                      'e.g. "set,any,((117|48)-A)".')
     site.add_argument('--tree_site_plot', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Generate a matplotlib-based tree + site summary plot.')
     site.add_argument('--site_state_plot', metavar='yes|no', default='yes', type=strtobool,
@@ -257,6 +313,17 @@ def _main():
     site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=30, required=False, type=int,
                       help='default=%(default)s: Maximum number of plotted sites in the tree + site summary '
                            '(convergent and divergent columns are balanced when both are available).')
+    site.add_argument('--species_regex', metavar='REGEX', default='^([^_]+_[^_]+)_', required=False, type=str,
+                      help='default=%(default)s: Regular expression for extracting species IDs from leaf labels '
+                           'for species-overlap node annotation in tree plots. '
+                           'If the regex contains capture groups, the first non-empty captured group is used; '
+                           'otherwise, the full regex match is used. '
+                           'For GENUS_SPECIES_GENEID labels, the default works as-is.')
+    site.add_argument('--species_overlap_node_plot', metavar='yes|no|auto', default='auto', required=False, type=str,
+                      help='default=%(default)s: Show speciation/duplication node markers in tree plots. '
+                           '"yes" always tries to plot, "no" disables them, and "auto" enables them only when '
+                           'all tip labels are parseable by --species_regex '
+                           '(GENUS_SPECIES_GENEID labels satisfy the default regex).')
     site.add_argument('--site_output_manifest', metavar='yes|no', default='yes', required=False, type=strtobool,
                       help='default=%(default)s: Write csubst_site.outputs.tsv with generated files, '
                            'sizes, branch IDs, and key plotting parameters.')
@@ -332,7 +399,7 @@ def _main():
 
     # analyze
     help_txt = 'calculates convergence rates and other metrics on branch combinations.  See `csubst analyze -h`'
-    analyze = subparsers.add_parser('analyze', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as])
+    analyze = subparsers.add_parser('analyze', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as,psr_rc])
     analyze.set_defaults(handler=command_analyze)
     # branch combinations
     analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
@@ -377,15 +444,6 @@ def _main():
                          help='default=%(default)s: Branch-site output. Set "yes" to generate the output tsv.')
     analyze.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output tsv.')
-    # Plot outputs
-    analyze.add_argument('--more_tree_plot', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: More tree plots to generate.')
-    analyze.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Tree plots with per-site ancestral amino acid states. '
-                              'This option will generate many pdfs')
-    analyze.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Tree plots with per-site ancestral codon states. '
-                              'This option will generate many pdfs')
     # Omega_C calculation
     analyze.add_argument('--omegaC_method', metavar='[submodel|modelfree]', default='submodel', type=str,
                          choices=['modelfree','submodel'],
@@ -414,6 +472,17 @@ def _main():
     analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
                               'by quantile-based transformation.')
+
+    # inspect
+    help_txt = 'writes branch/tree/state inspection outputs without running convergence statistics. See `csubst inspect -h`'
+    inspect = subparsers.add_parser('inspect', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as,psr_rc])
+    inspect.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
+                         help='default=%(default)s: Write per-site ancestral amino-acid state trees into csubst_plot_state_aa/.')
+    inspect.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
+                         help='default=%(default)s: Write per-site ancestral codon state trees into csubst_plot_state_codon/.')
+    inspect.add_argument('--plot_nonsyn_recode_pca', metavar='yes|no', default='no', type=strtobool,
+                         help='default=%(default)s: Write csubst_nonsyn_recoding_pca.png from input alignment.')
+    inspect.set_defaults(handler=command_inspect)
 
     # Handler
     args = parser.parse_args()

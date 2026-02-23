@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+from scipy.linalg import blas as scipy_blas
 
 import os
 import re
@@ -23,6 +24,11 @@ from csubst import output_stat
 _CB_BASE_SUBSTITUTIONS = ("any2any", "spe2any", "any2spe", "spe2spe")
 _SUB_TENSOR_BACKENDS = ('auto', 'dense', 'sparse')
 _CYTHON_FALLBACK_WARNED = set()
+_SPARSE_CB_SUMMARY_GRAM_MIN_COMBINATIONS = 512
+_SPARSE_CB_SUMMARY_GRAM_MAX_BRANCHES = 512
+_SPARSE_CB_SUMMARY_SYRK_MIN_FEATURES = 10000
+_SPARSE_SUB_TENSOR_INDEXED_CHILD_MAX_DENSITY = 0.35
+_SUB_TENSOR_PARALLEL_SITE_BLOCK_SIZE = 5000
 
 
 def _warn_cython_fallback(fastpath_name, exc):
@@ -109,6 +115,68 @@ def _get_selected_branch_set(g):
     return set(int(v) for v in _normalize_branch_ids(selected_branch_ids))
 
 
+def _collect_sub_tensor_branch_pairs(g, state_tensor_anc, selected_branch_set):
+    parent_state_mass = state_tensor_anc.sum(axis=(1, 2))
+    branch_pairs = []
+    for node in g['tree'].traverse():
+        if ete.is_root(node):
+            continue
+        child = int(ete.get_prop(node, "numerical_label"))
+        if (selected_branch_set is not None) and (child not in selected_branch_set):
+            continue
+        parent = int(ete.get_prop(node.up, "numerical_label"))
+        if parent_state_mass[parent] < g['float_tol']:
+            continue
+        branch_pairs.append((child, parent))
+    return branch_pairs
+
+
+def _estimate_sub_tensor_parallel_items(num_branch_pairs, state_tensor, mode):
+    if num_branch_pairs <= 0:
+        return int(num_branch_pairs)
+    if state_tensor is None:
+        return int(num_branch_pairs)
+    if (not hasattr(state_tensor, 'shape')) or (len(state_tensor.shape) < 2):
+        return int(num_branch_pairs)
+    num_site = int(state_tensor.shape[1])
+    site_blocks = max(1, (num_site + (_SUB_TENSOR_PARALLEL_SITE_BLOCK_SIZE - 1)) // _SUB_TENSOR_PARALLEL_SITE_BLOCK_SIZE)
+    if mode == 'asis':
+        num_state = int(state_tensor.shape[2]) if len(state_tensor.shape) > 2 else 1
+    elif mode == 'syn':
+        # Synonymous tensors are grouped into small state blocks; keep the scaling conservative.
+        num_state = 6
+    else:
+        num_state = int(state_tensor.shape[2]) if len(state_tensor.shape) > 2 else 1
+    state_factor = max(1, num_state // 10)
+    return int(num_branch_pairs) * int(site_blocks) * int(state_factor)
+
+
+def _resolve_sub_tensor_parallel_n_jobs(num_branch_pairs, g, state_tensor=None, mode=''):
+    # Backward compatibility: explicit legacy knob keeps old behavior unless new total-size threshold is set.
+    if ('parallel_sub_tensor_min_branches_per_job' in g.keys()) and ('parallel_min_items_sub_tensor' not in g.keys()):
+        min_items_for_parallel = 0
+    else:
+        min_items_for_parallel = int(g.get('parallel_min_items_sub_tensor', 256))
+    min_items_per_job = int(
+        g.get(
+            'parallel_min_items_per_job_sub_tensor',
+            g.get('parallel_sub_tensor_min_branches_per_job', 64),
+        )
+    )
+    estimated_items = _estimate_sub_tensor_parallel_items(
+        num_branch_pairs=num_branch_pairs,
+        state_tensor=state_tensor,
+        mode=mode,
+    )
+    effective_items = max(int(num_branch_pairs), int(estimated_items))
+    return parallel.resolve_adaptive_n_jobs(
+        num_items=effective_items,
+        threads=int(g.get('threads', 1)),
+        min_items_for_parallel=min_items_for_parallel,
+        min_items_per_job=min_items_per_job,
+    )
+
+
 def _resolve_output_dtype(source_dtype, default_dtype):
     if np.dtype(source_dtype) == np.dtype(bool):
         return np.int32
@@ -177,18 +245,56 @@ def _get_combo_index_range(mmap_start, num_combinations):
     return start, end
 
 
-def resolve_sub_tensor_backend(g):
-    if 'resolved_sub_tensor_backend' in g.keys():
-        return g['resolved_sub_tensor_backend']
+def _estimate_sub_tensor_num_elements(state_tensor, mode, g):
+    if state_tensor is None:
+        return None
+    if not hasattr(state_tensor, 'shape'):
+        return None
+    if len(state_tensor.shape) < 3:
+        return None
+    num_branch = int(state_tensor.shape[0])
+    num_site = int(state_tensor.shape[1])
+    if mode == 'asis':
+        num_group = 1
+        num_state = int(state_tensor.shape[2])
+    elif mode == 'syn':
+        num_group = int(len(g['amino_acid_orders']))
+        num_state = int(g['max_synonymous_size'])
+    else:
+        return None
+    return num_branch * num_site * num_group * num_state * num_state
+
+
+def resolve_sub_tensor_backend(g, state_tensor=None, mode=''):
     requested = _resolve_requested_sub_tensor_backend(g)
-    if requested in ['auto', 'dense']:
+    details = ''
+    if requested == 'dense':
         resolved = 'dense'
     elif requested == 'sparse':
         resolved = 'sparse'
+    elif requested == 'auto':
+        min_elements = int(g.get('sub_tensor_auto_sparse_min_elements', 100000000))
+        estimated_elements = _estimate_sub_tensor_num_elements(
+            state_tensor=state_tensor,
+            mode=mode,
+            g=g,
+        )
+        if estimated_elements is None:
+            resolved = 'dense'
+        else:
+            resolved = 'sparse' if (estimated_elements >= min_elements) else 'dense'
+            details = 'mode={}, estimated_elements={:,}, min_elements={:,}'.format(
+                mode,
+                estimated_elements,
+                min_elements,
+            )
     g['sub_tensor_backend'] = requested
     g['resolved_sub_tensor_backend'] = resolved
     txt = 'Substitution tensor backend: requested={}, resolved={}'
-    print(txt.format(requested, resolved), flush=True)
+    if details == '':
+        print(txt.format(requested, resolved), flush=True)
+    else:
+        print((txt + ' ({})').format(requested, resolved, details), flush=True)
     return resolved
 
 def dense_to_sparse_sub_tensor(sub_tensor, tol=0):
@@ -305,6 +411,139 @@ def _get_sparse_combination_group_tensor(sub_tensor, branch_ids, sg, data_type=N
     return out
 
 
+def _accumulate_sparse_sub_tensor_chunk(branch_pairs, state_tensor, state_tensor_anc, mode, amino_acid_orders, syn_indices_list):
+    # key -> {row(branch_id): (cols, data)}
+    sparse_entries = defaultdict(dict)
+    if mode == 'asis':
+        num_state = state_tensor.shape[2]
+    elif mode != 'syn':
+        raise ValueError('Unsupported mode for sparse substitution tensor: {}'.format(mode))
+    for child, parent in branch_pairs:
+        child_id = int(child)
+        parent_matrix = state_tensor_anc[parent, :, :]
+        child_matrix = state_tensor[child_id, :, :]
+        if mode == 'asis':
+            child_density = np.count_nonzero(child_matrix) / child_matrix.size
+            if child_density <= _SPARSE_SUB_TENSOR_INDEXED_CHILD_MAX_DENSITY:
+                child_payload = []
+                for d in range(num_state):
+                    child_state = child_matrix[:, d]
+                    child_nz = np.flatnonzero(child_state)
+                    if child_nz.shape[0] == 0:
+                        child_payload.append(None)
+                        continue
+                    child_payload.append((child_nz, child_state[child_nz]))
+                for d, payload in enumerate(child_payload):
+                    if payload is None:
+                        continue
+                    child_nz, child_vals = payload
+                    vals_by_from = parent_matrix[child_nz, :] * child_vals[:, None]
+                    for a in range(num_state):
+                        if a == d:
+                            continue
+                        vals = vals_by_from[:, a]
+                        nz_local = np.flatnonzero(vals)
+                        if nz_local.shape[0] == 0:
+                            continue
+                        if nz_local.shape[0] == child_nz.shape[0]:
+                            nz = child_nz
+                            selected_vals = vals
+                        else:
+                            nz = child_nz[nz_local]
+                            selected_vals = vals[nz_local]
+                        sparse_entries[(0, a, d)][child_id] = (
+                            np.asarray(nz, dtype=np.int32),
+                            np.asarray(selected_vals, dtype=state_tensor.dtype),
+                        )
+            else:
+                for a in range(num_state):
+                    parent_state = parent_matrix[:, a]
+                    if not np.any(parent_state):
+                        continue
+                    for d in range(num_state):
+                        if a == d:
+                            continue
+                        vals = parent_state * child_matrix[:, d]
+                        nz = np.where(vals != 0)[0]
+                        if nz.shape[0] == 0:
+                            continue
+                        sparse_entries[(0, a, d)][child_id] = (
+                            np.asarray(nz, dtype=np.int32),
+                            np.asarray(vals[nz], dtype=state_tensor.dtype),
+                        )
+        elif mode == 'syn':
+            for sg, ind in enumerate(syn_indices_list):
+                size = ind.shape[0]
+                if size <= 1:
+                    continue
+                parent_sub = state_tensor_anc[parent, :, ind]
+                child_sub = state_tensor[child_id, :, ind]
+                # Advanced indexing keeps state as the first axis, but normalize defensively.
+                if parent_sub.shape[0] != size:
+                    parent_sub = parent_sub.T
+                if child_sub.shape[0] != size:
+                    child_sub = child_sub.T
+                child_density = np.count_nonzero(child_sub) / child_sub.size
+                if child_density <= _SPARSE_SUB_TENSOR_INDEXED_CHILD_MAX_DENSITY:
+                    child_payload = []
+                    for d in range(size):
+                        child_state = child_sub[d, :]
+                        child_nz = np.flatnonzero(child_state)
+                        if child_nz.shape[0] == 0:
+                            child_payload.append(None)
+                            continue
+                        child_payload.append((child_nz, child_state[child_nz]))
+                    for d, payload in enumerate(child_payload):
+                        if payload is None:
+                            continue
+                        child_nz, child_vals = payload
+                        vals_by_from = parent_sub[:, child_nz].T * child_vals[:, None]
+                        for a in range(size):
+                            if a == d:
+                                continue
+                            vals = vals_by_from[:, a]
+                            nz_local = np.flatnonzero(vals)
+                            if nz_local.shape[0] == 0:
+                                continue
+                            if nz_local.shape[0] == child_nz.shape[0]:
+                                nz = child_nz
+                                selected_vals = vals
+                            else:
+                                nz = child_nz[nz_local]
+                                selected_vals = vals[nz_local]
+                            sparse_entries[(sg, a, d)][child_id] = (
+                                np.asarray(nz, dtype=np.int32),
+                                np.asarray(selected_vals, dtype=state_tensor.dtype),
+                            )
+                else:
+                    for a in range(size):
+                        parent_state = parent_sub[a, :]
+                        if not np.any(parent_state):
+                            continue
+                        for d in range(size):
+                            if a == d:
+                                continue
+                            vals = parent_state * child_sub[d, :]
+                            nz = np.where(vals != 0)[0]
+                            if nz.shape[0] == 0:
+                                continue
+                            sparse_entries[(sg, a, d)][child_id] = (
+                                np.asarray(nz, dtype=np.int32),
+                                np.asarray(vals[nz], dtype=state_tensor.dtype),
+                            )
+    return sparse_entries
+
+
+def _merge_sparse_entry_maps(entry_maps):
+    merged = defaultdict(dict)
+    for entry_map in entry_maps:
+        for key, row_map in entry_map.items():
+            out_row_map = merged[key]
+            for row, cols_data in row_map.items():
+                out_row_map[int(row)] = cols_data
+    return merged
+
+
 def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
     dtype = state_tensor.dtype
     num_branch = state_tensor.shape[0]
@@ -312,77 +551,79 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
     if mode == 'asis':
         num_syngroup = 1
         num_state = state_tensor.shape[2]
+        amino_acid_orders = None
+        syn_indices_list = None
     elif mode == 'syn':
         num_syngroup = len(g['amino_acid_orders'])
         num_state = g['max_synonymous_size']
+        amino_acid_orders = list(g['amino_acid_orders'])
+        syn_indices_list = [np.asarray(g['synonymous_indices'][aa], dtype=np.int64) for aa in amino_acid_orders]
     else:
         raise ValueError('Unsupported mode for sparse substitution tensor: {}'.format(mode))
-    sparse_entries = defaultdict(lambda: [list(), list(), list()])  # key -> [rows, cols, data]
     selected_branch_set = _get_selected_branch_set(g)
-    parent_state_mass = state_tensor_anc.sum(axis=(1, 2))
-    for node in g['tree'].traverse():
-        if ete.is_root(node):
-            continue
-        child = ete.get_prop(node, "numerical_label")
-        if (selected_branch_set is not None) and (child not in selected_branch_set):
-            continue
-        parent = ete.get_prop(node.up, "numerical_label")
-        if parent_state_mass[parent] < g['float_tol']:
-            continue
-        parent_matrix = state_tensor_anc[parent, :, :]
-        child_matrix = state_tensor[child, :, :]
-        if mode == 'asis':
-            for a in range(num_state):
-                parent_state = parent_matrix[:, a]
-                if not np.any(parent_state):
-                    continue
-                for d in range(num_state):
-                    if a == d:
-                        continue
-                    vals = parent_state * child_matrix[:, d]
-                    nz = np.where(vals != 0)[0]
-                    if nz.shape[0] == 0:
-                        continue
-                    rows, cols, data = sparse_entries[(0, a, d)]
-                    rows.extend([child] * nz.shape[0])
-                    cols.extend(nz.tolist())
-                    data.extend(vals[nz].tolist())
-        elif mode == 'syn':
-            for sg, aa in enumerate(g['amino_acid_orders']):
-                ind = np.array(g['synonymous_indices'][aa], dtype=np.int64)
-                size = ind.shape[0]
-                if size <= 1:
-                    continue
-                # Keep indexing semantics consistent with dense path: [state, site].
-                parent_sub = state_tensor_anc[parent, :, ind]
-                child_sub = state_tensor[child, :, ind]
-                for a in range(size):
-                    parent_state = parent_sub[a, :]
-                    if not np.any(parent_state):
-                        continue
-                    for d in range(size):
-                        if a == d:
-                            continue
-                        vals = parent_state * child_sub[d, :]
-                        nz = np.where(vals != 0)[0]
-                        if nz.shape[0] == 0:
-                            continue
-                        rows, cols, data = sparse_entries[(sg, a, d)]
-                        rows.extend([child] * nz.shape[0])
-                        cols.extend(nz.tolist())
-                        data.extend(vals[nz].tolist())
+    branch_pairs = _collect_sub_tensor_branch_pairs(
+        g=g,
+        state_tensor_anc=state_tensor_anc,
+        selected_branch_set=selected_branch_set,
+    )
+    n_jobs = _resolve_sub_tensor_parallel_n_jobs(
+        num_branch_pairs=len(branch_pairs),
+        g=g,
+        state_tensor=state_tensor,
+        mode=mode,
+    )
+    txt = 'Sub-tensor scheduler (sparse, mode={}): branches={}, workers={} (threads={})'
+    print(txt.format(mode, len(branch_pairs), n_jobs, int(g.get('threads', 1))), flush=True)
+    if n_jobs == 1:
+        sparse_entries = _accumulate_sparse_sub_tensor_chunk(
+            branch_pairs=branch_pairs,
+            state_tensor=state_tensor,
+            state_tensor_anc=state_tensor_anc,
+            mode=mode,
+            amino_acid_orders=amino_acid_orders,
+            syn_indices_list=syn_indices_list,
+        )
+    else:
+        chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+        branch_chunks, _ = parallel.get_chunks(input_data=branch_pairs, threads=n_jobs, chunk_factor=chunk_factor)
+        txt = 'Parallel sparse substitution-tensor generation: branches={}, workers={}, chunks={}'
+        print(txt.format(len(branch_pairs), n_jobs, len(branch_chunks)), flush=True)
+        tasks = [
+            (chunk, state_tensor, state_tensor_anc, mode, amino_acid_orders, syn_indices_list)
+            for chunk in branch_chunks
+        ]
+        chunk_maps = parallel.run_starmap(
+            func=_accumulate_sparse_sub_tensor_chunk,
+            args_iterable=tasks,
+            n_jobs=n_jobs,
+            backend='threading',
+        )
+        sparse_entries = _merge_sparse_entry_maps(chunk_maps)
     blocks = dict()
     shape = (num_branch, num_site)
-    for key, (rows, cols, data) in sparse_entries.items():
-        if len(data) == 0:
+    for key, row_map in sparse_entries.items():
+        if len(row_map) == 0:
             continue
-        mat = sp.coo_matrix(
-            (np.asarray(data, dtype=dtype), (np.asarray(rows), np.asarray(cols))),
+        indptr = np.zeros(shape=(num_branch + 1,), dtype=np.int64)
+        nnz = 0
+        for row, (cols, _vals) in row_map.items():
+            row = int(row)
+            indptr[row + 1] = int(cols.shape[0])
+            nnz += int(cols.shape[0])
+        np.cumsum(indptr, out=indptr)
+        indices = np.empty(shape=(nnz,), dtype=np.int32)
+        data = np.empty(shape=(nnz,), dtype=dtype)
+        for row, (cols, vals) in row_map.items():
+            row = int(row)
+            start = int(indptr[row])
+            end = int(indptr[row + 1])
+            indices[start:end] = np.asarray(cols, dtype=np.int32)
+            data[start:end] = np.asarray(vals, dtype=dtype)
+        mat = sp.csr_matrix(
+            (data, indices, indptr),
             shape=shape,
             dtype=dtype,
-        ).tocsr()
-        mat.sum_duplicates()
-        mat.eliminate_zeros()
+        )
         if mat.nnz > 0:
             blocks[key] = mat
     tensor_shape = (num_branch, num_site, num_syngroup, num_state, num_state)
@@ -684,10 +925,83 @@ def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None)
     sub_tensor = np.memmap(mmap_tensor, dtype=dtype, shape=axis, mode='w+')
     return sub_tensor
 
+
+def _fill_dense_sub_tensor_chunk_asis(branch_pairs, state_tensor, state_tensor_anc, sub_tensor):
+    if len(branch_pairs) == 0:
+        return None
+    num_state = state_tensor.shape[2]
+    diag_zero = np.diag([-1] * num_state) + 1
+    for child, parent in branch_pairs:
+        parent_matrix = state_tensor_anc[parent, :, :]
+        child_matrix = state_tensor[child, :, :]
+        out_branch_group = sub_tensor[child, :, 0, :, :]
+        if _can_use_cython_asis_sub_tensor_fill(
+            parent_matrix=parent_matrix,
+            child_matrix=child_matrix,
+            out_branch_group=out_branch_group,
+        ):
+            substitution_cy.fill_sub_tensor_asis_branch_double(
+                parent_matrix=parent_matrix,
+                child_matrix=child_matrix,
+                out_branch_group=out_branch_group,
+            )
+        else:
+            sub_matrix = np.einsum("sa,sd,ad->sad", parent_matrix, child_matrix, diag_zero)
+            out_branch_group[:, :, :] = sub_matrix
+    return None
+
+
+def _fill_dense_sub_tensor_chunk_syn(
+    branch_pairs,
+    state_tensor,
+    state_tensor_anc,
+    sub_tensor,
+    amino_acid_orders,
+    syn_indices_list,
+    syn_index_matrix,
+    syn_group_sizes,
+):
+    if len(branch_pairs) == 0:
+        return None
+    diag_zero_by_size = dict()
+    for child, parent in branch_pairs:
+        parent_matrix = state_tensor_anc[parent, :, :]
+        child_matrix = state_tensor[child, :, :]
+        out_branch_tensor = sub_tensor[child, :, :, :, :]
+        if _can_use_cython_syn_sub_tensor_fill(
+            parent_matrix=parent_matrix,
+            child_matrix=child_matrix,
+            syn_index_matrix=syn_index_matrix,
+            syn_group_sizes=syn_group_sizes,
+            out_branch_tensor=out_branch_tensor,
+        ):
+            substitution_cy.fill_sub_tensor_syn_branch_double(
+                parent_matrix=parent_matrix,
+                child_matrix=child_matrix,
+                syn_index_matrix=syn_index_matrix,
+                syn_group_sizes=syn_group_sizes,
+                out_branch_tensor=out_branch_tensor,
+            )
+            continue
+        for s, _aa in enumerate(amino_acid_orders):
+            ind = syn_indices_list[s]
+            size = ind.shape[0]
+            if size == 0:
+                continue
+            if size not in diag_zero_by_size:
+                diag_zero_by_size[size] = np.diag([-1] * size) + 1
+            diag_zero = diag_zero_by_size[size]
+            parent_group_matrix = state_tensor_anc[parent, :, ind]
+            child_group_matrix = state_tensor[child, :, ind]
+            sub_matrix = np.einsum("as,ds,ad->sad", parent_group_matrix, child_group_matrix, diag_zero)
+            sub_tensor[child, :, s, :size, :size] = sub_matrix
+    return None
+
+
 def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None, mmap_attr=''):
     if g is None:
         raise ValueError('g is required.')
-    backend = resolve_sub_tensor_backend(g)
+    backend = resolve_sub_tensor_backend(g=g, state_tensor=state_tensor, mode=mode)
     ml_anc = _parse_bool_like(g.get('ml_anc', False), 'ml_anc')
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
@@ -702,69 +1016,78 @@ def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None
     sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
     if not ml_anc:
         sub_tensor[:,:,:,:,:] = np.nan
-    parent_state_mass = state_tensor_anc.sum(axis=(1, 2))
-    diag_zero = None
+    branch_pairs = _collect_sub_tensor_branch_pairs(
+        g=g,
+        state_tensor_anc=state_tensor_anc,
+        selected_branch_set=selected_branch_set,
+    )
+    n_jobs = _resolve_sub_tensor_parallel_n_jobs(
+        num_branch_pairs=len(branch_pairs),
+        g=g,
+        state_tensor=state_tensor,
+        mode=mode,
+    )
+    txt = 'Sub-tensor scheduler (dense, mode={}): branches={}, workers={} (threads={})'
+    print(txt.format(mode, len(branch_pairs), n_jobs, int(g.get('threads', 1))), flush=True)
     if mode=='asis':
-        pass
+        if n_jobs == 1:
+            _fill_dense_sub_tensor_chunk_asis(
+                branch_pairs=branch_pairs,
+                state_tensor=state_tensor,
+                state_tensor_anc=state_tensor_anc,
+                sub_tensor=sub_tensor,
+            )
+        else:
+            chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+            branch_chunks, _ = parallel.get_chunks(input_data=branch_pairs, threads=n_jobs, chunk_factor=chunk_factor)
+            txt = 'Parallel dense substitution-tensor generation (asis): branches={}, workers={}, chunks={}'
+            print(txt.format(len(branch_pairs), n_jobs, len(branch_chunks)), flush=True)
+            tasks = [(chunk, state_tensor, state_tensor_anc, sub_tensor) for chunk in branch_chunks]
+            parallel.run_starmap(
+                func=_fill_dense_sub_tensor_chunk_asis,
+                args_iterable=tasks,
+                n_jobs=n_jobs,
+                backend='threading',
+            )
     elif mode=='syn':
         syn_index_matrix, syn_group_sizes = _get_syn_group_index_cache(g)
-    for node in g['tree'].traverse():
-        if ete.is_root(node):
-            continue
-        child = ete.get_prop(node, "numerical_label")
-        if (selected_branch_set is not None) and (child not in selected_branch_set):
-            continue
-        parent = ete.get_prop(node.up, "numerical_label")
-        if parent_state_mass[parent] < g['float_tol']:
-            continue
-        if mode=='asis':
-            parent_matrix = state_tensor_anc[parent, :, :]
-            child_matrix = state_tensor[child, :, :]
-            out_branch_group = sub_tensor[child, :, 0, :, :]
-            if _can_use_cython_asis_sub_tensor_fill(
-                parent_matrix=parent_matrix,
-                child_matrix=child_matrix,
-                out_branch_group=out_branch_group,
-            ):
-                substitution_cy.fill_sub_tensor_asis_branch_double(
-                    parent_matrix=parent_matrix,
-                    child_matrix=child_matrix,
-                    out_branch_group=out_branch_group,
-                )
-            else:
-                if diag_zero is None:
-                    num_state = state_tensor.shape[2]
-                    diag_zero = np.diag([-1] * num_state) + 1
-                sub_matrix = np.einsum("sa,sd,ad->sad", parent_matrix, child_matrix, diag_zero)
-                # s=site, a=ancestral, d=derived
-                out_branch_group[:, :, :] = sub_matrix
-        elif mode=='syn':
-            parent_matrix = state_tensor_anc[parent, :, :]
-            child_matrix = state_tensor[child, :, :]
-            out_branch_tensor = sub_tensor[child, :, :, :, :]
-            if _can_use_cython_syn_sub_tensor_fill(
-                parent_matrix=parent_matrix,
-                child_matrix=child_matrix,
+        amino_acid_orders = list(g['amino_acid_orders'])
+        syn_indices_list = [np.asarray(g['synonymous_indices'][aa], dtype=np.int64) for aa in amino_acid_orders]
+        if n_jobs == 1:
+            _fill_dense_sub_tensor_chunk_syn(
+                branch_pairs=branch_pairs,
+                state_tensor=state_tensor,
+                state_tensor_anc=state_tensor_anc,
+                sub_tensor=sub_tensor,
+                amino_acid_orders=amino_acid_orders,
+                syn_indices_list=syn_indices_list,
                 syn_index_matrix=syn_index_matrix,
                 syn_group_sizes=syn_group_sizes,
-                out_branch_tensor=out_branch_tensor,
-            ):
-                substitution_cy.fill_sub_tensor_syn_branch_double(
-                    parent_matrix=parent_matrix,
-                    child_matrix=child_matrix,
-                    syn_index_matrix=syn_index_matrix,
-                    syn_group_sizes=syn_group_sizes,
-                    out_branch_tensor=out_branch_tensor,
+            )
+        else:
+            chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+            branch_chunks, _ = parallel.get_chunks(input_data=branch_pairs, threads=n_jobs, chunk_factor=chunk_factor)
+            txt = 'Parallel dense substitution-tensor generation (syn): branches={}, workers={}, chunks={}'
+            print(txt.format(len(branch_pairs), n_jobs, len(branch_chunks)), flush=True)
+            tasks = [
+                (
+                    chunk,
+                    state_tensor,
+                    state_tensor_anc,
+                    sub_tensor,
+                    amino_acid_orders,
+                    syn_indices_list,
+                    syn_index_matrix,
+                    syn_group_sizes,
                 )
-            else:
-                for s,aa in enumerate(g['amino_acid_orders']):
-                    ind = np.array(g['synonymous_indices'][aa])
-                    size = len(ind)
-                    diag_zero = np.diag([-1] * size) + 1
-                    parent_group_matrix = state_tensor_anc[parent, :, ind] # axis is swapped, shape=[state,site]
-                    child_group_matrix = state_tensor[child, :, ind] # axis is swapped, shape=[state,site]
-                    sub_matrix = np.einsum("as,ds,ad->sad", parent_group_matrix, child_group_matrix, diag_zero)
-                    sub_tensor[child, :, s, :size, :size] = sub_matrix
+                for chunk in branch_chunks
+            ]
+            parallel.run_starmap(
+                func=_fill_dense_sub_tensor_chunk_syn,
+                args_iterable=tasks,
+                n_jobs=n_jobs,
+                backend='threading',
+            )
     if np.isnan(sub_tensor).any():
         sub_tensor = np.nan_to_num(sub_tensor, nan=0, copy=False)
     return sub_tensor
@@ -801,6 +1124,17 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
     df['branch_name'] = df['branch_name'].astype(str)
     if sitewise:
         df[attr + '_sitewise'] = ''
+    site_index_alignment = g.get('site_index_alignment', None)
+    if site_index_alignment is not None:
+        site_index_alignment = np.asarray(site_index_alignment, dtype=np.int64).reshape(-1)
+        if site_index_alignment.shape[0] != int(sub_tensor.shape[1]):
+            txt = 'site_index_alignment length ({}) did not match sub-tensor site axis ({}).'
+            raise ValueError(txt.format(site_index_alignment.shape[0], sub_tensor.shape[1]))
+    def _site_label(site_index):
+        site_index = int(site_index)
+        if site_index_alignment is None:
+            return site_index + 1
+        return int(site_index_alignment[site_index]) + 1
     branch_sub_counts = get_branch_sub_counts(sub_tensor) if _is_sparse_sub_tensor(sub_tensor) else None
     i=0
     for node in g['tree'].traverse():
@@ -820,7 +1154,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
                 for s, anc, der in zip(site_ids.tolist(), anc_ids.tolist(), der_ids.tolist()):
                     ancestral_state = state_order[int(anc)]
                     derived_state = state_order[int(der)]
-                    sub_string = ancestral_state + str(int(s) + 1) + derived_state
+                    sub_string = ancestral_state + str(_site_label(s)) + derived_state
                     sub_list.append(sub_string)
                 df.at[i, attr + '_sitewise'] = ','.join(sub_list)
                 i += 1
@@ -832,7 +1166,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
         if sitewise:
             sub_list = list()
             if attr=='N':
-                state_order = g['amino_acid_orders']
+                state_order = g.get('nonsyn_state_orders', g.get('amino_acid_orders', []))
             elif attr=='S':
                 raise ValueError('This function is not supported for synonymous substitutions.')
             if _can_use_cython_sitewise_max_scan(branch_tensor=branch_tensor):
@@ -843,7 +1177,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
                 for s, anc, der in zip(site_ids.tolist(), anc_ids.tolist(), der_ids.tolist()):
                     ancestral_state = state_order[int(anc)]
                     derived_state = state_order[int(der)]
-                    sub_string = ancestral_state + str(int(s) + 1) + derived_state
+                    sub_string = ancestral_state + str(_site_label(s)) + derived_state
                     sub_list.append(sub_string)
             else:
                 for s in range(sub_tensor.shape[1]):
@@ -858,7 +1192,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
                         continue
                     ancestral_state = state_order[max_idx[1][0]]
                     derived_state = state_order[max_idx[2][0]]
-                    sub_string = ancestral_state+str(s+1)+derived_state
+                    sub_string = ancestral_state + str(_site_label(s)) + derived_state
                     sub_list.append(sub_string)
             df.at[i, attr + '_sitewise'] = ','.join(sub_list)
         i+=1
@@ -1273,6 +1607,90 @@ def _clear_sparse_cb_summary_arrays(sub_tensor, selected):
         cache.pop(key, None)
 
 
+def _can_use_sparse_cb_summary_gram(id_combinations, sub_tensor):
+    if not _is_sparse_sub_tensor(sub_tensor):
+        return False
+    if id_combinations.shape[1] != 2:
+        return False
+    if id_combinations.dtype.kind not in ['i', 'u']:
+        return False
+    if int(id_combinations.shape[0]) < _SPARSE_CB_SUMMARY_GRAM_MIN_COMBINATIONS:
+        return False
+    if int(sub_tensor.num_branch) > _SPARSE_CB_SUMMARY_GRAM_MAX_BRANCHES:
+        return False
+    return True
+
+
+def _run_sparse_cb_summary_gram(
+    id_combinations,
+    selected,
+    mmap,
+    df_mmap,
+    mmap_start,
+    float_type,
+    branch_group_site_total,
+    branch_group_from_site,
+    branch_group_to_site,
+    branch_group_pair_site,
+):
+    def _calc_selected_gram_values(matrix_2d, upper_rows, upper_cols):
+        if matrix_2d.shape[1] < _SPARSE_CB_SUMMARY_SYRK_MIN_FEATURES:
+            gram = matrix_2d @ matrix_2d.T
+            return gram[upper_rows, upper_cols]
+        try:
+            # dsyrk computes A*A^T while exploiting symmetry; we keep only upper-triangular pairs.
+            matrix_ft = np.asfortranarray(matrix_2d.T, dtype=np.float64)
+            gram_upper = scipy_blas.dsyrk(alpha=1.0, a=matrix_ft, trans=1, lower=0)
+            return gram_upper[upper_rows, upper_cols]
+        except Exception:
+            gram = matrix_2d @ matrix_2d.T
+            return gram[upper_rows, upper_cols]
+
+    arity = id_combinations.shape[1]
+    ids = np.asarray(id_combinations, dtype=np.int64)
+    b0 = ids[:, 0]
+    b1 = ids[:, 1]
+    upper_rows = np.minimum(b0, b1)
+    upper_cols = np.maximum(b0, b1)
+    selected_df = np.zeros(shape=(ids.shape[0], arity + len(selected)), dtype=np.float64)
+    selected_df[:, 0] = b0
+    selected_df[:, 1] = b1
+    selected_col_map = {stat: (arity + i) for i, stat in enumerate(selected)}
+    if 'any2any' in selected:
+        total2d = np.asarray(branch_group_site_total, dtype=np.float64).reshape((branch_group_site_total.shape[0], -1))
+        selected_df[:, selected_col_map['any2any']] = _calc_selected_gram_values(
+            matrix_2d=total2d,
+            upper_rows=upper_rows,
+            upper_cols=upper_cols,
+        )
+    if 'spe2any' in selected:
+        from2d = np.asarray(branch_group_from_site, dtype=np.float64).reshape((branch_group_from_site.shape[0], -1))
+        selected_df[:, selected_col_map['spe2any']] = _calc_selected_gram_values(
+            matrix_2d=from2d,
+            upper_rows=upper_rows,
+            upper_cols=upper_cols,
+        )
+    if 'any2spe' in selected:
+        to2d = np.asarray(branch_group_to_site, dtype=np.float64).reshape((branch_group_to_site.shape[0], -1))
+        selected_df[:, selected_col_map['any2spe']] = _calc_selected_gram_values(
+            matrix_2d=to2d,
+            upper_rows=upper_rows,
+            upper_cols=upper_cols,
+        )
+    if 'spe2spe' in selected:
+        pair2d = np.asarray(branch_group_pair_site, dtype=np.float64).reshape((branch_group_pair_site.shape[0], -1))
+        selected_df[:, selected_col_map['spe2spe']] = _calc_selected_gram_values(
+            matrix_2d=pair2d,
+            upper_rows=upper_rows,
+            upper_cols=upper_cols,
+        )
+    if mmap:
+        row_start, row_end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
+        df_mmap[row_start:row_end, :] = selected_df.astype(df_mmap.dtype, copy=False)
+        return None
+    return selected_df.astype(float_type, copy=False)
+
+
 def _run_sparse_cb_summary_cython(
     id_combinations,
     selected,
@@ -1411,6 +1829,37 @@ def sub_tensor2cb_sparse(
         source_dtype=sub_tensor.dtype,
         default_dtype=float_type,
     )
+    if _can_use_sparse_cb_summary_gram(id_combinations=id_combinations, sub_tensor=sub_tensor):
+        try:
+            summary_arrays = _get_sparse_cb_summary_arrays(
+                sub_tensor=sub_tensor,
+                selected=selected,
+            )
+            branch_group_site_total = summary_arrays[0]
+            branch_group_from_site = summary_arrays[1]
+            branch_group_to_site = summary_arrays[2]
+            branch_group_pair_site = summary_arrays[3] if len(summary_arrays) > 3 else None
+            txt = 'Sparse cb summary backend: resolved=gram (combinations={}, branches={})'
+            print(txt.format(id_combinations.shape[0], int(sub_tensor.num_branch)), flush=True)
+            out = _run_sparse_cb_summary_gram(
+                id_combinations=id_combinations,
+                selected=selected,
+                mmap=mmap,
+                df_mmap=df_mmap,
+                mmap_start=mmap_start,
+                float_type=float_type,
+                branch_group_site_total=branch_group_site_total,
+                branch_group_from_site=branch_group_from_site,
+                branch_group_to_site=branch_group_to_site,
+                branch_group_pair_site=branch_group_pair_site,
+            )
+            _clear_sparse_cb_summary_arrays(sub_tensor=sub_tensor, selected=selected)
+            if not mmap:
+                return out
+            return
+        except Exception as exc:
+            _clear_sparse_cb_summary_arrays(sub_tensor=sub_tensor, selected=selected)
+            _warn_cython_fallback('sub_tensor2cb_sparse_gram', exc)
     if _can_use_cython_sparse_cb_summary(
         id_combinations=id_combinations,
         sub_tensor=sub_tensor,
@@ -1492,7 +1941,12 @@ def _resolve_cb_writer_and_columns(sub_tensor, attr, arity, selected):
 
 
 def _resolve_cb_n_jobs(id_combinations, sub_tensor, g, writer, selected):
-    n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
+    n_jobs = parallel.resolve_adaptive_n_jobs(
+        num_items=id_combinations.shape[0],
+        threads=g['threads'],
+        min_items_for_parallel=int(g.get('parallel_min_items_cb', 20000)),
+        min_items_per_job=int(g.get('parallel_min_items_per_job_cb', 5000)),
+    )
     if (writer is sub_tensor2cb) and _can_use_cython_dense_cb(
         id_combinations=id_combinations,
         sub_tensor=sub_tensor,
@@ -1535,6 +1989,8 @@ def _run_cb_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, selecte
         writer=writer,
         selected=selected,
     )
+    txt = 'cb reducer scheduler: combinations={}, workers={} (threads={})'
+    print(txt.format(id_combinations.shape[0], n_jobs, g['threads']), flush=True)
     if n_jobs == 1:
         return _run_cb_single_job(
             writer=writer,
@@ -1706,7 +2162,13 @@ def _resolve_cbs_writer_and_columns(sub_tensor, attr, arity):
 
 
 def _resolve_cbs_n_jobs(id_combinations, sub_tensor, g, writer):
-    n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=g['threads'])
+    num_rows = int(id_combinations.shape[0]) * int(sub_tensor.shape[1])
+    n_jobs = parallel.resolve_adaptive_n_jobs(
+        num_items=num_rows,
+        threads=g['threads'],
+        min_items_for_parallel=int(g.get('parallel_min_rows_cbs', 200000)),
+        min_items_per_job=int(g.get('parallel_min_rows_per_job_cbs', 50000)),
+    )
     if (writer is sub_tensor2cbs) and _can_use_cython_dense_cbs(
         id_combinations=id_combinations,
         sub_tensor=sub_tensor,
@@ -1735,6 +2197,9 @@ def _run_cbs_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, column
         g=g,
         writer=writer,
     )
+    num_rows = int(id_combinations.shape[0]) * int(sub_tensor.shape[1])
+    txt = 'cbs reducer scheduler: rows={}, workers={} (threads={})'
+    print(txt.format(num_rows, n_jobs, g['threads']), flush=True)
     if n_jobs == 1:
         return _run_cbs_single_job(
             writer=writer,

@@ -168,6 +168,8 @@ def test_get_node_combinations_target_dict_uses_threading_for_union(monkeypatch)
         "threads": 2,
         "parallel_backend": "multiprocessing",
         "parallel_chunk_factor": 1,
+        "parallel_min_items_node_union": 0,
+        "parallel_min_items_per_job_node_union": 1,
         "exhaustive_until": 1,
     }
     target_id_dict = {"traitA": np.array(leaf_ids, dtype=np.int64)}
@@ -237,6 +239,8 @@ def test_get_node_combinations_cb_passed_uses_threading_for_union(monkeypatch):
         "threads": 2,
         "parallel_backend": "multiprocessing",
         "parallel_chunk_factor": 1,
+        "parallel_min_items_node_union": 0,
+        "parallel_min_items_per_job_node_union": 1,
         "exhaustive_until": 3,
     }
     cb_passed = pd.DataFrame(
@@ -269,6 +273,42 @@ def test_get_node_combinations_cb_passed_uses_threading_for_union(monkeypatch):
     node_union_calls = [backend for func_name, backend in calls if func_name == "node_union"]
     assert node_union_calls
     assert all(backend == "threading" for backend in node_union_calls)
+
+
+def test_get_node_combinations_exhaustive_parallel_nc_matrix_matches_single_thread():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1,C:1,D:1,E:1,F:1)R;", format=1))
+    non_root_ids = [ete.get_prop(n, "numerical_label") for n in tr.traverse() if not ete.is_root(n)]
+    g_single = {
+        "tree": tr,
+        "dep_ids": [np.array([bid], dtype=np.int64) for bid in non_root_ids],
+        "fg_dep_ids": {"traitA": []},
+        "fg_df": pd.DataFrame({"name": ["A", "B", "C", "D", "E", "F"], "traitA": [1, 1, 1, 1, 1, 1]}),
+        "threads": 1,
+        "exhaustive_until": 2,
+    }
+    g_parallel = dict(
+        g_single,
+        threads=2,
+        parallel_min_items_nc_matrix=0,
+        parallel_min_items_per_job_nc_matrix=1,
+    )
+    _, ids_single = combination.get_node_combinations(
+        g=g_single,
+        exhaustive=True,
+        arity=2,
+        check_attr="name",
+        verbose=False,
+    )
+    _, ids_parallel = combination.get_node_combinations(
+        g=g_parallel,
+        exhaustive=True,
+        arity=2,
+        check_attr="name",
+        verbose=False,
+    )
+    set_single = {tuple(sorted(row.tolist())) for row in ids_single}
+    set_parallel = {tuple(sorted(row.tolist())) for row in ids_parallel}
+    assert set_parallel == set_single
 
 
 def test_node_combination_subsamples_rifle_handles_dep_ids_list_without_crashing():

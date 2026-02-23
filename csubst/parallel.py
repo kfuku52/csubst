@@ -86,6 +86,23 @@ def resolve_n_jobs(num_items, threads):
     return min(num_items, threads)
 
 
+def resolve_adaptive_n_jobs(num_items, threads, min_items_for_parallel=0, min_items_per_job=1):
+    num_items = int(num_items)
+    min_items_for_parallel = int(min_items_for_parallel)
+    min_items_per_job = int(min_items_per_job)
+    if min_items_for_parallel < 0:
+        raise ValueError('min_items_for_parallel should be >= 0.')
+    if min_items_per_job < 1:
+        raise ValueError('min_items_per_job should be >= 1.')
+    requested = resolve_n_jobs(num_items=num_items, threads=threads)
+    if requested <= 1:
+        return 1
+    if num_items < min_items_for_parallel:
+        return 1
+    max_jobs_by_work = max(1, num_items // min_items_per_job)
+    return max(1, min(requested, max_jobs_by_work))
+
+
 def resolve_parallel_backend(g, task='general'):
     backend = str(g.get('parallel_backend', 'auto')).lower()
     if backend not in _VALID_PARALLEL_BACKENDS:

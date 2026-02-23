@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from csubst import omega
+from csubst import parallel
 from csubst import substitution
 from csubst import tree
 from csubst import ete
@@ -131,6 +132,27 @@ def test_get_exp_state_uses_branch_distance_props():
     np.testing.assert_allclose(cdn[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
 
 
+def test_get_exp_state_nsy_uses_nonsynonymous_rate_matrix():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    state = np.zeros((num_node, 1, 2), dtype=np.float64)
+    state[labels["R"], 0, 0] = 1.0
+    g = {
+        "tree": tr,
+        "state_nsy": state.copy(),
+        "instantaneous_nsy_rate_matrix": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=np.float64),
+        "iqtree_rate_values": np.array([1.0], dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+    }
+    a_node = [n for n in tr.traverse() if n.name == "A"][0]
+    ete.set_prop(a_node, "Ndist", 0.5)
+    out = omega.get_exp_state(g=g, mode="nsy")
+    assert out[labels["A"], 0, :].sum() > 0
+    np.testing.assert_allclose(out[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
+
+
 def test_get_exp_state_rejects_unknown_mode():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))
@@ -249,6 +271,89 @@ def test_get_exp_state_matches_numpy_fallback(monkeypatch):
     monkeypatch.setattr(omega, "_can_use_cython_expected_state", lambda *_args, **_kwargs: False)
     out_numpy = omega.get_exp_state(g=g, mode="pep")
     np.testing.assert_allclose(out_default, out_numpy, atol=1e-12)
+
+
+def test_get_exp_state_parallel_projection_matches_single_thread():
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("((((A:1,B:1):1,(C:1,D:1):1):1,((E:1,F:1):1,(G:1,H:1):1):1):1,I:1)R;", format=1)
+    )
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    rng = np.random.default_rng(8)
+    state = rng.random((num_node, 120, 4), dtype=np.float64)
+    state /= state.sum(axis=2, keepdims=True)
+    g_parallel = {
+        "tree": tr,
+        "state_pep": state.copy(),
+        "instantaneous_aa_rate_matrix": np.array(
+            [
+                [-1.5, 0.5, 0.5, 0.5],
+                [0.2, -1.2, 0.6, 0.4],
+                [0.4, 0.3, -1.1, 0.4],
+                [0.3, 0.5, 0.2, -1.0],
+            ],
+            dtype=np.float64,
+        ),
+        "iqtree_rate_values": np.array(([0.5, 1.0, 1.5, 2.0] * 30), dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+        "threads": 4,
+        "parallel_chunk_factor": 2,
+        "parallel_min_items_expected_state": 1,
+        "parallel_min_items_per_job_expected_state": 1,
+    }
+    for node in tr.traverse():
+        if ete.is_root(node):
+            continue
+        ete.set_prop(node, "Ndist", 0.2)
+    g_single = dict(g_parallel)
+    g_single["threads"] = 1
+    out_parallel = omega.get_exp_state(g=g_parallel, mode="pep")
+    out_single = omega.get_exp_state(g=g_single, mode="pep")
+    np.testing.assert_allclose(out_parallel, out_single, atol=1e-12)
+
+
+def test_get_exp_state_respects_parallel_threshold(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1):1,C:1)R;", format=1))
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    rng = np.random.default_rng(11)
+    state = rng.random((num_node, 8, 4), dtype=np.float64)
+    state /= state.sum(axis=2, keepdims=True)
+    g = {
+        "tree": tr,
+        "state_pep": state.copy(),
+        "instantaneous_aa_rate_matrix": np.array(
+            [
+                [-1.5, 0.5, 0.5, 0.5],
+                [0.2, -1.2, 0.6, 0.4],
+                [0.4, 0.3, -1.1, 0.4],
+                [0.3, 0.5, 0.2, -1.0],
+            ],
+            dtype=np.float64,
+        ),
+        "iqtree_rate_values": np.ones(8, dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+        "threads": 4,
+        "parallel_min_items_expected_state": 10**18,
+        "parallel_min_items_per_job_expected_state": 10**18,
+    }
+    for node in tr.traverse():
+        if ete.is_root(node):
+            continue
+        ete.set_prop(node, "Ndist", 0.1)
+    invoked = {"parallel": False}
+    orig_run_starmap = parallel.run_starmap
+
+    def _wrapped_run_starmap(*args, **kwargs):
+        invoked["parallel"] = True
+        return orig_run_starmap(*args, **kwargs)
+
+    monkeypatch.setattr(parallel, "run_starmap", _wrapped_run_starmap)
+    out = omega.get_exp_state(g=g, mode="pep")
+    assert invoked["parallel"] is False
+    assert np.isfinite(out).all()
 
 
 def test_calibrate_dsc_skips_substitution_class_without_finite_pairs():

@@ -797,6 +797,8 @@ def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_re
             cb=cb_missing,
             ncpu=g['threads'],
             float_type=g['float_type'],
+            min_items_for_parallel=int(g.get('parallel_min_items_branch_dist', 20000)),
+            min_items_per_job=int(g.get('parallel_min_items_per_job_branch_dist', 5000)),
         )
     cb_missing = substitution.get_substitutions_per_branch(cb_missing, g['branch_table'], g)
     cb_missing = table.get_linear_regression(cb_missing)

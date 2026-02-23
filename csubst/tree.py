@@ -42,6 +42,10 @@ AA_LOGO_COLORS = {
     'Y': '#7570b3',
 }
 
+
+def _format_branch_id_label(branch_id):
+    return 'b{}'.format(int(branch_id))
+
 def add_numerical_node_labels(tree):
     all_leaf_names = sorted(ete.get_leaf_names(tree))
     leaf_numerical_labels = dict()
@@ -142,7 +146,14 @@ def calc_node_dist_chunk(chunk, start, tree_dict, float_type):
             print(txt.format(i, start, end, int(time.time() - start_time)), flush=True)
     return arr_dist
 
-def get_node_distance(tree, cb, ncpu, float_type):
+def get_node_distance(
+    tree,
+    cb,
+    ncpu,
+    float_type,
+    min_items_for_parallel=20000,
+    min_items_per_job=5000,
+):
     txt = 'Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no'
     print(txt, flush=True)
     start_time = time.time()
@@ -153,7 +164,14 @@ def get_node_distance(tree, cb, ncpu, float_type):
         tree_dict[ete.get_prop(node, "numerical_label")] = node
     cn1 = cb.columns[cb.columns.str.startswith('branch_id_')]
     id_combinations = cb.loc[:,cn1].values
-    n_jobs = parallel.resolve_n_jobs(num_items=id_combinations.shape[0], threads=ncpu)
+    n_jobs = parallel.resolve_adaptive_n_jobs(
+        num_items=id_combinations.shape[0],
+        threads=ncpu,
+        min_items_for_parallel=min_items_for_parallel,
+        min_items_per_job=min_items_per_job,
+    )
+    txt = 'Branch-distance scheduler: combinations={}, workers={} (threads={})'
+    print(txt.format(id_combinations.shape[0], n_jobs, ncpu), flush=True)
     if n_jobs == 1:
         out_list = [calc_node_dist_chunk(id_combinations, 0, tree_dict, float_type)]
     else:
@@ -377,6 +395,15 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     xcoord,ycoord,leaves = _get_tree_xy(tree)
     use_aa_logo = (state_mode=='aa') and (state_prob_by_node is not None) and (state_orders is not None)
     labels = []
+    show_branch_id_labels = (state_by_node is None)
+    branch_id_labels = []
+    max_branch_id_len = 0
+    if show_branch_id_labels:
+        for node in tree.traverse():
+            if ete.is_root(node):
+                continue
+            branch_id_labels.append((node, _format_branch_id_label(ete.get_prop(node, "numerical_label"))))
+        max_branch_id_len = max([len(lbl[1]) for lbl in branch_id_labels], default=0)
     if use_aa_logo:
         max_label_len = max([len(leaf.name or '') for leaf in leaves], default=0) + 6
     else:
@@ -386,7 +413,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     continue
                 if (label=='leaf') and (not ete.is_leaf(node)):
                     continue
-                txt = (node.name or '') + '|' + str(ete.get_prop(node, "numerical_label"))
+                txt = node.name or ''
                 font_size = 4
             else:
                 nl = ete.get_prop(node, "numerical_label")
@@ -413,6 +440,23 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     xmax = max(xcoord.values()) if len(xcoord)>0 else 0.0
     xspan = max(xmax, 1.0)
     text_offset = xspan * 0.015
+    branch_id_text_space = 0.0
+    if show_branch_id_labels and (max_branch_id_len > 0):
+        branch_id_text_space = max(xspan * 0.028, max_branch_id_len * xspan * 0.02)
+        branch_id_offset = max(xspan * 0.008, 0.008)
+        for node,bid_txt in branch_id_labels:
+            text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
+            ax.text(
+                xcoord[id(node)] + branch_id_offset,
+                ycoord[id(node)] - 0.08,
+                bid_txt,
+                fontsize=4,
+                color=text_color,
+                va='center',
+                ha='left',
+                clip_on=False,
+            )
+    label_text_offset = text_offset + branch_id_text_space
     if use_aa_logo:
         mpl_patches,mpl_textpath,mpl_transforms,font_properties = _get_logo_modules()
         logo_width = max(AA_LOGO_MIN_WIDTH, xspan * AA_LOGO_WIDTH_RATIO)
@@ -471,7 +515,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
         for node,txt,font_size in labels:
             text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
             ax.text(
-                xcoord[id(node)] + text_offset,
+                xcoord[id(node)] + label_text_offset,
                 ycoord[id(node)],
                 txt,
                 fontsize=font_size,
@@ -480,12 +524,12 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                 ha='left',
                 clip_on=False,
             )
-        text_space = max_label_len * xspan * 0.03
+        text_space = branch_id_text_space + (max_label_len * xspan * 0.03)
     else:
         for node,txt,font_size in labels:
             text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
             ax.text(
-                xcoord[id(node)] + text_offset,
+                xcoord[id(node)] + label_text_offset,
                 ycoord[id(node)],
                 txt,
                 fontsize=font_size,
@@ -494,7 +538,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                 ha='left',
                 clip_on=False,
             )
-        text_space = xspan * 0.1
+        text_space = branch_id_text_space + (xspan * 0.1)
     ax.set_xlim(-xspan * 0.02, xmax + text_space + text_offset)
     ax.set_ylim(-0.5, num_leaves - 0.5)
     ax.axis('off')

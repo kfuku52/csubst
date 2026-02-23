@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 from pathlib import Path
 import pytest
@@ -133,6 +134,19 @@ def _toy_reducer_tensor():
     sub[1, 1, 0, :, :] = [[0.0, 0.1], [0.3, 0.0]]
     sub[2, 1, 0, :, :] = [[0.0, 0.2], [0.1, 0.0]]
     return sub
+
+
+def _large_sparse_reducer_tensor(num_branch=40, num_site=12):
+    # Dense initialization with moderate sparsity for Gram-path tests.
+    rng = np.random.default_rng(7)
+    sub = np.zeros((num_branch, num_site, 1, 2, 2), dtype=np.float64)
+    vals01 = rng.random((num_branch, num_site), dtype=np.float64)
+    vals10 = rng.random((num_branch, num_site), dtype=np.float64)
+    vals01[vals01 < 0.6] = 0
+    vals10[vals10 < 0.6] = 0
+    sub[:, :, 0, 0, 1] = vals01
+    sub[:, :, 0, 1, 0] = vals10
+    return substitution.dense_to_sparse_sub_tensor(sub, tol=0)
 
 
 def test_get_cs_sparse_matches_dense():
@@ -378,6 +392,70 @@ def test_sub_tensor2cb_sparse_cython_fastpath_matches_python_fallback(monkeypatc
     monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: True)
     observed = substitution.sub_tensor2cb_sparse(
         ids,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback(monkeypatch):
+    sparse_tensor = _large_sparse_reducer_tensor(num_branch=40, num_site=12)
+    ids = np.array(list(itertools.combinations(range(40), 2)), dtype=np.int64)
+    selected = ["any2any", "any2spe"]
+
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: False)
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    expected = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: True)
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    observed = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback_with_unsorted_pairs(monkeypatch):
+    sparse_tensor = _large_sparse_reducer_tensor(num_branch=40, num_site=12)
+    ids = np.array(list(itertools.combinations(range(40), 2)), dtype=np.int64)
+    ids_unsorted = ids.copy()
+    ids_unsorted[1::2, :] = ids_unsorted[1::2, ::-1]
+    selected = ["any2any", "spe2any", "any2spe", "spe2spe"]
+
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: False)
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    expected = substitution.sub_tensor2cb_sparse(
+        ids_unsorted,
+        sparse_tensor,
+        mmap=False,
+        df_mmap=None,
+        mmap_start=0,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: True)
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    observed = substitution.sub_tensor2cb_sparse(
+        ids_unsorted,
         sparse_tensor,
         mmap=False,
         df_mmap=None,
@@ -664,6 +742,174 @@ def test_get_substitution_tensor_sparse_asis_matches_dense():
             dense_mmap.unlink()
         if sparse_mmap.exists():
             sparse_mmap.unlink()
+
+
+def test_get_substitution_tensor_dense_asis_parallel_matches_single_thread():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    state = np.zeros((num_node, 3, 3), dtype=np.float64)
+    state[labels["R"], :, :] = [[0.7, 0.2, 0.1], [0.1, 0.8, 0.1], [0.3, 0.2, 0.5]]
+    state[labels["N1"], :, :] = [[0.6, 0.3, 0.1], [0.2, 0.6, 0.2], [0.4, 0.1, 0.5]]
+    state[labels["A"], :, :] = [[0.2, 0.7, 0.1], [0.8, 0.1, 0.1], [0.2, 0.2, 0.6]]
+    state[labels["B"], :, :] = [[0.8, 0.1, 0.1], [0.2, 0.7, 0.1], [0.6, 0.1, 0.3]]
+    state[labels["C"], :, :] = [[0.3, 0.6, 0.1], [0.1, 0.2, 0.7], [0.5, 0.2, 0.3]]
+    g_single = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "sub_tensor_backend": "dense",
+        "threads": 1,
+    }
+    g_parallel = dict(g_single, threads=2, parallel_sub_tensor_min_branches_per_job=1)
+    single_mmap = Path("tmp.csubst.sub_tensor.toy_dense_asis_single.mmap")
+    parallel_mmap = Path("tmp.csubst.sub_tensor.toy_dense_asis_parallel.mmap")
+    try:
+        expected = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="asis",
+            g=g_single,
+            mmap_attr="toy_dense_asis_single",
+        )
+        observed = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="asis",
+            g=g_parallel,
+            mmap_attr="toy_dense_asis_parallel",
+        )
+        np.testing.assert_allclose(observed, expected, atol=1e-12)
+    finally:
+        if single_mmap.exists():
+            single_mmap.unlink()
+        if parallel_mmap.exists():
+            parallel_mmap.unlink()
+
+
+def test_get_substitution_tensor_dense_syn_parallel_matches_single_thread():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    # state order: [AAA, AAG, TTT, TTC]
+    state = np.zeros((num_node, 2, 4), dtype=np.float64)
+    state[labels["R"], :, :] = [[0.5, 0.5, 0.0, 0.0], [0.1, 0.9, 0.0, 0.0]]
+    state[labels["N1"], :, :] = [[0.7, 0.3, 0.0, 0.0], [0.4, 0.6, 0.0, 0.0]]
+    state[labels["A"], :, :] = [[0.2, 0.8, 0.0, 0.0], [0.7, 0.3, 0.0, 0.0]]
+    state[labels["B"], :, :] = [[0.9, 0.1, 0.0, 0.0], [0.3, 0.7, 0.0, 0.0]]
+    state[labels["C"], :, :] = [[0.6, 0.4, 0.0, 0.0], [0.2, 0.8, 0.0, 0.0]]
+    g_single = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "sub_tensor_backend": "dense",
+        "threads": 1,
+        "amino_acid_orders": np.array(["K", "F"], dtype=object),
+        "synonymous_indices": {"K": [0, 1], "F": [2, 3]},
+        "max_synonymous_size": 2,
+    }
+    g_parallel = dict(g_single, threads=2, parallel_sub_tensor_min_branches_per_job=1)
+    single_mmap = Path("tmp.csubst.sub_tensor.toy_dense_syn_single.mmap")
+    parallel_mmap = Path("tmp.csubst.sub_tensor.toy_dense_syn_parallel.mmap")
+    try:
+        expected = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="syn",
+            g=g_single,
+            mmap_attr="toy_dense_syn_single",
+        )
+        observed = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="syn",
+            g=g_parallel,
+            mmap_attr="toy_dense_syn_parallel",
+        )
+        np.testing.assert_allclose(observed, expected, atol=1e-12)
+    finally:
+        if single_mmap.exists():
+            single_mmap.unlink()
+        if parallel_mmap.exists():
+            parallel_mmap.unlink()
+
+
+def test_get_substitution_tensor_sparse_asis_parallel_matches_single_thread():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    state = np.zeros((num_node, 3, 3), dtype=np.float64)
+    state[labels["R"], :, :] = [[0.7, 0.2, 0.1], [0.1, 0.8, 0.1], [0.3, 0.2, 0.5]]
+    state[labels["N1"], :, :] = [[0.6, 0.3, 0.1], [0.2, 0.6, 0.2], [0.4, 0.1, 0.5]]
+    state[labels["A"], :, :] = [[0.2, 0.7, 0.1], [0.8, 0.1, 0.1], [0.2, 0.2, 0.6]]
+    state[labels["B"], :, :] = [[0.8, 0.1, 0.1], [0.2, 0.7, 0.1], [0.6, 0.1, 0.3]]
+    state[labels["C"], :, :] = [[0.3, 0.6, 0.1], [0.1, 0.2, 0.7], [0.5, 0.2, 0.3]]
+    g_single = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "sub_tensor_backend": "sparse",
+        "threads": 1,
+    }
+    g_parallel = dict(g_single, threads=2, parallel_sub_tensor_min_branches_per_job=1)
+    expected = substitution.get_substitution_tensor(
+        state_tensor=state,
+        mode="asis",
+        g=g_single,
+        mmap_attr="toy_sparse_asis_single",
+    )
+    observed = substitution.get_substitution_tensor(
+        state_tensor=state,
+        mode="asis",
+        g=g_parallel,
+        mmap_attr="toy_sparse_asis_parallel",
+    )
+    np.testing.assert_allclose(observed.to_dense(), expected.to_dense(), atol=1e-12)
+
+
+def test_get_substitution_tensor_sparse_syn_indexed_child_matches_baseline(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((3, 4, 4), dtype=np.float64)
+    state[labels["R"], :, :] = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+    state[labels["A"], :, :] = [
+        [0.0, 1.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0, 0.0],
+    ]
+    state[labels["B"], :, :] = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.5, 0.5, 0.0, 0.0],
+        [0.0, 0.0, 0.7, 0.3],
+        [0.0, 0.0, 0.2, 0.8],
+    ]
+    base_g = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "sub_tensor_backend": "sparse",
+        "amino_acid_orders": np.array(["AA0", "AA1"], dtype=object),
+        "synonymous_indices": {"AA0": [0, 1], "AA1": [2, 3]},
+        "max_synonymous_size": 2,
+        "threads": 1,
+    }
+    monkeypatch.setattr(substitution, "_SPARSE_SUB_TENSOR_INDEXED_CHILD_MAX_DENSITY", -1.0)
+    baseline = substitution.get_substitution_tensor(
+        state_tensor=state,
+        mode="syn",
+        g=dict(base_g),
+        mmap_attr="toy_sparse_syn_baseline",
+    )
+    monkeypatch.setattr(substitution, "_SPARSE_SUB_TENSOR_INDEXED_CHILD_MAX_DENSITY", 1.0)
+    optimized = substitution.get_substitution_tensor(
+        state_tensor=state,
+        mode="syn",
+        g=dict(base_g),
+        mmap_attr="toy_sparse_syn_indexed",
+    )
+    np.testing.assert_allclose(optimized.to_dense(), baseline.to_dense(), atol=1e-12)
 
 
 def test_get_substitution_tensor_cython_asis_fill_matches_python_fallback(monkeypatch):

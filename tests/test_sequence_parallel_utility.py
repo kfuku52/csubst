@@ -4,9 +4,11 @@ import pandas as pd
 import pytest
 
 from csubst import foreground
+from csubst import ete
 from csubst import genetic_code
 from csubst import parallel
 from csubst import sequence
+from csubst import tree
 from csubst import utility
 
 
@@ -70,6 +72,43 @@ def test_resolve_n_jobs_is_capped_by_workload_size():
     assert parallel.resolve_n_jobs(num_items=8, threads=2) == 2
 
 
+def test_resolve_adaptive_n_jobs_falls_back_to_single_for_small_workload():
+    out = parallel.resolve_adaptive_n_jobs(
+        num_items=100,
+        threads=8,
+        min_items_for_parallel=500,
+        min_items_per_job=50,
+    )
+    assert out == 1
+
+
+def test_resolve_adaptive_n_jobs_caps_by_min_items_per_job():
+    out = parallel.resolve_adaptive_n_jobs(
+        num_items=1000,
+        threads=16,
+        min_items_for_parallel=0,
+        min_items_per_job=300,
+    )
+    assert out == 3
+
+
+def test_resolve_adaptive_n_jobs_rejects_invalid_thresholds():
+    with pytest.raises(ValueError, match="min_items_for_parallel"):
+        parallel.resolve_adaptive_n_jobs(
+            num_items=10,
+            threads=2,
+            min_items_for_parallel=-1,
+            min_items_per_job=1,
+        )
+    with pytest.raises(ValueError, match="min_items_per_job"):
+        parallel.resolve_adaptive_n_jobs(
+            num_items=10,
+            threads=2,
+            min_items_for_parallel=0,
+            min_items_per_job=0,
+        )
+
+
 def test_resolve_parallel_backend_auto_uses_task_policy():
     g = {"parallel_backend": "auto"}
     assert parallel.resolve_parallel_backend(g=g, task="general") == "multiprocessing"
@@ -129,6 +168,17 @@ def test_cdn2pep_state_sums_synonymous_codons():
     state_cdn = np.array([[[0.7, 0.3], [0.2, 0.8]]], dtype=float)
     out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
     np.testing.assert_allclose(out, state_cdn, atol=1e-12)
+
+
+def test_cdn2nsy_state_sums_recoded_codon_groups():
+    g = {
+        "nonsyn_state_orders": np.array(["AG", "C"]),
+        "nonsynonymous_indices": {"AG": [0, 1], "C": [2]},
+    }
+    state_cdn = np.array([[[0.3, 0.4, 0.3], [0.1, 0.2, 0.7]]], dtype=float)
+    out = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g)
+    expected = np.array([[[0.7, 0.3], [0.3, 0.7]]], dtype=float)
+    np.testing.assert_allclose(out, expected, atol=1e-12)
 
 
 def test_cdn2pep_state_selected_branch_ids_keeps_global_branch_index():
@@ -217,6 +267,38 @@ def test_translate_state_handles_missing_states():
     }
     assert sequence.translate_state(0, "codon", g) == "AAT---"
     assert sequence.translate_state(0, "aa", g) == "N-"
+
+
+def test_translate_state_nsy_uses_single_character_symbols():
+    g = {
+        "float_tol": 1e-12,
+        "nonsyn_state_orders": np.array(["AGPST", "C", "DENQ"], dtype=object),
+        "state_nsy": np.array([[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, 0.0]]], dtype=float),
+    }
+    out = sequence.translate_state(0, "nsy", g)
+    assert out == "ABC-"
+    assert len(out) == 4
+
+
+def test_write_alignment_uses_name_only_header_without_branch_id(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    max_label = max([int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()])
+    state = np.zeros((max_label + 1, 2, 1), dtype=float)
+    for node in tr.traverse():
+        nlabel = int(ete.get_prop(node, "numerical_label"))
+        state[nlabel, :, 0] = 1.0
+    g = {
+        "tree": tr,
+        "float_tol": 1e-12,
+        "amino_acid_orders": np.array(["K"], dtype=object),
+        "state_pep": state,
+    }
+    out_fa = tmp_path / "out.fa"
+    sequence.write_alignment(str(out_fa), mode="aa", g=g, leaf_only=True)
+    lines = out_fa.read_text(encoding="utf-8").splitlines()
+    headers = [line for line in lines if line.startswith(">")]
+    assert headers == [">A", ">B"]
+    assert all(["|" not in h for h in headers])
 
 
 def test_translate_state_rejects_unknown_mode():

@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from csubst import parser_misc
+from csubst import sequence
 from csubst import table
 from csubst import ete
 from csubst import tree
@@ -395,6 +396,91 @@ def test_cdn2pep_matrix_matches_manual_group_sum():
     np.testing.assert_allclose(out, np.array([[-1.2, 1.2], [1.1, -1.1]]), atol=1e-12)
 
 
+def test_cdn2nsy_matrix_matches_manual_recoded_group_sum():
+    inst_cdn = np.array(
+        [
+            [-1.2, 0.2, 1.0, 0.0],
+            [0.1, -0.7, 0.3, 0.3],
+            [0.4, 0.2, -0.8, 0.2],
+            [0.0, 0.5, 0.1, -0.6],
+        ],
+        dtype=float,
+    )
+    g = {
+        "nonsyn_state_orders": np.array(["AG", "C"], dtype=object),
+        "nonsynonymous_indices": {"AG": [0, 1, 2], "C": [3]},
+    }
+    out = parser_misc.cdn2nsy_matrix(inst_cdn, g)
+    np.testing.assert_allclose(out, np.array([[-0.5, 0.5], [0.6, -0.6]]), atol=1e-12)
+
+
+def test_initialize_and_report_nonsyn_recode_writes_table(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    amino_acids = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
+    codon_orders = np.array(["C{:02d}".format(i) for i in range(amino_acids.shape[0])], dtype=object)
+    synonymous_indices = {aa: [i] for i, aa in enumerate(amino_acids.tolist())}
+    matrix_groups = {aa: [codon_orders[i]] for i, aa in enumerate(amino_acids.tolist())}
+    g = {
+        "amino_acid_orders": amino_acids,
+        "codon_orders": codon_orders,
+        "synonymous_indices": synonymous_indices,
+        "matrix_groups": matrix_groups,
+        "nonsyn_recode": "dayhoff6",
+    }
+    out = parser_misc._initialize_and_report_nonsyn_recode(g)
+    assert out["nonsyn_recode"] == "dayhoff6"
+    output_path = tmp_path / "csubst_nonsyn_recoding.tsv"
+    assert output_path.exists() is True
+    lines = output_path.read_text(encoding="utf-8").strip().splitlines()
+    assert lines[0].startswith("recode\tstate_id\tstate_label")
+    pca_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
+    assert pca_path.exists() is False
+
+
+def test_initialize_and_report_nonsyn_recode_writes_pca_when_enabled(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    amino_acids = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
+    codon_orders = np.array(["C{:02d}".format(i) for i in range(amino_acids.shape[0])], dtype=object)
+    synonymous_indices = {aa: [i] for i, aa in enumerate(amino_acids.tolist())}
+    matrix_groups = {aa: [codon_orders[i]] for i, aa in enumerate(amino_acids.tolist())}
+    g = {
+        "amino_acid_orders": amino_acids,
+        "codon_orders": codon_orders,
+        "synonymous_indices": synonymous_indices,
+        "matrix_groups": matrix_groups,
+        "nonsyn_recode": "dayhoff6",
+        "plot_nonsyn_recode_pca": True,
+    }
+    out = parser_misc._initialize_and_report_nonsyn_recode(g)
+    assert out["nonsyn_recode"] == "dayhoff6"
+    pca_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
+    assert pca_path.exists() is True
+    assert pca_path.stat().st_size > 0
+
+
+def test_initialize_and_report_nonsyn_recode_writes_pca_for_no_when_enabled(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    amino_acids = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
+    codon_orders = np.array(["C{:02d}".format(i) for i in range(amino_acids.shape[0])], dtype=object)
+    synonymous_indices = {aa: [i] for i, aa in enumerate(amino_acids.tolist())}
+    matrix_groups = {aa: [codon_orders[i]] for i, aa in enumerate(amino_acids.tolist())}
+    g = {
+        "amino_acid_orders": amino_acids,
+        "codon_orders": codon_orders,
+        "synonymous_indices": synonymous_indices,
+        "matrix_groups": matrix_groups,
+        "nonsyn_recode": "no",
+        "plot_nonsyn_recode_pca": True,
+    }
+    out = parser_misc._initialize_and_report_nonsyn_recode(g)
+    assert out["nonsyn_recode"] == "no"
+    table_path = tmp_path / "csubst_nonsyn_recoding.tsv"
+    assert table_path.exists() is False
+    pca_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
+    assert pca_path.exists() is True
+    assert pca_path.stat().st_size > 0
+
+
 def test_get_mechanistic_instantaneous_rate_matrix_matches_manual_example():
     g = {
         "codon_orders": np.array(["AAA", "AAG", "AAC"]),
@@ -593,6 +679,10 @@ def test_read_input_submodel_detects_reverse_signed_rate_sum_mismatch(monkeypatc
                 "omega": 1.0,
                 "kappa": 1.0,
                 "equilibrium_frequency": np.array([0.5, 0.5], dtype=float),
+                "codon_orders": np.array(["AAA", "AAC"]),
+                "amino_acid_orders": np.array(["K", "N"]),
+                "synonymous_indices": {"K": [0], "N": [1]},
+                "matrix_groups": {"K": ["AAA"], "N": ["AAC"]},
             }
         )
         return local_g
@@ -626,3 +716,216 @@ def test_read_input_submodel_detects_reverse_signed_rate_sum_mismatch(monkeypatc
     }
     with pytest.raises(AssertionError, match="Sum of rates did not match"):
         parser_misc.read_input(g)
+
+
+def test_map_internal_site_indices_defaults_to_identity_without_mapping():
+    g = {}
+    out = parser_misc.map_internal_site_indices(site_indices=np.array([0, 2, 4], dtype=np.int64), g=g)
+    np.testing.assert_array_equal(out, np.array([0, 2, 4], dtype=np.int64))
+
+
+def test_map_internal_site_indices_handles_invalid_sites_when_allowed():
+    g = {"site_index_alignment": np.array([3, 5], dtype=np.int64)}
+    out = parser_misc.map_internal_site_indices(
+        site_indices=np.array([0, 1, 2, -1], dtype=np.int64),
+        g=g,
+        missing_value=-1,
+        allow_invalid=True,
+    )
+    np.testing.assert_array_equal(out, np.array([3, 5, -1, -1], dtype=np.int64))
+
+
+def test_expand_site_axis_table_to_alignment_without_groups():
+    g = {
+        "num_input_site": 5,
+        "site_index_alignment": np.array([1, 3], dtype=np.int64),
+    }
+    df = pd.DataFrame(
+        {
+            "site": np.array([1, 3], dtype=np.int64),
+            "N_sub": np.array([0.25, 0.75], dtype=float),
+        }
+    )
+    out = parser_misc.expand_site_axis_table_to_alignment(
+        df=df,
+        g=g,
+        site_col="site",
+        group_cols=[],
+        site_is_one_based=False,
+    )
+    assert out.shape[0] == 5
+    assert out["site"].tolist() == [0, 1, 2, 3, 4]
+    assert out["is_site_retained"].tolist() == ["no", "yes", "no", "yes", "no"]
+    assert np.isnan(out.loc[out["site"] == 0, "N_sub"]).all()
+    assert out.loc[out["site"] == 1, "N_sub"].iloc[0] == pytest.approx(0.25)
+    assert out.loc[out["site"] == 3, "N_sub"].iloc[0] == pytest.approx(0.75)
+
+
+def test_expand_site_axis_table_to_alignment_with_groups_and_one_based_sites():
+    g = {
+        "num_input_site": 4,
+        "site_index_alignment": np.array([0, 2], dtype=np.int64),
+    }
+    df = pd.DataFrame(
+        {
+            "branch_id": np.array([10, 10, 11, 11], dtype=np.int64),
+            "codon_site_alignment": np.array([1, 3, 1, 3], dtype=np.int64),
+            "N_sub": np.array([1.0, 2.0, 3.0, 4.0], dtype=float),
+        }
+    )
+    out = parser_misc.expand_site_axis_table_to_alignment(
+        df=df,
+        g=g,
+        site_col="codon_site_alignment",
+        group_cols=["branch_id"],
+        site_is_one_based=True,
+    )
+    assert out.shape[0] == 8
+    for bid in [10, 11]:
+        sub = out.loc[out["branch_id"] == bid, :]
+        assert sub["codon_site_alignment"].tolist() == [1, 2, 3, 4]
+        assert sub["is_site_retained"].tolist() == ["yes", "no", "yes", "no"]
+    assert np.isnan(out.loc[(out["branch_id"] == 10) & (out["codon_site_alignment"] == 2), "N_sub"]).all()
+    assert out.loc[(out["branch_id"] == 11) & (out["codon_site_alignment"] == 3), "N_sub"].iloc[0] == pytest.approx(4.0)
+
+
+def test_drop_invariant_tip_sites_drops_and_writes_site_map(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    seq_by_leaf = {
+        "A": "AAAAAAAAG",
+        "B": "AAAAAAAAG",
+        "C": "AAAAAAAAA",
+    }
+    for leaf in ete.iter_leaves(tr):
+        ete.set_prop(leaf, "sequence", seq_by_leaf[leaf.name])
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 3, 2), dtype=float)
+    state_pep = np.zeros((num_node, 3, 2), dtype=float)
+    state_nsy = np.zeros((num_node, 3, 2), dtype=float)
+    state_nuc = np.zeros((num_node, 9, 4), dtype=float)
+    for node_id in range(num_node):
+        for site_id in range(3):
+            state_cdn[node_id, site_id, :] = [node_id + 1.0, site_id + 1.0]
+            state_pep[node_id, site_id, :] = [site_id + 1.0, node_id + 1.0]
+            state_nsy[node_id, site_id, :] = [1.0, 0.0]
+        state_nuc[node_id, :, :] = 1.0
+    g = {
+        "tree": tr,
+        "num_input_site": 3,
+        "codon_orders": np.array(["AAA", "AAG"], dtype=object),
+        "state_nuc": state_nuc,
+        "state_cdn": state_cdn,
+        "state_pep": state_pep,
+        "state_nsy": state_nsy,
+        "iqtree_rate_values": np.array([0.1, 0.2, 0.3], dtype=float),
+    }
+    out = parser_misc.drop_invariant_tip_sites(g)
+    np.testing.assert_array_equal(out["site_index_alignment"], np.array([2], dtype=np.int64))
+    assert out["num_dropped_tip_invariant_sites"] == 2
+    np.testing.assert_array_equal(out["dropped_tip_invariant_site_alignment"], np.array([0, 1], dtype=np.int64))
+    assert out["state_cdn"].shape[1] == 1
+    assert out["state_pep"].shape[1] == 1
+    assert out["state_nsy"].shape[1] == 1
+    assert out["state_nuc"].shape[1] == 3
+    np.testing.assert_allclose(out["iqtree_rate_values"], np.array([0.3], dtype=float), atol=1e-12)
+    map_path = tmp_path / "csubst_site_index_map.tsv"
+    assert map_path.exists()
+    site_map = pd.read_csv(map_path, sep="\t")
+    assert site_map["codon_site_alignment"].tolist() == [0, 1, 2]
+    assert site_map["site"].tolist() == [-1, -1, 0]
+    assert site_map["is_retained"].tolist() == ["no", "no", "yes"]
+
+
+def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    seq_by_leaf = {
+        # site0: AAA/AAA/AAA -> tip-invariant
+        # site1: AAA/NNN/NNN -> only one unambiguous tip codon, should now be dropped
+        # site2: AAG/AAA/AAA -> variable among unambiguous tips, should be retained
+        "A": "AAAAAAAAG",
+        "B": "AAANNNAAA",
+        "C": "AAANNNAAA",
+    }
+    for leaf in ete.iter_leaves(tr):
+        ete.set_prop(leaf, "sequence", seq_by_leaf[leaf.name])
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 3, 2), dtype=float)
+    state_pep = np.zeros((num_node, 3, 2), dtype=float)
+    state_nsy = np.zeros((num_node, 3, 2), dtype=float)
+    state_nuc = np.zeros((num_node, 9, 4), dtype=float)
+    for node_id in range(num_node):
+        for site_id in range(3):
+            state_cdn[node_id, site_id, :] = [node_id + 1.0, site_id + 1.0]
+            state_pep[node_id, site_id, :] = [site_id + 1.0, node_id + 1.0]
+            state_nsy[node_id, site_id, :] = [1.0, 0.0]
+        state_nuc[node_id, :, :] = 1.0
+    g = {
+        "tree": tr,
+        "num_input_site": 3,
+        "codon_orders": np.array(["AAA", "AAG"], dtype=object),
+        "state_nuc": state_nuc,
+        "state_cdn": state_cdn,
+        "state_pep": state_pep,
+        "state_nsy": state_nsy,
+        "iqtree_rate_values": np.array([0.1, 0.2, 0.3], dtype=float),
+    }
+    out = parser_misc.drop_invariant_tip_sites(g)
+    np.testing.assert_array_equal(out["site_index_alignment"], np.array([2], dtype=np.int64))
+    assert out["num_dropped_tip_invariant_sites"] == 2
+    np.testing.assert_array_equal(out["dropped_tip_invariant_site_alignment"], np.array([0, 1], dtype=np.int64))
+    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
+    assert site_map["site"].tolist() == [-1, -1, 0]
+    assert site_map["is_retained"].tolist() == ["no", "no", "yes"]
+
+
+def test_drop_invariant_tip_sites_zero_sub_mass_mode_drops_only_zero_mass_sites(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    node_by_name = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()}
+    root_id = node_by_name["R"]
+    a_id = node_by_name["A"]
+    b_id = node_by_name["B"]
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 3, 3), dtype=float)
+    # site 0: AAA -> AAA in all branches (zero N/S substitution mass)
+    state_cdn[root_id, 0, 0] = 1.0
+    state_cdn[a_id, 0, 0] = 1.0
+    state_cdn[b_id, 0, 0] = 1.0
+    # site 1: AAA -> AAG in branch B (synonymous substitution mass > 0)
+    state_cdn[root_id, 1, 0] = 1.0
+    state_cdn[a_id, 1, 0] = 1.0
+    state_cdn[b_id, 1, 1] = 1.0
+    # site 2: AAA -> AAC in branch B (nonsynonymous substitution mass > 0)
+    state_cdn[root_id, 2, 0] = 1.0
+    state_cdn[a_id, 2, 0] = 1.0
+    state_cdn[b_id, 2, 2] = 1.0
+    state_nuc = np.ones((num_node, 9, 4), dtype=float)
+    g = {
+        "tree": tr,
+        "num_input_site": 3,
+        "float_tol": 1e-12,
+        "drop_invariant_tip_sites_mode": "zero_sub_mass",
+        "codon_orders": np.array(["AAA", "AAG", "AAC"], dtype=object),
+        "amino_acid_orders": np.array(["K", "N"], dtype=object),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+        "nonsyn_state_orders": np.array(["K", "N"], dtype=object),
+        "nonsynonymous_indices": {"K": [0, 1], "N": [2]},
+        "state_nuc": state_nuc,
+        "state_cdn": state_cdn,
+        "iqtree_rate_values": np.array([0.1, 0.2, 0.3], dtype=float),
+    }
+    g["state_pep"] = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
+    g["state_nsy"] = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g)
+    out = parser_misc.drop_invariant_tip_sites(g)
+    np.testing.assert_array_equal(out["site_index_alignment"], np.array([1, 2], dtype=np.int64))
+    assert out["num_dropped_tip_invariant_sites"] == 1
+    np.testing.assert_array_equal(out["dropped_tip_invariant_site_alignment"], np.array([0], dtype=np.int64))
+    assert out["state_cdn"].shape[1] == 2
+    assert out["state_pep"].shape[1] == 2
+    assert out["state_nsy"].shape[1] == 2
+    assert out["state_nuc"].shape[1] == 6
+    np.testing.assert_allclose(out["iqtree_rate_values"], np.array([0.2, 0.3], dtype=float), atol=1e-12)
+    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
+    assert site_map["site"].tolist() == [-1, 0, 1]

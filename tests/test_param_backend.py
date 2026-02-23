@@ -1,5 +1,6 @@
 import argparse
 
+import numpy as np
 import pytest
 
 from csubst import param
@@ -21,9 +22,17 @@ def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     g = param.get_global_parameters(_args())
     assert g["sub_tensor_backend"] == "auto"
     assert g["sub_tensor_sparse_density_cutoff"] == pytest.approx(0.15)
+    assert g["sub_tensor_auto_sparse_min_elements"] == 100000000
     assert g["parallel_backend"] == "auto"
     assert g["parallel_chunk_factor"] == 1
     assert g["parallel_chunk_factor_reducer"] == 4
+    assert g["parallel_min_items_sub_tensor"] == 256
+    assert g["parallel_min_items_per_job_sub_tensor"] == 64
+    assert g["parallel_min_items_cb"] == 20000
+    assert g["parallel_min_rows_cbs"] == 200000
+    assert g["parallel_min_items_branch_dist"] == 20000
+    assert g["parallel_min_items_expected_state"] == 50000000
+    assert g["parallel_min_items_per_job_expected_state"] == 10000000
 
 
 def test_get_global_parameters_rejects_unsupported_float_type():
@@ -68,6 +77,8 @@ def test_get_global_parameters_rejects_invalid_sub_tensor_backend():
 def test_get_global_parameters_rejects_invalid_sparse_density_cutoff():
     with pytest.raises(ValueError, match="sub_tensor_sparse_density_cutoff"):
         param.get_global_parameters(_args(sub_tensor_sparse_density_cutoff=1.5))
+    with pytest.raises(ValueError, match="sub_tensor_auto_sparse_min_elements"):
+        param.get_global_parameters(_args(sub_tensor_auto_sparse_min_elements=-1))
 
 
 @pytest.mark.parametrize(
@@ -96,6 +107,19 @@ def test_get_global_parameters_rejects_invalid_chunk_factors():
         param.get_global_parameters(_args(parallel_chunk_factor=0))
     with pytest.raises(ValueError, match="parallel_chunk_factor_reducer"):
         param.get_global_parameters(_args(parallel_chunk_factor_reducer=0))
+
+
+def test_get_global_parameters_rejects_invalid_parallel_auto_thresholds():
+    with pytest.raises(ValueError, match="parallel_min_items_sub_tensor"):
+        param.get_global_parameters(_args(parallel_min_items_sub_tensor=-1))
+    with pytest.raises(ValueError, match="parallel_min_items_per_job_sub_tensor"):
+        param.get_global_parameters(_args(parallel_min_items_per_job_sub_tensor=0))
+    with pytest.raises(ValueError, match="parallel_min_rows_per_job_cbs"):
+        param.get_global_parameters(_args(parallel_min_rows_per_job_cbs=0))
+    with pytest.raises(ValueError, match="parallel_min_items_expected_state"):
+        param.get_global_parameters(_args(parallel_min_items_expected_state=-1))
+    with pytest.raises(ValueError, match="parallel_min_items_per_job_expected_state"):
+        param.get_global_parameters(_args(parallel_min_items_per_job_expected_state=0))
 
 
 def test_get_global_parameters_parses_output_stat_and_required_base_stats():
@@ -251,6 +275,29 @@ def test_get_global_parameters_rejects_invalid_uniprot_include_redundant_string(
         param.get_global_parameters(_args(uniprot_include_redundant="maybe"))
 
 
+def test_get_global_parameters_parses_drop_invariant_tip_sites_single_option():
+    g_no = param.get_global_parameters(_args(drop_invariant_tip_sites="no"))
+    g_tip = param.get_global_parameters(_args(drop_invariant_tip_sites="tip_invariant"))
+    g_zero = param.get_global_parameters(_args(drop_invariant_tip_sites="zero_sub_mass"))
+    assert g_no["drop_invariant_tip_sites"] is False
+    assert g_no["drop_invariant_tip_sites_mode"] == "tip_invariant"
+    assert g_tip["drop_invariant_tip_sites"] is True
+    assert g_tip["drop_invariant_tip_sites_mode"] == "tip_invariant"
+    assert g_zero["drop_invariant_tip_sites"] is True
+    assert g_zero["drop_invariant_tip_sites_mode"] == "zero_sub_mass"
+
+
+def test_get_global_parameters_rejects_invalid_drop_invariant_tip_sites_string():
+    with pytest.raises(ValueError, match="drop_invariant_tip_sites"):
+        param.get_global_parameters(_args(drop_invariant_tip_sites="maybe"))
+    with pytest.raises(ValueError, match="drop_invariant_tip_sites"):
+        param.get_global_parameters(_args(drop_invariant_tip_sites="yes"))
+    with pytest.raises(ValueError, match="drop_invariant_tip_sites"):
+        param.get_global_parameters(_args(drop_invariant_tip_sites="true"))
+    with pytest.raises(ValueError, match="drop_invariant_tip_sites"):
+        param.get_global_parameters(_args(drop_invariant_tip_sites="false"))
+
+
 def test_get_global_parameters_validates_database_timeout():
     g = param.get_global_parameters(_args(database_timeout=12))
     assert g["database_timeout"] == pytest.approx(12.0)
@@ -361,3 +408,17 @@ def test_resolve_sub_tensor_backend_sparse_is_sparse():
     g = {"sub_tensor_backend": "sparse"}
     assert substitution.resolve_sub_tensor_backend(g) == "sparse"
     assert g["resolved_sub_tensor_backend"] == "sparse"
+
+
+def test_resolve_sub_tensor_backend_auto_can_switch_to_sparse_for_large_tensors():
+    g = {"sub_tensor_backend": "auto", "sub_tensor_auto_sparse_min_elements": 1000}
+    state = np.zeros((2, 2, 20), dtype=float)
+    assert substitution.resolve_sub_tensor_backend(g=g, state_tensor=state, mode="asis") == "sparse"
+    assert g["resolved_sub_tensor_backend"] == "sparse"
+
+
+def test_resolve_sub_tensor_backend_auto_keeps_dense_for_small_tensors():
+    g = {"sub_tensor_backend": "auto", "sub_tensor_auto_sparse_min_elements": 100000}
+    state = np.zeros((2, 2, 20), dtype=float)
+    assert substitution.resolve_sub_tensor_backend(g=g, state_tensor=state, mode="asis") == "dense"
+    assert g["resolved_sub_tensor_backend"] == "dense"
