@@ -254,3 +254,72 @@ def test_main_inspect_download_prostt5_exits_before_input_loading(monkeypatch):
     g = {"download_prostt5": True, "prostt5_model": "Rostlab/ProstT5"}
     main_inspect.main_inspect(g)
     assert call_log == [("ensure", "Rostlab/ProstT5")]
+
+
+def test_main_inspect_applies_3di_smoke_branch_limit(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1))
+    node_ids = sorted([int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()])
+    root_id = int(ete.get_prop(ete.get_tree_root(tr), "numerical_label"))
+    nonroot_ids = [bid for bid in node_ids if bid != root_id]
+    expected_nonroot = np.array(nonroot_ids[:2], dtype=np.int64)
+    expected_with_root = np.array([root_id] + expected_nonroot.tolist(), dtype=np.int64)
+
+    def fake_read_treefile(local_g):
+        local_g["tree"] = tr
+        return local_g
+
+    def fake_passthrough(local_g):
+        return local_g
+
+    def fake_read_input(local_g):
+        local_g["amino_acid_orders"] = np.array(["A", "C"], dtype=object)
+        local_g["codon_orders"] = np.array(["AAA", "AAC"], dtype=object)
+        local_g["nonsyn_state_orders"] = np.array(["A", "C"], dtype=object)
+        return local_g
+
+    def fake_get_foreground_branch(local_g):
+        local_g["fg_df"] = pd.DataFrame(columns=["name"])
+        local_g["target_ids"] = {}
+        return local_g
+
+    observed = {"sa_ids": None, "nsy_branch_ids": None}
+
+    def fake_prep_state(local_g):
+        observed["sa_ids"] = np.asarray(local_g.get("sa_inference_branch_ids"), dtype=np.int64)
+        num_node = max([int(ete.get_prop(node, "numerical_label")) for node in local_g["tree"].traverse()]) + 1
+        local_g["state_pep"] = np.zeros((num_node, 1, 2), dtype=float)
+        local_g["state_cdn"] = np.zeros((num_node, 1, 2), dtype=float)
+        local_g["state_nsy"] = np.zeros((num_node, 1, 2), dtype=float)
+        return local_g
+
+    def fake_write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
+        Path(outfile).write_text("aln", encoding="utf-8")
+        if str(outfile) == "csubst_alignment_3di.fa":
+            observed["nsy_branch_ids"] = np.asarray(branch_ids, dtype=np.int64)
+
+    def fake_write_tree(tree_obj, outfile="csubst_tree.nwk", add_numerical_label=True):
+        Path(outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
+
+    monkeypatch.setattr(main_inspect.tree, "read_treefile", fake_read_treefile)
+    monkeypatch.setattr(main_inspect.parser_misc, "generate_intermediate_files", fake_passthrough)
+    monkeypatch.setattr(main_inspect.parser_misc, "annotate_tree", fake_passthrough)
+    monkeypatch.setattr(main_inspect.parser_misc, "read_input", fake_read_input)
+    monkeypatch.setattr(main_inspect.foreground, "get_foreground_branch", fake_get_foreground_branch)
+    monkeypatch.setattr(main_inspect.foreground, "get_marginal_branch", fake_passthrough)
+    monkeypatch.setattr(main_inspect.parser_misc, "resolve_state_loading", fake_passthrough)
+    monkeypatch.setattr(main_inspect.parser_misc, "prep_state", fake_prep_state)
+    monkeypatch.setattr(main_inspect.sequence, "write_alignment", fake_write_alignment)
+    monkeypatch.setattr(main_inspect.tree, "write_tree", fake_write_tree)
+    monkeypatch.setattr(main_inspect.tree, "plot_branch_category", lambda local_g, file_base, label="all": None)
+
+    g = {
+        "genetic_code": 1,
+        "nonsyn_recode": "3di20",
+        "sa_smoke_max_branches": 2,
+        "plot_state_aa": False,
+        "plot_state_codon": False,
+    }
+    main_inspect.main_inspect(g)
+    np.testing.assert_array_equal(observed["sa_ids"], expected_with_root)
+    np.testing.assert_array_equal(observed["nsy_branch_ids"], expected_nonroot)

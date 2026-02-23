@@ -501,6 +501,10 @@ def _main():
                          help='default=%(default)s: Write per-site ancestral codon state trees into csubst_plot_state_codon/.')
     inspect.add_argument('--plot_nonsyn_recode_pca', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Write csubst_nonsyn_recoding_pca.png from input alignment.')
+    inspect.add_argument('--sa_smoke_max_branches', metavar='INTEGER', default=0, type=int,
+                         help='default=%(default)s: CPU smoke mode for --nonsyn_recode 3di20. '
+                              'Limit 3Di inference to the first N non-root branches ordered by branch_id. '
+                              'Set 0 to disable.')
     inspect.add_argument('--download_prostt5', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Download/check ProstT5 model files and exit.')
     inspect.set_defaults(handler=command_inspect)

@@ -454,6 +454,12 @@ def get_global_parameters(args):
     g['sa_iqtree_model'] = str(g['sa_iqtree_model']).strip()
     if g['sa_iqtree_model'] == '':
         raise ValueError('--sa_iqtree_model should be non-empty.')
+    if 'sa_smoke_max_branches' in g.keys():
+        g['sa_smoke_max_branches'] = int(g['sa_smoke_max_branches'])
+    else:
+        g['sa_smoke_max_branches'] = 0
+    if g['sa_smoke_max_branches'] < 0:
+        raise ValueError('--sa_smoke_max_branches should be >= 0.')
     if g['nonsyn_recode'] == '3di20':
         full_path = str(g.get('full_cds_alignment_file', '')).strip()
         if full_path == '':

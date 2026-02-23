@@ -796,6 +796,39 @@ def test_prep_state_3di20_direct_uses_direct_builder(monkeypatch):
     assert "_3di_tip_alignment_by_leaf" in out
 
 
+def test_prep_state_3di20_prefers_sa_inference_branch_ids(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 2, 3), dtype=float)
+    state_cdn[:, :, 0] = 1.0
+    state_pep = np.zeros((num_node, 2, 20), dtype=float)
+    state_pep[:, :, 0] = 1.0
+    state_nsy = np.zeros((num_node, 2, 20), dtype=float)
+    state_nsy[:, :, 3] = 1.0
+    state_orders = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_state_tensor", lambda g, selected_branch_ids=None: state_cdn)
+    monkeypatch.setattr(sequence, "cdn2pep_state", lambda state_cdn, g, selected_branch_ids=None: state_pep)
+    called_selected = {"ids": None}
+
+    def _fake_translate_builder(g, state_pep, selected_branch_ids=None):
+        called_selected["ids"] = np.asarray(selected_branch_ids, dtype=np.int64)
+        return state_nsy, state_orders, {0: "VV", 1: "VV", 2: "VV"}
+
+    monkeypatch.setattr(parser_misc.structural_alphabet, "build_3di_state_from_state_pep", _fake_translate_builder)
+    g = {
+        "tree": tr,
+        "infile_type": "iqtree",
+        "input_data_type": "cdn",
+        "nonsyn_recode": "3di20",
+        "sa_asr_mode": "translate",
+        "state_loaded_branch_ids": np.array([0, 1, 2], dtype=np.int64),
+        "sa_inference_branch_ids": np.array([0, 2], dtype=np.int64),
+    }
+    parser_misc.prep_state(g)
+    np.testing.assert_array_equal(called_selected["ids"], np.array([0, 2], dtype=np.int64))
+
+
 def test_map_internal_site_indices_defaults_to_identity_without_mapping():
     g = {}
     out = parser_misc.map_internal_site_indices(site_indices=np.array([0, 2, 4], dtype=np.int64), g=g)

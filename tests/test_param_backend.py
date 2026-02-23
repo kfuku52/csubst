@@ -324,6 +324,16 @@ def test_get_global_parameters_rejects_invalid_sa_asr_mode():
         param.get_global_parameters(_args(sa_iqtree_model=""))
 
 
+def test_get_global_parameters_parses_sa_smoke_max_branches():
+    g = param.get_global_parameters(_args(sa_smoke_max_branches=5))
+    assert g["sa_smoke_max_branches"] == 5
+
+
+def test_get_global_parameters_rejects_negative_sa_smoke_max_branches():
+    with pytest.raises(ValueError, match="sa_smoke_max_branches"):
+        param.get_global_parameters(_args(sa_smoke_max_branches=-1))
+
+
 def test_get_global_parameters_parses_prostt5_options():
     g = param.get_global_parameters(
         _args(

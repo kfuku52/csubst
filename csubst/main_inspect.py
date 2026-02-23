@@ -121,6 +121,35 @@ def _get_aa_state_view_for_inspect(g):
     return g["state_pep"], g["amino_acid_orders"], "aa"
 
 
+def _configure_3di_smoke_mode(g):
+    g["sa_inference_branch_ids"] = None
+    g["sa_smoke_inferred_nonroot_branch_ids"] = None
+    max_branches = int(g.get("sa_smoke_max_branches", 0))
+    if max_branches <= 0:
+        return g
+    recode = str(g.get("nonsyn_recode", "no")).strip().lower()
+    if recode != "3di20":
+        print("Ignoring --sa_smoke_max_branches because --nonsyn_recode is not 3di20.", flush=True)
+        return g
+    nonroot_branch_ids = list()
+    root_id = int(ete.get_prop(ete.get_tree_root(g["tree"]), "numerical_label"))
+    for node in g["tree"].traverse():
+        if ete.is_root(node):
+            continue
+        nonroot_branch_ids.append(int(ete.get_prop(node, "numerical_label")))
+    nonroot_branch_ids = sorted(nonroot_branch_ids)
+    selected_nonroot = nonroot_branch_ids[:max_branches]
+    g["sa_smoke_inferred_nonroot_branch_ids"] = np.asarray(selected_nonroot, dtype=np.int64)
+    g["sa_inference_branch_ids"] = np.asarray([root_id] + selected_nonroot, dtype=np.int64)
+    txt = "3Di smoke mode: limiting inference to {:,} / {:,} non-root branches (plus root)."
+    print(txt.format(len(selected_nonroot), len(nonroot_branch_ids)), flush=True)
+    if str(g.get("sa_asr_mode", "translate")).strip().lower() == "direct":
+        txt = "3Di smoke mode note: --sa_asr_mode direct still runs full IQ-TREE ASR; "
+        txt += "branch filtering is applied when importing states."
+        print(txt, flush=True)
+    return g
+
+
 def main_inspect(g):
     start = time.time()
     if bool(g.get("download_prostt5", False)):
@@ -138,13 +167,17 @@ def main_inspect(g):
     g = foreground.get_foreground_branch(g)
     g = foreground.get_marginal_branch(g)
     g = parser_misc.resolve_state_loading(g)
+    g = _configure_3di_smoke_mode(g)
     g = parser_misc.prep_state(g)
     loaded_branch_ids = g.get("state_loaded_branch_ids", None)
     sequence.write_alignment("csubst_alignment_codon.fa", mode="codon", g=g, branch_ids=loaded_branch_ids)
     aa_state, aa_orders, aa_mode = _get_aa_state_view_for_inspect(g)
     sequence.write_alignment("csubst_alignment_aa.fa", mode=aa_mode, g=g, branch_ids=loaded_branch_ids)
     if str(g.get("nonsyn_recode", "no")).strip().lower() == "3di20":
-        sequence.write_alignment("csubst_alignment_3di.fa", mode="nsy", g=g, branch_ids=loaded_branch_ids)
+        nsy_branch_ids = g.get("sa_smoke_inferred_nonroot_branch_ids", None)
+        if nsy_branch_ids is None:
+            nsy_branch_ids = loaded_branch_ids
+        sequence.write_alignment("csubst_alignment_3di.fa", mode="nsy", g=g, branch_ids=nsy_branch_ids)
 
     tree.write_tree(g["tree"])
     tree.plot_branch_category(g, file_base="csubst_branch_id", label="all")

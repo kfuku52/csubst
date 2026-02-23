@@ -72,6 +72,7 @@ def test_inspect_help_includes_nonsyn_recode_pca_option():
     help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
     assert "--plot_nonsyn_recode_pca" in help_text
     assert "--download_prostt5" in help_text
+    assert "--sa_smoke_max_branches" in help_text
     assert "--nonsyn_recode" in help_text
 
 

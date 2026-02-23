@@ -717,6 +717,9 @@ def prep_state(g):
     state_pep = None
     state_nsy = None
     loaded_branch_ids = g.get('state_loaded_branch_ids', None)
+    nsy_branch_ids = g.get('sa_inference_branch_ids', None)
+    if nsy_branch_ids is None:
+        nsy_branch_ids = loaded_branch_ids
 
     def _resolve_state_nsy(state_cdn_local, state_pep_local):
         if g.get('nonsyn_recode', 'no') != '3di20':
@@ -730,7 +733,7 @@ def prep_state(g):
             state_nsy_local, state_orders, aligned_3di = structural_alphabet.build_3di_state_from_state_pep(
                 g=g,
                 state_pep=state_pep_local,
-                selected_branch_ids=loaded_branch_ids,
+                selected_branch_ids=nsy_branch_ids,
             )
             g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
             g['_3di_alignment_by_branch_id'] = aligned_3di
@@ -738,7 +741,7 @@ def prep_state(g):
         if sa_mode == 'direct':
             state_nsy_local, state_orders, tip_3di = structural_alphabet.build_3di_state_direct(
                 g=g,
-                selected_branch_ids=loaded_branch_ids,
+                selected_branch_ids=nsy_branch_ids,
             )
             g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
             g['_3di_tip_alignment_by_leaf'] = tip_3di
