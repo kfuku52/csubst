@@ -39,9 +39,7 @@ AUTO_RECODING_SCHEMES = OrderedDict(
 )
 
 _RECODING_ALIASES = {
-    "none": "none",
-    "off": "none",
-    "20": "none",
+    "no": "no",
     "dayhoff6": "dayhoff6",
     "dayhoff-6": "dayhoff6",
     "dayhoff_6": "dayhoff6",
@@ -80,7 +78,7 @@ _RECODING_ALIASES = {
     "ais6": "kgbauto6",
 }
 
-SUPPORTED_RECODINGS = tuple(["none"] + list(RECODING_SCHEMES.keys()) + list(AUTO_RECODING_SCHEMES.keys()))
+SUPPORTED_RECODINGS = tuple(["no"] + list(RECODING_SCHEMES.keys()) + list(AUTO_RECODING_SCHEMES.keys()))
 
 
 def _validate_scheme(name, groups):
@@ -108,7 +106,7 @@ for _scheme_name, _groups in RECODING_SCHEMES.items():
 
 def normalize_nonsyn_recode(value):
     if value is None:
-        return "none"
+        return "no"
     value_txt = str(value).strip().lower()
     if value_txt in _RECODING_ALIASES:
         normalized = _RECODING_ALIASES[value_txt]
@@ -1064,14 +1062,14 @@ def _build_recoded_groups(g, scheme_name):
 
 
 def initialize_nonsyn_groups(g):
-    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "none"))
+    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
     g["nonsyn_recode"] = recode
     required_keys = ["amino_acid_orders", "synonymous_indices", "matrix_groups"]
     missing_keys = [key for key in required_keys if key not in g]
     if len(missing_keys) > 0:
         txt = "Missing required key(s) for nonsynonymous recoding initialization: {}"
         raise ValueError(txt.format(", ".join(missing_keys)))
-    if recode == "none":
+    if recode == "no":
         state_orders, index_map, codon_map, members, aa_to_state = _copy_nonsyn_groups_from_amino_acids(g)
     else:
         state_orders, index_map, codon_map, members, aa_to_state = _build_recoded_groups(g, scheme_name=recode)
@@ -1092,8 +1090,8 @@ def _join_values(values):
 
 
 def write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv"):
-    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "none"))
-    if recode == "none":
+    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
+    if recode == "no":
         return None
     required_keys = [
         "amino_acid_orders",
@@ -1156,10 +1154,10 @@ def write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv"):
 
 def _get_scheme_groups_for_pca(g):
     groups_by_scheme = OrderedDict()
-    groups_by_scheme["none"] = tuple([str(aa) for aa in _CANONICAL_AA])
+    groups_by_scheme["no"] = tuple([str(aa) for aa in _CANONICAL_AA])
     for scheme_name, groups in RECODING_SCHEMES.items():
         groups_by_scheme[str(scheme_name)] = tuple([str(group) for group in groups])
-    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "none"))
+    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
     if (recode in AUTO_RECODING_SCHEMES) and ("nonsyn_state_orders" not in g):
         raise ValueError('Missing "nonsyn_state_orders" for auto recoding PCA output.')
     g_for_auto = dict(g)
@@ -1226,7 +1224,7 @@ def _project_pca_2d(feature_matrix):
 
 
 def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.png"):
-    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "none"))
+    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
     groups_by_scheme = _get_scheme_groups_for_pca(g=g)
     scheme_names = list(groups_by_scheme.keys())
     feature_matrix = np.vstack(

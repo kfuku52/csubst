@@ -1,0 +1,3 @@
+mode	n_total	n_finite_omega	n_nonfinite_omega	pearson_r_finite	max_abs_delta_finite	mean_abs_delta_finite	n_rel_gt_1pct_finite	pct_rel_gt_1pct_finite	n_rel_gt_5pct_finite	pct_rel_gt_5pct_finite	n_ocn_gt1_finite	n_ocn_gt1_rel_gt_1pct	pct_ocn_gt1_rel_gt_1pct	n_ocn_gt1_rel_gt_5pct	pct_ocn_gt1_rel_gt_5pct
+default(auto)	8308	8304	4	0.9999989536556914	1354.153099999996	0.4578887162813122	1942	23.386319845857418	45	0.541907514450867	1137	350	30.782761653474054	1	0.08795074758135445
+sparse-fixed	8308	8304	4	0.9999989535849961	1354.153100000054	0.4579721700385437	1942	23.386319845857418	45	0.541907514450867	1137	350	30.782761653474054	1	0.08795074758135445

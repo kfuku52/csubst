@@ -287,6 +287,79 @@ def _resolve_quantile_parallel_plan(cb_rows, num_categories, quantile_niter, req
     return n_jobs, max(chunk_factor, 4)
 
 
+def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol):
+    jobs = list()
+    if mode == 'cdn':
+        dist_prop = 'SNdist'
+    elif mode in ['pep', 'nsy']:
+        dist_prop = 'Ndist'
+    else:
+        raise ValueError('Unsupported expected-state mode: {}'.format(mode))
+    for node in tree.traverse():
+        if ete.is_root(node):
+            continue
+        branch_length = max(float(ete.get_prop(node, dist_prop, 0)), 0.0)
+        if branch_length < float_tol:
+            continue
+        nl = int(ete.get_prop(node, "numerical_label"))
+        parent_nl = int(ete.get_prop(node.up, "numerical_label"))
+        if (parent_nl < 0) or (parent_nl >= num_node):
+            continue
+        if (nl < 0) or (nl >= num_node):
+            continue
+        jobs.append((nl, parent_nl, branch_length))
+    return jobs
+
+
+def _resolve_expected_state_n_jobs(num_branch_jobs, num_site, num_state, g):
+    threads = int(g.get('threads', 1))
+    if (threads <= 1) or (num_branch_jobs <= 1):
+        return 1, 0
+    estimated_work = int(num_branch_jobs) * int(num_site) * int(num_state) * int(num_state)
+    n_jobs = parallel.resolve_adaptive_n_jobs(
+        num_items=estimated_work,
+        threads=threads,
+        min_items_for_parallel=int(g.get('parallel_min_items_expected_state', 5000000000)),
+        min_items_per_job=int(g.get('parallel_min_items_per_job_expected_state', 1000000000)),
+    )
+    max_jobs_by_branch = parallel.resolve_n_jobs(num_items=num_branch_jobs, threads=threads)
+    return min(n_jobs, max_jobs_by_branch), estimated_work
+
+
+def _project_expected_state_chunk(
+    branch_jobs,
+    state,
+    stateE,
+    unique_site_rates,
+    rate_site_indices,
+    inst,
+    float_tol,
+):
+    if len(branch_jobs) == 0:
+        return None
+    transition_prob_cache = dict()
+    for nl, parent_nl, branch_length in branch_jobs:
+        inst_bl = inst * branch_length
+        for site_rate, site_indices in zip(unique_site_rates, rate_site_indices):
+            if site_indices.shape[0] == 0:
+                continue
+            cache_key = (branch_length, float(site_rate))
+            transition_prob = transition_prob_cache.get(cache_key, None)
+            if transition_prob is None:
+                inst_bl_site = inst_bl * site_rate
+                # Confirmed this implementation (with expm) correctly replicated the example in this instruction (Huelsenbeck, 2012)
+                # https://molevolworkshop.github.io/faculty/huelsenbeck/pdf/WoodsHoleHandout.pdf
+                transition_prob = expm(inst_bl_site)
+                transition_prob_cache[cache_key] = transition_prob
+            parent_state_block = state[parent_nl, site_indices, :]
+            stateE[nl, site_indices, :] = _project_expected_state_block(
+                parent_state_block=parent_state_block,
+                transition_prob=transition_prob,
+                float_tol=float_tol,
+            )
+    return None
+
+
 def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g):
     E_b = np.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
     for i,sg,a,d in list_igad:
@@ -488,7 +561,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             g['EN_tensor'] = substitution.get_substitution_tensor(state_nsyE, g['state_nsy'], mode='asis', g=g, mmap_attr='EN')
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
         print(txt.format(substitution.get_total_substitution(g['EN_tensor'])))
-        print('Preparing the ECN table with {:,} process(es).'.format(g['threads']), flush=True)
+        print('Preparing the ECN table with up to {:,} process(es).'.format(g['threads']), flush=True)
         cbEN = substitution.get_cb(
             cb.loc[:,id_cols].values,
             g['EN_tensor'],
@@ -503,7 +576,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
         print(txt.format(substitution.get_total_substitution(g['ES_tensor'])))
-        print('Preparing the ECS table with {:,} process(es).'.format(g['threads']), flush=True)
+        print('Preparing the ECS table with up to {:,} process(es).'.format(g['threads']), flush=True)
         cbES = substitution.get_cb(
             cb.loc[:,id_cols].values,
             g['ES_tensor'],
@@ -539,38 +612,53 @@ def get_exp_state(g, mode):
         rate_values = rate_values.reshape(-1)
     unique_site_rates, inverse_rate_indices = np.unique(rate_values, return_inverse=True)
     rate_site_indices = [np.where(inverse_rate_indices == i)[0] for i in range(unique_site_rates.shape[0])]
-    for node in g['tree'].traverse():
-        if ete.is_root(node):
-            continue
-        if mode=='cdn':
-            branch_length = ete.get_prop(node, 'SNdist', 0)
-        elif mode in ['pep', 'nsy']:
-            branch_length = ete.get_prop(node, 'Ndist', 0)
-        else:
-            raise ValueError('Unsupported expected-state mode: {}'.format(mode))
-        branch_length = max(branch_length, 0)
-        if branch_length<g['float_tol']:
-            continue # Skip if no substitution
-        nl = ete.get_prop(node, "numerical_label")
-        parent_nl = ete.get_prop(node.up, "numerical_label")
-        if (parent_nl < 0) or (parent_nl >= stateE.shape[0]):
-            continue
-        if (nl < 0) or (nl >= stateE.shape[0]):
-            continue
-        inst_bl = inst * branch_length
-        for site_rate, site_indices in zip(unique_site_rates, rate_site_indices):
-            if site_indices.shape[0] == 0:
-                continue
-            inst_bl_site = inst_bl * site_rate
-            # Confirmed this implementation (with expm) correctly replicated the example in this instruction (Huelsenbeck, 2012)
-            # https://molevolworkshop.github.io/faculty/huelsenbeck/pdf/WoodsHoleHandout.pdf
-            transition_prob = expm(inst_bl_site)
-            parent_state_block = state[parent_nl, site_indices, :]
-            stateE[nl, site_indices, :] = _project_expected_state_block(
-                parent_state_block=parent_state_block,
-                transition_prob=transition_prob,
-                float_tol=g['float_tol'],
-            )
+    branch_jobs = _collect_expected_state_branch_jobs(
+        tree=g['tree'],
+        mode=mode,
+        num_node=stateE.shape[0],
+        float_tol=float(g['float_tol']),
+    )
+    n_jobs, estimated_work = _resolve_expected_state_n_jobs(
+        num_branch_jobs=len(branch_jobs),
+        num_site=state.shape[1],
+        num_state=state.shape[2],
+        g=g,
+    )
+    txt = 'Expected-state scheduler (mode={}): branches={}, site_rates={}, estimated_work={}, workers={} (threads={})'
+    print(
+        txt.format(
+            mode,
+            len(branch_jobs),
+            unique_site_rates.shape[0],
+            estimated_work,
+            n_jobs,
+            int(g.get('threads', 1)),
+        ),
+        flush=True,
+    )
+    if n_jobs == 1:
+        _project_expected_state_chunk(
+            branch_jobs=branch_jobs,
+            state=state,
+            stateE=stateE,
+            unique_site_rates=unique_site_rates,
+            rate_site_indices=rate_site_indices,
+            inst=inst,
+            float_tol=float(g['float_tol']),
+        )
+    else:
+        chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+        branch_chunks, _ = parallel.get_chunks(input_data=branch_jobs, threads=n_jobs, chunk_factor=chunk_factor)
+        tasks = [
+            (chunk, state, stateE, unique_site_rates, rate_site_indices, inst, float(g['float_tol']))
+            for chunk in branch_chunks
+        ]
+        parallel.run_starmap(
+            func=_project_expected_state_chunk,
+            args_iterable=tasks,
+            n_jobs=n_jobs,
+            backend='threading',
+        )
     max_stateE = stateE.sum(axis=(2)).max()
     if (max_stateE - 1) >= g['float_tol']:
         raise AssertionError('Total probability of expected states should not exceed 1. {}'.format(max_stateE))

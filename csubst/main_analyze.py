@@ -20,6 +20,23 @@ from csubst import output_stat
 from csubst import tree
 
 
+def _remap_site_column_to_alignment(df, g, column_name='site'):
+    if column_name not in df.columns:
+        return df
+    if df.shape[0] == 0:
+        return df
+    out = df.copy(deep=True)
+    site_values = out.loc[:, column_name].to_numpy(dtype=np.int64, copy=True)
+    mapped_values = parser_misc.map_internal_site_indices(
+        site_indices=site_values,
+        g=g,
+        missing_value=-1,
+        allow_invalid=False,
+    )
+    out.loc[:, column_name] = mapped_values
+    return out
+
+
 def _plot_state_tree_in_directory(output_dir, state, orders, mode, g):
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
@@ -101,7 +118,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             txt = 'Arity (K) = {:,}: No branch combination satisfied phylogenetic independence. Ending higher-order search at K = {:,}.'
             print(txt.format(current_arity, current_arity))
             break
-        print('Preparing OCS table with {:,} process(es).'.format(g['threads']), flush=True)
+        print('Preparing OCS table with up to {:,} process(es).'.format(g['threads']), flush=True)
         cbOS = substitution.get_cb(
             id_combinations,
             OS_tensor_reducer,
@@ -109,7 +126,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             'OCS',
             selected_base_stats=g.get('output_base_stats'),
         )
-        print('Preparing OCN table with {:,} process(es).'.format(g['threads']), flush=True)
+        print('Preparing OCN table with up to {:,} process(es).'.format(g['threads']), flush=True)
         cbON = substitution.get_cb(
             id_combinations,
             ON_tensor_reducer,
@@ -133,7 +150,14 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         else:
             g['df_cb_stats'].at[0, 'dSC_calibration'] = 'N'
         if g['branch_dist']:
-            cb = tree.get_node_distance(tree=g['tree'], cb=cb, ncpu=g['threads'], float_type=g['float_type'])
+            cb = tree.get_node_distance(
+                tree=g['tree'],
+                cb=cb,
+                ncpu=g['threads'],
+                float_type=g['float_type'],
+                min_items_for_parallel=int(g.get('parallel_min_items_branch_dist', 20000)),
+                min_items_per_job=int(g.get('parallel_min_items_per_job_branch_dist', 5000)),
+            )
         cb = substitution.get_substitutions_per_branch(cb, b, g)
         #cb = combination.calc_substitution_patterns(cb)
         cb = table.get_linear_regression(cb)
@@ -195,27 +219,6 @@ def main_analyze(g):
     sequence.write_alignment('csubst_alignment_codon.fa', mode='codon', g=g, branch_ids=loaded_branch_ids)
     sequence.write_alignment('csubst_alignment_aa.fa', mode='aa', g=g, branch_ids=loaded_branch_ids)
     g = combination.get_dep_ids(g)
-    tree.write_tree(g['tree'])
-    tree.plot_branch_category(g, file_base='csubst_branch_id', label='all')
-    if g['more_tree_plot']:
-        tree.plot_branch_category(g, file_base='csubst_branch_id_leaf', label='leaf')
-        tree.plot_branch_category(g, file_base='csubst_branch_id_nolabel', label='no')
-    if g['plot_state_aa']:
-        _plot_state_tree_in_directory(
-            output_dir='csubst_plot_state_aa',
-            state=g['state_pep'],
-            orders=g['amino_acid_orders'],
-            mode='aa',
-            g=g,
-        )
-    if g['plot_state_codon']:
-        _plot_state_tree_in_directory(
-            output_dir='csubst_plot_state_codon',
-            state=g['state_cdn'],
-            orders=g['codon_orders'],
-            mode='codon',
-            g=g,
-        )
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
     sub_branches = np.where(substitution.get_branch_sub_counts(ON_tensor) != 0)[0].tolist()
@@ -242,6 +245,15 @@ def main_analyze(g):
         start = time.time()
         print("Generating bs table", flush=True)
         bs = substitution.get_bs(OS_tensor, ON_tensor)
+        bs = _remap_site_column_to_alignment(df=bs, g=g, column_name='site')
+        if bool(g.get('drop_invariant_tip_sites', False)):
+            bs = parser_misc.expand_site_axis_table_to_alignment(
+                df=bs,
+                g=g,
+                site_col='site',
+                group_cols=['branch_id'],
+                site_is_one_based=False,
+            )
         bs = table.sort_branch_ids(df=bs)
         bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
@@ -259,6 +271,15 @@ def main_analyze(g):
         g = substitution.get_sub_sites(g, sOS, sON, state_tensor=g['state_cdn'])
         del sOS, sON
         if (g['s']):
+            s = _remap_site_column_to_alignment(df=s, g=g, column_name='site')
+            if bool(g.get('drop_invariant_tip_sites', False)):
+                s = parser_misc.expand_site_axis_table_to_alignment(
+                    df=s,
+                    g=g,
+                    site_col='site',
+                    group_cols=[],
+                    site_is_one_based=False,
+                )
             s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(s.values.nbytes/1024/1024, s.values.dtype), flush=True)
@@ -305,6 +326,15 @@ def main_analyze(g):
         csON = substitution.get_cs(id_combinations, reducer_ON_tensor, attr='N')
         cs = table.merge_tables(csOS, csON)
         del csOS, csON
+        cs = _remap_site_column_to_alignment(df=cs, g=g, column_name='site')
+        if bool(g.get('drop_invariant_tip_sites', False)):
+            cs = parser_misc.expand_site_axis_table_to_alignment(
+                df=cs,
+                g=g,
+                site_col='site',
+                group_cols=[],
+                site_is_one_based=False,
+            )
         cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of cs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cs.values.nbytes/1024/1024, cs.values.dtype), flush=True)
@@ -321,6 +351,16 @@ def main_analyze(g):
         cbsON = substitution.get_cbs(id_combinations, ON_tensor, attr='N', g=g)
         cbs = table.merge_tables(cbsOS, cbsON)
         del cbsOS, cbsON
+        cbs = _remap_site_column_to_alignment(df=cbs, g=g, column_name='site')
+        if bool(g.get('drop_invariant_tip_sites', False)):
+            cbs_group_cols = [col for col in cbs.columns.tolist() if str(col).startswith('branch_id_')]
+            cbs = parser_misc.expand_site_axis_table_to_alignment(
+                df=cbs,
+                g=g,
+                site_col='site',
+                group_cols=cbs_group_cols,
+                site_is_one_based=False,
+            )
         cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of cbs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cbs.values.nbytes/1024/1024, cbs.values.dtype), flush=True)

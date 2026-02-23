@@ -130,6 +130,12 @@ def get_global_parameters(args):
         g['sub_tensor_sparse_density_cutoff'] = 0.15
     if (g['sub_tensor_sparse_density_cutoff'] < 0) or (g['sub_tensor_sparse_density_cutoff'] > 1):
         raise ValueError('--sub_tensor_sparse_density_cutoff should be between 0 and 1.')
+    if 'sub_tensor_auto_sparse_min_elements' in g.keys():
+        g['sub_tensor_auto_sparse_min_elements'] = int(g['sub_tensor_auto_sparse_min_elements'])
+    else:
+        g['sub_tensor_auto_sparse_min_elements'] = 100000000
+    if g['sub_tensor_auto_sparse_min_elements'] < 0:
+        raise ValueError('--sub_tensor_auto_sparse_min_elements should be >= 0.')
     if 'parallel_backend' in g.keys():
         g['parallel_backend'] = str(g['parallel_backend']).lower()
     else:
@@ -148,6 +154,38 @@ def get_global_parameters(args):
         g['parallel_chunk_factor_reducer'] = 4
     if g['parallel_chunk_factor_reducer'] < 1:
         raise ValueError('--parallel_chunk_factor_reducer should be >= 1.')
+    parallel_min_items_defaults = {
+        'parallel_min_items_sub_tensor': 256,
+        'parallel_min_items_node_union': 20000,
+        'parallel_min_items_nc_matrix': 100000,
+        'parallel_min_items_cb': 20000,
+        'parallel_min_rows_cbs': 200000,
+        'parallel_min_items_branch_dist': 20000,
+        'parallel_min_items_expected_state': 50000000,
+    }
+    for key, default_value in parallel_min_items_defaults.items():
+        if key in g.keys():
+            g[key] = int(g[key])
+        else:
+            g[key] = int(default_value)
+        if g[key] < 0:
+            raise ValueError('--{} should be >= 0.'.format(key))
+    parallel_min_per_job_defaults = {
+        'parallel_min_items_per_job_sub_tensor': 64,
+        'parallel_min_items_per_job_node_union': 5000,
+        'parallel_min_items_per_job_nc_matrix': 25000,
+        'parallel_min_items_per_job_cb': 5000,
+        'parallel_min_rows_per_job_cbs': 50000,
+        'parallel_min_items_per_job_branch_dist': 5000,
+        'parallel_min_items_per_job_expected_state': 10000000,
+    }
+    for key, default_value in parallel_min_per_job_defaults.items():
+        if key in g.keys():
+            g[key] = int(g[key])
+        else:
+            g[key] = int(default_value)
+        if g[key] < 1:
+            raise ValueError('--{} should be >= 1.'.format(key))
     if 'pdb' in g.keys():
         if g['pdb']=='besthit':
             g['run_pdb_sequence_search'] = True
@@ -176,6 +214,16 @@ def get_global_parameters(args):
         g['export2chimera'] = export2chimera
         if export2chimera and (g.get('untrimmed_cds', None) in [None, '']):
             raise ValueError('--export2chimera "yes" requires --untrimmed_cds.')
+    drop_mode_token = str(g.get('drop_invariant_tip_sites', 'tip_invariant')).strip().lower()
+    if drop_mode_token == 'no':
+        g['drop_invariant_tip_sites'] = False
+        g['drop_invariant_tip_sites_mode'] = 'tip_invariant'
+    elif drop_mode_token in ['tip_invariant', 'zero_sub_mass']:
+        g['drop_invariant_tip_sites'] = True
+        g['drop_invariant_tip_sites_mode'] = drop_mode_token
+    else:
+        txt = '--drop_invariant_tip_sites should be one of no, tip_invariant, zero_sub_mass.'
+        raise ValueError(txt)
     if 'num_simulated_site' in g.keys():
         g['num_simulated_site'] = int(g['num_simulated_site'])
         if (g['num_simulated_site'] != -1) and (g['num_simulated_site'] < 1):
@@ -245,6 +293,23 @@ def get_global_parameters(args):
         g['tree_site_plot_max_sites'] = int(g['tree_site_plot_max_sites'])
         if g['tree_site_plot_max_sites'] < 1:
             raise ValueError('--tree_site_plot_max_sites should be >= 1.')
+    if 'species_regex' in g.keys():
+        if g['species_regex'] is None:
+            g['species_regex'] = ''
+        else:
+            g['species_regex'] = str(g['species_regex']).strip()
+        if g['species_regex'] != '':
+            try:
+                re.compile(g['species_regex'])
+            except re.error as exc:
+                txt = '--species_regex is not a valid regular expression: {}'
+                raise ValueError(txt.format(exc))
+    if 'species_overlap_node_plot' in g.keys():
+        g['species_overlap_node_plot'] = str(g['species_overlap_node_plot']).strip().lower()
+    else:
+        g['species_overlap_node_plot'] = 'auto'
+    if g['species_overlap_node_plot'] not in ['yes', 'no', 'auto']:
+        raise ValueError('--species_overlap_node_plot should be one of yes, no, auto.')
     if 'tree_site_plot_min_prob' in g.keys():
         g['tree_site_plot_min_prob'] = _require_finite_float(
             value=float(g['tree_site_plot_min_prob']),
@@ -326,7 +391,7 @@ def get_global_parameters(args):
     if 'nonsyn_recode' in g.keys():
         g['nonsyn_recode'] = recoding.normalize_nonsyn_recode(g['nonsyn_recode'])
     else:
-        g['nonsyn_recode'] = 'none'
+        g['nonsyn_recode'] = 'no'
     if 'output_stat' in g.keys():
         g['output_stats'] = output_stat.parse_output_stats(g['output_stat'])
     else:

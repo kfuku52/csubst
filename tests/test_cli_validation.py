@@ -41,6 +41,39 @@ def test_site_deprecated_probability_options_are_rejected():
     assert "unrecognized arguments: --tree_site_plot_min_prob 0.5" in log_text
 
 
+def test_site_invalid_species_regex_fails_cleanly():
+    proc, log_text = _run_cli("site", "--branch_id", "0", "--species_regex", "(")
+    assert proc.returncode == 2
+    assert "--species_regex is not a valid regular expression" in log_text
+    assert "Traceback" not in log_text
+
+
+def test_site_invalid_species_overlap_node_plot_fails_cleanly():
+    proc, log_text = _run_cli("site", "--branch_id", "0", "--species_overlap_node_plot", "maybe")
+    assert proc.returncode == 2
+    assert "--species_overlap_node_plot should be one of yes, no, auto." in log_text
+    assert "Traceback" not in log_text
+
+
+def test_analyze_state_plot_options_are_rejected_after_move_to_inspect():
+    proc, log_text = _run_cli("analyze", "--plot_state_aa", "yes")
+    assert proc.returncode == 2
+    assert "unrecognized arguments: --plot_state_aa yes" in log_text
+
+
+def test_inspect_help_is_available():
+    proc, _ = _run_cli("inspect", "-h")
+    assert proc.returncode == 0
+
+
+def test_inspect_help_includes_nonsyn_recode_pca_option():
+    proc, log_text = _run_cli("inspect", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "--plot_nonsyn_recode_pca" in help_text
+    assert "--nonsyn_recode" in help_text
+
+
 def test_cli_entrypoint_runs_from_repo_root_without_pythonpath():
     repo_root = Path(__file__).resolve().parents[1]
     cmd = [sys.executable, str(repo_root / "csubst" / "csubst"), "--help"]

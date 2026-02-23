@@ -62,7 +62,7 @@ def _can_use_cython_leaf_codon_fill(state_matrix, codon_lookup):
     return hasattr(parser_iqtree_cy, 'fill_leaf_state_matrix_codon_unambiguous')
 
 
-def _fill_leaf_state_matrix_codon(seq, state_matrix, g, codon_lookup):
+def _fill_leaf_state_matrix_codon(seq, state_matrix, g, codon_lookup, codon_state_lookup=None):
     num_codon_site = state_matrix.shape[0]
     unresolved_sites = np.arange(num_codon_site, dtype=np.int64)
     if _can_use_cython_leaf_codon_fill(state_matrix=state_matrix, codon_lookup=codon_lookup):
@@ -74,7 +74,12 @@ def _fill_leaf_state_matrix_codon(seq, state_matrix, g, codon_lookup):
         unresolved_sites = np.where(unresolved_mask != 0)[0]
     for s in unresolved_sites:
         codon = seq[(s * 3):((s + 1) * 3)]
-        codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
+        codon_index = sequence.get_state_index(
+            codon,
+            g['codon_orders'],
+            genetic_code.ambiguous_table,
+            state_lookup=codon_state_lookup,
+        )
         if len(codon_index) == 0:
             continue
         weight = 1 / len(codon_index)
@@ -185,7 +190,8 @@ def _parse_float_from_log_line(line, label):
 
 def _estimate_empirical_codon_frequency_from_alignment(alignment_file, codon_orders, float_type):
     seq_dict = sequence.read_fasta(alignment_file)
-    codon_orders = np.array(codon_orders)
+    codon_orders = np.array(codon_orders, dtype=object)
+    codon_state_lookup = sequence.build_state_index_lookup(codon_orders)
     counts = np.zeros(shape=(codon_orders.shape[0],), dtype=float_type)
     for seq in seq_dict.values():
         seq = seq.upper().replace('U', 'T')
@@ -193,7 +199,16 @@ def _estimate_empirical_codon_frequency_from_alignment(alignment_file, codon_ord
             raise AssertionError('Sequence length is not multiple of 3 in alignment file.')
         for s in np.arange(0, len(seq), 3):
             codon = seq[s:s+3]
-            codon_idx = sequence.get_state_index(codon, codon_orders, genetic_code.ambiguous_table)
+            codon_idx_direct = codon_state_lookup.get(codon, None)
+            if codon_idx_direct is not None:
+                codon_idx = [int(codon_idx_direct)]
+            else:
+                codon_idx = sequence.get_state_index(
+                    codon,
+                    codon_orders,
+                    genetic_code.ambiguous_table,
+                    state_lookup=codon_state_lookup,
+                )
             if len(codon_idx)==0:
                 continue
             counts[codon_idx] += 1 / len(codon_idx)
@@ -283,7 +298,7 @@ def read_state(g):
         )
     elif g['num_input_state'] > 20:
         g['input_data_type'] = 'cdn'
-        g['codon_orders'] = state_table.columns[3:].str.replace('p_','').values
+        g['codon_orders'] = state_table.columns[3:].str.replace('p_','').to_numpy(dtype=object)
         codon_orders_list = [str(c) for c in g['codon_orders'].tolist()]
         if len(codon_orders_list) != len(set(codon_orders_list)):
             duplicate_codons = sorted(list(set([c for c in codon_orders_list if codon_orders_list.count(c) > 1])))
@@ -487,6 +502,7 @@ def _get_leaf_nonmissing_sites(g, required_leaf_ids):
     leaf_nonmissing = np.zeros(shape=(num_node, g['num_input_site']), dtype=bool)
     if len(required_leaf_ids) == 0:
         return leaf_nonmissing
+    codon_state_lookup = sequence.build_state_index_lookup(g['codon_orders'])
     for node in g['tree'].traverse():
         if not ete.is_leaf(node):
             continue
@@ -508,7 +524,16 @@ def _get_leaf_nonmissing_sites(g, required_leaf_ids):
             raise AssertionError(msg.format(node.name, g['num_input_site'], num_codon_site))
         for s in np.arange(num_codon_site):
             codon = seq[(s*3):((s+1)*3)]
-            codon_index = sequence.get_state_index(codon, g['codon_orders'], genetic_code.ambiguous_table)
+            codon_index_direct = codon_state_lookup.get(codon, None)
+            if codon_index_direct is not None:
+                codon_index = [int(codon_index_direct)]
+            else:
+                codon_index = sequence.get_state_index(
+                    codon,
+                    g['codon_orders'],
+                    genetic_code.ambiguous_table,
+                    state_lookup=codon_state_lookup,
+                )
             leaf_nonmissing[nl, s] = (len(codon_index) > 0)
     return leaf_nonmissing
 
@@ -644,12 +669,24 @@ def get_state_tensor(g, selected_branch_ids=None):
         is_missing = (state_table.loc[:,'State']=='???') | (state_table.loc[:,'State']=='?')
         state_table.loc[is_missing, state_columns] = 0
         state_table_by_node = dict()
-        site_index_by_label = {int(site_label): i for i, site_label in enumerate(site_labels.tolist())}
+        site_labels = np.asarray(site_labels, dtype=np.int64)
+        site_start = int(site_labels[0]) if site_labels.shape[0] else 0
+        expected_site_labels = np.arange(site_start, site_start + site_labels.shape[0], dtype=np.int64)
+        is_contiguous_site_labels = np.array_equal(site_labels, expected_site_labels)
+        expected_row_indices = np.arange(g['num_input_site'], dtype=np.int64)
+        if not is_contiguous_site_labels:
+            site_index_by_label = {int(site_label): i for i, site_label in enumerate(site_labels.tolist())}
         for node_name, tmp in state_table.groupby('Node', sort=False):
-            state_matrix = np.zeros(shape=(g['num_input_site'], g['num_input_state']), dtype=g['float_type'])
             row_values = tmp.loc[:, state_columns].to_numpy(dtype=g['float_type'], copy=False)
             row_sites = tmp.loc[:, 'Site'].to_numpy(dtype=np.int64, copy=False)
-            row_indices = np.array([site_index_by_label[int(site)] for site in row_sites], dtype=np.int64)
+            if is_contiguous_site_labels:
+                row_indices = row_sites - site_start
+            else:
+                row_indices = np.array([site_index_by_label[int(site)] for site in row_sites], dtype=np.int64)
+            if (row_indices.shape[0] == expected_row_indices.shape[0]) and np.array_equal(row_indices, expected_row_indices):
+                state_table_by_node[node_name] = np.asarray(row_values, dtype=g['float_type'])
+                continue
+            state_matrix = np.zeros(shape=(g['num_input_site'], g['num_input_state']), dtype=g['float_type'])
             state_matrix[row_indices, :] = row_values
             state_table_by_node[node_name] = state_matrix
     else:
@@ -662,8 +699,10 @@ def get_state_tensor(g, selected_branch_ids=None):
         mmap_name='tmp.csubst.state_tensor.mmap',
     )
     codon_lookup = None
+    codon_state_lookup = None
     if g['input_data_type'] == 'cdn':
         codon_lookup = _build_unambiguous_codon_lookup(g['codon_orders'])
+        codon_state_lookup = sequence.build_state_index_lookup(g['codon_orders'])
     for node in g['tree'].traverse():
         if ete.is_root(node):
             continue
@@ -692,6 +731,7 @@ def get_state_tensor(g, selected_branch_ids=None):
                     state_matrix=state_matrix,
                     g=g,
                     codon_lookup=codon_lookup,
+                    codon_state_lookup=codon_state_lookup,
                 )
             elif g['input_data_type']=='nuc':
                 for s in np.arange(len(seq)):
@@ -721,10 +761,10 @@ def get_state_tensor(g, selected_branch_ids=None):
         if selected_set is None:
             idxmax = np.argmax(state_tensor, axis=2)
             state_tensor2 = np.zeros(state_tensor.shape, dtype=bool)
-            for b in np.arange(state_tensor2.shape[0]):
-                for s in np.arange(state_tensor2.shape[1]):
-                    if state_tensor[b,s,:].sum()!=0:
-                        state_tensor2[b,s,idxmax[b,s]] = 1
+            is_nonmissing = (state_tensor.sum(axis=2) != 0)
+            nonmissing_branch, nonmissing_site = np.where(is_nonmissing)
+            if nonmissing_branch.shape[0] > 0:
+                state_tensor2[nonmissing_branch, nonmissing_site, idxmax[nonmissing_branch, nonmissing_site]] = True
             state_tensor = state_tensor2
             del state_tensor2
         else:

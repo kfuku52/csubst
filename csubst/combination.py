@@ -83,7 +83,93 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             df_mmap[i, :] = node_union
             i += 1
 
-def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
+def _resolve_combination_step_n_jobs(g, num_items, min_items_key, min_items_per_job_key, default_min_items, default_min_items_per_job):
+    return parallel.resolve_adaptive_n_jobs(
+        num_items=num_items,
+        threads=int(g.get('threads', 1)),
+        min_items_for_parallel=int(g.get(min_items_key, default_min_items)),
+        min_items_per_job=int(g.get(min_items_per_job_key, default_min_items_per_job)),
+    )
+
+
+def _map_node_combinations_to_rows_vectorized(node_combinations, sorted_node_ids, sorted_row_ids):
+    node_combinations = np.asarray(node_combinations, dtype=np.int64)
+    if node_combinations.size == 0:
+        return np.zeros(shape=node_combinations.shape, dtype=np.int64)
+    flat_ids = node_combinations.reshape(-1)
+    positions = np.searchsorted(sorted_node_ids, flat_ids)
+    is_in_bounds = (positions >= 0) & (positions < sorted_node_ids.shape[0])
+    if not np.all(is_in_bounds):
+        raise ValueError('Node combinations contain node IDs that are not present in the tree.')
+    is_exact_match = (sorted_node_ids[positions] == flat_ids)
+    if not np.all(is_exact_match):
+        raise ValueError('Node combinations contain node IDs that are not present in the tree.')
+    mapped_rows = sorted_row_ids[positions]
+    return mapped_rows.reshape(node_combinations.shape)
+
+
+def _map_node_combination_chunk_to_matrix_indices(node_chunk, start_col, sorted_node_ids, sorted_row_ids):
+    if node_chunk.shape[0] == 0:
+        return np.zeros(shape=(0,), dtype=np.int64), np.zeros(shape=(0,), dtype=np.int64)
+    mapped_rows = _map_node_combinations_to_rows_vectorized(
+        node_combinations=node_chunk,
+        sorted_node_ids=sorted_node_ids,
+        sorted_row_ids=sorted_row_ids,
+    )
+    arity = int(node_chunk.shape[1])
+    col_ids = np.repeat(np.arange(start_col, start_col + node_chunk.shape[0], dtype=np.int64), arity)
+    row_ids = mapped_rows.reshape(-1)
+    return row_ids, col_ids
+
+
+def _populate_nc_matrix(nc_matrix, node_combinations, all_node_ids, g):
+    num_combinations = int(node_combinations.shape[0])
+    if num_combinations == 0:
+        return None
+    all_node_ids = np.asarray(all_node_ids, dtype=np.int64).reshape(-1)
+    sorted_order = np.argsort(all_node_ids)
+    sorted_node_ids = all_node_ids[sorted_order]
+    sorted_row_ids = sorted_order.astype(np.int64, copy=False)
+    n_jobs = _resolve_combination_step_n_jobs(
+        g=g,
+        num_items=num_combinations,
+        min_items_key='parallel_min_items_nc_matrix',
+        min_items_per_job_key='parallel_min_items_per_job_nc_matrix',
+        default_min_items=100000,
+        default_min_items_per_job=25000,
+    )
+    if n_jobs == 1:
+        row_ids, col_ids = _map_node_combination_chunk_to_matrix_indices(
+            node_chunk=node_combinations,
+            start_col=0,
+            sorted_node_ids=sorted_node_ids,
+            sorted_row_ids=sorted_row_ids,
+        )
+        nc_matrix[row_ids, col_ids] = True
+        return None
+    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    chunks, starts = parallel.get_chunks(node_combinations, n_jobs, chunk_factor=chunk_factor)
+    tasks = [(chunk, start, sorted_node_ids, sorted_row_ids) for chunk, start in zip(chunks, starts)]
+    out = parallel.run_starmap(
+        func=_map_node_combination_chunk_to_matrix_indices,
+        args_iterable=tasks,
+        n_jobs=n_jobs,
+        backend='threading',
+    )
+    for row_ids, col_ids in out:
+        if row_ids.shape[0] == 0:
+            continue
+        nc_matrix[row_ids, col_ids] = True
+    return None
+
+
+def nc_matrix2id_combinations(
+    nc_matrix,
+    arity,
+    ncpu,
+    min_items_for_parallel=0,
+    min_items_per_job=1,
+):
     col_sums = nc_matrix.sum(axis=0)
     valid_cols = np.where(col_sums == arity)[0]
     if valid_cols.shape[0] == 0:
@@ -94,7 +180,12 @@ def nc_matrix2id_combinations(nc_matrix, arity, ncpu):
     empty_id_combinations = np.zeros(shape=(unique_cols.shape[0], arity), dtype=np.int64)
     if unique_cols.shape[0] == 0:
         return empty_id_combinations
-    n_jobs = parallel.resolve_n_jobs(num_items=unique_cols.shape[0], threads=ncpu)
+    n_jobs = parallel.resolve_adaptive_n_jobs(
+        num_items=unique_cols.shape[0],
+        threads=ncpu,
+        min_items_for_parallel=min_items_for_parallel,
+        min_items_per_job=min_items_per_job,
+    )
     if n_jobs == 1:
         return combination_cy.generate_id_chunk(empty_id_combinations, 0, arity, ind2, rows, cols, unique_cols)
     chunks, starts = parallel.get_chunks(empty_id_combinations, n_jobs)
@@ -155,7 +246,14 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             df_mmap = np.memmap(mmap_out, dtype=np.int32, shape=axis, mode='w+')
-            n_jobs = parallel.resolve_n_jobs(num_items=len(index_combinations), threads=g['threads'])
+            n_jobs = _resolve_combination_step_n_jobs(
+                g=g,
+                num_items=len(index_combinations),
+                min_items_key='parallel_min_items_node_union',
+                min_items_per_job_key='parallel_min_items_per_job_node_union',
+                default_min_items=20000,
+                default_min_items_per_job=5000,
+            )
             if n_jobs == 1:
                 node_union(index_combinations, trait_target_nodes, df_mmap, 0)
             else:
@@ -216,7 +314,14 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
             df_mmap = np.memmap(mmap_out, dtype=np.int32, shape=axis, mode='w+')
-            n_jobs = parallel.resolve_n_jobs(num_items=len(index_combinations), threads=g['threads'])
+            n_jobs = _resolve_combination_step_n_jobs(
+                g=g,
+                num_items=len(index_combinations),
+                min_items_key='parallel_min_items_node_union',
+                min_items_per_job_key='parallel_min_items_per_job_node_union',
+                default_min_items=20000,
+                default_min_items_per_job=5000,
+            )
             if n_jobs == 1:
                 node_union(index_combinations, bid_trait, df_mmap, 0)
             else:
@@ -245,13 +350,12 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     if verbose:
         print("Number of all branch combinations before independency check: {:,}".format(node_combinations.shape[0]), flush=True)
     nc_matrix = np.zeros(shape=(len(all_nodes), node_combinations.shape[0]), dtype=bool)
-    for i in np.arange(node_combinations.shape[0]):
-        row_indices = _map_node_ids_to_rows(
-            node_ids=node_combinations[i, :],
-            id_to_row=node_id_to_row,
-            context='Node combinations',
-        )
-        nc_matrix[row_indices, i] = True
+    _populate_nc_matrix(
+        nc_matrix=nc_matrix,
+        node_combinations=node_combinations,
+        all_node_ids=all_node_ids,
+        g=g,
+    )
     is_dependent_col = np.zeros(shape=(nc_matrix.shape[1],), dtype=bool)
     for dep_id in g['dep_ids']:
         dep_indices = _map_node_ids_to_rows(
@@ -285,13 +389,25 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 print(txt.format(trait_name, is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)
             fg_dep_nc_matrix = np.copy(nc_matrix)
             fg_dep_nc_matrix[:,~is_fg_dependent_col] = False
-            fg_dep_rows = nc_matrix2id_combinations(fg_dep_nc_matrix, arity, g['threads'])
+            fg_dep_rows = nc_matrix2id_combinations(
+                nc_matrix=fg_dep_nc_matrix,
+                arity=arity,
+                ncpu=g['threads'],
+                min_items_for_parallel=int(g.get('parallel_min_items_nc_matrix', 100000)),
+                min_items_per_job=int(g.get('parallel_min_items_per_job_nc_matrix', 25000)),
+            )
             g['fg_dependent_id_combinations'][trait_name] = _map_row_combinations_to_node_ids(
                 row_combinations=fg_dep_rows,
                 node_ids=all_node_ids,
             )
             if trait_name == trait_names[0]:
-                id_rows = nc_matrix2id_combinations(nc_matrix, arity, g['threads'])
+                id_rows = nc_matrix2id_combinations(
+                    nc_matrix=nc_matrix,
+                    arity=arity,
+                    ncpu=g['threads'],
+                    min_items_for_parallel=int(g.get('parallel_min_items_nc_matrix', 100000)),
+                    min_items_per_job=int(g.get('parallel_min_items_per_job_nc_matrix', 25000)),
+                )
                 id_combinations = _map_row_combinations_to_node_ids(
                     row_combinations=id_rows,
                     node_ids=all_node_ids,
@@ -302,7 +418,13 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 print(txt.format(is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0], trait_name), flush=True)
             trait_nc_matrix = nc_matrix[:,~is_fg_dependent_col]
             g['fg_dependent_id_combinations'][trait_name] = np.array([])
-            trait_rows = nc_matrix2id_combinations(trait_nc_matrix, arity, g['threads'])
+            trait_rows = nc_matrix2id_combinations(
+                nc_matrix=trait_nc_matrix,
+                arity=arity,
+                ncpu=g['threads'],
+                min_items_for_parallel=int(g.get('parallel_min_items_nc_matrix', 100000)),
+                min_items_per_job=int(g.get('parallel_min_items_per_job_nc_matrix', 25000)),
+            )
             trait_id_combinations = _map_row_combinations_to_node_ids(
                 row_combinations=trait_rows,
                 node_ids=all_node_ids,

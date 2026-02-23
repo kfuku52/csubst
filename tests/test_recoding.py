@@ -56,7 +56,7 @@ def _toy_auto_grouping_g():
 
 
 def test_normalize_nonsyn_recode_accepts_aliases():
-    assert recoding.normalize_nonsyn_recode("none") == "none"
+    assert recoding.normalize_nonsyn_recode("no") == "no"
     assert recoding.normalize_nonsyn_recode("dayhoff-6") == "dayhoff6"
     assert recoding.normalize_nonsyn_recode("SR_6") == "sr6"
     assert recoding.normalize_nonsyn_recode("sr-chi-sq") == "srchisq6"
@@ -66,13 +66,15 @@ def test_normalize_nonsyn_recode_accepts_aliases():
 def test_normalize_nonsyn_recode_rejects_unknown_value():
     with pytest.raises(ValueError, match="--nonsyn_recode should be one of"):
         recoding.normalize_nonsyn_recode("unknown")
+    with pytest.raises(ValueError, match="--nonsyn_recode should be one of"):
+        recoding.normalize_nonsyn_recode("none")
 
 
-def test_initialize_nonsyn_groups_none_copies_amino_acid_groups():
+def test_initialize_nonsyn_groups_no_copies_amino_acid_groups():
     g = _toy_grouping_g()
-    g["nonsyn_recode"] = "none"
+    g["nonsyn_recode"] = "no"
     out = recoding.initialize_nonsyn_groups(g)
-    assert out["nonsyn_recode"] == "none"
+    assert out["nonsyn_recode"] == "no"
     assert out["nonsyn_state_orders"].tolist() == out["amino_acid_orders"].tolist()
     assert out["max_nonsynonymous_size"] == 1
     for aa in out["amino_acid_orders"]:
@@ -660,9 +662,9 @@ def test_write_nonsyn_recoding_table_writes_non_none_scheme(tmp_path):
     assert any([line.split("\t")[4] == "A" for line in lines[1:]])
 
 
-def test_write_nonsyn_recoding_table_skips_none(tmp_path):
+def test_write_nonsyn_recoding_table_skips_no(tmp_path):
     g = _toy_grouping_g()
-    g["nonsyn_recode"] = "none"
+    g["nonsyn_recode"] = "no"
     g = recoding.initialize_nonsyn_groups(g)
     output_path = tmp_path / "csubst_nonsyn_recoding.tsv"
     returned = recoding.write_nonsyn_recoding_table(g, output_path=str(output_path))
@@ -700,17 +702,17 @@ def test_get_scheme_groups_for_pca_includes_auto_schemes_when_data_available():
     g["nonsyn_recode"] = "dayhoff6"
     g = recoding.initialize_nonsyn_groups(g)
     groups_by_scheme = recoding._get_scheme_groups_for_pca(g)
-    assert "none" in groups_by_scheme
-    assert groups_by_scheme["none"] == tuple(list("ACDEFGHIKLMNPQRSTVWY"))
+    assert "no" in groups_by_scheme
+    assert groups_by_scheme["no"] == tuple(list("ACDEFGHIKLMNPQRSTVWY"))
     assert "srchisq6" in groups_by_scheme
     assert "kgbauto6" in groups_by_scheme
     assert len(groups_by_scheme["srchisq6"]) == 6
     assert len(groups_by_scheme["kgbauto6"]) == 6
 
 
-def test_write_nonsyn_recoding_pca_plot_writes_png_for_none(tmp_path):
+def test_write_nonsyn_recoding_pca_plot_writes_png_for_no(tmp_path):
     g = _toy_grouping_g()
-    g["nonsyn_recode"] = "none"
+    g["nonsyn_recode"] = "no"
     g = recoding.initialize_nonsyn_groups(g)
     output_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
     returned = recoding.write_nonsyn_recoding_pca_plot(g, output_path=str(output_path))

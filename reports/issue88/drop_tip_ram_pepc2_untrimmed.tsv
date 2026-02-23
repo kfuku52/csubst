@@ -1,0 +1,5 @@
+run	drop_invariant_tip_sites	sub_tensor_backend	real_sec	peak_memory_footprint_bytes	max_rss_bytes
+analyze_no	no	default(auto)	7.28	819551104	2114437120
+analyze_tip	tip_invariant	default(auto)	13.55	1203055680	2838478848
+analyze_no_sparse	no	sparse-fixed	4.1	526209216	1112375296
+analyze_tip_sparse	tip_invariant	sparse-fixed	4.14	473960896	1092812800
