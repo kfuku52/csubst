@@ -144,6 +144,8 @@ cpdef calc_shared_counts_packed_uint8(
     cdef int[:, :] out_mv
     cdef Py_ssize_t i, j, col, b
     cdef long bid
+    cdef long bid0
+    cdef long bid1
     cdef unsigned int shared
     cdef unsigned int x
     cdef int count
@@ -157,13 +159,43 @@ cpdef calc_shared_counts_packed_uint8(
     mask_mv = packed_masks
     cb_mv = remapped_cb_ids
     out_mv = out
+    if arity == 1:
+        for i in range(num_cb):
+            bid0 = cb_mv[i, 0]
+            if (bid0 < 0) or (bid0 >= num_branch):
+                raise ValueError('remapped_cb_ids contain out-of-range branch IDs.')
+            for j in range(niter):
+                count = 0
+                for b in range(num_packed_site):
+                    x = <unsigned int>mask_mv[bid0, j, b]
+                    x = x - ((x >> 1) & 0x55)
+                    x = (x & 0x33) + ((x >> 2) & 0x33)
+                    count += <int>((x + (x >> 4)) & 0x0F)
+                out_mv[i, j] = count
+        return out
+
+    if arity == 2:
+        for i in range(num_cb):
+            bid0 = cb_mv[i, 0]
+            bid1 = cb_mv[i, 1]
+            if (bid0 < 0) or (bid0 >= num_branch) or (bid1 < 0) or (bid1 >= num_branch):
+                raise ValueError('remapped_cb_ids contain out-of-range branch IDs.')
+            for j in range(niter):
+                count = 0
+                for b in range(num_packed_site):
+                    shared = <unsigned int>mask_mv[bid0, j, b] & <unsigned int>mask_mv[bid1, j, b]
+                    x = shared
+                    x = x - ((x >> 1) & 0x55)
+                    x = (x & 0x33) + ((x >> 2) & 0x33)
+                    count += <int>((x + (x >> 4)) & 0x0F)
+                out_mv[i, j] = count
+        return out
+
     for i in range(num_cb):
         for col in range(arity):
             bid = cb_mv[i, col]
             if (bid < 0) or (bid >= num_branch):
                 raise ValueError('remapped_cb_ids contain out-of-range branch IDs.')
-
-    for i in range(num_cb):
         for j in range(niter):
             count = 0
             for b in range(num_packed_site):
