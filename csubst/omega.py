@@ -20,6 +20,7 @@ from csubst import substitution_sparse
 from csubst import table
 from csubst import ete
 from csubst import output_stat
+from csubst import pseudocount
 try:
     from csubst import omega_cy
 except Exception:  # pragma: no cover - Cython extension is optional
@@ -29,6 +30,14 @@ _UINT8_POPCOUNT = np.unpackbits(
     np.arange(256, dtype=np.uint8)[:, None],
     axis=1,
 ).sum(axis=1).astype(np.uint8)
+_EPI_BETA_GRID = np.unique(np.concatenate([
+    np.arange(-2.0, 2.001, 0.01, dtype=np.float64),
+    np.array([-3.0, -2.5, 2.5, 3.0], dtype=np.float64),
+]))
+_EPI_AUTO_CLIP_QUANTILE = 0.995
+_EPI_AUTO_CLIP_MIN = 1.5
+_EPI_AUTO_CLIP_MAX = 5.0
+_EPI_CV_FOLDS = 5
 
 
 def _get_cb_ids(cb):
@@ -71,6 +80,421 @@ def _resolve_requested_output_stats(g):
     if 'output_stat' in g.keys():
         return output_stat.parse_output_stats(g['output_stat'])
     return list(output_stat.ALL_OUTPUT_STATS)
+
+
+def _resolve_epistasis_channels(g):
+    token = str(g.get('epistasis_apply_to', 'N')).strip().upper()
+    if token == 'N':
+        return ('N',)
+    if token == 'S':
+        return ('S',)
+    if token == 'NS':
+        return ('N', 'S')
+    raise ValueError('Unsupported epistasis_apply_to value: {}'.format(token))
+
+
+def _get_epistasis_weight_matrix_for_obs_col(obs_col, g):
+    if not bool(g.get('epistasis_enabled', False)):
+        return None
+    state = g.get('_epistasis_state', dict())
+    if str(obs_col).startswith('OCN'):
+        channel_state = state.get('N', dict())
+        return channel_state.get('weights', None)
+    if str(obs_col).startswith('OCS'):
+        channel_state = state.get('S', dict())
+        return channel_state.get('weights', None)
+    return None
+
+
+def _get_epistasis_branch_site_counts(sub_tensor, g):
+    if 'is_site_nonmissing' in g.keys():
+        num_branch = int(g['is_site_nonmissing'].shape[0])
+        num_site = int(g['is_site_nonmissing'].shape[1])
+    else:
+        num_branch = int(sub_tensor.shape[0])
+        num_site = int(sub_tensor.shape[1])
+    counts = np.zeros(shape=(num_branch, num_site), dtype=np.float64)
+    if '_asrv_branch_ids' in g.keys():
+        branch_ids = np.asarray(g['_asrv_branch_ids'], dtype=np.int64).reshape(-1)
+    else:
+        branch_ids = np.arange(num_branch, dtype=np.int64)
+    for branch_id in branch_ids.tolist():
+        counts[branch_id, :] = substitution.get_branch_site_sub_counts(
+            sub_tensor=sub_tensor,
+            branch_id=int(branch_id),
+        )
+    return counts
+
+
+def _build_epistasis_base_probs(counts, is_site_nonmissing, dirichlet_alpha, float_tol):
+    counts = np.asarray(counts, dtype=np.float64)
+    is_site_nonmissing = np.asarray(is_site_nonmissing, dtype=bool)
+    if counts.shape != is_site_nonmissing.shape:
+        txt = 'counts shape ({}) and is_site_nonmissing shape ({}) should match.'
+        raise ValueError(txt.format(counts.shape, is_site_nonmissing.shape))
+    out = np.zeros(shape=counts.shape, dtype=np.float64)
+    dirichlet_alpha = float(dirichlet_alpha)
+    for i in range(counts.shape[0]):
+        valid = is_site_nonmissing[i, :]
+        n_valid = int(valid.sum())
+        if n_valid == 0:
+            continue
+        row_counts = counts[i, valid]
+        row_sum = float(row_counts.sum(dtype=np.float64))
+        if dirichlet_alpha > 0:
+            denom = row_sum + (dirichlet_alpha * n_valid)
+            if denom > float(float_tol):
+                out[i, valid] = (row_counts + dirichlet_alpha) / denom
+            else:
+                out[i, valid] = 1.0 / n_valid
+            continue
+        if row_sum > float(float_tol):
+            out[i, valid] = row_counts / row_sum
+        else:
+            out[i, valid] = 1.0 / n_valid
+    return out
+
+
+def _calc_epistasis_branch_context(counts, degree_z, is_site_nonmissing, float_tol):
+    counts = np.asarray(counts, dtype=np.float64)
+    degree_z = np.asarray(degree_z, dtype=np.float64).reshape(-1)
+    is_site_nonmissing = np.asarray(is_site_nonmissing, dtype=bool)
+    if counts.shape != is_site_nonmissing.shape:
+        txt = 'counts shape ({}) and is_site_nonmissing shape ({}) should match.'
+        raise ValueError(txt.format(counts.shape, is_site_nonmissing.shape))
+    if counts.shape[1] != degree_z.shape[0]:
+        txt = 'counts site axis ({}) and degree_z length ({}) should match.'
+        raise ValueError(txt.format(counts.shape[1], degree_z.shape[0]))
+    context = np.zeros(shape=(counts.shape[0],), dtype=np.float64)
+    for i in range(counts.shape[0]):
+        valid = is_site_nonmissing[i, :]
+        if not valid.any():
+            continue
+        row_counts = counts[i, valid]
+        total = float(row_counts.sum(dtype=np.float64))
+        if total <= float(float_tol):
+            continue
+        context[i] = float(np.dot(row_counts, degree_z[valid]) / total)
+    return context
+
+
+def _apply_epistasis_beta_to_probs(base_probs, branch_context, degree_z, beta, clip_value, is_site_nonmissing, float_tol):
+    base_probs = np.asarray(base_probs, dtype=np.float64)
+    branch_context = np.asarray(branch_context, dtype=np.float64).reshape(-1)
+    degree_z = np.asarray(degree_z, dtype=np.float64).reshape(-1)
+    is_site_nonmissing = np.asarray(is_site_nonmissing, dtype=bool)
+    if base_probs.shape != is_site_nonmissing.shape:
+        txt = 'base_probs shape ({}) and is_site_nonmissing shape ({}) should match.'
+        raise ValueError(txt.format(base_probs.shape, is_site_nonmissing.shape))
+    if base_probs.shape[0] != branch_context.shape[0]:
+        txt = 'base_probs branch axis ({}) and branch_context length ({}) should match.'
+        raise ValueError(txt.format(base_probs.shape[0], branch_context.shape[0]))
+    if base_probs.shape[1] != degree_z.shape[0]:
+        txt = 'base_probs site axis ({}) and degree_z length ({}) should match.'
+        raise ValueError(txt.format(base_probs.shape[1], degree_z.shape[0]))
+    beta = float(beta)
+    if beta <= float(float_tol):
+        return base_probs.copy()
+    score = beta * np.multiply.outer(branch_context, degree_z)
+    if np.isfinite(float(clip_value)):
+        np.clip(score, -float(clip_value), float(clip_value), out=score)
+    weight = np.exp(score)
+    numer = base_probs * weight
+    numer = np.where(is_site_nonmissing, numer, 0.0)
+    denom = numer.sum(axis=1, keepdims=True, dtype=np.float64)
+    out = base_probs.copy()
+    valid_rows = (denom[:, 0] > float(float_tol))
+    if valid_rows.any():
+        out[valid_rows, :] = numer[valid_rows, :] / denom[valid_rows, :]
+    return out
+
+
+def _calc_epistasis_branch_loglik(counts, probs, float_tol):
+    counts = np.asarray(counts, dtype=np.float64)
+    probs = np.asarray(probs, dtype=np.float64)
+    safe_probs = np.clip(probs, a_min=float(float_tol), a_max=1.0)
+    return (counts * np.log(safe_probs)).sum(axis=1, dtype=np.float64)
+
+
+def _fit_epistasis_beta_cv(
+    counts,
+    base_probs,
+    branch_context,
+    degree_z,
+    is_site_nonmissing,
+    clip_value,
+    float_tol,
+    dirichlet_alpha=1.0,
+):
+    counts = np.asarray(counts, dtype=np.float64)
+    base_probs = np.asarray(base_probs, dtype=np.float64)
+    branch_context = np.asarray(branch_context, dtype=np.float64).reshape(-1)
+    degree_z = np.asarray(degree_z, dtype=np.float64).reshape(-1)
+    is_site_nonmissing = np.asarray(is_site_nonmissing, dtype=bool)
+    if counts.shape != base_probs.shape:
+        txt = 'counts shape ({}) and base_probs shape ({}) should match.'
+        raise ValueError(txt.format(counts.shape, base_probs.shape))
+    if counts.shape != is_site_nonmissing.shape:
+        txt = 'counts shape ({}) and is_site_nonmissing shape ({}) should match.'
+        raise ValueError(txt.format(counts.shape, is_site_nonmissing.shape))
+    if counts.shape[0] != branch_context.shape[0]:
+        txt = 'counts branch axis ({}) and branch_context length ({}) should match.'
+        raise ValueError(txt.format(counts.shape[0], branch_context.shape[0]))
+    if counts.shape[1] != degree_z.shape[0]:
+        txt = 'counts site axis ({}) and degree_z length ({}) should match.'
+        raise ValueError(txt.format(counts.shape[1], degree_z.shape[0]))
+    dirichlet_alpha = float(dirichlet_alpha)
+    if dirichlet_alpha < 0:
+        raise ValueError('dirichlet_alpha should be >= 0.')
+
+    total_by_branch = counts.sum(axis=1, dtype=np.float64)
+    is_active = (total_by_branch > float(float_tol)) & is_site_nonmissing.any(axis=1)
+    active_rows = np.where(is_active)[0].astype(np.int64)
+    if active_rows.shape[0] < 2:
+        return 0.0, {'active_branch_count': int(active_rows.shape[0]), 'num_folds': 0, 'best_score': np.nan}
+    num_folds = min(_EPI_CV_FOLDS, int(active_rows.shape[0]))
+    fold_ids = np.arange(active_rows.shape[0], dtype=np.int64) % num_folds
+    fold_scores = np.full(shape=(_EPI_BETA_GRID.shape[0], num_folds), fill_value=np.nan, dtype=np.float64)
+    # Cross-validation uses branch-held-out priors to avoid a trivial beta=0 optimum
+    # induced by evaluating each branch against its own empirical distribution.
+    for i, beta in enumerate(_EPI_BETA_GRID.tolist()):
+        for fold in range(num_folds):
+            test_rows = active_rows[fold_ids == fold]
+            train_rows = active_rows[fold_ids != fold]
+            if test_rows.shape[0] == 0:
+                continue
+            if train_rows.shape[0] == 0:
+                fold_base = base_probs[test_rows, :].copy()
+            else:
+                site_prior = counts[train_rows, :].sum(axis=0, dtype=np.float64)
+                site_prior = np.clip(site_prior, a_min=0.0, a_max=None)
+                if dirichlet_alpha > 0:
+                    site_prior = site_prior + dirichlet_alpha
+                fold_base = np.where(
+                    is_site_nonmissing[test_rows, :],
+                    site_prior[None, :],
+                    0.0,
+                ).astype(np.float64, copy=False)
+                row_sum = fold_base.sum(axis=1, keepdims=True, dtype=np.float64)
+                nonzero_rows = (row_sum[:, 0] > float(float_tol))
+                if nonzero_rows.any():
+                    fold_base[nonzero_rows, :] = fold_base[nonzero_rows, :] / row_sum[nonzero_rows, :]
+                zero_rows = ~nonzero_rows
+                if zero_rows.any():
+                    fill = is_site_nonmissing[test_rows[zero_rows], :].astype(np.float64, copy=False)
+                    fill_sum = fill.sum(axis=1, keepdims=True, dtype=np.float64)
+                    valid_fill = (fill_sum[:, 0] > 0)
+                    if valid_fill.any():
+                        fill[valid_fill, :] = fill[valid_fill, :] / fill_sum[valid_fill, :]
+                    fold_base[zero_rows, :] = fill
+            probs = _apply_epistasis_beta_to_probs(
+                base_probs=fold_base,
+                branch_context=branch_context[test_rows],
+                degree_z=degree_z,
+                beta=float(beta),
+                clip_value=float(clip_value),
+                is_site_nonmissing=is_site_nonmissing[test_rows, :],
+                float_tol=float_tol,
+            )
+            ll_by_branch = _calc_epistasis_branch_loglik(
+                counts=counts[test_rows, :],
+                probs=probs,
+                float_tol=float_tol,
+            )
+            fold_scores[i, fold] = ll_by_branch.sum(dtype=np.float64)
+    mean_score = np.nanmean(fold_scores, axis=1)
+    best_idx = int(np.nanargmax(mean_score))
+    best_mean = float(mean_score[best_idx])
+    if num_folds >= 2:
+        best_se = float(np.nanstd(fold_scores[best_idx, :], ddof=1) / np.sqrt(num_folds))
+    else:
+        best_se = 0.0
+    selected_idx = best_idx
+    selected_beta = float(_EPI_BETA_GRID[selected_idx])
+    diag = {
+        'active_branch_count': int(active_rows.shape[0]),
+        'num_folds': int(num_folds),
+        'best_score': float(best_mean),
+        'best_beta': float(_EPI_BETA_GRID[best_idx]),
+        'selected_beta': float(selected_beta),
+        'one_se': float(best_se),
+        'selection_rule': 'argmax_mean_cv_loglik',
+    }
+    return selected_beta, diag
+
+
+def _auto_epistasis_clip(beta, branch_context, degree_z, is_site_nonmissing):
+    beta = float(beta)
+    if beta <= 0:
+        return float(_EPI_AUTO_CLIP_MIN)
+    score = np.abs(beta * np.multiply.outer(branch_context, degree_z))
+    mask = np.asarray(is_site_nonmissing, dtype=bool)
+    if score.shape != mask.shape:
+        txt = 'score shape ({}) and is_site_nonmissing shape ({}) should match.'
+        raise ValueError(txt.format(score.shape, mask.shape))
+    values = score[mask]
+    values = values[np.isfinite(values)]
+    if values.shape[0] == 0:
+        return float(_EPI_AUTO_CLIP_MIN)
+    clip = float(np.quantile(values, _EPI_AUTO_CLIP_QUANTILE))
+    clip = min(max(clip, float(_EPI_AUTO_CLIP_MIN)), float(_EPI_AUTO_CLIP_MAX))
+    if clip <= 0:
+        clip = float(_EPI_AUTO_CLIP_MIN)
+    return clip
+
+
+def _build_epistasis_weight_matrix(branch_context, degree_z, beta, clip_value, is_site_nonmissing, float_tol):
+    beta = float(beta)
+    if beta <= float(float_tol):
+        return np.ones(shape=is_site_nonmissing.shape, dtype=np.float64)
+    score = beta * np.multiply.outer(branch_context, degree_z)
+    if np.isfinite(float(clip_value)):
+        np.clip(score, -float(clip_value), float(clip_value), out=score)
+    weight = np.exp(score)
+    weight = np.where(is_site_nonmissing, weight, 1.0)
+    return weight
+
+
+def _apply_epistasis_to_sub_sites(sub_sites, obs_col, g):
+    weight = _get_epistasis_weight_matrix_for_obs_col(obs_col=obs_col, g=g)
+    if weight is None:
+        return sub_sites
+    sub_sites_arr = np.asarray(sub_sites)
+    if sub_sites_arr.ndim == 1:
+        site_weight = np.asarray(weight, dtype=np.float64).mean(axis=0)
+        out = np.asarray(sub_sites_arr, dtype=np.float64) * site_weight
+        total = float(out.sum(dtype=np.float64))
+        if total > float(g['float_tol']):
+            out = out / total
+        return out.astype(getattr(sub_sites_arr, 'dtype', np.float64), copy=False)
+    if sub_sites_arr.ndim != 2:
+        return sub_sites
+    weight = np.asarray(weight, dtype=np.float64)
+    if sub_sites_arr.shape != weight.shape:
+        txt = 'Epistasis weight shape ({}) did not match sub_sites shape ({}).'
+        raise ValueError(txt.format(weight.shape, sub_sites_arr.shape))
+    sub_sites_float = np.asarray(sub_sites_arr, dtype=np.float64)
+    numer = sub_sites_float * weight
+    denom = numer.sum(axis=1, keepdims=True, dtype=np.float64)
+    out = sub_sites_float.copy()
+    valid_rows = (denom[:, 0] > float(g['float_tol']))
+    if valid_rows.any():
+        out[valid_rows, :] = numer[valid_rows, :] / denom[valid_rows, :]
+    return out.astype(sub_sites_arr.dtype, copy=False)
+
+
+def prepare_epistasis(g, ON_tensor, OS_tensor):
+    g['epistasis_enabled'] = False
+    degree_z = g.get('epistasis_site_degree_internal', None)
+    if degree_z is None:
+        return g
+    degree_z = np.asarray(degree_z, dtype=np.float64).reshape(-1)
+    is_site_nonmissing = np.asarray(g.get('is_site_nonmissing', None), dtype=bool)
+    if is_site_nonmissing.ndim != 2:
+        raise ValueError('is_site_nonmissing should be available before epistasis preparation.')
+    if is_site_nonmissing.shape[1] != degree_z.shape[0]:
+        txt = 'is_site_nonmissing site axis ({}) and epistasis degree length ({}) should match.'
+        raise ValueError(txt.format(is_site_nonmissing.shape[1], degree_z.shape[0]))
+    channels = _resolve_epistasis_channels(g=g)
+    state = dict()
+    for channel in channels:
+        if channel == 'N':
+            tensor = ON_tensor
+        elif channel == 'S':
+            tensor = OS_tensor
+        else:
+            raise ValueError('Unsupported epistasis channel: {}'.format(channel))
+        counts = _get_epistasis_branch_site_counts(sub_tensor=tensor, g=g)
+        counts = np.asarray(counts, dtype=np.float64)
+        if counts.shape != is_site_nonmissing.shape:
+            txt = 'Epistasis counts shape ({}) did not match is_site_nonmissing shape ({}).'
+            raise ValueError(txt.format(counts.shape, is_site_nonmissing.shape))
+        counts = np.where(is_site_nonmissing, counts, 0.0)
+        base_probs = _build_epistasis_base_probs(
+            counts=counts,
+            is_site_nonmissing=is_site_nonmissing,
+            dirichlet_alpha=float(g.get('asrv_dirichlet_alpha', 0.0)),
+            float_tol=float(g['float_tol']),
+        )
+        branch_context = _calc_epistasis_branch_context(
+            counts=counts,
+            degree_z=degree_z,
+            is_site_nonmissing=is_site_nonmissing,
+            float_tol=float(g['float_tol']),
+        )
+        beta_auto = bool(g.get('epistasis_beta_auto', False))
+        clip_auto = bool(g.get('epistasis_clip_auto', False))
+        if beta_auto:
+            clip_for_fit = float(g['epistasis_clip_value']) if (not clip_auto) else float(_EPI_AUTO_CLIP_MAX)
+            beta, beta_diag = _fit_epistasis_beta_cv(
+                counts=counts,
+                base_probs=base_probs,
+                branch_context=branch_context,
+                degree_z=degree_z,
+                is_site_nonmissing=is_site_nonmissing,
+                clip_value=clip_for_fit,
+                float_tol=float(g['float_tol']),
+                dirichlet_alpha=float(g.get('asrv_dirichlet_alpha', 1.0)),
+            )
+        else:
+            beta = float(g.get('epistasis_beta_value', 0.0))
+            beta_diag = {'active_branch_count': int((counts.sum(axis=1) > float(g['float_tol'])).sum()), 'num_folds': 0}
+        if clip_auto:
+            clip_value = _auto_epistasis_clip(
+                beta=beta,
+                branch_context=branch_context,
+                degree_z=degree_z,
+                is_site_nonmissing=is_site_nonmissing,
+            )
+            if beta_auto:
+                beta, beta_diag = _fit_epistasis_beta_cv(
+                    counts=counts,
+                    base_probs=base_probs,
+                    branch_context=branch_context,
+                    degree_z=degree_z,
+                    is_site_nonmissing=is_site_nonmissing,
+                    clip_value=float(clip_value),
+                    float_tol=float(g['float_tol']),
+                    dirichlet_alpha=float(g.get('asrv_dirichlet_alpha', 1.0)),
+                )
+                clip_value = _auto_epistasis_clip(
+                    beta=beta,
+                    branch_context=branch_context,
+                    degree_z=degree_z,
+                    is_site_nonmissing=is_site_nonmissing,
+                )
+        else:
+            clip_value = float(g.get('epistasis_clip_value', 3.0))
+        weights = _build_epistasis_weight_matrix(
+            branch_context=branch_context,
+            degree_z=degree_z,
+            beta=beta,
+            clip_value=clip_value,
+            is_site_nonmissing=is_site_nonmissing,
+            float_tol=float(g['float_tol']),
+        )
+        state[channel] = {
+            'beta': float(beta),
+            'clip': float(clip_value),
+            'weights': weights.astype(np.float64, copy=False),
+            'branch_context': branch_context.astype(np.float64, copy=False),
+            'beta_diag': beta_diag,
+        }
+        txt = 'Epistasis [{}]: beta={}, clip={}, active_branches={}'
+        print(
+            txt.format(
+                channel,
+                '{:.6g}'.format(float(beta)),
+                '{:.6g}'.format(float(clip_value)),
+                int(beta_diag.get('active_branch_count', 0)),
+            ),
+            flush=True,
+        )
+    if len(state) == 0:
+        return g
+    g['_epistasis_state'] = state
+    g['epistasis_enabled'] = True
+    return g
 
 
 def _can_use_cython_expected_state(parent_state_block, transition_prob):
@@ -289,13 +713,17 @@ def _project_expected_state_block(parent_state_block, transition_prob, float_tol
 
 def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
     if g['asrv'] in ['each', 'file_each']:
-        return substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
+        sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
+        return _apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col=obs_col, g=g)
     if (g['asrv']=='sn'):
         if (obs_col.startswith('OCS')):
-            return g['sub_sites']['S']
+            sub_sites = g['sub_sites']['S']
+            return _apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col=obs_col, g=g)
         if (obs_col.startswith('OCN')):
-            return g['sub_sites']['N']
-    return g['sub_sites'][g['asrv']]
+            sub_sites = g['sub_sites']['N']
+            return _apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col=obs_col, g=g)
+    sub_sites = g['sub_sites'][g['asrv']]
+    return _apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col=obs_col, g=g)
 
 
 def _get_static_sub_sites_if_available(g, sub_sg, mode, obs_col):
@@ -425,7 +853,88 @@ def _weighted_sample_without_replacement_masks(p, size, niter):
     return masks
 
 
+def _resolve_omega_pvalue_rounding_mode(g):
+    mode = 'round'
+    if g is not None:
+        mode = str(g.get('omega_pvalue_rounding', 'round')).strip().lower()
+    allowed = {'round', 'stochastic', 'floor', 'ceil'}
+    if mode not in allowed:
+        raise ValueError('omega_pvalue_rounding should be one of round, stochastic, floor, ceil.')
+    return mode
+
+
+def _prepare_permutation_branch_sizes(sub_branches, niter, g):
+    sub_branches = np.asarray(sub_branches)
+    if sub_branches.ndim != 1:
+        raise ValueError('sub_branches should be a 1D array.')
+    if np.issubdtype(sub_branches.dtype, np.integer):
+        out = sub_branches.astype(np.int64, copy=False)
+        if (out < 0).any():
+            raise ValueError('sub_branches should be non-negative.')
+        return out
+    sub_branches = sub_branches.astype(np.float64, copy=False)
+    if not np.isfinite(sub_branches).all():
+        raise ValueError('sub_branches should be finite.')
+    sub_branches = np.clip(sub_branches, a_min=0.0, a_max=None)
+    rounding_mode = _resolve_omega_pvalue_rounding_mode(g=g)
+    if rounding_mode == 'stochastic':
+        niter = int(niter)
+        if niter <= 0:
+            raise ValueError('niter should be a positive integer.')
+        base = np.floor(sub_branches).astype(np.int64, copy=False)
+        frac = sub_branches - base
+        if (frac > 0).any():
+            rand = np.random.random((sub_branches.shape[0], niter))
+            inc = (rand < frac[:, None]).astype(np.int64, copy=False)
+            return base[:, None] + inc
+        return np.repeat(base[:, None], repeats=niter, axis=1)
+    if rounding_mode == 'round':
+        out = np.rint(sub_branches)
+    elif rounding_mode == 'floor':
+        out = np.floor(sub_branches)
+    elif rounding_mode == 'ceil':
+        out = np.ceil(sub_branches)
+    else:
+        raise ValueError('Unsupported omega_pvalue_rounding: {}'.format(rounding_mode))
+    out = out.astype(np.int64, copy=False)
+    if (out < 0).any():
+        raise ValueError('sub_branches should be non-negative after rounding.')
+    return out
+
+
+def _fill_packed_masks_for_sizes(packed_masks_branch, site_p, size_values):
+    size_values = np.asarray(size_values, dtype=np.int64).reshape(-1)
+    if packed_masks_branch.shape[0] != size_values.shape[0]:
+        txt = 'packed_masks_branch iterations ({}) and size_values ({}) should match.'
+        raise ValueError(txt.format(packed_masks_branch.shape[0], size_values.shape[0]))
+    if (size_values < 0).any():
+        raise ValueError('size_values should be non-negative.')
+    site_p = np.asarray(site_p, dtype=np.float64).reshape(-1)
+    num_positive_sites = int((site_p > 0).sum())
+    if num_positive_sites == 0:
+        return None
+    positive_sizes = np.unique(size_values[size_values > 0])
+    for size in positive_sizes:
+        capped_size = int(size)
+        if capped_size > num_positive_sites:
+            capped_size = num_positive_sites
+        if capped_size <= 0:
+            continue
+        iter_indices = np.where(size_values == size)[0]
+        if iter_indices.shape[0] == 0:
+            continue
+        packed_masks_branch[iter_indices, :] = _weighted_sample_without_replacement_packed(
+            p=site_p,
+            size=capped_size,
+            niter=iter_indices.shape[0],
+        )
+    return None
+
+
 def _get_permutations_fast(cb_ids, sub_branches, p, niter):
+    niter = int(niter)
+    if niter < 0:
+        raise ValueError('niter should be >= 0.')
     cb_ids = np.asarray(cb_ids, dtype=np.int64)
     if cb_ids.ndim != 2:
         raise ValueError('cb_ids should be a 2D array.')
@@ -433,11 +942,21 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
         return np.zeros((0, niter), dtype=np.int32)
     if (cb_ids < 0).any():
         raise ValueError('cb_ids should be non-negative.')
-    sub_branches = np.asarray(sub_branches, dtype=np.int64)
-    if sub_branches.ndim != 1:
-        raise ValueError('sub_branches should be a 1D array.')
+    sub_branches = np.asarray(sub_branches)
+    if sub_branches.ndim not in [1, 2]:
+        raise ValueError('sub_branches should be a 1D or 2D array.')
+    is_per_iteration_sizes = (sub_branches.ndim == 2)
+    if is_per_iteration_sizes:
+        if sub_branches.shape[1] != niter:
+            txt = 'When sub_branches is 2D, its number of columns ({}) should match niter ({}).'
+            raise ValueError(txt.format(sub_branches.shape[1], niter))
+        sub_branches = np.asarray(sub_branches, dtype=np.int64)
+    else:
+        sub_branches = np.asarray(sub_branches, dtype=np.int64)
     if sub_branches.shape[0] <= cb_ids.max():
         raise ValueError('cb_ids contain out-of-range branch IDs.')
+    if (sub_branches < 0).any():
+        raise ValueError('sub_branches should be non-negative.')
     p = np.asarray(p, dtype=np.float64)
     if p.ndim == 1:
         num_site = p.shape[0]
@@ -452,6 +971,57 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
         branch_site_p = p
     else:
         raise ValueError('p should be a 1D or 2D array.')
+    if is_per_iteration_sizes:
+        active_branch_ids, inverse_branch_ids = np.unique(cb_ids, return_inverse=True)
+        remapped_cb_ids = inverse_branch_ids.reshape(cb_ids.shape)
+        active_sub_branches = sub_branches[active_branch_ids, :]
+        num_branch = active_sub_branches.shape[0]
+        num_packed_site = (num_site + 7) // 8
+        packed_masks = np.zeros(shape=(num_branch, niter, num_packed_site), dtype=np.uint8)
+        if shared_site_p is not None:
+            num_positive_sites = int((shared_site_p > 0).sum())
+            if num_positive_sites == 0:
+                return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
+            for branch_id in range(num_branch):
+                size_values = active_sub_branches[branch_id, :]
+                if (size_values > 0).sum() == 0:
+                    continue
+                _fill_packed_masks_for_sizes(
+                    packed_masks_branch=packed_masks[branch_id, :, :],
+                    site_p=shared_site_p,
+                    size_values=size_values,
+                )
+        else:
+            active_site_p = branch_site_p[active_branch_ids, :]
+            first_site_p = active_site_p[0, :]
+            is_shared_site_p = np.array_equal(active_site_p, np.broadcast_to(first_site_p, active_site_p.shape))
+            if is_shared_site_p:
+                num_positive_sites = int((first_site_p > 0).sum())
+                if num_positive_sites == 0:
+                    return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
+                for branch_id in range(num_branch):
+                    size_values = active_sub_branches[branch_id, :]
+                    if (size_values > 0).sum() == 0:
+                        continue
+                    _fill_packed_masks_for_sizes(
+                        packed_masks_branch=packed_masks[branch_id, :, :],
+                        site_p=first_site_p,
+                        size_values=size_values,
+                    )
+            else:
+                for branch_id in range(num_branch):
+                    size_values = active_sub_branches[branch_id, :]
+                    if (size_values > 0).sum() == 0:
+                        continue
+                    _fill_packed_masks_for_sizes(
+                        packed_masks_branch=packed_masks[branch_id, :, :],
+                        site_p=active_site_p[branch_id, :],
+                        size_values=size_values,
+                    )
+        return _calc_shared_counts_from_packed_masks(
+            packed_masks=packed_masks,
+            remapped_cb_ids=remapped_cb_ids,
+        )
     cb_branch_sizes = sub_branches[cb_ids]
     is_active_row = (cb_branch_sizes > 0).all(axis=1)
     if not is_active_row.any():
@@ -593,6 +1163,79 @@ def _needs_quantile_refinement(probability_values, quantile_niter, edge_bins):
     return (probability_values <= edge) | (probability_values >= (1.0 - edge))
 
 
+def _calc_quantile_count_matrix(
+    mode,
+    cb_ids,
+    sub_sg,
+    sub_bg,
+    quantile_niter,
+    obs_col,
+    num_gad_combinat,
+    list_igad,
+    g,
+    static_sub_sites,
+):
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
+    quantile_niter = int(quantile_niter)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if quantile_niter <= 0:
+        raise ValueError('quantile_niter should be a positive integer.')
+    if cb_ids.shape[0] == 0:
+        return np.zeros(shape=(0, quantile_niter), dtype=np.int32)
+    requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
+    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    n_jobs, chunk_factor = _resolve_quantile_parallel_plan(
+        cb_rows=cb_ids.shape[0],
+        num_categories=len(list_igad),
+        quantile_niter=quantile_niter,
+        requested_n_jobs=requested_n_jobs,
+        requested_chunk_factor=chunk_factor,
+    )
+    igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
+    axis = (cb_ids.shape[0], quantile_niter)
+    dfq = np.zeros(shape=axis, dtype=np.int32)
+    if n_jobs == 1:
+        joblib_calc_quantile(
+            mode,
+            cb_ids,
+            sub_sg,
+            sub_bg,
+            dfq,
+            quantile_niter,
+            obs_col,
+            num_gad_combinat,
+            list_igad,
+            g,
+            static_sub_sites=static_sub_sites,
+        )
+        return dfq
+    tasks = [
+        (
+            mode,
+            cb_ids,
+            sub_sg,
+            sub_bg,
+            quantile_niter,
+            obs_col,
+            num_gad_combinat,
+            igad_chunk,
+            g,
+            static_sub_sites,
+        )
+        for igad_chunk in igad_chunks
+    ]
+    chunk_dfs = parallel.run_starmap(
+        func=_calc_quantile_chunk_local,
+        args_iterable=tasks,
+        n_jobs=n_jobs,
+        backend='threading',
+    )
+    for dfq_chunk in chunk_dfs:
+        dfq += dfq_chunk
+    return dfq
+
+
 def _calc_quantile_probabilities(
     mode,
     cb_ids,
@@ -620,56 +1263,18 @@ def _calc_quantile_probabilities(
         raise ValueError('quantile_niter should be a positive integer.')
     if cb_ids.shape[0] == 0:
         return np.zeros(shape=(0,), dtype=g['float_type'])
-    requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
-    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
-    n_jobs, chunk_factor = _resolve_quantile_parallel_plan(
-        cb_rows=cb_ids.shape[0],
-        num_categories=len(list_igad),
+    dfq = _calc_quantile_count_matrix(
+        mode=mode,
+        cb_ids=cb_ids,
+        sub_sg=sub_sg,
+        sub_bg=sub_bg,
         quantile_niter=quantile_niter,
-        requested_n_jobs=requested_n_jobs,
-        requested_chunk_factor=chunk_factor,
+        obs_col=obs_col,
+        num_gad_combinat=num_gad_combinat,
+        list_igad=list_igad,
+        g=g,
+        static_sub_sites=static_sub_sites,
     )
-    igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
-    axis = (cb_ids.shape[0], quantile_niter)
-    dfq = np.zeros(shape=axis, dtype=np.int32)
-    if n_jobs == 1:
-        joblib_calc_quantile(
-            mode,
-            cb_ids,
-            sub_sg,
-            sub_bg,
-            dfq,
-            quantile_niter,
-            obs_col,
-            num_gad_combinat,
-            list_igad,
-            g,
-            static_sub_sites=static_sub_sites,
-        )
-    else:
-        tasks = [
-            (
-                mode,
-                cb_ids,
-                sub_sg,
-                sub_bg,
-                quantile_niter,
-                obs_col,
-                num_gad_combinat,
-                igad_chunk,
-                g,
-                static_sub_sites,
-            )
-            for igad_chunk in igad_chunks
-        ]
-        chunk_dfs = parallel.run_starmap(
-            func=_calc_quantile_chunk_local,
-            args_iterable=tasks,
-            n_jobs=n_jobs,
-            backend='threading',
-        )
-        for dfq_chunk in chunk_dfs:
-            dfq += dfq_chunk
     gt_ranks = (dfq < obs_values[:, None]).sum(axis=1, dtype=np.int64)
     ge_ranks = (dfq <= obs_values[:, None]).sum(axis=1, dtype=np.int64)
     probabilities = ((gt_ranks + ge_ranks) / 2) / quantile_niter
@@ -835,9 +1440,11 @@ def joblib_calc_quantile(
             if (p.sum(axis=1) > 0).sum() == 0:
                 continue
         pm_start = time.time()
-        if 'float' in str(sub_branches.dtype):
-            # TODO: warn this rounding (only once)
-            sub_branches = sub_branches.round().astype(np.int64)
+        sub_branches = _prepare_permutation_branch_sizes(
+            sub_branches=sub_branches,
+            niter=quantile_niter,
+            g=g,
+        )
         dfq[:,:] += _get_permutations_fast(cb_ids, sub_branches, p, quantile_niter)
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i+1, num_gad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
@@ -901,15 +1508,11 @@ def _calc_quantile_chunk_local(
     )
     return dfq_local
 
-def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g=None):
-    if g is None:
-        raise ValueError('g is required.')
+
+def _prepare_substitution_quantile_components(sub_tensor, mode, SN, g):
     supported_modes = {'spe2spe', 'spe2any', 'any2spe', 'any2any'}
     if mode not in supported_modes:
         raise ValueError('Unsupported E-stat mode: {}'.format(mode))
-    supported_stats = {'mean', 'quantile'}
-    if stat not in supported_stats:
-        raise ValueError('Unsupported E-stat summary statistic: {}'.format(stat))
     if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
         sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor=sub_tensor, mode=mode)
     if mode=='spe2spe':
@@ -933,10 +1536,25 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             sub_sg = sub_tensor.sum(axis=(0, 3, 4)) # site, matrix_group
         list_gad = list(itertools.product(np.arange(sub_tensor.shape[2]), ['any2',], ['2any',]))
     num_gad_combinat = len(list_gad)
-    txt = 'E{}{}: Total number of substitution categories after NaN removals: {}'
-    print(txt.format(SN, mode, num_gad_combinat))
     list_igad = [ [i,]+list(items) for i,items in zip(range(num_gad_combinat), list_gad) ]
     obs_col = 'OC'+SN+mode
+    return sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat
+
+
+def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g=None):
+    if g is None:
+        raise ValueError('g is required.')
+    supported_stats = {'mean', 'quantile'}
+    if stat not in supported_stats:
+        raise ValueError('Unsupported E-stat summary statistic: {}'.format(stat))
+    sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_quantile_components(
+        sub_tensor=sub_tensor,
+        mode=mode,
+        SN=SN,
+        g=g,
+    )
+    txt = 'E{}{}: Total number of substitution categories after NaN removals: {}'
+    print(txt.format(SN, mode, num_gad_combinat))
     cb_ids = _get_cb_ids(cb)
     static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
     cb_site_overlap = None
@@ -1216,9 +1834,246 @@ def get_exp_state(g, mode):
         raise AssertionError('Total probability of expected states should not exceed 1. {}'.format(max_stateE))
     return stateE
 
+
+def _calc_raw_rate(obs, exp, float_tol):
+    obs = np.asarray(obs, dtype=np.float64)
+    exp = np.asarray(exp, dtype=np.float64)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        out = obs / exp
+    out[obs < float_tol] = 0
+    return out
+
+
+def _calc_raw_omega(dNc, dSc, float_tol):
+    dNc = np.asarray(dNc, dtype=np.float64)
+    dSc = np.asarray(dSc, dtype=np.float64)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        omega = dNc / dSc
+    omega[dNc < float_tol] = 0
+    return omega
+
+
+def _collect_stat_masses(cb, prefix):
+    stat_masses = dict()
+    for stat_name in output_stat.ALL_OUTPUT_STATS:
+        col_name = prefix + stat_name
+        if col_name not in cb.columns:
+            continue
+        values = cb.loc[:, col_name].to_numpy(dtype=np.float64, copy=False)
+        is_finite = np.isfinite(values)
+        if not is_finite.any():
+            continue
+        stat_masses[stat_name] = float(np.clip(values[is_finite], a_min=0.0, a_max=None).sum(dtype=np.float64))
+    return stat_masses
+
+
+def _calc_distribution_entropy(prob):
+    prob = np.asarray(prob, dtype=np.float64)
+    positive = prob[prob > 0]
+    if positive.shape[0] == 0:
+        return 0.0
+    return float(-(positive * np.log(positive)).sum(dtype=np.float64))
+
+
+def _calc_zero_fraction(cb, prefix, output_stats, float_tol):
+    cols = [prefix + sub for sub in output_stats if (prefix + sub) in cb.columns]
+    if len(cols) == 0:
+        return np.nan
+    values = cb.loc[:, cols].to_numpy(dtype=np.float64, copy=False)
+    is_finite = np.isfinite(values)
+    if not is_finite.any():
+        return np.nan
+    return float(((values < float_tol) & is_finite).sum() / is_finite.sum())
+
+
+def _collect_alpha_fit_pairs(cb, output_stats):
+    obs_list = list()
+    exp_list = list()
+    for sub in output_stats:
+        col_obs_n = 'OCN' + sub
+        col_exp_n = 'ECN' + sub
+        col_obs_s = 'OCS' + sub
+        col_exp_s = 'ECS' + sub
+        if all([c in cb.columns for c in [col_obs_n, col_exp_n]]):
+            obs_list.append(cb.loc[:, col_obs_n].to_numpy(dtype=np.float64, copy=False))
+            exp_list.append(cb.loc[:, col_exp_n].to_numpy(dtype=np.float64, copy=False))
+        if all([c in cb.columns for c in [col_obs_s, col_exp_s]]):
+            obs_list.append(cb.loc[:, col_obs_s].to_numpy(dtype=np.float64, copy=False))
+            exp_list.append(cb.loc[:, col_exp_s].to_numpy(dtype=np.float64, copy=False))
+    return obs_list, exp_list
+
+
+def _get_pseudocount_context(cb, g, output_stats):
+    config = pseudocount.validate_args(g).copy()
+    alpha_fit_diag = dict()
+    if config['pseudocount_alpha_auto'] and (config['pseudocount_mode'] != 'none'):
+        obs_list, exp_list = _collect_alpha_fit_pairs(cb=cb, output_stats=output_stats)
+        estimated_alpha, alpha_fit_diag = pseudocount.estimate_alpha_empirical_bayes(
+            obs_list=obs_list,
+            exp_list=exp_list,
+            float_tol=g['float_tol'],
+        )
+        config['pseudocount_alpha'] = float(estimated_alpha)
+        config['pseudocount_enabled'] = bool((config['pseudocount_alpha'] > 0) and (config['pseudocount_mode'] != 'none'))
+        config['pseudocount_add_output_columns'] = bool(config['pseudocount_enabled'] or config['pseudocount_report'])
+    K = len(output_stats)
+    alpha_obs_N = np.zeros(shape=(K,), dtype=np.float64)
+    alpha_exp_N = np.zeros(shape=(K,), dtype=np.float64)
+    alpha_obs_S = np.zeros(shape=(K,), dtype=np.float64)
+    alpha_exp_S = np.zeros(shape=(K,), dtype=np.float64)
+    summary = {
+        'pseudocount_mode': config['pseudocount_mode'],
+        'pseudocount_alpha': float(config['pseudocount_alpha']),
+        'pseudocount_alpha_source': 'auto' if config.get('pseudocount_alpha_auto', False) else 'fixed',
+        'pseudocount_target': config['pseudocount_target'],
+        'pseudocount_enabled': int(config['pseudocount_enabled']),
+        'pseudocount_zero_prop_OCN': _calc_zero_fraction(cb, 'OCN', output_stats, g['float_tol']),
+        'pseudocount_zero_prop_ECN': _calc_zero_fraction(cb, 'ECN', output_stats, g['float_tol']),
+        'pseudocount_zero_prop_OCS': _calc_zero_fraction(cb, 'OCS', output_stats, g['float_tol']),
+        'pseudocount_zero_prop_ECS': _calc_zero_fraction(cb, 'ECS', output_stats, g['float_tol']),
+    }
+    if len(alpha_fit_diag):
+        summary['pseudocount_alpha_fit_pairs'] = int(alpha_fit_diag.get('num_pairs', 0))
+        summary['pseudocount_alpha_fit_loglikelihood'] = float(alpha_fit_diag.get('fit_loglikelihood', np.nan))
+    if K > 0:
+        if config['pseudocount_mode'] == 'empirical':
+            obs_N_masses = _collect_stat_masses(cb=cb, prefix='OCN')
+            exp_N_masses = _collect_stat_masses(cb=cb, prefix='ECN')
+            obs_S_masses = _collect_stat_masses(cb=cb, prefix='OCS')
+            exp_S_masses = _collect_stat_masses(cb=cb, prefix='ECS')
+            alpha_obs_N, p_atomic_obs_N = pseudocount.compute_empirical_stat_alphas(
+                stat_masses=obs_N_masses,
+                stats=output_stats,
+                alpha=config['pseudocount_alpha'],
+            )
+            alpha_exp_N, p_atomic_exp_N = pseudocount.compute_empirical_stat_alphas(
+                stat_masses=exp_N_masses,
+                stats=output_stats,
+                alpha=config['pseudocount_alpha'],
+            )
+            alpha_obs_S, p_atomic_obs_S = pseudocount.compute_empirical_stat_alphas(
+                stat_masses=obs_S_masses,
+                stats=output_stats,
+                alpha=config['pseudocount_alpha'],
+            )
+            alpha_exp_S, p_atomic_exp_S = pseudocount.compute_empirical_stat_alphas(
+                stat_masses=exp_S_masses,
+                stats=output_stats,
+                alpha=config['pseudocount_alpha'],
+            )
+            summary['pseudocount_pglobal_entropy_atomic_OCN'] = _calc_distribution_entropy(p_atomic_obs_N)
+            summary['pseudocount_pglobal_entropy_atomic_ECN'] = _calc_distribution_entropy(p_atomic_exp_N)
+            summary['pseudocount_pglobal_entropy_atomic_OCS'] = _calc_distribution_entropy(p_atomic_obs_S)
+            summary['pseudocount_pglobal_entropy_atomic_ECS'] = _calc_distribution_entropy(p_atomic_exp_S)
+        else:
+            alpha_base = pseudocount.compute_alpha_vector(
+                mode=config['pseudocount_mode'],
+                alpha=config['pseudocount_alpha'],
+                p_global=None,
+                K=K,
+            )
+            alpha_obs_N = alpha_base.copy()
+            alpha_exp_N = alpha_base.copy()
+            alpha_obs_S = alpha_base.copy()
+            alpha_exp_S = alpha_base.copy()
+    if config['pseudocount_target'] == 'observed':
+        alpha_exp_N[:] = 0
+        alpha_exp_S[:] = 0
+    elif config['pseudocount_target'] == 'expected':
+        alpha_obs_N[:] = 0
+        alpha_obs_S[:] = 0
+    context = {
+        'config': config,
+        'output_stats': tuple(output_stats),
+        'alpha_obs_N': alpha_obs_N,
+        'alpha_exp_N': alpha_exp_N,
+        'alpha_obs_S': alpha_obs_S,
+        'alpha_exp_S': alpha_exp_S,
+        'summary': summary,
+    }
+    return context
+
+
+def _print_pseudocount_summary(context):
+    summary = context.get('summary', dict())
+    txt = 'Pseudocount settings: mode={}, alpha={}, alpha_source={}, target={}, enabled={}'
+    print(
+        txt.format(
+            summary.get('pseudocount_mode', 'none'),
+            summary.get('pseudocount_alpha', 0.0),
+            summary.get('pseudocount_alpha_source', 'fixed'),
+            summary.get('pseudocount_target', 'both'),
+            summary.get('pseudocount_enabled', 0),
+        ),
+        flush=True,
+    )
+    if summary.get('pseudocount_alpha_source', 'fixed') == 'auto':
+        txt = 'Pseudocount alpha auto-fit: pairs={:,}, logL={:.3f}'
+        print(
+            txt.format(
+                int(summary.get('pseudocount_alpha_fit_pairs', 0)),
+                float(summary.get('pseudocount_alpha_fit_loglikelihood', np.nan)),
+            ),
+            flush=True,
+        )
+    txt = 'Pseudocount sparsity (pre-smoothing): OCN_zero={:.3f}, ECN_zero={:.3f}, OCS_zero={:.3f}, ECS_zero={:.3f}'
+    print(
+        txt.format(
+            float(summary.get('pseudocount_zero_prop_OCN', np.nan)),
+            float(summary.get('pseudocount_zero_prop_ECN', np.nan)),
+            float(summary.get('pseudocount_zero_prop_OCS', np.nan)),
+            float(summary.get('pseudocount_zero_prop_ECS', np.nan)),
+        ),
+        flush=True,
+    )
+    if summary.get('pseudocount_mode', 'none') == 'empirical':
+        txt = 'Pseudocount empirical atomic p_global entropy: OCN={:.3f}, ECN={:.3f}, OCS={:.3f}, ECS={:.3f}'
+        print(
+            txt.format(
+                float(summary.get('pseudocount_pglobal_entropy_atomic_OCN', np.nan)),
+                float(summary.get('pseudocount_pglobal_entropy_atomic_ECN', np.nan)),
+                float(summary.get('pseudocount_pglobal_entropy_atomic_OCS', np.nan)),
+                float(summary.get('pseudocount_pglobal_entropy_atomic_ECS', np.nan)),
+            ),
+            flush=True,
+        )
+
+
+def _write_pseudocount_summary_to_cb_stats(g, context):
+    if 'df_cb_stats' not in g:
+        return
+    summary = context.get('summary', dict())
+    for key, value in summary.items():
+        g['df_cb_stats'].at[0, key] = value
+
+
 def get_omega(cb, g):
     requested_output_stats = _resolve_requested_output_stats(g)
-    for sub in requested_output_stats:
+    context = g.get('_pseudocount_context', None)
+    if (context is None) or (tuple(requested_output_stats) != context.get('output_stats', tuple())):
+        context = _get_pseudocount_context(cb=cb, g=g, output_stats=requested_output_stats)
+    config = context['config']
+    if (not config['pseudocount_enabled']) and (not config['pseudocount_add_output_columns']):
+        for sub in requested_output_stats:
+            col_omega = 'omegaC'+sub
+            col_N = 'OCN'+sub
+            col_EN = 'ECN'+sub
+            col_dNc = 'dNC'+sub
+            col_S = 'OCS'+sub
+            col_ES = 'ECS'+sub
+            col_dSc = 'dSC'+sub
+            if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
+                cb.loc[:,col_dNc] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
+                is_N_zero = (cb.loc[:,col_N]<g['float_tol'])
+                cb.loc[is_N_zero,col_dNc] = 0
+                cb.loc[:,col_dSc] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
+                is_S_zero = (cb.loc[:,col_S]<g['float_tol'])
+                cb.loc[is_S_zero,col_dSc] = 0
+                cb.loc[:,col_omega] = cb.loc[:,col_dNc] / cb.loc[:,col_dSc]
+                is_dN_zero = (cb.loc[:,col_dNc]<g['float_tol'])
+                cb.loc[is_dN_zero,col_omega] = 0
+        return cb
+    for i, sub in enumerate(requested_output_stats):
         col_omega = 'omegaC'+sub
         col_N = 'OCN'+sub
         col_EN = 'ECN'+sub
@@ -1227,15 +2082,45 @@ def get_omega(cb, g):
         col_ES = 'ECS'+sub
         col_dSc = 'dSC'+sub
         if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
-            cb.loc[:,col_dNc] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
-            is_N_zero = (cb.loc[:,col_N]<g['float_tol'])
-            cb.loc[is_N_zero,col_dNc] = 0
-            cb.loc[:,col_dSc] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
-            is_S_zero = (cb.loc[:,col_S]<g['float_tol'])
-            cb.loc[is_S_zero,col_dSc] = 0
-            cb.loc[:,col_omega] = cb.loc[:,col_dNc] / cb.loc[:,col_dSc]
-            is_dN_zero = (cb.loc[:,col_dNc]<g['float_tol'])
-            cb.loc[is_dN_zero,col_omega] = 0
+            obs_N = cb.loc[:, col_N].to_numpy(dtype=np.float64, copy=False)
+            exp_N = cb.loc[:, col_EN].to_numpy(dtype=np.float64, copy=False)
+            obs_S = cb.loc[:, col_S].to_numpy(dtype=np.float64, copy=False)
+            exp_S = cb.loc[:, col_ES].to_numpy(dtype=np.float64, copy=False)
+            raw_dNc = _calc_raw_rate(obs=obs_N, exp=exp_N, float_tol=g['float_tol'])
+            raw_dSc = _calc_raw_rate(obs=obs_S, exp=exp_S, float_tol=g['float_tol'])
+            raw_omega = _calc_raw_omega(dNc=raw_dNc, dSc=raw_dSc, float_tol=g['float_tol'])
+            if config['pseudocount_enabled']:
+                sm_dNc = pseudocount.smooth_ratio(
+                    O=obs_N,
+                    E=exp_N,
+                    alpha_obs=context['alpha_obs_N'][i],
+                    alpha_exp=context['alpha_exp_N'][i],
+                )
+                sm_dSc = pseudocount.smooth_ratio(
+                    O=obs_S,
+                    E=exp_S,
+                    alpha_obs=context['alpha_obs_S'][i],
+                    alpha_exp=context['alpha_exp_S'][i],
+                )
+                sm_omega = pseudocount.smooth_ratio(O=sm_dNc, E=sm_dSc, alpha_obs=0, alpha_exp=0)
+                log_sm_omega = pseudocount.smooth_log_ratio(O=sm_dNc, E=sm_dSc, alpha_obs=0, alpha_exp=0)
+            else:
+                sm_dNc = raw_dNc.copy()
+                sm_dSc = raw_dSc.copy()
+                sm_omega = raw_omega.copy()
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    log_sm_omega = np.log(sm_omega)
+            cb.loc[:, col_dNc] = sm_dNc
+            cb.loc[:, col_dSc] = sm_dSc
+            cb.loc[:, col_omega] = sm_omega
+            if config['pseudocount_add_output_columns']:
+                cb.loc[:, col_dNc + '_raw'] = raw_dNc
+                cb.loc[:, col_dSc + '_raw'] = raw_dSc
+                cb.loc[:, col_omega + '_raw'] = raw_omega
+                cb.loc[:, col_dNc + '_smoothed'] = sm_dNc
+                cb.loc[:, col_dSc + '_smoothed'] = sm_dSc
+                cb.loc[:, col_omega + '_smoothed'] = sm_omega
+                cb.loc[:, 'log' + col_omega + '_smoothed'] = log_sm_omega
     return cb
 
 def get_CoD(cb, g):
@@ -1252,6 +2137,199 @@ def get_CoD(cb, g):
             cb.loc[(is_Nzero&is_inf), col_cod] = np.nan
     return cb
 
+
+def _calc_dif_count_matrix(any_count, spe_count, tol):
+    any_count = np.asarray(any_count, dtype=np.float64)
+    spe_count = np.asarray(spe_count, dtype=np.float64)
+    out = any_count - spe_count
+    is_negative = (out < (-float(tol)))
+    is_almost_zero = (~is_negative) & (out < float(tol))
+    out[is_negative] = np.nan
+    out[is_almost_zero] = 0
+    return out
+
+
+def _compose_permutation_count_matrix(stat, mode_to_count, tol):
+    if stat in ['any2any', 'spe2any', 'any2spe', 'spe2spe']:
+        return np.asarray(mode_to_count[stat], dtype=np.float64)
+    if stat == 'any2dif':
+        return _calc_dif_count_matrix(mode_to_count['any2any'], mode_to_count['any2spe'], tol=tol)
+    if stat == 'dif2any':
+        return _calc_dif_count_matrix(mode_to_count['any2any'], mode_to_count['spe2any'], tol=tol)
+    if stat == 'dif2spe':
+        return _calc_dif_count_matrix(mode_to_count['any2spe'], mode_to_count['spe2spe'], tol=tol)
+    if stat == 'spe2dif':
+        return _calc_dif_count_matrix(mode_to_count['spe2any'], mode_to_count['spe2spe'], tol=tol)
+    if stat == 'dif2dif':
+        any2dif = _calc_dif_count_matrix(mode_to_count['any2any'], mode_to_count['any2spe'], tol=tol)
+        spe2dif = _calc_dif_count_matrix(mode_to_count['spe2any'], mode_to_count['spe2spe'], tol=tol)
+        return _calc_dif_count_matrix(any2dif, spe2dif, tol=tol)
+    raise ValueError('Unsupported output stat for permutation omega p-value: {}'.format(stat))
+
+
+def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g):
+    sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_quantile_components(
+        sub_tensor=sub_tensor,
+        mode=mode,
+        SN=SN,
+        g=g,
+    )
+    static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
+    txt = 'pomegaC {}{}: randomization count matrix (rows={:,}, niter={:,}, categories={:,})'
+    print(txt.format(SN, mode, cb_ids.shape[0], int(niter), int(num_gad_combinat)), flush=True)
+    return _calc_quantile_count_matrix(
+        mode=mode,
+        cb_ids=cb_ids,
+        sub_sg=sub_sg,
+        sub_bg=sub_bg,
+        quantile_niter=int(niter),
+        obs_col=obs_col,
+        num_gad_combinat=num_gad_combinat,
+        list_igad=list_igad,
+        g=g,
+        static_sub_sites=static_sub_sites,
+    )
+
+
+def _calc_omega_empirical_upper_tail_pvalues(obs_omega, exp_N, exp_S, perm_count_N, perm_count_S, float_tol):
+    obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
+    exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
+    exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
+    perm_count_N = np.asarray(perm_count_N, dtype=np.float64)
+    perm_count_S = np.asarray(perm_count_S, dtype=np.float64)
+    if perm_count_N.shape != perm_count_S.shape:
+        raise ValueError('perm_count_N and perm_count_S should have identical shapes.')
+    if perm_count_N.ndim != 2:
+        raise ValueError('perm_count_N should be a 2D array.')
+    if perm_count_N.shape[0] != obs_omega.shape[0]:
+        txt = 'Permutation rows ({}) and observed rows ({}) should match.'
+        raise ValueError(txt.format(perm_count_N.shape[0], obs_omega.shape[0]))
+    if exp_N.shape[0] != obs_omega.shape[0]:
+        txt = 'exp_N rows ({}) and observed rows ({}) should match.'
+        raise ValueError(txt.format(exp_N.shape[0], obs_omega.shape[0]))
+    if exp_S.shape[0] != obs_omega.shape[0]:
+        txt = 'exp_S rows ({}) and observed rows ({}) should match.'
+        raise ValueError(txt.format(exp_S.shape[0], obs_omega.shape[0]))
+    perm_dNc = _calc_raw_rate(obs=perm_count_N, exp=exp_N[:, None], float_tol=float_tol)
+    perm_dSc = _calc_raw_rate(obs=perm_count_S, exp=exp_S[:, None], float_tol=float_tol)
+    perm_omega = _calc_raw_omega(dNc=perm_dNc, dSc=perm_dSc, float_tol=float_tol)
+    valid_perm = np.isfinite(perm_omega)
+    ge_ranks = (valid_perm & (perm_omega >= obs_omega[:, None])).sum(axis=1, dtype=np.int64)
+    valid_niter = valid_perm.sum(axis=1, dtype=np.int64)
+    pvalue = np.full(shape=obs_omega.shape, fill_value=np.nan, dtype=np.float64)
+    valid_rows = np.isfinite(obs_omega) & (valid_niter > 0)
+    pvalue[valid_rows] = (ge_ranks[valid_rows] + 1.0) / (valid_niter[valid_rows] + 1.0)
+    return pvalue
+
+
+def _calc_bh_fdr_qvalues(pvalues):
+    pvalues = np.asarray(pvalues, dtype=np.float64).reshape(-1)
+    qvalues = np.full(shape=pvalues.shape, fill_value=np.nan, dtype=np.float64)
+    is_finite = np.isfinite(pvalues)
+    if not is_finite.any():
+        return qvalues
+    p_finite = np.clip(pvalues[is_finite], a_min=0.0, a_max=1.0)
+    m = int(p_finite.shape[0])
+    order = np.argsort(p_finite, kind='mergesort')
+    ranked = p_finite[order]
+    bh = ranked * (float(m) / np.arange(1, m + 1, dtype=np.float64))
+    bh = np.minimum.accumulate(bh[::-1])[::-1]
+    bh = np.clip(bh, a_min=0.0, a_max=1.0)
+    q_finite = np.empty_like(bh)
+    q_finite[order] = bh
+    qvalues[is_finite] = q_finite
+    return qvalues
+
+
+def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
+    if not bool(g.get('calc_omega_pvalue', False)):
+        return cb
+    if str(g.get('omegaC_method', '')).strip().lower() != 'modelfree':
+        sys.stderr.write('Skipping --calc_omega_pvalue because --omegaC_method is not "modelfree".\n')
+        return cb
+    niter = int(g.get('omega_pvalue_niter', 1000))
+    if niter <= 0:
+        raise ValueError('omega_pvalue_niter should be a positive integer.')
+    cb_ids = _get_cb_ids(cb)
+    output_stats = _resolve_requested_output_stats(g)
+    for sub in output_stats:
+        col_omega = 'omegaC' + sub
+        col_exp_N = 'ECN' + sub
+        col_exp_S = 'ECS' + sub
+        if not all([col in cb.columns for col in [col_omega, col_exp_N, col_exp_S]]):
+            continue
+        mode_to_count_N = dict()
+        mode_to_count_S = dict()
+        required_modes = output_stat.get_required_base_stats([sub])
+        for mode in required_modes:
+            mode_to_count_N[mode] = _get_mode_permutation_count_matrix(
+                cb_ids=cb_ids,
+                sub_tensor=ON_tensor,
+                mode=mode,
+                SN='N',
+                niter=niter,
+                g=g,
+            )
+            mode_to_count_S[mode] = _get_mode_permutation_count_matrix(
+                cb_ids=cb_ids,
+                sub_tensor=OS_tensor,
+                mode=mode,
+                SN='S',
+                niter=niter,
+                g=g,
+            )
+        perm_count_N = _compose_permutation_count_matrix(
+            stat=sub,
+            mode_to_count=mode_to_count_N,
+            tol=g['float_tol'],
+        )
+        perm_count_S = _compose_permutation_count_matrix(
+            stat=sub,
+            mode_to_count=mode_to_count_S,
+            tol=g['float_tol'],
+        )
+        pvalue = _calc_omega_empirical_upper_tail_pvalues(
+            obs_omega=cb.loc[:, col_omega].to_numpy(dtype=np.float64, copy=False),
+            exp_N=cb.loc[:, col_exp_N].to_numpy(dtype=np.float64, copy=False),
+            exp_S=cb.loc[:, col_exp_S].to_numpy(dtype=np.float64, copy=False),
+            perm_count_N=perm_count_N,
+            perm_count_S=perm_count_S,
+            float_tol=g['float_tol'],
+        )
+        col_p = 'pomegaC' + sub
+        cb.loc[:, col_p] = pvalue
+        col_q = 'qomegaC' + sub
+        qvalue = _calc_bh_fdr_qvalues(pvalue)
+        cb.loc[:, col_q] = qvalue
+        finite = np.isfinite(pvalue)
+        if finite.any():
+            txt = 'Arity = {:,}, cb: median {} = {:.4f} ({:,}/{:,} finite)'
+            print(
+                txt.format(
+                    cb_ids.shape[1],
+                    col_p,
+                    float(np.nanmedian(pvalue)),
+                    int(finite.sum()),
+                    int(pvalue.shape[0]),
+                ),
+                flush=True,
+            )
+        finite_q = np.isfinite(qvalue)
+        if finite_q.any():
+            txt = 'Arity = {:,}, cb: median {} = {:.4f} ({:,}/{:,} finite)'
+            print(
+                txt.format(
+                    cb_ids.shape[1],
+                    col_q,
+                    float(np.nanmedian(qvalue)),
+                    int(finite_q.sum()),
+                    int(qvalue.shape[0]),
+                ),
+                flush=True,
+            )
+    return cb
+
+
 def print_cb_stats(cb, prefix, output_stats):
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'Arity = {:,}, {}:'.format(arity, prefix)
@@ -1265,9 +2343,16 @@ def print_cb_stats(cb, prefix, output_stats):
 
 def calc_omega(cb, OS_tensor, ON_tensor, g):
     cb = get_E(cb, g, ON_tensor, OS_tensor)
+    output_stats = _resolve_requested_output_stats(g)
+    context = _get_pseudocount_context(cb=cb, g=g, output_stats=output_stats)
+    g['_pseudocount_context'] = context
+    if context['config']['pseudocount_add_output_columns']:
+        _print_pseudocount_summary(context=context)
+        _write_pseudocount_summary_to_cb_stats(g=g, context=context)
     cb = get_omega(cb, g)
     cb = get_CoD(cb, g)
-    print_cb_stats(cb=cb, prefix='cb', output_stats=_resolve_requested_output_stats(g))
+    cb = add_omega_empirical_pvalues(cb=cb, ON_tensor=ON_tensor, OS_tensor=OS_tensor, g=g)
+    print_cb_stats(cb=cb, prefix='cb', output_stats=output_stats)
     return(cb, g)
 
 def calibrate_dsc(cb, transformation='quantile', output_stats=None):
@@ -1280,6 +2365,8 @@ def calibrate_dsc(cb, transformation='quantile', output_stats=None):
         col_dNc = 'dNC'+sub
         col_dSc = 'dSC'+sub
         col_omega = 'omegaC'+sub
+        col_pvalue = 'pomegaC'+sub
+        col_qvalue = 'qomegaC'+sub
         col_noncalibrated_dSc = 'dSC'+sub+'_nocalib'
         col_noncalibrated_omega = 'omegaC'+sub+'_nocalib'
         if not all([col in cb.columns for col in [col_dNc, col_dSc, col_omega]]):
@@ -1294,8 +2381,12 @@ def calibrate_dsc(cb, transformation='quantile', output_stats=None):
         if (is_na.sum()>0):
             txt = 'dSc calibration could not be applied to {:,}/{:,} branch combinations for {}\n'
             sys.stderr.write(txt.format(is_na.sum(), cb.shape[0], sub))
-        cb.columns = cb.columns.str.replace(col_dSc, col_noncalibrated_dSc, regex=False)
-        cb.columns = cb.columns.str.replace(col_omega, col_noncalibrated_omega, regex=False)
+        rename_map = {col_dSc: col_noncalibrated_dSc, col_omega: col_noncalibrated_omega}
+        if col_pvalue in cb.columns:
+            rename_map[col_pvalue] = col_pvalue + '_nocalib'
+        if col_qvalue in cb.columns:
+            rename_map[col_qvalue] = col_qvalue + '_nocalib'
+        cb = cb.rename(columns=rename_map)
         dNc_values_wo_na = dNc_values[~is_na]
         uncorrected_dSc_values_wo_na = uncorrected_dSc_values[~is_na]
         ranks = stats.rankdata(uncorrected_dSc_values_wo_na)

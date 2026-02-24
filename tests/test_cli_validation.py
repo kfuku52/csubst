@@ -67,6 +67,12 @@ def test_analyze_rejects_removed_prostt5_batch_size_option():
     assert "unrecognized arguments: --prostt5_batch_size 8" in log_text
 
 
+def test_analyze_rejects_removed_pseudocount_strength_option():
+    proc, log_text = _run_cli("analyze", "--pseudocount_strength", "2.0")
+    assert proc.returncode == 2
+    assert "unrecognized arguments: --pseudocount_strength 2.0" in log_text
+
+
 def test_inspect_help_is_available():
     proc, _ = _run_cli("inspect", "-h")
     assert proc.returncode == 0

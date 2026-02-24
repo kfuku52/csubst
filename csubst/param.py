@@ -12,6 +12,7 @@ except ImportError:  # pragma: no cover
 
 from csubst.__init__ import __version__
 from csubst import output_stat
+from csubst import pseudocount
 from csubst import recoding
 from csubst import table
 
@@ -50,6 +51,31 @@ def _require_finite_float(value, param_name):
     if not np.isfinite(value):
         raise ValueError('{} should be a finite number.'.format(param_name))
     return value
+
+
+def _parse_auto_or_float(value, param_name, min_value=None, strict_min=False):
+    if isinstance(value, str):
+        token = value.strip().lower()
+        if token == 'auto':
+            return True, np.nan
+        if token == '':
+            raise ValueError('{} should be "auto" or a number.'.format(param_name))
+        try:
+            numeric = float(token)
+        except ValueError as exc:
+            raise ValueError('{} should be "auto" or a number.'.format(param_name)) from exc
+    else:
+        numeric = float(value)
+    numeric = _require_finite_float(numeric, param_name=param_name)
+    if min_value is not None:
+        min_value = float(min_value)
+        if strict_min:
+            if numeric <= min_value:
+                raise ValueError('{} should be > {}.'.format(param_name, min_value))
+        else:
+            if numeric < min_value:
+                raise ValueError('{} should be >= {}.'.format(param_name, min_value))
+    return False, float(numeric)
 
 
 def _parse_quantile_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
@@ -142,6 +168,27 @@ def get_global_parameters(args):
         if g['calc_quantile']:
             if g['omegaC_method'] != 'modelfree':
                 raise ValueError('--calc_quantile "yes" should be used with --omegaC_method "modelfree".')
+    if 'calc_omega_pvalue' in g.keys():
+        g['calc_omega_pvalue'] = _parse_bool_like(g['calc_omega_pvalue'], '--calc_omega_pvalue')
+    else:
+        g['calc_omega_pvalue'] = False
+    if g['calc_omega_pvalue'] and (g['omegaC_method'] != 'modelfree'):
+        raise ValueError('--calc_omega_pvalue "yes" should be used with --omegaC_method "modelfree".')
+    if 'omega_pvalue_niter' in g.keys():
+        g['omega_pvalue_niter'] = int(g['omega_pvalue_niter'])
+    else:
+        g['omega_pvalue_niter'] = 1000
+    if g['omega_pvalue_niter'] <= 0:
+        raise ValueError('--omega_pvalue_niter should be a positive integer.')
+    if g['omega_pvalue_niter'] > int(MAX_QUANTILE_NITER):
+        txt = '--omega_pvalue_niter upper bound should be <= {}.'
+        raise ValueError(txt.format(int(MAX_QUANTILE_NITER)))
+    if 'omega_pvalue_rounding' in g.keys():
+        g['omega_pvalue_rounding'] = str(g['omega_pvalue_rounding']).strip().lower()
+    else:
+        g['omega_pvalue_rounding'] = 'round'
+    if g['omega_pvalue_rounding'] not in ['round', 'stochastic', 'floor', 'ceil']:
+        raise ValueError('--omega_pvalue_rounding should be one of round, stochastic, floor, ceil.')
     if 'asrv' in g.keys():
         g['asrv'] = str(g['asrv']).strip().lower()
     else:
@@ -157,6 +204,136 @@ def get_global_parameters(args):
         g['asrv_dirichlet_alpha'] = 1.0
     if g['asrv_dirichlet_alpha'] < 0:
         raise ValueError('--asrv_dirichlet_alpha should be >= 0.')
+    if 'epistasis_apply_to' in g.keys():
+        g['epistasis_apply_to'] = str(g['epistasis_apply_to']).strip().upper()
+    else:
+        g['epistasis_apply_to'] = 'N'
+    if g['epistasis_apply_to'] not in ['N', 'S', 'NS']:
+        raise ValueError('--epistasis_apply_to should be one of N, S, NS.')
+    if 'epistasis_beta' not in g.keys():
+        g['epistasis_beta'] = '0.0'
+    epistasis_beta_auto, epistasis_beta_value = _parse_auto_or_float(
+        value=g['epistasis_beta'],
+        param_name='--epistasis_beta',
+        min_value=0.0,
+        strict_min=False,
+    )
+    g['epistasis_beta_auto'] = bool(epistasis_beta_auto)
+    g['epistasis_beta_value'] = float(epistasis_beta_value) if (not epistasis_beta_auto) else np.nan
+    if 'epistasis_clip' not in g.keys():
+        g['epistasis_clip'] = '3.0'
+    epistasis_clip_auto, epistasis_clip_value = _parse_auto_or_float(
+        value=g['epistasis_clip'],
+        param_name='--epistasis_clip',
+        min_value=0.0,
+        strict_min=True,
+    )
+    g['epistasis_clip_auto'] = bool(epistasis_clip_auto)
+    g['epistasis_clip_value'] = float(epistasis_clip_value) if (not epistasis_clip_auto) else np.nan
+    if 'epistasis_degree_file' not in g.keys():
+        g['epistasis_degree_file'] = ''
+    if g['epistasis_degree_file'] is None:
+        g['epistasis_degree_file'] = ''
+    g['epistasis_degree_file'] = str(g['epistasis_degree_file']).strip()
+    if 'epistasis_pdb' not in g.keys():
+        g['epistasis_pdb'] = ''
+    if g['epistasis_pdb'] is None:
+        g['epistasis_pdb'] = ''
+    g['epistasis_pdb'] = str(g['epistasis_pdb']).strip()
+    if 'epistasis_database' not in g.keys():
+        g['epistasis_database'] = 'pdb,alphafill,alphafold'
+    g['epistasis_database'] = str(g['epistasis_database']).strip().lower()
+    if g['epistasis_database'] == '':
+        g['epistasis_database'] = 'pdb,alphafill,alphafold'
+    epistasis_database_names = [db.strip().lower() for db in g['epistasis_database'].split(',') if db.strip() != '']
+    if len(epistasis_database_names) == 0:
+        raise ValueError('--epistasis_database should include one or more of pdb,alphafill,alphafold.')
+    epistasis_allowed_database_names = {'pdb', 'alphafill', 'alphafold'}
+    epistasis_unknown_database_names = sorted(set(epistasis_database_names).difference(epistasis_allowed_database_names))
+    if len(epistasis_unknown_database_names):
+        txt = '--epistasis_database includes unknown values: {}. Supported: {}.'
+        raise ValueError(txt.format(','.join(epistasis_unknown_database_names), ','.join(sorted(epistasis_allowed_database_names))))
+    g['epistasis_database'] = ','.join(epistasis_database_names)
+    if 'epistasis_database_timeout' in g.keys():
+        g['epistasis_database_timeout'] = _require_finite_float(
+            value=float(g['epistasis_database_timeout']),
+            param_name='--epistasis_database_timeout',
+        )
+    else:
+        g['epistasis_database_timeout'] = 30.0
+    if g['epistasis_database_timeout'] <= 0:
+        raise ValueError('--epistasis_database_timeout should be > 0.')
+    if 'epistasis_database_evalue_cutoff' in g.keys():
+        g['epistasis_database_evalue_cutoff'] = _require_finite_float(
+            value=float(g['epistasis_database_evalue_cutoff']),
+            param_name='--epistasis_database_evalue_cutoff',
+        )
+    else:
+        g['epistasis_database_evalue_cutoff'] = 1.0
+    if g['epistasis_database_evalue_cutoff'] <= 0:
+        raise ValueError('--epistasis_database_evalue_cutoff should be > 0.')
+    if 'epistasis_database_minimum_identity' in g.keys():
+        g['epistasis_database_minimum_identity'] = _require_finite_float(
+            value=float(g['epistasis_database_minimum_identity']),
+            param_name='--epistasis_database_minimum_identity',
+        )
+    else:
+        g['epistasis_database_minimum_identity'] = 0.25
+    if (g['epistasis_database_minimum_identity'] < 0) or (g['epistasis_database_minimum_identity'] > 1):
+        raise ValueError('--epistasis_database_minimum_identity should satisfy 0 <= value <= 1.')
+    if 'epistasis_user_alignment' not in g.keys():
+        g['epistasis_user_alignment'] = ''
+    if g['epistasis_user_alignment'] is None:
+        g['epistasis_user_alignment'] = ''
+    g['epistasis_user_alignment'] = str(g['epistasis_user_alignment']).strip()
+    if 'epistasis_contact_distance' in g.keys():
+        g['epistasis_contact_distance'] = _require_finite_float(
+            value=float(g['epistasis_contact_distance']),
+            param_name='--epistasis_contact_distance',
+        )
+    else:
+        g['epistasis_contact_distance'] = 8.0
+    if g['epistasis_contact_distance'] <= 0:
+        raise ValueError('--epistasis_contact_distance should be > 0.')
+    if 'epistasis_mafft_exe' not in g.keys():
+        g['epistasis_mafft_exe'] = 'mafft'
+    g['epistasis_mafft_exe'] = str(g['epistasis_mafft_exe']).strip()
+    if g['epistasis_mafft_exe'] == '':
+        raise ValueError('--epistasis_mafft_exe should be non-empty.')
+    if 'epistasis_mafft_op' in g.keys():
+        g['epistasis_mafft_op'] = _require_finite_float(
+            value=float(g['epistasis_mafft_op']),
+            param_name='--epistasis_mafft_op',
+        )
+    else:
+        g['epistasis_mafft_op'] = -1.0
+    if (g['epistasis_mafft_op'] != -1) and (g['epistasis_mafft_op'] < 0):
+        raise ValueError('--epistasis_mafft_op should be -1 or >= 0.')
+    if 'epistasis_mafft_ep' in g.keys():
+        g['epistasis_mafft_ep'] = _require_finite_float(
+            value=float(g['epistasis_mafft_ep']),
+            param_name='--epistasis_mafft_ep',
+        )
+    else:
+        g['epistasis_mafft_ep'] = -1.0
+    if (g['epistasis_mafft_ep'] != -1) and (g['epistasis_mafft_ep'] < 0):
+        raise ValueError('--epistasis_mafft_ep should be -1 or >= 0.')
+    if 'epistasis_pymol_max_num_chain' in g.keys():
+        g['epistasis_pymol_max_num_chain'] = int(g['epistasis_pymol_max_num_chain'])
+    else:
+        g['epistasis_pymol_max_num_chain'] = 20
+    if g['epistasis_pymol_max_num_chain'] < 1:
+        raise ValueError('--epistasis_pymol_max_num_chain should be >= 1.')
+    if 'epistasis_degree_outfile' not in g.keys():
+        g['epistasis_degree_outfile'] = 'csubst_epistasis_structure_degree.tsv'
+    if g['epistasis_degree_outfile'] is None:
+        g['epistasis_degree_outfile'] = 'csubst_epistasis_structure_degree.tsv'
+    g['epistasis_degree_outfile'] = str(g['epistasis_degree_outfile']).strip()
+    if g['epistasis_degree_outfile'] == '':
+        raise ValueError('--epistasis_degree_outfile should be non-empty.')
+    g['epistasis_requested'] = bool(g['epistasis_beta_auto'] or (g['epistasis_beta_value'] > 0))
+    pseudocount_config = pseudocount.validate_args(g)
+    g.update(pseudocount_config)
     if 'quantile_refine_edge_bins' in g.keys():
         g['quantile_refine_edge_bins'] = int(g['quantile_refine_edge_bins'])
     else:

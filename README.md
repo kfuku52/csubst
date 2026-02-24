@@ -95,6 +95,29 @@ csubst site \
   --branch_id 23,51
 ```
 
+Optional Bayesian shrinkage for sparse convergence counts:
+
+```bash
+csubst analyze \
+  --alignment_file alignment.fa \
+  --rooted_tree_file tree.nwk \
+  --pseudocount_alpha 0.5 \
+  --pseudocount_mode symmetric \
+  --pseudocount_target both
+```
+
+- `--pseudocount_alpha`: Dirichlet pseudo-count strength (`0` disables smoothing; typical values: `0.1` or `0.5`).
+  `auto` is also available and estimates alpha from the data (Empirical-Bayes).
+- `--pseudocount_mode`:
+  - `none`: legacy behavior (no smoothing).
+  - `symmetric`: equal pseudo-count across substitution categories.
+  - `empirical`: shrink toward dataset-wide substitution-category frequencies (`p_global`) estimated on disjoint base categories and mapped back to reported stats.
+    This keeps additive identities consistent (e.g., pseudo-count allocation also satisfies `any2any = any2dif + any2spe`).
+- `--pseudocount_target`: apply pseudo-counts to observed counts, expected counts, or both.
+- `--pseudocount_report`: add pseudocount diagnostics and smoothed/raw columns in outputs.
+
+This uses Dirichlet-prior shrinkage and helps stabilize rare-event metrics (`omegaC`, `dNC`, `dSC`) by reducing `0/0`, `log(0)`, and extreme ratio spikes.
+
 For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 
 ### 3Di Speed Benchmark (local code)

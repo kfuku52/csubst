@@ -13,6 +13,28 @@ ALL_OUTPUT_STATS = (
     "spe2dif",
 )
 
+ATOMIC_OUTPUT_STATS = (
+    "spe2spe",
+    "spe2dif",
+    "dif2spe",
+    "dif2dif",
+)
+
+# Linear mapping from atomic categories to all reported categories.
+# Each tuple corresponds to coefficients for:
+# (spe2spe, spe2dif, dif2spe, dif2dif)
+STAT_TO_ATOMIC_WEIGHTS = {
+    "any2any": (1.0, 1.0, 1.0, 1.0),
+    "any2spe": (1.0, 0.0, 1.0, 0.0),
+    "any2dif": (0.0, 1.0, 0.0, 1.0),
+    "spe2any": (1.0, 1.0, 0.0, 0.0),
+    "spe2spe": (1.0, 0.0, 0.0, 0.0),
+    "spe2dif": (0.0, 1.0, 0.0, 0.0),
+    "dif2any": (0.0, 0.0, 1.0, 1.0),
+    "dif2spe": (0.0, 0.0, 1.0, 0.0),
+    "dif2dif": (0.0, 0.0, 0.0, 1.0),
+}
+
 STAT_COLUMN_PREFIXES = (
     "OCN",
     "OCS",
