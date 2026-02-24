@@ -2436,6 +2436,103 @@ def test_get_sub_sites_raises_when_tree_branch_id_exceeds_state_tensor_axis():
         substitution.get_sub_sites(g=g, sS=sS, sN=sN, state_tensor=state_tensor)
 
 
+def test_get_sub_sites_sn_applies_dirichlet_pseudocount():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_branch = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    state_tensor = np.ones((num_branch, 2, 2), dtype=float)
+    sS = pd.DataFrame({"S_sub": [2.0, 0.0]})
+    sN = pd.DataFrame({"N_sub": [0.0, 1.0]})
+    g = {
+        "tree": tr,
+        "asrv": "sn",
+        "float_type": np.float64,
+        "asrv_dirichlet_alpha": 1.0,
+    }
+
+    out = substitution.get_sub_sites(g=g, sS=sS, sN=sN, state_tensor=state_tensor)
+
+    for node in tr.traverse():
+        nl = int(ete.get_prop(node, "numerical_label"))
+        np.testing.assert_allclose(out["sub_sites"]["S"][nl, :], np.array([0.75, 0.25]), atol=1e-12)
+        np.testing.assert_allclose(out["sub_sites"]["N"][nl, :], np.array([1.0 / 3.0, 2.0 / 3.0]), atol=1e-12)
+
+
+def test_get_each_sub_sites_applies_dirichlet_pseudocount():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_branch = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    state_tensor = np.ones((num_branch, 2, 2), dtype=float)
+    sS = pd.DataFrame({"S_sub": [1.0, 1.0]})
+    sN = pd.DataFrame({"N_sub": [1.0, 1.0]})
+    g = {
+        "tree": tr,
+        "asrv": "each",
+        "float_type": np.float64,
+        "asrv_dirichlet_alpha": 1.0,
+    }
+    g = substitution.get_sub_sites(g=g, sS=sS, sN=sN, state_tensor=state_tensor)
+    sub_sg = np.array([[2.0], [0.0]], dtype=np.float64)  # [site, group]
+
+    out = substitution.get_each_sub_sites(sub_sg=sub_sg, mode="any2any", sg=0, a=0, d=0, g=g)
+
+    for node in tr.traverse():
+        nl = int(ete.get_prop(node, "numerical_label"))
+        np.testing.assert_allclose(out[nl, :], np.array([0.75, 0.25]), atol=1e-12)
+
+
+def test_get_each_sub_sites_file_each_uses_rate_hybrid_weight():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_branch = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    state_tensor = np.ones((num_branch, 2, 2), dtype=float)
+    sS = pd.DataFrame({"S_sub": [1.0, 1.0]})
+    sN = pd.DataFrame({"N_sub": [1.0, 1.0]})
+    g = {
+        "tree": tr,
+        "asrv": "file_each",
+        "float_type": np.float64,
+        "asrv_dirichlet_alpha": 0.0,
+        "iqtree_rate_values": np.array([0.5, 2.0], dtype=np.float64),
+    }
+    g = substitution.get_sub_sites(g=g, sS=sS, sN=sN, state_tensor=state_tensor)
+    sub_sg = np.array([[2.0], [1.0]], dtype=np.float64)  # [site, group]
+
+    out = substitution.get_each_sub_sites(sub_sg=sub_sg, mode="any2any", sg=0, a=0, d=0, g=g)
+
+    for node in tr.traverse():
+        nl = int(ete.get_prop(node, "numerical_label"))
+        np.testing.assert_allclose(out[nl, :], np.array([1.0 / 3.0, 2.0 / 3.0]), atol=1e-12)
+
+
+def test_normalize_site_weights_by_branch_cython_matches_python_fallback(monkeypatch):
+    if not hasattr(substitution.substitution_cy, "normalize_branch_site_weights_double"):
+        pytest.skip("Cython branch-site normalization fast path is unavailable")
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_branch = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    state_tensor = np.ones((num_branch, 3, 2), dtype=float)
+    sS = pd.DataFrame({"S_sub": [1.0, 1.0, 1.0]})
+    sN = pd.DataFrame({"N_sub": [1.0, 1.0, 1.0]})
+    g = {
+        "tree": tr,
+        "asrv": "each",
+        "float_type": np.float64,
+        "asrv_dirichlet_alpha": 0.0,
+    }
+    g = substitution.get_sub_sites(g=g, sS=sS, sN=sN, state_tensor=state_tensor)
+    weights = np.array([0.2, 0.0, 0.8], dtype=np.float64)
+    out_fast = substitution._normalize_site_weights_by_branch(
+        nonadjusted_sub_sites=weights,
+        g=g,
+        dirichlet_alpha=0.3,
+    )
+
+    monkeypatch.setattr(substitution, "_can_use_cython_site_weight_normalization", lambda *_args, **_kwargs: False)
+    out_py = substitution._normalize_site_weights_by_branch(
+        nonadjusted_sub_sites=weights,
+        g=g,
+        dirichlet_alpha=0.3,
+    )
+    np.testing.assert_allclose(out_fast, out_py, atol=1e-12)
+
+
 def test_add_dif_column_and_add_dif_stats():
     cb = pd.DataFrame(
         {

@@ -24,12 +24,12 @@ def _initialize_and_report_nonsyn_recode(g):
         txt = "Applying nonsynonymous recoding scheme: {}"
         print(txt.format(g["nonsyn_recode"]))
         if g["nonsyn_recode"] == "3di20":
-            txt = "3Di mode: --sa_asr_mode={}, ProstT5 model={}, direct IQ-TREE model={}"
+            txt = "3Di mode: --sa_asr_mode={}, ProstT5 model={}, direct IQ-TREE model={} (--seqtype MORPH)"
             print(
                 txt.format(
-                    g.get("sa_asr_mode", "translate"),
+                    g.get("sa_asr_mode", "direct"),
                     g.get("prostt5_model", "Rostlab/ProstT5"),
-                    g.get("sa_iqtree_model", "GTR20"),
+                    g.get("sa_iqtree_model", "GTR"),
                 )
             )
         recoding.write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv")
@@ -662,7 +662,16 @@ def drop_invariant_tip_sites(g):
     site_index_alignment = get_site_index_alignment(g=g, expected_num_site=state_cdn.shape[1])
     mode = str(g.get('drop_invariant_tip_sites_mode', 'tip_invariant')).strip().lower()
     if mode == 'tip_invariant':
-        is_drop_site = _get_tip_invariant_site_mask(g=g, site_index_alignment=site_index_alignment)
+        precomputed = g.get('_precomputed_tip_invariant_site_mask', None)
+        if precomputed is not None:
+            precomputed = np.asarray(precomputed, dtype=bool).reshape(-1)
+            if precomputed.shape[0] != site_index_alignment.shape[0]:
+                txt = 'Precomputed tip-invariant site mask length ({}) did not match current site axis ({}).'
+                raise ValueError(txt.format(precomputed.shape[0], site_index_alignment.shape[0]))
+            is_drop_site = precomputed
+            print('Using precomputed tip-invariant site mask from direct 3Di prefilter.', flush=True)
+        else:
+            is_drop_site = _get_tip_invariant_site_mask(g=g, site_index_alignment=site_index_alignment)
         mode_label = 'tip-invariant'
     elif mode == 'zero_sub_mass':
         is_drop_site = _get_zero_substitution_mass_site_mask(g=g)
@@ -728,7 +737,7 @@ def prep_state(g):
                 g=g,
                 selected_branch_ids=loaded_branch_ids,
             )
-        sa_mode = str(g.get('sa_asr_mode', 'translate')).strip().lower()
+        sa_mode = str(g.get('sa_asr_mode', 'direct')).strip().lower()
         if sa_mode == 'translate':
             state_nsy_local, state_orders, aligned_3di = structural_alphabet.build_3di_state_from_state_pep(
                 g=g,

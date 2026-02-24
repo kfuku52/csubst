@@ -24,6 +24,13 @@ DEPENDENCY_DISTRIBUTIONS = (
     'matplotlib',
 )
 
+DEFAULT_QUANTILE_NITER_AUTO_SCHEDULE = [100, 1000, 10000]
+MAX_QUANTILE_NITER = 10000
+
+
+def _default_prostt5_cache_file():
+    return 'csubst_prostt5_cache.tsv'
+
 
 def _parse_bool_like(value, param_name):
     if isinstance(value, bool):
@@ -43,6 +50,34 @@ def _require_finite_float(value, param_name):
     if not np.isfinite(value):
         raise ValueError('{} should be a finite number.'.format(param_name))
     return value
+
+
+def _parse_quantile_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
+    if isinstance(value, (list, tuple, np.ndarray)):
+        raw_tokens = [str(v).strip() for v in value]
+    else:
+        raw_txt = '' if value is None else str(value).strip()
+        if raw_txt.lower() in ['', '0', 'auto']:
+            raw_tokens = [str(v) for v in DEFAULT_QUANTILE_NITER_AUTO_SCHEDULE]
+        else:
+            raw_tokens = [token.strip() for token in raw_txt.split(',') if token.strip() != '']
+    if len(raw_tokens) == 0:
+        raise ValueError('--quantile_niter_schedule should not be empty.')
+    schedule = list()
+    for token in raw_tokens:
+        if not re.fullmatch(r'[0-9]+', token):
+            raise ValueError('--quantile_niter_schedule should contain integers.')
+        niter = int(token)
+        if niter <= 0:
+            raise ValueError('--quantile_niter_schedule should contain positive integers.')
+        schedule.append(niter)
+    for prev, curr in zip(schedule, schedule[1:]):
+        if curr <= prev:
+            raise ValueError('--quantile_niter_schedule should be strictly increasing.')
+    if max(schedule) > int(max_niter):
+        txt = '--quantile_niter_schedule upper bound should be <= {}.'
+        raise ValueError(txt.format(int(max_niter)))
+    return schedule
 
 
 def _get_dependency_version(distribution_name):
@@ -107,6 +142,31 @@ def get_global_parameters(args):
         if g['calc_quantile']:
             if g['omegaC_method'] != 'modelfree':
                 raise ValueError('--calc_quantile "yes" should be used with --omegaC_method "modelfree".')
+    if 'asrv' in g.keys():
+        g['asrv'] = str(g['asrv']).strip().lower()
+    else:
+        g['asrv'] = 'each'
+    if g['asrv'] not in ['no', 'pool', 'sn', 'each', 'file', 'file_each']:
+        raise ValueError('--asrv should be one of no, pool, sn, each, file, file_each.')
+    if 'asrv_dirichlet_alpha' in g.keys():
+        g['asrv_dirichlet_alpha'] = _require_finite_float(
+            value=float(g['asrv_dirichlet_alpha']),
+            param_name='--asrv_dirichlet_alpha',
+        )
+    else:
+        g['asrv_dirichlet_alpha'] = 0.0
+    if g['asrv_dirichlet_alpha'] < 0:
+        raise ValueError('--asrv_dirichlet_alpha should be >= 0.')
+    if 'quantile_refine_edge_bins' in g.keys():
+        g['quantile_refine_edge_bins'] = int(g['quantile_refine_edge_bins'])
+    else:
+        g['quantile_refine_edge_bins'] = 2
+    if g['quantile_refine_edge_bins'] < 0:
+        raise ValueError('--quantile_refine_edge_bins should be >= 0.')
+    if 'quantile_niter_schedule' in g.keys():
+        g['quantile_niter_schedule'] = _parse_quantile_niter_schedule(g['quantile_niter_schedule'])
+    else:
+        g['quantile_niter_schedule'] = _parse_quantile_niter_schedule('0')
     if 'exhaustive_until' in g.keys():
         if (g['exhaustive_until']==1)&(g['foreground'] is None):
             raise ValueError('To enable --exhaustive_until 1, use --foreground')
@@ -419,7 +479,7 @@ def get_global_parameters(args):
     if 'sa_asr_mode' in g.keys():
         g['sa_asr_mode'] = str(g['sa_asr_mode']).strip().lower()
     else:
-        g['sa_asr_mode'] = 'translate'
+        g['sa_asr_mode'] = 'direct'
     if g['sa_asr_mode'] not in ['translate', 'direct']:
         raise ValueError('--sa_asr_mode should be one of translate, direct.')
     if 'prostt5_model' not in g.keys():
@@ -447,10 +507,23 @@ def get_global_parameters(args):
     if 'prostt5_device' not in g.keys():
         g['prostt5_device'] = 'auto'
     g['prostt5_device'] = str(g['prostt5_device']).strip().lower()
-    if g['prostt5_device'] not in ['auto', 'cpu', 'cuda']:
-        raise ValueError('--prostt5_device should be one of auto, cpu, cuda.')
+    if g['prostt5_device'] not in ['auto', 'cpu', 'cuda', 'mps']:
+        raise ValueError('--prostt5_device should be one of auto, cpu, cuda, mps.')
+    if 'prostt5_cache' not in g.keys():
+        g['prostt5_cache'] = True
+    g['prostt5_cache'] = _parse_bool_like(
+        value=g['prostt5_cache'],
+        param_name='--prostt5_cache',
+    )
+    if 'prostt5_cache_file' not in g.keys():
+        g['prostt5_cache_file'] = _default_prostt5_cache_file()
+    if g['prostt5_cache_file'] is None:
+        g['prostt5_cache_file'] = _default_prostt5_cache_file()
+    g['prostt5_cache_file'] = str(g['prostt5_cache_file']).strip()
+    if g['prostt5_cache_file'] == '':
+        raise ValueError('--prostt5_cache_file should be non-empty.')
     if 'sa_iqtree_model' not in g.keys():
-        g['sa_iqtree_model'] = 'GTR20'
+        g['sa_iqtree_model'] = 'GTR'
     g['sa_iqtree_model'] = str(g['sa_iqtree_model']).strip()
     if g['sa_iqtree_model'] == '':
         raise ValueError('--sa_iqtree_model should be non-empty.')

@@ -244,6 +244,8 @@ def test_get_static_sub_sites_if_available_uses_asrv_mode():
     sub_sg = np.zeros((2, 1), dtype=np.float64)
     g_each = {"asrv": "each", "sub_sites": {"each": np.ones((2, 2), dtype=np.float64)}}
     assert omega._get_static_sub_sites_if_available(g_each, sub_sg, "any2any", "OCNany2any") is None
+    g_file_each = {"asrv": "file_each", "sub_sites": {}}
+    assert omega._get_static_sub_sites_if_available(g_file_each, sub_sg, "any2any", "OCNany2any") is None
 
     g_sn = {
         "asrv": "sn",

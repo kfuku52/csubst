@@ -146,7 +146,7 @@ def _project_expected_state_block(parent_state_block, transition_prob, float_tol
 
 
 def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
-    if (g['asrv']=='each'):
+    if g['asrv'] in ['each', 'file_each']:
         return substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
     if (g['asrv']=='sn'):
         if (obs_col.startswith('OCS')):
@@ -158,7 +158,7 @@ def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
 
 def _get_static_sub_sites_if_available(g, sub_sg, mode, obs_col):
     asrv_mode = str(g.get('asrv', 'no')).strip().lower()
-    if asrv_mode == 'each':
+    if asrv_mode in ['each', 'file_each']:
         return None
     return _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=0, a=0, d=0, obs_col=obs_col)
 
@@ -408,6 +408,130 @@ def _resolve_quantile_parallel_plan(cb_rows, num_categories, quantile_niter, req
     if (cb_rows <= 4) or (workload < 20_000_000):
         return 1, max(chunk_factor, 1)
     return n_jobs, max(chunk_factor, 4)
+
+
+def _resolve_quantile_niter_schedule(g, quantile_niter):
+    if g is not None:
+        schedule = g.get('quantile_niter_schedule', None)
+        if schedule is not None:
+            schedule = [int(v) for v in schedule]
+            if len(schedule) == 0:
+                raise ValueError('quantile_niter_schedule should contain at least one stage.')
+            if min(schedule) <= 0:
+                raise ValueError('quantile_niter_schedule should contain positive integers.')
+            for prev, curr in zip(schedule, schedule[1:]):
+                if curr <= prev:
+                    raise ValueError('quantile_niter_schedule should be strictly increasing.')
+            return schedule
+    niter = int(quantile_niter)
+    if niter <= 0:
+        raise ValueError('quantile_niter should be a positive integer.')
+    return [niter]
+
+
+def _resolve_quantile_refine_edge_bins(g):
+    if g is None:
+        return 0
+    edge_bins = int(g.get('quantile_refine_edge_bins', 0))
+    if edge_bins < 0:
+        raise ValueError('quantile_refine_edge_bins should be >= 0.')
+    return edge_bins
+
+
+def _needs_quantile_refinement(probability_values, quantile_niter, edge_bins):
+    probability_values = np.asarray(probability_values, dtype=np.float64)
+    if probability_values.ndim != 1:
+        raise ValueError('probability_values should be a 1D array.')
+    if int(edge_bins) <= 0:
+        return np.zeros(shape=probability_values.shape, dtype=bool)
+    niter = int(quantile_niter)
+    if niter <= 0:
+        raise ValueError('quantile_niter should be a positive integer.')
+    edge = float(edge_bins) / float(niter)
+    return (probability_values <= edge) | (probability_values >= (1.0 - edge))
+
+
+def _calc_quantile_probabilities(
+    mode,
+    cb_ids,
+    obs_values,
+    sub_sg,
+    sub_bg,
+    quantile_niter,
+    obs_col,
+    num_gad_combinat,
+    list_igad,
+    g,
+    static_sub_sites,
+):
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
+    obs_values = np.asarray(obs_values, dtype=g['float_type']).reshape(-1)
+    quantile_niter = int(quantile_niter)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if obs_values.ndim != 1:
+        raise ValueError('obs_values should be a 1D array.')
+    if cb_ids.shape[0] != obs_values.shape[0]:
+        txt = 'cb_ids rows ({}) and obs_values length ({}) should match.'
+        raise ValueError(txt.format(cb_ids.shape[0], obs_values.shape[0]))
+    if quantile_niter <= 0:
+        raise ValueError('quantile_niter should be a positive integer.')
+    if cb_ids.shape[0] == 0:
+        return np.zeros(shape=(0,), dtype=g['float_type'])
+    requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
+    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    n_jobs, chunk_factor = _resolve_quantile_parallel_plan(
+        cb_rows=cb_ids.shape[0],
+        num_categories=len(list_igad),
+        quantile_niter=quantile_niter,
+        requested_n_jobs=requested_n_jobs,
+        requested_chunk_factor=chunk_factor,
+    )
+    igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
+    axis = (cb_ids.shape[0], quantile_niter)
+    dfq = np.zeros(shape=axis, dtype=np.int32)
+    if n_jobs == 1:
+        joblib_calc_quantile(
+            mode,
+            cb_ids,
+            sub_sg,
+            sub_bg,
+            dfq,
+            quantile_niter,
+            obs_col,
+            num_gad_combinat,
+            list_igad,
+            g,
+            static_sub_sites=static_sub_sites,
+        )
+    else:
+        tasks = [
+            (
+                mode,
+                cb_ids,
+                sub_sg,
+                sub_bg,
+                quantile_niter,
+                obs_col,
+                num_gad_combinat,
+                igad_chunk,
+                g,
+                static_sub_sites,
+            )
+            for igad_chunk in igad_chunks
+        ]
+        chunk_dfs = parallel.run_starmap(
+            func=_calc_quantile_chunk_local,
+            args_iterable=tasks,
+            n_jobs=n_jobs,
+            backend='threading',
+        )
+        for dfq_chunk in chunk_dfs:
+            dfq += dfq_chunk
+    gt_ranks = (dfq < obs_values[:, None]).sum(axis=1, dtype=np.int64)
+    ge_ranks = (dfq <= obs_values[:, None]).sum(axis=1, dtype=np.int64)
+    probabilities = ((gt_ranks + ge_ranks) / 2) / quantile_niter
+    return probabilities.astype(g['float_type'], copy=False)
 
 
 def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol):
@@ -683,15 +807,13 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
     chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
     n_jobs = requested_n_jobs
-    if stat == 'quantile':
-        n_jobs, chunk_factor = _resolve_quantile_parallel_plan(
-            cb_rows=cb.shape[0],
-            num_categories=len(list_igad),
-            quantile_niter=quantile_niter,
-            requested_n_jobs=requested_n_jobs,
-            requested_chunk_factor=chunk_factor,
+    igad_chunks = None
+    if stat == 'mean':
+        igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(
+            list_igad,
+            n_jobs,
+            chunk_factor=chunk_factor,
         )
-    igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
     if stat=='mean':
         if n_jobs == 1:
             E_b = calc_E_mean(
@@ -741,51 +863,72 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             del dfEb
             if os.path.exists(mmap_out): os.unlink(mmap_out)
     elif stat=='quantile':
-        axis = (cb.shape[0], quantile_niter)
-        dfq = np.zeros(shape=axis, dtype=np.int32)
-        if n_jobs == 1:
-            joblib_calc_quantile(
+        quantile_schedule = _resolve_quantile_niter_schedule(g=g, quantile_niter=quantile_niter)
+        edge_bins = _resolve_quantile_refine_edge_bins(g=g)
+        obs_values = cb.loc[:,obs_col].values.astype(g['float_type'], copy=False)
+        E_b = np.zeros(shape=(cb.shape[0],), dtype=g['float_type'])
+        active_rows = np.arange(cb.shape[0], dtype=np.int64)
+        active_probs = None
+        prev_total_niter = 0
+        for stage_index, stage_niter in enumerate(quantile_schedule):
+            stage_niter = int(stage_niter)
+            incremental_niter = stage_niter - prev_total_niter
+            if incremental_niter <= 0:
+                txt = 'quantile_niter_schedule should be strictly increasing; got {} after {}.'
+                raise ValueError(txt.format(stage_niter, prev_total_niter))
+            txt = 'E{}{} quantile stage {}/{}: cumulative_niter={:,}, incremental_niter={:,}, rows={:,}'
+            print(
+                txt.format(
+                    SN,
+                    mode,
+                    stage_index + 1,
+                    len(quantile_schedule),
+                    stage_niter,
+                    incremental_niter,
+                    active_rows.shape[0],
+                ),
+                flush=True,
+            )
+            if active_rows.shape[0] == 0:
+                break
+            incremental_probs = _calc_quantile_probabilities(
                 mode,
-                cb_ids,
+                cb_ids[active_rows, :],
+                obs_values[active_rows],
                 sub_sg,
                 sub_bg,
-                dfq,
-                quantile_niter,
+                incremental_niter,
                 obs_col,
                 num_gad_combinat,
                 list_igad,
                 g,
                 static_sub_sites=static_sub_sites,
             )
-        else:
-            tasks = [
-                (
-                    mode,
-                    cb_ids,
-                    sub_sg,
-                    sub_bg,
-                    quantile_niter,
-                    obs_col,
-                    num_gad_combinat,
-                    igad_chunk,
-                    g,
-                    static_sub_sites,
-                )
-                for igad_chunk in igad_chunks
-            ]
-            chunk_dfs = parallel.run_starmap(
-                func=_calc_quantile_chunk_local,
-                args_iterable=tasks,
-                n_jobs=n_jobs,
-                backend='threading',
+            if prev_total_niter == 0:
+                stage_probs = incremental_probs
+            else:
+                stage_probs = (
+                    (active_probs * prev_total_niter) +
+                    (incremental_probs * incremental_niter)
+                ) / stage_niter
+            E_b[active_rows] = stage_probs
+            is_last_stage = (stage_index == (len(quantile_schedule) - 1))
+            if is_last_stage:
+                break
+            refine_mask = _needs_quantile_refinement(
+                probability_values=stage_probs,
+                quantile_niter=stage_niter,
+                edge_bins=edge_bins,
             )
-            for dfq_chunk in chunk_dfs:
-                dfq += dfq_chunk
-        # num_gad_combinat: poisson approximation
-        obs_values = cb.loc[:,obs_col].values.astype(g['float_type'], copy=False)
-        gt_ranks = (dfq < obs_values[:, None]).sum(axis=1, dtype=np.int64)
-        ge_ranks = (dfq <= obs_values[:, None]).sum(axis=1, dtype=np.int64)
-        E_b = ((gt_ranks + ge_ranks) / 2) / quantile_niter
+            next_rows = active_rows[refine_mask]
+            txt = 'E{}{} quantile refinement after stage {}: rows {} -> {} (edge_bins={})'
+            print(
+                txt.format(SN, mode, stage_index + 1, active_rows.shape[0], next_rows.shape[0], edge_bins),
+                flush=True,
+            )
+            active_rows = next_rows
+            active_probs = stage_probs[refine_mask]
+            prev_total_niter = stage_niter
     return E_b
 
 def subroot_E2nan(cb, tree):

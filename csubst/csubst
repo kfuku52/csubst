@@ -27,6 +27,10 @@ def strtobool(value):
     raise argparse.ArgumentTypeError('invalid truth value: {}'.format(value))
 
 
+def _default_prostt5_cache_file():
+    return "csubst_prostt5_cache.tsv"
+
+
 def get_global_parameters_or_exit(args):
     try:
         return param.get_global_parameters(args)
@@ -206,9 +210,10 @@ def _main():
                              'Use "no" for standard 20 amino-acid states. '
                              '"3di20" enables structural-alphabet (3Di) recoding via ProstT5. '
                              '"srchisq6" and "kgbauto6" infer 6-state groupings from alignment composition.')
-    psr_rc.add_argument('--sa_asr_mode', metavar='translate|direct', default='translate', type=str,
+    psr_rc.add_argument('--sa_asr_mode', metavar='translate|direct', default='direct', type=str,
                         help='default=%(default)s: Structural-alphabet ancestral-state mode for --nonsyn_recode 3di20. '
-                             '"translate" converts ML amino-acid states to 3Di via ProstT5. '
+                             '"translate" converts ML amino-acid states to 3Di via ProstT5, then one-hot encodes '
+                             'each branch-site by argmax state. '
                              '"direct" runs direct 3Di ancestral-state reconstruction with IQ-TREE.')
     psr_rc.add_argument('--prostt5_model', metavar='STR', default='Rostlab/ProstT5', type=str,
                         help='default=%(default)s: ProstT5 model identifier used for --nonsyn_recode 3di20.')
@@ -217,10 +222,17 @@ def _main():
                              'If provided, it is used instead of --prostt5_model.')
     psr_rc.add_argument('--prostt5_no_download', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Set "yes" to disable automatic ProstT5 download and require local files.')
-    psr_rc.add_argument('--prostt5_device', metavar='auto|cpu|cuda', default='auto', type=str,
-                        help='default=%(default)s: Device for ProstT5 inference.')
-    psr_rc.add_argument('--sa_iqtree_model', metavar='STR', default='GTR20', type=str,
-                        help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20.')
+    psr_rc.add_argument('--prostt5_device', metavar='auto|cpu|cuda|mps', default='auto', type=str,
+                        help='default=%(default)s: Device for ProstT5 inference. '
+                             'With "auto", CUDA is preferred, then MPS, then CPU. '
+                             'When MPS is used, CSUBST enables PYTORCH_ENABLE_MPS_FALLBACK=1 automatically.')
+    psr_rc.add_argument('--prostt5_cache', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Reuse ProstT5 sequence-level cache.')
+    psr_rc.add_argument('--prostt5_cache_file', metavar='PATH', default=_default_prostt5_cache_file(), type=str,
+                        help='default=%(default)s: ProstT5 cache file path.')
+    psr_rc.add_argument('--sa_iqtree_model', metavar='STR', default='GTR', type=str,
+                        help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20 '
+                             '(used with --seqtype MORPH).')
 
     # shared: PhyloBayes inputs, but PhyloBayes is no longer supported.
     psr_pb = argparse.ArgumentParser(add_help=False)
@@ -477,8 +489,16 @@ def _main():
                          help='default=%(default)s: Experimental. Calculate resampling-based quantiles in '
                               'Wallenius\' noncentral hypergeometric distribution for combinatorial substitutions. '
                               'This option should be used with --omegaC_method "modelfree".')
-    analyze.add_argument('--asrv', metavar='no|pool|sn|each|file', default='each', type=str,
-                         choices=['no', 'pool', 'sn', 'each', 'file'],
+    analyze.add_argument('--quantile_niter_schedule', metavar='0|N1,N2,...', default='0', type=str,
+                         help='default=%(default)s: Quantile resampling iteration schedule. '
+                              'Set 0 (auto) to use 100,1000,10000. '
+                              'Custom values should be comma-delimited strictly increasing integers '
+                              '(e.g., 200,2000,10000).')
+    analyze.add_argument('--quantile_refine_edge_bins', metavar='INTEGER', default=2, type=int,
+                         help='default=%(default)s: Number of edge probability bins used to decide '
+                              'which rows are refined to the next quantile iteration stage.')
+    analyze.add_argument('--asrv', metavar='no|pool|sn|each|file|file_each', default='each', type=str,
+                         choices=['no', 'pool', 'sn', 'each', 'file', 'file_each'],
                          help='default=%(default)s: Experimental. Correct among-site rate variation in omega/quantile calculation. '
                               'This option is used in --omegaC_method modelfree but not with --omegaC_method submodel. '
                               '"no", No ASRV, meaning a uniform rate among sites. '
@@ -487,7 +507,11 @@ def _main():
                               'to calculate their respective ASRVs (2 sets). '
                               '"each", Each of 61x60 patterns of substitutions are processed individually '
                               'to calculate their respective ASRVs. '
-                              '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). ')
+                              '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
+                              '"file_each", Hybrid of site-rate and category-specific empirical site mass. ')
+    analyze.add_argument('--asrv_dirichlet_alpha', metavar='FLOAT', default=0.0, type=float,
+                         help='default=%(default)s: Dirichlet pseudo-count alpha for branch-wise ASRV normalization '
+                              'in --asrv sn/each/file_each. Set >0 to smooth sparse site-mass profiles.')
     analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
                          help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
                               'by quantile-based transformation.')

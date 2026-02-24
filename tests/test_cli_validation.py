@@ -61,6 +61,12 @@ def test_analyze_state_plot_options_are_rejected_after_move_to_inspect():
     assert "unrecognized arguments: --plot_state_aa yes" in log_text
 
 
+def test_analyze_rejects_removed_prostt5_batch_size_option():
+    proc, log_text = _run_cli("analyze", "--prostt5_batch_size", "8")
+    assert proc.returncode == 2
+    assert "unrecognized arguments: --prostt5_batch_size 8" in log_text
+
+
 def test_inspect_help_is_available():
     proc, _ = _run_cli("inspect", "-h")
     assert proc.returncode == 0

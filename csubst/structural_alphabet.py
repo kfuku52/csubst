@@ -13,6 +13,16 @@ from csubst import tree
 
 _THREEDI_STATE_ORDERS = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
 _THREEDI_STATE_SET = frozenset(_THREEDI_STATE_ORDERS.tolist())
+_MORPH_STATE_ORDERS = np.array(list("0123456789ABCDEFGHIJ"), dtype=object)
+_THREEDI_TO_MORPH_SYMBOL = {
+    str(th): str(mo)
+    for th, mo in zip(_THREEDI_STATE_ORDERS.tolist(), _MORPH_STATE_ORDERS.tolist())
+}
+_MORPH_TO_THREEDI_SYMBOL = {v: k for k, v in _THREEDI_TO_MORPH_SYMBOL.items()}
+_ASCII_CODE_SIZE = 256
+_THREEDI_ASCII_VALID_MASK = np.zeros(shape=(_ASCII_CODE_SIZE,), dtype=bool)
+for _state_symbol in _THREEDI_STATE_ORDERS.tolist():
+    _THREEDI_ASCII_VALID_MASK[ord(str(_state_symbol).strip().upper())] = True
 
 
 def is_3di_recode(g):
@@ -21,6 +31,89 @@ def is_3di_recode(g):
 
 def get_3di_state_orders():
     return _THREEDI_STATE_ORDERS.copy()
+
+
+def _default_prostt5_cache_file():
+    return "csubst_prostt5_cache.tsv"
+
+
+def _to_ascii_matrix(aligned_sequences):
+    num_sequence = int(len(aligned_sequences))
+    if num_sequence == 0:
+        return np.zeros(shape=(0, 0), dtype=np.uint8)
+    seq_lengths = sorted(set([len(str(seq).strip().upper()) for seq in aligned_sequences]))
+    if len(seq_lengths) != 1:
+        raise ValueError("Aligned sequences should have equal lengths.")
+    num_site = int(seq_lengths[0])
+    if num_site == 0:
+        return np.zeros(shape=(num_sequence, 0), dtype=np.uint8)
+    out = np.zeros(shape=(num_sequence, num_site), dtype=np.uint8)
+    for i, seq in enumerate(aligned_sequences):
+        seq_txt = str(seq).strip().upper()
+        try:
+            seq_ascii = np.frombuffer(seq_txt.encode("ascii"), dtype=np.uint8)
+        except UnicodeEncodeError as exc:
+            raise ValueError("Sequence contained non-ASCII symbol(s).") from exc
+        if seq_ascii.shape[0] != num_site:
+            raise ValueError("Aligned sequences should have equal lengths.")
+        out[i, :] = seq_ascii
+    return out
+
+
+def _build_ascii_symbol_lookup(symbol_orders):
+    out = np.full(shape=(_ASCII_CODE_SIZE,), fill_value=-1, dtype=np.int16)
+    for i, symbol in enumerate(np.asarray(symbol_orders, dtype=object).tolist()):
+        txt = str(symbol).strip().upper()
+        if len(txt) != 1:
+            continue
+        code = ord(txt)
+        if 0 <= code < _ASCII_CODE_SIZE:
+            out[code] = int(i)
+    return out
+
+
+def _convert_3di_symbol_to_morph(symbol):
+    symbol = str(symbol).strip().upper()
+    if symbol == "-":
+        return "-"
+    out = _THREEDI_TO_MORPH_SYMBOL.get(symbol, None)
+    if out is None:
+        txt = "Unsupported 3Di symbol for MORPH conversion: {}"
+        raise ValueError(txt.format(symbol))
+    return out
+
+
+def _convert_state_symbol_to_3di(symbol, symbol_mode):
+    symbol = str(symbol).strip().upper()
+    mode = str(symbol_mode).strip().lower()
+    if mode == "morph":
+        return _MORPH_TO_THREEDI_SYMBOL.get(symbol, None)
+    if mode == "aa":
+        if symbol in _THREEDI_STATE_SET:
+            return symbol
+        return None
+    if symbol in _THREEDI_STATE_SET:
+        return symbol
+    return _MORPH_TO_THREEDI_SYMBOL.get(symbol, None)
+
+
+def _encode_tip_3di_alignment_for_morph(tip_3di_by_name, output_path=None):
+    out = OrderedDict()
+    for name, seq in tip_3di_by_name.items():
+        out[str(name)] = "".join([_convert_3di_symbol_to_morph(ch) for ch in str(seq).strip().upper()])
+    if output_path is not None and str(output_path).strip() != "":
+        _write_fasta_dict(path=str(output_path), seq_dict=out)
+        print("Writing sequence alignment: {}".format(os.path.abspath(output_path)), flush=True)
+    return out
+
+
+def _normalize_direct_iqtree_model(model):
+    model_txt = str(model).strip()
+    if model_txt == "":
+        raise ValueError("--sa_iqtree_model should be non-empty.")
+    if model_txt.upper() == "GTR20":
+        return "GTR", True
+    return model_txt, False
 
 
 def _normalize_branch_ids(branch_ids):
@@ -66,21 +159,27 @@ def _iter_target_branch_ids(tree_obj, selected_branch_ids=None):
 
 
 def _state_pep_to_ml_aa_alignment_by_branch(state_pep, g, selected_branch_ids=None):
-    aa_orders = np.asarray(g["amino_acid_orders"], dtype=object).reshape(-1)
+    aa_orders = np.asarray(g["amino_acid_orders"], dtype="U1").reshape(-1)
     if aa_orders.shape[0] != int(state_pep.shape[2]):
         txt = "amino_acid_orders length ({}) did not match state_pep state axis ({})."
         raise ValueError(txt.format(aa_orders.shape[0], state_pep.shape[2]))
     float_tol = float(g.get("float_tol", 0))
     site_max = state_pep.max(axis=2)
     site_argmax = state_pep.argmax(axis=2)
+    target_branch_ids = np.array(
+        _iter_target_branch_ids(g["tree"], selected_branch_ids=selected_branch_ids),
+        dtype=np.int64,
+    )
     out = OrderedDict()
-    for branch_id in _iter_target_branch_ids(g["tree"], selected_branch_ids=selected_branch_ids):
-        symbols = aa_orders[site_argmax[branch_id, :]]
-        missing = site_max[branch_id, :] < float_tol
-        if np.any(missing):
-            symbols = symbols.copy()
-            symbols[missing] = "-"
-        out[int(branch_id)] = "".join(symbols.tolist())
+    if target_branch_ids.shape[0] == 0:
+        return out
+    symbols_matrix = aa_orders[site_argmax[target_branch_ids, :]]
+    missing_matrix = site_max[target_branch_ids, :] < float_tol
+    if np.any(missing_matrix):
+        symbols_matrix = symbols_matrix.copy()
+        symbols_matrix[missing_matrix] = "-"
+    for i, branch_id in enumerate(target_branch_ids.tolist()):
+        out[int(branch_id)] = "".join(symbols_matrix[i, :].tolist())
     return out
 
 
@@ -206,6 +305,10 @@ def ensure_prostt5_model_files(g, tokenizer_cls=None, model_cls=None):
 
 
 def _load_prostt5_components(g):
+    device_opt = g.get("prostt5_device", "auto")
+    mps_fallback_enabled_preimport = _enable_mps_fallback_for_option_if_needed(
+        device_opt=device_opt
+    )
     try:
         import torch
     except ModuleNotFoundError as exc:
@@ -217,16 +320,80 @@ def _load_prostt5_components(g):
         tokenizer_cls=T5Tokenizer,
         model_cls=T5ForConditionalGeneration,
     )
-    device_opt = str(g.get("prostt5_device", "auto")).strip().lower()
-    if device_opt == "auto":
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-    elif device_opt in ["cpu", "cuda"]:
-        device = device_opt
-    else:
-        raise ValueError('--prostt5_device should be one of "auto", "cpu", "cuda".')
+    device = _resolve_prostt5_device(
+        torch_module=torch,
+        device_opt=device_opt,
+    )
+    if (str(device).strip().lower() == "mps") and mps_fallback_enabled_preimport:
+        print("Enabled PYTORCH_ENABLE_MPS_FALLBACK=1 for ProstT5 on MPS.", flush=True)
+    elif _enable_mps_fallback_if_needed(device=device):
+        print("Enabled PYTORCH_ENABLE_MPS_FALLBACK=1 for ProstT5 on MPS.", flush=True)
     model = model.to(device)
     model.eval()
     return torch, tokenizer, model, device
+
+
+def _torch_mps_is_available(torch_module):
+    backends = getattr(torch_module, "backends", None)
+    if backends is None:
+        return False
+    mps_backend = getattr(backends, "mps", None)
+    if mps_backend is None:
+        return False
+    try:
+        if hasattr(mps_backend, "is_built") and (not bool(mps_backend.is_built())):
+            return False
+        return bool(mps_backend.is_available())
+    except Exception:
+        return False
+
+
+def _resolve_prostt5_device(torch_module, device_opt):
+    device_opt = str(device_opt).strip().lower()
+    cuda_available = bool(getattr(torch_module, "cuda", None) is not None and torch_module.cuda.is_available())
+    mps_available = _torch_mps_is_available(torch_module=torch_module)
+    if device_opt == "auto":
+        if cuda_available:
+            return "cuda"
+        if mps_available:
+            return "mps"
+        return "cpu"
+    if device_opt == "cuda":
+        if not cuda_available:
+            raise ValueError('Requested --prostt5_device cuda, but CUDA is not available.')
+        return "cuda"
+    if device_opt == "mps":
+        if not mps_available:
+            raise ValueError('Requested --prostt5_device mps, but MPS is not available.')
+        return "mps"
+    if device_opt == "cpu":
+        return "cpu"
+    raise ValueError('--prostt5_device should be one of "auto", "cpu", "cuda", "mps".')
+
+
+def _enable_mps_fallback_if_needed(device):
+    if str(device).strip().lower() != "mps":
+        return False
+    key = "PYTORCH_ENABLE_MPS_FALLBACK"
+    current = str(os.environ.get(key, "")).strip()
+    if current == "1":
+        return False
+    os.environ[key] = "1"
+    return True
+
+
+def _enable_mps_fallback_for_option_if_needed(device_opt):
+    device_opt = str(device_opt).strip().lower()
+    if sys.platform != "darwin":
+        return False
+    if device_opt not in ["auto", "mps"]:
+        return False
+    key = "PYTORCH_ENABLE_MPS_FALLBACK"
+    current = str(os.environ.get(key, "")).strip()
+    if current == "1":
+        return False
+    os.environ[key] = "1"
+    return True
 
 
 def _resolve_prostt5_model_source(g):
@@ -238,35 +405,218 @@ def _resolve_prostt5_model_source(g):
     return model_source, no_download
 
 
-def predict_3di_with_prostt5(aa_sequences, g):
-    torch, tokenizer, model, device = _load_prostt5_components(g=g)
+def _normalize_prostt5_model_cache_key(model_source):
+    model_source = str(model_source).strip()
+    if os.path.isdir(model_source):
+        return os.path.abspath(model_source)
+    return model_source
+
+
+def _load_prostt5_sequence_cache(cache_file, model_key):
     out = dict()
-    with torch.no_grad():
-        for seq_id, raw_seq in aa_sequences.items():
-            seq = _sanitize_aa_sequence_for_prostt5(raw_seq)
-            if seq == "":
-                out[seq_id] = ""
+    cache_file = str(cache_file).strip()
+    if cache_file == "":
+        return out
+    if not os.path.exists(cache_file):
+        return out
+    with open(cache_file, encoding="utf-8", errors="replace") as f:
+        for raw_line in f:
+            line = raw_line.rstrip("\n")
+            if line == "":
                 continue
-            prompt = "<AA2fold> " + " ".join(list(seq))
-            batch = tokenizer(prompt, return_tensors="pt")
-            batch = {k: v.to(device) for k, v in batch.items()}
-            pred_ids = model.generate(
-                input_ids=batch["input_ids"],
-                attention_mask=batch.get("attention_mask", None),
-                num_beams=1,
-                do_sample=False,
-                min_new_tokens=int(len(seq)),
-                max_new_tokens=int(len(seq)),
-            )
-            pred = tokenizer.decode(pred_ids[0], skip_special_tokens=True).replace(" ", "")
-            pred = str(pred).strip().upper()
-            if len(pred) != len(seq):
-                txt = "ProstT5 output length mismatch for sequence {}: input={}, output={}."
-                raise ValueError(txt.format(seq_id, len(seq), len(pred)))
-            invalid = sorted(list(set([ch for ch in pred if ch not in _THREEDI_STATE_SET])))
+            cols = line.split("\t")
+            if len(cols) != 3:
+                continue
+            key_txt, seq_txt, pred_txt = cols
+            if key_txt != model_key:
+                continue
+            seq_txt = str(seq_txt).strip().upper()
+            pred_txt = str(pred_txt).strip().upper()
+            if (seq_txt == "") or (pred_txt == ""):
+                continue
+            if len(seq_txt) != len(pred_txt):
+                continue
+            invalid = sorted(list(set([ch for ch in pred_txt if ch not in _THREEDI_STATE_SET])))
             if len(invalid) > 0:
-                txt = "Unsupported 3Di symbol(s) in ProstT5 output for sequence {}: {}"
-                raise ValueError(txt.format(seq_id, ",".join(invalid)))
+                continue
+            out[seq_txt] = pred_txt
+    return out
+
+
+def _append_prostt5_sequence_cache(cache_file, model_key, seq_to_pred):
+    if len(seq_to_pred) == 0:
+        return
+    cache_file = str(cache_file).strip()
+    if cache_file == "":
+        return
+    cache_dir = os.path.dirname(cache_file)
+    if cache_dir != "":
+        os.makedirs(cache_dir, exist_ok=True)
+    with open(cache_file, mode="a", encoding="utf-8") as f:
+        for seq_txt, pred_txt in seq_to_pred.items():
+            f.write("{}\t{}\t{}\n".format(model_key, seq_txt, pred_txt))
+
+
+def _is_prostt5_oom_error(exc):
+    txt = str(exc).strip().lower()
+    return ("out of memory" in txt) or ("oom" in txt) or ("cuda out of memory" in txt) or ("mps out of memory" in txt)
+
+
+def _clear_torch_device_cache(torch_module, device):
+    device = str(device).strip().lower()
+    if device == "cuda":
+        cuda_ns = getattr(torch_module, "cuda", None)
+        if cuda_ns is not None and hasattr(cuda_ns, "empty_cache"):
+            try:
+                cuda_ns.empty_cache()
+            except Exception:
+                pass
+    if device == "mps":
+        mps_ns = getattr(torch_module, "mps", None)
+        if mps_ns is not None and hasattr(mps_ns, "empty_cache"):
+            try:
+                mps_ns.empty_cache()
+            except Exception:
+                pass
+
+
+def _resolve_prostt5_auto_batch_size(threads, device, unique_sequence_count):
+    threads = max(1, int(threads))
+    batch_size = threads
+    device = str(device).strip().lower()
+    if device in ["cuda", "mps"]:
+        # Favor larger batches on accelerators; dynamic backoff handles OOM.
+        batch_size = max(16, threads * 4)
+        if device == "cuda":
+            batch_size = max(batch_size, 32)
+        batch_size = min(batch_size, 64)
+    if unique_sequence_count > 0:
+        batch_size = min(batch_size, unique_sequence_count)
+    return max(1, batch_size)
+
+
+def predict_3di_with_prostt5(aa_sequences, g):
+    out = dict()
+    seq_to_ids = OrderedDict()
+    seq_to_pred = dict()
+    for seq_id, raw_seq in aa_sequences.items():
+        seq = _sanitize_aa_sequence_for_prostt5(raw_seq)
+        if seq == "":
+            out[seq_id] = ""
+            continue
+        if seq not in seq_to_ids:
+            seq_to_ids[seq] = list()
+        seq_to_ids[seq].append(seq_id)
+    length_to_unique_sequences = OrderedDict()
+    for seq in seq_to_ids.keys():
+        seq_len = int(len(seq))
+        if seq_len not in length_to_unique_sequences:
+            length_to_unique_sequences[seq_len] = list()
+        length_to_unique_sequences[seq_len].append(seq)
+    model_source, _ = _resolve_prostt5_model_source(g=g)
+    model_key = _normalize_prostt5_model_cache_key(model_source=model_source)
+    use_cache = bool(g.get("prostt5_cache", True))
+    cache_file = str(g.get("prostt5_cache_file", _default_prostt5_cache_file())).strip()
+    cache_hit_count = 0
+    if use_cache:
+        cached = _load_prostt5_sequence_cache(
+            cache_file=cache_file,
+            model_key=model_key,
+        )
+        for seq in seq_to_ids.keys():
+            pred = cached.get(seq, None)
+            if pred is None:
+                continue
+            seq_to_pred[seq] = pred
+            cache_hit_count += 1
+        if cache_hit_count > 0:
+            txt = "ProstT5 cache hit: {} / {} unique sequence(s)"
+            print(txt.format(cache_hit_count, len(seq_to_ids)), flush=True)
+    remaining = [seq for seq in seq_to_ids.keys() if seq not in seq_to_pred]
+    if len(remaining) == 0:
+        for seq, seq_ids in seq_to_ids.items():
+            pred = seq_to_pred[seq]
+            for seq_id in seq_ids:
+                out[seq_id] = pred
+        return out
+    seq_to_prompt = {
+        seq: "<AA2fold> " + " ".join(seq)
+        for seq in remaining
+    }
+    torch, tokenizer, model, device = _load_prostt5_components(g=g)
+    batch_size = _resolve_prostt5_auto_batch_size(
+        threads=g.get("threads", 1),
+        device=device,
+        unique_sequence_count=len(remaining),
+    )
+    new_cache_entries = dict()
+    infer_context = torch.no_grad
+    if hasattr(torch, "inference_mode") and callable(getattr(torch, "inference_mode")):
+        infer_context = torch.inference_mode
+    with infer_context():
+        for seq_len, unique_sequences in length_to_unique_sequences.items():
+            infer_sequences = [seq for seq in unique_sequences if seq not in seq_to_pred]
+            i = 0
+            current_batch_size = int(batch_size)
+            while i < len(infer_sequences):
+                chunk = infer_sequences[i : i + current_batch_size]
+                prompts = [seq_to_prompt[seq] for seq in chunk]
+                try:
+                    batch = tokenizer(prompts, return_tensors="pt", padding=True)
+                    batch = {k: v.to(device) for k, v in batch.items()}
+                    pred_ids = model.generate(
+                        input_ids=batch["input_ids"],
+                        attention_mask=batch.get("attention_mask", None),
+                        num_beams=1,
+                        do_sample=False,
+                        min_new_tokens=int(seq_len),
+                        max_new_tokens=int(seq_len),
+                    )
+                except RuntimeError as exc:
+                    if _is_prostt5_oom_error(exc) and (current_batch_size > 1):
+                        next_batch_size = max(1, current_batch_size // 2)
+                        if next_batch_size < current_batch_size:
+                            txt = "ProstT5 OOM at batch_size={}, retrying with batch_size={}."
+                            print(txt.format(current_batch_size, next_batch_size), flush=True)
+                            current_batch_size = next_batch_size
+                            _clear_torch_device_cache(torch_module=torch, device=device)
+                            continue
+                    raise
+                if hasattr(tokenizer, "batch_decode") and callable(getattr(tokenizer, "batch_decode")):
+                    pred_texts = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
+                else:
+                    pred_texts = [tokenizer.decode(pred_id, skip_special_tokens=True) for pred_id in pred_ids]
+                for seq, pred_txt in zip(chunk, pred_texts):
+                    pred = str(pred_txt).replace(" ", "")
+                    pred = str(pred).strip().upper()
+                    if len(pred) != len(seq):
+                        txt = "ProstT5 output length mismatch for sequence {}: input={}, output={}."
+                        raise ValueError(txt.format(seq, len(seq), len(pred)))
+                    invalid = sorted(list(set([ch for ch in pred if ch not in _THREEDI_STATE_SET])))
+                    if len(invalid) > 0:
+                        txt = "Unsupported 3Di symbol(s) in ProstT5 output for sequence {}: {}"
+                        raise ValueError(txt.format(seq, ",".join(invalid)))
+                    seq_to_pred[seq] = pred
+                    if use_cache:
+                        new_cache_entries[seq] = pred
+                i += len(chunk)
+            # Carry forward the stable per-device batch size to avoid repeated OOM retries
+            # across different sequence-length groups in the same run.
+            batch_size = min(int(batch_size), int(current_batch_size))
+    if use_cache and (len(new_cache_entries) > 0):
+        _append_prostt5_sequence_cache(
+            cache_file=cache_file,
+            model_key=model_key,
+            seq_to_pred=new_cache_entries,
+        )
+        txt = "ProstT5 cache update: wrote {} new unique sequence(s) to {}"
+        print(txt.format(len(new_cache_entries), cache_file), flush=True)
+    for seq, seq_ids in seq_to_ids.items():
+        pred = seq_to_pred.get(seq, None)
+        if pred is None:
+            txt = "No ProstT5 output was produced for sequence length {}."
+            raise ValueError(txt.format(len(seq)))
+        for seq_id in seq_ids:
             out[seq_id] = pred
     return out
 
@@ -416,23 +766,77 @@ def _build_state_tensor_from_tip_alignment(
     if len(seq_lengths) != 1:
         raise ValueError("Tip 3Di alignment should have equal sequence lengths.")
     num_site = int(seq_lengths[0]) if len(seq_lengths) > 0 else 0
-    lookup = {str(state): i for i, state in enumerate(np.asarray(state_orders, dtype=object).tolist())}
-    state = np.zeros((num_node, num_site, len(lookup)), dtype=dtype)
+    state_orders = np.asarray(state_orders, dtype=object).reshape(-1)
+    state = np.zeros((num_node, num_site, state_orders.shape[0]), dtype=dtype)
+    lookup_ascii = _build_ascii_symbol_lookup(state_orders)
+    leaf_branch_ids = list()
+    leaf_sequences = list()
     for leaf in ete.iter_leaves(tree_obj):
         branch_id = int(ete.get_prop(leaf, "numerical_label"))
         seq_txt = tip_3di_by_name.get(leaf.name, None)
         if seq_txt is None:
             continue
-        seq_txt = str(seq_txt)
+        seq_txt = str(seq_txt).strip().upper()
         if len(seq_txt) != num_site:
             txt = "Tip 3Di sequence length mismatch for {}: expected {}, got {}."
             raise ValueError(txt.format(leaf.name, num_site, len(seq_txt)))
-        for i, ch in enumerate(seq_txt):
-            idx = lookup.get(ch, None)
-            if idx is None:
-                continue
-            state[branch_id, i, idx] = 1
+        leaf_branch_ids.append(int(branch_id))
+        leaf_sequences.append(seq_txt)
+    if len(leaf_sequences) == 0 or num_site == 0:
+        return state
+    seq_ascii = _to_ascii_matrix(leaf_sequences)
+    state_ids = lookup_ascii[seq_ascii]
+    row_idx, site_idx = np.where(state_ids >= 0)
+    if row_idx.shape[0] > 0:
+        branch_ids = np.asarray(leaf_branch_ids, dtype=np.int64)
+        state_idx = state_ids[row_idx, site_idx].astype(np.int64, copy=False)
+        state[branch_ids[row_idx], site_idx, state_idx] = 1
     return state
+
+
+def _get_tip_alignment_length(tip_alignment):
+    lengths = sorted(set([len(str(v)) for v in tip_alignment.values()]))
+    if len(lengths) != 1:
+        raise ValueError("Tip alignment should have equal sequence lengths.")
+    return int(lengths[0]) if len(lengths) > 0 else 0
+
+
+def _get_tip_invariant_3di_site_mask(tip_3di_by_name):
+    num_site = _get_tip_alignment_length(tip_3di_by_name)
+    is_tip_invariant = np.zeros(shape=(num_site,), dtype=bool)
+    if len(tip_3di_by_name) == 0:
+        return is_tip_invariant
+    tip_sequences = [str(seq).strip().upper() for seq in tip_3di_by_name.values()]
+    tip_ascii = _to_ascii_matrix(tip_sequences)
+    if tip_ascii.shape[1] == 0:
+        return is_tip_invariant
+    is_nonmissing = tip_ascii != ord("-")
+    has_invalid_nonmissing = np.any(is_nonmissing & (~_THREEDI_ASCII_VALID_MASK[tip_ascii]), axis=0)
+    num_nonmissing = is_nonmissing.sum(axis=0)
+    min_values = np.where(is_nonmissing, tip_ascii, np.uint8(255)).min(axis=0)
+    max_values = np.where(is_nonmissing, tip_ascii, np.uint8(0)).max(axis=0)
+    is_tip_invariant = (num_nonmissing >= 1) & (min_values == max_values) & (~has_invalid_nonmissing)
+    return is_tip_invariant
+
+
+def _slice_tip_alignment_by_site_mask(tip_alignment, keep_mask):
+    keep_index = np.where(np.asarray(keep_mask, dtype=bool))[0]
+    out = OrderedDict()
+    for name, seq in tip_alignment.items():
+        seq = str(seq)
+        out[str(name)] = "".join([seq[int(i)] for i in keep_index.tolist()])
+    return out, keep_index
+
+
+def _expand_state_tensor_site_axis(state_tensor, keep_site_index, full_num_site):
+    keep_site_index = np.asarray(keep_site_index, dtype=np.int64).reshape(-1)
+    expanded = np.zeros(
+        shape=(state_tensor.shape[0], int(full_num_site), state_tensor.shape[2]),
+        dtype=state_tensor.dtype,
+    )
+    if keep_site_index.shape[0] > 0:
+        expanded[:, keep_site_index, :] = state_tensor
+    return expanded
 
 
 def _run_iqtree_direct_3di(g, tip_alignment_path):
@@ -455,9 +859,12 @@ def _run_iqtree_direct_3di(g, tip_alignment_path):
     file_tree = "tmp.csubst.3di.nwk"
     tree.write_tree(g["rooted_tree"], outfile=file_tree, add_numerical_label=False)
     try:
-        model = str(g.get("sa_iqtree_model", "GTR20")).strip()
-        if model == "":
-            raise ValueError("--sa_iqtree_model should be non-empty.")
+        model, did_remap_gtr20 = _normalize_direct_iqtree_model(g.get("sa_iqtree_model", "GTR"))
+        if did_remap_gtr20:
+            print(
+                "Direct 3Di with --seqtype MORPH remaps --sa_iqtree_model GTR20 to GTR.",
+                flush=True,
+            )
         command = [
             g["iqtree_exe"],
             "-s",
@@ -467,7 +874,7 @@ def _run_iqtree_direct_3di(g, tip_alignment_path):
             "-m",
             model,
             "--seqtype",
-            "AA",
+            "MORPH",
             "--threads-max",
             str(int(g.get("threads", 1))),
             "-T",
@@ -491,6 +898,7 @@ def _run_iqtree_direct_3di(g, tip_alignment_path):
         "state": path_state,
         "iqtree": path_iqtree,
         "log": path_log,
+        "state_symbol_mode": "morph",
     }
 
 
@@ -523,10 +931,12 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
     state_columns = state_table.columns[3:]
     state_lookup = {str(s): i for i, s in enumerate(state_orders.tolist())}
     col_to_state = dict()
+    state_symbol_mode = str(paths.get("state_symbol_mode", "auto")).strip().lower()
     for col in state_columns:
-        symbol = str(col).replace("p_", "").strip().upper()
-        if symbol in state_lookup:
-            col_to_state[str(col)] = int(state_lookup[symbol])
+        raw_symbol = str(col).replace("p_", "").strip().upper()
+        symbol_3di = _convert_state_symbol_to_3di(raw_symbol, symbol_mode=state_symbol_mode)
+        if symbol_3di in state_lookup:
+            col_to_state[str(col)] = int(state_lookup[symbol_3di])
     if len(col_to_state) == 0:
         raise ValueError("No recognized 3Di state columns were found in direct .state file.")
     site_values = pd.to_numeric(state_table.loc[:, "Site"], errors="coerce")
@@ -545,17 +955,33 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
     node_name_to_id = dict()
     for node in direct_tree.traverse():
         node_name_to_id[str(node.name)] = int(ete.get_prop(node, "numerical_label"))
-    for node_name, tmp in state_table.groupby("Node", sort=False):
-        node_name = str(node_name)
-        node_id = node_name_to_id.get(node_name, None)
-        if node_id is None:
+    row_site_labels = state_table.loc[:, "Site"].to_numpy(dtype=np.int64, copy=False)
+    row_site_index = np.fromiter(
+        (site_index_by_label[int(v)] for v in row_site_labels),
+        dtype=np.int64,
+        count=row_site_labels.shape[0],
+    )
+    row_node_names = state_table.loc[:, "Node"].astype(str).to_numpy(dtype=object, copy=False)
+    row_node_ids = np.fromiter(
+        (node_name_to_id.get(name, -1) for name in row_node_names),
+        dtype=np.int64,
+        count=row_node_names.shape[0],
+    )
+    is_valid_row = row_node_ids >= 0
+    state_col_names = list(col_to_state.keys())
+    state_matrix = state_table.loc[:, state_col_names].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    state_matrix = np.nan_to_num(state_matrix, nan=0.0)
+    for col_idx, col in enumerate(state_col_names):
+        values = state_matrix[:, col_idx]
+        if not np.any(values):
             continue
-        row_sites = tmp.loc[:, "Site"].to_numpy(dtype=np.int64, copy=False)
-        row_indices = np.array([site_index_by_label[int(v)] for v in row_sites], dtype=np.int64)
-        for col, state_id in col_to_state.items():
-            values = pd.to_numeric(tmp.loc[:, col], errors="coerce").to_numpy(dtype=float)
-            values = np.nan_to_num(values, nan=0.0)
-            state_tensor[node_id, row_indices, state_id] = values.astype(out_dtype, copy=False)
+        is_nonzero = values != 0
+        is_write = is_valid_row & is_nonzero
+        if not np.any(is_write):
+            continue
+        state_id = int(col_to_state[col])
+        write_values = values[is_write].astype(out_dtype, copy=False)
+        state_tensor[row_node_ids[is_write], row_site_index[is_write], state_id] = write_values
     state_tensor = np.nan_to_num(state_tensor, copy=False)
     if bool(g.get("ml_anc", False)):
         idxmax = np.argmax(state_tensor, axis=2)
@@ -576,19 +1002,49 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
 
 
 def build_3di_state_direct(g, selected_branch_ids=None, predictor=None):
-    tip_3di_by_name = build_tip_3di_alignment_from_full_cds(
+    tip_3di_by_name_full = build_tip_3di_alignment_from_full_cds(
         g=g,
         predictor=predictor,
         output_path="csubst_alignment_3di_tip.fa",
     )
-    iqtree_paths = _run_iqtree_direct_3di(g=g, tip_alignment_path="csubst_alignment_3di_tip.fa")
-    state_tensor, state_orders = _read_direct_3di_state_tensor(
+    g.pop("_precomputed_tip_invariant_site_mask", None)
+    tip_3di_by_name_direct = tip_3di_by_name_full
+    full_num_site = _get_tip_alignment_length(tip_3di_by_name_full)
+    keep_site_index = np.arange(full_num_site, dtype=np.int64)
+    mode = str(g.get("drop_invariant_tip_sites_mode", "tip_invariant")).strip().lower()
+    should_prefilter = bool(g.get("drop_invariant_tip_sites", False)) and (mode == "tip_invariant")
+    if should_prefilter and (full_num_site > 0):
+        is_drop_site = _get_tip_invariant_3di_site_mask(tip_3di_by_name=tip_3di_by_name_full)
+        if bool(is_drop_site.any()):
+            keep_mask = ~is_drop_site
+            if bool(keep_mask.any()):
+                tip_3di_by_name_direct, keep_site_index = _slice_tip_alignment_by_site_mask(
+                    tip_alignment=tip_3di_by_name_full,
+                    keep_mask=keep_mask,
+                )
+                g["_precomputed_tip_invariant_site_mask"] = np.asarray(is_drop_site, dtype=bool)
+                txt = "Direct 3Di prefilter: dropping {:,} tip-invariant 3Di site(s) before IQ-TREE."
+                print(txt.format(int(is_drop_site.sum())), flush=True)
+    _encode_tip_3di_alignment_for_morph(
+        tip_3di_by_name=tip_3di_by_name_direct,
+        output_path="csubst_alignment_3di_tip_morph.fa",
+    )
+    iqtree_paths = _run_iqtree_direct_3di(g=g, tip_alignment_path="csubst_alignment_3di_tip_morph.fa")
+    state_tensor_direct, state_orders = _read_direct_3di_state_tensor(
         g=g,
         paths=iqtree_paths,
-        tip_3di_by_name=tip_3di_by_name,
+        tip_3di_by_name=tip_3di_by_name_direct,
         selected_branch_ids=selected_branch_ids,
     )
-    return state_tensor, state_orders, tip_3di_by_name
+    if keep_site_index.shape[0] != full_num_site:
+        state_tensor = _expand_state_tensor_site_axis(
+            state_tensor=state_tensor_direct,
+            keep_site_index=keep_site_index,
+            full_num_site=full_num_site,
+        )
+    else:
+        state_tensor = state_tensor_direct
+    return state_tensor, state_orders, tip_3di_by_name_full
 
 
 def build_3di_state_from_state_pep(g, state_pep, selected_branch_ids=None, predictor=None):
@@ -607,26 +1063,37 @@ def build_3di_state_from_state_pep(g, state_pep, selected_branch_ids=None, predi
     }
     pred_ungapped = predictor(aa_ungapped, g)
     aligned_3di = OrderedDict()
+    projected_by_sequence_pair = dict()
     for branch_id, aa_aligned_seq in aa_aligned_by_branch.items():
         pred_seq = pred_ungapped.get(int(branch_id), "")
-        aligned_3di[int(branch_id)] = _inject_alignment_gaps(
-            reference_aligned_seq=aa_aligned_seq,
-            ungapped_pred_seq=pred_seq,
-            seq_id=branch_id,
-        )
+        pair_key = (str(aa_aligned_seq), str(pred_seq))
+        projected = projected_by_sequence_pair.get(pair_key, None)
+        if projected is None:
+            projected = _inject_alignment_gaps(
+                reference_aligned_seq=aa_aligned_seq,
+                ungapped_pred_seq=pred_seq,
+                seq_id=branch_id,
+            )
+            projected_by_sequence_pair[pair_key] = projected
+        aligned_3di[int(branch_id)] = projected
     state_orders = get_3di_state_orders()
-    state_lookup = {str(state): i for i, state in enumerate(state_orders.tolist())}
+    state_lookup_ascii = _build_ascii_symbol_lookup(state_orders)
     num_node = int(state_pep.shape[0])
     num_site = int(state_pep.shape[1])
     out_dtype = g.get("float_type", state_pep.dtype)
     state_3di = np.zeros((num_node, num_site, state_orders.shape[0]), dtype=out_dtype)
-    for branch_id, seq in aligned_3di.items():
+    if len(aligned_3di) == 0 or num_site == 0:
+        return state_3di, state_orders, aligned_3di
+    branch_ids = np.array([int(branch_id) for branch_id in aligned_3di.keys()], dtype=np.int64)
+    seq_list = [str(seq).strip().upper() for seq in aligned_3di.values()]
+    for branch_id, seq in zip(branch_ids.tolist(), seq_list):
         if len(seq) != num_site:
             txt = "Aligned 3Di sequence length mismatch for branch {}: expected {}, got {}."
             raise ValueError(txt.format(branch_id, num_site, len(seq)))
-        for i, ch in enumerate(seq):
-            state_id = state_lookup.get(ch, None)
-            if state_id is None:
-                continue
-            state_3di[int(branch_id), i, int(state_id)] = 1
+    seq_ascii = _to_ascii_matrix(seq_list)
+    state_ids = state_lookup_ascii[seq_ascii]
+    row_idx, site_idx = np.where(state_ids >= 0)
+    if row_idx.shape[0] > 0:
+        state_idx = state_ids[row_idx, site_idx].astype(np.int64, copy=False)
+        state_3di[branch_ids[row_idx], site_idx, state_idx] = 1
     return state_3di, state_orders, aligned_3di

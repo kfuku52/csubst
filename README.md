@@ -97,6 +97,18 @@ csubst site \
 
 For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 
+### 3Di Speed Benchmark (local code)
+
+To compare `no`, `3di20-direct`, and `3di20-translate` on the bundled tiny dataset:
+
+```bash
+bash tools/bench_3di_modes.sh
+```
+
+The script writes per-mode logs and `summary.tsv` under `/tmp/csubst_speed_bench_YYYYmmdd_HHMMSS/`.
+On Apple Silicon, `--prostt5_device auto` uses MPS when available and CSUBST enables `PYTORCH_ENABLE_MPS_FALLBACK=1` automatically for unsupported ops.
+Set `MODES=no` (or `MODES=direct,translate`) to run a subset during quick checks.
+
 ## Citation
 Fukushima K, Pollock DD. 2023. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. Nature Ecology & Evolution 7: 155–170. [DOI: 10.1038/s41559-022-01932-7](https://doi.org/10.1038/s41559-022-01932-7)
 

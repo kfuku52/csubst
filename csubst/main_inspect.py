@@ -143,7 +143,7 @@ def _configure_3di_smoke_mode(g):
     g["sa_inference_branch_ids"] = np.asarray([root_id] + selected_nonroot, dtype=np.int64)
     txt = "3Di smoke mode: limiting inference to {:,} / {:,} non-root branches (plus root)."
     print(txt.format(len(selected_nonroot), len(nonroot_branch_ids)), flush=True)
-    if str(g.get("sa_asr_mode", "translate")).strip().lower() == "direct":
+    if str(g.get("sa_asr_mode", "direct")).strip().lower() == "direct":
         txt = "3Di smoke mode note: --sa_asr_mode direct still runs full IQ-TREE ASR; "
         txt += "branch filtering is applied when importing states."
         print(txt, flush=True)

@@ -409,3 +409,59 @@ cpdef fill_sub_tensor_syn_branch_double(
                     else:
                         der_state = idx_mv[sg, di]
                         out_mv[s, sg, ai, di] = pa * child_mv[s, der_state]
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef normalize_branch_site_weights_double(
+    numpy.ndarray[numpy.float64_t, ndim=1] nonadjusted_sub_sites,
+    numpy.ndarray[numpy.uint8_t, ndim=2] is_site_nonmissing,
+    numpy.ndarray[numpy.int64_t, ndim=1] branch_ids,
+    double dirichlet_alpha,
+):
+    cdef Py_ssize_t num_branch = is_site_nonmissing.shape[0]
+    cdef Py_ssize_t num_site = is_site_nonmissing.shape[1]
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] out = numpy.zeros((num_branch, num_site), dtype=numpy.float64)
+    cdef double[:] weight_mv = nonadjusted_sub_sites
+    cdef unsigned char[:, :] nonmissing_mv = is_site_nonmissing
+    cdef numpy.int64_t[:] branch_id_mv = branch_ids
+    cdef double[:, :] out_mv = out
+    cdef Py_ssize_t i, nl, s
+    cdef double sum_weight
+    cdef double total_weight
+    cdef double inv_total_weight
+    cdef Py_ssize_t nonmissing_count
+
+    if nonadjusted_sub_sites.shape[0] != num_site:
+        raise ValueError('nonadjusted_sub_sites length should match site axis.')
+    if dirichlet_alpha < 0:
+        raise ValueError('dirichlet_alpha should be >= 0.')
+    for s in range(num_site):
+        if weight_mv[s] < 0:
+            raise ValueError('Site weights should be non-negative.')
+    for i in range(branch_ids.shape[0]):
+        nl = <Py_ssize_t>branch_id_mv[i]
+        if (nl < 0) or (nl >= num_branch):
+            raise ValueError('branch_ids contain an out-of-range branch index.')
+        sum_weight = 0.0
+        nonmissing_count = 0
+        for s in range(num_site):
+            if nonmissing_mv[nl, s] != 0:
+                sum_weight += weight_mv[s]
+                nonmissing_count += 1
+        if nonmissing_count == 0:
+            continue
+        total_weight = sum_weight + (dirichlet_alpha * nonmissing_count)
+        if total_weight <= 0:
+            continue
+        inv_total_weight = 1.0 / total_weight
+        if dirichlet_alpha > 0:
+            for s in range(num_site):
+                if nonmissing_mv[nl, s] != 0:
+                    out_mv[nl, s] = (weight_mv[s] + dirichlet_alpha) * inv_total_weight
+        else:
+            for s in range(num_site):
+                if nonmissing_mv[nl, s] != 0:
+                    out_mv[nl, s] = weight_mv[s] * inv_total_weight
+    return numpy.asarray(out)

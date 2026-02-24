@@ -991,6 +991,39 @@ def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, mon
     assert site_map["is_retained"].tolist() == ["no", "no", "yes"]
 
 
+def test_drop_invariant_tip_sites_uses_precomputed_mask_when_available(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for leaf in ete.iter_leaves(tr):
+        ete.set_prop(leaf, "sequence", "AAAAAAAAA")
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.ones((num_node, 3, 2), dtype=float)
+    state_pep = np.ones((num_node, 3, 2), dtype=float)
+    state_nsy = np.ones((num_node, 3, 2), dtype=float)
+    state_nuc = np.ones((num_node, 9, 4), dtype=float)
+    g = {
+        "tree": tr,
+        "num_input_site": 3,
+        "codon_orders": np.array(["AAA", "AAG"], dtype=object),
+        "state_nuc": state_nuc,
+        "state_cdn": state_cdn,
+        "state_pep": state_pep,
+        "state_nsy": state_nsy,
+        "_precomputed_tip_invariant_site_mask": np.array([True, False, True], dtype=bool),
+    }
+    monkeypatch.setattr(
+        parser_misc,
+        "_get_tip_invariant_site_mask",
+        lambda g, site_index_alignment: (_ for _ in ()).throw(AssertionError("unexpected fallback mask call")),
+    )
+    out = parser_misc.drop_invariant_tip_sites(g)
+    np.testing.assert_array_equal(out["site_index_alignment"], np.array([1], dtype=np.int64))
+    assert out["state_cdn"].shape[1] == 1
+    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
+    assert site_map["site"].tolist() == [-1, 0, -1]
+    assert site_map["is_retained"].tolist() == ["no", "yes", "no"]
+
+
 def test_drop_invariant_tip_sites_zero_sub_mass_mode_drops_only_zero_mass_sites(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))

@@ -253,6 +253,52 @@ def test_get_global_parameters_rejects_calc_quantile_without_modelfree():
         param.get_global_parameters(_args(calc_quantile=True, omegaC_method="submodel"))
 
 
+def test_get_global_parameters_accepts_file_each_asrv_and_dirichlet_alpha():
+    g = param.get_global_parameters(_args(asrv="FILE_EACH", asrv_dirichlet_alpha=0.25))
+    assert g["asrv"] == "file_each"
+    assert g["asrv_dirichlet_alpha"] == pytest.approx(0.25)
+
+
+def test_get_global_parameters_rejects_invalid_asrv_dirichlet_alpha():
+    with pytest.raises(ValueError, match="asrv_dirichlet_alpha"):
+        param.get_global_parameters(_args(asrv_dirichlet_alpha=-0.1))
+
+
+def test_get_global_parameters_rejects_invalid_asrv_mode():
+    with pytest.raises(ValueError, match="--asrv"):
+        param.get_global_parameters(_args(asrv="hybrid"))
+
+
+def test_get_global_parameters_sets_quantile_refine_defaults():
+    g = param.get_global_parameters(_args())
+    assert g["quantile_refine_edge_bins"] == 2
+    assert g["quantile_niter_schedule"] == [100, 1000, 10000]
+
+
+def test_get_global_parameters_parses_quantile_schedule_auto_alias():
+    g = param.get_global_parameters(_args(quantile_niter_schedule="auto"))
+    assert g["quantile_niter_schedule"] == [100, 1000, 10000]
+
+
+def test_get_global_parameters_parses_custom_quantile_schedule():
+    g = param.get_global_parameters(_args(quantile_niter_schedule="200,2000,10000"))
+    assert g["quantile_niter_schedule"] == [200, 2000, 10000]
+
+
+def test_get_global_parameters_rejects_invalid_quantile_schedule():
+    with pytest.raises(ValueError, match="integers"):
+        param.get_global_parameters(_args(quantile_niter_schedule="100,abc"))
+    with pytest.raises(ValueError, match="strictly increasing"):
+        param.get_global_parameters(_args(quantile_niter_schedule="1000,100"))
+    with pytest.raises(ValueError, match="upper bound"):
+        param.get_global_parameters(_args(quantile_niter_schedule="100,100000"))
+
+
+def test_get_global_parameters_rejects_negative_quantile_refine_edge_bins():
+    with pytest.raises(ValueError, match="quantile_refine_edge_bins"):
+        param.get_global_parameters(_args(quantile_refine_edge_bins=-1))
+
+
 def test_get_global_parameters_rejects_invalid_percent_biased_sub():
     with pytest.raises(ValueError, match="percent_biased_sub"):
         param.get_global_parameters(_args(percent_biased_sub=-1))
@@ -312,7 +358,7 @@ def test_get_global_parameters_parses_sa_asr_mode_values():
     g_default = param.get_global_parameters(_args())
     g_translate = param.get_global_parameters(_args(sa_asr_mode="translate"))
     g_direct = param.get_global_parameters(_args(sa_asr_mode="direct"))
-    assert g_default["sa_asr_mode"] == "translate"
+    assert g_default["sa_asr_mode"] == "direct"
     assert g_translate["sa_asr_mode"] == "translate"
     assert g_direct["sa_asr_mode"] == "direct"
 
@@ -339,15 +385,36 @@ def test_get_global_parameters_parses_prostt5_options():
         _args(
             prostt5_local_dir=" /tmp/prostt5 ",
             prostt5_no_download="yes",
+            prostt5_device="MPS",
+            prostt5_cache="yes",
+            prostt5_cache_file=" /tmp/prostt5_cache.tsv ",
         )
     )
     assert g["prostt5_local_dir"] == "/tmp/prostt5"
     assert g["prostt5_no_download"] is True
+    assert g["prostt5_device"] == "mps"
+    assert g["prostt5_cache"] is True
+    assert g["prostt5_cache_file"] == "/tmp/prostt5_cache.tsv"
 
 
 def test_get_global_parameters_rejects_invalid_prostt5_no_download():
     with pytest.raises(ValueError, match="prostt5_no_download"):
         param.get_global_parameters(_args(prostt5_no_download="maybe"))
+
+
+def test_get_global_parameters_rejects_invalid_prostt5_cache():
+    with pytest.raises(ValueError, match="prostt5_cache"):
+        param.get_global_parameters(_args(prostt5_cache="maybe"))
+
+
+def test_get_global_parameters_rejects_empty_prostt5_cache_file():
+    with pytest.raises(ValueError, match="prostt5_cache_file"):
+        param.get_global_parameters(_args(prostt5_cache_file=""))
+
+
+def test_get_global_parameters_sets_default_prostt5_cache_file():
+    g = param.get_global_parameters(_args())
+    assert g["prostt5_cache_file"] == "csubst_prostt5_cache.tsv"
 
 
 def test_get_global_parameters_requires_full_cds_alignment_for_3di20():
