@@ -1,0 +1,20 @@
+{
+  "off": {
+    "alpha": 0.0,
+    "real_sec": 8.41,
+    "peak_bytes": 825169848
+  },
+  "half": {
+    "alpha": 0.5,
+    "real_sec": 7.44,
+    "peak_bytes": 813037328
+  },
+  "omega_columns": [
+    "omegaCany2any",
+    "omegaCany2dif",
+    "omegaCany2spe"
+  ],
+  "rows_merged": 27992,
+  "plot_path": "/tmp/csubst_dirichlet_scatter_20260224_153431/omega_dirichlet_alpha05_vs_0_log_scatter.png",
+  "summary_path": "/tmp/csubst_dirichlet_scatter_20260224_153431/omega_dirichlet_alpha05_vs_0_log_scatter_summary.tsv"
+}

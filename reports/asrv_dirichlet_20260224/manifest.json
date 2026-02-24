@@ -1,0 +1,17 @@
+{
+  "source_tmp_dir": "/tmp/csubst_dirichlet_scatter_20260224_153431",
+  "generated_files": [
+    "commands.txt",
+    "hashes.tsv",
+    "metrics_alpha05.json",
+    "metrics_alpha10.json",
+    "omega_dirichlet_6panel_log_scatter.png",
+    "omega_dirichlet_6panel_log_scatter_summary.tsv",
+    "omega_dirichlet_alpha05_vs_0_log_scatter.png",
+    "omega_dirichlet_alpha05_vs_0_log_scatter_summary.tsv",
+    "omega_dirichlet_on_off_log_scatter.png",
+    "omega_dirichlet_on_off_log_scatter_summary.tsv",
+    "runtime_peak_by_alpha.png",
+    "runtime_peak_by_alpha.tsv"
+  ]
+}
