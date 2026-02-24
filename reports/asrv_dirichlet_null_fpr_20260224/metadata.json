@@ -1,0 +1,18 @@
+{
+  "runs": {
+    "0.0": "/private/tmp/csubst_dirichlet_scatter_20260224_153431/off",
+    "0.5": "/private/tmp/csubst_dirichlet_scatter_20260224_153431/half",
+    "1.0": "/private/tmp/csubst_dirichlet_scatter_20260224_153431/on"
+  },
+  "baseline_alpha": 0.0,
+  "ocn_col": "OCNany2spe",
+  "omega_col": "omegaCany2spe",
+  "ocn_cutoff": 2.0,
+  "omega_cutoff": 5.0,
+  "nperm": 500000,
+  "seed": 20260224,
+  "id_cols": [
+    "branch_id_1",
+    "branch_id_2"
+  ]
+}

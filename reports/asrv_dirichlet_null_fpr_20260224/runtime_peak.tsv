@@ -1,0 +1,4 @@
+alpha	run_dir	real_sec	peak_bytes	peak_mib
+0.0	/private/tmp/csubst_dirichlet_scatter_20260224_153431/off	8.41	825169848.0	786.9432907104492
+0.5	/private/tmp/csubst_dirichlet_scatter_20260224_153431/half	7.44	813037328.0	775.3728179931641
+1.0	/private/tmp/csubst_dirichlet_scatter_20260224_153431/on	7.86	817518496.0	779.6463928222656

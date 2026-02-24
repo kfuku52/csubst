@@ -130,6 +130,148 @@ def _can_use_cython_tmp_E_sum(cb_ids, sub_sites, sub_branches):
     return True
 
 
+def _can_use_cython_packed_shared_counts(packed_masks, remapped_cb_ids):
+    if omega_cy is None:
+        return False
+    if not hasattr(omega_cy, 'calc_shared_counts_packed_uint8'):
+        return False
+    if not isinstance(packed_masks, np.ndarray):
+        return False
+    if not isinstance(remapped_cb_ids, np.ndarray):
+        return False
+    if packed_masks.dtype != np.uint8:
+        return False
+    if remapped_cb_ids.dtype != np.int64:
+        return False
+    if packed_masks.ndim != 3:
+        return False
+    if remapped_cb_ids.ndim != 2:
+        return False
+    if remapped_cb_ids.shape[1] == 0:
+        return False
+    return True
+
+
+def _can_use_cython_pack_sampled_indices(sampled_site_indices):
+    if omega_cy is None:
+        return False
+    if not hasattr(omega_cy, 'pack_sampled_site_indices_uint8'):
+        return False
+    if not isinstance(sampled_site_indices, np.ndarray):
+        return False
+    if sampled_site_indices.dtype != np.int64:
+        return False
+    if sampled_site_indices.ndim != 2:
+        return False
+    return True
+
+
+def _calc_shared_counts_from_packed_masks(packed_masks, remapped_cb_ids):
+    packed_masks = np.asarray(packed_masks, dtype=np.uint8)
+    remapped_cb_ids = np.asarray(remapped_cb_ids, dtype=np.int64)
+    if packed_masks.ndim != 3:
+        raise ValueError('packed_masks should be a 3D array.')
+    if remapped_cb_ids.ndim != 2:
+        raise ValueError('remapped_cb_ids should be a 2D array.')
+    if remapped_cb_ids.shape[1] <= 0:
+        raise ValueError('remapped_cb_ids should have at least one column.')
+    if remapped_cb_ids.shape[0] == 0:
+        return np.zeros((0, packed_masks.shape[1]), dtype=np.int32)
+    if (remapped_cb_ids < 0).any():
+        raise ValueError('remapped_cb_ids should be non-negative.')
+    if remapped_cb_ids.max() >= packed_masks.shape[0]:
+        raise ValueError('remapped_cb_ids contain out-of-range branch IDs.')
+    if _can_use_cython_packed_shared_counts(packed_masks=packed_masks, remapped_cb_ids=remapped_cb_ids):
+        try:
+            return omega_cy.calc_shared_counts_packed_uint8(
+                packed_masks=packed_masks,
+                remapped_cb_ids=remapped_cb_ids,
+            )
+        except Exception:
+            pass
+    arity = remapped_cb_ids.shape[1]
+    if arity == 1:
+        return _UINT8_POPCOUNT[packed_masks[remapped_cb_ids[:, 0], :, :]].sum(axis=2, dtype=np.int32)
+    if arity == 2:
+        return _UINT8_POPCOUNT[np.bitwise_and(
+            packed_masks[remapped_cb_ids[:, 0], :, :],
+            packed_masks[remapped_cb_ids[:, 1], :, :],
+        )].sum(axis=2, dtype=np.int32)
+    shared = packed_masks[remapped_cb_ids[:, 0], :, :].copy()
+    for col in range(1, arity):
+        shared = np.bitwise_and(shared, packed_masks[remapped_cb_ids[:, col], :, :])
+    return _UINT8_POPCOUNT[shared].sum(axis=2, dtype=np.int32)
+
+
+def _pack_sampled_site_indices_to_uint8(sampled_site_indices, num_site):
+    sampled_site_indices = np.asarray(sampled_site_indices, dtype=np.int64)
+    if sampled_site_indices.ndim != 2:
+        raise ValueError('sampled_site_indices should be a 2D array.')
+    niter = int(sampled_site_indices.shape[0])
+    size = int(sampled_site_indices.shape[1])
+    num_site = int(num_site)
+    if num_site < 0:
+        raise ValueError('num_site should be >= 0.')
+    num_packed_site = (num_site + 7) // 8
+    packed = np.zeros((niter, num_packed_site), dtype=np.uint8)
+    if (niter == 0) or (size == 0) or (num_site == 0):
+        return packed
+    if _can_use_cython_pack_sampled_indices(sampled_site_indices=sampled_site_indices):
+        try:
+            return omega_cy.pack_sampled_site_indices_uint8(
+                sampled_site_indices=sampled_site_indices,
+                num_site=num_site,
+            )
+        except Exception:
+            pass
+    row_indices = np.repeat(np.arange(niter, dtype=np.int64), size)
+    flattened_sites = sampled_site_indices.reshape(-1)
+    if (flattened_sites < 0).any() or (flattened_sites >= num_site).any():
+        raise ValueError('sampled_site_indices contain out-of-range site IDs.')
+    byte_indices = flattened_sites >> 3
+    bit_offsets = flattened_sites & 7
+    bit_values = (1 << (7 - bit_offsets)).astype(np.uint8, copy=False)
+    np.bitwise_or.at(packed, (row_indices, byte_indices), bit_values)
+    return packed
+
+
+def _weighted_sample_without_replacement_packed(p, size, niter):
+    p = np.asarray(p, dtype=np.float64)
+    if p.ndim != 1:
+        raise ValueError('p should be a 1D array.')
+    if size < 0:
+        raise ValueError('size should be >= 0.')
+    if niter < 0:
+        raise ValueError('niter should be >= 0.')
+    num_site = int(p.shape[0])
+    num_packed_site = (num_site + 7) // 8
+    packed = np.zeros(shape=(niter, num_packed_site), dtype=np.uint8)
+    positive_sites = np.flatnonzero(p > 0).astype(np.int64, copy=False)
+    num_positive_sites = positive_sites.shape[0]
+    if (size == 0) or (num_positive_sites == 0) or (niter == 0):
+        return packed
+    if size > num_positive_sites:
+        txt = 'Sample size ({}) exceeded number of positive-probability sites ({}) in quantile sampling.'
+        raise ValueError(txt.format(size, num_positive_sites))
+    if size == num_positive_sites:
+        row_mask = np.zeros((num_packed_site,), dtype=np.uint8)
+        byte_indices = positive_sites >> 3
+        bit_offsets = positive_sites & 7
+        bit_values = (1 << (7 - bit_offsets)).astype(np.uint8, copy=False)
+        np.bitwise_or.at(row_mask, byte_indices, bit_values)
+        packed[:, :] = row_mask[None, :]
+        return packed
+    # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
+    positive_weights = p[positive_sites].astype(np.float32, copy=False)
+    keys = np.random.random((niter, num_positive_sites)).astype(np.float32, copy=False)
+    np.log(keys, out=keys)
+    keys /= positive_weights
+    kth = num_positive_sites - size
+    sampled_local_indices = np.argpartition(keys, kth=kth, axis=1)[:, kth:]
+    sampled_site_indices = positive_sites[sampled_local_indices]
+    return _pack_sampled_site_indices_to_uint8(sampled_site_indices=sampled_site_indices, num_site=num_site)
+
+
 def _project_expected_state_block(parent_state_block, transition_prob, float_tol):
     if _can_use_cython_expected_state(parent_state_block, transition_prob):
         return omega_cy.project_expected_state_block_double(
@@ -341,8 +483,11 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                 packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
                 continue
             previous_branch_id_by_size[size] = branch_id
-            masks = _weighted_sample_without_replacement_masks(p=shared_site_p, size=size, niter=niter)
-            packed_masks[branch_id, :, :] = np.packbits(masks, axis=1)
+            packed_masks[branch_id, :, :] = _weighted_sample_without_replacement_packed(
+                p=shared_site_p,
+                size=size,
+                niter=niter,
+            )
     else:
         active_site_p = branch_site_p[active_branch_ids, :]
         first_site_p = active_site_p[0, :]
@@ -363,8 +508,11 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                     packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
                     continue
                 previous_branch_id_by_size[size] = branch_id
-                masks = _weighted_sample_without_replacement_masks(p=first_site_p, size=size, niter=niter)
-                packed_masks[branch_id, :, :] = np.packbits(masks, axis=1)
+                packed_masks[branch_id, :, :] = _weighted_sample_without_replacement_packed(
+                    p=first_site_p,
+                    size=size,
+                    niter=niter,
+                )
         else:
             for branch_id in range(num_branch):
                 size = int(active_sub_branches[branch_id])
@@ -376,22 +524,16 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                     continue
                 if size > num_positive_sites:
                     size = num_positive_sites
-                masks = _weighted_sample_without_replacement_masks(p=site_p, size=size, niter=niter)
-                packed_masks[branch_id, :, :] = np.packbits(masks, axis=1)
+                packed_masks[branch_id, :, :] = _weighted_sample_without_replacement_packed(
+                    p=site_p,
+                    size=size,
+                    niter=niter,
+                )
 
-    arity = remapped_active_cb_ids.shape[1]
-    if arity == 1:
-        active_out = _UINT8_POPCOUNT[packed_masks[remapped_active_cb_ids[:, 0], :, :]].sum(axis=2, dtype=np.int32)
-    elif arity == 2:
-        active_out = _UINT8_POPCOUNT[np.bitwise_and(
-            packed_masks[remapped_active_cb_ids[:, 0], :, :],
-            packed_masks[remapped_active_cb_ids[:, 1], :, :],
-        )].sum(axis=2, dtype=np.int32)
-    else:
-        shared = packed_masks[remapped_active_cb_ids[:, 0], :, :].copy()
-        for col in range(1, arity):
-            shared = np.bitwise_and(shared, packed_masks[remapped_active_cb_ids[:, col], :, :])
-        active_out = _UINT8_POPCOUNT[shared].sum(axis=2, dtype=np.int32)
+    active_out = _calc_shared_counts_from_packed_masks(
+        packed_masks=packed_masks,
+        remapped_cb_ids=remapped_active_cb_ids,
+    )
     out = np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
     out[active_row_indices, :] = active_out
     return out

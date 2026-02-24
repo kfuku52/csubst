@@ -2255,7 +2255,7 @@ def _resolve_asrv_mode(g):
 
 
 def _resolve_asrv_dirichlet_alpha(g):
-    alpha = float(g.get('asrv_dirichlet_alpha', 0.0))
+    alpha = float(g.get('asrv_dirichlet_alpha', 1.0))
     if not np.isfinite(alpha):
         raise ValueError('--asrv_dirichlet_alpha should be a finite number.')
     if alpha < 0:
@@ -2355,7 +2355,7 @@ def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, 
     return out
 
 
-def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=0.0):
+def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=1.0):
     dirichlet_alpha = _resolve_asrv_dirichlet_alpha({'asrv_dirichlet_alpha': dirichlet_alpha})
     branch_ids = _get_asrv_branch_ids(g=g, num_branch=g['is_site_nonmissing'].shape[0])
     nonadjusted_sub_sites = np.asarray(nonadjusted_sub_sites, dtype=g['float_type']).reshape(-1)

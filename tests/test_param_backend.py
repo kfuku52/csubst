@@ -259,6 +259,11 @@ def test_get_global_parameters_accepts_file_each_asrv_and_dirichlet_alpha():
     assert g["asrv_dirichlet_alpha"] == pytest.approx(0.25)
 
 
+def test_get_global_parameters_sets_dirichlet_alpha_default_to_one():
+    g = param.get_global_parameters(_args(asrv="each"))
+    assert g["asrv_dirichlet_alpha"] == pytest.approx(1.0)
+
+
 def test_get_global_parameters_rejects_invalid_asrv_dirichlet_alpha():
     with pytest.raises(ValueError, match="asrv_dirichlet_alpha"):
         param.get_global_parameters(_args(asrv_dirichlet_alpha=-0.1))

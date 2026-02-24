@@ -1,0 +1,17 @@
+{
+  "runs": {
+    "0.0": "/private/tmp/csubst_dirichlet_scatter_20260224_153431/off",
+    "0.5": "/private/tmp/csubst_dirichlet_scatter_20260224_153431/half",
+    "1.0": "/private/tmp/csubst_dirichlet_scatter_20260224_153431/on"
+  },
+  "baseline_alpha": 0.0,
+  "id_cols": [
+    "branch_id_1",
+    "branch_id_2"
+  ],
+  "omega_cols": [
+    "omegaCany2any",
+    "omegaCany2dif",
+    "omegaCany2spe"
+  ]
+}

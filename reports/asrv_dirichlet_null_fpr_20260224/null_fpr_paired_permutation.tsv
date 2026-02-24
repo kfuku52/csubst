@@ -1,0 +1,3 @@
+alpha	baseline_alpha	n_total_pairs	n_discordant	n_base_hit	n_alpha_hit	n_base1_alpha0	n_base0_alpha1	observed_delta_rate	pvalue_one_sided_alpha_lt_baseline	pvalue_two_sided
+0.5	0.0	27992	2	9	7	2	0	-7.144898542440698e-05	0.2499275001449997	0.4987710024579951
+1.0	0.0	27992	3	9	6	3	0	-0.00010717347813661046	0.1251037497925004	0.249747500504999

@@ -124,3 +124,93 @@ cpdef calc_tmp_E_sum_double(
             total += prod
         out_mv[i] = total
     return out
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef calc_shared_counts_packed_uint8(
+    numpy.ndarray[numpy.uint8_t, ndim=3] packed_masks,
+    numpy.ndarray[numpy.int64_t, ndim=2] remapped_cb_ids,
+):
+    cdef Py_ssize_t num_branch = packed_masks.shape[0]
+    cdef Py_ssize_t niter = packed_masks.shape[1]
+    cdef Py_ssize_t num_packed_site = packed_masks.shape[2]
+    cdef Py_ssize_t num_cb = remapped_cb_ids.shape[0]
+    cdef Py_ssize_t arity = remapped_cb_ids.shape[1]
+    cdef numpy.ndarray[numpy.int32_t, ndim=2] out
+    cdef unsigned char[:, :, :] mask_mv
+    cdef long[:, :] cb_mv
+    cdef int[:, :] out_mv
+    cdef Py_ssize_t i, j, col, b
+    cdef long bid
+    cdef unsigned int shared
+    cdef unsigned int x
+    cdef int count
+
+    if arity <= 0:
+        raise ValueError('remapped_cb_ids should have at least one column.')
+    out = numpy.zeros((num_cb, niter), dtype=numpy.int32)
+    if num_cb == 0:
+        return out
+
+    mask_mv = packed_masks
+    cb_mv = remapped_cb_ids
+    out_mv = out
+    for i in range(num_cb):
+        for col in range(arity):
+            bid = cb_mv[i, col]
+            if (bid < 0) or (bid >= num_branch):
+                raise ValueError('remapped_cb_ids contain out-of-range branch IDs.')
+
+    for i in range(num_cb):
+        for j in range(niter):
+            count = 0
+            for b in range(num_packed_site):
+                shared = <unsigned int>mask_mv[cb_mv[i, 0], j, b]
+                for col in range(1, arity):
+                    shared &= <unsigned int>mask_mv[cb_mv[i, col], j, b]
+                x = shared
+                x = x - ((x >> 1) & 0x55)
+                x = (x & 0x33) + ((x >> 2) & 0x33)
+                count += <int>((x + (x >> 4)) & 0x0F)
+            out_mv[i, j] = count
+    return out
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef pack_sampled_site_indices_uint8(
+    numpy.ndarray[numpy.int64_t, ndim=2] sampled_site_indices,
+    long num_site,
+):
+    cdef Py_ssize_t niter = sampled_site_indices.shape[0]
+    cdef Py_ssize_t size = sampled_site_indices.shape[1]
+    cdef Py_ssize_t num_packed_site
+    cdef numpy.ndarray[numpy.uint8_t, ndim=2] out
+    cdef long[:, :] site_mv
+    cdef unsigned char[:, :] out_mv
+    cdef Py_ssize_t i, j
+    cdef long site_id
+    cdef Py_ssize_t byte_index
+    cdef unsigned char bit_mask
+
+    if num_site < 0:
+        raise ValueError('num_site should be >= 0.')
+    num_packed_site = (num_site + 7) // 8
+    out = numpy.zeros((niter, num_packed_site), dtype=numpy.uint8)
+    if (niter == 0) or (size == 0) or (num_site == 0):
+        return out
+
+    site_mv = sampled_site_indices
+    out_mv = out
+    for i in range(niter):
+        for j in range(size):
+            site_id = site_mv[i, j]
+            if (site_id < 0) or (site_id >= num_site):
+                raise ValueError('sampled_site_indices contain out-of-range site IDs.')
+            byte_index = site_id >> 3
+            bit_mask = <unsigned char>(1 << (7 - (site_id & 7)))
+            out_mv[i, byte_index] |= bit_mask
+    return out

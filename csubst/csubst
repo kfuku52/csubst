@@ -509,7 +509,7 @@ def _main():
                               'to calculate their respective ASRVs. '
                               '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
                               '"file_each", Hybrid of site-rate and category-specific empirical site mass. ')
-    analyze.add_argument('--asrv_dirichlet_alpha', metavar='FLOAT', default=0.0, type=float,
+    analyze.add_argument('--asrv_dirichlet_alpha', metavar='FLOAT', default=1.0, type=float,
                          help='default=%(default)s: Dirichlet pseudo-count alpha for branch-wise ASRV normalization '
                               'in --asrv sn/each/file_each. Set >0 to smooth sparse site-mass profiles.')
     analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,

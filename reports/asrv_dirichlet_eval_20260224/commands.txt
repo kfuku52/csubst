@@ -1,0 +1,1 @@
+python3 tools/evaluate_dirichlet_alpha_effect.py --runs 0.0:/tmp/csubst_dirichlet_scatter_20260224_153431/off,0.5:/tmp/csubst_dirichlet_scatter_20260224_153431/half,1.0:/tmp/csubst_dirichlet_scatter_20260224_153431/on --baseline-alpha 0.0 --outdir reports/asrv_dirichlet_eval_20260224

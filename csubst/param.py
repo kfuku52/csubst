@@ -154,7 +154,7 @@ def get_global_parameters(args):
             param_name='--asrv_dirichlet_alpha',
         )
     else:
-        g['asrv_dirichlet_alpha'] = 0.0
+        g['asrv_dirichlet_alpha'] = 1.0
     if g['asrv_dirichlet_alpha'] < 0:
         raise ValueError('--asrv_dirichlet_alpha should be >= 0.')
     if 'quantile_refine_edge_bins' in g.keys():
