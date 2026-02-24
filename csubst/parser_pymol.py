@@ -137,6 +137,139 @@ def add_pdb_residue_numbering(df):
     print('The column "codon_site_pdb_**ID**" indicates the positions of codons/amino acids in the sequence "**ID**" in the PDB file. 0 = missing site.')
     return df
 
+
+def _select_best_pdb_chain_column(df):
+    pdb_cols = [col for col in df.columns.tolist() if str(col).startswith('codon_site_pdb_')]
+    if len(pdb_cols) == 0:
+        return None
+    best_col = None
+    best_score = None
+    for col in sorted(pdb_cols):
+        values = pd.to_numeric(df.loc[:, col], errors='coerce').fillna(0).to_numpy(dtype=np.int64, copy=False)
+        is_mapped = values > 0
+        mapped_count = int(is_mapped.sum())
+        unique_count = int(np.unique(values[is_mapped]).shape[0]) if mapped_count > 0 else 0
+        score = (mapped_count, unique_count, col)
+        if (best_score is None) or (score > best_score):
+            best_col = col
+            best_score = score
+    return best_col
+
+
+def _parse_pdb_residue_number(value):
+    if pd.isna(value):
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return None
+    if isinstance(value, (int, np.integer)):
+        residue = int(value)
+    elif isinstance(value, (float, np.floating)):
+        if (not np.isfinite(value)) or (not float(value).is_integer()):
+            return None
+        residue = int(value)
+    else:
+        txt = str(value).strip()
+        if txt == '':
+            return None
+        if not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', txt)):
+            return None
+        residue = int(float(txt))
+    if residue <= 0:
+        return None
+    return residue
+
+
+def _get_chain_ca_coordinates():
+    out = dict()
+    object_names = [on for on in pymol.cmd.get_names() if not str(on).endswith('_pol_conts')]
+    for object_name in object_names:
+        for ch in pymol.cmd.get_chains(object_name):
+            key = object_name + '_' + ch
+            model = pymol.cmd.get_model('{} and chain {} and name ca'.format(object_name, ch))
+            residue_coord = dict()
+            for atom in model.atom:
+                residue = _parse_pdb_residue_number(atom.resi)
+                if residue is None:
+                    continue
+                residue_coord[int(residue)] = np.array(atom.coord, dtype=np.float64)
+            out[key] = residue_coord
+    return out
+
+
+def add_contact_degree_from_structure(df, distance_cutoff=8.0, chain_col=None):
+    distance_cutoff = float(distance_cutoff)
+    if distance_cutoff <= 0:
+        raise ValueError('distance_cutoff should be > 0.')
+    out = df.copy(deep=True)
+    if chain_col is None:
+        chain_col = _select_best_pdb_chain_column(df=out)
+    if chain_col is None:
+        out.loc[:, 'epistasis_contact_chain'] = ''
+        out.loc[:, 'epistasis_contact_residue'] = 0
+        out.loc[:, 'epistasis_contact_degree'] = np.nan
+        out.loc[:, 'epistasis_contact_degree_z'] = 0.0
+        out.loc[:, 'epistasis_contact_proximity'] = np.nan
+        out.loc[:, 'epistasis_contact_proximity_z'] = 0.0
+        return out
+    chain_name = str(chain_col).replace('codon_site_pdb_', '', 1)
+    residue_values = pd.to_numeric(out.loc[:, chain_col], errors='coerce').fillna(0).astype(np.int64).to_numpy(copy=False)
+    coord_by_chain = _get_chain_ca_coordinates()
+    chain_coord = coord_by_chain.get(chain_name, dict())
+    mapped_residues = sorted(list(set([int(v) for v in residue_values.tolist() if (int(v) > 0) and (int(v) in chain_coord)])))
+    residue_degree = dict()
+    residue_proximity = dict()
+    if len(mapped_residues) > 0:
+        xyz = np.array([chain_coord[resi] for resi in mapped_residues], dtype=np.float64)
+        delta = xyz[:, np.newaxis, :] - xyz[np.newaxis, :, :]
+        dist2 = np.einsum('ijk,ijk->ij', delta, delta)
+        cutoff2 = distance_cutoff ** 2
+        degree = (dist2 <= cutoff2).sum(axis=1).astype(np.int64) - 1
+        dist = np.sqrt(np.clip(dist2, a_min=0.0, a_max=None))
+        proximity_weight = np.clip((distance_cutoff - dist) / distance_cutoff, a_min=0.0, a_max=None)
+        np.fill_diagonal(proximity_weight, 0.0)
+        proximity = proximity_weight.sum(axis=1, dtype=np.float64)
+        residue_degree = {int(resi): int(deg) for resi, deg in zip(mapped_residues, degree.tolist())}
+        residue_proximity = {int(resi): float(prox) for resi, prox in zip(mapped_residues, proximity.tolist())}
+    degree_values = np.full(shape=(out.shape[0],), fill_value=np.nan, dtype=np.float64)
+    proximity_values = np.full(shape=(out.shape[0],), fill_value=np.nan, dtype=np.float64)
+    selected_residue = np.zeros(shape=(out.shape[0],), dtype=np.int64)
+    for i, residue in enumerate(residue_values.tolist()):
+        if residue <= 0:
+            continue
+        selected_residue[i] = int(residue)
+        if int(residue) in residue_degree:
+            degree_values[i] = float(residue_degree[int(residue)])
+        if int(residue) in residue_proximity:
+            proximity_values[i] = float(residue_proximity[int(residue)])
+    out.loc[:, 'epistasis_contact_chain'] = chain_name
+    out.loc[:, 'epistasis_contact_residue'] = selected_residue
+    out.loc[:, 'epistasis_contact_degree'] = degree_values
+    out.loc[:, 'epistasis_contact_proximity'] = proximity_values
+    degree_z_values = np.zeros(shape=(out.shape[0],), dtype=np.float64)
+    is_finite = np.isfinite(degree_values)
+    if is_finite.any():
+        finite_values = degree_values[is_finite]
+        mean = finite_values.mean()
+        std = finite_values.std(ddof=0)
+        if std > 0:
+            degree_z_values[is_finite] = (finite_values - mean) / std
+        else:
+            degree_z_values[is_finite] = 0.0
+    out.loc[:, 'epistasis_contact_degree_z'] = degree_z_values
+    proximity_z_values = np.zeros(shape=(out.shape[0],), dtype=np.float64)
+    is_finite = np.isfinite(proximity_values)
+    if is_finite.any():
+        finite_values = proximity_values[is_finite]
+        mean = finite_values.mean()
+        std = finite_values.std(ddof=0)
+        if std > 0:
+            proximity_z_values[is_finite] = (finite_values - mean) / std
+        else:
+            proximity_z_values[is_finite] = 0.0
+    out.loc[:, 'epistasis_contact_proximity_z'] = proximity_z_values
+    return out
+
+
 def add_coordinate_from_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
     print('Loading amino acid coordinates from: {}'.format(mafft_map_file), flush=True)
     with open(mafft_map_file, 'r') as f:

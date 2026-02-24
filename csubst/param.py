@@ -27,6 +27,7 @@ DEPENDENCY_DISTRIBUTIONS = (
 
 DEFAULT_QUANTILE_NITER_AUTO_SCHEDULE = [100, 1000, 10000]
 MAX_QUANTILE_NITER = 10000
+DEFAULT_OMEGA_PVALUE_SAFE_MIN_SUB_PP = 0.05
 
 
 def _default_prostt5_cache_file():
@@ -174,6 +175,46 @@ def get_global_parameters(args):
         g['calc_omega_pvalue'] = False
     if g['calc_omega_pvalue'] and (g['omegaC_method'] != 'modelfree'):
         raise ValueError('--calc_omega_pvalue "yes" should be used with --omegaC_method "modelfree".')
+    if 'omega_pvalue_null_model' in g.keys():
+        g['omega_pvalue_null_model'] = str(g['omega_pvalue_null_model']).strip().lower()
+    else:
+        g['omega_pvalue_null_model'] = 'hypergeom'
+    if g['omega_pvalue_null_model'] not in ['hypergeom', 'poisson', 'poisson_full']:
+        raise ValueError('--omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full.')
+    if 'omega_pvalue_safe_min_sub_pp' in g.keys():
+        g['omega_pvalue_safe_min_sub_pp'] = _require_finite_float(
+            value=float(g['omega_pvalue_safe_min_sub_pp']),
+            param_name='--omega_pvalue_safe_min_sub_pp',
+        )
+    else:
+        g['omega_pvalue_safe_min_sub_pp'] = float(DEFAULT_OMEGA_PVALUE_SAFE_MIN_SUB_PP)
+    if g['omega_pvalue_safe_min_sub_pp'] < 0:
+        raise ValueError('--omega_pvalue_safe_min_sub_pp should be >= 0.')
+    if g['omega_pvalue_safe_min_sub_pp'] > 1:
+        raise ValueError('--omega_pvalue_safe_min_sub_pp should be <= 1.')
+    if 'ml_anc' in g.keys():
+        g['ml_anc'] = _parse_bool_like(g['ml_anc'], '--ml_anc')
+    else:
+        g['ml_anc'] = False
+    if 'min_sub_pp' in g.keys():
+        g['min_sub_pp'] = _require_finite_float(
+            value=float(g['min_sub_pp']),
+            param_name='--min_sub_pp',
+        )
+    else:
+        g['min_sub_pp'] = 0.0
+    if g['min_sub_pp'] < 0:
+        raise ValueError('--min_sub_pp should be >= 0.')
+    if g['min_sub_pp'] > 1:
+        raise ValueError('--min_sub_pp should be <= 1.')
+    g['omega_pvalue_min_sub_pp_auto_applied'] = False
+    if g['calc_omega_pvalue'] and (not g['ml_anc']) and (g['min_sub_pp'] == 0) and (g['omega_pvalue_safe_min_sub_pp'] > 0):
+        g['min_sub_pp'] = float(g['omega_pvalue_safe_min_sub_pp'])
+        g['omega_pvalue_min_sub_pp_auto_applied'] = True
+        txt = '--calc_omega_pvalue detected with --min_sub_pp=0 and --ml_anc=no. '
+        txt += 'To reduce anti-conservative behavior in empirical p-values, --min_sub_pp was auto-set to {:g}. '
+        txt += 'Set --min_sub_pp explicitly to override.\n'
+        sys.stderr.write(txt.format(float(g['omega_pvalue_safe_min_sub_pp'])))
     if 'omega_pvalue_niter' in g.keys():
         g['omega_pvalue_niter'] = int(g['omega_pvalue_niter'])
     else:
@@ -210,16 +251,31 @@ def get_global_parameters(args):
         g['epistasis_apply_to'] = 'N'
     if g['epistasis_apply_to'] not in ['N', 'S', 'NS']:
         raise ValueError('--epistasis_apply_to should be one of N, S, NS.')
-    if 'epistasis_beta' not in g.keys():
-        g['epistasis_beta'] = '0.0'
-    epistasis_beta_auto, epistasis_beta_value = _parse_auto_or_float(
-        value=g['epistasis_beta'],
-        param_name='--epistasis_beta',
-        min_value=0.0,
-        strict_min=False,
-    )
+    if ('epistasis_beta' not in g.keys()) or (g['epistasis_beta'] is None):
+        g['epistasis_beta'] = 'off'
+    epistasis_beta_token = None
+    if isinstance(g['epistasis_beta'], str):
+        epistasis_beta_token = g['epistasis_beta'].strip().lower()
+    if epistasis_beta_token in ['off', 'none', 'false', 'no']:
+        epistasis_beta_auto = False
+        epistasis_beta_value = 0.0
+    else:
+        epistasis_beta_auto, epistasis_beta_value = _parse_auto_or_float(
+            value=g['epistasis_beta'],
+            param_name='--epistasis_beta',
+            min_value=0.0,
+            strict_min=False,
+        )
     g['epistasis_beta_auto'] = bool(epistasis_beta_auto)
     g['epistasis_beta_value'] = float(epistasis_beta_value) if (not epistasis_beta_auto) else np.nan
+    if ('epistasis_site_metric' not in g.keys()) or (g['epistasis_site_metric'] is None):
+        g['epistasis_site_metric'] = 'off'
+    else:
+        g['epistasis_site_metric'] = str(g['epistasis_site_metric']).strip().lower()
+    if g['epistasis_site_metric'] not in ['off', 'auto', 'degree', 'proximity', 'hybrid']:
+        raise ValueError('--epistasis_site_metric should be one of off, auto, degree, proximity, hybrid.')
+    if (g['epistasis_site_metric'] == 'off') and (g['epistasis_beta_auto'] or (g['epistasis_beta_value'] > 0)):
+        g['epistasis_site_metric'] = 'auto'
     if 'epistasis_clip' not in g.keys():
         g['epistasis_clip'] = '3.0'
     epistasis_clip_auto, epistasis_clip_value = _parse_auto_or_float(

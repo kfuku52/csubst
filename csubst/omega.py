@@ -2167,6 +2167,148 @@ def _compose_permutation_count_matrix(stat, mode_to_count, tol):
     raise ValueError('Unsupported output stat for permutation omega p-value: {}'.format(stat))
 
 
+def _resolve_omega_pvalue_null_model(g):
+    model = 'hypergeom'
+    if g is not None:
+        model = str(g.get('omega_pvalue_null_model', 'hypergeom')).strip().lower()
+    if model not in ['hypergeom', 'poisson', 'poisson_full']:
+        raise ValueError('omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full.')
+    return model
+
+
+def _calc_poisson_count_matrix(
+    mode,
+    cb_ids,
+    sub_sg,
+    sub_bg,
+    niter,
+    obs_col,
+    num_gad_combinat,
+    list_igad,
+    g,
+    static_sub_sites,
+):
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
+    niter = int(niter)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if niter <= 0:
+        raise ValueError('niter should be a positive integer.')
+    out = np.zeros(shape=(cb_ids.shape[0], niter), dtype=np.float64)
+    if cb_ids.shape[0] == 0:
+        return out
+    for i, sg, a, d in list_igad:
+        if a == d:
+            continue
+        if static_sub_sites is None:
+            sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+        else:
+            sub_sites = static_sub_sites
+        sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
+        mean_count = _calc_tmp_E_sum(
+            cb_ids=cb_ids,
+            sub_sites=sub_sites,
+            sub_branches=sub_branches,
+            float_type=np.float64,
+        )
+        mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
+        if mean_count.shape[0] != cb_ids.shape[0]:
+            txt = 'mean_count rows ({}) and cb_ids rows ({}) should match.'
+            raise ValueError(txt.format(mean_count.shape[0], cb_ids.shape[0]))
+        np.clip(mean_count, a_min=0.0, a_max=None, out=mean_count)
+        if (mean_count > 0).sum() == 0:
+            continue
+        pm_start = time.time()
+        out += np.random.poisson(
+            lam=mean_count[:, None],
+            size=(mean_count.shape[0], niter),
+        ).astype(np.float64, copy=False)
+        txt = '{} (poisson): {}/{} matrix_group/ancestral_state/derived_state combinations. '
+        txt += 'Time elapsed for {:,} permutation: {:,} [sec]'
+        print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
+    return out
+
+
+def _get_mode_branch_site_mass(sub_tensor, mode, sg, a, d):
+    if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
+        if mode == 'spe2spe':
+            mat = sub_tensor.blocks.get((int(sg), int(a), int(d)), None)
+            if mat is None:
+                return np.zeros(shape=(sub_tensor.num_branch, sub_tensor.num_site), dtype=np.float64)
+            return np.asarray(mat.toarray(), dtype=np.float64)
+        if mode == 'spe2any':
+            return np.asarray(sub_tensor.project_spe2any(int(sg), int(a)).toarray(), dtype=np.float64)
+        if mode == 'any2spe':
+            return np.asarray(sub_tensor.project_any2spe(int(sg), int(d)).toarray(), dtype=np.float64)
+        if mode == 'any2any':
+            return np.asarray(sub_tensor.project_any2any(int(sg)).toarray(), dtype=np.float64)
+        raise ValueError('Unsupported mode: {}'.format(mode))
+    sub_tensor = np.asarray(sub_tensor)
+    if mode == 'spe2spe':
+        return np.asarray(sub_tensor[:, :, int(sg), int(a), int(d)], dtype=np.float64)
+    if mode == 'spe2any':
+        return np.asarray(sub_tensor[:, :, int(sg), int(a), :].sum(axis=2), dtype=np.float64)
+    if mode == 'any2spe':
+        return np.asarray(sub_tensor[:, :, int(sg), :, int(d)].sum(axis=2), dtype=np.float64)
+    if mode == 'any2any':
+        return np.asarray(sub_tensor[:, :, int(sg), :, :].sum(axis=(2, 3)), dtype=np.float64)
+    raise ValueError('Unsupported mode: {}'.format(mode))
+
+
+def _calc_poisson_full_count_matrix(
+    mode,
+    cb_ids,
+    sub_tensor,
+    niter,
+    obs_col,
+    num_gad_combinat,
+    list_igad,
+):
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
+    niter = int(niter)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if niter <= 0:
+        raise ValueError('niter should be a positive integer.')
+    out = np.zeros(shape=(cb_ids.shape[0], niter), dtype=np.float64)
+    if cb_ids.shape[0] == 0:
+        return out
+    num_branch = int(sub_tensor.shape[0])
+    branch_ones = np.ones(shape=(num_branch,), dtype=np.float64)
+    for i, sg, a, d in list_igad:
+        if a == d:
+            continue
+        sub_sites = _get_mode_branch_site_mass(
+            sub_tensor=sub_tensor,
+            mode=mode,
+            sg=sg,
+            a=a,
+            d=d,
+        )
+        mean_count = _calc_tmp_E_sum(
+            cb_ids=cb_ids,
+            sub_sites=sub_sites,
+            sub_branches=branch_ones,
+            float_type=np.float64,
+        )
+        mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
+        if mean_count.shape[0] != cb_ids.shape[0]:
+            txt = 'mean_count rows ({}) and cb_ids rows ({}) should match.'
+            raise ValueError(txt.format(mean_count.shape[0], cb_ids.shape[0]))
+        np.clip(mean_count, a_min=0.0, a_max=None, out=mean_count)
+        if (mean_count > 0).sum() == 0:
+            continue
+        pm_start = time.time()
+        out += np.random.poisson(
+            lam=mean_count[:, None],
+            size=(mean_count.shape[0], niter),
+        ).astype(np.float64, copy=False)
+        txt = '{} (poisson_full): {}/{} matrix_group/ancestral_state/derived_state combinations. '
+        txt += 'Time elapsed for {:,} permutation: {:,} [sec]'
+        print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
+    return out
+
+
 def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g):
     sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_quantile_components(
         sub_tensor=sub_tensor,
@@ -2175,20 +2317,51 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g):
         g=g,
     )
     static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
-    txt = 'pomegaC {}{}: randomization count matrix (rows={:,}, niter={:,}, categories={:,})'
-    print(txt.format(SN, mode, cb_ids.shape[0], int(niter), int(num_gad_combinat)), flush=True)
-    return _calc_quantile_count_matrix(
-        mode=mode,
-        cb_ids=cb_ids,
-        sub_sg=sub_sg,
-        sub_bg=sub_bg,
-        quantile_niter=int(niter),
-        obs_col=obs_col,
-        num_gad_combinat=num_gad_combinat,
-        list_igad=list_igad,
-        g=g,
-        static_sub_sites=static_sub_sites,
-    )
+    null_model = _resolve_omega_pvalue_null_model(g=g)
+    txt = 'pomegaC {}{}: {} count matrix (rows={:,}, niter={:,}, categories={:,})'
+    model_label = 'randomization'
+    if null_model == 'poisson':
+        model_label = 'poisson-rate'
+    if null_model == 'poisson_full':
+        model_label = 'poisson-full-rate'
+    print(txt.format(SN, mode, model_label, cb_ids.shape[0], int(niter), int(num_gad_combinat)), flush=True)
+    if null_model == 'hypergeom':
+        return _calc_quantile_count_matrix(
+            mode=mode,
+            cb_ids=cb_ids,
+            sub_sg=sub_sg,
+            sub_bg=sub_bg,
+            quantile_niter=int(niter),
+            obs_col=obs_col,
+            num_gad_combinat=num_gad_combinat,
+            list_igad=list_igad,
+            g=g,
+            static_sub_sites=static_sub_sites,
+        )
+    if null_model == 'poisson':
+        return _calc_poisson_count_matrix(
+            mode=mode,
+            cb_ids=cb_ids,
+            sub_sg=sub_sg,
+            sub_bg=sub_bg,
+            niter=int(niter),
+            obs_col=obs_col,
+            num_gad_combinat=num_gad_combinat,
+            list_igad=list_igad,
+            g=g,
+            static_sub_sites=static_sub_sites,
+        )
+    if null_model == 'poisson_full':
+        return _calc_poisson_full_count_matrix(
+            mode=mode,
+            cb_ids=cb_ids,
+            sub_tensor=sub_tensor,
+            niter=int(niter),
+            obs_col=obs_col,
+            num_gad_combinat=num_gad_combinat,
+            list_igad=list_igad,
+        )
+    raise ValueError('Unsupported omega_pvalue_null_model: {}'.format(null_model))
 
 
 def _calc_omega_empirical_upper_tail_pvalues(obs_omega, exp_N, exp_S, perm_count_N, perm_count_S, float_tol):
@@ -2250,6 +2423,9 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
     niter = int(g.get('omega_pvalue_niter', 1000))
     if niter <= 0:
         raise ValueError('omega_pvalue_niter should be a positive integer.')
+    null_model = _resolve_omega_pvalue_null_model(g=g)
+    txt = 'omega_C empirical p-value null model: {}'
+    print(txt.format(null_model), flush=True)
     cb_ids = _get_cb_ids(cb)
     output_stats = _resolve_requested_output_stats(g)
     for sub in output_stats:

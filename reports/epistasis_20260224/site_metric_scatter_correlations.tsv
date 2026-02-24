@@ -1,0 +1,5 @@
+mode	label	metric	n_log_points	pearson_r_log10	spearman_rho_log10	median_abs_delta_raw	q95_abs_delta_raw	beta_N	clip_N	active_branches	metric_requested	metric_resolved	metric_source
+n_degree_file	degree	omegaCany2spe	7580	0.9997889748823525	0.9997298162218833	0.0027000000000000357	0.19092999999999963	0.91	1.5	138	degree	degree	file
+n_proximity_file	proximity	omegaCany2spe	7584	0.9997502315137097	0.9997289457924712	0.003049999999999997	0.20948500000000003	1.01	1.5	138	proximity	proximity	file
+n_hybrid_file	hybrid(file)	omegaCany2spe	7584	0.9997740571917277	0.9997350290036751	0.002899999999999958	0.1976399999999996	0.9	1.5	138	hybrid	hybrid	file
+n_auto_pdb	auto(structure)	omegaCany2spe	7584	0.9997740554648411	0.9997350223530912	0.002899999999999958	0.1976399999999996	0.9	1.5	138	auto	hybrid	structure

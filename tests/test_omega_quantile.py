@@ -111,6 +111,49 @@ def test_get_permutations_fast_rejects_negative_branch_ids():
         omega._get_permutations_fast(cb_ids=cb_ids, sub_branches=sub_branches, p=p, niter=8)
 
 
+def test_prepare_permutation_branch_sizes_supports_stochastic_mode():
+    sub_branches = np.array([0.2, 1.6, 2.0], dtype=np.float64)
+    np.random.seed(0)
+    out = omega._prepare_permutation_branch_sizes(
+        sub_branches=sub_branches,
+        niter=64,
+        g={"omega_pvalue_rounding": "stochastic"},
+    )
+    assert out.shape == (3, 64)
+    assert out.dtype == np.int64
+    assert set(np.unique(out[0, :]).tolist()).issubset({0, 1})
+    assert set(np.unique(out[1, :]).tolist()).issubset({1, 2})
+    assert np.all(out[2, :] == 2)
+
+
+def test_get_permutations_fast_accepts_per_iteration_branch_sizes():
+    cb_ids = np.array([[0, 1], [1, 2]], dtype=np.int64)
+    sub_branches = np.array(
+        [
+            [1, 0, 1, 0],
+            [1, 1, 1, 1],
+            [1, 1, 0, 0],
+        ],
+        dtype=np.int64,
+    )
+    p = np.array([0.4, 0.3, 0.2, 0.1], dtype=np.float64)
+    np.random.seed(3)
+    out = omega._get_permutations_fast(cb_ids=cb_ids, sub_branches=sub_branches, p=p, niter=4)
+    assert out.shape == (2, 4)
+    assert out.dtype == np.int32
+    assert out[0, 1] == 0  # branch 0 size=0 in iteration 2
+    assert out[1, 2] == 0  # branch 2 size=0 in iteration 3
+    assert out[1, 3] == 0  # branch 2 size=0 in iteration 4
+
+
+def test_get_permutations_fast_rejects_branch_size_matrix_niter_mismatch():
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    sub_branches = np.array([[1, 1], [1, 1]], dtype=np.int64)
+    p = np.array([0.5, 0.5], dtype=np.float64)
+    with pytest.raises(ValueError, match="number of columns"):
+        omega._get_permutations_fast(cb_ids=cb_ids, sub_branches=sub_branches, p=p, niter=3)
+
+
 def test_weighted_sample_without_replacement_packed_matches_mask_packbits():
     p = np.array([0.4, 0.25, 0.2, 0.15, 0.0], dtype=np.float64)
     np.random.seed(11)
@@ -343,3 +386,342 @@ def test_get_cod_skips_when_required_columns_missing():
     out = omega.get_CoD(cb.copy(), g={"float_tol": 1e-12})
     assert "OCNCoD" not in out.columns
     assert "OCSCoD" not in out.columns
+
+
+def test_calc_dif_count_matrix_marks_negative_counts_as_nan():
+    any_count = np.array([[4.0, 1.0], [0.0, 2.0]], dtype=np.float64)
+    spe_count = np.array([[2.0, 2.0], [1.0, 2.0]], dtype=np.float64)
+    out = omega._calc_dif_count_matrix(any_count=any_count, spe_count=spe_count, tol=1e-9)
+    expected = np.array([[2.0, np.nan], [np.nan, 0.0]], dtype=np.float64)
+    np.testing.assert_allclose(out, expected, equal_nan=True)
+
+
+def test_calc_omega_empirical_upper_tail_pvalues_uses_upper_tail_mid_p():
+    obs_omega = np.array([2.0, 1.0], dtype=np.float64)
+    exp_N = np.array([1.0, 1.0], dtype=np.float64)
+    exp_S = np.array([1.0, 1.0], dtype=np.float64)
+    perm_count_N = np.array([[2.0, 1.0, 3.0], [0.0, 1.0, 1.0]], dtype=np.float64)
+    perm_count_S = np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64)
+    out = omega._calc_omega_empirical_upper_tail_pvalues(
+        obs_omega=obs_omega,
+        exp_N=exp_N,
+        exp_S=exp_S,
+        perm_count_N=perm_count_N,
+        perm_count_S=perm_count_S,
+        float_tol=1e-12,
+    )
+    np.testing.assert_allclose(out, np.array([0.75, 0.75], dtype=np.float64))
+
+
+def test_calc_bh_fdr_qvalues_handles_nan_and_monotonicity():
+    pvalues = np.array([0.01, 0.04, 0.03, np.nan], dtype=np.float64)
+    out = omega._calc_bh_fdr_qvalues(pvalues)
+    expected = np.array([0.03, 0.04, 0.04, np.nan], dtype=np.float64)
+    np.testing.assert_allclose(out, expected, equal_nan=True)
+
+
+def test_calc_poisson_count_matrix_matches_expected_means():
+    cb_ids = np.array([[0, 1], [1, 2]], dtype=np.int64)
+    sub_bg = np.array([[1.0], [2.0], [3.0]], dtype=np.float64)
+    sub_sg = np.zeros((2, 1), dtype=np.float64)
+    static_sub_sites = np.array(
+        [
+            [0.6, 0.4],
+            [0.5, 0.5],
+            [0.2, 0.8],
+        ],
+        dtype=np.float64,
+    )
+    list_igad = [[0, 0, "any2", "2any"]]
+    expected_mean = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=static_sub_sites,
+        sub_branches=sub_bg[:, 0],
+        float_type=np.float64,
+    )
+    np.random.seed(7)
+    out = omega._calc_poisson_count_matrix(
+        mode="any2any",
+        cb_ids=cb_ids,
+        sub_sg=sub_sg,
+        sub_bg=sub_bg,
+        niter=4000,
+        obs_col="OCNany2any",
+        num_gad_combinat=1,
+        list_igad=list_igad,
+        g={"float_tol": 1e-12},
+        static_sub_sites=static_sub_sites,
+    )
+    assert out.shape == (2, 4000)
+    assert out.dtype == np.float64
+    assert np.all(out >= 0)
+    np.testing.assert_allclose(out, np.round(out), atol=0.0)
+    np.testing.assert_allclose(out.mean(axis=1), expected_mean, atol=0.12)
+
+
+def test_calc_poisson_full_count_matrix_matches_expected_means():
+    cb_ids = np.array([[0, 1], [1, 2]], dtype=np.int64)
+    sub_tensor = np.zeros((3, 2, 1, 2, 2), dtype=np.float64)
+    sub_tensor[:, :, 0, 0, 1] = np.array(
+        [
+            [0.4, 0.6],
+            [0.3, 0.7],
+            [0.8, 0.2],
+        ],
+        dtype=np.float64,
+    )
+    list_igad = [[0, 0, "any2", "2any"]]
+    site_mass = sub_tensor[:, :, 0, :, :].sum(axis=(2, 3))
+    expected_mean = (site_mass[cb_ids[:, 0], :] * site_mass[cb_ids[:, 1], :]).sum(axis=1)
+    np.random.seed(11)
+    out = omega._calc_poisson_full_count_matrix(
+        mode="any2any",
+        cb_ids=cb_ids,
+        sub_tensor=sub_tensor,
+        niter=4000,
+        obs_col="OCNany2any",
+        num_gad_combinat=1,
+        list_igad=list_igad,
+    )
+    assert out.shape == (2, 4000)
+    assert out.dtype == np.float64
+    assert np.all(out >= 0)
+    np.testing.assert_allclose(out, np.round(out), atol=0.0)
+    np.testing.assert_allclose(out.mean(axis=1), expected_mean, atol=0.06)
+
+
+def test_get_mode_permutation_count_matrix_uses_poisson_model(monkeypatch):
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    expected = np.full((1, 5), 2.0, dtype=np.float64)
+
+    def fake_prepare(sub_tensor, mode, SN, g):
+        return np.zeros((2, 1), dtype=np.float64), np.zeros((3, 1), dtype=np.float64), [[0, 0, "any2", "2any"]], "OCNany2any", 1
+
+    def fake_static(g, sub_sg, mode, obs_col):
+        return np.ones((2, 3), dtype=np.float64) / 3.0
+
+    def fake_poisson(mode, cb_ids, sub_sg, sub_bg, niter, obs_col, num_gad_combinat, list_igad, g, static_sub_sites):
+        return expected.copy()
+
+    def fake_quantile(*args, **kwargs):
+        raise AssertionError("hypergeom path should not be used for poisson null model")
+
+    monkeypatch.setattr(omega, "_prepare_substitution_quantile_components", fake_prepare)
+    monkeypatch.setattr(omega, "_get_static_sub_sites_if_available", fake_static)
+    monkeypatch.setattr(omega, "_calc_poisson_count_matrix", fake_poisson)
+    monkeypatch.setattr(omega, "_calc_quantile_count_matrix", fake_quantile)
+
+    out = omega._get_mode_permutation_count_matrix(
+        cb_ids=cb_ids,
+        sub_tensor=None,
+        mode="any2any",
+        SN="N",
+        niter=5,
+        g={"omega_pvalue_null_model": "poisson"},
+    )
+    np.testing.assert_allclose(out, expected)
+
+
+def test_get_mode_permutation_count_matrix_uses_poisson_full_model(monkeypatch):
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    expected = np.full((1, 5), 3.0, dtype=np.float64)
+
+    def fake_prepare(sub_tensor, mode, SN, g):
+        return np.zeros((2, 1), dtype=np.float64), np.zeros((3, 1), dtype=np.float64), [[0, 0, "any2", "2any"]], "OCNany2any", 1
+
+    def fake_static(g, sub_sg, mode, obs_col):
+        return np.ones((2, 3), dtype=np.float64) / 3.0
+
+    def fake_poisson(*args, **kwargs):
+        raise AssertionError("factorized poisson path should not be used for poisson_full null model")
+
+    def fake_poisson_full(mode, cb_ids, sub_tensor, niter, obs_col, num_gad_combinat, list_igad):
+        return expected.copy()
+
+    def fake_quantile(*args, **kwargs):
+        raise AssertionError("hypergeom path should not be used for poisson_full null model")
+
+    monkeypatch.setattr(omega, "_prepare_substitution_quantile_components", fake_prepare)
+    monkeypatch.setattr(omega, "_get_static_sub_sites_if_available", fake_static)
+    monkeypatch.setattr(omega, "_calc_poisson_count_matrix", fake_poisson)
+    monkeypatch.setattr(omega, "_calc_poisson_full_count_matrix", fake_poisson_full)
+    monkeypatch.setattr(omega, "_calc_quantile_count_matrix", fake_quantile)
+
+    out = omega._get_mode_permutation_count_matrix(
+        cb_ids=cb_ids,
+        sub_tensor=np.zeros((2, 3, 1, 1, 1), dtype=np.float64),
+        mode="any2any",
+        SN="N",
+        niter=5,
+        g={"omega_pvalue_null_model": "poisson_full"},
+    )
+    np.testing.assert_allclose(out, expected)
+
+
+def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [0, 1],
+            "branch_id_2": [2, 3],
+            "omegaCany2dif": [2.0, 0.0],
+            "ECNany2dif": [1.0, 1.0],
+            "ECSany2dif": [1.0, 1.0],
+        }
+    )
+    mode_counts = {
+        ("N", "any2any"): np.array([[4.0, 2.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64),
+        ("N", "any2spe"): np.array([[2.0, 1.0, 1.0], [1.0, 2.0, 1.0]], dtype=np.float64),
+        ("S", "any2any"): np.array([[2.0, 2.0, 2.0], [1.0, 1.0, 1.0]], dtype=np.float64),
+        ("S", "any2spe"): np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64),
+    }
+    calls = []
+
+    def fake_get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g):
+        calls.append((SN, mode, int(niter), cb_ids.shape))
+        return mode_counts[(SN, mode)]
+
+    monkeypatch.setattr(omega, "_get_mode_permutation_count_matrix", fake_get_mode_permutation_count_matrix)
+    out = omega.add_omega_empirical_pvalues(
+        cb=cb.copy(),
+        ON_tensor=None,
+        OS_tensor=None,
+        g={
+            "calc_omega_pvalue": True,
+            "omegaC_method": "modelfree",
+            "omega_pvalue_niter": 3,
+            "output_stats": ["any2dif"],
+            "float_tol": 1e-12,
+        },
+    )
+    assert calls == [
+        ("N", "any2any", 3, (2, 2)),
+        ("S", "any2any", 3, (2, 2)),
+        ("N", "any2spe", 3, (2, 2)),
+        ("S", "any2spe", 3, (2, 2)),
+    ]
+    np.testing.assert_allclose(out.loc[:, "pomegaCany2dif"].to_numpy(dtype=np.float64), np.array([0.5, 1.0]))
+    np.testing.assert_allclose(out.loc[:, "qomegaCany2dif"].to_numpy(dtype=np.float64), np.array([1.0, 1.0]))
+
+
+def test_calibrate_dsc_renames_empirical_pq_columns_to_nocalib():
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [0, 1],
+            "branch_id_2": [2, 3],
+            "dNCany2spe": [2.0, 1.0],
+            "dSCany2spe": [1.0, 2.0],
+            "omegaCany2spe": [2.0, 0.5],
+            "pomegaCany2spe": [0.05, 0.20],
+            "qomegaCany2spe": [0.10, 0.20],
+        }
+    )
+    out = omega.calibrate_dsc(cb.copy(), output_stats=["any2spe"])
+    assert "pomegaCany2spe" not in out.columns
+    assert "qomegaCany2spe" not in out.columns
+    assert "pomegaCany2spe_nocalib" in out.columns
+    assert "qomegaCany2spe_nocalib" in out.columns
+    np.testing.assert_allclose(
+        out.loc[:, "pomegaCany2spe_nocalib"].to_numpy(dtype=np.float64),
+        np.array([0.05, 0.20], dtype=np.float64),
+    )
+    np.testing.assert_allclose(
+        out.loc[:, "qomegaCany2spe_nocalib"].to_numpy(dtype=np.float64),
+        np.array([0.10, 0.20], dtype=np.float64),
+    )
+
+
+def test_prepare_epistasis_supports_s_channel_and_applies_only_to_ocs():
+    ON_tensor = np.zeros(shape=(2, 3, 1, 1, 1), dtype=np.float64)
+    OS_tensor = np.zeros(shape=(2, 3, 1, 1, 1), dtype=np.float64)
+    OS_tensor[0, :, 0, 0, 0] = np.array([2.0, 1.0, 0.0], dtype=np.float64)
+    OS_tensor[1, :, 0, 0, 0] = np.array([0.0, 1.0, 3.0], dtype=np.float64)
+    g = {
+        "float_tol": 1e-12,
+        "is_site_nonmissing": np.ones(shape=(2, 3), dtype=bool),
+        "_asrv_branch_ids": np.array([0, 1], dtype=np.int64),
+        "epistasis_apply_to": "S",
+        "epistasis_beta_auto": False,
+        "epistasis_beta_value": 1.0,
+        "epistasis_clip_auto": False,
+        "epistasis_clip_value": 3.0,
+        "asrv_dirichlet_alpha": 1.0,
+        "epistasis_site_degree_internal": np.array([-1.0, 0.0, 1.0], dtype=np.float64),
+    }
+    g = omega.prepare_epistasis(g=g, ON_tensor=ON_tensor, OS_tensor=OS_tensor)
+    assert g["epistasis_enabled"] is True
+    assert "S" in g["_epistasis_state"]
+    assert "N" not in g["_epistasis_state"]
+    sub_sites = np.array(
+        [
+            [0.5, 0.3, 0.2],
+            [0.2, 0.3, 0.5],
+        ],
+        dtype=np.float64,
+    )
+    out_s = omega._apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col="OCSany2any", g=g)
+    out_n = omega._apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col="OCNany2any", g=g)
+    assert not np.allclose(out_s, sub_sites)
+    np.testing.assert_allclose(out_n, sub_sites)
+
+
+def test_fit_epistasis_beta_cv_returns_zero_when_active_branches_are_insufficient():
+    counts = np.array([[2.0, 1.0, 0.0]], dtype=np.float64)
+    mask = np.ones(shape=counts.shape, dtype=bool)
+    base_probs = np.array([[2.0 / 3.0, 1.0 / 3.0, 0.0]], dtype=np.float64)
+    branch_context = np.array([0.1], dtype=np.float64)
+    degree_z = np.array([-1.0, 0.0, 1.0], dtype=np.float64)
+    beta, diag = omega._fit_epistasis_beta_cv(
+        counts=counts,
+        base_probs=base_probs,
+        branch_context=branch_context,
+        degree_z=degree_z,
+        is_site_nonmissing=mask,
+        clip_value=3.0,
+        float_tol=1e-12,
+    )
+    assert beta == pytest.approx(0.0)
+    assert diag["active_branch_count"] == 1
+
+
+def test_fit_epistasis_beta_cv_detects_positive_signal():
+    degree_z = np.array([-1.0, 0.0, 1.0], dtype=np.float64)
+    branch_context = np.array([-1.2, -0.8, -0.4, 0.4, 0.8, 1.2], dtype=np.float64)
+    mask = np.ones(shape=(branch_context.shape[0], degree_z.shape[0]), dtype=bool)
+    base_probs = np.full(shape=mask.shape, fill_value=(1.0 / 3.0), dtype=np.float64)
+    probs = omega._apply_epistasis_beta_to_probs(
+        base_probs=base_probs,
+        branch_context=branch_context,
+        degree_z=degree_z,
+        beta=1.2,
+        clip_value=5.0,
+        is_site_nonmissing=mask,
+        float_tol=1e-12,
+    )
+    counts = np.round(probs * 120.0).astype(np.float64)
+    beta, diag = omega._fit_epistasis_beta_cv(
+        counts=counts,
+        base_probs=base_probs,
+        branch_context=branch_context,
+        degree_z=degree_z,
+        is_site_nonmissing=mask,
+        clip_value=5.0,
+        float_tol=1e-12,
+        dirichlet_alpha=1.0,
+    )
+    assert beta > 0.0
+    assert diag["selection_rule"] == "argmax_mean_cv_loglik"
+    assert diag["best_beta"] == pytest.approx(beta)
+
+
+def test_auto_epistasis_clip_stays_within_bounds():
+    branch_context = np.array([0.0, 1.0], dtype=np.float64)
+    degree_z = np.array([-2.0, 0.0, 2.0], dtype=np.float64)
+    mask = np.ones(shape=(2, 3), dtype=bool)
+    clip = omega._auto_epistasis_clip(
+        beta=10.0,
+        branch_context=branch_context,
+        degree_z=degree_z,
+        is_site_nonmissing=mask,
+    )
+    assert clip >= 1.5
+    assert clip <= 5.0

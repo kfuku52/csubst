@@ -124,6 +124,27 @@ def test_sparse_summary_matches_dense_axis_sums():
     np.testing.assert_allclose(sub_sg, dense.sum(axis=(0, 3, 4)), atol=1e-12)
 
 
+def test_sparse_summary_bool_tensor_accumulates_counts_without_cast_errors():
+    dense = (_toy_dense_tensor() > 0)
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+
+    sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor, mode="spe2spe")
+    np.testing.assert_allclose(sub_bg, dense.sum(axis=1), atol=1e-12)
+    np.testing.assert_allclose(sub_sg, dense.sum(axis=0), atol=1e-12)
+
+    sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor, mode="spe2any")
+    np.testing.assert_allclose(sub_bg, dense.sum(axis=(1, 4)), atol=1e-12)
+    np.testing.assert_allclose(sub_sg, dense.sum(axis=(0, 4)), atol=1e-12)
+
+    sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor, mode="any2spe")
+    np.testing.assert_allclose(sub_bg, dense.sum(axis=(1, 3)), atol=1e-12)
+    np.testing.assert_allclose(sub_sg, dense.sum(axis=(0, 3)), atol=1e-12)
+
+    sub_bg, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(sparse_tensor, mode="any2any")
+    np.testing.assert_allclose(sub_bg, dense.sum(axis=(1, 3, 4)), atol=1e-12)
+    np.testing.assert_allclose(sub_sg, dense.sum(axis=(0, 3, 4)), atol=1e-12)
+
+
 def _toy_reducer_tensor():
     # shape = [branch, site, group, from, to]
     sub = np.zeros((3, 2, 1, 2, 2), dtype=np.float64)

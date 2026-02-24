@@ -1,0 +1,7 @@
+mode	criterion	count_base	count_other	intersection	union	jaccard
+epi_N_auto	omegaCany2spe>=5	374	371	369	376	0.9813829787234043
+epi_N_auto	OCNany2spe>=2 & omegaCany2spe>=5	17	17	17	17	1.0
+epi_S_auto	omegaCany2spe>=5	374	373	372	375	0.992
+epi_S_auto	OCNany2spe>=2 & omegaCany2spe>=5	17	17	17	17	1.0
+epi_NS_auto	omegaCany2spe>=5	374	373	369	378	0.9761904761904762
+epi_NS_auto	OCNany2spe>=2 & omegaCany2spe>=5	17	17	17	17	1.0
