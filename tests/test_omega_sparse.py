@@ -213,6 +213,51 @@ def test_calc_tmp_E_sum_matches_numpy_fallback(monkeypatch):
     np.testing.assert_allclose(out_default, out_numpy, atol=1e-12)
 
 
+@pytest.mark.parametrize("arity", [1, 2, 3])
+def test_calc_tmp_E_sum_with_cached_site_overlap_matches_direct(arity):
+    rng = np.random.default_rng(14 + arity)
+    sub_sites = rng.random((9, 31), dtype=np.float64)
+    sub_branches = rng.random(9, dtype=np.float64)
+    cb_ids = rng.integers(0, 9, size=(12, arity), dtype=np.int64)
+    site_overlap = omega._calc_cb_site_overlap(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        float_type=np.float64,
+    )
+    out_direct = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        sub_branches=sub_branches,
+        float_type=np.float64,
+    )
+    out_cached = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        sub_branches=sub_branches,
+        float_type=np.float64,
+        cb_site_overlap=site_overlap,
+    )
+    np.testing.assert_allclose(out_cached, out_direct, atol=1e-12)
+
+
+def test_get_static_sub_sites_if_available_uses_asrv_mode():
+    sub_sg = np.zeros((2, 1), dtype=np.float64)
+    g_each = {"asrv": "each", "sub_sites": {"each": np.ones((2, 2), dtype=np.float64)}}
+    assert omega._get_static_sub_sites_if_available(g_each, sub_sg, "any2any", "OCNany2any") is None
+
+    g_sn = {
+        "asrv": "sn",
+        "sub_sites": {
+            "S": np.array([[0.1, 0.9]], dtype=np.float64),
+            "N": np.array([[0.3, 0.7]], dtype=np.float64),
+        },
+    }
+    out_s = omega._get_static_sub_sites_if_available(g_sn, sub_sg, "any2any", "OCSany2any")
+    out_n = omega._get_static_sub_sites_if_available(g_sn, sub_sg, "any2any", "OCNany2any")
+    np.testing.assert_allclose(out_s, g_sn["sub_sites"]["S"], atol=1e-12)
+    np.testing.assert_allclose(out_n, g_sn["sub_sites"]["N"], atol=1e-12)
+
+
 def test_can_use_cython_tmp_E_sum_rejects_non_float64_inputs():
     cb_ids = np.array([[0, 1]], dtype=np.int64)
     sub_sites = np.array([[0.1, 0.2], [0.3, 0.4]], dtype=np.float32)

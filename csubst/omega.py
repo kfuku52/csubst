@@ -76,6 +76,8 @@ def _resolve_requested_output_stats(g):
 def _can_use_cython_expected_state(parent_state_block, transition_prob):
     if omega_cy is None:
         return False
+    if not hasattr(omega_cy, 'project_expected_state_block_double'):
+        return False
     if not isinstance(parent_state_block, np.ndarray):
         return False
     if not isinstance(transition_prob, np.ndarray):
@@ -100,6 +102,8 @@ def _can_use_cython_expected_state(parent_state_block, transition_prob):
 
 def _can_use_cython_tmp_E_sum(cb_ids, sub_sites, sub_branches):
     if omega_cy is None:
+        return False
+    if not hasattr(omega_cy, 'calc_tmp_E_sum_double'):
         return False
     if not isinstance(cb_ids, np.ndarray):
         return False
@@ -152,7 +156,76 @@ def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
     return g['sub_sites'][g['asrv']]
 
 
-def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type):
+def _get_static_sub_sites_if_available(g, sub_sg, mode, obs_col):
+    asrv_mode = str(g.get('asrv', 'no')).strip().lower()
+    if asrv_mode == 'each':
+        return None
+    return _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=0, a=0, d=0, obs_col=obs_col)
+
+
+def _calc_cb_site_overlap(cb_ids, sub_sites, float_type):
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
+    sub_sites = np.asarray(sub_sites, dtype=float_type)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if sub_sites.ndim != 2:
+        raise ValueError('sub_sites should be a 2D array.')
+    if cb_ids.shape[0] == 0:
+        return np.zeros(shape=(0,), dtype=float_type)
+    if (cb_ids < 0).any():
+        raise ValueError('cb_ids should be non-negative.')
+    if sub_sites.shape[0] <= cb_ids.max():
+        raise ValueError('cb_ids contain out-of-range branch IDs.')
+    arity = cb_ids.shape[1]
+    if arity <= 0:
+        raise ValueError('cb_ids should have at least one column.')
+    if arity == 1:
+        bids = cb_ids[:, 0]
+        return sub_sites[bids, :].sum(axis=1, dtype=float_type)
+    if arity == 2:
+        bid1 = cb_ids[:, 0]
+        bid2 = cb_ids[:, 1]
+        site_overlap = sub_sites[bid1, :] * sub_sites[bid2, :]
+        return site_overlap.sum(axis=1, dtype=float_type)
+    site_overlap = np.ones(shape=(cb_ids.shape[0], sub_sites.shape[1]), dtype=float_type)
+    for col in range(arity):
+        bids = cb_ids[:, col]
+        site_overlap *= sub_sites[bids, :]
+    return site_overlap.sum(axis=1, dtype=float_type)
+
+
+def _calc_cb_branch_factor(cb_ids, sub_branches, float_type):
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
+    sub_branches = np.asarray(sub_branches, dtype=float_type)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if sub_branches.ndim != 1:
+        raise ValueError('sub_branches should be a 1D array.')
+    if cb_ids.shape[0] == 0:
+        return np.zeros(shape=(0,), dtype=float_type)
+    if (cb_ids < 0).any():
+        raise ValueError('cb_ids should be non-negative.')
+    if sub_branches.shape[0] <= cb_ids.max():
+        raise ValueError('cb_ids contain out-of-range branch IDs.')
+    if cb_ids.shape[1] <= 0:
+        raise ValueError('cb_ids should have at least one column.')
+    branch_factor = np.ones(shape=(cb_ids.shape[0],), dtype=float_type)
+    for col in range(cb_ids.shape[1]):
+        branch_factor *= sub_branches[cb_ids[:, col]]
+    return branch_factor
+
+
+def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type, cb_site_overlap=None):
+    if cb_site_overlap is not None:
+        cb_site_overlap = np.asarray(cb_site_overlap, dtype=float_type).reshape(-1)
+        if cb_site_overlap.shape[0] != cb_ids.shape[0]:
+            txt = 'cb_site_overlap length ({}) did not match number of cb rows ({}).'
+            raise ValueError(txt.format(cb_site_overlap.shape[0], cb_ids.shape[0]))
+        return cb_site_overlap * _calc_cb_branch_factor(
+            cb_ids=cb_ids,
+            sub_branches=sub_branches,
+            float_type=float_type,
+        )
     if _can_use_cython_tmp_E_sum(cb_ids=cb_ids, sub_sites=sub_sites, sub_branches=sub_branches):
         try:
             return omega_cy.calc_tmp_E_sum_double(
@@ -164,19 +237,20 @@ def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type):
             pass
     if (cb_ids.shape[1] == 1):
         bids = cb_ids[:, 0]
-        tmp_E = sub_sites[bids, :] * sub_branches[bids, None]
-        return tmp_E.sum(axis=1)
+        site_overlap = sub_sites[bids, :].sum(axis=1)
+        return site_overlap * sub_branches[bids]
     if (cb_ids.shape[1] == 2):
         bid1 = cb_ids[:, 0]
         bid2 = cb_ids[:, 1]
-        tmp_E = sub_sites[bid1, :] * sub_branches[bid1, None]
-        tmp_E *= sub_sites[bid2, :] * sub_branches[bid2, None]
-        return tmp_E.sum(axis=1)
+        site_overlap = (sub_sites[bid1, :] * sub_sites[bid2, :]).sum(axis=1)
+        return site_overlap * sub_branches[bid1] * sub_branches[bid2]
     tmp_E = np.ones(shape=(cb_ids.shape[0], sub_sites.shape[1]), dtype=float_type)
+    branch_factor = np.ones(shape=(cb_ids.shape[0],), dtype=float_type)
     for col in range(cb_ids.shape[1]):
         bids = cb_ids[:, col]
-        tmp_E *= sub_sites[bids, :] * sub_branches[bids, None]
-    return tmp_E.sum(axis=1)
+        tmp_E *= sub_sites[bids, :]
+        branch_factor *= sub_branches[bids]
+    return tmp_E.sum(axis=1) * branch_factor
 
 
 def _weighted_sample_without_replacement_masks(p, size, niter):
@@ -222,6 +296,20 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
         raise ValueError('sub_branches should be a 1D array.')
     if sub_branches.shape[0] <= cb_ids.max():
         raise ValueError('cb_ids contain out-of-range branch IDs.')
+    p = np.asarray(p, dtype=np.float64)
+    if p.ndim == 1:
+        num_site = p.shape[0]
+        shared_site_p = p
+        branch_site_p = None
+    elif p.ndim == 2:
+        if p.shape[0] != sub_branches.shape[0]:
+            txt = 'When p is 2D, its number of rows ({}) should match sub_branches length ({}).'
+            raise ValueError(txt.format(p.shape[0], sub_branches.shape[0]))
+        num_site = p.shape[1]
+        shared_site_p = None
+        branch_site_p = p
+    else:
+        raise ValueError('p should be a 1D or 2D array.')
     cb_branch_sizes = sub_branches[cb_ids]
     is_active_row = (cb_branch_sizes > 0).all(axis=1)
     if not is_active_row.any():
@@ -233,28 +321,63 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
     active_sub_branches = sub_branches[active_branch_ids]
 
     num_branch = active_sub_branches.shape[0]
-    num_site = p.shape[0]
-    num_positive_sites = int((p > 0).sum())
-    if num_positive_sites == 0:
-        return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
     num_packed_site = (num_site + 7) // 8
     packed_masks = np.zeros(shape=(num_branch, niter, num_packed_site), dtype=np.uint8)
-    previous_branch_id_by_size = dict()
-    for branch_id in range(num_branch):
-        size = int(active_sub_branches[branch_id])
-        if size == 0:
-            continue
-        # Rounding from floating substitution counts can slightly exceed the
-        # number of positive-probability sites. Cap to valid bounds.
-        if size > num_positive_sites:
-            size = num_positive_sites
-        if size in previous_branch_id_by_size:
-            prev_branch_id = previous_branch_id_by_size[size]
-            packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
-            continue
-        previous_branch_id_by_size[size] = branch_id
-        masks = _weighted_sample_without_replacement_masks(p=p, size=size, niter=niter)
-        packed_masks[branch_id, :, :] = np.packbits(masks, axis=1)
+    if shared_site_p is not None:
+        num_positive_sites = int((shared_site_p > 0).sum())
+        if num_positive_sites == 0:
+            return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
+        previous_branch_id_by_size = dict()
+        for branch_id in range(num_branch):
+            size = int(active_sub_branches[branch_id])
+            if size == 0:
+                continue
+            # Rounding from floating substitution counts can slightly exceed the
+            # number of positive-probability sites. Cap to valid bounds.
+            if size > num_positive_sites:
+                size = num_positive_sites
+            if size in previous_branch_id_by_size:
+                prev_branch_id = previous_branch_id_by_size[size]
+                packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
+                continue
+            previous_branch_id_by_size[size] = branch_id
+            masks = _weighted_sample_without_replacement_masks(p=shared_site_p, size=size, niter=niter)
+            packed_masks[branch_id, :, :] = np.packbits(masks, axis=1)
+    else:
+        active_site_p = branch_site_p[active_branch_ids, :]
+        first_site_p = active_site_p[0, :]
+        is_shared_site_p = np.array_equal(active_site_p, np.broadcast_to(first_site_p, active_site_p.shape))
+        if is_shared_site_p:
+            num_positive_sites = int((first_site_p > 0).sum())
+            if num_positive_sites == 0:
+                return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
+            previous_branch_id_by_size = dict()
+            for branch_id in range(num_branch):
+                size = int(active_sub_branches[branch_id])
+                if size == 0:
+                    continue
+                if size > num_positive_sites:
+                    size = num_positive_sites
+                if size in previous_branch_id_by_size:
+                    prev_branch_id = previous_branch_id_by_size[size]
+                    packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
+                    continue
+                previous_branch_id_by_size[size] = branch_id
+                masks = _weighted_sample_without_replacement_masks(p=first_site_p, size=size, niter=niter)
+                packed_masks[branch_id, :, :] = np.packbits(masks, axis=1)
+        else:
+            for branch_id in range(num_branch):
+                size = int(active_sub_branches[branch_id])
+                if size == 0:
+                    continue
+                site_p = active_site_p[branch_id, :]
+                num_positive_sites = int((site_p > 0).sum())
+                if num_positive_sites == 0:
+                    continue
+                if size > num_positive_sites:
+                    size = num_positive_sites
+                masks = _weighted_sample_without_replacement_masks(p=site_p, size=size, niter=niter)
+                packed_masks[branch_id, :, :] = np.packbits(masks, axis=1)
 
     arity = remapped_active_cb_ids.shape[1]
     if arity == 1:
@@ -360,23 +483,39 @@ def _project_expected_state_chunk(
     return None
 
 
-def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g):
+def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g, static_sub_sites=None, cb_site_overlap=None):
     E_b = np.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
     for i,sg,a,d in list_igad:
         if (a==d):
             continue
-        sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+        if static_sub_sites is None:
+            sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+        else:
+            sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
         E_b += _calc_tmp_E_sum(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
             float_type=g['float_type'],
+            cb_site_overlap=cb_site_overlap,
         )
     return E_b
 
 
-def joblib_calc_E_mean(mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g):
+def joblib_calc_E_mean(
+    mode,
+    cb_ids,
+    sub_sg,
+    sub_bg,
+    dfEb,
+    obs_col,
+    num_gad_combinat,
+    igad_chunk,
+    g,
+    static_sub_sites=None,
+    cb_site_overlap=None,
+):
     iter_start = time.time()
     if (igad_chunk==[]):
         return None # This happens when the number of iteration is smaller than --threads
@@ -384,27 +523,51 @@ def joblib_calc_E_mean(mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_comb
     for i,sg,a,d in igad_chunk:
         if (a==d):
             continue
-        sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+        if static_sub_sites is None:
+            sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+        else:
+            sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
         dfEb += _calc_tmp_E_sum(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
             float_type=g['float_type'],
+            cb_site_overlap=cb_site_overlap,
         )
     txt = 'E{}: {}-{}th of {} matrix_group/ancestral_state/derived_state combinations. Time elapsed: {:,} [sec]'
     print(txt.format(obs_col, i_start, i, num_gad_combinat, int(time.time()-iter_start)), flush=True)
 
 
-def joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
+def joblib_calc_quantile(
+    mode,
+    cb_ids,
+    sub_sg,
+    sub_bg,
+    dfq,
+    quantile_niter,
+    obs_col,
+    num_gad_combinat,
+    igad_chunk,
+    g,
+    static_sub_sites=None,
+):
     for i,sg,a,d in igad_chunk:
         if (a==d):
             continue
-        sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+        if static_sub_sites is None:
+            sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+        else:
+            sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        p = sub_sites[0]
-        if p.sum()==0:
-            continue
+        if np.asarray(sub_sites).ndim == 1:
+            p = sub_sites
+            if p.sum()==0:
+                continue
+        else:
+            p = sub_sites
+            if (p.sum(axis=1) > 0).sum() == 0:
+                continue
         pm_start = time.time()
         if 'float' in str(sub_branches.dtype):
             # TODO: warn this rounding (only once)
@@ -413,14 +576,63 @@ def joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i+1, num_gad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
 
-def _calc_E_mean_chunk_to_mmap(mode, cb_ids, sub_sg, sub_bg, mmap_out, dtype, shape, obs_col, num_gad_combinat, igad_chunk, g):
+def _calc_E_mean_chunk_to_mmap(
+    mode,
+    cb_ids,
+    sub_sg,
+    sub_bg,
+    mmap_out,
+    dtype,
+    shape,
+    obs_col,
+    num_gad_combinat,
+    igad_chunk,
+    g,
+    static_sub_sites,
+    cb_site_overlap,
+):
     dfEb = np.memmap(filename=mmap_out, dtype=dtype, shape=shape, mode='r+')
-    joblib_calc_E_mean(mode, cb_ids, sub_sg, sub_bg, dfEb, obs_col, num_gad_combinat, igad_chunk, g)
+    joblib_calc_E_mean(
+        mode,
+        cb_ids,
+        sub_sg,
+        sub_bg,
+        dfEb,
+        obs_col,
+        num_gad_combinat,
+        igad_chunk,
+        g,
+        static_sub_sites=static_sub_sites,
+        cb_site_overlap=cb_site_overlap,
+    )
     dfEb.flush()
 
-def _calc_quantile_chunk_local(mode, cb_ids, sub_sg, sub_bg, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g):
+def _calc_quantile_chunk_local(
+    mode,
+    cb_ids,
+    sub_sg,
+    sub_bg,
+    quantile_niter,
+    obs_col,
+    num_gad_combinat,
+    igad_chunk,
+    g,
+    static_sub_sites,
+):
     dfq_local = np.zeros(shape=(cb_ids.shape[0], quantile_niter), dtype=np.int32)
-    joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq_local, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
+    joblib_calc_quantile(
+        mode,
+        cb_ids,
+        sub_sg,
+        sub_bg,
+        dfq_local,
+        quantile_niter,
+        obs_col,
+        num_gad_combinat,
+        igad_chunk,
+        g,
+        static_sub_sites=static_sub_sites,
+    )
     return dfq_local
 
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g=None):
@@ -460,6 +672,14 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     list_igad = [ [i,]+list(items) for i,items in zip(range(num_gad_combinat), list_gad) ]
     obs_col = 'OC'+SN+mode
     cb_ids = _get_cb_ids(cb)
+    static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
+    cb_site_overlap = None
+    if static_sub_sites is not None:
+        cb_site_overlap = _calc_cb_site_overlap(
+            cb_ids=cb_ids,
+            sub_sites=static_sub_sites,
+            float_type=g['float_type'],
+        )
     requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
     chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
     n_jobs = requested_n_jobs
@@ -474,7 +694,17 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
     if stat=='mean':
         if n_jobs == 1:
-            E_b = calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g)
+            E_b = calc_E_mean(
+                mode,
+                cb_ids,
+                sub_sg,
+                sub_bg,
+                obs_col,
+                list_igad,
+                g,
+                static_sub_sites=static_sub_sites,
+                cb_site_overlap=cb_site_overlap,
+            )
         else:
             my_dtype = sub_tensor.dtype
             if 'bool' in str(my_dtype): my_dtype = g['float_type']
@@ -483,7 +713,21 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             axis = (cb.shape[0],)
             dfEb = np.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
             tasks = [
-                (mode, cb_ids, sub_sg, sub_bg, mmap_out, my_dtype, axis, obs_col, num_gad_combinat, igad_chunk, g)
+                (
+                    mode,
+                    cb_ids,
+                    sub_sg,
+                    sub_bg,
+                    mmap_out,
+                    my_dtype,
+                    axis,
+                    obs_col,
+                    num_gad_combinat,
+                    igad_chunk,
+                    g,
+                    static_sub_sites,
+                    cb_site_overlap,
+                )
                 for igad_chunk in igad_chunks
             ]
             parallel.run_starmap(
@@ -500,10 +744,33 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
         axis = (cb.shape[0], quantile_niter)
         dfq = np.zeros(shape=axis, dtype=np.int32)
         if n_jobs == 1:
-            joblib_calc_quantile(mode, cb_ids, sub_sg, sub_bg, dfq, quantile_niter, obs_col, num_gad_combinat, list_igad, g)
+            joblib_calc_quantile(
+                mode,
+                cb_ids,
+                sub_sg,
+                sub_bg,
+                dfq,
+                quantile_niter,
+                obs_col,
+                num_gad_combinat,
+                list_igad,
+                g,
+                static_sub_sites=static_sub_sites,
+            )
         else:
             tasks = [
-                (mode, cb_ids, sub_sg, sub_bg, quantile_niter, obs_col, num_gad_combinat, igad_chunk, g)
+                (
+                    mode,
+                    cb_ids,
+                    sub_sg,
+                    sub_bg,
+                    quantile_niter,
+                    obs_col,
+                    num_gad_combinat,
+                    igad_chunk,
+                    g,
+                    static_sub_sites,
+                )
                 for igad_chunk in igad_chunks
             ]
             chunk_dfs = parallel.run_starmap(

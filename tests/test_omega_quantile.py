@@ -60,6 +60,49 @@ def test_get_permutations_fast_caps_oversized_branch_counts_to_positive_sites():
     assert out.max() <= 2
 
 
+def test_get_permutations_fast_uses_branch_specific_probabilities_when_given_matrix():
+    cb_ids = np.array([[1, 2], [2, 3]], dtype=np.int64)
+    sub_branches = np.array([0, 2, 2, 2], dtype=np.int64)
+    p_by_branch = np.array(
+        [
+            [0.0, 0.0, 0.0, 0.0],  # branch 0 has no informative site weights
+            [0.4, 0.3, 0.2, 0.1],
+            [0.4, 0.3, 0.2, 0.1],
+            [0.4, 0.3, 0.2, 0.1],
+        ],
+        dtype=np.float64,
+    )
+
+    np.random.seed(0)
+    out_branch_specific = omega._get_permutations_fast(
+        cb_ids=cb_ids,
+        sub_branches=sub_branches,
+        p=p_by_branch,
+        niter=64,
+    )
+    np.random.seed(0)
+    out_branch0_only = omega._get_permutations_fast(
+        cb_ids=cb_ids,
+        sub_branches=sub_branches,
+        p=p_by_branch[0, :],
+        niter=64,
+    )
+
+    assert out_branch_specific.shape == (2, 64)
+    assert out_branch_specific.dtype == np.int32
+    assert out_branch_specific.max() <= 2
+    assert out_branch_specific.sum() > 0
+    assert out_branch0_only.sum() == 0
+
+
+def test_get_permutations_fast_rejects_branch_probability_row_mismatch():
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    sub_branches = np.array([1, 2], dtype=np.int64)
+    p = np.ones((3, 4), dtype=np.float64)
+    with pytest.raises(ValueError, match="number of rows"):
+        omega._get_permutations_fast(cb_ids=cb_ids, sub_branches=sub_branches, p=p, niter=16)
+
+
 def test_get_permutations_fast_rejects_negative_branch_ids():
     cb_ids = np.array([[0, -1]], dtype=np.int64)
     sub_branches = np.array([2, 3], dtype=np.int64)

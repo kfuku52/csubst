@@ -241,7 +241,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 if verbose:
                     txt = 'There is no target branch combination for {} at K = {:,}.\n'
                     sys.stderr.write(txt.format(trait_name, arity))
-                    continue
+                continue
             axis = (len(index_combinations), arity)
             mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.node_combinations.mmap')
             if os.path.exists(mmap_out): os.unlink(mmap_out)
