@@ -1,0 +1,5 @@
+setting	output_stat	real_sec	maxrss_bytes	peak_mem_bytes
+new(auto-guard)	any2any	11.57	1979105280	599038144
+old(min_sub_pp=0)	any2any	11.74	1938866176	615323968
+new(auto-guard)	any2spe	15.66	1670266880	496080064
+old(min_sub_pp=0)	any2spe	15.21	1804599296	486626432

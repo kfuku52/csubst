@@ -495,8 +495,8 @@ def _main():
                               'P values of omega_C by substitution randomization (modelfree only). '
                               'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib". '
                               'If --min_sub_pp is left at 0 and --ml_anc is "no", CSUBST auto-sets --min_sub_pp to '
-                              '--omega_pvalue_safe_min_sub_pp (default 0.05) to reduce anti-conservative p-values.')
-    analyze.add_argument('--omega_pvalue_safe_min_sub_pp', metavar='FLOAT', default=0.05, type=float,
+                              '--omega_pvalue_safe_min_sub_pp (disabled by default) to reduce anti-conservative p-values.')
+    analyze.add_argument('--omega_pvalue_safe_min_sub_pp', metavar='FLOAT', default=0, type=float,
                          help='default=%(default)s: Auto-guard threshold for --min_sub_pp when --calc_omega_pvalue is active, '
                               '--ml_anc is "no", and --min_sub_pp is 0. Set 0 to disable this auto-adjustment.')
     analyze.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full', default='hypergeom', type=str,

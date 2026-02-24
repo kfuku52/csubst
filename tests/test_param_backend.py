@@ -264,7 +264,7 @@ def test_get_global_parameters_sets_omega_pvalue_defaults():
     assert g["omega_pvalue_null_model"] == "hypergeom"
     assert g["omega_pvalue_niter"] == 1000
     assert g["omega_pvalue_rounding"] == "round"
-    assert g["omega_pvalue_safe_min_sub_pp"] == pytest.approx(0.05)
+    assert g["omega_pvalue_safe_min_sub_pp"] == pytest.approx(0.0)
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_niter():
@@ -296,6 +296,21 @@ def test_get_global_parameters_rejects_invalid_omega_pvalue_safe_min_sub_pp():
         param.get_global_parameters(_args(omega_pvalue_safe_min_sub_pp=1.1))
 
 
+def test_get_global_parameters_default_safe_threshold_keeps_min_sub_pp_unchanged(capsys):
+    g = param.get_global_parameters(
+        _args(
+            calc_omega_pvalue=True,
+            omegaC_method="modelfree",
+            min_sub_pp=0,
+            ml_anc="no",
+        )
+    )
+    captured = capsys.readouterr()
+    assert g["min_sub_pp"] == pytest.approx(0.0)
+    assert g["omega_pvalue_min_sub_pp_auto_applied"] is False
+    assert "auto-set to" not in captured.err
+
+
 def test_get_global_parameters_auto_sets_min_sub_pp_for_omega_pvalue(capsys):
     g = param.get_global_parameters(
         _args(
@@ -303,6 +318,7 @@ def test_get_global_parameters_auto_sets_min_sub_pp_for_omega_pvalue(capsys):
             omegaC_method="modelfree",
             min_sub_pp=0,
             ml_anc="no",
+            omega_pvalue_safe_min_sub_pp=0.05,
         )
     )
     captured = capsys.readouterr()

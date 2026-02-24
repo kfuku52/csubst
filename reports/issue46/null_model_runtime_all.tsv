@@ -1,0 +1,7 @@
+output_stat	null_model	real_sec	maxrss_bytes	peak_mem_bytes	auto_guard_msg
+any2any	hypergeom	11.45	1838825472	611915904	False
+any2any	poisson	3.6	1535180800	488691008	False
+any2any	poisson_full	3.56	1533247488	486724544	False
+any2spe	hypergeom	15.0	1685782528	490558720	False
+any2spe	poisson	5.86	1551695872	489510272	False
+any2spe	poisson_full	5.75	1535033344	492279040	False
