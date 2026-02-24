@@ -1,0 +1,10 @@
+case	stat	n_positive_finite	n_fg_positive_finite	pearson_log10
+sym_observed	omegaCany2any	8186	20	0.1762456157226614
+sym_expected	omegaCany2any	8146	20	0.9631147235307763
+sym_both	omegaCany2any	8186	20	0.5154688662026061
+sym_observed	omegaCany2dif	8148	20	0.18209470828979882
+sym_expected	omegaCany2dif	8100	20	0.967312640997252
+sym_both	omegaCany2dif	8148	20	0.48871226069114726
+sym_observed	omegaCany2spe	7641	20	0.14138433979761325
+sym_expected	omegaCany2spe	7412	20	0.958165590952665
+sym_both	omegaCany2spe	7641	20	0.5889869229822436

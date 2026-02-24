@@ -1,0 +1,5 @@
+case	real_sec	peak_bytes	exit_code	run_dir	peak_mib
+none	8.92	1186622464.0	0	/tmp/csubst_pepc_target_plot_20260224_231219/none	1131.6513671875
+sym_observed	8.55	1266576320.0	0	/tmp/csubst_pepc_target_plot_20260224_231219/sym_observed	1207.9013061523438
+sym_expected	8.53	1253665920.0	0	/tmp/csubst_pepc_target_plot_20260224_231219/sym_expected	1195.5889892578125
+sym_both	8.17	1164848256.0	0	/tmp/csubst_pepc_target_plot_20260224_231219/sym_both	1110.8858642578125
