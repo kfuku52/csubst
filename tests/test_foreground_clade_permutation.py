@@ -5,6 +5,7 @@ import pytest
 import warnings
 
 from csubst import foreground
+from csubst import combination
 from csubst import ete
 from csubst import tree
 
@@ -222,6 +223,51 @@ def test_randomize_foreground_flags_without_sample_original_raises_when_candidat
     before = np.array([True, True, False], dtype=bool)
     with pytest.raises(ValueError, match="Not enough non-foreground clades"):
         foreground._randomize_foreground_flags(before_randomization=before, sample_original_foreground=False)
+
+
+def test_get_randomized_pair_combinations_matches_general_combination_path():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,(C:1,D:1)Y:1)R;", format=1))
+    node_by_name = {n.name: n for n in tr.traverse() if n.name}
+    a_id = int(ete.get_prop(node_by_name["A"], "numerical_label"))
+    b_id = int(ete.get_prop(node_by_name["B"], "numerical_label"))
+    c_id = int(ete.get_prop(node_by_name["C"], "numerical_label"))
+    d_id = int(ete.get_prop(node_by_name["D"], "numerical_label"))
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"name": ["A", "B", "C", "D"], "traitA": [1, 1, 1, 1]}),
+        "dep_ids": [np.array([a_id, b_id], dtype=np.int64)],
+        "fg_dep_ids": {"traitA": [np.array([c_id, d_id], dtype=np.int64)]},
+        "exhaustive_until": 1,
+        "current_arity": 2,
+        "threads": 1,
+        "r_target_ids": {"traitA": np.array([a_id, b_id, c_id, d_id], dtype=np.int64)},
+    }
+    fast = foreground._get_randomized_pair_combinations(g=g, trait_name="traitA")
+
+    g_general = {
+        "tree": tr,
+        "dep_ids": [np.array([a_id, b_id], dtype=np.int64)],
+        "fg_dep_ids": {"traitA": [np.array([c_id, d_id], dtype=np.int64)]},
+        "fg_df": pd.DataFrame({"name": ["A", "B", "C", "D"], "traitA": [1, 1, 1, 1]}),
+        "threads": 1,
+        "exhaustive_until": 1,
+    }
+    _, general = combination.get_node_combinations(
+        g=g_general,
+        target_id_dict={"traitA": np.array([a_id, b_id, c_id, d_id], dtype=np.int64)},
+        arity=2,
+        check_attr="name",
+        verbose=False,
+    )
+
+    def _sort_rows(values):
+        if values.shape[0] == 0:
+            return values
+        out = np.sort(values.astype(np.int64, copy=False), axis=1)
+        order = np.lexsort((out[:, 1], out[:, 0]))
+        return out[order, :]
+
+    assert np.array_equal(_sort_rows(fast), _sort_rows(general))
 
 
 def test_clade_permutation_uses_observed_stats_when_main_table_has_only_permutations(monkeypatch):

@@ -22,12 +22,113 @@ def _get_trait_names(g):
     return g['fg_df'].columns[1:len(g['fg_df'].columns)]
 
 
+def _invalidate_clade_permutation_cache(g):
+    for key in [
+        '_node_by_branch_id_cache',
+        '_clade_permutation_trait_cache',
+        '_clade_permutation_pair_block_cache',
+        '_clade_permutation_combination_count_cache',
+        '_clade_permutation_randomization_plan_cache',
+        '_permutation_cb_pair_lookup_cache',
+        '_clade_permutation_fast_stats_plan_cache',
+        '_clade_permutation_selected_rows_plan_cache',
+    ]:
+        if key in g:
+            del g[key]
+    return g
+
+
 def _get_node_by_branch_id(g):
+    cached = g.get('_node_by_branch_id_cache', None)
+    if cached is not None:
+        return cached
     node_by_id = dict()
     for node in g['tree'].traverse():
         branch_id = int(ete.get_prop(node, "numerical_label"))
         node_by_id[branch_id] = node
+    g['_node_by_branch_id_cache'] = node_by_id
     return node_by_id
+
+
+def _build_trait_clade_permutation_cache(g, trait_name):
+    node_by_id = _get_node_by_branch_id(g)
+    tree_obj = g['tree']
+    branch_ids = np.array(
+        sorted([
+            bid
+            for bid, node in node_by_id.items()
+            if not ete.is_root(node)
+        ]),
+        dtype=np.int64,
+    )
+    branch_id_to_index = {int(bid): i for i, bid in enumerate(branch_ids.tolist())}
+    leaf_count_by_bid = dict()
+    for node in tree_obj.traverse('postorder'):
+        bid = int(ete.get_prop(node, "numerical_label"))
+        if ete.is_leaf(node):
+            leaf_count_by_bid[bid] = 1
+            continue
+        count = 0
+        for child in ete.get_children(node):
+            child_bid = int(ete.get_prop(child, "numerical_label"))
+            count += int(leaf_count_by_bid.get(child_bid, 0))
+        leaf_count_by_bid[bid] = int(count)
+    size_array = np.array(
+        [leaf_count_by_bid.get(int(bid), 1) for bid in branch_ids.tolist()],
+        dtype=np.int64,
+    )
+    is_fg_stem = np.zeros(shape=(branch_ids.shape[0],), dtype=bool)
+    descendant_branch_ids_by_bid = dict()
+    descendant_indices_by_bid = dict()
+    leaf_names_by_bid = dict()
+    for i, bid in enumerate(branch_ids.tolist()):
+        node = node_by_id[int(bid)]
+        is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
+        is_parent_fg = ete.get_prop(node.up, 'is_fg_' + trait_name, False)
+        is_fg_stem[i] = bool(is_fg and (not is_parent_fg))
+        descendant_branch_ids = np.array(
+            [
+                int(ete.get_prop(d, "numerical_label"))
+                for d in node.traverse()
+                if not ete.is_root(d)
+            ],
+            dtype=np.int64,
+        )
+        descendant_branch_ids_by_bid[int(bid)] = descendant_branch_ids
+        descendant_indices_by_bid[int(bid)] = np.array(
+            [branch_id_to_index[int(d)] for d in descendant_branch_ids.tolist() if int(d) in branch_id_to_index],
+            dtype=np.int64,
+        )
+        leaf_names_by_bid[int(bid)] = tuple(ete.get_leaf_names(node))
+    descendant_branch_ids_by_index = [descendant_branch_ids_by_bid[int(bid)] for bid in branch_ids.tolist()]
+    descendant_indices_by_index = [descendant_indices_by_bid[int(bid)] for bid in branch_ids.tolist()]
+    leaf_names_by_index = [leaf_names_by_bid[int(bid)] for bid in branch_ids.tolist()]
+    df_clade_size_template = pd.DataFrame(index=branch_ids, columns=['branch_id', 'size', 'is_fg_stem_' + trait_name])
+    df_clade_size_template.loc[:, 'branch_id'] = branch_ids
+    df_clade_size_template.loc[:, 'size'] = size_array
+    df_clade_size_template.loc[:, 'is_fg_stem_' + trait_name] = is_fg_stem
+    return {
+        'branch_ids': branch_ids,
+        'branch_id_to_index': branch_id_to_index,
+        'size': size_array,
+        'is_fg_stem': is_fg_stem,
+        'descendant_branch_ids_by_bid': descendant_branch_ids_by_bid,
+        'descendant_indices_by_bid': descendant_indices_by_bid,
+        'descendant_branch_ids_by_index': descendant_branch_ids_by_index,
+        'descendant_indices_by_index': descendant_indices_by_index,
+        'leaf_names_by_index': leaf_names_by_index,
+        'df_clade_size_template': df_clade_size_template,
+    }
+
+
+def _get_trait_clade_permutation_cache(g, trait_name):
+    trait_cache_dict = g.get('_clade_permutation_trait_cache', None)
+    if trait_cache_dict is None:
+        trait_cache_dict = dict()
+        g['_clade_permutation_trait_cache'] = trait_cache_dict
+    if trait_name not in trait_cache_dict:
+        trait_cache_dict[trait_name] = _build_trait_clade_permutation_cache(g=g, trait_name=trait_name)
+    return trait_cache_dict[trait_name]
 
 
 def _normalize_branch_ids(branch_ids):
@@ -133,47 +234,46 @@ def combinations_count(n, r):
     return numer // denom
 
 def get_df_clade_size(g, trait_name):
-    branch_ids = sorted([
-        int(ete.get_prop(n, "numerical_label"))
-        for n in g['tree'].traverse()
-        if not ete.is_root(n)
-    ])
-    cols = ['branch_id','size','is_fg_stem_'+trait_name]
-    df_clade_size = pd.DataFrame(index=branch_ids, columns=cols)
-    df_clade_size.loc[:,'branch_id'] = branch_ids
-    df_clade_size.loc[:,'is_fg_stem_'+trait_name] = False
-    for node in g['tree'].traverse():
-        if ete.is_root(node):
-            continue
-        bid = ete.get_prop(node, "numerical_label")
-        df_clade_size.at[bid,'size'] = len(ete.get_leaf_names(node))
-        is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
-        is_parent_fg = ete.get_prop(node.up, 'is_fg_' + trait_name, False)
-        if is_fg and (not is_parent_fg):
-            df_clade_size.at[bid,'is_fg_stem_'+trait_name] = True
-    return df_clade_size
+    trait_cache = _get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
+    return trait_cache['df_clade_size_template'].copy(deep=True)
 
 
-def _build_clade_permutation_bins(df_clade_size, trait_name, min_clade_bin_count, sample_original_foreground):
-    size_array = df_clade_size.loc[:, 'size'].values.astype(np.int64)
-    size_min = size_array.min()
-    size_max = size_array.max()
+def _build_clade_permutation_bins_from_arrays(size_array, is_fg_stem, min_clade_bin_count, sample_original_foreground):
+    size_array = np.asarray(size_array, dtype=np.int64).reshape(-1)
+    is_fg_stem = np.asarray(is_fg_stem, dtype=bool).reshape(-1)
+    if size_array.shape[0] == 0:
+        return np.array([0, 0], dtype=np.int64), []
+    size_min = int(size_array.min())
+    size_max = int(size_array.max())
     sizes = np.unique(size_array)[::-1]  # To start counting from rarer (larger) clades
-    bins = np.array([size_max + 1], dtype=np.int64)
+    bins = [int(size_max + 1)]
     count = 0
     counts = []
     for size in sizes:
-        if sample_original_foreground:
-            is_size = (size_array == size)
-        else:
-            is_size = ((size_array == size) & (~df_clade_size.loc[:, 'is_fg_stem_' + trait_name]))
-        count += is_size.sum()
-        if count >= min_clade_bin_count:
-            bins = np.append(bins, size)
-            counts.append(count)
+        is_size = (size_array == int(size))
+        if not sample_original_foreground:
+            is_size &= (~is_fg_stem)
+        count += int(is_size.sum())
+        if count >= int(min_clade_bin_count):
+            bins.append(int(size))
+            counts.append(int(count))
             count = 0
     if len(bins) < 2:
-        bins = np.array([size_min, size_max], dtype=np.int64)
+        bins = [int(size_min), int(size_max)]
+    return np.array(bins, dtype=np.int64), counts
+
+
+def _build_clade_permutation_bins(df_clade_size, trait_name, min_clade_bin_count, sample_original_foreground):
+    size_array = df_clade_size.loc[:, 'size'].to_numpy(dtype=np.int64, copy=False)
+    if size_array.shape[0] == 0:
+        return np.array([0, 0], dtype=np.int64), [], size_array
+    is_fg_stem = df_clade_size.loc[:, 'is_fg_stem_' + trait_name].to_numpy(dtype=bool, copy=False)
+    bins, counts = _build_clade_permutation_bins_from_arrays(
+        size_array=size_array,
+        is_fg_stem=is_fg_stem,
+        min_clade_bin_count=min_clade_bin_count,
+        sample_original_foreground=sample_original_foreground,
+    )
     return bins, counts, size_array
 
 
@@ -214,42 +314,195 @@ def foreground_clade_randomization(df_clade_size, g, trait_name, sample_original
     txt = 'Number of clade permutation bins = {:,} (bin limits = {}, counts = {})'
     print(txt.format(bins.shape[0]-1, ', '.join([ str(s) for s in bins ]), ', '.join([ str(s) for s in counts ])))
     bins = bins[::-1]
-    df_clade_size.loc[:,'bin'] = np.digitize(size_array, bins, right=False)
-    is_fg = (df_clade_size.loc[:,'is_fg_stem_'+trait_name]==True)
-    fg_bins = df_clade_size.loc[is_fg,'bin']
-    df_clade_size.loc[:,'is_fg_stem_randomized'] = df_clade_size.loc[:,'is_fg_stem_'+trait_name]
-    df_clade_size.loc[:,'is_blocked'] = False
-    node_by_id = _get_node_by_branch_id(g)
-    for bin in fg_bins.unique():
-        is_bin = (df_clade_size.loc[:,'bin']==bin)
-        is_blocked = df_clade_size.loc[:,'is_blocked'].values
-        before_randomization = df_clade_size.loc[is_bin&~is_blocked,'is_fg_stem_randomized'].values
+    bin_array = np.digitize(size_array, bins, right=False).astype(np.int64, copy=False)
+    is_fg = df_clade_size.loc[:, 'is_fg_stem_' + trait_name].to_numpy(dtype=bool, copy=False)
+    fg_bins = np.unique(bin_array[is_fg])
+    is_fg_stem_randomized = is_fg.copy()
+    is_blocked = np.zeros(shape=(df_clade_size.shape[0],), dtype=bool)
+    branch_ids = df_clade_size.loc[:, 'branch_id'].to_numpy(dtype=np.int64, copy=False)
+    trait_cache = _get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
+    branch_id_to_index = trait_cache['branch_id_to_index']
+    descendant_indices_by_bid = trait_cache.get('descendant_indices_by_bid', None)
+    node_by_id = None
+    if descendant_indices_by_bid is None:
+        node_by_id = _get_node_by_branch_id(g)
+    for bin_no in fg_bins:
+        is_bin = (bin_array == int(bin_no))
+        is_eligible = is_bin & (~is_blocked)
+        before_randomization = is_fg_stem_randomized[is_eligible]
         after_randomization = _randomize_foreground_flags(
             before_randomization=before_randomization,
             sample_original_foreground=sample_original_foreground,
         )
-        df_clade_size.loc[is_bin&~is_blocked,'is_fg_stem_randomized'] = after_randomization
-        df_clade_size = _block_randomized_foreground_descendants(
-            df_clade_size=df_clade_size,
-            is_bin=is_bin,
-            node_by_id=node_by_id,
-        )
+        is_fg_stem_randomized[is_eligible] = after_randomization
+        is_new_fg = is_eligible & is_fg_stem_randomized
+        new_fg_bids = branch_ids[is_new_fg]
+        for new_fg_bid in new_fg_bids.tolist():
+            descendant_indices = None
+            if descendant_indices_by_bid is not None:
+                descendant_indices = descendant_indices_by_bid.get(int(new_fg_bid), None)
+            else:
+                node = node_by_id.get(int(new_fg_bid), None)
+                if node is None:
+                    continue
+                descendant_bids = [
+                    int(ete.get_prop(d, "numerical_label"))
+                    for d in node.traverse()
+                    if not ete.is_root(d)
+                ]
+                descendant_indices = np.array(
+                    [branch_id_to_index[int(d)] for d in descendant_bids if int(d) in branch_id_to_index],
+                    dtype=np.int64,
+                )
+            if (descendant_indices is not None) and (descendant_indices.shape[0] > 0):
+                is_blocked[descendant_indices] = True
+    df_clade_size.loc[:, 'bin'] = bin_array
+    df_clade_size.loc[:, 'is_fg_stem_randomized'] = is_fg_stem_randomized
+    df_clade_size.loc[:, 'is_blocked'] = is_blocked
     return df_clade_size
 
-def get_new_foreground_ids(df_clade_size, g):
+
+def _build_clade_permutation_randomization_plan(g, trait_name, sample_original_foreground):
+    trait_cache = _get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
+    bins, counts = _build_clade_permutation_bins_from_arrays(
+        size_array=trait_cache['size'],
+        is_fg_stem=trait_cache['is_fg_stem'],
+        min_clade_bin_count=g['min_clade_bin_count'],
+        sample_original_foreground=sample_original_foreground,
+    )
+    txt = 'Number of clade permutation bins = {:,} (bin limits = {}, counts = {})'
+    print(txt.format(bins.shape[0] - 1, ', '.join([str(s) for s in bins]), ', '.join([str(s) for s in counts])))
+    bins_for_digitize = bins[::-1]
+    bin_array = np.digitize(trait_cache['size'], bins_for_digitize, right=False).astype(np.int64, copy=False)
+    unique_bins = np.unique(bin_array)
+    fg_bins = np.unique(bin_array[trait_cache['is_fg_stem']])
+    bin_indices = dict()
+    for bin_no in unique_bins.tolist():
+        bin_indices[int(bin_no)] = np.where(bin_array == int(bin_no))[0].astype(np.int64, copy=False)
+    num_possible_permutation_combination = 1
+    for bin_no in unique_bins.tolist():
+        indices = bin_indices[int(bin_no)]
+        num_bin_fg = int(trait_cache['is_fg_stem'][indices].sum())
+        if num_bin_fg == 0:
+            continue
+        if sample_original_foreground:
+            num_bin_choice = int(indices.shape[0])
+        else:
+            num_bin_choice = int((~trait_cache['is_fg_stem'][indices]).sum())
+        num_possible_permutation_combination *= combinations_count(n=num_bin_choice, r=num_bin_fg)
+    return {
+        'bin_array': bin_array,
+        'fg_bins': fg_bins.astype(np.int64, copy=False),
+        'bin_indices': bin_indices,
+        'num_possible_permutation_combination': int(num_possible_permutation_combination),
+    }
+
+
+def _get_clade_permutation_randomization_plan(g, trait_name, sample_original_foreground):
+    cache = g.get('_clade_permutation_randomization_plan_cache', None)
+    if cache is None:
+        cache = dict()
+        g['_clade_permutation_randomization_plan_cache'] = cache
+    cache_key = (str(trait_name), bool(sample_original_foreground), int(g.get('min_clade_bin_count', 0)))
+    if cache_key not in cache:
+        cache[cache_key] = _build_clade_permutation_randomization_plan(
+            g=g,
+            trait_name=trait_name,
+            sample_original_foreground=sample_original_foreground,
+        )
+    return cache[cache_key]
+
+
+def _randomize_foreground_stem_flags_from_plan(trait_cache, randomization_plan, sample_original_foreground):
+    is_fg_stem_randomized = trait_cache['is_fg_stem'].copy()
+    is_blocked = np.zeros(shape=(is_fg_stem_randomized.shape[0],), dtype=bool)
+    descendant_indices_by_index = trait_cache['descendant_indices_by_index']
+    for bin_no in randomization_plan['fg_bins'].tolist():
+        indices = randomization_plan['bin_indices'].get(int(bin_no), None)
+        if (indices is None) or (indices.shape[0] == 0):
+            continue
+        eligible_indices = indices[~is_blocked[indices]]
+        if eligible_indices.shape[0] == 0:
+            continue
+        before_randomization = is_fg_stem_randomized[eligible_indices]
+        after_randomization = _randomize_foreground_flags(
+            before_randomization=before_randomization,
+            sample_original_foreground=sample_original_foreground,
+        )
+        is_fg_stem_randomized[eligible_indices] = after_randomization
+        new_fg_indices = eligible_indices[after_randomization]
+        for idx in new_fg_indices.tolist():
+            descendant_indices = descendant_indices_by_index[int(idx)]
+            if descendant_indices.shape[0] > 0:
+                is_blocked[descendant_indices] = True
+    return is_fg_stem_randomized
+
+
+def _resolve_randomized_target_ids(trait_cache, randomized_stem_indices, fg_stem_only):
+    if randomized_stem_indices.shape[0] == 0:
+        return np.array([], dtype=np.int64)
+    branch_ids = trait_cache['branch_ids']
+    randomized_stem_bids = branch_ids[randomized_stem_indices]
+    if fg_stem_only:
+        return randomized_stem_bids.astype(np.int64, copy=True)
+    descendant_branch_ids_by_index = trait_cache['descendant_branch_ids_by_index']
+    concatenated = [descendant_branch_ids_by_index[int(i)] for i in randomized_stem_indices.tolist()]
+    if len(concatenated) == 0:
+        return np.array([], dtype=np.int64)
+    return np.unique(np.concatenate(concatenated).astype(np.int64, copy=False))
+
+
+def _resolve_randomized_fg_leaf_names(trait_cache, randomized_stem_indices):
+    if randomized_stem_indices.shape[0] == 0:
+        return []
+    leaf_names_by_index = trait_cache['leaf_names_by_index']
+    leaf_name_set = set()
+    for idx in randomized_stem_indices.tolist():
+        leaf_name_set.update(leaf_names_by_index[int(idx)])
+    return sorted(leaf_name_set)
+
+
+def _infer_trait_name_from_clade_size(df_clade_size):
+    for col in df_clade_size.columns:
+        col_text = str(col)
+        if col_text.startswith('is_fg_stem_') and (col_text != 'is_fg_stem_randomized'):
+            return col_text.replace('is_fg_stem_', '', 1)
+    return None
+
+
+def get_new_foreground_ids(df_clade_size, g, trait_name=None):
     is_new_fg = (df_clade_size.loc[:,'is_fg_stem_randomized']==True)
-    fg_stem_bids = df_clade_size.loc[is_new_fg,'branch_id'].values
+    fg_stem_bids = df_clade_size.loc[is_new_fg,'branch_id'].to_numpy(dtype=np.int64, copy=False)
+    if fg_stem_bids.shape[0] == 0:
+        return np.array([], dtype=np.int64)
     new_fg_ids = list()
     if (g['fg_stem_only']):
-        new_fg_ids = fg_stem_bids
+        new_fg_ids = fg_stem_bids.astype(np.int64, copy=False)
     else:
-        node_by_id = _get_node_by_branch_id(g)
-        for fg_stem_bid in fg_stem_bids:
-            node = node_by_id.get(int(fg_stem_bid), None)
-            if node is None:
-                continue
-            new_lineage_fg_ids = [ete.get_prop(n, "numerical_label") for n in node.traverse()]
-            new_fg_ids += new_lineage_fg_ids
+        if trait_name is None:
+            trait_name = _infer_trait_name_from_clade_size(df_clade_size=df_clade_size)
+        descendant_branch_ids_by_bid = None
+        if trait_name is not None:
+            trait_cache = _get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
+            descendant_branch_ids_by_bid = trait_cache.get('descendant_branch_ids_by_bid', None)
+        if descendant_branch_ids_by_bid is not None:
+            for fg_stem_bid in fg_stem_bids.tolist():
+                descendant_branch_ids = descendant_branch_ids_by_bid.get(int(fg_stem_bid), None)
+                if descendant_branch_ids is None:
+                    continue
+                new_fg_ids.append(descendant_branch_ids)
+            if len(new_fg_ids) > 0:
+                new_fg_ids = np.concatenate(new_fg_ids)
+            else:
+                new_fg_ids = np.array([], dtype=np.int64)
+        else:
+            node_by_id = _get_node_by_branch_id(g)
+            for fg_stem_bid in fg_stem_bids.tolist():
+                node = node_by_id.get(int(fg_stem_bid), None)
+                if node is None:
+                    continue
+                new_lineage_fg_ids = [ete.get_prop(n, "numerical_label") for n in node.traverse()]
+                new_fg_ids += new_lineage_fg_ids
     new_fg_ids = np.unique(np.array(new_fg_ids, dtype=np.int64))
     return new_fg_ids
 
@@ -438,44 +691,65 @@ def get_foreground_branch(g, simulate=False):
                 g['fg_df'] = g['fg_df'].iloc[:,[0,1]]
             g['fg_df'].columns = ['name','PLACEHOLDER']
         g = get_foreground_ids(g=g, write=True)
+    g = _invalidate_clade_permutation_cache(g)
+    g['_foreground_annotation_ready'] = True
     return g
 
 def print_num_possible_permuted_combinations(df_clade_size, trait_name, sample_original_foreground):
-    import scipy
     num_possible_permutation_combination = 1
-    is_fg_stem = df_clade_size.loc[:, 'is_fg_stem_'+trait_name].values
-    for bin_no in df_clade_size.loc[:, 'bin'].unique():
-        is_bin = (df_clade_size.loc[:, 'bin'] == bin_no)
-        num_bin_fg = (is_bin & is_fg_stem).sum()
+    is_fg_stem = df_clade_size.loc[:, 'is_fg_stem_'+trait_name].to_numpy(dtype=bool, copy=False)
+    bin_array = df_clade_size.loc[:, 'bin'].to_numpy(dtype=np.int64, copy=False)
+    for bin_no in np.unique(bin_array):
+        is_bin = (bin_array == int(bin_no))
+        num_bin_fg = int((is_bin & is_fg_stem).sum())
         if num_bin_fg == 0:
             continue
         if sample_original_foreground:
-            num_bin_choice = is_bin.sum()
+            num_bin_choice = int(is_bin.sum())
         else:
-            num_bin_choice = (is_bin & ~is_fg_stem).sum()
-        num_possible_permutation_combination_bin = scipy.special.comb(N=num_bin_choice, k=num_bin_fg, repetition=False)
+            num_bin_choice = int((is_bin & ~is_fg_stem).sum())
+        num_possible_permutation_combination_bin = combinations_count(n=num_bin_choice, r=num_bin_fg)
         num_possible_permutation_combination *= num_possible_permutation_combination_bin
-    txt = 'Number of possible clade-permuted combinations without considering branch dependency = {:,}'
-    print(txt.format(int(num_possible_permutation_combination)))
+    return int(num_possible_permutation_combination)
 
 def randomize_foreground_branch(g, trait_name, sample_original_foreground=False):
-    g['r_target_ids'] = dict()
-    g['r_fg_ids'] = dict()
-    g['r_fg_leaf_names'] = dict()
-    df_clade_size = get_df_clade_size(g, trait_name)
-    r_df_clade_size = foreground_clade_randomization(df_clade_size, g, trait_name, sample_original_foreground)
-    print_num_possible_permuted_combinations(r_df_clade_size, trait_name, sample_original_foreground)
-    g['r_target_ids'][trait_name] = get_new_foreground_ids(r_df_clade_size, g)
-    g['r_fg_ids'][trait_name] = copy.deepcopy(g['r_target_ids'][trait_name])
-    randomized_fg_id_set = set(_normalize_branch_ids(g['r_fg_ids'][trait_name]).tolist())
-    new_fg_leaf_names = [
-        ete.get_leaf_names(n)
-        for n in g['tree'].traverse()
-        if ete.get_prop(n, "numerical_label") in randomized_fg_id_set
-    ]
-    new_fg_leaf_names = list(itertools.chain(*new_fg_leaf_names))
-    new_fg_leaf_names = list(set(new_fg_leaf_names))
-    g['r_fg_leaf_names'][trait_name] = new_fg_leaf_names
+    if 'r_target_ids' not in g:
+        g['r_target_ids'] = dict()
+    if 'r_fg_ids' not in g:
+        g['r_fg_ids'] = dict()
+    if 'r_fg_leaf_names' not in g:
+        g['r_fg_leaf_names'] = dict()
+    trait_cache = _get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
+    randomization_plan = _get_clade_permutation_randomization_plan(
+        g=g,
+        trait_name=trait_name,
+        sample_original_foreground=sample_original_foreground,
+    )
+    is_fg_stem_randomized = _randomize_foreground_stem_flags_from_plan(
+        trait_cache=trait_cache,
+        randomization_plan=randomization_plan,
+        sample_original_foreground=sample_original_foreground,
+    )
+    randomized_stem_indices = np.where(is_fg_stem_randomized)[0].astype(np.int64, copy=False)
+    count_cache = g.get('_clade_permutation_combination_count_cache', None)
+    if count_cache is None:
+        count_cache = dict()
+        g['_clade_permutation_combination_count_cache'] = count_cache
+    count_cache_key = (str(trait_name), bool(sample_original_foreground))
+    if count_cache_key not in count_cache:
+        count_cache[count_cache_key] = int(randomization_plan['num_possible_permutation_combination'])
+        txt = 'Number of possible clade-permuted combinations without considering branch dependency = {:,}'
+        print(txt.format(int(count_cache[count_cache_key])))
+    g['r_target_ids'][trait_name] = _resolve_randomized_target_ids(
+        trait_cache=trait_cache,
+        randomized_stem_indices=randomized_stem_indices,
+        fg_stem_only=bool(g.get('fg_stem_only', False)),
+    )
+    g['r_fg_ids'][trait_name] = g['r_target_ids'][trait_name].copy()
+    g['r_fg_leaf_names'][trait_name] = _resolve_randomized_fg_leaf_names(
+        trait_cache=trait_cache,
+        randomized_stem_indices=randomized_stem_indices,
+    )
     return g
 
 def get_marginal_branch(g):
@@ -611,17 +885,81 @@ def get_num_foreground_lineages(tree, trait_name):
     return num_fl
 
 
+def _build_clade_permutation_pair_block_cache(g, trait_name):
+    node_by_id = _get_node_by_branch_id(g)
+    max_branch_id = max([int(bid) for bid in node_by_id.keys()]) if len(node_by_id) > 0 else 0
+    multiplier = np.int64(max_branch_id + 1)
+    blocked_keys = []
+    dep_groups = [np.asarray(dep, dtype=np.int64).reshape(-1) for dep in g.get('dep_ids', [])]
+    if int(g.get('exhaustive_until', 0)) < int(g.get('current_arity', 2)):
+        dep_groups += [np.asarray(dep, dtype=np.int64).reshape(-1) for dep in g.get('fg_dep_ids', {}).get(trait_name, [])]
+    for dep_group in dep_groups:
+        dep_group = np.unique(_normalize_branch_ids(dep_group))
+        if dep_group.shape[0] < 2:
+            continue
+        left, right = np.triu_indices(dep_group.shape[0], k=1)
+        if left.shape[0] == 0:
+            continue
+        keys = dep_group[left].astype(np.int64, copy=False) * multiplier + dep_group[right].astype(np.int64, copy=False)
+        blocked_keys.append(keys)
+    if len(blocked_keys) > 0:
+        blocked_keys = np.unique(np.concatenate(blocked_keys).astype(np.int64, copy=False))
+    else:
+        blocked_keys = np.array([], dtype=np.int64)
+    return {
+        'multiplier': multiplier,
+        'blocked_keys': blocked_keys,
+    }
+
+
+def _get_clade_permutation_pair_block_cache(g, trait_name):
+    pair_cache_dict = g.get('_clade_permutation_pair_block_cache', None)
+    if pair_cache_dict is None:
+        pair_cache_dict = dict()
+        g['_clade_permutation_pair_block_cache'] = pair_cache_dict
+    cache_key = (
+        str(trait_name),
+        int(g.get('current_arity', 2)),
+        int(g.get('exhaustive_until', 0)),
+    )
+    if cache_key not in pair_cache_dict:
+        pair_cache_dict[cache_key] = _build_clade_permutation_pair_block_cache(g=g, trait_name=trait_name)
+    return pair_cache_dict[cache_key]
+
+
+def _get_randomized_pair_combinations(g, trait_name):
+    target_ids = np.unique(_normalize_branch_ids(g['r_target_ids'][trait_name]))
+    if target_ids.shape[0] < 2:
+        return np.zeros(shape=(0, 2), dtype=np.int64)
+    left, right = np.triu_indices(target_ids.shape[0], k=1)
+    pair_left = target_ids[left].astype(np.int64, copy=False)
+    pair_right = target_ids[right].astype(np.int64, copy=False)
+    cache = _get_clade_permutation_pair_block_cache(g=g, trait_name=trait_name)
+    blocked_keys = cache['blocked_keys']
+    if blocked_keys.shape[0] > 0:
+        pair_keys = pair_left * cache['multiplier'] + pair_right
+        is_blocked = np.isin(pair_keys, blocked_keys)
+        pair_left = pair_left[~is_blocked]
+        pair_right = pair_right[~is_blocked]
+    if pair_left.shape[0] == 0:
+        return np.zeros(shape=(0, 2), dtype=np.int64)
+    return np.column_stack([pair_left, pair_right]).astype(np.int64, copy=False)
+
+
 def _try_randomized_foreground_combinations(g, trait_name, current_arity, sample_original_foreground):
     g = randomize_foreground_branch(g, trait_name, sample_original_foreground=sample_original_foreground)
     if g['r_target_ids'][trait_name].shape[0] < 2:
         return g, None
-    g, rid_combinations = combination.get_node_combinations(
-        g=g,
-        target_id_dict=g['r_target_ids'],
-        arity=current_arity,
-        check_attr="name",
-        verbose=False,
-    )
+    if int(current_arity) == 2:
+        rid_combinations = _get_randomized_pair_combinations(g=g, trait_name=trait_name)
+    else:
+        g, rid_combinations = combination.get_node_combinations(
+            g=g,
+            target_id_dict=g['r_target_ids'],
+            arity=current_arity,
+            check_attr="name",
+            verbose=False,
+        )
     if rid_combinations.shape[0] == 0:
         return g, None
     return g, rid_combinations
@@ -636,8 +974,9 @@ def _raise_foreground_permutation_failure(num_trial, sample_original_foreground)
 
 
 def set_random_foreground_branch(g, trait_name, num_trial=100, sample_original_foreground=False):
-    # Refresh tree foreground annotations once before randomization attempts.
-    g = get_foreground_branch(g)
+    # Refresh tree foreground annotations only once; repeated refresh is expensive.
+    if not bool(g.get('_foreground_annotation_ready', False)):
+        g = get_foreground_branch(g)
     for i in np.arange(num_trial):
         g, rid_combinations = _try_randomized_foreground_combinations(
             g=g,
@@ -684,37 +1023,475 @@ def _resolve_cb_stats_for_median_and_total(cb):
     return stats
 
 
+def _build_cutoff_column_plan(cb, cutoff_stat_str):
+    cutoff_stat_entries = table.parse_cutoff_stat(cutoff_stat_str=cutoff_stat_str)
+    cutoff_column_plan = []
+    for cutoff_stat_exp, cutoff_stat_value in cutoff_stat_entries:
+        is_col = cb.columns.str.fullmatch(cutoff_stat_exp, na=False)
+        if is_col.sum() == 0:
+            txt = 'The column "{}" was not found in the cb table. '
+            txt += 'Check the format of the --cutoff_stat specification ("{}") carefully.'
+            raise ValueError(txt.format(cutoff_stat_exp, cutoff_stat_str))
+        cutoff_stat_cols = cb.columns[is_col]
+        for cutoff_stat_col in cutoff_stat_cols:
+            cutoff_column_plan.append((str(cutoff_stat_col), float(cutoff_stat_value)))
+    return cutoff_column_plan
+
+
+def _evaluate_cutoff_column_plan(cb, cutoff_column_plan):
+    if len(cutoff_column_plan) == 0:
+        return np.ones(shape=(cb.shape[0],), dtype=bool)
+    is_enough_stat = np.ones(shape=(cb.shape[0],), dtype=bool)
+    for cutoff_col, cutoff_value in cutoff_column_plan:
+        values = cb.loc[:, cutoff_col].to_numpy(copy=False)
+        if np.issubdtype(values.dtype, np.number):
+            values_float = values.astype(np.float64, copy=False)
+        else:
+            values_float = pd.to_numeric(cb.loc[:, cutoff_col], errors='coerce').to_numpy(dtype=np.float64, copy=False)
+        is_enough_stat &= np.isfinite(values_float) & (values_float >= float(cutoff_value))
+    return is_enough_stat
+
+
+def _build_clade_permutation_target_suffix_to_col(cb, trait_names, target_col_prefixes):
+    suffix_to_col = dict()
+    for trait_name in trait_names:
+        for target_col_prefix in target_col_prefixes:
+            target_col = target_col_prefix + '_' + trait_name
+            if target_col in cb.columns:
+                suffix = target_col.replace('is_', '_')
+                suffix_to_col[suffix] = target_col
+            elif target_col_prefix == 'is_all':
+                suffix_to_col['_all'] = None
+    if '_all' not in suffix_to_col:
+        suffix_to_col['_all'] = None
+    return suffix_to_col
+
+
+def _build_clade_permutation_fast_stats_plan(g, cb, trait_names, target_col_prefixes):
+    stats = _resolve_cb_stats_for_median_and_total(cb)
+    median_stats = [ms for ms in stats['median'] if ms in cb.columns]
+    total_stats = [ms for ms in stats['total'] if ms in cb.columns]
+    all_stats = list(dict.fromkeys(median_stats + total_stats))
+    stat_to_index = {stat_col: i for i, stat_col in enumerate(all_stats)}
+    median_indices = np.array([stat_to_index[ms] for ms in median_stats], dtype=np.int64)
+    total_indices = np.array([stat_to_index[ms] for ms in total_stats], dtype=np.int64)
+    suffix_to_col = _build_clade_permutation_target_suffix_to_col(
+        cb=cb,
+        trait_names=trait_names,
+        target_col_prefixes=target_col_prefixes,
+    )
+    median_output_cols = dict()
+    total_output_cols = dict()
+    count_output_cols = dict()
+    for suffix in suffix_to_col.keys():
+        median_output_cols[suffix] = ['median_' + ms + suffix for ms in median_stats]
+        total_output_cols[suffix] = ['total_' + ms + suffix for ms in total_stats]
+        count_output_cols[suffix] = ('num' + suffix, 'num_qualified' + suffix)
+    cutoff_column_plan = _build_cutoff_column_plan(cb=cb, cutoff_stat_str=g['cutoff_stat'])
+    return {
+        'all_stats': all_stats,
+        'median_indices': median_indices,
+        'total_indices': total_indices,
+        'median_output_cols': median_output_cols,
+        'total_output_cols': total_output_cols,
+        'count_output_cols': count_output_cols,
+        'suffix_to_col': suffix_to_col,
+        'cutoff_column_plan': cutoff_column_plan,
+    }
+
+
+def _get_clade_permutation_fast_stats_plan(g, cb, trait_names, target_col_prefixes):
+    plan_cache = g.get('_clade_permutation_fast_stats_plan_cache', None)
+    if plan_cache is None:
+        plan_cache = dict()
+        g['_clade_permutation_fast_stats_plan_cache'] = plan_cache
+    cache_key = (tuple(cb.columns.tolist()), tuple(trait_names), str(g.get('cutoff_stat', '')))
+    if cache_key not in plan_cache:
+        plan_cache[cache_key] = _build_clade_permutation_fast_stats_plan(
+            g=g,
+            cb=cb,
+            trait_names=trait_names,
+            target_col_prefixes=target_col_prefixes,
+        )
+    return plan_cache[cache_key]
+
+
+def _build_clade_permutation_selected_rows_plan(g, cb, trait_names, target_col_prefixes):
+    base_plan = _build_clade_permutation_fast_stats_plan(
+        g=g,
+        cb=cb,
+        trait_names=trait_names,
+        target_col_prefixes=target_col_prefixes,
+    )
+    all_stats = base_plan['all_stats']
+    if len(all_stats) == 0:
+        stat_matrix = np.zeros(shape=(cb.shape[0], 0), dtype=np.float64)
+    else:
+        try:
+            stat_matrix = cb.loc[:, all_stats].to_numpy(dtype=np.float64, copy=False)
+        except Exception:
+            stat_matrix = np.empty(shape=(cb.shape[0], len(all_stats)), dtype=np.float64)
+            for i, stat_col in enumerate(all_stats):
+                series = cb.loc[:, stat_col]
+                if np.issubdtype(series.dtype, np.number):
+                    stat_matrix[:, i] = series.to_numpy(dtype=np.float64, copy=False)
+                else:
+                    stat_matrix[:, i] = pd.to_numeric(series, errors='coerce').to_numpy(dtype=np.float64, copy=False)
+    target_arrays_by_suffix = dict()
+    for suffix, target_col in base_plan['suffix_to_col'].items():
+        if target_col is None:
+            continue
+        target_arrays_by_suffix[suffix] = (cb.loc[:, target_col].to_numpy(copy=False) == 'Y')
+    cutoff_arrays = []
+    for cutoff_col, cutoff_value in base_plan['cutoff_column_plan']:
+        values = cb.loc[:, cutoff_col].to_numpy(copy=False)
+        if np.issubdtype(values.dtype, np.number):
+            values_float = values.astype(np.float64, copy=False)
+        else:
+            values_float = pd.to_numeric(cb.loc[:, cutoff_col], errors='coerce').to_numpy(dtype=np.float64, copy=False)
+        cutoff_arrays.append((values_float, float(cutoff_value)))
+    out = dict(base_plan)
+    out['stat_matrix'] = stat_matrix
+    out['target_arrays_by_suffix'] = target_arrays_by_suffix
+    out['cutoff_arrays'] = cutoff_arrays
+    return out
+
+
+def _get_clade_permutation_selected_rows_plan(g, cb, trait_names, target_col_prefixes):
+    cache = g.get('_clade_permutation_selected_rows_plan_cache', None)
+    if cache is None:
+        cache = dict()
+        g['_clade_permutation_selected_rows_plan_cache'] = cache
+    cache_key = (
+        id(cb),
+        tuple(cb.columns.tolist()),
+        tuple(trait_names),
+        str(g.get('cutoff_stat', '')),
+    )
+    if cache_key not in cache:
+        cache[cache_key] = _build_clade_permutation_selected_rows_plan(
+            g=g,
+            cb=cb,
+            trait_names=trait_names,
+            target_col_prefixes=target_col_prefixes,
+        )
+    return cache[cache_key]
+
+
+def _build_cb_target_masks_from_suffix_plan(cb, suffix_to_col):
+    masks = dict()
+    for suffix, target_col in suffix_to_col.items():
+        if target_col is None:
+            masks[suffix] = np.ones(shape=(cb.shape[0],), dtype=bool)
+        else:
+            masks[suffix] = (cb.loc[:, target_col].to_numpy(copy=False) == 'Y')
+    return masks
+
+
+def _compute_aggregate_cb_stat_values_from_plan(cb, plan, is_targets):
+    all_stats = plan['all_stats']
+    if len(all_stats) == 0:
+        return dict()
+    try:
+        stat_matrix = cb.loc[:, all_stats].to_numpy(dtype=np.float64, copy=False)
+    except Exception:
+        stat_matrix = np.empty(shape=(cb.shape[0], len(all_stats)), dtype=np.float64)
+        for i, stat_col in enumerate(all_stats):
+            series = cb.loc[:, stat_col]
+            if np.issubdtype(series.dtype, np.number):
+                stat_matrix[:, i] = series.to_numpy(dtype=np.float64, copy=False)
+            else:
+                stat_matrix[:, i] = pd.to_numeric(series, errors='coerce').to_numpy(dtype=np.float64, copy=False)
+    median_indices = plan['median_indices']
+    total_indices = plan['total_indices']
+    aggregated_values = dict()
+    for suffix, mask in is_targets.items():
+        selected = stat_matrix[mask, :]
+        if median_indices.shape[0] > 0:
+            median_selected = selected[:, median_indices]
+            medians = np.full(shape=(median_indices.shape[0],), fill_value=np.nan, dtype=np.float64)
+            if median_selected.shape[0] > 0:
+                has_finite = np.any(~np.isnan(median_selected), axis=0)
+                if has_finite.any():
+                    medians[has_finite] = np.nanmedian(median_selected[:, has_finite], axis=0)
+            for out_col, out_value in zip(plan['median_output_cols'][suffix], medians.tolist()):
+                aggregated_values[out_col] = float(out_value)
+        if total_indices.shape[0] > 0:
+            total_selected = selected[:, total_indices]
+            if total_selected.shape[0] == 0:
+                totals = np.zeros(shape=(total_indices.shape[0],), dtype=np.float64)
+            else:
+                totals = np.nansum(total_selected, axis=0)
+            for out_col, out_value in zip(plan['total_output_cols'][suffix], totals.tolist()):
+                aggregated_values[out_col] = float(out_value)
+    return aggregated_values
+
+
+def _compute_aggregate_cb_stat_values_from_selected_matrix(stat_matrix, plan, is_targets):
+    if stat_matrix.shape[1] == 0:
+        return dict()
+    median_indices = plan['median_indices']
+    total_indices = plan['total_indices']
+    aggregated_values = dict()
+    for suffix, mask in is_targets.items():
+        selected = stat_matrix[mask, :]
+        if median_indices.shape[0] > 0:
+            median_selected = selected[:, median_indices]
+            medians = np.full(shape=(median_indices.shape[0],), fill_value=np.nan, dtype=np.float64)
+            if median_selected.shape[0] > 0:
+                has_finite = np.any(~np.isnan(median_selected), axis=0)
+                if has_finite.any():
+                    medians[has_finite] = np.nanmedian(median_selected[:, has_finite], axis=0)
+            for out_col, out_value in zip(plan['median_output_cols'][suffix], medians.tolist()):
+                aggregated_values[out_col] = float(out_value)
+        if total_indices.shape[0] > 0:
+            total_selected = selected[:, total_indices]
+            if total_selected.shape[0] == 0:
+                totals = np.zeros(shape=(total_indices.shape[0],), dtype=np.float64)
+            else:
+                totals = np.nansum(total_selected, axis=0)
+            for out_col, out_value in zip(plan['total_output_cols'][suffix], totals.tolist()):
+                aggregated_values[out_col] = float(out_value)
+    return aggregated_values
+
+
 def _append_cb_target_count_columns(df_cb_stats, is_targets, is_qualified):
-    new_columns = {}
-    for suffix, is_target in is_targets.items():
-        new_columns['num' + suffix] = is_target.sum()
-        new_columns['num_qualified' + suffix] = (is_target & is_qualified).sum()
-    new_columns_df = pd.DataFrame(new_columns, index=df_cb_stats.index)
-    return pd.concat([df_cb_stats, new_columns_df], axis=1)
+    count_values = _compute_target_count_values(is_targets=is_targets, is_qualified=is_qualified)
+    if len(count_values) > 0:
+        row_index = df_cb_stats.index[0]
+        cols = list(count_values.keys())
+        df_cb_stats.loc[row_index, cols] = [count_values[col] for col in cols]
+    return df_cb_stats
 
 
-def _ensure_df_cb_stats_column(df_cb_stats, col):
-    if col in df_cb_stats.columns:
+def _ensure_df_cb_stats_columns(df_cb_stats, cols, fill_value=0.0):
+    missing_cols = [col for col in cols if col not in df_cb_stats.columns]
+    if len(missing_cols) == 0:
         return df_cb_stats
-    newcol = pd.DataFrame({col: np.zeros(shape=(df_cb_stats.shape[0]))})
-    return pd.concat([df_cb_stats, newcol], ignore_index=False, axis=1)
+    for col in missing_cols:
+        df_cb_stats.loc[:, col] = fill_value
+    return df_cb_stats
+
+
+def _compute_target_count_values(is_targets, is_qualified):
+    out = dict()
+    is_qualified = np.asarray(is_qualified, dtype=bool)
+    for suffix, is_target in is_targets.items():
+        is_target = np.asarray(is_target, dtype=bool)
+        out['num' + suffix] = int(is_target.sum())
+        out['num_qualified' + suffix] = int((is_target & is_qualified).sum())
+    return out
+
+
+def _compute_aggregate_cb_stat_values(cb, stats, is_targets):
+    target_masks = {suffix: np.asarray(is_target, dtype=bool) for suffix, is_target in is_targets.items()}
+    available_stats = [ms for stat_values in stats.values() for ms in stat_values if ms in cb.columns]
+    # Preserve order while removing duplicates.
+    available_stats = list(dict.fromkeys(available_stats))
+    values_by_ms = dict()
+    for ms in available_stats:
+        series = cb.loc[:, ms]
+        if np.issubdtype(series.dtype, np.number):
+            values_by_ms[ms] = series.to_numpy(dtype=np.float64, copy=False)
+        else:
+            values_by_ms[ms] = pd.to_numeric(series, errors='coerce').to_numpy(dtype=np.float64, copy=False)
+    aggregated_values = dict()
+    for stat in stats.keys():
+        for ms in stats[stat]:
+            values = values_by_ms.get(ms, None)
+            if values is None:
+                continue
+            for suffix, mask in target_masks.items():
+                col = stat + '_' + ms + suffix
+                selected_values = values[mask]
+                if stat == 'median':
+                    if selected_values.shape[0] == 0:
+                        aggregated_values[col] = np.nan
+                    elif np.isnan(selected_values).all():
+                        aggregated_values[col] = np.nan
+                    else:
+                        aggregated_values[col] = float(np.nanmedian(selected_values))
+                elif stat == 'total':
+                    aggregated_values[col] = float(np.nansum(selected_values))
+    return aggregated_values
 
 
 def _aggregate_cb_stats(df_cb_stats, cb, stats, is_targets):
+    required_cols = []
     for stat in stats.keys():
-        for suffix, is_target in is_targets.items():
-            for ms in stats[stat]:
-                col = stat + '_' + ms + suffix
-                df_cb_stats = _ensure_df_cb_stats_column(df_cb_stats=df_cb_stats, col=col)
-                if ms not in cb.columns:
-                    continue
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", category=RuntimeWarning)
-                    if stat == 'median':
-                        df_cb_stats.at[0, col] = cb.loc[is_target, ms].median()
-                    elif stat == 'total':
-                        df_cb_stats.at[0, col] = cb.loc[is_target, ms].sum()
+        for suffix in is_targets.keys():
+            required_cols.extend([stat + '_' + ms + suffix for ms in stats[stat]])
+    df_cb_stats = _ensure_df_cb_stats_columns(df_cb_stats=df_cb_stats, cols=required_cols, fill_value=0.0)
+    aggregated_values = _compute_aggregate_cb_stat_values(
+        cb=cb,
+        stats=stats,
+        is_targets=is_targets,
+    )
+    if len(aggregated_values) > 0:
+        row_index = df_cb_stats.index[0]
+        cols = list(aggregated_values.keys())
+        df_cb_stats.loc[row_index, cols] = [aggregated_values[col] for col in cols]
     return df_cb_stats
+
+
+def _add_median_cb_stats_fast_for_clade_permutation(g, cb, current_arity, start, verbose=True):
+    row_defaults = g.get('_clade_permutation_cb_stats_row_defaults', None)
+    columns = g.get('_clade_permutation_cb_stats_columns', None)
+    if (row_defaults is None) or (columns is None):
+        return None
+    target_col_prefixes = ['is_fg', 'is_mg', 'is_mf', 'is_all']
+    trait_names = _get_trait_names(g)
+    stats_plan = _get_clade_permutation_fast_stats_plan(
+        g=g,
+        cb=cb,
+        trait_names=trait_names,
+        target_col_prefixes=target_col_prefixes,
+    )
+    is_targets = _build_cb_target_masks_from_suffix_plan(
+        cb=cb,
+        suffix_to_col=stats_plan['suffix_to_col'],
+    )
+    is_qualified = _evaluate_cutoff_column_plan(cb=cb, cutoff_column_plan=stats_plan['cutoff_column_plan'])
+    update_values = dict()
+    update_values['arity'] = int(current_arity)
+    update_values['cutoff_stat'] = g.get('cutoff_stat', '')
+    update_values.update(_compute_target_count_values(is_targets=is_targets, is_qualified=is_qualified))
+    update_values.update(_compute_aggregate_cb_stat_values_from_plan(cb=cb, plan=stats_plan, is_targets=is_targets))
+    elapsed_time = int(time.time() - start)
+    update_values['elapsed_sec'] = elapsed_time
+    row_values = dict(row_defaults)
+    row_values.update(update_values)
+    missing_cols = [col for col in update_values.keys() if col not in columns]
+    if len(missing_cols) > 0:
+        columns = columns + missing_cols
+        g['_clade_permutation_cb_stats_columns'] = columns
+        for col in missing_cols:
+            row_defaults[col] = np.nan
+    g['_clade_permutation_current_stat_row'] = row_values
+    if verbose:
+        g['df_cb_stats'] = pd.DataFrame(
+            [{col: row_values.get(col, np.nan) for col in columns}],
+            columns=columns,
+        )
+    if verbose:
+        _print_total_oc_ec_summary(df_cb_stats=g['df_cb_stats'])
+        print(("Elapsed time for arity = {}: {:,.1f} sec\n".format(current_arity, elapsed_time)), flush=True)
+    return g
+
+
+def _build_clade_permutation_target_masks_for_selected_rows(
+    cb,
+    selected_rows,
+    suffix_to_col,
+    trait_name,
+    target_arrays_by_suffix=None,
+):
+    selected_rows = np.asarray(selected_rows, dtype=np.int64).reshape(-1)
+    num_rows = selected_rows.shape[0]
+    if target_arrays_by_suffix is None:
+        target_arrays_by_suffix = dict()
+    out = dict()
+    fg_suffix = '_fg_' + str(trait_name)
+    mg_suffix = '_mg_' + str(trait_name)
+    mf_suffix = '_mf_' + str(trait_name)
+    for suffix, target_col in suffix_to_col.items():
+        if suffix == '_all':
+            out[suffix] = np.ones(shape=(num_rows,), dtype=bool)
+            continue
+        if suffix == fg_suffix:
+            out[suffix] = np.ones(shape=(num_rows,), dtype=bool)
+            continue
+        if (suffix == mg_suffix) or (suffix == mf_suffix):
+            out[suffix] = np.zeros(shape=(num_rows,), dtype=bool)
+            continue
+        if target_col is None:
+            out[suffix] = np.ones(shape=(num_rows,), dtype=bool)
+            continue
+        precomputed = target_arrays_by_suffix.get(suffix, None)
+        if precomputed is not None:
+            out[suffix] = precomputed[selected_rows]
+        else:
+            out[suffix] = (cb.loc[selected_rows, target_col].to_numpy(copy=False) == 'Y')
+    return out
+
+
+def _evaluate_cutoff_column_plan_for_selected_rows(cb, selected_rows, cutoff_column_plan, cutoff_arrays=None):
+    selected_rows = np.asarray(selected_rows, dtype=np.int64).reshape(-1)
+    if selected_rows.shape[0] == 0:
+        return np.zeros(shape=(0,), dtype=bool)
+    if len(cutoff_column_plan) == 0:
+        return np.ones(shape=(selected_rows.shape[0],), dtype=bool)
+    if cutoff_arrays is None:
+        cutoff_arrays = []
+    is_enough_stat = np.ones(shape=(selected_rows.shape[0],), dtype=bool)
+    if len(cutoff_arrays) == len(cutoff_column_plan):
+        for values_float, cutoff_value in cutoff_arrays:
+            selected_values = values_float[selected_rows]
+            is_enough_stat &= np.isfinite(selected_values) & (selected_values >= float(cutoff_value))
+        return is_enough_stat
+    for cutoff_col, cutoff_value in cutoff_column_plan:
+        values = cb.loc[selected_rows, cutoff_col].to_numpy(copy=False)
+        if np.issubdtype(values.dtype, np.number):
+            values_float = values.astype(np.float64, copy=False)
+        else:
+            values_float = pd.to_numeric(cb.loc[selected_rows, cutoff_col], errors='coerce').to_numpy(dtype=np.float64, copy=False)
+        is_enough_stat &= np.isfinite(values_float) & (values_float >= float(cutoff_value))
+    return is_enough_stat
+
+
+def _set_clade_permutation_stat_row_from_selected_rows(g, cb, selected_rows, trait_name, current_arity, start):
+    row_defaults = g.get('_clade_permutation_cb_stats_row_defaults', None)
+    columns = g.get('_clade_permutation_cb_stats_columns', None)
+    if (row_defaults is None) or (columns is None):
+        return None
+    trait_names = _get_trait_names(g)
+    target_col_prefixes = ['is_fg', 'is_mg', 'is_mf', 'is_all']
+    stats_plan = _get_clade_permutation_selected_rows_plan(
+        g=g,
+        cb=cb,
+        trait_names=trait_names,
+        target_col_prefixes=target_col_prefixes,
+    )
+    selected_rows = np.asarray(selected_rows, dtype=np.int64).reshape(-1)
+    if selected_rows.shape[0] == 0:
+        stat_matrix = np.zeros(shape=(0, stats_plan['stat_matrix'].shape[1]), dtype=np.float64)
+    else:
+        stat_matrix = stats_plan['stat_matrix'][selected_rows, :]
+    is_targets = _build_clade_permutation_target_masks_for_selected_rows(
+        cb=cb,
+        selected_rows=selected_rows,
+        suffix_to_col=stats_plan['suffix_to_col'],
+        trait_name=trait_name,
+        target_arrays_by_suffix=stats_plan.get('target_arrays_by_suffix', None),
+    )
+    is_qualified = _evaluate_cutoff_column_plan_for_selected_rows(
+        cb=cb,
+        selected_rows=selected_rows,
+        cutoff_column_plan=stats_plan['cutoff_column_plan'],
+        cutoff_arrays=stats_plan.get('cutoff_arrays', None),
+    )
+    update_values = dict()
+    update_values['arity'] = int(current_arity)
+    update_values['cutoff_stat'] = g.get('cutoff_stat', '')
+    update_values.update(_compute_target_count_values(is_targets=is_targets, is_qualified=is_qualified))
+    update_values.update(
+        _compute_aggregate_cb_stat_values_from_selected_matrix(
+            stat_matrix=stat_matrix,
+            plan=stats_plan,
+            is_targets=is_targets,
+        )
+    )
+    update_values['elapsed_sec'] = int(time.time() - start)
+    row_values = dict(row_defaults)
+    row_values.update(update_values)
+    missing_cols = [col for col in update_values.keys() if col not in columns]
+    if len(missing_cols) > 0:
+        columns = columns + missing_cols
+        g['_clade_permutation_cb_stats_columns'] = columns
+        for col in missing_cols:
+            row_defaults[col] = np.nan
+    g['_clade_permutation_current_stat_row'] = row_values
+    return g
 
 
 def _print_total_oc_ec_summary(df_cb_stats):
@@ -738,6 +1515,16 @@ def _print_total_oc_ec_summary(df_cb_stats):
 
 
 def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
+    if '_clade_permutation_cb_stats_row_defaults' in g:
+        fast_out = _add_median_cb_stats_fast_for_clade_permutation(
+            g=g,
+            cb=cb,
+            current_arity=current_arity,
+            start=start,
+            verbose=verbose,
+        )
+        if fast_out is not None:
+            return fast_out
     target_col_prefixes = ['is_fg', 'is_mg', 'is_mf', 'is_all']
     trait_names = _get_trait_names(g)
     is_targets = _build_cb_target_masks(
@@ -765,6 +1552,14 @@ def add_median_cb_stats(g, cb, current_arity, start, verbose=True):
     if verbose:
         print(("Elapsed time for arity = {}: {:,.1f} sec\n".format(current_arity, elapsed_time)), flush=True)
     return g
+
+
+_ORIGINAL_ADD_MEDIAN_CB_STATS = add_median_cb_stats
+
+
+def _is_default_add_median_cb_stats_impl():
+    return add_median_cb_stats is _ORIGINAL_ADD_MEDIAN_CB_STATS
+
 
 def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_reducer, ON_tensor_reducer):
     cbOS = substitution.get_cb(
@@ -807,8 +1602,86 @@ def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_re
     cb_missing = table.sort_cb(cb_missing)
     return cb_missing, g
 
+
+def _get_permutation_cb_pair_lookup(cb, bid_columns, g):
+    cache = g.get('_permutation_cb_pair_lookup_cache', None)
+    cache_key = (id(cb), tuple(bid_columns))
+    if (cache is not None) and (cache.get('cache_key', None) == cache_key):
+        return cache['lookup'], cache['multiplier']
+    bid_values = cb.loc[:, bid_columns].to_numpy(copy=False, dtype=np.int64)
+    if bid_values.shape[0] == 0:
+        lookup = dict()
+        multiplier = np.int64(1)
+    else:
+        bid_values = np.sort(bid_values, axis=1)
+        multiplier = np.int64(int(bid_values.max()) + 1)
+        keys = bid_values[:, 0].astype(np.int64, copy=False) * multiplier + bid_values[:, 1].astype(np.int64, copy=False)
+        lookup = dict()
+        for i, key in enumerate(keys.tolist()):
+            lookup.setdefault(int(key), []).append(i)
+    g['_permutation_cb_pair_lookup_cache'] = {
+        'cache_key': cache_key,
+        'lookup': lookup,
+        'multiplier': multiplier,
+    }
+    return lookup, multiplier
+
+
+def _get_permutation_cb_rows_fast_pairs(rid_combinations, cb, bid_columns, g, build_rcb=True):
+    rid_array = np.asarray(rid_combinations, dtype=np.int64)
+    if (rid_array.ndim != 2) or (rid_array.shape[1] != 2):
+        return None
+    if rid_array.shape[0] == 0:
+        empty_rows = np.zeros(shape=(0,), dtype=np.int64)
+        if build_rcb:
+            return cb.iloc[0:0, :].copy(), 0, 0, empty_rows
+        return None, 0, 0, empty_rows
+    rid_sorted = np.sort(rid_array, axis=1)
+    lookup, multiplier = _get_permutation_cb_pair_lookup(cb=cb, bid_columns=bid_columns, g=g)
+    keys = rid_sorted[:, 0].astype(np.int64, copy=False) * multiplier + rid_sorted[:, 1].astype(np.int64, copy=False)
+    selected_rows = []
+    missing_rows = []
+    for rid_idx, key in enumerate(keys.tolist()):
+        row_ids = lookup.get(int(key), None)
+        if row_ids is None:
+            missing_rows.append(rid_idx)
+            continue
+        selected_rows.extend(row_ids)
+    selected_rows = np.asarray(selected_rows, dtype=np.int64)
+    if len(selected_rows) > 0:
+        if build_rcb:
+            rcb = cb.take(selected_rows, axis=0)
+        else:
+            rcb = None
+    else:
+        if build_rcb:
+            rcb = cb.iloc[0:0, :].copy()
+        else:
+            rcb = None
+    num_kept = int(selected_rows.shape[0])
+    return rcb, rid_array.shape[0] - num_kept, rid_array.shape[0], selected_rows
+
 def _get_permutation_cb_rows(rid_combinations, cb, cb_cache, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
     bid_columns = ['branch_id_' + str(k + 1) for k in np.arange(rid_combinations.shape[1])]
+    selected_rows = None
+    if cb_cache.shape[0] == 0:
+        fast_out = _get_permutation_cb_rows_fast_pairs(
+            rid_combinations=rid_combinations,
+            cb=cb,
+            bid_columns=bid_columns,
+            g=g,
+            build_rcb=(not _is_default_add_median_cb_stats_impl()),
+        )
+        if fast_out is not None:
+            rcb, dropped_before_recompute, requested_rows, selected_rows = fast_out
+            if (dropped_before_recompute == 0) or (OS_tensor_reducer is None) or (ON_tensor_reducer is None):
+                if selected_rows is not None:
+                    dropped_after_recompute = requested_rows - selected_rows.shape[0]
+                elif rcb is not None:
+                    dropped_after_recompute = requested_rows - rcb.shape[0]
+                else:
+                    dropped_after_recompute = requested_rows
+                return rcb, cb_cache, g, requested_rows, dropped_before_recompute, dropped_after_recompute, selected_rows
     rid_combinations = pd.DataFrame(rid_combinations, columns=bid_columns)
     rid_combinations = table.sort_branch_ids(rid_combinations)
     if cb_cache.shape[0] == 0:
@@ -840,13 +1713,112 @@ def _get_permutation_cb_rows(rid_combinations, cb, cb_cache, g, OS_tensor_reduce
                 cb_pool = pd.concat([cb, cb_cache], ignore_index=True)
                 rcb = pd.merge(rid_combinations, cb_pool, how='inner', on=bid_columns)
     dropped_after_recompute = rid_combinations.shape[0] - rcb.shape[0]
-    return rcb, cb_cache, g, rid_combinations.shape[0], dropped_before_recompute, dropped_after_recompute
+    return rcb, cb_cache, g, rid_combinations.shape[0], dropped_before_recompute, dropped_after_recompute, None
 
 def _clade_permutation_mode_prefix(trait_name):
     return 'randomization_' + str(trait_name) + '_'
 
 
+def _move_duplicate_columns_to_end(df):
+    if df is None:
+        return df
+    if df.shape[1] == 0:
+        return df
+    non_placeholder_positions = []
+    placeholder_positions = []
+    for i, col in enumerate(df.columns.tolist()):
+        if str(col).endswith('_PLACEHOLDER'):
+            placeholder_positions.append(i)
+        else:
+            non_placeholder_positions.append(i)
+    if len(placeholder_positions) > 0:
+        df = df.iloc[:, non_placeholder_positions + placeholder_positions]
+    first_positions = []
+    duplicate_positions = []
+    seen = set()
+    for i, col in enumerate(df.columns.tolist()):
+        if col in seen:
+            duplicate_positions.append(i)
+            continue
+        seen.add(col)
+        first_positions.append(i)
+    if len(duplicate_positions) == 0:
+        return df
+    reordered_positions = first_positions + duplicate_positions
+    return df.iloc[:, reordered_positions]
+
+
+def _build_empty_clade_permutation_cb_stats_template(g):
+    source = g.get('df_cb_stats_observed', g.get('df_cb_stats', pd.DataFrame()))
+    default_cols = ['arity', 'elapsed_sec', 'fg_enrichment_factor', 'mode', 'dSC_calibration', 'cutoff_stat']
+    if (source is None) or (source.shape[1] == 0):
+        columns = default_cols
+    else:
+        columns = source.columns.tolist()
+        for default_col in default_cols:
+            if default_col not in columns:
+                columns.append(default_col)
+    # Keep only the first occurrence to match initialize_df_cb_stats-style schema.
+    dedup_columns = []
+    seen_columns = set()
+    for col in columns:
+        if col in seen_columns:
+            continue
+        seen_columns.add(col)
+        dedup_columns.append(col)
+    columns = dedup_columns
+    data = {}
+    for col in columns:
+        col_txt = str(col)
+        if col_txt == 'arity':
+            data[col] = np.array([int(g['current_arity'])], dtype=np.int64)
+        elif col_txt == 'cutoff_stat':
+            data[col] = np.array([str(g.get('cutoff_stat', ''))], dtype=object)
+        elif col_txt in ['mode', 'dSC_calibration']:
+            data[col] = np.array([''], dtype=object)
+        elif col_txt.startswith('clade_permutation_status_'):
+            data[col] = np.array([''], dtype=object)
+        elif col_txt.startswith('fg_enrichment_factor'):
+            data[col] = np.array([np.nan], dtype=np.float64)
+        elif (
+            col_txt.startswith('num')
+            or col_txt.startswith('total_')
+            or col_txt.startswith('median_')
+            or col_txt == 'elapsed_sec'
+        ):
+            data[col] = np.array([0.0], dtype=np.float64)
+        else:
+            data[col] = np.array([np.nan], dtype=np.float64)
+    template = pd.DataFrame(data=data, columns=columns)
+    return template
+
+
 def _initialize_current_arity_cb_stats(g):
+    template = g.get('_clade_permutation_cb_stats_template', None)
+    if template is not None:
+        row_defaults = g.get('_clade_permutation_cb_stats_row_defaults', None)
+        if row_defaults is not None:
+            row_values = dict(row_defaults)
+            row_values['arity'] = int(g['current_arity'])
+            row_values['cutoff_stat'] = g.get('cutoff_stat', '')
+            g['_clade_permutation_current_stat_row'] = row_values
+            if (
+                ('df_cb_stats' not in g)
+                or (not isinstance(g['df_cb_stats'], pd.DataFrame))
+                or (g['df_cb_stats'].shape[0] == 0)
+            ):
+                g['df_cb_stats'] = template.copy(deep=True)
+            if 'arity' in g['df_cb_stats'].columns:
+                g['df_cb_stats'].at[0, 'arity'] = g['current_arity']
+            if 'cutoff_stat' in g['df_cb_stats'].columns:
+                g['df_cb_stats'].at[0, 'cutoff_stat'] = g.get('cutoff_stat', '')
+            return g
+        g['df_cb_stats'] = template.copy(deep=True)
+        if 'arity' in g['df_cb_stats'].columns:
+            g['df_cb_stats'].at[0, 'arity'] = g['current_arity']
+        if 'cutoff_stat' in g['df_cb_stats'].columns:
+            g['df_cb_stats'].at[0, 'cutoff_stat'] = g.get('cutoff_stat', '')
+        return g
     g = param.initialize_df_cb_stats(g)
     is_arity = (g['df_cb_stats'].loc[:, 'arity'] == g['current_arity'])
     g['df_cb_stats'] = g['df_cb_stats'].loc[is_arity, :].reset_index(drop=True)
@@ -876,8 +1848,68 @@ def _set_randomized_trait_flags(rcb, trait_name):
     return rcb
 
 
+def _get_current_clade_permutation_stat_row(g):
+    row = g.get('_clade_permutation_current_stat_row', None)
+    if row is not None:
+        return row
+    df_cb_stats = g.get('df_cb_stats', None)
+    if (df_cb_stats is None) or (not isinstance(df_cb_stats, pd.DataFrame)) or (df_cb_stats.shape[0] == 0):
+        return None
+    return df_cb_stats.iloc[0].to_dict()
+
+
+def _append_current_clade_permutation_row_to_buffer(g):
+    row = _get_current_clade_permutation_stat_row(g=g)
+    if row is None:
+        return g
+    if '_clade_permutation_rows_buffer' not in g:
+        g['_clade_permutation_rows_buffer'] = []
+    g['_clade_permutation_rows_buffer'].append(dict(row))
+    return g
+
+
+def _flush_clade_permutation_rows_buffer(g):
+    rows_buffer = g.get('_clade_permutation_rows_buffer', None)
+    if rows_buffer is None:
+        return g
+    if len(rows_buffer) == 0:
+        return g
+    columns = list(g.get('_clade_permutation_cb_stats_columns', []))
+    for row in rows_buffer:
+        for col in row.keys():
+            if col not in columns:
+                columns.append(col)
+    rows_for_df = [{col: row.get(col, np.nan) for col in columns} for row in rows_buffer]
+    perm_df = pd.DataFrame(rows_for_df, columns=columns)
+    if ('df_cb_stats_main' not in g) or (g['df_cb_stats_main'] is None) or (g['df_cb_stats_main'].shape[0] == 0):
+        g['df_cb_stats_main'] = perm_df
+    else:
+        g['df_cb_stats_main'] = pd.concat([g['df_cb_stats_main'], perm_df], ignore_index=True)
+    rows_buffer.clear()
+    return g
+
+
 def _is_valid_clade_permutation_stat_row(g, trait_name, rid_combinations):
     omega_col = 'median_omegaCany2spe_fg_' + trait_name
+    row = _get_current_clade_permutation_stat_row(g=g)
+    if row is not None:
+        if omega_col not in row:
+            txt = 'omegaCany2spe could not be obtained for trait "{}"; skipping this clade permutation trial.\n'
+            sys.stderr.write(txt.format(trait_name))
+            return False
+        omega_value = row.get(omega_col, np.nan)
+        if isinstance(omega_value, (np.ndarray, list, tuple)):
+            if len(omega_value) == 0:
+                txt = 'No clade-permutation stats row was available for trait "{}"; skipping this clade permutation trial.\n'
+                sys.stderr.write(txt.format(trait_name))
+                return False
+            omega_value = np.asarray(omega_value).reshape(-1)[0]
+        if not pd.isna(omega_value):
+            return True
+        print('OmegaCany2spe could not be obtained for permuted foregrounds:')
+        print(rid_combinations)
+        print('')
+        return False
     if omega_col not in g['df_cb_stats'].columns:
         txt = 'omegaCany2spe could not be obtained for trait "{}"; skipping this clade permutation trial.\n'
         sys.stderr.write(txt.format(trait_name))
@@ -949,7 +1981,11 @@ def _report_permutation_clade_permutation_ocn(g, trait_name, obs_ocn_col, is_ari
 
 
 def _get_finite_mean_std(values):
-    finite_values = values[np.isfinite(values)]
+    try:
+        numeric_values = np.asarray(values, dtype=np.float64)
+    except Exception:
+        numeric_values = pd.to_numeric(pd.Series(values), errors='coerce').to_numpy(dtype=np.float64, copy=False)
+    finite_values = numeric_values[np.isfinite(numeric_values)]
     if finite_values.shape[0] == 0:
         return np.nan, np.nan
     return finite_values.mean(), finite_values.std()
@@ -999,10 +2035,15 @@ def _report_clade_permutation_stats(g, trait_name):
 def _append_clade_permutation_failure_row(g, trait_name, trial_no, reason):
     g = _initialize_current_arity_cb_stats(g)
     mode_prefix = _clade_permutation_mode_prefix(trait_name)
-    g['df_cb_stats'].loc[:, 'mode'] = mode_prefix + 'iter0_failed_trial' + str(trial_no)
+    row = _get_current_clade_permutation_stat_row(g=g)
+    if row is None:
+        row = dict()
+    row = dict(row)
+    row['mode'] = mode_prefix + 'iter0_failed_trial' + str(trial_no)
     status_col = 'clade_permutation_status_' + trait_name
-    g['df_cb_stats'].loc[:, status_col] = str(reason)
-    g['df_cb_stats_main'] = pd.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+    row[status_col] = str(reason)
+    g['_clade_permutation_current_stat_row'] = row
+    g = _append_current_clade_permutation_row_to_buffer(g=g)
     return g
 
 
@@ -1053,7 +2094,7 @@ def _resolve_clade_permutation_rows_and_mode(
         randomized_bids=g['r_fg_ids'][trait_name],
         sample_original_foreground=sample_original_foreground,
     )
-    rcb, cb_cache, g, requested_rows, _dropped_before_recompute, dropped_after_recompute = _get_permutation_cb_rows(
+    rcb, cb_cache, g, requested_rows, _dropped_before_recompute, dropped_after_recompute, selected_rows = _get_permutation_cb_rows(
         rid_combinations=rid_combinations,
         cb=cb,
         cb_cache=cb_cache,
@@ -1064,9 +2105,9 @@ def _resolve_clade_permutation_rows_and_mode(
     _report_dropped_permutation_rows(
         dropped_after_recompute=dropped_after_recompute,
         requested_rows=requested_rows,
-        kept_rows=rcb.shape[0],
+        kept_rows=(selected_rows.shape[0] if selected_rows is not None else rcb.shape[0]),
     )
-    return random_mode, rcb, cb_cache, g
+    return random_mode, rcb, cb_cache, g, selected_rows
 
 
 def _finalize_clade_permutation_iteration(
@@ -1083,7 +2124,7 @@ def _finalize_clade_permutation_iteration(
     OS_tensor_reducer=None,
     ON_tensor_reducer=None,
 ):
-    random_mode, rcb, cb_cache, g = _resolve_clade_permutation_rows_and_mode(
+    random_mode, rcb, cb_cache, g, selected_rows = _resolve_clade_permutation_rows_and_mode(
         cb=cb,
         cb_cache=cb_cache,
         g=g,
@@ -1094,12 +2135,29 @@ def _finalize_clade_permutation_iteration(
         OS_tensor_reducer=OS_tensor_reducer,
         ON_tensor_reducer=ON_tensor_reducer,
     )
-    rcb = _set_randomized_trait_flags(rcb=rcb, trait_name=trait_name)
-    g = add_median_cb_stats(g, rcb, g['current_arity'], start, verbose=False)
-    g['df_cb_stats'].loc[:, 'mode'] = random_mode
+    g['_clade_permutation_current_stat_row'] = None
+    if (selected_rows is not None) and _is_default_add_median_cb_stats_impl():
+        g = _set_clade_permutation_stat_row_from_selected_rows(
+            g=g,
+            cb=cb,
+            selected_rows=selected_rows,
+            trait_name=trait_name,
+            current_arity=g['current_arity'],
+            start=start,
+        )
+    else:
+        rcb = _set_randomized_trait_flags(rcb=rcb, trait_name=trait_name)
+        g = add_median_cb_stats(g, rcb, g['current_arity'], start, verbose=False)
+    row = _get_current_clade_permutation_stat_row(g=g)
+    if row is not None:
+        row = dict(row)
+        row['mode'] = random_mode
+        g['_clade_permutation_current_stat_row'] = row
+    else:
+        g['df_cb_stats'].loc[:, 'mode'] = random_mode
     if not _is_valid_clade_permutation_stat_row(g=g, trait_name=trait_name, rid_combinations=rid_combinations):
         return g, cb_cache, False, False
-    g['df_cb_stats_main'] = pd.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
+    g = _append_current_clade_permutation_row_to_buffer(g=g)
     print('')
     advance_iter, break_trait = _resolve_clade_iteration_transition(
         g=g,
@@ -1183,6 +2241,7 @@ def _run_clade_permutation_for_trait(
             iteration += 1
         if break_trait:
             break
+    g = _flush_clade_permutation_rows_buffer(g=g)
     _report_clade_permutation_stats(g, trait_name)
     return g, cb_cache
 
@@ -1194,6 +2253,11 @@ def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
         sys.stderr.write('No foreground traits were available for clade permutation.\n')
         return g
     g['df_cb_stats_observed'] = g['df_cb_stats'].copy()
+    g['_clade_permutation_cb_stats_template'] = _build_empty_clade_permutation_cb_stats_template(g)
+    g['_clade_permutation_cb_stats_columns'] = g['_clade_permutation_cb_stats_template'].columns.tolist()
+    g['_clade_permutation_cb_stats_row_defaults'] = g['_clade_permutation_cb_stats_template'].iloc[0].to_dict()
+    g['_clade_permutation_rows_buffer'] = []
+    g['_clade_permutation_current_stat_row'] = None
     max_trials = g['fg_clade_permutation'] * 10
     cb_cache = pd.DataFrame()
     for trait_name in trait_names:
@@ -1206,5 +2270,18 @@ def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
             OS_tensor_reducer=OS_tensor_reducer,
             ON_tensor_reducer=ON_tensor_reducer,
         )
+    g['df_cb_stats_main'] = _move_duplicate_columns_to_end(g['df_cb_stats_main'])
     g['df_cb_stats'] = g['df_cb_stats_observed'].copy()
+    if '_clade_permutation_cb_stats_template' in g:
+        del g['_clade_permutation_cb_stats_template']
+    if '_clade_permutation_cb_stats_columns' in g:
+        del g['_clade_permutation_cb_stats_columns']
+    if '_clade_permutation_cb_stats_row_defaults' in g:
+        del g['_clade_permutation_cb_stats_row_defaults']
+    if '_clade_permutation_rows_buffer' in g:
+        del g['_clade_permutation_rows_buffer']
+    if '_clade_permutation_current_stat_row' in g:
+        del g['_clade_permutation_current_stat_row']
+    if '_clade_permutation_selected_rows_plan_cache' in g:
+        del g['_clade_permutation_selected_rows_plan_cache']
     return g

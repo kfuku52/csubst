@@ -7,13 +7,15 @@ ete4 (preferred) or ete3 (fallback for older environments).
 from __future__ import annotations
 
 import os
+import types
 
 _ete4_import_error = None
 _ete3_import_error = None
 _backend = None
 
 try:
-    import ete4 as _ete_mod  # type: ignore[import-not-found]
+    from ete4.core.tree import Tree as _ete4_tree  # type: ignore[import-not-found]
+    _ete_mod = types.SimpleNamespace(Tree=_ete4_tree)
     _backend = "ete4"
 except Exception as exc:  # pragma: no cover - backend-specific
     _ete4_import_error = exc

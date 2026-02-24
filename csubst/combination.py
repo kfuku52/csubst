@@ -74,6 +74,66 @@ def _map_row_combinations_to_node_ids(row_combinations, node_ids):
     return node_ids[row_combinations]
 
 
+def _pairwise_node_combinations(values):
+    values = _normalize_node_ids(values)
+    if values.shape[0] < 2:
+        return np.zeros(shape=(0, 2), dtype=np.int64)
+    left, right = np.triu_indices(values.shape[0], k=1)
+    out = np.empty(shape=(left.shape[0], 2), dtype=np.int64)
+    left_values = values[left]
+    right_values = values[right]
+    out[:, 0] = np.minimum(left_values, right_values)
+    out[:, 1] = np.maximum(left_values, right_values)
+    if out.shape[0] == 0:
+        return out
+    return np.unique(out, axis=0)
+
+
+def _get_dependency_row_indices(g, all_node_ids, node_id_to_row, trait_names):
+    cache = g.get('_combination_dependency_row_cache', None)
+    if cache is not None:
+        cached_ids = cache.get('all_node_ids', None)
+        cached_trait_names = cache.get('trait_names', None)
+        if (
+            (cached_ids is not None)
+            and np.array_equal(cached_ids, all_node_ids)
+            and (cached_trait_names == tuple(trait_names))
+            and (cache.get('dep_ids_obj', None) is g.get('dep_ids'))
+            and (cache.get('fg_dep_ids_obj', None) is g.get('fg_dep_ids'))
+        ):
+            return cache['dep_indices'], cache['fg_dep_indices']
+    dep_indices = []
+    for dep_id in g['dep_ids']:
+        dep_indices.append(
+            _map_node_ids_to_rows(
+                node_ids=dep_id,
+                id_to_row=node_id_to_row,
+                context='Dependency groups',
+            )
+        )
+    fg_dep_indices = dict()
+    for trait_name in trait_names:
+        trait_indices = []
+        for fg_dep_id in g['fg_dep_ids'][trait_name]:
+            trait_indices.append(
+                _map_node_ids_to_rows(
+                    node_ids=fg_dep_id,
+                    id_to_row=node_id_to_row,
+                    context='Foreground dependency groups',
+                )
+            )
+        fg_dep_indices[trait_name] = trait_indices
+    g['_combination_dependency_row_cache'] = {
+        'all_node_ids': np.array(all_node_ids, dtype=np.int64, copy=True),
+        'trait_names': tuple(trait_names),
+        'dep_ids_obj': g.get('dep_ids'),
+        'fg_dep_ids_obj': g.get('fg_dep_ids'),
+        'dep_indices': dep_indices,
+        'fg_dep_indices': fg_dep_indices,
+    }
+    return dep_indices, fg_dep_indices
+
+
 def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
     arity = target_nodes.shape[1] + 1
     i = mmap_start
@@ -231,6 +291,33 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 trait_target_nodes = _normalize_node_ids(trait_target_nodes.reshape(-1)).reshape(original_shape)
             else:
                 raise ValueError('target_id_dict values should be 1D or 2D arrays.')
+            if (arity == 2) and (trait_target_nodes.shape[1] == 1):
+                pair_count = trait_target_nodes.shape[0] * (trait_target_nodes.shape[0] - 1) // 2
+                n_jobs = _resolve_combination_step_n_jobs(
+                    g=g,
+                    num_items=pair_count,
+                    min_items_key='parallel_min_items_node_union',
+                    min_items_per_job_key='parallel_min_items_per_job_node_union',
+                    default_min_items=20000,
+                    default_min_items_per_job=5000,
+                )
+                if n_jobs != 1:
+                    # Keep the original threaded node_union path when parallel execution is selected.
+                    pass
+                else:
+                    pairwise = _pairwise_node_combinations(trait_target_nodes[:, 0])
+                    if pairwise.shape[0] > 0:
+                        is_all_trait_no_branch_combination = False
+                        if verbose:
+                            txt = 'Number of branch combinations before independency check for {}: {:,}'
+                            print(txt.format(trait_name, pairwise.shape[0]), flush=True)
+                        node_combination_dict[trait_name] = pairwise
+                    else:
+                        if verbose:
+                            txt = 'There is no target branch combination for {} at K = {:,}.\n'
+                            sys.stderr.write(txt.format(trait_name, arity))
+                        node_combination_dict[trait_name] = np.zeros(shape=[0, arity], dtype=np.int64)
+                    continue
             index_combinations = list(itertools.combinations(np.arange(trait_target_nodes.shape[0]), 2))
             if len(index_combinations) > 0:
                 is_all_trait_no_branch_combination = False
@@ -356,33 +443,29 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
         all_node_ids=all_node_ids,
         g=g,
     )
+    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
+    dep_indices, fg_dep_indices = _get_dependency_row_indices(
+        g=g,
+        all_node_ids=all_node_ids,
+        node_id_to_row=node_id_to_row,
+        trait_names=trait_names,
+    )
     is_dependent_col = np.zeros(shape=(nc_matrix.shape[1],), dtype=bool)
-    for dep_id in g['dep_ids']:
-        dep_indices = _map_node_ids_to_rows(
-            node_ids=dep_id,
-            id_to_row=node_id_to_row,
-            context='Dependency groups',
-        )
-        if dep_indices.shape[0] == 0:
+    for dep_rows in dep_indices:
+        if dep_rows.shape[0] == 0:
             continue
-        is_dependent_col |= (nc_matrix[dep_indices, :].sum(axis=0) > 1)
+        is_dependent_col |= (nc_matrix[dep_rows, :].sum(axis=0) > 1)
     if verbose:
         print('Number of non-independent branch combinations to be removed: {:,}'.format(is_dependent_col.sum()), flush=True)
     nc_matrix = nc_matrix[:,~is_dependent_col]
     id_combinations = np.zeros(shape=(0,arity), dtype=np.int64)
     start = time.time()
-    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
     for trait_name in trait_names:
         is_fg_dependent_col = np.zeros(shape=(nc_matrix.shape[1],), dtype=bool)
-        for fg_dep_id in g['fg_dep_ids'][trait_name]:
-            dep_indices = _map_node_ids_to_rows(
-                node_ids=fg_dep_id,
-                id_to_row=node_id_to_row,
-                context='Foreground dependency groups',
-            )
-            if dep_indices.shape[0] == 0:
+        for dep_rows in fg_dep_indices[trait_name]:
+            if dep_rows.shape[0] == 0:
                 continue
-            is_fg_dependent_col |= (nc_matrix[dep_indices, :].sum(axis=0) > 1)
+            is_fg_dependent_col |= (nc_matrix[dep_rows, :].sum(axis=0) > 1)
         if (g['exhaustive_until']>=arity):
             if verbose:
                 txt = 'Number of non-independent foreground branch combinations to be non-foreground-marked for {}: {:,} / {:,}'
