@@ -1,0 +1,45 @@
+# Benchmark root
+/tmp/csubst_quantile_cmp_20260224_151443
+
+# Environment
+PYTHONPATH="/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst${PYTHONPATH:+:$PYTHONPATH}"
+
+# auto edge=2 (after optimization)
+/usr/bin/time -l -p python /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My\ Drive/psnl/repos/csubst/csubst/csubst \
+  analyze \
+  --alignment_file PGK.alignment.fa \
+  --rooted_tree_file PGK.tree.nwk \
+  --foreground PGK.foreground.txt \
+  --omegaC_method modelfree \
+  --calc_quantile yes \
+  --asrv no \
+  --output_stat any2spe \
+  --threads 1 \
+  --quantile_niter_schedule 0
+
+# fixed 1000
+/usr/bin/time -l -p python /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My\ Drive/psnl/repos/csubst/csubst/csubst \
+  analyze \
+  --alignment_file PGK.alignment.fa \
+  --rooted_tree_file PGK.tree.nwk \
+  --foreground PGK.foreground.txt \
+  --omegaC_method modelfree \
+  --calc_quantile yes \
+  --asrv no \
+  --output_stat any2spe \
+  --threads 1 \
+  --quantile_niter_schedule 1000
+
+# auto edge=1 reference
+/usr/bin/time -l -p python /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My\ Drive/psnl/repos/csubst/csubst/csubst \
+  analyze \
+  --alignment_file PGK.alignment.fa \
+  --rooted_tree_file PGK.tree.nwk \
+  --foreground PGK.foreground.txt \
+  --omegaC_method modelfree \
+  --calc_quantile yes \
+  --asrv no \
+  --output_stat any2spe \
+  --threads 1 \
+  --quantile_niter_schedule 0 \
+  --quantile_refine_edge_bins 1

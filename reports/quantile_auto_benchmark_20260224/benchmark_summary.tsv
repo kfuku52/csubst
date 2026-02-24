@@ -1,0 +1,4 @@
+condition	quantile_niter_schedule	quantile_refine_edge_bins	real_sec	peak_memory_footprint_bytes	maximum_resident_set_size_bytes
+auto_edge2	0	2	121.54	2772425192	2886418432
+fixed_1000	1000	2	30.43	1023870256	1295380480
+auto_edge1	0	1	107.78	2093392320	2344009728
