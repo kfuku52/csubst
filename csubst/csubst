@@ -287,7 +287,7 @@ def _main():
     dataset.set_defaults(handler=command_dataset)
 
     # simulate
-    help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario (optional; requires pyvolve). See `csubst simulate -h`'
+    help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
     simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg])
     simulate.add_argument('--background_omega', metavar='FLOAT', default=0.2, type=float,
                           help='default=%(default)s: dN/dS for background branches.')
@@ -319,7 +319,7 @@ def _main():
                                '--convergent_amino_acids, while preserving the original relative codon frequencies '
                                'among the synonymous codons.')
     simulate.add_argument('--simulate_seed', metavar='INT', default=-1, type=int,
-                          help='default=%(default)s: Random seed for pyvolve simulation. '
+                          help='default=%(default)s: Random seed for simulation. '
                                'Set -1 to use non-deterministic seed.')
     simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
                           help='default=%(default)s: Export true ancestral-state bundle from simulation '
