@@ -1,0 +1,7 @@
+metric	ocn_column	n	n_ocn_ge_1	n_ocn_lt_1	pearson_r_log10	median_abs_dlog10
+omegaCany2any	OCNany2any	2400	21	2379	0.49973809840517214	0.0
+omegaCany2dif	OCNany2dif	1774	10	1764	0.46660473756937637	0.0
+omegaCany2spe	OCNany2spe	1203	2	1201	0.4738289264460165	0.0
+omegaCany2any_nocalib	OCNany2any	8207	21	8186	0.27663980450173836	0.0
+omegaCany2dif_nocalib	OCNany2dif	8192	10	8182	0.21118983187011897	0.0
+omegaCany2spe_nocalib	OCNany2spe	8278	2	8276	0.17809552472947243	0.0
