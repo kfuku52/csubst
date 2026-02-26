@@ -4,6 +4,7 @@ import copy
 import itertools
 import os
 import re
+from collections import OrderedDict
 
 from csubst import foreground
 from csubst import genetic_code
@@ -83,6 +84,25 @@ def get_pyvolve_newick(tree, trait_name):
         node.dist = ete.get_prop(node, 'dist2')
         ete.del_prop(node, 'dist2')
     return newick_txt
+
+
+def ensure_internal_node_names(tree_obj, prefix='N'):
+    leaf_names = set([leaf.name for leaf in ete.get_leaves(tree_obj)])
+    used_names = set([name for name in leaf_names if name not in [None, '']])
+    for node in tree_obj.traverse():
+        if ete.is_leaf(node):
+            continue
+        raw_name = '' if node.name is None else str(node.name).strip()
+        if (raw_name == '') or (raw_name in used_names):
+            raw_name = '{}{}'.format(prefix, int(ete.get_prop(node, 'numerical_label')))
+        candidate = raw_name
+        suffix = 1
+        while candidate in used_names:
+            candidate = '{}_{}'.format(raw_name, suffix)
+            suffix += 1
+        node.name = candidate
+        used_names.add(candidate)
+    return tree_obj
 
 def get_pyvolve_codon_order():
     codons = [ ''.join(a) for a in itertools.product('ACGT', repeat=3) ]
@@ -328,7 +348,7 @@ def evolve_convergent_partitions(g):
         ratefile='tmp.csubst.simulate_convergent_ratefile.txt',
         infofile='tmp.csubst.simulate_convergent_infofile.txt',
         seqfile='tmp.csubst.simulate_convergent.fa',
-        write_anc=False
+        write_anc=bool(g.get('export_true_asr', True)),
     )
 
 def evolve_nonconvergent_partition(g):
@@ -349,7 +369,7 @@ def evolve_nonconvergent_partition(g):
         ratefile='tmp.csubst.simulate_nonconvergent_ratefile.txt',
         infofile='tmp.csubst.simulate_nonconvergent_infofile.txt',
         seqfile='tmp.csubst.simulate_nonconvergent.fa',
-        write_anc=False
+        write_anc=bool(g.get('export_true_asr', True)),
     )
 
 def get_pyvolve_tree(tree, foreground_scaling_factor, trait_name):
@@ -378,26 +398,8 @@ def get_background_Q(g, Q_method):
     return background_Q
 
 def concatenate_alignment(in1, in2, out):
-    def _read_fasta(path):
-        seqs = dict()
-        current_name = None
-        with open(path, 'r') as f:
-            for raw_line in f:
-                line = raw_line.strip()
-                if line == '':
-                    continue
-                if line.startswith('>'):
-                    current_name = line
-                    if current_name not in seqs:
-                        seqs[current_name] = ''
-                    continue
-                if current_name is None:
-                    raise ValueError('Invalid FASTA format in {}: sequence line appeared before header.'.format(path))
-                seqs[current_name] += line
-        return seqs
-
-    seqs1 = _read_fasta(in1)
-    seqs2 = _read_fasta(in2)
+    seqs1 = read_fasta(in1)
+    seqs2 = read_fasta(in2)
     if set(seqs1.keys()) != set(seqs2.keys()):
         missing_in_second = sorted(list(set(seqs1.keys()) - set(seqs2.keys())))
         missing_in_first = sorted(list(set(seqs2.keys()) - set(seqs1.keys())))
@@ -405,8 +407,130 @@ def concatenate_alignment(in1, in2, out):
         raise ValueError(txt.format(','.join(missing_in_second), ','.join(missing_in_first)))
     with open(out, 'w') as f:
         for key in seqs1.keys():
-            f.write(key + '\n' + seqs1[key] + seqs2[key] + '\n')
+            f.write('>' + key + '\n' + seqs1[key] + seqs2[key] + '\n')
     return None
+
+
+def read_fasta(path):
+    seqs = OrderedDict()
+    current_name = None
+    with open(path, 'r') as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if line == '':
+                continue
+            if line.startswith('>'):
+                current_name = line[1:].strip()
+                if current_name == '':
+                    raise ValueError('Invalid FASTA header in {}.'.format(path))
+                if current_name in seqs:
+                    raise ValueError('Duplicate FASTA header in {}: {}'.format(path, current_name))
+                seqs[current_name] = ''
+                continue
+            if current_name is None:
+                raise ValueError('Invalid FASTA format in {}: sequence line appeared before header.'.format(path))
+            seqs[current_name] += line.upper().replace('U', 'T')
+    return seqs
+
+
+def write_fasta(seqs, path):
+    with open(path, 'w') as f:
+        for name, seq in seqs.items():
+            f.write('>{}\n{}\n'.format(name, seq))
+    return None
+
+
+def split_tip_and_ancestor_alignment(in_fasta, tip_out, anc_out, tip_names):
+    tip_names = set([str(name) for name in tip_names])
+    seqs = read_fasta(in_fasta)
+    tip = OrderedDict()
+    anc = OrderedDict()
+    for name, seq in seqs.items():
+        if name in tip_names:
+            tip[name] = seq
+        else:
+            anc[name] = seq
+    if len(tip) != len(tip_names):
+        missing_tip = sorted(list(set(tip_names) - set(tip.keys())))
+        txt = 'Some tip sequences were not found in simulated FASTA: {}'
+        raise ValueError(txt.format(','.join(missing_tip[:10])))
+    write_fasta(tip, tip_out)
+    write_fasta(anc, anc_out)
+    return len(tip), len(anc)
+
+
+def write_true_asr_bundle(g, anc_fasta, prefix):
+    prefix = str(prefix).strip()
+    if prefix == '':
+        raise ValueError('--true_asr_prefix should be a non-empty path prefix.')
+    anc_seqs = read_fasta(anc_fasta)
+    if len(anc_seqs) == 0:
+        raise ValueError('No ancestral sequences were found in {}.'.format(anc_fasta))
+    codon_order = get_pyvolve_codon_order()
+    codon_to_index = {codon: i for i, codon in enumerate(codon_order.tolist())}
+    internal_nodes = [node for node in g['tree'].traverse() if not ete.is_leaf(node)]
+    internal_names = [str(node.name) for node in internal_nodes]
+    missing_nodes = [name for name in internal_names if name not in anc_seqs]
+    if len(missing_nodes):
+        txt = 'Ancestral FASTA did not contain all internal nodes. Missing examples: {}'
+        raise ValueError(txt.format(','.join(missing_nodes[:10])))
+    seq_len = len(next(iter(anc_seqs.values())))
+    if seq_len % 3 != 0:
+        raise ValueError('Ancestral sequence length should be a multiple of 3.')
+    num_site = seq_len // 3
+    for name, seq in anc_seqs.items():
+        if len(seq) != seq_len:
+            raise ValueError('Ancestral sequence lengths are inconsistent: {}'.format(name))
+    state_file = prefix + '.state'
+    tree_file = prefix + '.treefile'
+    rate_file = prefix + '.rate'
+    iqtree_file = prefix + '.iqtree'
+    log_file = prefix + '.log'
+    anc_file = prefix + '.anc.fa'
+    out_tree = copy.deepcopy(g['tree'])
+    ete.write_tree(out_tree, format=1, outfile=tree_file)
+    write_fasta(anc_seqs, anc_file)
+    with open(state_file, 'w') as f:
+        header = ['Node', 'Site', 'State'] + ['p_' + c for c in codon_order.tolist()]
+        f.write('\t'.join(header) + '\n')
+        for node in internal_nodes:
+            node_name = str(node.name)
+            seq = anc_seqs[node_name]
+            for site in range(num_site):
+                codon = seq[(site * 3):((site + 1) * 3)]
+                state_vector = ['0'] * codon_order.shape[0]
+                codon_index = codon_to_index.get(codon, None)
+                if codon_index is not None:
+                    state_txt = codon
+                    state_vector[codon_index] = '1'
+                else:
+                    state_txt = '???'
+                row = [node_name, str(site + 1), state_txt] + state_vector
+                f.write('\t'.join(row) + '\n')
+    with open(rate_file, 'w') as f:
+        f.write('Site\tC_Rate\n')
+        for site in range(num_site):
+            f.write('{}\t1.000000\n'.format(site + 1))
+    model_txt = str(g.get('iqtree_model', 'ECMK07+F+R4'))
+    eq_freq = np.asarray(g['eq_freq'], dtype=float)
+    with open(iqtree_file, 'w') as f:
+        f.write('IQ-TREE multicore version 2.2.6\n')
+        f.write('Model of substitution: {}\n'.format(model_txt))
+        for codon, freq in zip(codon_order.tolist(), eq_freq.tolist()):
+            f.write('pi({}) = {:.10f}\n'.format(codon, float(freq)))
+    with open(log_file, 'w') as f:
+        f.write('IQ-TREE multicore version 2.2.6\n')
+        f.write('Converting to codon sequences with genetic code {} ...\n'.format(int(g['genetic_code'])))
+        f.write('Nonsynonymous/synonymous ratio (omega): {:.6f}\n'.format(float(g['background_omega'])))
+        f.write('Transition/transversion ratio (kappa): 1.000000\n')
+    return {
+        'state': os.path.abspath(state_file),
+        'treefile': os.path.abspath(tree_file),
+        'rate': os.path.abspath(rate_file),
+        'iqtree': os.path.abspath(iqtree_file),
+        'log': os.path.abspath(log_file),
+        'anc_fasta': os.path.abspath(anc_file),
+    }
 
 def main_simulate(g, Q_method='csubst'):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
@@ -414,7 +538,12 @@ def main_simulate(g, Q_method='csubst'):
     g = parser_misc.generate_intermediate_files(g, force_notree_run=True)
     g = parser_misc.annotate_tree(g, ignore_tree_inconsistency=True)
     g = parser_misc.read_input(g)
+    g['export_true_asr'] = bool(g.get('export_true_asr', True))
+    g['true_asr_prefix'] = str(g.get('true_asr_prefix', 'simulate_true_asr')).strip()
+    if g['export_true_asr'] and (g['true_asr_prefix'] == ''):
+        raise ValueError('--true_asr_prefix should be a non-empty path prefix.')
     g['trait_name'] = 'PLACEHOLDER'
+    g['tree'] = ensure_internal_node_names(g['tree'])
     g['all_syn_cdn_index'] = get_synonymous_codon_substitution_index(g, get_pyvolve_codon_order())
     g['all_nsy_cdn_index'] = get_nonsynonymous_codon_substitution_index(g['all_syn_cdn_index'])
     if (g['num_simulated_site']==-1):
@@ -426,6 +555,7 @@ def main_simulate(g, Q_method='csubst'):
         g['tree2'] = g['tree']
         g['tree'] = g['rooted_tree']
     g['tree'] = scale_tree(tree=g['tree'], scaling_factor=g['tree_scaling_factor'])
+    g['tree'] = ensure_internal_node_names(g['tree'])
     # Re-annotate the tree chosen for simulation/plotting so lineage colors and
     # lineage IDs in --foreground are reflected in simulate_branch_id.pdf and
     # pyvolve model tags.
@@ -453,12 +583,40 @@ def main_simulate(g, Q_method='csubst'):
     file_conv = 'tmp.csubst.simulate_convergent.fa'
     file_noconv = 'tmp.csubst.simulate_nonconvergent.fa'
     file_out = 'simulate.fa'
+    file_all = 'tmp.csubst.simulate_all.fa'
+    file_anc = 'tmp.csubst.simulate_anc.fa'
     if (os.path.exists(file_conv))&(not os.path.exists(file_noconv)):
-        os.rename(file_conv, file_out)
+        os.rename(file_conv, file_out if (not g['export_true_asr']) else file_all)
     elif (not os.path.exists(file_conv))&(os.path.exists(file_noconv)):
-        os.rename(file_noconv, file_out)
+        os.rename(file_noconv, file_out if (not g['export_true_asr']) else file_all)
     else:
-        concatenate_alignment(in1=file_conv, in2=file_noconv, out=file_out)
+        concatenate_alignment(
+            in1=file_conv,
+            in2=file_noconv,
+            out=file_out if (not g['export_true_asr']) else file_all,
+        )
+    if g['export_true_asr']:
+        tip_names = [leaf.name for leaf in ete.get_leaves(g['tree'])]
+        num_tip, num_anc = split_tip_and_ancestor_alignment(
+            in_fasta=file_all,
+            tip_out=file_out,
+            anc_out=file_anc,
+            tip_names=tip_names,
+        )
+        txt = 'Split simulated sequences into tips ({}) and ancestors ({}) for true-ASR export.'
+        print(txt.format(num_tip, num_anc), flush=True)
+        true_asr_files = write_true_asr_bundle(
+            g=g,
+            anc_fasta=file_anc,
+            prefix=g['true_asr_prefix'],
+        )
+        print('True-ASR bundle prefix: {}'.format(os.path.abspath(g['true_asr_prefix'])), flush=True)
+        print('  state: {}'.format(true_asr_files['state']), flush=True)
+        print('  tree : {}'.format(true_asr_files['treefile']), flush=True)
+        print('  rate : {}'.format(true_asr_files['rate']), flush=True)
+        print('  iqtree: {}'.format(true_asr_files['iqtree']), flush=True)
+        print('  log  : {}'.format(true_asr_files['log']), flush=True)
+        print('  anc  : {}'.format(true_asr_files['anc_fasta']), flush=True)
 
     tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
     _ = [os.remove(ts) for ts in tmp_files]

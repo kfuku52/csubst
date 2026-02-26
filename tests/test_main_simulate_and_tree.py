@@ -339,6 +339,48 @@ def test_concatenate_alignment_rejects_mismatched_headers(tmp_path):
         main_simulate.concatenate_alignment(str(in1), str(in2), str(out))
 
 
+def test_split_tip_and_ancestor_alignment_separates_sequences(tmp_path):
+    in_fa = tmp_path / "all.fa"
+    tip_fa = tmp_path / "tips.fa"
+    anc_fa = tmp_path / "anc.fa"
+    in_fa.write_text(">R\nAAA\n>A\nCCC\n>B\nGGG\n", encoding="utf-8")
+    n_tip, n_anc = main_simulate.split_tip_and_ancestor_alignment(
+        in_fasta=str(in_fa),
+        tip_out=str(tip_fa),
+        anc_out=str(anc_fa),
+        tip_names=["A", "B"],
+    )
+    assert (n_tip, n_anc) == (2, 1)
+    tip = main_simulate.read_fasta(str(tip_fa))
+    anc = main_simulate.read_fasta(str(anc_fa))
+    assert list(tip.keys()) == ["A", "B"]
+    assert list(anc.keys()) == ["R"]
+    assert anc["R"] == "AAA"
+
+
+def test_write_true_asr_bundle_writes_iqtree_compatible_files(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    anc = tmp_path / "anc.fa"
+    anc.write_text(">R\nAAA\n", encoding="utf-8")
+    g = {
+        "tree": tr,
+        "eq_freq": np.full(shape=(61,), fill_value=(1 / 61), dtype=float),
+        "iqtree_model": "ECMK07+F+R4",
+        "genetic_code": 1,
+        "background_omega": 0.2,
+    }
+    prefix = str(tmp_path / "sim_true")
+    out = main_simulate.write_true_asr_bundle(g=g, anc_fasta=str(anc), prefix=prefix)
+    for key in ["state", "treefile", "rate", "iqtree", "log", "anc_fasta"]:
+        assert key in out
+        assert (tmp_path / ("sim_true" + "." + ("anc.fa" if key == "anc_fasta" else key))).exists()
+    state = (tmp_path / "sim_true.state").read_text(encoding="utf-8").splitlines()
+    assert state[0].startswith("Node\tSite\tState\tp_")
+    assert state[1].startswith("R\t1\tAAA\t")
+    iqtree_text = (tmp_path / "sim_true.iqtree").read_text(encoding="utf-8")
+    assert "Model of substitution: ECMK07+F+R4" in iqtree_text
+
+
 def test_plot_branch_category_writes_pdf_with_matplotlib_backend(tmp_path):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
     for node in tr.traverse():

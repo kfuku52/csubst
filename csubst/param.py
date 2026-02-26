@@ -603,6 +603,25 @@ def get_global_parameters(args):
         )
         if (g['percent_convergent_site'] < 0) or (g['percent_convergent_site'] > 100):
             raise ValueError('--percent_convergent_site should be between 0 and 100.')
+    if 'simulate_seed' in g.keys():
+        g['simulate_seed'] = int(g['simulate_seed'])
+        if (g['simulate_seed'] < -1):
+            raise ValueError('--simulate_seed should be -1 or >= 0.')
+    if 'export_true_asr' in g.keys():
+        g['export_true_asr'] = _parse_bool_like(
+            value=g['export_true_asr'],
+            param_name='--export_true_asr',
+        )
+    else:
+        g['export_true_asr'] = True
+    if 'true_asr_prefix' in g.keys():
+        if g['true_asr_prefix'] is None:
+            g['true_asr_prefix'] = ''
+        g['true_asr_prefix'] = str(g['true_asr_prefix']).strip()
+    else:
+        g['true_asr_prefix'] = 'simulate_true_asr'
+    if g['export_true_asr'] and (g['true_asr_prefix'] == ''):
+        raise ValueError('--true_asr_prefix should be non-empty when --export_true_asr is enabled.')
     if 'tree_scaling_factor' in g.keys():
         g['tree_scaling_factor'] = _require_finite_float(
             value=float(g['tree_scaling_factor']),
