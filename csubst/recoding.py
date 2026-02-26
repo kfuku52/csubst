@@ -1160,11 +1160,12 @@ def write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv"):
     return output_path
 
 
-def _get_scheme_groups_for_pca(g, require_auto=False):
+def _get_scheme_groups_for_pca(g, require_auto=False, include_3di20=False):
     groups_by_scheme = OrderedDict()
     groups_by_scheme["no"] = tuple([str(aa) for aa in _CANONICAL_AA])
-    # 3Di20 has 20 states and does not define AA co-clustering; represent as singleton states.
-    groups_by_scheme["3di20"] = tuple([str(aa) for aa in _CANONICAL_AA])
+    if bool(include_3di20):
+        # 3Di20 has 20 states and does not define AA co-clustering; represent as singleton states.
+        groups_by_scheme["3di20"] = tuple([str(aa) for aa in _CANONICAL_AA])
     for scheme_name, groups in RECODING_SCHEMES.items():
         groups_by_scheme[str(scheme_name)] = tuple([str(group) for group in groups])
     recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
@@ -1382,13 +1383,17 @@ def _detect_srchisq6_inset_target(scheme_names, x, y):
 
 
 def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.png"):
-    recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
     require_auto = False
+    include_3di20 = bool(g.get("plot_nonsyn_recode_pca_3di20", False))
     if _AA_ALIGNMENT_CACHE_KEY in g:
         require_auto = True
     elif str(g.get("alignment_file", "")).strip() != "":
         require_auto = True
-    groups_by_scheme = _get_scheme_groups_for_pca(g=g, require_auto=require_auto)
+    groups_by_scheme = _get_scheme_groups_for_pca(
+        g=g,
+        require_auto=require_auto,
+        include_3di20=include_3di20,
+    )
     scheme_names = list(groups_by_scheme.keys())
     feature_by_scheme = OrderedDict(
         [
@@ -1396,12 +1401,9 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
             for name in scheme_names
         ]
     )
-    three_di_feature_mode = "singleton"
     if "3di20" in feature_by_scheme:
         vector_3di = _build_3di20_dataset_feature_vector(g=g)
-        if vector_3di is not None:
-            three_di_feature_mode = "prostt5"
-        elif str(g.get("alignment_file", "")).strip() != "":
+        if (vector_3di is None) and (str(g.get("alignment_file", "")).strip() != ""):
             txt = "Failed to infer 3di20 PCA feature from input dataset via ProstT5."
             raise ValueError(txt)
         if vector_3di is not None:
@@ -1472,9 +1474,17 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
                 break
 
         note_lines = []
-        if ("srchisq6" in scheme_names) or ("kgbauto6" in scheme_names) or ("3di20" in scheme_names):
-            note_lines.append("srchisq6, kgbauto6, and 3di20 are")
-            note_lines.append("inferred from the input dataset.")
+        inferred_schemes = [name for name in ["srchisq6", "kgbauto6", "3di20"] if name in scheme_names]
+        if len(inferred_schemes) == 1:
+            note_lines.append("{} is inferred from".format(inferred_schemes[0]))
+            note_lines.append("the input dataset.")
+        elif len(inferred_schemes) == 2:
+            note_lines.append("{} and {} are inferred".format(inferred_schemes[0], inferred_schemes[1]))
+            note_lines.append("from the input dataset.")
+        elif len(inferred_schemes) >= 3:
+            head = ", ".join(inferred_schemes[0:-1])
+            note_lines.append("{}, and {} are inferred".format(head, inferred_schemes[-1]))
+            note_lines.append("from the input dataset.")
         if show_sr_inset:
             note_lines.append("srchisq6 is shown in the inset when far from")
             note_lines.append("the main point cloud along PC1/PC2.")

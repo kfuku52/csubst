@@ -829,6 +829,101 @@ def test_prep_state_3di20_prefers_sa_inference_branch_ids(monkeypatch):
     np.testing.assert_array_equal(called_selected["ids"], np.array([0, 2], dtype=np.int64))
 
 
+def test_prep_state_3di20_auto_writes_and_reuses_cache(tmp_path, monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 2, 3), dtype=np.float64)
+    state_cdn[:, :, 0] = 1.0
+    state_pep = np.zeros((num_node, 2, 20), dtype=np.float64)
+    state_pep[:, :, 0] = 1.0
+    state_nsy = np.zeros((num_node, 2, 20), dtype=np.float64)
+    state_nsy[:, :, 4] = 1.0
+    state_orders = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
+    cache_file = tmp_path / "3di_state_cache.npz"
+    full_cds_file = tmp_path / "full_cds.fa"
+    iqtree_state_file = tmp_path / "input.state"
+    full_cds_file.write_text(">A\nATGATG\n>B\nATGATG\n", encoding="utf-8")
+    iqtree_state_file.write_text("# dummy\n", encoding="utf-8")
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_state_tensor", lambda g, selected_branch_ids=None: state_cdn)
+    monkeypatch.setattr(sequence, "cdn2pep_state", lambda state_cdn, g, selected_branch_ids=None: state_pep)
+    called = {"n": 0}
+
+    def _fake_translate_builder(g, state_pep, selected_branch_ids=None):
+        called["n"] += 1
+        return state_nsy, state_orders, {0: "VV", 1: "VV", 2: "VV"}
+
+    monkeypatch.setattr(parser_misc.structural_alphabet, "build_3di_state_from_state_pep", _fake_translate_builder)
+    g_base = {
+        "tree": tr,
+        "infile_type": "iqtree",
+        "input_data_type": "cdn",
+        "nonsyn_recode": "3di20",
+        "sa_asr_mode": "translate",
+        "sa_state_cache": "auto",
+        "sa_state_cache_file": str(cache_file),
+        "full_cds_alignment_file": str(full_cds_file),
+        "alignment_file": str(full_cds_file),
+        "path_iqtree_state": str(iqtree_state_file),
+        "float_type": np.float64,
+    }
+    out_first = parser_misc.prep_state(dict(g_base))
+    assert called["n"] == 1
+    assert cache_file.exists() is True
+    assert out_first["state_nsy"].shape == state_nsy.shape
+
+    monkeypatch.setattr(
+        parser_misc.structural_alphabet,
+        "build_3di_state_from_state_pep",
+        lambda g, state_pep, selected_branch_ids=None: (_ for _ in ()).throw(
+            AssertionError("3Di builder should not run when cache is reusable")
+        ),
+    )
+    out_second = parser_misc.prep_state(dict(g_base))
+    assert called["n"] == 1
+    assert out_second["nonsyn_state_orders"].tolist() == state_orders.tolist()
+    assert out_second["state_nsy"].shape == state_nsy.shape
+
+
+def test_prep_state_3di20_yes_requires_compatible_cache(tmp_path, monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 2, 3), dtype=np.float64)
+    state_cdn[:, :, 0] = 1.0
+    state_pep = np.zeros((num_node, 2, 20), dtype=np.float64)
+    state_pep[:, :, 0] = 1.0
+    cache_file = tmp_path / "missing_cache.npz"
+    full_cds_file = tmp_path / "full_cds.fa"
+    iqtree_state_file = tmp_path / "input.state"
+    full_cds_file.write_text(">A\nATGATG\n>B\nATGATG\n", encoding="utf-8")
+    iqtree_state_file.write_text("# dummy\n", encoding="utf-8")
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_state_tensor", lambda g, selected_branch_ids=None: state_cdn)
+    monkeypatch.setattr(sequence, "cdn2pep_state", lambda state_cdn, g, selected_branch_ids=None: state_pep)
+    monkeypatch.setattr(
+        parser_misc.structural_alphabet,
+        "build_3di_state_from_state_pep",
+        lambda g, state_pep, selected_branch_ids=None: (_ for _ in ()).throw(
+            AssertionError("3Di builder should not run when --sa_state_cache yes has no cache")
+        ),
+    )
+    g = {
+        "tree": tr,
+        "infile_type": "iqtree",
+        "input_data_type": "cdn",
+        "nonsyn_recode": "3di20",
+        "sa_asr_mode": "translate",
+        "sa_state_cache": "yes",
+        "sa_state_cache_file": str(cache_file),
+        "full_cds_alignment_file": str(full_cds_file),
+        "alignment_file": str(full_cds_file),
+        "path_iqtree_state": str(iqtree_state_file),
+        "float_type": np.float64,
+    }
+    with pytest.raises(ValueError, match="sa_state_cache yes"):
+        parser_misc.prep_state(g)
+
+
 def test_map_internal_site_indices_defaults_to_identity_without_mapping():
     g = {}
     out = parser_misc.map_internal_site_indices(site_indices=np.array([0, 2, 4], dtype=np.int64), g=g)

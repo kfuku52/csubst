@@ -261,10 +261,9 @@ def test_get_global_parameters_rejects_calc_omega_pvalue_without_modelfree():
 def test_get_global_parameters_sets_omega_pvalue_defaults():
     g = param.get_global_parameters(_args())
     assert g["calc_omega_pvalue"] is False
-    assert g["omega_pvalue_null_model"] == "hypergeom"
+    assert g["omega_pvalue_null_model"] == "poisson"
     assert g["omega_pvalue_niter"] == 1000
     assert g["omega_pvalue_rounding"] == "round"
-    assert g["omega_pvalue_safe_min_sub_pp"] == pytest.approx(0.0)
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_niter():
@@ -289,14 +288,7 @@ def test_get_global_parameters_accepts_omega_pvalue_poisson_full_model():
     assert g["omega_pvalue_null_model"] == "poisson_full"
 
 
-def test_get_global_parameters_rejects_invalid_omega_pvalue_safe_min_sub_pp():
-    with pytest.raises(ValueError, match="omega_pvalue_safe_min_sub_pp"):
-        param.get_global_parameters(_args(omega_pvalue_safe_min_sub_pp=-0.1))
-    with pytest.raises(ValueError, match="omega_pvalue_safe_min_sub_pp"):
-        param.get_global_parameters(_args(omega_pvalue_safe_min_sub_pp=1.1))
-
-
-def test_get_global_parameters_default_safe_threshold_keeps_min_sub_pp_unchanged(capsys):
+def test_get_global_parameters_keeps_min_sub_pp_unchanged_for_omega_pvalue(capsys):
     g = param.get_global_parameters(
         _args(
             calc_omega_pvalue=True,
@@ -307,40 +299,12 @@ def test_get_global_parameters_default_safe_threshold_keeps_min_sub_pp_unchanged
     )
     captured = capsys.readouterr()
     assert g["min_sub_pp"] == pytest.approx(0.0)
-    assert g["omega_pvalue_min_sub_pp_auto_applied"] is False
     assert "auto-set to" not in captured.err
 
 
-def test_get_global_parameters_auto_sets_min_sub_pp_for_omega_pvalue(capsys):
-    g = param.get_global_parameters(
-        _args(
-            calc_omega_pvalue=True,
-            omegaC_method="modelfree",
-            min_sub_pp=0,
-            ml_anc="no",
-            omega_pvalue_safe_min_sub_pp=0.05,
-        )
-    )
-    captured = capsys.readouterr()
-    assert g["min_sub_pp"] == pytest.approx(0.05)
-    assert g["omega_pvalue_min_sub_pp_auto_applied"] is True
-    assert "auto-set to 0.05" in captured.err
-
-
-def test_get_global_parameters_auto_sets_min_sub_pp_for_custom_safe_threshold(capsys):
-    g = param.get_global_parameters(
-        _args(
-            calc_omega_pvalue=True,
-            omegaC_method="modelfree",
-            min_sub_pp=0,
-            ml_anc="no",
-            omega_pvalue_safe_min_sub_pp=0.2,
-        )
-    )
-    captured = capsys.readouterr()
-    assert g["min_sub_pp"] == pytest.approx(0.2)
-    assert g["omega_pvalue_min_sub_pp_auto_applied"] is True
-    assert "auto-set to 0.2" in captured.err
+def test_get_global_parameters_rejects_removed_omega_pvalue_safe_min_sub_pp():
+    with pytest.raises(ValueError, match="was removed"):
+        param.get_global_parameters(_args(omega_pvalue_safe_min_sub_pp=0.05))
 
 
 def test_get_global_parameters_keeps_explicit_min_sub_pp_for_omega_pvalue(capsys):
@@ -354,8 +318,7 @@ def test_get_global_parameters_keeps_explicit_min_sub_pp_for_omega_pvalue(capsys
     )
     captured = capsys.readouterr()
     assert g["min_sub_pp"] == pytest.approx(0.2)
-    assert g["omega_pvalue_min_sub_pp_auto_applied"] is False
-    assert "auto-set to 0.05" not in captured.err
+    assert "auto-set to" not in captured.err
 
 
 def test_get_global_parameters_does_not_auto_set_min_sub_pp_when_ml_anc_yes(capsys):
@@ -369,8 +332,7 @@ def test_get_global_parameters_does_not_auto_set_min_sub_pp_when_ml_anc_yes(caps
     )
     captured = capsys.readouterr()
     assert g["min_sub_pp"] == pytest.approx(0.0)
-    assert g["omega_pvalue_min_sub_pp_auto_applied"] is False
-    assert "auto-set to 0.05" not in captured.err
+    assert "auto-set to" not in captured.err
 
 
 def test_get_global_parameters_rejects_invalid_min_sub_pp():
@@ -378,22 +340,6 @@ def test_get_global_parameters_rejects_invalid_min_sub_pp():
         param.get_global_parameters(_args(min_sub_pp=-0.1))
     with pytest.raises(ValueError, match="min_sub_pp"):
         param.get_global_parameters(_args(min_sub_pp=1.1))
-
-
-def test_get_global_parameters_disables_auto_min_sub_pp_when_safe_threshold_is_zero(capsys):
-    g = param.get_global_parameters(
-        _args(
-            calc_omega_pvalue=True,
-            omegaC_method="modelfree",
-            min_sub_pp=0,
-            ml_anc="no",
-            omega_pvalue_safe_min_sub_pp=0,
-        )
-    )
-    captured = capsys.readouterr()
-    assert g["min_sub_pp"] == pytest.approx(0.0)
-    assert g["omega_pvalue_min_sub_pp_auto_applied"] is False
-    assert "auto-set to" not in captured.err
 
 
 def test_get_global_parameters_accepts_file_each_asrv_and_dirichlet_alpha():
@@ -425,6 +371,12 @@ def test_get_global_parameters_sets_epistasis_defaults():
     assert g["epistasis_beta_value"] == pytest.approx(0.0)
     assert g["epistasis_clip_auto"] is False
     assert g["epistasis_clip_value"] == pytest.approx(3.0)
+    assert g["epistasis_beta_partition"] == "global"
+    assert g["epistasis_branch_depth_bins"] == 3
+    assert g["epistasis_feature_mode"] == "single"
+    assert g["epistasis_joint_auto"] is False
+    assert g["epistasis_joint_alpha_grid"] == [0.0, 0.5, 1.0, 2.0]
+    assert g["epistasis_joint_clip_grid"] == [1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
     assert g["epistasis_requested"] is False
 
 
@@ -435,12 +387,24 @@ def test_get_global_parameters_parses_epistasis_auto_and_apply_to_s():
             epistasis_site_metric="proximity",
             epistasis_beta="auto",
             epistasis_clip="auto",
+            epistasis_beta_partition="branch_depth",
+            epistasis_branch_depth_bins=4,
+            epistasis_feature_mode="paired",
+            epistasis_joint_auto="yes",
+            epistasis_joint_alpha_grid="0,0.25,1",
+            epistasis_joint_clip_grid="1.5,2,3",
         )
     )
     assert g["epistasis_apply_to"] == "S"
     assert g["epistasis_site_metric"] == "proximity"
     assert g["epistasis_beta_auto"] is True
     assert g["epistasis_clip_auto"] is True
+    assert g["epistasis_beta_partition"] == "branch_depth"
+    assert g["epistasis_branch_depth_bins"] == 4
+    assert g["epistasis_feature_mode"] == "paired"
+    assert g["epistasis_joint_auto"] is True
+    assert g["epistasis_joint_alpha_grid"] == [0.0, 0.25, 1.0]
+    assert g["epistasis_joint_clip_grid"] == [1.5, 2.0, 3.0]
     assert g["epistasis_requested"] is True
 
 
@@ -461,6 +425,16 @@ def test_get_global_parameters_rejects_invalid_epistasis_options():
         param.get_global_parameters(_args(epistasis_beta="-0.1"))
     with pytest.raises(ValueError, match="epistasis_clip"):
         param.get_global_parameters(_args(epistasis_clip="0"))
+    with pytest.raises(ValueError, match="epistasis_beta_partition"):
+        param.get_global_parameters(_args(epistasis_beta_partition="invalid"))
+    with pytest.raises(ValueError, match="epistasis_branch_depth_bins"):
+        param.get_global_parameters(_args(epistasis_branch_depth_bins=0))
+    with pytest.raises(ValueError, match="epistasis_feature_mode"):
+        param.get_global_parameters(_args(epistasis_feature_mode="invalid"))
+    with pytest.raises(ValueError, match="epistasis_joint_alpha_grid"):
+        param.get_global_parameters(_args(epistasis_joint_alpha_grid="-1,0"))
+    with pytest.raises(ValueError, match="epistasis_joint_clip_grid"):
+        param.get_global_parameters(_args(epistasis_joint_clip_grid="0,1"))
 
 
 def test_get_global_parameters_sets_pseudocount_defaults():
@@ -668,6 +642,40 @@ def test_get_global_parameters_rejects_empty_prostt5_cache_file():
 def test_get_global_parameters_sets_default_prostt5_cache_file():
     g = param.get_global_parameters(_args())
     assert g["prostt5_cache_file"] == "csubst_prostt5_cache.tsv"
+
+
+def test_get_global_parameters_parses_sa_state_cache_options():
+    g_default = param.get_global_parameters(_args())
+    assert g_default["sa_state_cache"] == "auto"
+    assert g_default["sa_state_cache_file"] == "csubst_3di_state_cache.npz"
+
+    g_custom = param.get_global_parameters(
+        _args(
+            sa_state_cache="YES",
+            sa_state_cache_file=" /tmp/3di_state_cache.npz ",
+        )
+    )
+    assert g_custom["sa_state_cache"] == "yes"
+    assert g_custom["sa_state_cache_file"] == "/tmp/3di_state_cache.npz"
+
+
+def test_get_global_parameters_rejects_invalid_sa_state_cache_mode():
+    with pytest.raises(ValueError, match="sa_state_cache"):
+        param.get_global_parameters(_args(sa_state_cache="maybe"))
+
+
+def test_get_global_parameters_rejects_empty_sa_state_cache_file():
+    with pytest.raises(ValueError, match="sa_state_cache_file"):
+        param.get_global_parameters(_args(sa_state_cache_file=""))
+
+
+def test_get_global_parameters_parses_plot_nonsyn_recode_pca_3di20_bool():
+    g_default = param.get_global_parameters(_args())
+    assert g_default["plot_nonsyn_recode_pca_3di20"] is False
+    g_yes = param.get_global_parameters(_args(plot_nonsyn_recode_pca_3di20="yes"))
+    assert g_yes["plot_nonsyn_recode_pca_3di20"] is True
+    with pytest.raises(ValueError, match="plot_nonsyn_recode_pca_3di20"):
+        param.get_global_parameters(_args(plot_nonsyn_recode_pca_3di20="maybe"))
 
 
 def test_get_global_parameters_requires_full_cds_alignment_for_3di20():

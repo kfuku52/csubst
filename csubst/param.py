@@ -27,11 +27,14 @@ DEPENDENCY_DISTRIBUTIONS = (
 
 DEFAULT_QUANTILE_NITER_AUTO_SCHEDULE = [100, 1000, 10000]
 MAX_QUANTILE_NITER = 10000
-DEFAULT_OMEGA_PVALUE_SAFE_MIN_SUB_PP = 0.0
 
 
 def _default_prostt5_cache_file():
     return 'csubst_prostt5_cache.tsv'
+
+
+def _default_sa_state_cache_file():
+    return 'csubst_3di_state_cache.npz'
 
 
 def _parse_bool_like(value, param_name):
@@ -77,6 +80,34 @@ def _parse_auto_or_float(value, param_name, min_value=None, strict_min=False):
             if numeric < min_value:
                 raise ValueError('{} should be >= {}.'.format(param_name, min_value))
     return False, float(numeric)
+
+
+def _parse_float_grid(value, param_name, min_value=None, strict_min=False):
+    if isinstance(value, (list, tuple, np.ndarray)):
+        raw_tokens = [str(v).strip() for v in value]
+    else:
+        raw_txt = '' if value is None else str(value).strip()
+        raw_tokens = [token.strip() for token in raw_txt.split(',') if token.strip() != '']
+    if len(raw_tokens) == 0:
+        raise ValueError('{} should contain one or more numeric values.'.format(param_name))
+    out = list()
+    for token in raw_tokens:
+        try:
+            numeric = float(token)
+        except ValueError as exc:
+            raise ValueError('{} should contain numeric values.'.format(param_name)) from exc
+        numeric = _require_finite_float(numeric, param_name=param_name)
+        if min_value is not None:
+            min_value = float(min_value)
+            if strict_min:
+                if numeric <= min_value:
+                    raise ValueError('{} should contain values > {}.'.format(param_name, min_value))
+            else:
+                if numeric < min_value:
+                    raise ValueError('{} should contain values >= {}.'.format(param_name, min_value))
+        out.append(float(numeric))
+    out = sorted(list(set(out)))
+    return out
 
 
 def _parse_quantile_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
@@ -178,20 +209,14 @@ def get_global_parameters(args):
     if 'omega_pvalue_null_model' in g.keys():
         g['omega_pvalue_null_model'] = str(g['omega_pvalue_null_model']).strip().lower()
     else:
-        g['omega_pvalue_null_model'] = 'hypergeom'
+        g['omega_pvalue_null_model'] = 'poisson'
     if g['omega_pvalue_null_model'] not in ['hypergeom', 'poisson', 'poisson_full']:
         raise ValueError('--omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full.')
     if 'omega_pvalue_safe_min_sub_pp' in g.keys():
-        g['omega_pvalue_safe_min_sub_pp'] = _require_finite_float(
-            value=float(g['omega_pvalue_safe_min_sub_pp']),
-            param_name='--omega_pvalue_safe_min_sub_pp',
+        raise ValueError(
+            '--omega_pvalue_safe_min_sub_pp was removed. '
+            'Use --min_sub_pp explicitly when running --calc_omega_pvalue.'
         )
-    else:
-        g['omega_pvalue_safe_min_sub_pp'] = float(DEFAULT_OMEGA_PVALUE_SAFE_MIN_SUB_PP)
-    if g['omega_pvalue_safe_min_sub_pp'] < 0:
-        raise ValueError('--omega_pvalue_safe_min_sub_pp should be >= 0.')
-    if g['omega_pvalue_safe_min_sub_pp'] > 1:
-        raise ValueError('--omega_pvalue_safe_min_sub_pp should be <= 1.')
     if 'ml_anc' in g.keys():
         g['ml_anc'] = _parse_bool_like(g['ml_anc'], '--ml_anc')
     else:
@@ -207,14 +232,6 @@ def get_global_parameters(args):
         raise ValueError('--min_sub_pp should be >= 0.')
     if g['min_sub_pp'] > 1:
         raise ValueError('--min_sub_pp should be <= 1.')
-    g['omega_pvalue_min_sub_pp_auto_applied'] = False
-    if g['calc_omega_pvalue'] and (not g['ml_anc']) and (g['min_sub_pp'] == 0) and (g['omega_pvalue_safe_min_sub_pp'] > 0):
-        g['min_sub_pp'] = float(g['omega_pvalue_safe_min_sub_pp'])
-        g['omega_pvalue_min_sub_pp_auto_applied'] = True
-        txt = '--calc_omega_pvalue detected with --min_sub_pp=0 and --ml_anc=no. '
-        txt += 'To reduce anti-conservative behavior in empirical p-values, --min_sub_pp was auto-set to {:g}. '
-        txt += 'Set --min_sub_pp explicitly to override.\n'
-        sys.stderr.write(txt.format(float(g['omega_pvalue_safe_min_sub_pp'])))
     if 'omega_pvalue_niter' in g.keys():
         g['omega_pvalue_niter'] = int(g['omega_pvalue_niter'])
     else:
@@ -286,6 +303,40 @@ def get_global_parameters(args):
     )
     g['epistasis_clip_auto'] = bool(epistasis_clip_auto)
     g['epistasis_clip_value'] = float(epistasis_clip_value) if (not epistasis_clip_auto) else np.nan
+    if 'epistasis_beta_partition' not in g.keys():
+        g['epistasis_beta_partition'] = 'global'
+    g['epistasis_beta_partition'] = str(g['epistasis_beta_partition']).strip().lower()
+    if g['epistasis_beta_partition'] not in ['global', 'branch_depth']:
+        raise ValueError('--epistasis_beta_partition should be one of global, branch_depth.')
+    if 'epistasis_branch_depth_bins' not in g.keys():
+        g['epistasis_branch_depth_bins'] = 3
+    g['epistasis_branch_depth_bins'] = int(g['epistasis_branch_depth_bins'])
+    if g['epistasis_branch_depth_bins'] < 1:
+        raise ValueError('--epistasis_branch_depth_bins should be >= 1.')
+    if 'epistasis_feature_mode' not in g.keys():
+        g['epistasis_feature_mode'] = 'single'
+    g['epistasis_feature_mode'] = str(g['epistasis_feature_mode']).strip().lower()
+    if g['epistasis_feature_mode'] not in ['single', 'paired']:
+        raise ValueError('--epistasis_feature_mode should be one of single, paired.')
+    if 'epistasis_joint_auto' not in g.keys():
+        g['epistasis_joint_auto'] = False
+    g['epistasis_joint_auto'] = _parse_bool_like(g['epistasis_joint_auto'], '--epistasis_joint_auto')
+    if 'epistasis_joint_alpha_grid' not in g.keys():
+        g['epistasis_joint_alpha_grid'] = '0,0.5,1,2'
+    g['epistasis_joint_alpha_grid'] = _parse_float_grid(
+        value=g['epistasis_joint_alpha_grid'],
+        param_name='--epistasis_joint_alpha_grid',
+        min_value=0.0,
+        strict_min=False,
+    )
+    if 'epistasis_joint_clip_grid' not in g.keys():
+        g['epistasis_joint_clip_grid'] = '1.5,2,2.5,3,4,5'
+    g['epistasis_joint_clip_grid'] = _parse_float_grid(
+        value=g['epistasis_joint_clip_grid'],
+        param_name='--epistasis_joint_clip_grid',
+        min_value=0.0,
+        strict_min=True,
+    )
     if 'epistasis_degree_file' not in g.keys():
         g['epistasis_degree_file'] = ''
     if g['epistasis_degree_file'] is None:
@@ -760,12 +811,30 @@ def get_global_parameters(args):
     g['sa_iqtree_model'] = str(g['sa_iqtree_model']).strip()
     if g['sa_iqtree_model'] == '':
         raise ValueError('--sa_iqtree_model should be non-empty.')
+    if 'sa_state_cache' not in g.keys():
+        g['sa_state_cache'] = 'auto'
+    g['sa_state_cache'] = str(g['sa_state_cache']).strip().lower()
+    if g['sa_state_cache'] not in ['auto', 'yes', 'no']:
+        raise ValueError('--sa_state_cache should be one of auto, yes, no.')
+    if 'sa_state_cache_file' not in g.keys():
+        g['sa_state_cache_file'] = _default_sa_state_cache_file()
+    if g['sa_state_cache_file'] is None:
+        g['sa_state_cache_file'] = _default_sa_state_cache_file()
+    g['sa_state_cache_file'] = str(g['sa_state_cache_file']).strip()
+    if g['sa_state_cache_file'] == '':
+        raise ValueError('--sa_state_cache_file should be non-empty.')
     if 'sa_smoke_max_branches' in g.keys():
         g['sa_smoke_max_branches'] = int(g['sa_smoke_max_branches'])
     else:
         g['sa_smoke_max_branches'] = 0
     if g['sa_smoke_max_branches'] < 0:
         raise ValueError('--sa_smoke_max_branches should be >= 0.')
+    if 'plot_nonsyn_recode_pca_3di20' not in g.keys():
+        g['plot_nonsyn_recode_pca_3di20'] = False
+    g['plot_nonsyn_recode_pca_3di20'] = _parse_bool_like(
+        value=g['plot_nonsyn_recode_pca_3di20'],
+        param_name='--plot_nonsyn_recode_pca_3di20',
+    )
     if g['nonsyn_recode'] == '3di20':
         full_path = str(g.get('full_cds_alignment_file', '')).strip()
         if full_path == '':

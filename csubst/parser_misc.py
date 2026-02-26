@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 import itertools
+import json
 import os
 import pkgutil
 import re
@@ -15,6 +16,8 @@ from csubst import recoding
 from csubst import structural_alphabet
 from csubst import tree
 from csubst import ete
+
+_THREEDI_STATE_CACHE_FORMAT_VERSION = 1
 
 
 def _initialize_and_report_nonsyn_recode(g):
@@ -36,6 +39,128 @@ def _initialize_and_report_nonsyn_recode(g):
     if write_pca:
         recoding.write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.png")
     return g
+
+
+def _normalize_sa_state_cache_mode(value):
+    normalized = str(value).strip().lower()
+    if normalized in ['auto', 'yes', 'no']:
+        return normalized
+    raise ValueError('--sa_state_cache should be one of auto, yes, no.')
+
+
+def _normalize_branch_ids_for_3di_cache(branch_ids):
+    if branch_ids is None:
+        return []
+    arr = np.asarray(branch_ids, dtype=np.int64).reshape(-1)
+    if arr.shape[0] == 0:
+        return []
+    return sorted(list(set([int(v) for v in arr.tolist()])))
+
+
+def _get_file_signature(path):
+    path_txt = str(path).strip()
+    if path_txt == '':
+        return {
+            'path': '',
+            'size': -1,
+            'mtime_ns': -1,
+        }
+    abs_path = os.path.abspath(path_txt)
+    if not os.path.isfile(abs_path):
+        return {
+            'path': abs_path,
+            'size': -1,
+            'mtime_ns': -1,
+        }
+    stat = os.stat(abs_path)
+    return {
+        'path': abs_path,
+        'size': int(stat.st_size),
+        'mtime_ns': int(getattr(stat, 'st_mtime_ns', int(stat.st_mtime * 1e9))),
+    }
+
+
+def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
+    full_cds_path = str(g.get('full_cds_alignment_file', '')).strip()
+    if full_cds_path == '':
+        full_cds_path = str(g.get('alignment_file', '')).strip()
+    context = {
+        'format_version': int(_THREEDI_STATE_CACHE_FORMAT_VERSION),
+        'nonsyn_recode': '3di20',
+        'sa_asr_mode': str(g.get('sa_asr_mode', 'direct')).strip().lower(),
+        'infile_type': str(g.get('infile_type', '')).strip().lower(),
+        'input_data_type': str(g.get('input_data_type', '')).strip().lower(),
+        'selected_branch_ids': _normalize_branch_ids_for_3di_cache(selected_branch_ids),
+        'state_cdn_shape': [int(v) for v in list(state_cdn_shape)],
+        'full_cds_alignment': _get_file_signature(full_cds_path),
+        'iqtree_state': _get_file_signature(g.get('path_iqtree_state', '')),
+    }
+    return context
+
+
+def _try_load_3di_state_cache(g, selected_branch_ids, state_cdn_shape):
+    cache_file = str(g.get('sa_state_cache_file', '')).strip()
+    if cache_file == '':
+        return None, None, '--sa_state_cache_file is empty.'
+    cache_path = os.path.abspath(cache_file)
+    if not os.path.isfile(cache_path):
+        return None, None, 'cache file not found: {}'.format(cache_path)
+    try:
+        with np.load(cache_path, allow_pickle=False) as cache:
+            required = ['metadata_json', 'state_nsy', 'state_orders']
+            missing = [key for key in required if key not in cache]
+            if len(missing) > 0:
+                txt = 'cache file missing field(s): {}'
+                return None, None, txt.format(','.join(missing))
+            metadata_raw = np.asarray(cache['metadata_json']).reshape(-1)
+            if metadata_raw.shape[0] != 1:
+                return None, None, 'metadata_json should contain a single record.'
+            cached_context = json.loads(str(metadata_raw[0]))
+            expected_context = _get_3di_state_cache_context(
+                g=g,
+                selected_branch_ids=selected_branch_ids,
+                state_cdn_shape=state_cdn_shape,
+            )
+            if cached_context != expected_context:
+                return None, None, 'cache metadata mismatch.'
+            state_nsy = np.asarray(cache['state_nsy'], dtype=g['float_type'])
+            state_orders = np.asarray(cache['state_orders'], dtype=object).reshape(-1)
+    except Exception as exc:
+        return None, None, 'failed to read cache file: {}'.format(str(exc))
+    if state_nsy.ndim != 3:
+        return None, None, 'cached state_nsy should be 3D.'
+    if state_nsy.shape[0] != int(state_cdn_shape[0]):
+        return None, None, 'cached state_nsy node axis mismatch.'
+    if state_nsy.shape[1] != int(state_cdn_shape[1]):
+        return None, None, 'cached state_nsy site axis mismatch.'
+    if state_nsy.shape[2] != state_orders.shape[0]:
+        return None, None, 'cached state_nsy/state_orders dimensions mismatch.'
+    return state_nsy, state_orders, None
+
+
+def _write_3di_state_cache(g, selected_branch_ids, state_cdn_shape, state_nsy, state_orders):
+    cache_file = str(g.get('sa_state_cache_file', '')).strip()
+    if cache_file == '':
+        raise ValueError('--sa_state_cache_file is empty.')
+    cache_path = os.path.abspath(cache_file)
+    cache_dir = os.path.dirname(cache_path)
+    if (cache_dir != '') and (not os.path.isdir(cache_dir)):
+        raise ValueError('Cache directory does not exist: {}'.format(cache_dir))
+    context = _get_3di_state_cache_context(
+        g=g,
+        selected_branch_ids=selected_branch_ids,
+        state_cdn_shape=state_cdn_shape,
+    )
+    metadata_json = json.dumps(context, sort_keys=True, separators=(',', ':'))
+    tmp_path = cache_path + '.tmp.npz'
+    np.savez_compressed(
+        tmp_path,
+        metadata_json=np.array([metadata_json], dtype=np.str_),
+        state_orders=np.asarray([str(v) for v in np.asarray(state_orders, dtype=object).reshape(-1)], dtype=np.str_),
+        state_nsy=np.asarray(state_nsy, dtype=g['float_type']),
+    )
+    os.replace(tmp_path, cache_path)
+    return cache_path
 
 
 def _read_package_text(file):
@@ -737,7 +862,30 @@ def prep_state(g):
                 g=g,
                 selected_branch_ids=loaded_branch_ids,
             )
+        cache_mode = _normalize_sa_state_cache_mode(g.get('sa_state_cache', 'auto'))
         sa_mode = str(g.get('sa_asr_mode', 'direct')).strip().lower()
+        state_cdn_shape = tuple([int(v) for v in state_cdn_local.shape])
+        if cache_mode in ['auto', 'yes']:
+            cached_state_nsy, cached_orders, cache_msg = _try_load_3di_state_cache(
+                g=g,
+                selected_branch_ids=nsy_branch_ids,
+                state_cdn_shape=state_cdn_shape,
+            )
+            if cached_state_nsy is not None:
+                g['nonsyn_state_orders'] = np.asarray(cached_orders, dtype=object)
+                g.pop('_3di_alignment_by_branch_id', None)
+                g.pop('_3di_tip_alignment_by_leaf', None)
+                txt = 'Loaded 3Di state cache: {}'
+                print(txt.format(os.path.abspath(str(g.get('sa_state_cache_file', '')).strip())), flush=True)
+                return cached_state_nsy
+            if cache_mode == 'yes':
+                txt = '--sa_state_cache yes requested a compatible 3Di cache, but it was unavailable: {}'
+                raise ValueError(txt.format(cache_msg))
+            if cache_msg is not None:
+                txt = '3Di state cache was not used (--sa_state_cache auto): {}'
+                print(txt.format(cache_msg), flush=True)
+        state_nsy_local = None
+        state_orders = None
         if sa_mode == 'translate':
             state_nsy_local, state_orders, aligned_3di = structural_alphabet.build_3di_state_from_state_pep(
                 g=g,
@@ -746,16 +894,29 @@ def prep_state(g):
             )
             g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
             g['_3di_alignment_by_branch_id'] = aligned_3di
-            return state_nsy_local
-        if sa_mode == 'direct':
+        elif sa_mode == 'direct':
             state_nsy_local, state_orders, tip_3di = structural_alphabet.build_3di_state_direct(
                 g=g,
                 selected_branch_ids=nsy_branch_ids,
             )
             g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
             g['_3di_tip_alignment_by_leaf'] = tip_3di
-            return state_nsy_local
-        raise ValueError('--sa_asr_mode should be one of translate, direct.')
+        else:
+            raise ValueError('--sa_asr_mode should be one of translate, direct.')
+        if cache_mode == 'auto':
+            try:
+                cache_path = _write_3di_state_cache(
+                    g=g,
+                    selected_branch_ids=nsy_branch_ids,
+                    state_cdn_shape=state_cdn_shape,
+                    state_nsy=state_nsy_local,
+                    state_orders=state_orders,
+                )
+                print('Wrote 3Di state cache: {}'.format(cache_path), flush=True)
+            except Exception as exc:
+                txt = 'Failed to write 3Di state cache in auto mode: {}'
+                print(txt.format(str(exc)), flush=True)
+        return state_nsy_local
 
     if (g['infile_type'] == 'phylobayes'):
         from csubst import parser_phylobayes

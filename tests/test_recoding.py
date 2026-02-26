@@ -780,6 +780,17 @@ def test_get_scheme_groups_for_pca_includes_auto_schemes_when_data_available():
     assert len(groups_by_scheme["kgbauto6"]) == 6
 
 
+def test_get_scheme_groups_for_pca_3di20_is_optional():
+    g = _toy_auto_grouping_g()
+    g["nonsyn_recode"] = "dayhoff6"
+    g = recoding.initialize_nonsyn_groups(g)
+    groups_default = recoding._get_scheme_groups_for_pca(g)
+    groups_with_3di = recoding._get_scheme_groups_for_pca(g, include_3di20=True)
+    assert "3di20" not in groups_default
+    assert "3di20" in groups_with_3di
+    assert groups_with_3di["3di20"] == tuple(list("ACDEFGHIKLMNPQRSTVWY"))
+
+
 def test_get_scheme_groups_for_pca_require_auto_raises_when_missing():
     g = _toy_grouping_g()
     g["nonsyn_recode"] = "dayhoff6"
@@ -840,3 +851,38 @@ def test_write_nonsyn_recoding_pca_plot_writes_png_for_no(tmp_path):
     assert returned == str(output_path)
     assert output_path.exists() is True
     assert output_path.stat().st_size > 0
+
+
+def test_write_nonsyn_recoding_pca_plot_skips_3di20_when_disabled(tmp_path, monkeypatch):
+    g = _toy_grouping_g()
+    g["nonsyn_recode"] = "dayhoff6"
+    g["plot_nonsyn_recode_pca_3di20"] = False
+    g = recoding.initialize_nonsyn_groups(g)
+    monkeypatch.setattr(
+        recoding,
+        "_build_3di20_dataset_feature_vector",
+        lambda g: (_ for _ in ()).throw(AssertionError("3di20 feature should be skipped")),
+    )
+    output_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
+    returned = recoding.write_nonsyn_recoding_pca_plot(g, output_path=str(output_path))
+    assert returned == str(output_path)
+    assert output_path.exists() is True
+
+
+def test_write_nonsyn_recoding_pca_plot_includes_3di20_when_enabled(tmp_path, monkeypatch):
+    g = _toy_grouping_g()
+    g["nonsyn_recode"] = "dayhoff6"
+    g["plot_nonsyn_recode_pca_3di20"] = True
+    g = recoding.initialize_nonsyn_groups(g)
+    called = {"used": False}
+
+    def _fake_build_3di20(g):
+        called["used"] = True
+        return np.linspace(0.0, 1.0, num=190, dtype=np.float64)
+
+    monkeypatch.setattr(recoding, "_build_3di20_dataset_feature_vector", _fake_build_3di20)
+    output_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
+    returned = recoding.write_nonsyn_recoding_pca_plot(g, output_path=str(output_path))
+    assert returned == str(output_path)
+    assert output_path.exists() is True
+    assert called["used"] is True
