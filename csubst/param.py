@@ -618,6 +618,12 @@ def get_global_parameters(args):
         g['simulate_seed'] = int(g['simulate_seed'])
         if (g['simulate_seed'] < -1):
             raise ValueError('--simulate_seed should be -1 or >= 0.')
+    if 'simulate_asrv' in g.keys():
+        g['simulate_asrv'] = str(g['simulate_asrv']).strip().lower()
+    else:
+        g['simulate_asrv'] = 'no'
+    if g['simulate_asrv'] not in ['no', 'file']:
+        raise ValueError('--simulate_asrv should be one of no, file.')
     if 'export_true_asr' in g.keys():
         g['export_true_asr'] = _parse_bool_like(
             value=g['export_true_asr'],
@@ -648,12 +654,20 @@ def get_global_parameters(args):
         if g['foreground_scaling_factor'] < 0:
             raise ValueError('--foreground_scaling_factor should be >= 0.')
     if 'background_omega' in g.keys():
-        g['background_omega'] = _require_finite_float(
-            value=float(g['background_omega']),
-            param_name='--background_omega',
-        )
-        if g['background_omega'] < 0:
-            raise ValueError('--background_omega should be >= 0.')
+        raw_background_omega = g['background_omega']
+        if raw_background_omega is None:
+            g['background_omega'] = None
+        else:
+            omega_txt = str(raw_background_omega).strip().lower()
+            if omega_txt in ['', 'none', 'auto', 'infer', 'iqtree']:
+                g['background_omega'] = None
+            else:
+                g['background_omega'] = _require_finite_float(
+                    value=float(raw_background_omega),
+                    param_name='--background_omega',
+                )
+                if g['background_omega'] < 0:
+                    raise ValueError('--background_omega should be >= 0.')
     if 'foreground_omega' in g.keys():
         g['foreground_omega'] = _require_finite_float(
             value=float(g['foreground_omega']),
@@ -661,6 +675,12 @@ def get_global_parameters(args):
         )
         if g['foreground_omega'] < 0:
             raise ValueError('--foreground_omega should be >= 0.')
+    if 'simulate_eq_freq' in g.keys():
+        g['simulate_eq_freq'] = str(g['simulate_eq_freq']).strip().lower()
+    else:
+        g['simulate_eq_freq'] = 'auto'
+    if g['simulate_eq_freq'] not in ['auto', 'iqtree', 'alignment']:
+        raise ValueError('--simulate_eq_freq should be one of auto, iqtree, alignment.')
     if 'convergent_amino_acids' in g.keys():
         conv_aa = str(g['convergent_amino_acids']).strip()
         if conv_aa == '':

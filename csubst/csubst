@@ -289,8 +289,9 @@ def _main():
     # simulate
     help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario (optional; requires pyvolve). See `csubst simulate -h`'
     simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg])
-    simulate.add_argument('--background_omega', metavar='FLOAT', default=0.2, type=float,
-                          help='default=%(default)s: dN/dS for background branches.')
+    simulate.add_argument('--background_omega', metavar='FLOAT', default=None, type=float,
+                          help='default=IQ-TREE estimate (fallback 0.2): dN/dS for background branches. '
+                               'Set explicitly to override IQ-TREE estimated omega.')
     simulate.add_argument('--foreground_omega', metavar='FLOAT', default=0.2, type=float,
                           help='default=%(default)s: dN/dS for foreground branches.')
     simulate.add_argument('--num_simulated_site', metavar='INT', default=-1, type=int,
@@ -321,6 +322,18 @@ def _main():
     simulate.add_argument('--simulate_seed', metavar='INT', default=-1, type=int,
                           help='default=%(default)s: Random seed for pyvolve simulation. '
                                'Set -1 to use non-deterministic seed.')
+    simulate.add_argument('--simulate_asrv', metavar='no|file', default='no', type=str,
+                          choices=['no', 'file'],
+                          help='default=%(default)s: Among-site rate variation mode for simulation. '
+                               '"no" uses a single-rate process across sites. '
+                               '"file" applies site rates from IQ-TREE .rate '
+                               '(C_Rate if present, otherwise Rate) to pyvolve per site.')
+    simulate.add_argument('--simulate_eq_freq', metavar='auto|iqtree|alignment', default='auto', type=str,
+                          choices=['auto', 'iqtree', 'alignment'],
+                          help='default=%(default)s: Source of codon equilibrium frequencies for simulation Q. '
+                               '"auto" prefers IQ-TREE frequencies and falls back to alignment frequencies; '
+                               '"iqtree" requires parsed IQ-TREE frequencies; '
+                               '"alignment" always re-estimates from alignment.')
     simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
                           help='default=%(default)s: Export true ancestral-state bundle from simulation '
                                '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for analyze-time evaluation.')

@@ -1,0 +1,3 @@
+comparison	nt_identity_fraction	codon_identity_fraction	changed_codons_total	total_codons	top5_taxa_changed_codons
+before_default_vs_after_omega0.2	0.9897052055325437	0.9792892958360584	285	13761	[('Mus_musculus_ENSMUSG00000031233', 41), ('Rattus_norvegicus_ENSRNOG00000013600', 35), ('Oryctolagus_cuniculus_ENSOCUG00000005270', 31), ('Ovis_aries_ENSOARG00000008736', 31), ('Sus_scrofa_ENSSSCG00000001738', 31)]
+before_default_vs_after_default	0.9277426543613594	0.8596758956471187	1931	13761	[('Xenopus_tropicalis_ENSXETG00000007447', 71), ('Mus_musculus_ENSMUSG00000031233', 70), ('Ovis_aries_ENSOARG00000008736', 68), ('Sus_scrofa_ENSSSCG00000001738', 68), ('Anolis_carolinensis_ENSACAG00000003255', 66)]
