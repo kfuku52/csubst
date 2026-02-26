@@ -184,6 +184,76 @@ def test_cb_search_rejects_invalid_max_arity():
         main_analyze.cb_search(g=g, b=None, OS_tensor=None, ON_tensor=None, id_combinations=None, write_cb=False)
 
 
+def test_cb_search_records_epistasis_negative_control_fields(monkeypatch):
+    def fake_get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=False, cb_all=False, arity=2,
+                                   check_attr=None, verbose=True):
+        return g, np.array([[0, 1]], dtype=np.int64)
+
+    def fake_get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
+        return pd.DataFrame({"_unused": [1.0]})
+
+    def fake_merge_tables(cbOS, cbON):
+        return pd.DataFrame(
+            {
+                "branch_id_1": [10],
+                "branch_id_2": [20],
+            }
+        )
+
+    def fake_calc_omega(cb, OS, ON, g):
+        out_g = g.copy()
+        out_g["epistasis_enabled"] = True
+        out_g["epistasis_apply_to"] = "S"
+        out_g["epistasis_site_metric"] = "proximity"
+        out_g["epistasis_site_metric_resolved"] = "proximity"
+        out_g["_epistasis_state"] = {
+            "S": {
+                "beta": 0.5,
+                "clip": 2.0,
+            },
+        }
+        return cb.copy(deep=True), out_g
+
+    monkeypatch.setattr(main_analyze.combination, "get_node_combinations", fake_get_node_combinations)
+    monkeypatch.setattr(main_analyze.substitution, "get_reducer_sub_tensor", lambda sub_tensor, g, label: sub_tensor)
+    monkeypatch.setattr(main_analyze.substitution, "get_cb", fake_get_cb)
+    monkeypatch.setattr(main_analyze.table, "merge_tables", fake_merge_tables)
+    monkeypatch.setattr(
+        main_analyze.substitution,
+        "add_dif_stats",
+        lambda cb, tol, prefix, output_stats=None: cb,
+    )
+    monkeypatch.setattr(main_analyze.omega, "calc_omega", fake_calc_omega)
+    monkeypatch.setattr(main_analyze.substitution, "get_substitutions_per_branch", lambda cb, b, g: cb)
+    monkeypatch.setattr(main_analyze.table, "get_linear_regression", lambda cb: cb)
+    monkeypatch.setattr(main_analyze.output_stat, "drop_unrequested_stat_columns", lambda cb, output_stats=None: cb)
+    monkeypatch.setattr(main_analyze.foreground, "get_foreground_branch_num", lambda cb, g: (cb, g))
+    monkeypatch.setattr(main_analyze.table, "sort_cb", lambda cb: cb)
+    monkeypatch.setattr(main_analyze.foreground, "add_median_cb_stats", lambda g, cb, current_arity, start: g)
+
+    g = {
+        "max_arity": 2,
+        "exhaustive_until": 2,
+        "foreground": None,
+        "cutoff_stat": "score,0",
+        "max_combination": 2,
+        "threads": 1,
+        "float_tol": 1e-12,
+        "calibrate_longtail": False,
+        "branch_dist": False,
+        "float_format": "%.6f",
+        "fg_clade_permutation": 0,
+        "df_cb_stats_main": pd.DataFrame(),
+    }
+
+    out_g, _ = main_analyze.cb_search(g=g, b=None, OS_tensor=None, ON_tensor=None, id_combinations=None, write_cb=False)
+
+    row = out_g["df_cb_stats_main"].iloc[0]
+    assert row["epistasis_negative_control_S"] == "Y"
+    assert row["epistasis_negative_control_S_mode"] == "S_only"
+    assert row["epistasis_apply_to"] == "S"
+
+
 def test_cb_search_rejects_invalid_max_combination():
     g = {
         "max_arity": 2,
@@ -287,3 +357,33 @@ def test_load_epistasis_degree_from_file_rejects_unavailable_requested_metric(tm
     }
     with pytest.raises(ValueError, match="proximity"):
         main_analyze._load_epistasis_degree_from_file(g=g, num_site=3)
+
+
+def test_resolve_epistasis_feature_matrix_supports_paired_mode():
+    g = {
+        "epistasis_feature_mode": "paired",
+        "epistasis_site_degree_internal": np.array([-1.0, 0.0, 1.0], dtype=np.float64),
+        "epistasis_profile_map_internal": {
+            "degree": np.array([-1.0, 0.0, 1.0], dtype=np.float64),
+            "proximity": np.array([1.0, 0.0, -1.0], dtype=np.float64),
+        },
+    }
+    features, resolved = main_analyze._resolve_epistasis_feature_matrix(g=g, num_site=3)
+    assert resolved == "paired"
+    assert features.shape == (3, 2)
+    np.testing.assert_allclose(features[:, 0], np.array([-1.0, 0.0, 1.0], dtype=np.float64))
+    np.testing.assert_allclose(features[:, 1], np.array([1.0, 0.0, -1.0], dtype=np.float64))
+
+
+def test_resolve_epistasis_feature_matrix_falls_back_to_single():
+    g = {
+        "epistasis_feature_mode": "paired",
+        "epistasis_site_degree_internal": np.array([-1.0, 0.0, 1.0], dtype=np.float64),
+        "epistasis_profile_map_internal": {
+            "degree": np.array([-1.0, 0.0, 1.0], dtype=np.float64),
+        },
+    }
+    features, resolved = main_analyze._resolve_epistasis_feature_matrix(g=g, num_site=3)
+    assert resolved == "single"
+    assert features.shape == (3, 1)
+    np.testing.assert_allclose(features[:, 0], np.array([-1.0, 0.0, 1.0], dtype=np.float64))

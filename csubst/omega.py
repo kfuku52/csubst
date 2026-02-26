@@ -155,17 +155,53 @@ def _build_epistasis_base_probs(counts, is_site_nonmissing, dirichlet_alpha, flo
     return out
 
 
+def _coerce_epistasis_site_features(site_features):
+    site_features = np.asarray(site_features, dtype=np.float64)
+    if site_features.ndim == 1:
+        site_features = site_features.reshape(-1, 1)
+    if site_features.ndim != 2:
+        raise ValueError('site_features should be a 1D or 2D array.')
+    return site_features
+
+
+def _coerce_epistasis_branch_parameter(value, num_branch, name):
+    arr = np.asarray(value, dtype=np.float64)
+    if arr.ndim == 0:
+        return np.full(shape=(num_branch,), fill_value=float(arr), dtype=np.float64)
+    arr = arr.reshape(-1).astype(np.float64, copy=False)
+    if arr.shape[0] != num_branch:
+        txt = '{} length ({}) should match number of branches ({}).'
+        raise ValueError(txt.format(name, arr.shape[0], num_branch))
+    return arr
+
+
+def _calc_epistasis_interaction_score(branch_context, site_features):
+    branch_context = np.asarray(branch_context, dtype=np.float64)
+    site_features = _coerce_epistasis_site_features(site_features=site_features)
+    if branch_context.ndim == 1:
+        branch_context = branch_context.reshape(-1, 1)
+    if branch_context.ndim != 2:
+        raise ValueError('branch_context should be a 1D or 2D array.')
+    if branch_context.shape[1] != site_features.shape[1]:
+        txt = 'branch_context feature dimension ({}) and site_features feature dimension ({}) should match.'
+        raise ValueError(txt.format(branch_context.shape[1], site_features.shape[1]))
+    score = branch_context @ site_features.T
+    if branch_context.shape[1] > 1:
+        score = score / float(branch_context.shape[1])
+    return score
+
+
 def _calc_epistasis_branch_context(counts, degree_z, is_site_nonmissing, float_tol):
     counts = np.asarray(counts, dtype=np.float64)
-    degree_z = np.asarray(degree_z, dtype=np.float64).reshape(-1)
+    site_features = _coerce_epistasis_site_features(site_features=degree_z)
     is_site_nonmissing = np.asarray(is_site_nonmissing, dtype=bool)
     if counts.shape != is_site_nonmissing.shape:
         txt = 'counts shape ({}) and is_site_nonmissing shape ({}) should match.'
         raise ValueError(txt.format(counts.shape, is_site_nonmissing.shape))
-    if counts.shape[1] != degree_z.shape[0]:
-        txt = 'counts site axis ({}) and degree_z length ({}) should match.'
-        raise ValueError(txt.format(counts.shape[1], degree_z.shape[0]))
-    context = np.zeros(shape=(counts.shape[0],), dtype=np.float64)
+    if counts.shape[1] != site_features.shape[0]:
+        txt = 'counts site axis ({}) and site_features length ({}) should match.'
+        raise ValueError(txt.format(counts.shape[1], site_features.shape[0]))
+    context = np.zeros(shape=(counts.shape[0], site_features.shape[1]), dtype=np.float64)
     for i in range(counts.shape[0]):
         valid = is_site_nonmissing[i, :]
         if not valid.any():
@@ -174,30 +210,49 @@ def _calc_epistasis_branch_context(counts, degree_z, is_site_nonmissing, float_t
         total = float(row_counts.sum(dtype=np.float64))
         if total <= float(float_tol):
             continue
-        context[i] = float(np.dot(row_counts, degree_z[valid]) / total)
+        context[i, :] = (row_counts[:, None] * site_features[valid, :]).sum(axis=0, dtype=np.float64) / total
+    if context.shape[1] == 1:
+        return context[:, 0]
     return context
 
 
 def _apply_epistasis_beta_to_probs(base_probs, branch_context, degree_z, beta, clip_value, is_site_nonmissing, float_tol):
     base_probs = np.asarray(base_probs, dtype=np.float64)
-    branch_context = np.asarray(branch_context, dtype=np.float64).reshape(-1)
-    degree_z = np.asarray(degree_z, dtype=np.float64).reshape(-1)
+    site_features = _coerce_epistasis_site_features(site_features=degree_z)
+    branch_context = np.asarray(branch_context, dtype=np.float64)
     is_site_nonmissing = np.asarray(is_site_nonmissing, dtype=bool)
     if base_probs.shape != is_site_nonmissing.shape:
         txt = 'base_probs shape ({}) and is_site_nonmissing shape ({}) should match.'
         raise ValueError(txt.format(base_probs.shape, is_site_nonmissing.shape))
+    if base_probs.shape[1] != site_features.shape[0]:
+        txt = 'base_probs site axis ({}) and site_features length ({}) should match.'
+        raise ValueError(txt.format(base_probs.shape[1], site_features.shape[0]))
+    if branch_context.ndim == 1:
+        branch_context = branch_context.reshape(-1, 1)
+    if branch_context.ndim != 2:
+        raise ValueError('branch_context should be a 1D or 2D array.')
     if base_probs.shape[0] != branch_context.shape[0]:
         txt = 'base_probs branch axis ({}) and branch_context length ({}) should match.'
         raise ValueError(txt.format(base_probs.shape[0], branch_context.shape[0]))
-    if base_probs.shape[1] != degree_z.shape[0]:
-        txt = 'base_probs site axis ({}) and degree_z length ({}) should match.'
-        raise ValueError(txt.format(base_probs.shape[1], degree_z.shape[0]))
-    beta = float(beta)
-    if beta <= float(float_tol):
+    if branch_context.shape[1] != site_features.shape[1]:
+        txt = 'branch_context feature dimension ({}) and site_features feature dimension ({}) should match.'
+        raise ValueError(txt.format(branch_context.shape[1], site_features.shape[1]))
+    beta_by_branch = _coerce_epistasis_branch_parameter(beta, base_probs.shape[0], 'beta')
+    if np.all(beta_by_branch <= float(float_tol)):
         return base_probs.copy()
-    score = beta * np.multiply.outer(branch_context, degree_z)
-    if np.isfinite(float(clip_value)):
-        np.clip(score, -float(clip_value), float(clip_value), out=score)
+    clip_by_branch = _coerce_epistasis_branch_parameter(clip_value, base_probs.shape[0], 'clip_value')
+    score = _calc_epistasis_interaction_score(
+        branch_context=branch_context,
+        site_features=site_features,
+    )
+    score = score * beta_by_branch[:, None]
+    finite_clip = np.isfinite(clip_by_branch)
+    if finite_clip.any():
+        clip_abs = np.abs(clip_by_branch)
+        score[finite_clip, :] = np.minimum(
+            np.maximum(score[finite_clip, :], -clip_abs[finite_clip, None]),
+            clip_abs[finite_clip, None],
+        )
     weight = np.exp(score)
     numer = base_probs * weight
     numer = np.where(is_site_nonmissing, numer, 0.0)
@@ -225,11 +280,14 @@ def _fit_epistasis_beta_cv(
     clip_value,
     float_tol,
     dirichlet_alpha=1.0,
+    beta_grid=None,
 ):
     counts = np.asarray(counts, dtype=np.float64)
     base_probs = np.asarray(base_probs, dtype=np.float64)
-    branch_context = np.asarray(branch_context, dtype=np.float64).reshape(-1)
-    degree_z = np.asarray(degree_z, dtype=np.float64).reshape(-1)
+    branch_context = np.asarray(branch_context, dtype=np.float64)
+    site_features = _coerce_epistasis_site_features(site_features=degree_z)
+    if branch_context.ndim == 1:
+        branch_context = branch_context.reshape(-1, 1)
     is_site_nonmissing = np.asarray(is_site_nonmissing, dtype=bool)
     if counts.shape != base_probs.shape:
         txt = 'counts shape ({}) and base_probs shape ({}) should match.'
@@ -240,24 +298,33 @@ def _fit_epistasis_beta_cv(
     if counts.shape[0] != branch_context.shape[0]:
         txt = 'counts branch axis ({}) and branch_context length ({}) should match.'
         raise ValueError(txt.format(counts.shape[0], branch_context.shape[0]))
-    if counts.shape[1] != degree_z.shape[0]:
-        txt = 'counts site axis ({}) and degree_z length ({}) should match.'
-        raise ValueError(txt.format(counts.shape[1], degree_z.shape[0]))
+    if counts.shape[1] != site_features.shape[0]:
+        txt = 'counts site axis ({}) and site_features length ({}) should match.'
+        raise ValueError(txt.format(counts.shape[1], site_features.shape[0]))
+    if branch_context.shape[1] != site_features.shape[1]:
+        txt = 'branch_context feature dimension ({}) and site_features feature dimension ({}) should match.'
+        raise ValueError(txt.format(branch_context.shape[1], site_features.shape[1]))
     dirichlet_alpha = float(dirichlet_alpha)
     if dirichlet_alpha < 0:
         raise ValueError('dirichlet_alpha should be >= 0.')
+    if beta_grid is None:
+        beta_grid = _EPI_BETA_GRID
+    beta_grid = np.asarray(beta_grid, dtype=np.float64).reshape(-1)
+    if beta_grid.shape[0] == 0:
+        raise ValueError('beta_grid should contain one or more values.')
 
     total_by_branch = counts.sum(axis=1, dtype=np.float64)
     is_active = (total_by_branch > float(float_tol)) & is_site_nonmissing.any(axis=1)
     active_rows = np.where(is_active)[0].astype(np.int64)
     if active_rows.shape[0] < 2:
-        return 0.0, {'active_branch_count': int(active_rows.shape[0]), 'num_folds': 0, 'best_score': np.nan}
+        fallback_beta = 0.0 if np.isclose(beta_grid, 0.0).any() else float(beta_grid[0])
+        return float(fallback_beta), {'active_branch_count': int(active_rows.shape[0]), 'num_folds': 0, 'best_score': np.nan}
     num_folds = min(_EPI_CV_FOLDS, int(active_rows.shape[0]))
     fold_ids = np.arange(active_rows.shape[0], dtype=np.int64) % num_folds
-    fold_scores = np.full(shape=(_EPI_BETA_GRID.shape[0], num_folds), fill_value=np.nan, dtype=np.float64)
+    fold_scores = np.full(shape=(beta_grid.shape[0], num_folds), fill_value=np.nan, dtype=np.float64)
     # Cross-validation uses branch-held-out priors to avoid a trivial beta=0 optimum
     # induced by evaluating each branch against its own empirical distribution.
-    for i, beta in enumerate(_EPI_BETA_GRID.tolist()):
+    for i, beta in enumerate(beta_grid.tolist()):
         for fold in range(num_folds):
             test_rows = active_rows[fold_ids == fold]
             train_rows = active_rows[fold_ids != fold]
@@ -290,7 +357,7 @@ def _fit_epistasis_beta_cv(
             probs = _apply_epistasis_beta_to_probs(
                 base_probs=fold_base,
                 branch_context=branch_context[test_rows],
-                degree_z=degree_z,
+                degree_z=site_features,
                 beta=float(beta),
                 clip_value=float(clip_value),
                 is_site_nonmissing=is_site_nonmissing[test_rows, :],
@@ -310,12 +377,12 @@ def _fit_epistasis_beta_cv(
     else:
         best_se = 0.0
     selected_idx = best_idx
-    selected_beta = float(_EPI_BETA_GRID[selected_idx])
+    selected_beta = float(beta_grid[selected_idx])
     diag = {
         'active_branch_count': int(active_rows.shape[0]),
         'num_folds': int(num_folds),
         'best_score': float(best_mean),
-        'best_beta': float(_EPI_BETA_GRID[best_idx]),
+        'best_beta': float(beta_grid[best_idx]),
         'selected_beta': float(selected_beta),
         'one_se': float(best_se),
         'selection_rule': 'argmax_mean_cv_loglik',
@@ -324,10 +391,18 @@ def _fit_epistasis_beta_cv(
 
 
 def _auto_epistasis_clip(beta, branch_context, degree_z, is_site_nonmissing):
-    beta = float(beta)
-    if beta <= 0:
+    site_features = _coerce_epistasis_site_features(site_features=degree_z)
+    branch_context = np.asarray(branch_context, dtype=np.float64)
+    if branch_context.ndim == 1:
+        branch_context = branch_context.reshape(-1, 1)
+    beta_by_branch = _coerce_epistasis_branch_parameter(beta, branch_context.shape[0], 'beta')
+    if np.all(beta_by_branch <= 0):
         return float(_EPI_AUTO_CLIP_MIN)
-    score = np.abs(beta * np.multiply.outer(branch_context, degree_z))
+    score = _calc_epistasis_interaction_score(
+        branch_context=branch_context,
+        site_features=site_features,
+    )
+    score = np.abs(score * beta_by_branch[:, None])
     mask = np.asarray(is_site_nonmissing, dtype=bool)
     if score.shape != mask.shape:
         txt = 'score shape ({}) and is_site_nonmissing shape ({}) should match.'
@@ -344,12 +419,26 @@ def _auto_epistasis_clip(beta, branch_context, degree_z, is_site_nonmissing):
 
 
 def _build_epistasis_weight_matrix(branch_context, degree_z, beta, clip_value, is_site_nonmissing, float_tol):
-    beta = float(beta)
-    if beta <= float(float_tol):
+    site_features = _coerce_epistasis_site_features(site_features=degree_z)
+    branch_context = np.asarray(branch_context, dtype=np.float64)
+    if branch_context.ndim == 1:
+        branch_context = branch_context.reshape(-1, 1)
+    beta_by_branch = _coerce_epistasis_branch_parameter(beta, branch_context.shape[0], 'beta')
+    if np.all(beta_by_branch <= float(float_tol)):
         return np.ones(shape=is_site_nonmissing.shape, dtype=np.float64)
-    score = beta * np.multiply.outer(branch_context, degree_z)
-    if np.isfinite(float(clip_value)):
-        np.clip(score, -float(clip_value), float(clip_value), out=score)
+    clip_by_branch = _coerce_epistasis_branch_parameter(clip_value, branch_context.shape[0], 'clip_value')
+    score = _calc_epistasis_interaction_score(
+        branch_context=branch_context,
+        site_features=site_features,
+    )
+    score = score * beta_by_branch[:, None]
+    finite_clip = np.isfinite(clip_by_branch)
+    if finite_clip.any():
+        clip_abs = np.abs(clip_by_branch)
+        score[finite_clip, :] = np.minimum(
+            np.maximum(score[finite_clip, :], -clip_abs[finite_clip, None]),
+            clip_abs[finite_clip, None],
+        )
     weight = np.exp(score)
     weight = np.where(is_site_nonmissing, weight, 1.0)
     return weight
@@ -383,19 +472,225 @@ def _apply_epistasis_to_sub_sites(sub_sites, obs_col, g):
     return out.astype(sub_sites_arr.dtype, copy=False)
 
 
+def _get_epistasis_branch_depth_by_id(g, num_branch):
+    out = np.arange(num_branch, dtype=np.float64)
+    tree = g.get('tree', None)
+    if tree is None:
+        return out
+    for node in tree.traverse():
+        try:
+            branch_id = int(ete.get_prop(node, 'numerical_label'))
+        except Exception:
+            continue
+        if (branch_id < 0) or (branch_id >= num_branch):
+            continue
+        try:
+            depth = 0.0
+            cursor = node
+            while (cursor is not None) and (not ete.is_root(cursor)):
+                depth += 0.0 if (cursor.dist is None) else float(cursor.dist)
+                cursor = cursor.up
+            out[branch_id] = float(depth)
+        except Exception:
+            out[branch_id] = np.nan
+    finite = np.isfinite(out)
+    if not finite.all():
+        fill = float(np.nanmedian(out[finite])) if finite.any() else 0.0
+        out[~finite] = fill
+    return out
+
+
+def _assign_epistasis_branch_depth_bins(depth_by_branch, active_mask, num_bins):
+    depth_by_branch = np.asarray(depth_by_branch, dtype=np.float64).reshape(-1)
+    active_mask = np.asarray(active_mask, dtype=bool).reshape(-1)
+    if depth_by_branch.shape[0] != active_mask.shape[0]:
+        txt = 'depth_by_branch length ({}) and active_mask length ({}) should match.'
+        raise ValueError(txt.format(depth_by_branch.shape[0], active_mask.shape[0]))
+    bin_ids = np.full(shape=(depth_by_branch.shape[0],), fill_value=-1, dtype=np.int64)
+    active_ids = np.where(active_mask & np.isfinite(depth_by_branch))[0].astype(np.int64)
+    if active_ids.shape[0] == 0:
+        return bin_ids, list()
+    num_bins = max(1, min(int(num_bins), int(active_ids.shape[0])))
+    sorted_ids = active_ids[np.argsort(depth_by_branch[active_ids], kind='mergesort')]
+    chunks = np.array_split(sorted_ids, num_bins)
+    summary = list()
+    for i, chunk in enumerate(chunks):
+        if chunk.shape[0] == 0:
+            continue
+        bin_ids[chunk] = int(i)
+        summary.append({
+            'bin': int(i),
+            'count': int(chunk.shape[0]),
+            'depth_min': float(depth_by_branch[chunk].min()),
+            'depth_max': float(depth_by_branch[chunk].max()),
+        })
+    return bin_ids, summary
+
+
+def _fit_epistasis_parameters_for_subset(
+    counts,
+    is_site_nonmissing,
+    branch_context,
+    site_features,
+    g,
+):
+    counts = np.asarray(counts, dtype=np.float64)
+    is_site_nonmissing = np.asarray(is_site_nonmissing, dtype=bool)
+    branch_context = np.asarray(branch_context, dtype=np.float64)
+    site_features = _coerce_epistasis_site_features(site_features=site_features)
+    if counts.shape != is_site_nonmissing.shape:
+        txt = 'counts shape ({}) and is_site_nonmissing shape ({}) should match.'
+        raise ValueError(txt.format(counts.shape, is_site_nonmissing.shape))
+    if counts.shape[0] == 0:
+        return {
+            'beta': 0.0,
+            'clip': float(g.get('epistasis_clip_value', 3.0)),
+            'alpha': float(g.get('asrv_dirichlet_alpha', 1.0)),
+            'diag': {'active_branch_count': 0, 'num_folds': 0, 'best_score': np.nan},
+        }
+    beta_auto = bool(g.get('epistasis_beta_auto', False))
+    clip_auto = bool(g.get('epistasis_clip_auto', False))
+    joint_auto = bool(g.get('epistasis_joint_auto', False))
+    base_alpha = float(g.get('asrv_dirichlet_alpha', 1.0))
+    float_tol = float(g['float_tol'])
+
+    if joint_auto:
+        alpha_grid = np.asarray(g.get('epistasis_joint_alpha_grid', [0.0, 0.5, 1.0, 2.0]), dtype=np.float64).reshape(-1)
+        clip_grid = np.asarray(g.get('epistasis_joint_clip_grid', [1.5, 2.0, 2.5, 3.0, 4.0, 5.0]), dtype=np.float64).reshape(-1)
+        if alpha_grid.shape[0] == 0:
+            alpha_grid = np.array([base_alpha], dtype=np.float64)
+        if clip_grid.shape[0] == 0:
+            clip_grid = np.array([float(g.get('epistasis_clip_value', 3.0))], dtype=np.float64)
+        best = None
+        for alpha in alpha_grid.tolist():
+            base_probs = _build_epistasis_base_probs(
+                counts=counts,
+                is_site_nonmissing=is_site_nonmissing,
+                dirichlet_alpha=float(alpha),
+                float_tol=float_tol,
+            )
+            for clip_value in clip_grid.tolist():
+                if beta_auto:
+                    beta_grid = None
+                else:
+                    beta_grid = np.array([float(g.get('epistasis_beta_value', 0.0))], dtype=np.float64)
+                beta, diag = _fit_epistasis_beta_cv(
+                    counts=counts,
+                    base_probs=base_probs,
+                    branch_context=branch_context,
+                    degree_z=site_features,
+                    is_site_nonmissing=is_site_nonmissing,
+                    clip_value=float(clip_value),
+                    float_tol=float_tol,
+                    dirichlet_alpha=float(alpha),
+                    beta_grid=beta_grid,
+                )
+                score = float(diag.get('best_score', np.nan))
+                cmp_score = score if np.isfinite(score) else -np.inf
+                if (best is None) or (cmp_score > best['cmp_score']):
+                    best = {
+                        'beta': float(beta),
+                        'clip': float(clip_value),
+                        'alpha': float(alpha),
+                        'diag': diag,
+                        'cmp_score': float(cmp_score),
+                    }
+        if best is not None:
+            return {
+                'beta': best['beta'],
+                'clip': best['clip'],
+                'alpha': best['alpha'],
+                'diag': best['diag'],
+            }
+
+    base_probs = _build_epistasis_base_probs(
+        counts=counts,
+        is_site_nonmissing=is_site_nonmissing,
+        dirichlet_alpha=base_alpha,
+        float_tol=float_tol,
+    )
+    if beta_auto:
+        clip_for_fit = float(g['epistasis_clip_value']) if (not clip_auto) else float(_EPI_AUTO_CLIP_MAX)
+        beta, beta_diag = _fit_epistasis_beta_cv(
+            counts=counts,
+            base_probs=base_probs,
+            branch_context=branch_context,
+            degree_z=site_features,
+            is_site_nonmissing=is_site_nonmissing,
+            clip_value=clip_for_fit,
+            float_tol=float_tol,
+            dirichlet_alpha=base_alpha,
+        )
+    else:
+        beta = float(g.get('epistasis_beta_value', 0.0))
+        beta_diag = {'active_branch_count': int((counts.sum(axis=1) > float_tol).sum()), 'num_folds': 0, 'best_score': np.nan}
+    if clip_auto:
+        clip_value = _auto_epistasis_clip(
+            beta=beta,
+            branch_context=branch_context,
+            degree_z=site_features,
+            is_site_nonmissing=is_site_nonmissing,
+        )
+        if beta_auto:
+            beta, beta_diag = _fit_epistasis_beta_cv(
+                counts=counts,
+                base_probs=base_probs,
+                branch_context=branch_context,
+                degree_z=site_features,
+                is_site_nonmissing=is_site_nonmissing,
+                clip_value=float(clip_value),
+                float_tol=float_tol,
+                dirichlet_alpha=base_alpha,
+            )
+            clip_value = _auto_epistasis_clip(
+                beta=beta,
+                branch_context=branch_context,
+                degree_z=site_features,
+                is_site_nonmissing=is_site_nonmissing,
+            )
+    else:
+        clip_value = float(g.get('epistasis_clip_value', 3.0))
+    return {
+        'beta': float(beta),
+        'clip': float(clip_value),
+        'alpha': float(base_alpha),
+        'diag': beta_diag,
+    }
+
+
 def prepare_epistasis(g, ON_tensor, OS_tensor):
     g['epistasis_enabled'] = False
-    degree_z = g.get('epistasis_site_degree_internal', None)
-    if degree_z is None:
+    site_features = g.get('epistasis_site_feature_matrix_internal', None)
+    if site_features is None:
+        site_features = g.get('epistasis_site_degree_internal', None)
+    if site_features is None:
         return g
-    degree_z = np.asarray(degree_z, dtype=np.float64).reshape(-1)
+    site_features = _coerce_epistasis_site_features(site_features=site_features)
     is_site_nonmissing = np.asarray(g.get('is_site_nonmissing', None), dtype=bool)
     if is_site_nonmissing.ndim != 2:
         raise ValueError('is_site_nonmissing should be available before epistasis preparation.')
-    if is_site_nonmissing.shape[1] != degree_z.shape[0]:
-        txt = 'is_site_nonmissing site axis ({}) and epistasis degree length ({}) should match.'
-        raise ValueError(txt.format(is_site_nonmissing.shape[1], degree_z.shape[0]))
+    if is_site_nonmissing.shape[1] != site_features.shape[0]:
+        txt = 'is_site_nonmissing site axis ({}) and epistasis feature length ({}) should match.'
+        raise ValueError(txt.format(is_site_nonmissing.shape[1], site_features.shape[0]))
     channels = _resolve_epistasis_channels(g=g)
+    resolved_site_metric = str(g.get('epistasis_site_metric_resolved', g.get('epistasis_site_metric', 'auto')))
+    resolved_feature_mode = str(g.get('epistasis_feature_mode_resolved', g.get('epistasis_feature_mode', 'single')))
+    print(
+        'Epistasis summary: apply_to={}, site_metric={}, feature_mode={}, beta_partition={}, joint_auto={}'.format(
+            ''.join(channels),
+            resolved_site_metric,
+            resolved_feature_mode,
+            str(g.get('epistasis_beta_partition', 'global')),
+            'yes' if bool(g.get('epistasis_joint_auto', False)) else 'no',
+        ),
+        flush=True,
+    )
+    if 'S' in channels:
+        if channels == ('S',):
+            txt = 'Epistasis negative-control summary: apply_to=S (ECS-only reweighting).'
+        else:
+            txt = 'Epistasis negative-control summary: S channel enabled alongside N (NS mode).'
+        print(txt, flush=True)
     state = dict()
     for channel in channels:
         if channel == 'N':
@@ -410,86 +705,129 @@ def prepare_epistasis(g, ON_tensor, OS_tensor):
             txt = 'Epistasis counts shape ({}) did not match is_site_nonmissing shape ({}).'
             raise ValueError(txt.format(counts.shape, is_site_nonmissing.shape))
         counts = np.where(is_site_nonmissing, counts, 0.0)
-        base_probs = _build_epistasis_base_probs(
-            counts=counts,
-            is_site_nonmissing=is_site_nonmissing,
-            dirichlet_alpha=float(g.get('asrv_dirichlet_alpha', 0.0)),
-            float_tol=float(g['float_tol']),
-        )
         branch_context = _calc_epistasis_branch_context(
             counts=counts,
-            degree_z=degree_z,
+            degree_z=site_features,
             is_site_nonmissing=is_site_nonmissing,
             float_tol=float(g['float_tol']),
         )
-        beta_auto = bool(g.get('epistasis_beta_auto', False))
-        clip_auto = bool(g.get('epistasis_clip_auto', False))
-        if beta_auto:
-            clip_for_fit = float(g['epistasis_clip_value']) if (not clip_auto) else float(_EPI_AUTO_CLIP_MAX)
-            beta, beta_diag = _fit_epistasis_beta_cv(
+        if branch_context.ndim == 1:
+            branch_context_matrix = branch_context.reshape(-1, 1)
+        else:
+            branch_context_matrix = branch_context
+        active_mask = (counts.sum(axis=1, dtype=np.float64) > float(g['float_tol'])) & is_site_nonmissing.any(axis=1)
+        partition_mode = str(g.get('epistasis_beta_partition', 'global')).strip().lower()
+        if partition_mode == 'branch_depth':
+            depth_by_branch = _get_epistasis_branch_depth_by_id(g=g, num_branch=counts.shape[0])
+            bin_ids, bin_summary = _assign_epistasis_branch_depth_bins(
+                depth_by_branch=depth_by_branch,
+                active_mask=active_mask,
+                num_bins=int(g.get('epistasis_branch_depth_bins', 3)),
+            )
+            beta_by_branch = np.zeros(shape=(counts.shape[0],), dtype=np.float64)
+            clip_by_branch = np.full(shape=(counts.shape[0],), fill_value=float(g.get('epistasis_clip_value', 3.0)), dtype=np.float64)
+            alpha_by_branch = np.full(shape=(counts.shape[0],), fill_value=float(g.get('asrv_dirichlet_alpha', 1.0)), dtype=np.float64)
+            bin_diags = list()
+            for item in bin_summary:
+                row_mask = (bin_ids == int(item['bin']))
+                fit = _fit_epistasis_parameters_for_subset(
+                    counts=counts[row_mask, :],
+                    is_site_nonmissing=is_site_nonmissing[row_mask, :],
+                    branch_context=branch_context_matrix[row_mask, :],
+                    site_features=site_features,
+                    g=g,
+                )
+                beta_by_branch[row_mask] = float(fit['beta'])
+                clip_by_branch[row_mask] = float(fit['clip'])
+                alpha_by_branch[row_mask] = float(fit['alpha'])
+                bin_diags.append({
+                    'bin': int(item['bin']),
+                    'count': int(item['count']),
+                    'depth_min': float(item['depth_min']),
+                    'depth_max': float(item['depth_max']),
+                    'beta': float(fit['beta']),
+                    'clip': float(fit['clip']),
+                    'alpha': float(fit['alpha']),
+                    'diag': fit['diag'],
+                })
+            beta_by_branch[~active_mask] = 0.0
+            if active_mask.any():
+                beta = float(beta_by_branch[active_mask].mean(dtype=np.float64))
+                clip_value = float(clip_by_branch[active_mask].mean(dtype=np.float64))
+                alpha_value = float(alpha_by_branch[active_mask].mean(dtype=np.float64))
+            else:
+                beta = 0.0
+                clip_value = float(g.get('epistasis_clip_value', 3.0))
+                alpha_value = float(g.get('asrv_dirichlet_alpha', 1.0))
+            beta_diag = {
+                'active_branch_count': int(active_mask.sum()),
+                'num_folds': 0,
+                'best_score': np.nan,
+                'partition': 'branch_depth',
+                'bins': bin_diags,
+            }
+        else:
+            fit = _fit_epistasis_parameters_for_subset(
                 counts=counts,
-                base_probs=base_probs,
-                branch_context=branch_context,
-                degree_z=degree_z,
                 is_site_nonmissing=is_site_nonmissing,
-                clip_value=clip_for_fit,
-                float_tol=float(g['float_tol']),
-                dirichlet_alpha=float(g.get('asrv_dirichlet_alpha', 1.0)),
+                branch_context=branch_context_matrix,
+                site_features=site_features,
+                g=g,
             )
-        else:
-            beta = float(g.get('epistasis_beta_value', 0.0))
-            beta_diag = {'active_branch_count': int((counts.sum(axis=1) > float(g['float_tol'])).sum()), 'num_folds': 0}
-        if clip_auto:
-            clip_value = _auto_epistasis_clip(
-                beta=beta,
-                branch_context=branch_context,
-                degree_z=degree_z,
-                is_site_nonmissing=is_site_nonmissing,
-            )
-            if beta_auto:
-                beta, beta_diag = _fit_epistasis_beta_cv(
-                    counts=counts,
-                    base_probs=base_probs,
-                    branch_context=branch_context,
-                    degree_z=degree_z,
-                    is_site_nonmissing=is_site_nonmissing,
-                    clip_value=float(clip_value),
-                    float_tol=float(g['float_tol']),
-                    dirichlet_alpha=float(g.get('asrv_dirichlet_alpha', 1.0)),
-                )
-                clip_value = _auto_epistasis_clip(
-                    beta=beta,
-                    branch_context=branch_context,
-                    degree_z=degree_z,
-                    is_site_nonmissing=is_site_nonmissing,
-                )
-        else:
-            clip_value = float(g.get('epistasis_clip_value', 3.0))
+            beta = float(fit['beta'])
+            clip_value = float(fit['clip'])
+            alpha_value = float(fit['alpha'])
+            beta_diag = dict(fit['diag'])
+            beta_diag['partition'] = 'global'
+            beta_by_branch = np.full(shape=(counts.shape[0],), fill_value=beta, dtype=np.float64)
+            clip_by_branch = np.full(shape=(counts.shape[0],), fill_value=clip_value, dtype=np.float64)
+            alpha_by_branch = np.full(shape=(counts.shape[0],), fill_value=alpha_value, dtype=np.float64)
         weights = _build_epistasis_weight_matrix(
-            branch_context=branch_context,
-            degree_z=degree_z,
-            beta=beta,
-            clip_value=clip_value,
+            branch_context=branch_context_matrix,
+            degree_z=site_features,
+            beta=beta_by_branch,
+            clip_value=clip_by_branch,
             is_site_nonmissing=is_site_nonmissing,
             float_tol=float(g['float_tol']),
         )
         state[channel] = {
             'beta': float(beta),
             'clip': float(clip_value),
+            'alpha': float(alpha_value),
             'weights': weights.astype(np.float64, copy=False),
-            'branch_context': branch_context.astype(np.float64, copy=False),
+            'branch_context': branch_context_matrix.astype(np.float64, copy=False),
+            'beta_by_branch': beta_by_branch.astype(np.float64, copy=False),
+            'clip_by_branch': clip_by_branch.astype(np.float64, copy=False),
+            'alpha_by_branch': alpha_by_branch.astype(np.float64, copy=False),
             'beta_diag': beta_diag,
         }
-        txt = 'Epistasis [{}]: beta={}, clip={}, active_branches={}'
+        txt = 'Epistasis [{}]: beta={}, clip={}, alpha={}, active_branches={}'
         print(
             txt.format(
                 channel,
                 '{:.6g}'.format(float(beta)),
                 '{:.6g}'.format(float(clip_value)),
-                int(beta_diag.get('active_branch_count', 0)),
+                '{:.6g}'.format(float(alpha_value)),
+                int(active_mask.sum()),
             ),
             flush=True,
         )
+        if partition_mode == 'branch_depth':
+            for item in beta_diag.get('bins', []):
+                txt = 'Epistasis [{}] depth-bin {} (n={} depth={:.6g}..{:.6g}): beta={}, clip={}, alpha={}'
+                print(
+                    txt.format(
+                        channel,
+                        int(item.get('bin', -1)),
+                        int(item.get('count', 0)),
+                        float(item.get('depth_min', np.nan)),
+                        float(item.get('depth_max', np.nan)),
+                        '{:.6g}'.format(float(item.get('beta', np.nan))),
+                        '{:.6g}'.format(float(item.get('clip', np.nan))),
+                        '{:.6g}'.format(float(item.get('alpha', np.nan))),
+                    ),
+                    flush=True,
+                )
     if len(state) == 0:
         return g
     g['_epistasis_state'] = state
@@ -2168,9 +2506,9 @@ def _compose_permutation_count_matrix(stat, mode_to_count, tol):
 
 
 def _resolve_omega_pvalue_null_model(g):
-    model = 'hypergeom'
+    model = 'poisson'
     if g is not None:
-        model = str(g.get('omega_pvalue_null_model', 'hypergeom')).strip().lower()
+        model = str(g.get('omega_pvalue_null_model', 'poisson')).strip().lower()
     if model not in ['hypergeom', 'poisson', 'poisson_full']:
         raise ValueError('omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full.')
     return model

@@ -142,12 +142,24 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             g['df_cb_stats'].at[0, 'epistasis_enabled'] = 'Y'
             g['df_cb_stats'].at[0, 'epistasis_apply_to'] = str(g.get('epistasis_apply_to', 'N'))
             g['df_cb_stats'].at[0, 'epistasis_site_metric'] = str(g.get('epistasis_site_metric_resolved', g.get('epistasis_site_metric', 'auto')))
+            g['df_cb_stats'].at[0, 'epistasis_feature_mode'] = str(g.get('epistasis_feature_mode_resolved', g.get('epistasis_feature_mode', 'single')))
+            g['df_cb_stats'].at[0, 'epistasis_beta_partition'] = str(g.get('epistasis_beta_partition', 'global'))
+            epistasis_state = g.get('_epistasis_state', dict())
+            epistasis_channels = [channel for channel in ['N', 'S'] if channel in epistasis_state]
+            has_s_channel = ('S' in epistasis_channels)
+            g['df_cb_stats'].at[0, 'epistasis_negative_control_S'] = 'Y' if has_s_channel else 'N'
+            if has_s_channel:
+                if epistasis_channels == ['S']:
+                    g['df_cb_stats'].at[0, 'epistasis_negative_control_S_mode'] = 'S_only'
+                else:
+                    g['df_cb_stats'].at[0, 'epistasis_negative_control_S_mode'] = 'NS_with_S'
             for channel in ['N', 'S']:
                 channel_state = g.get('_epistasis_state', dict()).get(channel, None)
                 if channel_state is None:
                     continue
                 g['df_cb_stats'].at[0, 'epistasis_beta_' + channel] = float(channel_state.get('beta', np.nan))
                 g['df_cb_stats'].at[0, 'epistasis_clip_' + channel] = float(channel_state.get('clip', np.nan))
+                g['df_cb_stats'].at[0, 'epistasis_alpha_' + channel] = float(channel_state.get('alpha', np.nan))
         if (g['calibrate_longtail']):
             if (g['exhaustive_until'] >= current_arity):
                 cb = omega.calibrate_dsc(cb, output_stats=g.get('output_stats'))
@@ -357,6 +369,27 @@ def _select_epistasis_profile(profile_map, metric, float_tol):
     raise ValueError('Unsupported --epistasis_site_metric: {}'.format(metric))
 
 
+def _resolve_epistasis_feature_matrix(g, num_site):
+    requested_mode = str(g.get('epistasis_feature_mode', 'single')).strip().lower()
+    selected_profile = np.asarray(g.get('epistasis_site_degree_internal', np.zeros(shape=(num_site,), dtype=np.float64)), dtype=np.float64).reshape(-1)
+    if selected_profile.shape[0] != num_site:
+        txt = 'epistasis_site_degree_internal length ({}) did not match site axis ({}).'
+        raise ValueError(txt.format(selected_profile.shape[0], num_site))
+    profile_map = g.get('epistasis_profile_map_internal', dict())
+    degree_profile = profile_map.get('degree', None)
+    proximity_profile = profile_map.get('proximity', None)
+    if requested_mode == 'paired':
+        if (degree_profile is not None) and (proximity_profile is not None):
+            degree_profile = np.asarray(degree_profile, dtype=np.float64).reshape(-1)
+            proximity_profile = np.asarray(proximity_profile, dtype=np.float64).reshape(-1)
+            if (degree_profile.shape[0] == num_site) and (proximity_profile.shape[0] == num_site):
+                feature_matrix = np.stack([degree_profile, proximity_profile], axis=1)
+                return feature_matrix.astype(np.float64, copy=False), 'paired'
+        print('Epistasis feature mode requested=paired, but degree/proximity pair was unavailable. Falling back to single.', flush=True)
+    feature_matrix = selected_profile.reshape(-1, 1).astype(np.float64, copy=False)
+    return feature_matrix, 'single'
+
+
 def _load_epistasis_degree_from_file(g, num_site):
     degree_file = str(g.get('epistasis_degree_file', '')).strip()
     if degree_file == '':
@@ -393,6 +426,10 @@ def _load_epistasis_degree_from_file(g, num_site):
         flush=True,
     )
     g['epistasis_site_metric_resolved'] = resolved_metric
+    g['epistasis_profile_map_internal'] = {
+        key: np.asarray(value, dtype=np.float64).reshape(-1)
+        for key, value in profile_map.items()
+    }
     return np.asarray(out, dtype=np.float64).reshape(-1)
 
 
@@ -486,6 +523,10 @@ def _compute_epistasis_degree_from_structure(g, num_site):
         flush=True,
     )
     g['epistasis_site_metric_resolved'] = resolved_metric
+    g['epistasis_profile_map_internal'] = {
+        key: np.asarray(value, dtype=np.float64).reshape(-1)
+        for key, value in profile_map.items()
+    }
     if degree_internal.shape[0] != num_site:
         txt = 'Unexpected epistasis degree length. Expected {}, observed {}.'
         raise ValueError(txt.format(num_site, degree_internal.shape[0]))
@@ -509,6 +550,17 @@ def _prepare_epistasis_configuration(g, ON_tensor, OS_tensor):
     if g['epistasis_site_degree_internal'].shape[0] != num_site:
         txt = 'epistasis_site_degree_internal length ({}) did not match site axis ({}).'
         raise ValueError(txt.format(g['epistasis_site_degree_internal'].shape[0], num_site))
+    feature_matrix, resolved_feature_mode = _resolve_epistasis_feature_matrix(g=g, num_site=num_site)
+    g['epistasis_site_feature_matrix_internal'] = feature_matrix
+    g['epistasis_feature_mode_resolved'] = resolved_feature_mode
+    print(
+        'Epistasis feature mode: requested={}, resolved={}, dimensions={}'.format(
+            str(g.get('epistasis_feature_mode', 'single')),
+            resolved_feature_mode,
+            int(feature_matrix.shape[1]),
+        ),
+        flush=True,
+    )
     g = omega.prepare_epistasis(g=g, ON_tensor=ON_tensor, OS_tensor=OS_tensor)
     return g
 
