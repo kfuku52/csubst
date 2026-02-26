@@ -1,0 +1,4 @@
+step	real_sec	max_rss_mb
+simulate	55.28	315.84375
+analyze_estimated_exh2	28.1	1544.37109375
+analyze_truth_exh2	3.94	1544.1640625

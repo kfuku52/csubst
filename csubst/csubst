@@ -321,6 +321,11 @@ def _main():
     simulate.add_argument('--simulate_seed', metavar='INT', default=-1, type=int,
                           help='default=%(default)s: Random seed for pyvolve simulation. '
                                'Set -1 to use non-deterministic seed.')
+    simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
+                          help='default=%(default)s: Export true ancestral-state bundle from simulation '
+                               '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for analyze-time evaluation.')
+    simulate.add_argument('--true_asr_prefix', metavar='PATH_PREFIX', default='simulate_true_asr', type=str,
+                          help='default=%(default)s: Output path prefix for true-ASR bundle files.')
     simulate.set_defaults(handler=command_simulate)
 
 
