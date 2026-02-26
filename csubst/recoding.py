@@ -1160,7 +1160,7 @@ def write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv"):
     return output_path
 
 
-def _get_scheme_groups_for_pca(g):
+def _get_scheme_groups_for_pca(g, require_auto=False):
     groups_by_scheme = OrderedDict()
     groups_by_scheme["no"] = tuple([str(aa) for aa in _CANONICAL_AA])
     # 3Di20 has 20 states and does not define AA co-clustering; represent as singleton states.
@@ -1171,15 +1171,20 @@ def _get_scheme_groups_for_pca(g):
     if (recode in AUTO_RECODING_SCHEMES) and ("nonsyn_state_orders" not in g):
         raise ValueError('Missing "nonsyn_state_orders" for auto recoding PCA output.')
     g_for_auto = dict(g)
+    missing_auto = []
     for auto_name in AUTO_RECODING_SCHEMES.keys():
         if (recode == auto_name) and ("nonsyn_state_orders" in g):
             groups_by_scheme[auto_name] = tuple([str(state) for state in g["nonsyn_state_orders"].tolist()])
             continue
         try:
             groups = _build_auto_recoded_groups(g=g_for_auto, scheme_name=auto_name)
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, OSError):
+            missing_auto.append(auto_name)
             continue
         groups_by_scheme[auto_name] = tuple([str(group) for group in groups])
+    if require_auto and (len(missing_auto) > 0):
+        txt = "Failed to infer auto recoding scheme(s) for PCA: {}"
+        raise ValueError(txt.format(", ".join(missing_auto)))
     return groups_by_scheme
 
 
@@ -1211,6 +1216,72 @@ def _build_co_cluster_feature_vector(groups):
     return np.array(values, dtype=np.float64)
 
 
+def _build_pairwise_similarity_feature_vector(prob_by_aa):
+    if prob_by_aa.ndim != 2:
+        raise ValueError("prob_by_aa should be 2D.")
+    if prob_by_aa.shape[0] != len(_CANONICAL_AA):
+        txt = "prob_by_aa should have {} amino-acid rows."
+        raise ValueError(txt.format(len(_CANONICAL_AA)))
+    values = []
+    for i in np.arange(len(_CANONICAL_AA) - 1):
+        p_i = prob_by_aa[i, :]
+        for j in np.arange(i + 1, len(_CANONICAL_AA)):
+            p_j = prob_by_aa[j, :]
+            values.append(float(np.dot(p_i, p_j)))
+    return np.array(values, dtype=np.float64)
+
+
+def _build_3di20_dataset_feature_vector(g):
+    # 3Di20 is context-dependent. For PCA, encode it from dataset-specific
+    # amino-acid -> 3Di distributions when prerequisites are available.
+    if ("tree" not in g) or ("codon_table" not in g):
+        return None
+    try:
+        from csubst import structural_alphabet
+    except Exception:
+        return None
+    try:
+        g_for_3di = dict(g)
+        if str(g_for_3di.get("prostt5_device", "auto")).strip().lower() == "auto":
+            # Prefer CPU for PCA-time ProstT5 to avoid long MPS fallback stalls.
+            g_for_3di["prostt5_device"] = "cpu"
+        aa_by_tip = structural_alphabet.build_tip_aa_alignment_from_full_cds(g=g_for_3di)
+        threedi_by_tip = structural_alphabet.build_tip_3di_alignment_from_full_cds(
+            g=g_for_3di,
+            output_path=None,
+        )
+    except Exception:
+        return None
+    if (len(aa_by_tip) == 0) or (len(threedi_by_tip) == 0):
+        return None
+    aa_to_index = {aa: i for i, aa in enumerate(_CANONICAL_AA)}
+    threedi_orders = [str(v) for v in structural_alphabet.get_3di_state_orders().tolist()]
+    threedi_to_index = {state: i for i, state in enumerate(threedi_orders)}
+    count = np.zeros((len(_CANONICAL_AA), len(threedi_orders)), dtype=np.float64)
+    common_tips = sorted(list(set(aa_by_tip.keys()).intersection(set(threedi_by_tip.keys()))))
+    if len(common_tips) == 0:
+        return None
+    for tip_name in common_tips:
+        aa_seq = str(aa_by_tip[tip_name]).strip().upper()
+        threedi_seq = str(threedi_by_tip[tip_name]).strip().upper()
+        if len(aa_seq) != len(threedi_seq):
+            continue
+        for aa_sym, threedi_sym in zip(aa_seq, threedi_seq):
+            aa_ind = aa_to_index.get(aa_sym, None)
+            threedi_ind = threedi_to_index.get(threedi_sym, None)
+            if (aa_ind is None) or (threedi_ind is None):
+                continue
+            count[aa_ind, threedi_ind] += 1.0
+    if float(count.sum()) <= 0:
+        return None
+    alpha = 1e-6
+    row_sum = count.sum(axis=1, keepdims=True)
+    denom = row_sum + (alpha * count.shape[1])
+    denom = np.where(denom > 0, denom, alpha * count.shape[1])
+    prob_by_aa = (count + alpha) / denom
+    return _build_pairwise_similarity_feature_vector(prob_by_aa=prob_by_aa)
+
+
 def _project_pca_2d(feature_matrix):
     if feature_matrix.ndim != 2:
         raise ValueError("feature_matrix should be 2D.")
@@ -1233,13 +1304,113 @@ def _project_pca_2d(feature_matrix):
     return coords, explained
 
 
+def _get_label_connector_mask(point_x, point_y, label_x, label_y, x_span, y_span, normalized_threshold=0.03):
+    point_x = np.asarray(point_x, dtype=np.float64)
+    point_y = np.asarray(point_y, dtype=np.float64)
+    label_x = np.asarray(label_x, dtype=np.float64)
+    label_y = np.asarray(label_y, dtype=np.float64)
+    if (
+        (point_x.shape != point_y.shape)
+        or (point_x.shape != label_x.shape)
+        or (point_x.shape != label_y.shape)
+    ):
+        raise ValueError("point/label coordinate arrays should have the same shape.")
+    x_scale = max(float(x_span), 1e-12)
+    y_scale = max(float(y_span), 1e-12)
+    dx = (label_x - point_x) / x_scale
+    dy = (label_y - point_y) / y_scale
+    dist = np.sqrt((dx ** 2) + (dy ** 2))
+    return dist > float(normalized_threshold)
+
+
+def _is_outside_axis_outlier(value, other_values, ratio_threshold=0.8, robust_z_threshold=6.0):
+    other_values = np.asarray(other_values, dtype=np.float64).reshape(-1)
+    if other_values.size == 0:
+        return False
+    other_min = float(other_values.min())
+    other_max = float(other_values.max())
+    if (value >= other_min) and (value <= other_max):
+        return False
+    outside = float(max(other_min - value, value - other_max, 0.0))
+    other_span = max(float(other_max - other_min), 1e-12)
+    if outside >= (float(ratio_threshold) * other_span):
+        return True
+    median = float(np.median(other_values))
+    mad = float(np.median(np.abs(other_values - median)))
+    if mad <= 1e-12:
+        return outside > 0.0
+    robust_sd = 1.4826 * mad
+    robust_z = abs(float(value) - median) / max(robust_sd, 1e-12)
+    return robust_z >= float(robust_z_threshold)
+
+
+def _detect_srchisq6_inset_target(scheme_names, x, y):
+    names = [str(v) for v in scheme_names]
+    if "srchisq6" not in names:
+        return {
+            "show_inset": False,
+            "srchisq6_index": None,
+            "x_far": False,
+            "y_far": False,
+        }
+    sr_index = int(names.index("srchisq6"))
+    if len(names) <= 2:
+        return {
+            "show_inset": False,
+            "srchisq6_index": sr_index,
+            "x_far": False,
+            "y_far": False,
+        }
+    x = np.asarray(x, dtype=np.float64).reshape(-1)
+    y = np.asarray(y, dtype=np.float64).reshape(-1)
+    mask_others = np.ones((len(names),), dtype=bool)
+    mask_others[sr_index] = False
+    x_far = _is_outside_axis_outlier(
+        value=float(x[sr_index]),
+        other_values=x[mask_others],
+    )
+    y_far = _is_outside_axis_outlier(
+        value=float(y[sr_index]),
+        other_values=y[mask_others],
+    )
+    return {
+        "show_inset": bool(x_far or y_far),
+        "srchisq6_index": sr_index,
+        "x_far": bool(x_far),
+        "y_far": bool(y_far),
+    }
+
+
 def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.png"):
     recode = normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
-    groups_by_scheme = _get_scheme_groups_for_pca(g=g)
+    require_auto = False
+    if _AA_ALIGNMENT_CACHE_KEY in g:
+        require_auto = True
+    elif str(g.get("alignment_file", "")).strip() != "":
+        require_auto = True
+    groups_by_scheme = _get_scheme_groups_for_pca(g=g, require_auto=require_auto)
     scheme_names = list(groups_by_scheme.keys())
-    feature_matrix = np.vstack(
-        [_build_co_cluster_feature_vector(groups_by_scheme[name]) for name in scheme_names]
+    feature_by_scheme = OrderedDict(
+        [
+            (name, _build_co_cluster_feature_vector(groups_by_scheme[name]))
+            for name in scheme_names
+        ]
     )
+    three_di_feature_mode = "singleton"
+    if "3di20" in feature_by_scheme:
+        vector_3di = _build_3di20_dataset_feature_vector(g=g)
+        if vector_3di is not None:
+            three_di_feature_mode = "prostt5"
+        elif str(g.get("alignment_file", "")).strip() != "":
+            txt = "Failed to infer 3di20 PCA feature from input dataset via ProstT5."
+            raise ValueError(txt)
+        if vector_3di is not None:
+            expected_dim = int(feature_by_scheme["3di20"].shape[0])
+            if int(vector_3di.shape[0]) != expected_dim:
+                txt = "3di20 feature dimension mismatch: expected {}, got {}."
+                raise ValueError(txt.format(expected_dim, int(vector_3di.shape[0])))
+            feature_by_scheme["3di20"] = vector_3di.astype(np.float64, copy=False)
+    feature_matrix = np.vstack([feature_by_scheme[name] for name in scheme_names])
     coords, explained = _project_pca_2d(feature_matrix=feature_matrix)
 
     import matplotlib as mpl
@@ -1258,16 +1429,26 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
         fig, ax = plt.subplots(figsize=(3.6, 3.6))
         x = coords[:, 0].astype(np.float64, copy=False)
         y = coords[:, 1].astype(np.float64, copy=False)
-        x_span = float(x.max() - x.min()) if x.shape[0] > 0 else 1.0
-        y_span = float(y.max() - y.min()) if y.shape[0] > 0 else 1.0
+        sr_inset = _detect_srchisq6_inset_target(scheme_names=scheme_names, x=x, y=y)
+        sr_index = sr_inset["srchisq6_index"]
+        show_sr_inset = bool(sr_inset["show_inset"])
+        if show_sr_inset and (sr_index is not None):
+            main_indices = [i for i in np.arange(len(scheme_names)) if int(i) != int(sr_index)]
+        else:
+            main_indices = [int(i) for i in np.arange(len(scheme_names))]
+
+        x_main = x[np.asarray(main_indices, dtype=np.int64)]
+        y_main = y[np.asarray(main_indices, dtype=np.int64)]
+        x_span = float(x_main.max() - x_main.min()) if x_main.shape[0] > 0 else 1.0
+        y_span = float(y_main.max() - y_main.min()) if y_main.shape[0] > 0 else 1.0
         if x_span <= 0:
             x_span = 1.0
         if y_span <= 0:
             y_span = 1.0
 
         # Lightweight ggrepel-like label adjustment in y-direction for nearby points.
-        label_x = x + (0.012 * x_span)
-        label_y = y.copy()
+        label_x = x_main + (0.012 * x_span)
+        label_y = y_main.copy()
         y_sep = 0.08 * y_span
         x_neighbor = 0.45 * x_span
         for _ in np.arange(200):
@@ -1290,22 +1471,46 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
             if not moved:
                 break
 
-        has_auto_note = ("srchisq6" in scheme_names) or ("kgbauto6" in scheme_names)
-        y_all = np.concatenate([y, label_y]) if y.shape[0] > 0 else y
+        note_lines = []
+        if ("srchisq6" in scheme_names) or ("kgbauto6" in scheme_names) or ("3di20" in scheme_names):
+            note_lines.append("srchisq6, kgbauto6, and 3di20 are")
+            note_lines.append("inferred from the input dataset.")
+        if show_sr_inset:
+            note_lines.append("srchisq6 is shown in the inset when far from")
+            note_lines.append("the main point cloud along PC1/PC2.")
+        has_note = len(note_lines) > 0
+        y_all = np.concatenate([y_main, label_y]) if y_main.shape[0] > 0 else y_main
         y_pad = 0.08 * y_span
-        y_note_pad = (0.34 * y_span) if has_auto_note else 0.0
+        y_note_pad = (0.10 * y_span * float(len(note_lines))) if has_note else 0.0
         y_min = float(y_all.min() - y_pad - y_note_pad)
         y_max = float(y_all.max() + y_pad)
-        x_min = float(x.min() - (0.08 * x_span))
+        x_min = float(x_main.min() - (0.08 * x_span))
         x_max = float(label_x.max() + (0.10 * x_span))
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)
+        connector_mask = _get_label_connector_mask(
+            point_x=x_main,
+            point_y=y_main,
+            label_x=label_x,
+            label_y=label_y,
+            x_span=x_span,
+            y_span=y_span,
+        )
 
-        for i, scheme_name in enumerate(scheme_names):
+        for i_main, point_index in enumerate(main_indices):
+            scheme_name = str(scheme_names[point_index])
             marker_size = 24
+            if bool(connector_mask[i_main]):
+                ax.plot(
+                    [float(x_main[i_main]), float(label_x[i_main])],
+                    [float(y_main[i_main]), float(label_y[i_main])],
+                    color="black",
+                    linewidth=0.5,
+                    zorder=2,
+                )
             ax.scatter(
-                [float(x[i])],
-                [float(y[i])],
+                [float(x_main[i_main])],
+                [float(y_main[i_main])],
                 color="black",
                 s=marker_size,
                 edgecolors="black",
@@ -1313,14 +1518,46 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
                 zorder=3,
             )
             ax.text(
-                float(label_x[i]),
-                float(label_y[i]),
+                float(label_x[i_main]),
+                float(label_y[i_main]),
                 str(scheme_name),
                 color="black",
                 fontsize=8,
                 fontfamily="Helvetica",
                 va="center",
                 ha="left",
+            )
+        if show_sr_inset and (sr_index is not None):
+            sr_x = float(x[sr_index])
+            sr_y = float(y[sr_index])
+            inset = ax.inset_axes([0.03, 0.72, 0.42, 0.24])
+            inset.scatter(
+                [sr_x],
+                [sr_y],
+                color="black",
+                s=24,
+                edgecolors="black",
+                linewidths=0.4,
+                zorder=3,
+            )
+            sr_x_span = max(0.06 * x_span, 1e-6)
+            sr_y_span = max(0.06 * y_span, 1e-6)
+            inset.set_xlim(sr_x - sr_x_span, sr_x + sr_x_span)
+            inset.set_ylim(sr_y - sr_y_span, sr_y + sr_y_span)
+            inset.grid(True, linewidth=0.3, color="#d9d9d9", zorder=0)
+            inset.tick_params(axis="both", which="both", labelsize=6, colors="black")
+            inset.set_title("srchisq6", fontsize=7, fontfamily="Helvetica", color="black")
+            coord_txt = "({:.2f}, {:.2f})".format(sr_x, sr_y)
+            inset.text(
+                0.02,
+                0.02,
+                coord_txt,
+                transform=inset.transAxes,
+                fontsize=6,
+                fontfamily="Helvetica",
+                color="black",
+                ha="left",
+                va="bottom",
             )
 
         pc1_txt = "PC1 ({:.1f}%)".format(float(explained[0] * 100.0))
@@ -1329,8 +1566,8 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
         ax.set_ylabel(pc2_txt, fontfamily="Helvetica", fontsize=8, color="black")
         ax.set_title("Amino acid recoding PCA", fontfamily="Helvetica", fontsize=8, color="black")
         ax.tick_params(axis="both", which="both", labelsize=8, colors="black")
-        if has_auto_note:
-            note_txt = "Note: srchisq6 and kgbauto6\nare inferred from the input dataset."
+        if has_note:
+            note_txt = "Note: " + "\n".join(note_lines)
             ax.text(
                 0.99,
                 0.01,

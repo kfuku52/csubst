@@ -709,6 +709,64 @@ def test_write_nonsyn_recoding_pca_plot_writes_png_for_auto_recode(tmp_path):
     assert output_path.stat().st_size > 0
 
 
+def test_get_label_connector_mask_marks_far_labels():
+    point_x = np.array([0.0, 0.0], dtype=np.float64)
+    point_y = np.array([0.0, 0.0], dtype=np.float64)
+    label_x = np.array([0.012, 0.012], dtype=np.float64)
+    label_y = np.array([0.0, 0.09], dtype=np.float64)
+    out = recoding._get_label_connector_mask(
+        point_x=point_x,
+        point_y=point_y,
+        label_x=label_x,
+        label_y=label_y,
+        x_span=1.0,
+        y_span=1.0,
+        normalized_threshold=0.03,
+    )
+    assert out.dtype == bool
+    assert out.tolist() == [False, True]
+
+
+def test_get_label_connector_mask_raises_on_shape_mismatch():
+    with pytest.raises(ValueError, match="same shape"):
+        recoding._get_label_connector_mask(
+            point_x=np.array([0.0, 1.0], dtype=np.float64),
+            point_y=np.array([0.0], dtype=np.float64),
+            label_x=np.array([0.0, 1.0], dtype=np.float64),
+            label_y=np.array([0.0, 1.0], dtype=np.float64),
+            x_span=1.0,
+            y_span=1.0,
+        )
+
+
+def test_is_outside_axis_outlier_detects_large_outside_shift():
+    other = np.array([-1.0, -0.2, 0.1, 0.7, 1.0], dtype=np.float64)
+    assert recoding._is_outside_axis_outlier(value=3.0, other_values=other) is True
+    assert recoding._is_outside_axis_outlier(value=0.5, other_values=other) is False
+
+
+def test_detect_srchisq6_inset_target_true_for_far_point():
+    names = ["no", "dayhoff6", "sr6", "srchisq6", "3di20"]
+    x = np.array([0.0, 0.1, -0.1, 3.0, 0.2], dtype=np.float64)
+    y = np.array([0.0, 0.2, -0.2, 4.0, 0.1], dtype=np.float64)
+    out = recoding._detect_srchisq6_inset_target(scheme_names=names, x=x, y=y)
+    assert out["show_inset"] is True
+    assert out["srchisq6_index"] == 3
+    assert out["x_far"] is True
+    assert out["y_far"] is True
+
+
+def test_detect_srchisq6_inset_target_false_for_compact_point_cloud():
+    names = ["no", "dayhoff6", "sr6", "srchisq6", "3di20"]
+    x = np.array([0.0, 0.1, -0.1, 0.08, 0.2], dtype=np.float64)
+    y = np.array([0.0, 0.2, -0.2, 0.12, 0.1], dtype=np.float64)
+    out = recoding._detect_srchisq6_inset_target(scheme_names=names, x=x, y=y)
+    assert out["show_inset"] is False
+    assert out["srchisq6_index"] == 3
+    assert out["x_far"] is False
+    assert out["y_far"] is False
+
+
 def test_get_scheme_groups_for_pca_includes_auto_schemes_when_data_available():
     g = _toy_auto_grouping_g()
     g["nonsyn_recode"] = "dayhoff6"
@@ -720,6 +778,57 @@ def test_get_scheme_groups_for_pca_includes_auto_schemes_when_data_available():
     assert "kgbauto6" in groups_by_scheme
     assert len(groups_by_scheme["srchisq6"]) == 6
     assert len(groups_by_scheme["kgbauto6"]) == 6
+
+
+def test_get_scheme_groups_for_pca_require_auto_raises_when_missing():
+    g = _toy_grouping_g()
+    g["nonsyn_recode"] = "dayhoff6"
+    g["alignment_file"] = "/tmp/nonexistent_alignment.fa"
+    g = recoding.initialize_nonsyn_groups(g)
+    with pytest.raises(ValueError, match="Failed to infer auto recoding scheme"):
+        recoding._get_scheme_groups_for_pca(g, require_auto=True)
+
+
+def test_build_3di20_dataset_feature_vector_is_not_no_when_data_available(monkeypatch):
+    from csubst import structural_alphabet
+
+    g = _toy_grouping_g()
+    g["tree"] = object()
+    g["codon_table"] = [("A", "GCT")]
+
+    aa_by_tip = {
+        "tip1": "AAAA",
+        "tip2": "CCCC",
+        "tip3": "AACC",
+    }
+    threedi_by_tip = {
+        "tip1": "ABAB",
+        "tip2": "CDCD",
+        "tip3": "ABCD",
+    }
+
+    monkeypatch.setattr(
+        structural_alphabet,
+        "build_tip_aa_alignment_from_full_cds",
+        lambda g: aa_by_tip,
+    )
+    monkeypatch.setattr(
+        structural_alphabet,
+        "build_tip_3di_alignment_from_full_cds",
+        lambda g, output_path=None: threedi_by_tip,
+    )
+    monkeypatch.setattr(
+        structural_alphabet,
+        "get_3di_state_orders",
+        lambda: np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object),
+    )
+
+    v_no = recoding._build_co_cluster_feature_vector(tuple(list("ACDEFGHIKLMNPQRSTVWY")))
+    v_3di = recoding._build_3di20_dataset_feature_vector(g=g)
+    assert v_3di is not None
+    assert v_3di.shape == v_no.shape
+    assert np.all(np.isfinite(v_3di))
+    assert np.allclose(v_3di, v_no) is False
 
 
 def test_write_nonsyn_recoding_pca_plot_writes_png_for_no(tmp_path):
