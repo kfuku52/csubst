@@ -14,7 +14,6 @@ for stat in "${stats[@]}"; do
       --output_stat "$stat" \
       --calc_omega_pvalue yes \
       --omega_pvalue_null_model "$model" \
-      --omega_pvalue_safe_min_sub_pp 0 \
       --omega_pvalue_niter 1000 \
       --omega_pvalue_rounding round \
       --calibrate_longtail yes \
@@ -43,11 +42,10 @@ PY
 import pandas as pd,re,sys
 stat=sys.argv[1]; model=sys.argv[2]
 err=open(f'analyze_{stat}_{model}.stderr.log').read()
-log=open(f'csubst_{stat}_{model}.log').read()
 real=re.search(r'^real\s+([0-9.]+)$',err,re.M)
 rss=re.search(r'^\s*([0-9]+)\s+maximum resident set size$',err,re.M)
 peak=re.search(r'^\s*([0-9]+)\s+peak memory footprint$',err,re.M)
-df=pd.DataFrame([dict(output_stat=stat,null_model=model,real_sec=float(real.group(1)) if real else None,maxrss_bytes=int(rss.group(1)) if rss else None,peak_mem_bytes=int(peak.group(1)) if peak else None,auto_guard_msg=('auto-set to' in log))])
+df=pd.DataFrame([dict(output_stat=stat,null_model=model,real_sec=float(real.group(1)) if real else None,maxrss_bytes=int(rss.group(1)) if rss else None,peak_mem_bytes=int(peak.group(1)) if peak else None)])
 df.to_csv(f'runtime_{stat}_{model}.tsv',sep='\t',index=False)
 print(df.to_string(index=False))
 PY

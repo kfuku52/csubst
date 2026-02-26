@@ -711,6 +711,22 @@ def test_get_global_parameters_disables_alignment_file_for_3di20():
     assert g_alias["alignment_file"] == "full_alias.fa"
 
 
+def test_get_global_parameters_infers_iqtree_paths_from_gz_alignment():
+    g = param.get_global_parameters(
+        _args(
+            alignment_file="input.fa.gz",
+            iqtree_treefile="infer",
+            iqtree_state="infer",
+            iqtree_rate="infer",
+            iqtree_iqtree="infer",
+        )
+    )
+    assert g["iqtree_treefile"] == "input.fa.treefile"
+    assert g["iqtree_state"] == "input.fa.state"
+    assert g["iqtree_rate"] == "input.fa.rate"
+    assert g["iqtree_iqtree"] == "input.fa.iqtree"
+
+
 def test_get_global_parameters_validates_database_timeout():
     g = param.get_global_parameters(_args(database_timeout=12))
     assert g["database_timeout"] == pytest.approx(12.0)
@@ -785,6 +801,15 @@ def test_get_global_parameters_rejects_invalid_simulate_ranges():
         param.get_global_parameters(_args(percent_convergent_site=-1))
     with pytest.raises(ValueError, match="percent_convergent_site"):
         param.get_global_parameters(_args(percent_convergent_site=101))
+
+
+def test_get_global_parameters_validates_simulate_seed():
+    with pytest.raises(ValueError, match="simulate_seed"):
+        param.get_global_parameters(_args(simulate_seed=-2))
+    g = param.get_global_parameters(_args(simulate_seed=-1))
+    assert g["simulate_seed"] == -1
+    g = param.get_global_parameters(_args(simulate_seed=123))
+    assert g["simulate_seed"] == 123
 
 
 def test_get_global_parameters_rejects_negative_simulate_scalars():

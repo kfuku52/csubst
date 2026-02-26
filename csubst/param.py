@@ -37,6 +37,13 @@ def _default_sa_state_cache_file():
     return 'csubst_3di_state_cache.npz'
 
 
+def _infer_iqtree_output_prefix_from_alignment(alignment_file):
+    alignment_file = str(alignment_file).strip()
+    if alignment_file.lower().endswith('.gz'):
+        return alignment_file[:-3]
+    return alignment_file
+
+
 def _parse_bool_like(value, param_name):
     if isinstance(value, bool):
         return value
@@ -460,16 +467,20 @@ def get_global_parameters(args):
                 raise ValueError('To enable --fg_clade_permutation, use --foreground')
     if 'iqtree_treefile' in g.keys():
         if (g['iqtree_treefile']=='infer'):
-            g['iqtree_treefile'] = g['alignment_file']+'.treefile'
+            iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g['alignment_file'])
+            g['iqtree_treefile'] = iqtree_prefix+'.treefile'
     if 'iqtree_state' in g.keys():
         if (g['iqtree_state']=='infer'):
-            g['iqtree_state'] = g['alignment_file']+'.state'
+            iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g['alignment_file'])
+            g['iqtree_state'] = iqtree_prefix+'.state'
     if 'iqtree_rate' in g.keys():
         if (g['iqtree_rate']=='infer'):
-            g['iqtree_rate'] = g['alignment_file']+'.rate'
+            iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g['alignment_file'])
+            g['iqtree_rate'] = iqtree_prefix+'.rate'
     if 'iqtree_iqtree' in g.keys():
         if (g['iqtree_iqtree']=='infer'):
-            g['iqtree_iqtree'] = g['alignment_file']+'.iqtree'
+            iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g['alignment_file'])
+            g['iqtree_iqtree'] = iqtree_prefix+'.iqtree'
     if 'float_type' in g.keys():
         g['float_type'] = int(g['float_type'])
         if (g['float_type']==16):
@@ -603,6 +614,10 @@ def get_global_parameters(args):
         )
         if (g['percent_convergent_site'] < 0) or (g['percent_convergent_site'] > 100):
             raise ValueError('--percent_convergent_site should be between 0 and 100.')
+    if 'simulate_seed' in g.keys():
+        g['simulate_seed'] = int(g['simulate_seed'])
+        if (g['simulate_seed'] < -1):
+            raise ValueError('--simulate_seed should be -1 or >= 0.')
     if 'tree_scaling_factor' in g.keys():
         g['tree_scaling_factor'] = _require_finite_float(
             value=float(g['tree_scaling_factor']),

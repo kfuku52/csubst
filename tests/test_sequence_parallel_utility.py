@@ -1,3 +1,4 @@
+import gzip
 import os
 import numpy as np
 import pandas as pd
@@ -338,6 +339,14 @@ def test_read_fasta_and_calc_identity(tmp_path):
     seqs = sequence.read_fasta(str(fasta))
     assert seqs == {"s1": "AAAA", "s2": "AATA"}
     assert sequence.calc_identity("AATA", "AACA") == 0.75
+
+
+def test_read_fasta_supports_gzipped_input(tmp_path):
+    fasta_gz = tmp_path / "toy.fa.gz"
+    with gzip.open(fasta_gz, mode="wt", encoding="utf-8") as f:
+        f.write(">s1\nAA\nAA\n>s2\nAATA\n")
+    seqs = sequence.read_fasta(str(fasta_gz))
+    assert seqs == {"s1": "AAAA", "s2": "AATA"}
 
 
 def test_read_fasta_rejects_duplicate_headers(tmp_path):

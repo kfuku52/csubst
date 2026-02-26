@@ -29,5 +29,5 @@
 
 ## Current default policy
 - Empirical p-value calculation remains default OFF (`--calc_omega_pvalue no`).
-- Safety threshold auto-adjustment is now default OFF (`--omega_pvalue_safe_min_sub_pp 0`).
-
+- No auto-adjustment is applied to `--min_sub_pp` for empirical p-value mode.
+- If thresholding is required, set `--min_sub_pp` explicitly.

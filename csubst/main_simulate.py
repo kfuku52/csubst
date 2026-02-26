@@ -324,12 +324,15 @@ def evolve_convergent_partitions(g):
           'expected to result from the introduced bias in Q matrix.'
     print(txt.format(mean_biased_substitution_fraction*100, g['num_convergent_site']))
     evolver = pyvolve.Evolver(partitions=convergent_partitions, tree=g['foreground_tree'])
-    evolver(
+    kwargs = dict(
         ratefile='tmp.csubst.simulate_convergent_ratefile.txt',
         infofile='tmp.csubst.simulate_convergent_infofile.txt',
         seqfile='tmp.csubst.simulate_convergent.fa',
-        write_anc=False
+        write_anc=False,
     )
+    if g.get('simulate_seed_convergent', None) is not None:
+        kwargs['seed'] = int(g['simulate_seed_convergent'])
+    evolver(**kwargs)
 
 def evolve_nonconvergent_partition(g):
     pyvolve = _require_pyvolve()
@@ -345,12 +348,15 @@ def evolve_nonconvergent_partition(g):
         model = pyvolve.Model(model_type='custom', name='root', parameters={'matrix':q_matrix})
     partition = pyvolve.Partition(models=model, size=num_nonconvergent_site)
     evolver = pyvolve.Evolver(partitions=partition, tree=g['background_tree'])
-    evolver(
+    kwargs = dict(
         ratefile='tmp.csubst.simulate_nonconvergent_ratefile.txt',
         infofile='tmp.csubst.simulate_nonconvergent_infofile.txt',
         seqfile='tmp.csubst.simulate_nonconvergent.fa',
-        write_anc=False
+        write_anc=False,
     )
+    if g.get('simulate_seed_nonconvergent', None) is not None:
+        kwargs['seed'] = int(g['simulate_seed_nonconvergent'])
+    evolver(**kwargs)
 
 def get_pyvolve_tree(tree, foreground_scaling_factor, trait_name):
     pyvolve = _require_pyvolve()
@@ -420,6 +426,15 @@ def main_simulate(g, Q_method='csubst'):
     if (g['num_simulated_site']==-1):
         g['num_simulated_site'] = g['num_input_site']
     _validate_simulate_params(g)
+    if int(g.get('simulate_seed', -1)) >= 0:
+        base_seed = int(g['simulate_seed'])
+        g['simulate_seed_convergent'] = base_seed
+        g['simulate_seed_nonconvergent'] = base_seed + 1
+        txt = 'Simulation seeds: convergent={}, nonconvergent={}'
+        print(txt.format(g['simulate_seed_convergent'], g['simulate_seed_nonconvergent']), flush=True)
+    else:
+        g['simulate_seed_convergent'] = None
+        g['simulate_seed_nonconvergent'] = None
     if g['optimized_branch_length']:
         g['tree'] = g['tree']
     else:

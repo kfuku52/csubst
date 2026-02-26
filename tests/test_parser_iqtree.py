@@ -6,6 +6,32 @@ from csubst import tree
 from csubst import ete
 
 
+def test_infer_iqtree_output_prefix_from_alignment_strips_gz_suffix():
+    assert parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa.gz") == "input.fa"
+    assert parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa") == "input.fa"
+
+
+def test_check_intermediate_files_infer_uses_uncompressed_prefix_for_gz_alignment(tmp_path):
+    prefix = tmp_path / "alignment.fa"
+    for ext in ["iqtree", "log", "rate", "state", "treefile"]:
+        (tmp_path / ("alignment.fa." + ext)).write_text("x\n", encoding="utf-8")
+    g = {
+        "alignment_file": str(tmp_path / "alignment.fa.gz"),
+        "iqtree_iqtree": "infer",
+        "iqtree_log": "infer",
+        "iqtree_rate": "infer",
+        "iqtree_state": "infer",
+        "iqtree_treefile": "infer",
+    }
+    out, all_exist = parser_iqtree.check_intermediate_files(g)
+    assert all_exist is True
+    assert out["path_iqtree_iqtree"] == str(prefix) + ".iqtree"
+    assert out["path_iqtree_log"] == str(prefix) + ".log"
+    assert out["path_iqtree_rate"] == str(prefix) + ".rate"
+    assert out["path_iqtree_state"] == str(prefix) + ".state"
+    assert out["path_iqtree_treefile"] == str(prefix) + ".treefile"
+
+
 def _get_base_g(tmp_path, iqtree_text, log_text):
     iqtree_file = tmp_path / "sample.iqtree"
     log_file = tmp_path / "sample.log"

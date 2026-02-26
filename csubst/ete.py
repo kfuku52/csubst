@@ -6,6 +6,7 @@ ete4 (preferred) or ete3 (fallback for older environments).
 
 from __future__ import annotations
 
+import gzip
 import os
 import types
 
@@ -132,7 +133,9 @@ def _read_fasta(path):
     seq_dict = {}
     current_name = None
     current_alias = None
-    with open(path, "r") as handle:
+    path_txt = str(path)
+    open_fn = gzip.open if path_txt.lower().endswith('.gz') else open
+    with open_fn(path_txt, "rt", encoding="utf-8") as handle:
         for raw_line in handle:
             line = raw_line.strip()
             if not line:

@@ -318,6 +318,9 @@ def _main():
                                'in the foreground branches/sites are biased toward amino acids specified by '
                                '--convergent_amino_acids, while preserving the original relative codon frequencies '
                                'among the synonymous codons.')
+    simulate.add_argument('--simulate_seed', metavar='INT', default=-1, type=int,
+                          help='default=%(default)s: Random seed for pyvolve simulation. '
+                               'Set -1 to use non-deterministic seed.')
     simulate.set_defaults(handler=command_simulate)
 
 
@@ -501,22 +504,22 @@ def _main():
                               'Wallenius\' noncentral hypergeometric distribution for combinatorial substitutions. '
                               'This option should be used with --omegaC_method "modelfree".')
     analyze.add_argument('--calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Experimental. Estimate branch-combination-wise one-sided empirical '
+                         help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
                               'P values of omega_C by substitution randomization (modelfree only). '
                               'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib".')
     analyze.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full', default='poisson', type=str,
                          choices=['hypergeom', 'poisson', 'poisson_full'],
-                         help='default=%(default)s: Null count generator for --calc_omega_pvalue. '
+                         help='default=%(default)s: Experimental feature. Null count generator for --calc_omega_pvalue. '
                               '"hypergeom" uses legacy site-subset randomization with integer draw sizes. '
                               '"poisson" uses factorized branch/site continuous-rate nulls (Poisson sampling from expected counts). '
                               '"poisson_full" uses branch-specific site masses without branch-site factorization; '
                               'both Poisson models reduce sensitivity to --min_sub_pp.')
     analyze.add_argument('--omega_pvalue_niter', metavar='INT', default=1000, type=int,
-                         help='default=%(default)s: Number of randomization iterations for --calc_omega_pvalue. '
+                         help='default=%(default)s: Experimental feature. Number of randomization iterations for --calc_omega_pvalue. '
                               'Larger values improve tail resolution but increase runtime and memory.')
     analyze.add_argument('--omega_pvalue_rounding', metavar='round|stochastic|floor|ceil', default='round', type=str,
                          choices=['round', 'stochastic', 'floor', 'ceil'],
-                         help='default=%(default)s: How fractional branch-wise substitution masses are converted to '
+                         help='default=%(default)s: Experimental feature. How fractional branch-wise substitution masses are converted to '
                               'integer draw sizes in randomization for --calc_omega_pvalue (and quantile count '
                               'sampling). "round" reproduces legacy behavior; "stochastic" applies per-iteration '
                               'stochastic rounding; "floor"/"ceil" provide deterministic lower/upper bounds.')
@@ -544,12 +547,12 @@ def _main():
                          help='default=%(default)s: Dirichlet pseudo-count alpha for branch-wise ASRV normalization '
                               'in --asrv sn/each/file_each. Set >0 to smooth sparse site-mass profiles.')
     analyze.add_argument('--epistasis_apply_to', metavar='N|S|NS', default='N', type=str,
-                         help='default=%(default)s: Expected-count channels to apply structure-aware epistasis correction. '
+                         help='default=%(default)s: Experimental feature. Expected-count channels to apply structure-aware epistasis correction. '
                               '"N" adjusts nonsynonymous expectations (ECN), '
                               '"S" adjusts synonymous expectations (ECS; useful as a negative-control check), '
                               '"NS" adjusts both.')
     analyze.add_argument('--epistasis_site_metric', metavar='off|auto|degree|proximity|hybrid', default='off', type=str,
-                         help='default=%(default)s: Site-level structure feature for epistasis weighting. '
+                         help='default=%(default)s: Experimental feature. Site-level structure feature for epistasis weighting. '
                               '"off" keeps epistasis-site-feature selection disabled by default '
                               '(auto-enabled when --epistasis_beta is active), '
                               '"degree" uses contact degree, '
@@ -557,60 +560,60 @@ def _main():
                               '"hybrid" averages degree/proximity z-scores, '
                               '"auto" selects hybrid when both are available (otherwise falls back).')
     analyze.add_argument('--epistasis_beta', metavar='off|auto|FLOAT', default='off', type=str,
-                         help='default=%(default)s: Strength of structure-aware epistasis correction. '
+                         help='default=%(default)s: Experimental feature. Strength of structure-aware epistasis correction. '
                               'Set "off"/0 to disable, a non-negative float for fixed strength, '
                               'or "auto" for branch-level CV tuning.')
     analyze.add_argument('--epistasis_beta_partition', metavar='global|branch_depth', default='global', type=str,
-                         help='default=%(default)s: Scope of epistasis beta estimation. '
+                         help='default=%(default)s: Experimental feature. Scope of epistasis beta estimation. '
                               '"global" fits one beta per channel; '
                               '"branch_depth" fits beta per branch-depth bin to reduce over-shrinkage from global averaging.')
     analyze.add_argument('--epistasis_branch_depth_bins', metavar='INT', default=3, type=int,
-                         help='default=%(default)s: Number of branch-depth bins for --epistasis_beta_partition branch_depth.')
+                         help='default=%(default)s: Experimental feature. Number of branch-depth bins for --epistasis_beta_partition branch_depth.')
     analyze.add_argument('--epistasis_feature_mode', metavar='single|paired', default='single', type=str,
-                         help='default=%(default)s: Site-feature dimensionality for epistasis weighting. '
+                         help='default=%(default)s: Experimental feature. Site-feature dimensionality for epistasis weighting. '
                               '"single" uses resolved --epistasis_site_metric only; '
                               '"paired" uses both degree and proximity when both are available.')
     analyze.add_argument('--epistasis_clip', metavar='auto|FLOAT', default='3.0', type=str,
-                         help='default=%(default)s: Absolute clipping bound for the internal epistasis score '
+                         help='default=%(default)s: Experimental feature. Absolute clipping bound for the internal epistasis score '
                               'before exponentiation. Set a positive float or "auto".')
     analyze.add_argument('--epistasis_joint_auto', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Jointly optimize epistasis alpha/clip with beta CV. '
+                         help='default=%(default)s: Experimental feature. Jointly optimize epistasis alpha/clip with beta CV. '
                               'When enabled with --epistasis_beta auto, the best (alpha, clip, beta) tuple is selected by CV score.')
     analyze.add_argument('--epistasis_joint_alpha_grid', metavar='FLOAT,FLOAT,...', default='0,0.5,1,2', type=str,
-                         help='default=%(default)s: Candidate ASRV Dirichlet alpha grid for --epistasis_joint_auto.')
+                         help='default=%(default)s: Experimental feature. Candidate ASRV Dirichlet alpha grid for --epistasis_joint_auto.')
     analyze.add_argument('--epistasis_joint_clip_grid', metavar='FLOAT,FLOAT,...', default='1.5,2,2.5,3,4,5', type=str,
-                         help='default=%(default)s: Candidate clip grid for --epistasis_joint_auto.')
+                         help='default=%(default)s: Experimental feature. Candidate clip grid for --epistasis_joint_auto.')
     analyze.add_argument('--epistasis_degree_file', metavar='PATH', default='', type=str,
-                         help='default=%(default)s: Optional precomputed site-wise structure-degree table. '
+                         help='default=%(default)s: Experimental feature. Optional precomputed site-wise structure-degree table. '
                               'If omitted, structure degree is computed during analyze when --epistasis_pdb is set.')
     analyze.add_argument('--epistasis_pdb', metavar='PATH/PDB_CODE/besthit', default='', type=str,
-                         help='default=%(default)s: Structure source for analyze-time epistasis degree generation. '
+                         help='default=%(default)s: Experimental feature. Structure source for analyze-time epistasis degree generation. '
                               'PATH: local structure file; PDB code: fetched from PDB; '
                               '"besthit": online sequence search + best-hit retrieval.')
     analyze.add_argument('--epistasis_database', metavar='DATABASE1,DATABASE2,...', default='pdb,alphafill,alphafold', type=str,
-                         help='default=%(default)s: Comma-delimited database priority for --epistasis_pdb besthit. '
+                         help='default=%(default)s: Experimental feature. Comma-delimited database priority for --epistasis_pdb besthit. '
                               'Supported: pdb, alphafill, alphafold.')
     analyze.add_argument('--epistasis_database_evalue_cutoff', metavar='FLOAT', default=1.0, type=float,
-                         help='default=%(default)s: E-value cutoff for --epistasis_pdb besthit searches.')
+                         help='default=%(default)s: Experimental feature. E-value cutoff for --epistasis_pdb besthit searches.')
     analyze.add_argument('--epistasis_database_minimum_identity', metavar='FLOAT', default=0.25, type=float,
-                         help='default=%(default)s: Minimum sequence identity for MMseqs2 PDB search in --epistasis_pdb besthit.')
+                         help='default=%(default)s: Experimental feature. Minimum sequence identity for MMseqs2 PDB search in --epistasis_pdb besthit.')
     analyze.add_argument('--epistasis_database_timeout', metavar='FLOAT', default=30.0, type=float,
-                         help='default=%(default)s: Network timeout in seconds for --epistasis_pdb besthit retrieval.')
+                         help='default=%(default)s: Experimental feature. Network timeout in seconds for --epistasis_pdb besthit retrieval.')
     analyze.add_argument('--epistasis_user_alignment', metavar='PATH', default='', type=str,
-                         help='default=%(default)s: Optional user-provided protein alignment for mapping structure residues '
+                         help='default=%(default)s: Experimental feature. Optional user-provided protein alignment for mapping structure residues '
                               'to alignment sites in analyze-time epistasis degree generation.')
     analyze.add_argument('--epistasis_contact_distance', metavar='FLOAT', default=8.0, type=float,
-                         help='default=%(default)s: CA-CA distance threshold (Angstrom) used to compute structure contact degree.')
+                         help='default=%(default)s: Experimental feature. CA-CA distance threshold (Angstrom) used to compute structure contact degree.')
     analyze.add_argument('--epistasis_mafft_exe', metavar='PATH', default='mafft', type=str,
-                         help='default=%(default)s: PATH to mafft executable for analyze-time structure mapping.')
+                         help='default=%(default)s: Experimental feature. PATH to mafft executable for analyze-time structure mapping.')
     analyze.add_argument('--epistasis_mafft_op', metavar='FLOAT', default=-1, type=float,
-                         help='default=%(default)s: mafft --op value for analyze-time structure mapping. -1 uses default.')
+                         help='default=%(default)s: Experimental feature. mafft --op value for analyze-time structure mapping. -1 uses default.')
     analyze.add_argument('--epistasis_mafft_ep', metavar='FLOAT', default=-1, type=float,
-                         help='default=%(default)s: mafft --ep value for analyze-time structure mapping. -1 uses default.')
+                         help='default=%(default)s: Experimental feature. mafft --ep value for analyze-time structure mapping. -1 uses default.')
     analyze.add_argument('--epistasis_pymol_max_num_chain', metavar='INT', default=20, type=int,
-                         help='default=%(default)s: Maximum chain count threshold for candidate structures in --epistasis_pdb besthit.')
+                         help='default=%(default)s: Experimental feature. Maximum chain count threshold for candidate structures in --epistasis_pdb besthit.')
     analyze.add_argument('--epistasis_degree_outfile', metavar='PATH', default='csubst_epistasis_structure_degree.tsv', type=str,
-                         help='default=%(default)s: Output TSV path for analyze-time structure degree table.')
+                         help='default=%(default)s: Experimental feature. Output TSV path for analyze-time structure degree table.')
     analyze.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='0.0', type=str,
                          help='default=%(default)s: Dirichlet pseudo-count alpha for convergence-statistic '
                               'shrinkage. Set 0 to disable smoothing. '

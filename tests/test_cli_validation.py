@@ -35,6 +35,13 @@ def test_simulate_invalid_percent_biased_sub_fails_cleanly():
     assert "Traceback" not in log_text
 
 
+def test_simulate_invalid_seed_fails_cleanly():
+    proc, log_text = _run_cli("simulate", "--simulate_seed", "-2")
+    assert proc.returncode == 2
+    assert "--simulate_seed should be -1 or >= 0." in log_text
+    assert "Traceback" not in log_text
+
+
 def test_site_deprecated_probability_options_are_rejected():
     proc, log_text = _run_cli("site", "--branch_id", "0", "--tree_site_plot_min_prob", "0.5")
     assert proc.returncode == 2

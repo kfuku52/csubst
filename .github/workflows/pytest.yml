@@ -76,8 +76,25 @@ jobs:
           python .github/scripts/site_parity_check.py --output parity_metrics.tsv --workdir parity_runs
           cat parity_metrics.tsv
 
+      - name: Run omega p-value calibration regression (PGK)
+        run: |
+          python .github/scripts/omega_pvalue_calibration_check.py \
+            --output omega_pvalue_calibration_summary.tsv \
+            --runtime-output omega_pvalue_calibration_runtime.tsv \
+            --workdir /tmp/csubst_omega_pvalue_calibration
+          cat omega_pvalue_calibration_summary.tsv
+          cat omega_pvalue_calibration_runtime.tsv
+
       - name: Upload parity metrics artifact
         uses: actions/upload-artifact@v4
         with:
           name: parity-metrics
           path: parity_metrics.tsv
+
+      - name: Upload omega p-value calibration artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-pvalue-calibration
+          path: |
+            omega_pvalue_calibration_summary.tsv
+            omega_pvalue_calibration_runtime.tsv

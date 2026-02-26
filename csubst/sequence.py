@@ -1,3 +1,4 @@
+import gzip
 import os
 import itertools
 import re
@@ -297,7 +298,9 @@ def read_fasta(path):
     seq_name = None
     seq_parts = list()
     seen_names = set()
-    with open(path, mode='r') as f:
+    path_txt = str(path)
+    open_fn = gzip.open if path_txt.lower().endswith('.gz') else open
+    with open_fn(path_txt, mode='rt', encoding='utf-8') as f:
         for line_no, line in enumerate(f, start=1):
             line = line.rstrip('\n')
             if line.startswith('>'):

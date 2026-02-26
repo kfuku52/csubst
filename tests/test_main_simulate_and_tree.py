@@ -295,6 +295,42 @@ def test_validate_simulate_params_rejects_out_of_range_values(g, pattern):
         main_simulate._validate_simulate_params(g)
 
 
+def test_evolve_nonconvergent_partition_forwards_seed_to_pyvolve(monkeypatch):
+    call_kwargs = {}
+
+    class DummyModel:
+        def __init__(self, *args, **kwargs):
+            self.kwargs = kwargs
+
+    class DummyPartition:
+        def __init__(self, *args, **kwargs):
+            self.kwargs = kwargs
+
+    class DummyEvolver:
+        def __init__(self, *args, **kwargs):
+            self.kwargs = kwargs
+
+        def __call__(self, **kwargs):
+            call_kwargs.update(kwargs)
+
+    class DummyPyvolve:
+        Model = DummyModel
+        Partition = DummyPartition
+        Evolver = DummyEvolver
+
+    monkeypatch.setattr(main_simulate, "_PYVOLVE", DummyPyvolve())
+    g = {
+        "num_convergent_site": 0,
+        "num_simulated_site": 5,
+        "background_Q": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=float),
+        "background_tree": object(),
+        "simulate_seed_nonconvergent": 101,
+    }
+    main_simulate.evolve_nonconvergent_partition(g)
+    assert call_kwargs["seed"] == 101
+    assert call_kwargs["seqfile"] == "tmp.csubst.simulate_nonconvergent.fa"
+
+
 def test_get_pyvolve_newick_marks_foreground_without_mutating_distances():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:0.1,B:0.2)R;", format=1))
     for node in tr.traverse():
@@ -427,6 +463,63 @@ def test_main_simulate_plot_uses_foreground_annotation(monkeypatch):
     with pytest.raises(RuntimeError, match="stop_after_plot"):
         main_simulate.main_simulate(g)
     assert captured["colored"] is True
+
+
+def test_main_simulate_assigns_simulation_seeds_when_requested(monkeypatch):
+    captured = {"seed_conv": None, "seed_nonconv": None}
+
+    def fake_read_treefile(local_g):
+        tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+        local_g["tree"] = tr
+        local_g["rooted_tree"] = tr
+        return local_g
+
+    def fake_passthrough(local_g, *args, **kwargs):
+        return local_g
+
+    def fake_read_input(local_g):
+        local_g["num_input_site"] = 5
+        return local_g
+
+    def fake_get_foreground_branch(local_g, simulate=False):
+        local_g["fg_df"] = pd.DataFrame({"name": ["A"], "PLACEHOLDER": [1]})
+        for node in local_g["tree"].traverse():
+            ete.set_prop(node, "is_fg_PLACEHOLDER", node.name == "A")
+            ete.set_prop(node, "foreground_lineage_id_PLACEHOLDER", 1 if node.name == "A" else 0)
+            ete.set_prop(node, "color_PLACEHOLDER", "red" if node.name == "A" else "black")
+            ete.set_prop(node, "labelcolor_PLACEHOLDER", "red" if node.name == "A" else "black")
+        return local_g
+
+    def fake_plot_branch_category(local_g, file_base, label="all"):
+        captured["seed_conv"] = local_g.get("simulate_seed_convergent", None)
+        captured["seed_nonconv"] = local_g.get("simulate_seed_nonconvergent", None)
+        raise RuntimeError("stop_after_plot")
+
+    monkeypatch.setattr(main_simulate.tree, "read_treefile", fake_read_treefile)
+    monkeypatch.setattr(main_simulate.parser_misc, "generate_intermediate_files", fake_passthrough)
+    monkeypatch.setattr(main_simulate.parser_misc, "annotate_tree", fake_passthrough)
+    monkeypatch.setattr(main_simulate.parser_misc, "read_input", fake_read_input)
+    monkeypatch.setattr(main_simulate.foreground, "get_foreground_branch", fake_get_foreground_branch)
+    monkeypatch.setattr(main_simulate.tree, "plot_branch_category", fake_plot_branch_category)
+
+    g = {
+        "genetic_code": 1,
+        "alignment_file": "dummy.fa",
+        "rooted_tree_file": "dummy.nwk",
+        "foreground": "dummy_fg.txt",
+        "fg_format": 1,
+        "num_simulated_site": 10,
+        "percent_convergent_site": 0,
+        "percent_biased_sub": 90,
+        "optimized_branch_length": True,
+        "tree_scaling_factor": 1.0,
+        "foreground_scaling_factor": 1.0,
+        "simulate_seed": 77,
+    }
+    with pytest.raises(RuntimeError, match="stop_after_plot"):
+        main_simulate.main_simulate(g)
+    assert captured["seed_conv"] == 77
+    assert captured["seed_nonconv"] == 78
 
 
 def test_require_pyvolve_raises_clear_optional_dependency_message(monkeypatch):

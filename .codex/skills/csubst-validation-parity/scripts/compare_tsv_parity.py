@@ -5,6 +5,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 
 def parse_args():
@@ -45,7 +46,9 @@ def compare_columns(df_left, df_right, columns, rtol, atol):
         if s_left.shape[0] != s_right.shape[0]:
             differences.append((col, "row_count_diff"))
             continue
-        if np.issubdtype(s_left.dtype, np.number) and np.issubdtype(s_right.dtype, np.number):
+        # pandas extension dtypes (for example, string[python]) can raise in np.issubdtype
+        # under pandas>=3. Use pandas-native dtype checks instead.
+        if is_numeric_dtype(s_left.dtype) and is_numeric_dtype(s_right.dtype):
             left = s_left.to_numpy(dtype=float)
             right = s_right.to_numpy(dtype=float)
             equal = np.isclose(left, right, rtol=rtol, atol=atol, equal_nan=True)
