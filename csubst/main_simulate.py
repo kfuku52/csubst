@@ -213,15 +213,50 @@ def get_total_Q(mat, cdn_index):
         total += mat[row,col]
     return total
 
-def rescale_substitution_matrix(mat, target_index, scaling_factor):
+def _normalize_matrix_by_expected_rate(mat, eq_freq):
+    eq_freq = np.asarray(eq_freq, dtype=float).reshape(-1)
+    mat = np.array(mat, copy=True, dtype=float)
+    if mat.shape[0] != mat.shape[1]:
+        raise ValueError('Rate matrix should be square.')
+    if mat.shape[0] != eq_freq.shape[0]:
+        txt = 'Equilibrium frequency length ({}) should match matrix dimension ({}).'
+        raise ValueError(txt.format(eq_freq.shape[0], mat.shape[0]))
+    if not np.isfinite(eq_freq).all():
+        raise ValueError('Equilibrium frequencies should be finite.')
+    if (eq_freq < 0).any():
+        raise ValueError('Equilibrium frequencies should be >= 0.')
+    total_eq = eq_freq.sum()
+    if not (total_eq > 0):
+        raise ValueError('Equilibrium frequencies should sum to a positive value.')
+    eq_freq = eq_freq / total_eq
+    diag_bool = np.eye(mat.shape[0], dtype=bool)
+    mat[diag_bool] = 0
+    mat[diag_bool] = -mat.sum(axis=1)
+    expected_rate = float(np.sum(eq_freq * (-np.diag(mat))))
+    if not np.isfinite(expected_rate):
+        raise ValueError('Expected substitution rate should be finite.')
+    if expected_rate <= 0:
+        raise ValueError('Expected substitution rate should be positive.')
+    mat /= expected_rate
+    mat[diag_bool] = 0
+    mat[diag_bool] = -mat.sum(axis=1)
+    return mat
+
+
+def rescale_substitution_matrix(mat, target_index, scaling_factor, eq_freq=None):
     mat = copy.copy(mat)
     diag_bool = np.eye(mat.shape[0], dtype=bool)
     mat[diag_bool] = 0
     sum_before = mat.sum()
     for i in np.arange(target_index.shape[0]):
         mat[target_index[i,0],target_index[i,1]] *= scaling_factor
-    sum_after = mat.sum()
-    mat = mat / sum_after * sum_before
+    if eq_freq is None:
+        sum_after = mat.sum()
+        mat = mat / sum_after * sum_before
+    else:
+        mat[diag_bool] = -mat.sum(axis=1)
+        mat = _normalize_matrix_by_expected_rate(mat=mat, eq_freq=eq_freq)
+    mat[diag_bool] = 0
     mat[diag_bool] = -mat.sum(axis=1)
     return mat
 
@@ -232,7 +267,7 @@ def generate_Q_matrix(eq_freq, omega, all_nsy_cdn_index, all_syn_cdn_index):
     model = pyvolve.Model(model_type='ECMunrest', name='placeholder', parameters=cmp, state_freqs=eq_freq)
     mat = model.matrix
     dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
-    mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, scaling_factor=omega/dnds)
+    mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, scaling_factor=omega/dnds, eq_freq=eq_freq)
     return mat
 
 def bias_eq_freq(eq_freq, biased_cdn_index, convergence_intensity_factor):
@@ -249,7 +284,7 @@ def get_total_biased_Q(mat, biased_aas, codon_table, codon_order):
     return total_biased_Q
 
 def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, codon_table, codon_orders,
-                             all_nsy_cdn_index, all_syn_cdn_index, foreground_omega):
+                             all_nsy_cdn_index, all_syn_cdn_index, foreground_omega, eq_freq=None):
     mat = copy.copy(mat)
     diag_bool = np.eye(mat.shape[0], dtype=bool)
     mat[diag_bool] = 0
@@ -258,19 +293,19 @@ def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, 
         if dnds == 0:
             raise ValueError('Cannot rescale nonsynonymous rates: background dN/dS is zero.')
         omega_scaling_factor = foreground_omega / dnds
-        mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor)
+        mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor, eq_freq=eq_freq)
         return mat
     total_biased_Q_before = get_total_biased_Q(mat, biased_aas, codon_table, codon_orders)
     if total_biased_Q_before <= 0:
         raise ValueError('No target-biased nonsynonymous substitutions are available for the selected amino acids.')
     total_nsy_Q_before = get_total_Q(mat, all_nsy_cdn_index)
     scaling_factor = total_nsy_Q_before / total_biased_Q_before / (1-(percent_biased_sub/100))
-    mat = rescale_substitution_matrix(mat, target_index, scaling_factor)
+    mat = rescale_substitution_matrix(mat, target_index, scaling_factor, eq_freq=eq_freq)
     dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
     if dnds == 0:
         raise ValueError('Cannot rescale nonsynonymous rates: current dN/dS is zero.')
     omega_scaling_factor = foreground_omega/dnds
-    mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor)
+    mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor, eq_freq=eq_freq)
     return mat
 
 
@@ -283,16 +318,57 @@ def _validate_simulate_params(g):
         raise ValueError('--percent_biased_sub must be within [0, 100).')
     return None
 
+
+def _scale_rate_matrix(matrix, rate_factor):
+    rate_factor = float(rate_factor)
+    if not np.isfinite(rate_factor):
+        raise ValueError('Simulation site-rate factors should be finite.')
+    if rate_factor < 0:
+        raise ValueError('Simulation site-rate factors should be >= 0.')
+    scaled = np.array(matrix, copy=True)
+    if rate_factor != 1.0:
+        scaled *= rate_factor
+    return scaled
+
+
+def _resolve_simulation_site_rates(g):
+    num_site = int(g['num_simulated_site'])
+    mode = str(g.get('simulate_asrv', 'no')).strip().lower()
+    if mode == 'no':
+        return np.ones(num_site, dtype=float)
+    if mode != 'file':
+        raise ValueError('Unsupported --simulate_asrv mode: {}'.format(mode))
+    if ('iqtree_rate_values' not in g) or (g['iqtree_rate_values'] is None):
+        raise ValueError('--simulate_asrv file requires IQ-TREE site rates.')
+    source_rates = np.asarray(g['iqtree_rate_values'], dtype=float).reshape(-1)
+    if source_rates.shape[0] == 0:
+        raise ValueError('IQ-TREE site rates are empty for --simulate_asrv file.')
+    if not np.isfinite(source_rates).all():
+        raise ValueError('IQ-TREE site rates include non-finite values.')
+    if (source_rates < 0).any():
+        raise ValueError('IQ-TREE site rates include negative values.')
+    if num_site <= source_rates.shape[0]:
+        return source_rates[:num_site].copy()
+    txt = '--num_simulated_site ({}) exceeded available IQ-TREE site rates ({}). Reusing rates cyclically.'
+    print(txt.format(num_site, source_rates.shape[0]), flush=True)
+    return np.resize(source_rates, num_site).astype(float)
+
+
 def evolve_convergent_partitions(g):
     pyvolve = _require_pyvolve()
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'], trait_name=g['trait_name'])
     model_names = ['root',] + [ 'm'+str(i+1) for i in range(num_fl) ]
     num_convergent_partition = g['num_convergent_site']
+    site_rates = np.asarray(g.get('simulate_rate_convergent', np.ones(num_convergent_partition)), dtype=float)
+    if site_rates.shape[0] != num_convergent_partition:
+        txt = 'simulate_rate_convergent length ({}) did not match num_convergent_site ({}).'
+        raise ValueError(txt.format(site_rates.shape[0], num_convergent_partition))
     convergent_partitions = list()
     biased_substitution_fractions = list()
     current_site = 0
     for partition_index in np.arange(num_convergent_partition):
         current_site += 1
+        site_rate = float(site_rates[partition_index])
         biased_aas = get_biased_amino_acids(g['convergent_amino_acids'], g['codon_table'])
         print('Codon site {}; Biased amino acids = {}; '.format(current_site, ''.join(biased_aas)), end='')
         biased_nsy_sub_index = get_biased_nonsynonymous_substitution_index(biased_aas,
@@ -307,6 +383,7 @@ def evolve_convergent_partitions(g):
                                             all_nsy_cdn_index=g['all_nsy_cdn_index'],
                                             all_syn_cdn_index=g['all_syn_cdn_index'],
                                             foreground_omega=g['foreground_omega'],
+                                            eq_freq=g['eq_freq'],
                                             )
         total_nsy_Q = get_total_Q(biased_Q, g['all_nsy_cdn_index'])
         total_biased_Q = get_total_biased_Q(biased_Q, biased_aas, g['codon_table'], g['pyvolve_codon_orders'])
@@ -323,9 +400,9 @@ def evolve_convergent_partitions(g):
         for model_name in model_names:
             is_nonroot_model = (model_name!='root')
             if (is_nonroot_model):
-                q_matrix = copy.copy(biased_Q)
+                q_matrix = _scale_rate_matrix(biased_Q, site_rate)
             else:
-                q_matrix = copy.copy(g['background_Q'])
+                q_matrix = _scale_rate_matrix(g['background_Q'], site_rate)
             with suppress_stdout_stderr():
                 model = pyvolve.Model(model_type='custom', name=model_name, parameters={'matrix':q_matrix})
             models.append(model)
@@ -362,11 +439,24 @@ def evolve_nonconvergent_partition(g):
     site_end = g['num_simulated_site']
     print('Codon site {}-{}; Non-convergent codons'.format(site_start, site_end))
     num_nonconvergent_site = g['num_simulated_site'] - g['num_convergent_site']
-    q_matrix = copy.copy(g['background_Q'])
-    with suppress_stdout_stderr():
-        model = pyvolve.Model(model_type='custom', name='root', parameters={'matrix':q_matrix})
-    partition = pyvolve.Partition(models=model, size=num_nonconvergent_site)
-    evolver = pyvolve.Evolver(partitions=partition, tree=g['background_tree'])
+    site_rates = np.asarray(g.get('simulate_rate_nonconvergent', np.ones(num_nonconvergent_site)), dtype=float)
+    if site_rates.shape[0] != num_nonconvergent_site:
+        txt = 'simulate_rate_nonconvergent length ({}) did not match non-convergent site count ({}).'
+        raise ValueError(txt.format(site_rates.shape[0], num_nonconvergent_site))
+    if (str(g.get('simulate_asrv', 'no')).strip().lower() == 'file'):
+        partitions = list()
+        for site_rate in site_rates:
+            q_matrix = _scale_rate_matrix(g['background_Q'], site_rate)
+            with suppress_stdout_stderr():
+                model = pyvolve.Model(model_type='custom', name='root', parameters={'matrix':q_matrix})
+            partitions.append(pyvolve.Partition(models=model, size=1))
+        evolver = pyvolve.Evolver(partitions=partitions, tree=g['background_tree'])
+    else:
+        q_matrix = _scale_rate_matrix(g['background_Q'], 1.0)
+        with suppress_stdout_stderr():
+            model = pyvolve.Model(model_type='custom', name='root', parameters={'matrix':q_matrix})
+        partition = pyvolve.Partition(models=model, size=num_nonconvergent_site)
+        evolver = pyvolve.Evolver(partitions=partition, tree=g['background_tree'])
     kwargs = dict(
         ratefile='tmp.csubst.simulate_nonconvergent_ratefile.txt',
         infofile='tmp.csubst.simulate_nonconvergent_infofile.txt',
@@ -388,16 +478,157 @@ def get_pyvolve_tree(tree, foreground_scaling_factor, trait_name):
     pyvolve_tree = pyvolve.read_tree(tree=newick_txt)
     return pyvolve_tree
 
+
+def _get_synonymous_indices(codon_order, codon_table):
+    codon_order = np.asarray(codon_order, dtype=object).reshape(-1)
+    aa_order = sorted(list(set([item[0] for item in codon_table if item[0] != '*'])))
+    synonymous_indices = dict()
+    codon_to_index = {str(codon): idx for idx, codon in enumerate(codon_order.tolist())}
+    for aa in aa_order:
+        synonymous_codons = [item[1] for item in codon_table if item[0] == aa]
+        synonymous_indices[aa] = [codon_to_index[codon] for codon in synonymous_codons if codon in codon_to_index]
+    return np.asarray(aa_order, dtype=object), synonymous_indices
+
+
+def _get_model_base_name(model_txt):
+    model_txt = str(model_txt).strip()
+    if model_txt == '':
+        return ''
+    return re.sub(r'\+.*$', '', model_txt)
+
+
+def _build_mechanistic_background_Q(g):
+    aa_order, synonymous_indices = _get_synonymous_indices(
+        codon_order=g['pyvolve_codon_orders'],
+        codon_table=g['codon_table'],
+    )
+    kappa = g.get('kappa', None)
+    if kappa is not None:
+        kappa = float(kappa)
+    local_g = {
+        'codon_orders': np.asarray(g['pyvolve_codon_orders'], dtype=object),
+        'amino_acid_orders': aa_order,
+        'synonymous_indices': synonymous_indices,
+        'omega': 1.0,
+        'kappa': kappa,
+        'equilibrium_frequency': np.asarray(g['eq_freq'], dtype=float),
+        'float_type': g.get('float_type', np.float64),
+    }
+    return parser_misc.get_mechanistic_instantaneous_rate_matrix(local_g)
+
+
+def _resolve_simulation_background_omega(g):
+    user_background_omega = g.get('background_omega', None)
+    if user_background_omega is not None:
+        return float(user_background_omega)
+    iqtree_omega = g.get('omega', None)
+    if iqtree_omega is None:
+        default_omega = 0.2
+        txt = 'IQ-TREE omega was unavailable. Falling back to background omega={}.'
+        print(txt.format(default_omega), flush=True)
+        return float(default_omega)
+    iqtree_omega = float(iqtree_omega)
+    if not np.isfinite(iqtree_omega):
+        raise ValueError('IQ-TREE omega should be finite when used as simulation background omega.')
+    if iqtree_omega < 0:
+        raise ValueError('IQ-TREE omega should be >= 0 when used for simulation.')
+    txt = 'Using IQ-TREE estimated omega for simulation background: {:.6f}'
+    print(txt.format(iqtree_omega), flush=True)
+    return float(iqtree_omega)
+
+
+def _resolve_simulation_eq_freq(g):
+    mode = str(g.get('simulate_eq_freq', 'auto')).strip().lower()
+    if mode not in ['auto', 'iqtree', 'alignment']:
+        raise ValueError('Unsupported --simulate_eq_freq mode: {}'.format(mode))
+    eq_freq_iqtree = None
+    if ('equilibrium_frequency' in g) and (g['equilibrium_frequency'] is not None):
+        eq_freq_iqtree = np.asarray(g['equilibrium_frequency'], dtype=float).reshape(-1)
+        input_codon_order = np.asarray(g.get('codon_orders', g['pyvolve_codon_orders']), dtype=object).reshape(-1)
+        if eq_freq_iqtree.shape[0] != input_codon_order.shape[0]:
+            txt = 'Ignoring IQ-TREE equilibrium frequency because its length ({}) did not match codon order ({}).'
+            print(txt.format(eq_freq_iqtree.shape[0], input_codon_order.shape[0]), flush=True)
+            eq_freq_iqtree = None
+        else:
+            codon_order_index = parser_misc.get_codon_order_index(
+                order_from=g['pyvolve_codon_orders'],
+                order_to=input_codon_order,
+            )
+            eq_freq_iqtree = eq_freq_iqtree[codon_order_index]
+            if not np.isfinite(eq_freq_iqtree).all():
+                raise ValueError('IQ-TREE equilibrium frequencies should be finite.')
+            if (eq_freq_iqtree < 0).any():
+                raise ValueError('IQ-TREE equilibrium frequencies should be >= 0.')
+            total = eq_freq_iqtree.sum()
+            if not (total > 0):
+                raise ValueError('IQ-TREE equilibrium frequencies should sum to a positive value.')
+            eq_freq_iqtree = eq_freq_iqtree / total
+    if (mode in ['auto', 'iqtree']) and (eq_freq_iqtree is not None):
+        txt = 'Simulation codon equilibrium frequencies: using IQ-TREE output ({} mode).'
+        print(txt.format(mode), flush=True)
+        return eq_freq_iqtree
+    if mode == 'iqtree':
+        raise ValueError('--simulate_eq_freq iqtree requires parsable IQ-TREE equilibrium frequencies.')
+    pyvolve = _require_pyvolve()
+    f = pyvolve.ReadFrequencies('codon', file=g['alignment_file'])
+    eq_freq_alignment = np.asarray(f.compute_frequencies(), dtype=float).reshape(-1)
+    if not np.isfinite(eq_freq_alignment).all():
+        raise ValueError('Alignment-derived equilibrium frequencies should be finite.')
+    if (eq_freq_alignment < 0).any():
+        raise ValueError('Alignment-derived equilibrium frequencies should be >= 0.')
+    total = eq_freq_alignment.sum()
+    if not (total > 0):
+        raise ValueError('Alignment-derived equilibrium frequencies should sum to a positive value.')
+    eq_freq_alignment /= total
+    if mode == 'alignment':
+        print('Simulation codon equilibrium frequencies: using alignment frequencies (--simulate_eq_freq alignment).', flush=True)
+    else:
+        print('Simulation codon equilibrium frequencies: IQ-TREE unavailable, falling back to alignment frequencies.', flush=True)
+    return eq_freq_alignment
+
+
 def get_background_Q(g, Q_method):
-    if (Q_method=='csubst'):
+    q_method = str(Q_method).strip().lower()
+    if (q_method == 'auto'):
+        base_model = _get_model_base_name(g.get('substitution_model', ''))
+        if base_model.startswith('ECMrest'):
+            matrix_file = 'substitution_matrix/ECMrest.dat'
+            g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(matrix_file, g['pyvolve_codon_orders'])
+            unscaled_mat = parser_misc.exchangeability2Q(g['exchangeability_matrix'], g['eq_freq'])
+        elif base_model.startswith('GY') or base_model.startswith('MG'):
+            unscaled_mat = _build_mechanistic_background_Q(g)
+        else:
+            if base_model.startswith('ECMK07'):
+                matrix_file = 'substitution_matrix/ECMunrest.dat'
+            else:
+                matrix_file = 'substitution_matrix/ECMunrest.dat'
+                txt = 'Unsupported/unknown model "{}" in simulate. Falling back to {}.'
+                print(txt.format(base_model, matrix_file), flush=True)
+            g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(matrix_file, g['pyvolve_codon_orders'])
+            unscaled_mat = parser_misc.exchangeability2Q(g['exchangeability_matrix'], g['eq_freq'])
+        dnds = get_total_Q(unscaled_mat, g['all_nsy_cdn_index']) / get_total_Q(unscaled_mat, g['all_syn_cdn_index'])
+        scaling_factor = g['background_omega'] / dnds
+        background_Q = rescale_substitution_matrix(
+            unscaled_mat,
+            g['all_nsy_cdn_index'],
+            scaling_factor,
+            eq_freq=g['eq_freq'],
+        )
+    elif (q_method == 'csubst'):
         matrix_file = 'substitution_matrix/ECMunrest.dat'
         g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(matrix_file, g['pyvolve_codon_orders'])
         unscaled_mat = parser_misc.exchangeability2Q(g['exchangeability_matrix'], g['eq_freq'])
         dnds = get_total_Q(unscaled_mat, g['all_nsy_cdn_index']) / get_total_Q(unscaled_mat, g['all_syn_cdn_index'])
-        scaling_factor = g['background_omega']/dnds
-        background_Q = rescale_substitution_matrix(unscaled_mat, g['all_nsy_cdn_index'], scaling_factor)
-    elif (Q_method=='pyvolve'):
+        scaling_factor = g['background_omega'] / dnds
+        background_Q = rescale_substitution_matrix(
+            unscaled_mat,
+            g['all_nsy_cdn_index'],
+            scaling_factor,
+            eq_freq=g['eq_freq'],
+        )
+    elif (q_method == 'pyvolve'):
         background_Q = generate_Q_matrix(g['eq_freq'], g['background_omega'], g['all_nsy_cdn_index'], g['all_syn_cdn_index'])
+        background_Q = _normalize_matrix_by_expected_rate(background_Q, g['eq_freq'])
     else:
         raise ValueError('Unsupported Q matrix method: {}'.format(Q_method))
     return background_Q
@@ -537,19 +768,21 @@ def write_true_asr_bundle(g, anc_fasta, prefix):
         'anc_fasta': os.path.abspath(anc_file),
     }
 
-def main_simulate(g, Q_method='csubst'):
+def main_simulate(g, Q_method='auto'):
     g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
     g = tree.read_treefile(g)
     g = parser_misc.generate_intermediate_files(g, force_notree_run=True)
     g = parser_misc.annotate_tree(g, ignore_tree_inconsistency=True)
     g = parser_misc.read_input(g)
+    g['simulate_asrv'] = str(g.get('simulate_asrv', 'no')).strip().lower()
     g['export_true_asr'] = bool(g.get('export_true_asr', True))
     g['true_asr_prefix'] = str(g.get('true_asr_prefix', 'simulate_true_asr')).strip()
     if g['export_true_asr'] and (g['true_asr_prefix'] == ''):
         raise ValueError('--true_asr_prefix should be a non-empty path prefix.')
     g['trait_name'] = 'PLACEHOLDER'
     g['tree'] = ensure_internal_node_names(g['tree'])
-    g['all_syn_cdn_index'] = get_synonymous_codon_substitution_index(g, get_pyvolve_codon_order())
+    g['pyvolve_codon_orders'] = get_pyvolve_codon_order()
+    g['all_syn_cdn_index'] = get_synonymous_codon_substitution_index(g, g['pyvolve_codon_orders'])
     g['all_nsy_cdn_index'] = get_nonsynonymous_codon_substitution_index(g['all_syn_cdn_index'])
     if (g['num_simulated_site']==-1):
         g['num_simulated_site'] = g['num_input_site']
@@ -577,10 +810,8 @@ def main_simulate(g, Q_method='csubst'):
     tree.plot_branch_category(g, file_base='simulate_branch_id', label='all')
     g['background_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=1, trait_name=g['trait_name'])
     g['foreground_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=g['foreground_scaling_factor'], trait_name=g['trait_name'])
-    pyvolve = _require_pyvolve()
-    f = pyvolve.ReadFrequencies('codon', file=g['alignment_file'])
-    g['eq_freq'] = f.compute_frequencies()
-    g['pyvolve_codon_orders'] = get_pyvolve_codon_order()
+    g['background_omega'] = _resolve_simulation_background_omega(g)
+    g['eq_freq'] = _resolve_simulation_eq_freq(g)
     g['background_Q'] = get_background_Q(g, Q_method)
     if g['foreground'] is None:
         print('--foreground was not provided. --percent_convergent_site will be set to 0.')
@@ -588,6 +819,17 @@ def main_simulate(g, Q_method='csubst'):
     else:
         g['num_convergent_site'] = int(g['num_simulated_site'] * g['percent_convergent_site'] / 100)
     g['num_no_convergent_site'] = int(g['num_simulated_site'] - g['num_convergent_site'])
+    g['simulate_site_rates'] = _resolve_simulation_site_rates(g)
+    g['simulate_rate_convergent'] = g['simulate_site_rates'][:g['num_convergent_site']]
+    g['simulate_rate_nonconvergent'] = g['simulate_site_rates'][g['num_convergent_site']:]
+    if g['simulate_asrv'] == 'file':
+        txt = 'Simulation ASRV (--simulate_asrv file): min={:.4f}, median={:.4f}, max={:.4f}, mean={:.4f}'
+        print(txt.format(
+            float(np.min(g['simulate_site_rates'])),
+            float(np.median(g['simulate_site_rates'])),
+            float(np.max(g['simulate_site_rates'])),
+            float(np.mean(g['simulate_site_rates'])),
+        ), flush=True)
     txt = '{:,} out of {:,} sites ({:.1f}%) will evolve convergently in the foreground lineages.'
     print(txt.format(g['num_convergent_site'], g['num_simulated_site'], g['percent_convergent_site']))
     if (g['num_convergent_site'] > 0):

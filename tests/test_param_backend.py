@@ -812,6 +812,26 @@ def test_get_global_parameters_validates_simulate_seed():
     assert g["simulate_seed"] == 123
 
 
+def test_get_global_parameters_validates_simulate_asrv_mode():
+    g = param.get_global_parameters(_args(simulate_asrv="no"))
+    assert g["simulate_asrv"] == "no"
+    g = param.get_global_parameters(_args(simulate_asrv="FiLe"))
+    assert g["simulate_asrv"] == "file"
+    with pytest.raises(ValueError, match="simulate_asrv"):
+        param.get_global_parameters(_args(simulate_asrv="maybe"))
+
+
+def test_get_global_parameters_validates_simulate_eq_freq_mode():
+    g = param.get_global_parameters(_args(simulate_eq_freq="auto"))
+    assert g["simulate_eq_freq"] == "auto"
+    g = param.get_global_parameters(_args(simulate_eq_freq="IQTREE"))
+    assert g["simulate_eq_freq"] == "iqtree"
+    g = param.get_global_parameters(_args(simulate_eq_freq="alignment"))
+    assert g["simulate_eq_freq"] == "alignment"
+    with pytest.raises(ValueError, match="simulate_eq_freq"):
+        param.get_global_parameters(_args(simulate_eq_freq="unsupported"))
+
+
 def test_get_global_parameters_rejects_negative_simulate_scalars():
     with pytest.raises(ValueError, match="tree_scaling_factor"):
         param.get_global_parameters(_args(tree_scaling_factor=-0.1))
@@ -821,6 +841,13 @@ def test_get_global_parameters_rejects_negative_simulate_scalars():
         param.get_global_parameters(_args(background_omega=-0.1))
     with pytest.raises(ValueError, match="foreground_omega"):
         param.get_global_parameters(_args(foreground_omega=-0.1))
+
+
+def test_get_global_parameters_accepts_optional_background_omega():
+    g = param.get_global_parameters(_args(background_omega=None))
+    assert g["background_omega"] is None
+    g = param.get_global_parameters(_args(background_omega="iqtree"))
+    assert g["background_omega"] is None
 
 
 def test_get_global_parameters_validates_convergent_amino_acids():

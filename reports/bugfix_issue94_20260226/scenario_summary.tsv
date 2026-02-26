@@ -1,0 +1,4 @@
+scenario	md5	num_taxa	codon_sites	gc_fraction	true_asr_omega_line	omega_source	eq_mode
+before_default	03b4cc9a3f3df084fe07832ede57bc2c	33	417	0.4857447375432987	Nonsynonymous/synonymous ratio (omega): 0.200000	explicit_or_legacy0.2	unknown
+after_omega0.2	baff2c49ebc9cdbde53a7b82a23abd68	33	417	0.4866409902381125	Nonsynonymous/synonymous ratio (omega): 0.200000	explicit_or_legacy0.2	iqtree(auto)
+after_default	355adc143a308e14c577b5c6a1e764db	33	417	0.4904924545212315	Nonsynonymous/synonymous ratio (omega): 1.000000	iqtree	iqtree(auto)

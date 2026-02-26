@@ -214,6 +214,16 @@ def test_rescale_substitution_matrix_preserves_total_and_zero_row_sum():
     np.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0, 0.0], atol=1e-12)
 
 
+def test_rescale_substitution_matrix_with_eq_freq_normalizes_expected_rate():
+    mat = np.array([[-1.0, 1.0], [2.0, -2.0]], dtype=float)
+    idx = np.array([[0, 1]], dtype=int)
+    eq = np.array([0.9, 0.1], dtype=float)
+    out = main_simulate.rescale_substitution_matrix(mat, idx, scaling_factor=2.0, eq_freq=eq)
+    np.testing.assert_allclose(out.sum(axis=1), [0.0, 0.0], atol=1e-12)
+    expected_rate = float(np.sum(eq * (-np.diag(out))))
+    assert expected_rate == pytest.approx(1.0, abs=1e-12)
+
+
 def test_bias_eq_freq_scales_and_renormalizes():
     eq = np.array([0.2, 0.3, 0.5], dtype=float)
     out = main_simulate.bias_eq_freq(eq, biased_cdn_index=np.array([[0], [1]]), convergence_intensity_factor=2.0)
@@ -331,6 +341,128 @@ def test_evolve_nonconvergent_partition_forwards_seed_to_pyvolve(monkeypatch):
     assert call_kwargs["seqfile"] == "tmp.csubst.simulate_nonconvergent.fa"
 
 
+def test_resolve_simulation_site_rates_no_mode_returns_ones():
+    g = {"num_simulated_site": 4, "simulate_asrv": "no"}
+    out = main_simulate._resolve_simulation_site_rates(g)
+    assert np.array_equal(out, np.ones(4, dtype=float))
+
+
+def test_resolve_simulation_site_rates_file_mode_wraps_when_needed():
+    g = {
+        "num_simulated_site": 5,
+        "simulate_asrv": "file",
+        "iqtree_rate_values": np.array([0.5, 1.0, 2.0], dtype=float),
+    }
+    out = main_simulate._resolve_simulation_site_rates(g)
+    assert np.allclose(out, np.array([0.5, 1.0, 2.0, 0.5, 1.0], dtype=float))
+
+
+def test_resolve_simulation_background_omega_prefers_explicit_over_iqtree():
+    g = {"background_omega": 0.7, "omega": 1.2}
+    out = main_simulate._resolve_simulation_background_omega(g)
+    assert out == pytest.approx(0.7, abs=1e-12)
+
+
+def test_resolve_simulation_background_omega_falls_back_to_iqtree_then_default():
+    g_iq = {"background_omega": None, "omega": 0.42}
+    out_iq = main_simulate._resolve_simulation_background_omega(g_iq)
+    assert out_iq == pytest.approx(0.42, abs=1e-12)
+    g_default = {"background_omega": None, "omega": None}
+    out_default = main_simulate._resolve_simulation_background_omega(g_default)
+    assert out_default == pytest.approx(0.2, abs=1e-12)
+
+
+def test_resolve_simulation_eq_freq_auto_prefers_iqtree_and_reorders(monkeypatch):
+    class _DummyReadFrequencies:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def compute_frequencies(self):
+            raise AssertionError("alignment fallback should not be used when IQ-TREE frequencies exist")
+
+    class _DummyPyvolve:
+        ReadFrequencies = _DummyReadFrequencies
+
+    monkeypatch.setattr(main_simulate, "_PYVOLVE", _DummyPyvolve())
+    g = {
+        "simulate_eq_freq": "auto",
+        "equilibrium_frequency": np.array([0.2, 0.3, 0.5], dtype=float),
+        "codon_orders": np.array(["AAA", "AAC", "AAG"], dtype=object),
+        "pyvolve_codon_orders": np.array(["AAG", "AAA", "AAC"], dtype=object),
+        "alignment_file": "dummy.fa",
+    }
+    out = main_simulate._resolve_simulation_eq_freq(g)
+    np.testing.assert_allclose(out, np.array([0.5, 0.2, 0.3], dtype=float), atol=1e-12)
+
+
+def test_resolve_simulation_eq_freq_alignment_mode_uses_alignment_frequencies(monkeypatch):
+    class _DummyReadFrequencies:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def compute_frequencies(self):
+            return np.array([0.1, 0.2, 0.7], dtype=float)
+
+    class _DummyPyvolve:
+        ReadFrequencies = _DummyReadFrequencies
+
+    monkeypatch.setattr(main_simulate, "_PYVOLVE", _DummyPyvolve())
+    g = {
+        "simulate_eq_freq": "alignment",
+        "pyvolve_codon_orders": np.array(["AAA", "AAC", "AAG"], dtype=object),
+        "alignment_file": "dummy.fa",
+    }
+    out = main_simulate._resolve_simulation_eq_freq(g)
+    np.testing.assert_allclose(out, np.array([0.1, 0.2, 0.7], dtype=float), atol=1e-12)
+
+
+def test_evolve_nonconvergent_partition_uses_sitewise_rates_when_asrv_file(monkeypatch):
+    call_kwargs = {}
+    model_matrices = []
+    partition_sizes = []
+
+    class DummyModel:
+        def __init__(self, *args, **kwargs):
+            model_matrices.append(np.array(kwargs["parameters"]["matrix"], dtype=float))
+
+    class DummyPartition:
+        def __init__(self, *args, **kwargs):
+            partition_sizes.append(int(kwargs["size"]))
+
+    class DummyEvolver:
+        def __init__(self, *args, **kwargs):
+            self.kwargs = kwargs
+
+        def __call__(self, **kwargs):
+            call_kwargs.update(kwargs)
+
+    class DummyPyvolve:
+        Model = DummyModel
+        Partition = DummyPartition
+        Evolver = DummyEvolver
+
+    monkeypatch.setattr(main_simulate, "_PYVOLVE", DummyPyvolve())
+    g = {
+        "num_convergent_site": 1,
+        "num_simulated_site": 4,
+        "background_Q": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=float),
+        "background_tree": object(),
+        "simulate_asrv": "file",
+        "simulate_rate_nonconvergent": np.array([0.5, 2.0, 3.0], dtype=float),
+        "simulate_seed_nonconvergent": 2026,
+    }
+    main_simulate.evolve_nonconvergent_partition(g)
+    assert call_kwargs["seed"] == 2026
+    assert partition_sizes == [1, 1, 1]
+    assert len(model_matrices) == 3
+    assert model_matrices[0][0, 1] == pytest.approx(0.5)
+    assert model_matrices[1][0, 1] == pytest.approx(2.0)
+    assert model_matrices[2][0, 1] == pytest.approx(3.0)
+    assert model_matrices[0][0, 0] == pytest.approx(-0.5)
+    assert model_matrices[1][0, 0] == pytest.approx(-2.0)
+    assert model_matrices[2][0, 0] == pytest.approx(-3.0)
+
+
 def test_get_pyvolve_newick_marks_foreground_without_mutating_distances():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:0.1,B:0.2)R;", format=1))
     for node in tr.traverse():
@@ -353,6 +485,31 @@ def test_scale_tree_multiplies_every_branch_length():
 def test_get_background_Q_rejects_unknown_method():
     with pytest.raises(ValueError, match="Unsupported Q matrix method"):
         main_simulate.get_background_Q({}, Q_method="unknown_method")
+
+
+def test_get_background_Q_auto_respects_target_omega_and_expected_rate(monkeypatch):
+    exchangeability = np.array(
+        [[0.0, 1.0, 2.0], [1.0, 0.0, 3.0], [2.0, 3.0, 0.0]],
+        dtype=float,
+    )
+
+    def _fake_read_exchangeability_matrix(_file, _codon_orders):
+        return exchangeability
+
+    monkeypatch.setattr(main_simulate.parser_misc, "read_exchangeability_matrix", _fake_read_exchangeability_matrix)
+    g = {
+        "substitution_model": "ECMrest+F+R4",
+        "pyvolve_codon_orders": np.array(["AAA", "AAG", "AAC"], dtype=object),
+        "eq_freq": np.array([0.2, 0.3, 0.5], dtype=float),
+        "all_syn_cdn_index": np.array([[0, 1], [1, 0]], dtype=int),
+        "all_nsy_cdn_index": np.array([[0, 2], [1, 2], [2, 0], [2, 1]], dtype=int),
+        "background_omega": 1.5,
+    }
+    out = main_simulate.get_background_Q(g, Q_method="auto")
+    dnds = main_simulate.get_total_Q(out, g["all_nsy_cdn_index"]) / main_simulate.get_total_Q(out, g["all_syn_cdn_index"])
+    assert dnds == pytest.approx(1.5, abs=1e-12)
+    expected_rate = float(np.sum(g["eq_freq"] * (-np.diag(out))))
+    assert expected_rate == pytest.approx(1.0, abs=1e-12)
 
 
 def test_concatenate_alignment_concatenates_matching_headers(tmp_path):

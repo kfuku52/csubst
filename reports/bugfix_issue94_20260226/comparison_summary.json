@@ -1,0 +1,96 @@
+[
+  {
+    "scenario": "before_default",
+    "simulate_fa": "/tmp/csubst_sim_compare_20260226_163916/runs2/before_default/simulate.fa",
+    "md5": "03b4cc9a3f3df084fe07832ede57bc2c",
+    "num_taxa": 33,
+    "nt_len": 1251,
+    "codon_sites": 417,
+    "gc_fraction": 0.4857447375432987,
+    "true_asr_omega_line": "Nonsynonymous/synonymous ratio (omega): 0.200000",
+    "omega_source": "explicit_or_legacy0.2",
+    "eq_mode": "unknown"
+  },
+  {
+    "scenario": "after_omega0.2",
+    "simulate_fa": "/tmp/csubst_sim_compare_20260226_163916/runs2/after_omega0.2/simulate.fa",
+    "md5": "baff2c49ebc9cdbde53a7b82a23abd68",
+    "num_taxa": 33,
+    "nt_len": 1251,
+    "codon_sites": 417,
+    "gc_fraction": 0.4866409902381125,
+    "true_asr_omega_line": "Nonsynonymous/synonymous ratio (omega): 0.200000",
+    "omega_source": "explicit_or_legacy0.2",
+    "eq_mode": "iqtree(auto)"
+  },
+  {
+    "scenario": "after_default",
+    "simulate_fa": "/tmp/csubst_sim_compare_20260226_163916/runs2/after_default/simulate.fa",
+    "md5": "355adc143a308e14c577b5c6a1e764db",
+    "num_taxa": 33,
+    "nt_len": 1251,
+    "codon_sites": 417,
+    "gc_fraction": 0.4904924545212315,
+    "true_asr_omega_line": "Nonsynonymous/synonymous ratio (omega): 1.000000",
+    "omega_source": "iqtree",
+    "eq_mode": "iqtree(auto)"
+  },
+  {
+    "comparison": "before_default_vs_after_omega0.2",
+    "nt_identity_fraction": 0.9897052055325437,
+    "codon_identity_fraction": 0.9792892958360584,
+    "changed_codons_total": 285,
+    "total_codons": 13761,
+    "top5_taxa_changed_codons": [
+      [
+        "Mus_musculus_ENSMUSG00000031233",
+        41
+      ],
+      [
+        "Rattus_norvegicus_ENSRNOG00000013600",
+        35
+      ],
+      [
+        "Oryctolagus_cuniculus_ENSOCUG00000005270",
+        31
+      ],
+      [
+        "Ovis_aries_ENSOARG00000008736",
+        31
+      ],
+      [
+        "Sus_scrofa_ENSSSCG00000001738",
+        31
+      ]
+    ]
+  },
+  {
+    "comparison": "before_default_vs_after_default",
+    "nt_identity_fraction": 0.9277426543613594,
+    "codon_identity_fraction": 0.8596758956471187,
+    "changed_codons_total": 1931,
+    "total_codons": 13761,
+    "top5_taxa_changed_codons": [
+      [
+        "Xenopus_tropicalis_ENSXETG00000007447",
+        71
+      ],
+      [
+        "Mus_musculus_ENSMUSG00000031233",
+        70
+      ],
+      [
+        "Ovis_aries_ENSOARG00000008736",
+        68
+      ],
+      [
+        "Sus_scrofa_ENSSSCG00000001738",
+        68
+      ],
+      [
+        "Anolis_carolinensis_ENSACAG00000003255",
+        66
+      ]
+    ]
+  }
+]
