@@ -20,12 +20,11 @@ def _require_pyvolve():
     if _PYVOLVE is not None:
         return _PYVOLVE
     try:
+        from csubst._vendor import pyvolve as _pyvolve
+    except Exception:
+        # Backward-compatible fallback for legacy environments where the
+        # vendored backend is unavailable.
         import pyvolve as _pyvolve
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            'pyvolve is an optional dependency for `csubst simulate`. '
-            'Install it with `pip install "csubst[simulate]"` (or `pip install pyvolve`).'
-        ) from exc
     _PYVOLVE = _pyvolve
     return _PYVOLVE
 

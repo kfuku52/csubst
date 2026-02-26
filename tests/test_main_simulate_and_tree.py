@@ -471,7 +471,7 @@ def test_main_simulate_plot_uses_foreground_annotation(monkeypatch):
     assert captured["colored"] is True
 
 
-def test_require_pyvolve_raises_clear_optional_dependency_message(monkeypatch):
+def test_require_pyvolve_prefers_vendored_backend(monkeypatch):
     original_import = builtins.__import__
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
@@ -482,10 +482,10 @@ def test_require_pyvolve_raises_clear_optional_dependency_message(monkeypatch):
     monkeypatch.setattr(main_simulate, "_PYVOLVE", None)
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
-    with pytest.raises(ModuleNotFoundError, match=r'optional dependency for `csubst simulate`'):
-        main_simulate._require_pyvolve()
-    with pytest.raises(ModuleNotFoundError, match=r'csubst\[simulate\]'):
-        main_simulate._require_pyvolve()
+    backend = main_simulate._require_pyvolve()
+    assert backend.__name__ == "csubst._vendor.pyvolve"
+    assert hasattr(backend, "Model")
+    assert main_simulate._require_pyvolve() is backend
 
 
 def test_foreground_stem_vertical_segment_is_not_colored():

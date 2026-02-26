@@ -29,7 +29,7 @@ setup(
     packages         = find_packages(),
     install_requires = ['ete4>=4.3.0','numpy','scipy','pandas','cython','matplotlib'],
     extras_require   = {
-                            'simulate': ['pyvolve',],
+                            'simulate': [],
     },
     scripts          = ['csubst/csubst',],
     setup_requires   = ['setuptools>=18.0','cython'],
@@ -45,5 +45,6 @@ setup(
                             '':['substitution_matrix/*.dat',
                                 'dataset/*',
                                 ],
+                            'csubst._vendor.pyvolve':['LICENSE.txt'],
     }
 )
