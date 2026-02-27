@@ -232,15 +232,6 @@ def get_global_parameters(args):
         )
         if g['omega_pvalue_nbinom_alpha'] < 0:
             raise ValueError('--omega_pvalue_nbinom_alpha should be >= 0.')
-    if 'omega_pvalue_min_expected_S' in g.keys():
-        g['omega_pvalue_min_expected_S'] = _require_finite_float(
-            value=float(g['omega_pvalue_min_expected_S']),
-            param_name='--omega_pvalue_min_expected_S',
-        )
-    else:
-        g['omega_pvalue_min_expected_S'] = 0.01
-    if g['omega_pvalue_min_expected_S'] < 0:
-        raise ValueError('--omega_pvalue_min_expected_S should be >= 0.')
     if 'omega_pvalue_safe_min_sub_pp' in g.keys():
         raise ValueError(
             '--omega_pvalue_safe_min_sub_pp was removed. '

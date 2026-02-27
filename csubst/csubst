@@ -537,11 +537,6 @@ def _main():
                          help='default=%(default)s: Experimental feature. Overdispersion coefficient for '
                               '--omega_pvalue_null_model nbinom. Variance is mean + alpha*mean^2. '
                               '"auto" estimates alpha from observed-vs-expected count dispersion.')
-    analyze.add_argument('--omega_pvalue_min_expected_S', metavar='FLOAT', default=0.01, type=float,
-                         help='default=%(default)s: Experimental feature. Minimum expected synonymous count '
-                              '(ECS) required to report empirical omega_C p-values. '
-                              'Rows with ECS below the resolved threshold are set to NaN because denominator-zero '
-                              'regimes are unstable for ratio-tail p-values.')
     analyze.add_argument('--omega_pvalue_niter', metavar='INT', default=1000, type=int,
                          help='default=%(default)s: Experimental feature. Number of randomization iterations for --calc_omega_pvalue. '
                               'Larger values improve tail resolution but increase runtime and memory.')

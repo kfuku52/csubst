@@ -15,7 +15,6 @@ for stat in "${stats[@]}"; do
       --calc_omega_pvalue yes \
       --omega_pvalue_null_model "$model" \
       --omega_pvalue_nbinom_alpha auto \
-      --omega_pvalue_min_expected_S 0.01 \
       --omega_pvalue_niter 1000 \
       --omega_pvalue_rounding round \
       --calibrate_longtail yes \

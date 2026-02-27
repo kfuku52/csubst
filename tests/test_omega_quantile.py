@@ -491,24 +491,6 @@ def test_calc_omega_empirical_upper_tail_pvalues_uses_upper_tail_mid_p():
     np.testing.assert_allclose(out, np.array([0.75, 0.75], dtype=np.float64))
 
 
-def test_calc_omega_empirical_upper_tail_pvalues_masks_low_expected_s_rows():
-    obs_omega = np.array([2.0, 1.0], dtype=np.float64)
-    exp_N = np.array([1.0, 1.0], dtype=np.float64)
-    exp_S = np.array([0.005, 1.0], dtype=np.float64)
-    perm_count_N = np.array([[2.0, 1.0, 3.0], [0.0, 1.0, 1.0]], dtype=np.float64)
-    perm_count_S = np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64)
-    out = omega._calc_omega_empirical_upper_tail_pvalues(
-        obs_omega=obs_omega,
-        exp_N=exp_N,
-        exp_S=exp_S,
-        perm_count_N=perm_count_N,
-        perm_count_S=perm_count_S,
-        float_tol=1e-12,
-        min_expected_s=0.01,
-    )
-    np.testing.assert_allclose(out, np.array([np.nan, 0.75], dtype=np.float64), equal_nan=True)
-
-
 def test_calc_omega_empirical_upper_tail_pvalues_from_perm_matches_wrapper():
     obs_omega = np.array([2.0, 1.0], dtype=np.float64)
     exp_N = np.array([1.0, 1.0], dtype=np.float64)
@@ -522,7 +504,6 @@ def test_calc_omega_empirical_upper_tail_pvalues_from_perm_matches_wrapper():
         perm_count_N=perm_count_N,
         perm_count_S=perm_count_S,
         float_tol=1e-12,
-        min_expected_s=0.0,
     )
     perm_omega = omega._calc_permutation_omega_matrix(
         exp_N=exp_N,
@@ -535,7 +516,6 @@ def test_calc_omega_empirical_upper_tail_pvalues_from_perm_matches_wrapper():
         obs_omega=obs_omega,
         exp_S=exp_S,
         perm_omega=perm_omega,
-        min_expected_s=0.0,
     )
     np.testing.assert_allclose(wrapper_out, from_perm_out)
 

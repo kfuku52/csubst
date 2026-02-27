@@ -2984,7 +2984,7 @@ def _calc_permutation_omega_matrix(exp_N, exp_S, perm_count_N, perm_count_S, flo
     return _calc_raw_omega(dNc=perm_dNc, dSc=perm_dSc, float_tol=float_tol)
 
 
-def _calc_omega_empirical_upper_tail_pvalues_from_perm(obs_omega, exp_S, perm_omega, min_expected_s=0.0):
+def _calc_omega_empirical_upper_tail_pvalues_from_perm(obs_omega, exp_S, perm_omega):
     obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
     exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
     perm_omega = np.asarray(perm_omega, dtype=np.float64)
@@ -3002,7 +3002,6 @@ def _calc_omega_empirical_upper_tail_pvalues_from_perm(obs_omega, exp_S, perm_om
     pvalue = np.full(shape=obs_omega.shape, fill_value=np.nan, dtype=np.float64)
     valid_rows = (~np.isnan(obs_omega)) & (valid_niter > 0)
     valid_rows &= np.isfinite(exp_S)
-    valid_rows &= (exp_S >= float(min_expected_s))
     pvalue[valid_rows] = (ge_ranks[valid_rows] + 1.0) / (valid_niter[valid_rows] + 1.0)
     return pvalue
 
@@ -3014,7 +3013,6 @@ def _calc_omega_empirical_upper_tail_pvalues(
     perm_count_N,
     perm_count_S,
     float_tol,
-    min_expected_s=0.0,
 ):
     obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
     exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
@@ -3045,7 +3043,6 @@ def _calc_omega_empirical_upper_tail_pvalues(
         obs_omega=obs_omega,
         exp_S=exp_S,
         perm_omega=perm_omega,
-        min_expected_s=min_expected_s,
     )
 
 
@@ -3077,9 +3074,6 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
     niter = int(g.get('omega_pvalue_niter', 1000))
     if niter <= 0:
         raise ValueError('omega_pvalue_niter should be a positive integer.')
-    min_expected_s = float(g.get('omega_pvalue_min_expected_S', 0.01))
-    if min_expected_s < 0:
-        raise ValueError('omega_pvalue_min_expected_S should be >= 0.')
     null_model = _resolve_omega_pvalue_null_model(g=g)
     txt = 'omega_C empirical p-value null model: {}'
     print(txt.format(null_model), flush=True)
@@ -3141,25 +3135,12 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
             perm_count_N=perm_count_N,
             perm_count_S=perm_count_S,
             float_tol=g['float_tol'],
-            min_expected_s=min_expected_s,
         )
         col_p = 'pomegaC' + sub
         cb.loc[:, col_p] = pvalue
         col_q = 'qomegaC' + sub
         qvalue = _calc_bh_fdr_qvalues(pvalue)
         cb.loc[:, col_q] = qvalue
-        low_exp_s = np.isfinite(exp_S_values) & (exp_S_values < min_expected_s)
-        if low_exp_s.any():
-            txt = 'Arity = {:,}, cb: {} rows with ECS<{} were set to NaN for {}'
-            print(
-                txt.format(
-                    cb_ids.shape[1],
-                    int(low_exp_s.sum()),
-                    '{:.6g}'.format(min_expected_s),
-                    col_p,
-                ),
-                flush=True,
-            )
         finite = np.isfinite(pvalue)
         if finite.any():
             txt = 'Arity = {:,}, cb: median {} = {:.4f} ({:,}/{:,} finite)'
