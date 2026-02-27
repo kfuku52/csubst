@@ -540,6 +540,21 @@ def _main():
     analyze.add_argument('--omega_pvalue_niter', metavar='INT', default=1000, type=int,
                          help='default=%(default)s: Experimental feature. Number of randomization iterations for --calc_omega_pvalue. '
                               'Larger values improve tail resolution but increase runtime and memory.')
+    analyze.add_argument('--omega_pvalue_niter_schedule', metavar='0|N1,N2,...', default='0', type=str,
+                         help='default=%(default)s: Experimental feature. Iteration schedule for staged '
+                              '--calc_omega_pvalue refinement under --omega_pvalue_null_model hypergeom. '
+                              'Set 0 (auto) to use adaptive stages ending at --omega_pvalue_niter '
+                              '(typically 100,1000,target). '
+                              'Custom values should be comma-delimited strictly increasing integers '
+                              '(e.g., 200,2000,10000).')
+    analyze.add_argument('--omega_pvalue_refine_threshold', metavar='FLOAT', default=0.05, type=float,
+                         help='default=%(default)s: Experimental feature. Target p-value threshold used by '
+                              'staged refinement under --omega_pvalue_null_model hypergeom. '
+                              'Rows whose confidence interval overlaps this threshold are refined to later stages.')
+    analyze.add_argument('--omega_pvalue_refine_ci_alpha', metavar='FLOAT', default=0.01, type=float,
+                         help='default=%(default)s: Experimental feature. Two-sided confidence level alpha used in '
+                              'staged refinement under --omega_pvalue_null_model hypergeom '
+                              '(Clopper-Pearson interval for upper-tail exceedance probability).')
     analyze.add_argument('--omega_pvalue_rounding', metavar='round|stochastic|floor|ceil', default='stochastic', type=str,
                          choices=['round', 'stochastic', 'floor', 'ceil'],
                          help='default=%(default)s: Experimental feature. How fractional branch-wise substitution masses are converted to '

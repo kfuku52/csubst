@@ -388,6 +388,42 @@ def test_resolve_quantile_niter_schedule_rejects_non_increasing_schedule():
         )
 
 
+def test_resolve_omega_pvalue_niter_schedule_auto_includes_target():
+    schedule = omega._resolve_omega_pvalue_niter_schedule(
+        g={},
+        omega_pvalue_niter=5000,
+    )
+    assert schedule == [100, 1000, 5000]
+
+
+def test_resolve_omega_pvalue_niter_schedule_accepts_auto_string():
+    schedule = omega._resolve_omega_pvalue_niter_schedule(
+        g={"omega_pvalue_niter_schedule": "auto"},
+        omega_pvalue_niter=1000,
+    )
+    assert schedule == [100, 1000]
+
+
+def test_resolve_omega_pvalue_niter_schedule_appends_target_when_needed():
+    schedule = omega._resolve_omega_pvalue_niter_schedule(
+        g={"omega_pvalue_niter_schedule": [200, 600]},
+        omega_pvalue_niter=1000,
+    )
+    assert schedule == [200, 600, 1000]
+
+
+def test_needs_omega_pvalue_refinement_uses_ci_overlap():
+    refine = omega._needs_omega_pvalue_refinement(
+        obs_omega=np.array([1.0, 1.0, 1.0], dtype=np.float64),
+        exp_S=np.array([1.0, 1.0, 1.0], dtype=np.float64),
+        ge_ranks=np.array([0, 5, 20], dtype=np.int64),
+        valid_niter=np.array([100, 100, 100], dtype=np.int64),
+        p_threshold=0.05,
+        ci_alpha=0.05,
+    )
+    np.testing.assert_array_equal(refine, np.array([False, True, False], dtype=bool))
+
+
 def test_needs_quantile_refinement_detects_edge_rows():
     mask = omega._needs_quantile_refinement(
         probability_values=np.array([0.99, 0.5, 0.01], dtype=np.float64),
@@ -934,6 +970,65 @@ def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
     ]
     np.testing.assert_allclose(out.loc[:, "pomegaCany2dif"].to_numpy(dtype=np.float64), np.array([0.5, 1.0]))
     np.testing.assert_allclose(out.loc[:, "qomegaCany2dif"].to_numpy(dtype=np.float64), np.array([1.0, 1.0]))
+
+
+def test_add_omega_empirical_pvalues_hypergeom_refines_only_ambiguous_rows(monkeypatch):
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [0, 1, 2],
+            "branch_id_2": [3, 4, 5],
+            "omegaCany2spe": [3.0, 1.0, 2.0],
+            "ECNany2spe": [1.0, 1.0, 1.0],
+            "ECSany2spe": [1.0, 1.0, 1.0],
+        }
+    )
+    calls = list()
+
+    def fake_get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, obs_count=None):
+        calls.append((SN, mode, int(niter), cb_ids.shape[0]))
+        if mode != "any2spe":
+            raise AssertionError("unexpected mode")
+        if SN == "S":
+            return np.ones((cb_ids.shape[0], int(niter)), dtype=np.float64)
+        if (int(niter) == 100) and (cb_ids.shape[0] == 3):
+            out = np.zeros((3, 100), dtype=np.float64)
+            out[1, :] = 2.0
+            out[2, :95] = 1.0
+            out[2, 95:] = 3.0
+            return out
+        if (int(niter) == 900) and (cb_ids.shape[0] == 1):
+            return np.zeros((1, 900), dtype=np.float64)
+        raise AssertionError("unexpected staged request")
+
+    monkeypatch.setattr(omega, "_get_mode_permutation_count_matrix", fake_get_mode_permutation_count_matrix)
+    out = omega.add_omega_empirical_pvalues(
+        cb=cb.copy(),
+        ON_tensor=None,
+        OS_tensor=None,
+        g={
+            "calc_omega_pvalue": True,
+            "omegaC_method": "modelfree",
+            "omega_pvalue_null_model": "hypergeom",
+            "omega_pvalue_niter": 1000,
+            "omega_pvalue_niter_schedule": [100, 1000],
+            "omega_pvalue_refine_ci_alpha": 0.05,
+            "output_stats": ["any2spe"],
+            "float_tol": 1e-12,
+        },
+    )
+    assert calls == [
+        ("N", "any2spe", 100, 3),
+        ("S", "any2spe", 100, 3),
+        ("N", "any2spe", 900, 1),
+        ("S", "any2spe", 900, 1),
+    ]
+    np.testing.assert_allclose(
+        out.loc[:, "pomegaCany2spe"].to_numpy(dtype=np.float64),
+        np.array([(0.0 + 1.0) / (100.0 + 1.0), 1.0, (5.0 + 1.0) / (1000.0 + 1.0)], dtype=np.float64),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    assert float(out.loc[2, "pomegaCany2spe"]) < float(out.loc[0, "pomegaCany2spe"])
 
 
 def test_add_omega_empirical_pvalues_uses_dsc_calibrated_null_when_columns_present(monkeypatch):

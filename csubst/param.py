@@ -145,6 +145,33 @@ def _parse_quantile_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
     return schedule
 
 
+def _parse_omega_pvalue_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
+    if isinstance(value, (list, tuple, np.ndarray)):
+        raw_tokens = [str(v).strip() for v in value]
+    else:
+        raw_txt = '' if value is None else str(value).strip()
+        if raw_txt.lower() in ['', '0', 'auto']:
+            return None
+        raw_tokens = [token.strip() for token in raw_txt.split(',') if token.strip() != '']
+    if len(raw_tokens) == 0:
+        raise ValueError('--omega_pvalue_niter_schedule should not be empty.')
+    schedule = list()
+    for token in raw_tokens:
+        if not re.fullmatch(r'[0-9]+', token):
+            raise ValueError('--omega_pvalue_niter_schedule should contain integers.')
+        niter = int(token)
+        if niter <= 0:
+            raise ValueError('--omega_pvalue_niter_schedule should contain positive integers.')
+        schedule.append(niter)
+    for prev, curr in zip(schedule, schedule[1:]):
+        if curr <= prev:
+            raise ValueError('--omega_pvalue_niter_schedule should be strictly increasing.')
+    if max(schedule) > int(max_niter):
+        txt = '--omega_pvalue_niter_schedule upper bound should be <= {}.'
+        raise ValueError(txt.format(int(max_niter)))
+    return schedule
+
+
 def _get_dependency_version(distribution_name):
     try:
         return importlib_metadata.version(distribution_name)
@@ -261,6 +288,32 @@ def get_global_parameters(args):
     if g['omega_pvalue_niter'] > int(MAX_QUANTILE_NITER):
         txt = '--omega_pvalue_niter upper bound should be <= {}.'
         raise ValueError(txt.format(int(MAX_QUANTILE_NITER)))
+    if 'omega_pvalue_niter_schedule' in g.keys():
+        g['omega_pvalue_niter_schedule'] = _parse_omega_pvalue_niter_schedule(g['omega_pvalue_niter_schedule'])
+    else:
+        g['omega_pvalue_niter_schedule'] = None
+    if g['omega_pvalue_niter_schedule'] is not None:
+        if max(g['omega_pvalue_niter_schedule']) > g['omega_pvalue_niter']:
+            txt = '--omega_pvalue_niter_schedule should not exceed --omega_pvalue_niter ({:,}).'
+            raise ValueError(txt.format(int(g['omega_pvalue_niter'])))
+    if 'omega_pvalue_refine_threshold' in g.keys():
+        g['omega_pvalue_refine_threshold'] = _require_finite_float(
+            value=float(g['omega_pvalue_refine_threshold']),
+            param_name='--omega_pvalue_refine_threshold',
+        )
+    else:
+        g['omega_pvalue_refine_threshold'] = 0.05
+    if (g['omega_pvalue_refine_threshold'] <= 0) or (g['omega_pvalue_refine_threshold'] >= 1):
+        raise ValueError('--omega_pvalue_refine_threshold should be in (0, 1).')
+    if 'omega_pvalue_refine_ci_alpha' in g.keys():
+        g['omega_pvalue_refine_ci_alpha'] = _require_finite_float(
+            value=float(g['omega_pvalue_refine_ci_alpha']),
+            param_name='--omega_pvalue_refine_ci_alpha',
+        )
+    else:
+        g['omega_pvalue_refine_ci_alpha'] = 0.01
+    if (g['omega_pvalue_refine_ci_alpha'] <= 0) or (g['omega_pvalue_refine_ci_alpha'] >= 1):
+        raise ValueError('--omega_pvalue_refine_ci_alpha should be in (0, 1).')
     if 'omega_pvalue_rounding' in g.keys():
         g['omega_pvalue_rounding'] = str(g['omega_pvalue_rounding']).strip().lower()
     else:
