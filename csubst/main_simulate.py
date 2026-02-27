@@ -135,7 +135,7 @@ def get_biased_nonsynonymous_substitution_index(biased_aas, codon_table, codon_o
     biased_cdn_index = np.array(biased_cdn_index)
     return biased_cdn_index
 
-def get_biased_amino_acids(convergent_amino_acids, codon_table):
+def get_biased_amino_acids(convergent_amino_acids, codon_table, rng=None):
     amino_acids = np.array(sorted(list(set([ item[0] for item in codon_table if item[0] != '*' ]))))
     if convergent_amino_acids.startswith('random'):
         num_random_aa = int(convergent_amino_acids.replace('random',''))
@@ -146,7 +146,10 @@ def get_biased_amino_acids(convergent_amino_acids, codon_table):
             raise ValueError(msg.format(num_random_aa, amino_acids.shape[0]))
         if num_random_aa == 0:
             return np.array([], dtype=amino_acids.dtype)
-        aa_index = np.random.choice(a=np.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
+        if rng is None:
+            aa_index = np.random.choice(a=np.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
+        else:
+            aa_index = rng.choice(a=np.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
         biased_aas = amino_acids[aa_index]
     else:
         biased_aas = np.array(list(convergent_amino_acids))
@@ -369,7 +372,11 @@ def evolve_convergent_partitions(g):
     for partition_index in np.arange(num_convergent_partition):
         current_site += 1
         site_rate = float(site_rates[partition_index])
-        biased_aas = get_biased_amino_acids(g['convergent_amino_acids'], g['codon_table'])
+        biased_aas = get_biased_amino_acids(
+            g['convergent_amino_acids'],
+            g['codon_table'],
+            rng=g.get('simulate_rng', None),
+        )
         print('Codon site {}; Biased amino acids = {}; '.format(current_site, ''.join(biased_aas)), end='')
         biased_nsy_sub_index = get_biased_nonsynonymous_substitution_index(biased_aas,
                                                                            g['codon_table'],
@@ -435,7 +442,7 @@ def evolve_nonconvergent_partition(g):
     if (g['num_convergent_site']==0):
         site_start = 1
     else:
-        site_start = g['num_simulated_site'] - g['num_convergent_site'] + 1
+        site_start = g['num_convergent_site'] + 1
     site_end = g['num_simulated_site']
     print('Codon site {}-{}; Non-convergent codons'.format(site_start, site_end))
     num_nonconvergent_site = g['num_simulated_site'] - g['num_convergent_site']
@@ -743,11 +750,27 @@ def write_true_asr_bundle(g, anc_fasta, prefix):
                     state_txt = '???'
                 row = [node_name, str(site + 1), state_txt] + state_vector
                 f.write('\t'.join(row) + '\n')
+    site_rates = np.asarray(g.get('simulate_site_rates', np.ones(num_site, dtype=float)), dtype=float).reshape(-1)
+    if site_rates.shape[0] != num_site:
+        txt = 'simulate_site_rates length ({}) did not match simulated codon sites ({}).'
+        raise ValueError(txt.format(site_rates.shape[0], num_site))
+    if not np.isfinite(site_rates).all():
+        raise ValueError('simulate_site_rates should be finite for true-ASR export.')
+    if (site_rates < 0).any():
+        raise ValueError('simulate_site_rates should be >= 0 for true-ASR export.')
     with open(rate_file, 'w') as f:
         f.write('Site\tC_Rate\n')
         for site in range(num_site):
-            f.write('{}\t1.000000\n'.format(site + 1))
-    model_txt = str(g.get('iqtree_model', 'ECMK07+F+R4'))
+            f.write('{}\t{:.6f}\n'.format(site + 1, float(site_rates[site])))
+    model_txt = str(g.get('substitution_model', g.get('iqtree_model', 'ECMK07+F+R4')))
+    kappa = g.get('kappa', None)
+    if kappa is None:
+        kappa = 1.0
+    kappa = float(kappa)
+    if not np.isfinite(kappa):
+        raise ValueError('kappa should be finite for true-ASR export.')
+    if kappa < 0:
+        raise ValueError('kappa should be >= 0 for true-ASR export.')
     eq_freq = np.asarray(g['eq_freq'], dtype=float)
     with open(iqtree_file, 'w') as f:
         f.write('IQ-TREE multicore version 2.2.6\n')
@@ -758,7 +781,7 @@ def write_true_asr_bundle(g, anc_fasta, prefix):
         f.write('IQ-TREE multicore version 2.2.6\n')
         f.write('Converting to codon sequences with genetic code {} ...\n'.format(int(g['genetic_code'])))
         f.write('Nonsynonymous/synonymous ratio (omega): {:.6f}\n'.format(float(g['background_omega'])))
-        f.write('Transition/transversion ratio (kappa): 1.000000\n')
+        f.write('Transition/transversion ratio (kappa): {:.6f}\n'.format(kappa))
     return {
         'state': os.path.abspath(state_file),
         'treefile': os.path.abspath(tree_file),
@@ -791,11 +814,13 @@ def main_simulate(g, Q_method='auto'):
         base_seed = int(g['simulate_seed'])
         g['simulate_seed_convergent'] = base_seed
         g['simulate_seed_nonconvergent'] = base_seed + 1
+        g['simulate_rng'] = np.random.default_rng(base_seed)
         txt = 'Simulation seeds: convergent={}, nonconvergent={}'
         print(txt.format(g['simulate_seed_convergent'], g['simulate_seed_nonconvergent']), flush=True)
     else:
         g['simulate_seed_convergent'] = None
         g['simulate_seed_nonconvergent'] = None
+        g['simulate_rng'] = np.random.default_rng()
     if g['optimized_branch_length']:
         g['tree'] = g['tree']
     else:

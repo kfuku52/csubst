@@ -243,6 +243,18 @@ def test_get_biased_amino_acids_rejects_unknown_symbol():
         main_simulate.get_biased_amino_acids("Z", codon_table)
 
 
+def test_get_biased_amino_acids_random_mode_is_reproducible_with_rng():
+    codon_table = [["K", "AAA"], ["K", "AAG"], ["N", "AAC"], ["F", "TTT"], ["F", "TTC"]]
+    rng_a = np.random.default_rng(17)
+    rng_b = np.random.default_rng(17)
+    out_a1 = main_simulate.get_biased_amino_acids("random1", codon_table, rng=rng_a)
+    out_a2 = main_simulate.get_biased_amino_acids("random1", codon_table, rng=rng_a)
+    out_b1 = main_simulate.get_biased_amino_acids("random1", codon_table, rng=rng_b)
+    out_b2 = main_simulate.get_biased_amino_acids("random1", codon_table, rng=rng_b)
+    np.testing.assert_array_equal(out_a1, out_b1)
+    np.testing.assert_array_equal(out_a2, out_b2)
+
+
 def test_apply_percent_biased_sub_preserves_foreground_omega():
     mat = np.array(
         [[-1.0, 0.5, 0.5], [0.5, -1.0, 0.5], [0.5, 0.5, -1.0]],
@@ -463,6 +475,41 @@ def test_evolve_nonconvergent_partition_uses_sitewise_rates_when_asrv_file(monke
     assert model_matrices[2][0, 0] == pytest.approx(-3.0)
 
 
+def test_evolve_nonconvergent_partition_reports_correct_site_range(capsys, monkeypatch):
+    class DummyModel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class DummyPartition:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class DummyEvolver:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __call__(self, **kwargs):
+            return None
+
+    class DummyPyvolve:
+        Model = DummyModel
+        Partition = DummyPartition
+        Evolver = DummyEvolver
+
+    monkeypatch.setattr(main_simulate, "_PYVOLVE", DummyPyvolve())
+    g = {
+        "num_convergent_site": 3,
+        "num_simulated_site": 10,
+        "background_Q": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=float),
+        "background_tree": object(),
+        "simulate_asrv": "no",
+        "simulate_seed_nonconvergent": None,
+    }
+    main_simulate.evolve_nonconvergent_partition(g)
+    out = capsys.readouterr().out
+    assert "Codon site 4-10; Non-convergent codons" in out
+
+
 def test_get_pyvolve_newick_marks_foreground_without_mutating_distances():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:0.1,B:0.2)R;", format=1))
     for node in tr.traverse():
@@ -572,6 +619,80 @@ def test_write_true_asr_bundle_writes_iqtree_compatible_files(tmp_path):
     assert state[1].startswith("R\t1\tAAA\t")
     iqtree_text = (tmp_path / "sim_true.iqtree").read_text(encoding="utf-8")
     assert "Model of substitution: ECMK07+F+R4" in iqtree_text
+
+
+def test_write_true_asr_bundle_prefers_substitution_model_and_kappa(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    anc = tmp_path / "anc.fa"
+    anc.write_text(">R\nAAA\n", encoding="utf-8")
+    g = {
+        "tree": tr,
+        "eq_freq": np.full(shape=(61,), fill_value=(1 / 61), dtype=float),
+        "iqtree_model": "ECMK07+F+R4",
+        "substitution_model": "GY+F3X4+R4",
+        "genetic_code": 1,
+        "background_omega": 0.2,
+        "kappa": 2.75,
+    }
+    prefix = str(tmp_path / "sim_true_model")
+    _ = main_simulate.write_true_asr_bundle(g=g, anc_fasta=str(anc), prefix=prefix)
+    iqtree_text = (tmp_path / "sim_true_model.iqtree").read_text(encoding="utf-8")
+    assert "Model of substitution: GY+F3X4+R4" in iqtree_text
+    log_text = (tmp_path / "sim_true_model.log").read_text(encoding="utf-8")
+    assert "Transition/transversion ratio (kappa): 2.750000" in log_text
+
+
+def test_write_true_asr_bundle_rejects_invalid_kappa(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    anc = tmp_path / "anc.fa"
+    anc.write_text(">R\nAAA\n", encoding="utf-8")
+    g = {
+        "tree": tr,
+        "eq_freq": np.full(shape=(61,), fill_value=(1 / 61), dtype=float),
+        "iqtree_model": "ECMK07+F+R4",
+        "genetic_code": 1,
+        "background_omega": 0.2,
+        "kappa": -0.1,
+    }
+    with pytest.raises(ValueError, match="kappa should be >= 0"):
+        main_simulate.write_true_asr_bundle(g=g, anc_fasta=str(anc), prefix=str(tmp_path / "sim_true_kappa_bad"))
+
+
+def test_write_true_asr_bundle_uses_simulated_site_rates(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    anc = tmp_path / "anc.fa"
+    anc.write_text(">R\nAAAAACAAG\n", encoding="utf-8")  # 3 codon sites
+    g = {
+        "tree": tr,
+        "eq_freq": np.full(shape=(61,), fill_value=(1 / 61), dtype=float),
+        "iqtree_model": "ECMK07+F+R4",
+        "genetic_code": 1,
+        "background_omega": 0.2,
+        "simulate_site_rates": np.array([0.5, 2.0, 3.25], dtype=float),
+    }
+    prefix = str(tmp_path / "sim_true_rates")
+    _ = main_simulate.write_true_asr_bundle(g=g, anc_fasta=str(anc), prefix=prefix)
+    rate_lines = (tmp_path / "sim_true_rates.rate").read_text(encoding="utf-8").splitlines()
+    assert rate_lines[0] == "Site\tC_Rate"
+    assert rate_lines[1] == "1\t0.500000"
+    assert rate_lines[2] == "2\t2.000000"
+    assert rate_lines[3] == "3\t3.250000"
+
+
+def test_write_true_asr_bundle_rejects_mismatched_site_rate_length(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    anc = tmp_path / "anc.fa"
+    anc.write_text(">R\nAAAAACAAG\n", encoding="utf-8")  # 3 codon sites
+    g = {
+        "tree": tr,
+        "eq_freq": np.full(shape=(61,), fill_value=(1 / 61), dtype=float),
+        "iqtree_model": "ECMK07+F+R4",
+        "genetic_code": 1,
+        "background_omega": 0.2,
+        "simulate_site_rates": np.array([0.5, 2.0], dtype=float),
+    }
+    with pytest.raises(ValueError, match="simulate_site_rates length"):
+        main_simulate.write_true_asr_bundle(g=g, anc_fasta=str(anc), prefix=str(tmp_path / "sim_true_bad_rate"))
 
 
 def test_plot_branch_category_writes_pdf_with_matplotlib_backend(tmp_path):
