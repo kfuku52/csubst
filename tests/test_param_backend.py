@@ -247,18 +247,14 @@ def test_get_global_parameters_sets_omega_pvalue_defaults():
     g = param.get_global_parameters(_args())
     assert g["calc_omega_pvalue"] is False
     assert g["omega_pvalue_null_model"] == "hypergeom"
-    assert g["omega_pvalue_niter"] == 1000
     assert g["omega_pvalue_niter_schedule"] is None
-    assert g["omega_pvalue_refine_threshold"] == pytest.approx(0.05)
-    assert g["omega_pvalue_refine_ci_alpha"] == pytest.approx(0.01)
+    assert g["omega_pvalue_refine_upper_edge_bins"] == 2
     assert g["omega_pvalue_rounding"] == "stochastic"
 
 
-def test_get_global_parameters_rejects_invalid_omega_pvalue_niter():
-    with pytest.raises(ValueError, match="omega_pvalue_niter"):
-        param.get_global_parameters(_args(omega_pvalue_niter=0))
-    with pytest.raises(ValueError, match="omega_pvalue_niter"):
-        param.get_global_parameters(_args(omega_pvalue_niter=100000))
+def test_get_global_parameters_rejects_removed_omega_pvalue_niter():
+    with pytest.raises(ValueError, match="omega_pvalue_niter was removed"):
+        param.get_global_parameters(_args(omega_pvalue_niter=1000))
 
 
 def test_get_global_parameters_parses_omega_pvalue_niter_schedule_auto_alias():
@@ -267,7 +263,7 @@ def test_get_global_parameters_parses_omega_pvalue_niter_schedule_auto_alias():
 
 
 def test_get_global_parameters_parses_custom_omega_pvalue_niter_schedule():
-    g = param.get_global_parameters(_args(omega_pvalue_niter=5000, omega_pvalue_niter_schedule="200,2000"))
+    g = param.get_global_parameters(_args(omega_pvalue_niter_schedule="200,2000"))
     assert g["omega_pvalue_niter_schedule"] == [200, 2000]
 
 
@@ -277,26 +273,27 @@ def test_get_global_parameters_rejects_invalid_omega_pvalue_niter_schedule():
     with pytest.raises(ValueError, match="omega_pvalue_niter_schedule"):
         param.get_global_parameters(_args(omega_pvalue_niter_schedule="1000,100"))
     with pytest.raises(ValueError, match="omega_pvalue_niter_schedule"):
-        param.get_global_parameters(_args(omega_pvalue_niter=500, omega_pvalue_niter_schedule="200,1000"))
+        param.get_global_parameters(_args(omega_pvalue_niter_schedule="200,20000"))
 
 
-def test_get_global_parameters_accepts_omega_pvalue_refine_params():
-    g = param.get_global_parameters(
-        _args(omega_pvalue_refine_threshold=0.1, omega_pvalue_refine_ci_alpha=0.2)
-    )
-    assert g["omega_pvalue_refine_threshold"] == pytest.approx(0.1)
-    assert g["omega_pvalue_refine_ci_alpha"] == pytest.approx(0.2)
+def test_get_global_parameters_accepts_omega_pvalue_refine_upper_edge_bins():
+    g = param.get_global_parameters(_args(omega_pvalue_refine_upper_edge_bins=5))
+    assert g["omega_pvalue_refine_upper_edge_bins"] == 5
 
 
-def test_get_global_parameters_rejects_invalid_omega_pvalue_refine_params():
-    with pytest.raises(ValueError, match="omega_pvalue_refine_threshold"):
-        param.get_global_parameters(_args(omega_pvalue_refine_threshold=0))
-    with pytest.raises(ValueError, match="omega_pvalue_refine_threshold"):
-        param.get_global_parameters(_args(omega_pvalue_refine_threshold=1))
-    with pytest.raises(ValueError, match="omega_pvalue_refine_ci_alpha"):
-        param.get_global_parameters(_args(omega_pvalue_refine_ci_alpha=0))
-    with pytest.raises(ValueError, match="omega_pvalue_refine_ci_alpha"):
-        param.get_global_parameters(_args(omega_pvalue_refine_ci_alpha=1))
+def test_get_global_parameters_rejects_invalid_omega_pvalue_refine_upper_edge_bins():
+    with pytest.raises(ValueError, match="omega_pvalue_refine_upper_edge_bins"):
+        param.get_global_parameters(_args(omega_pvalue_refine_upper_edge_bins=-1))
+
+
+def test_get_global_parameters_rejects_removed_omega_pvalue_refine_threshold():
+    with pytest.raises(ValueError, match="omega_pvalue_refine_threshold was removed"):
+        param.get_global_parameters(_args(omega_pvalue_refine_threshold=0.1))
+
+
+def test_get_global_parameters_rejects_removed_omega_pvalue_refine_ci_alpha():
+    with pytest.raises(ValueError, match="omega_pvalue_refine_ci_alpha was removed"):
+        param.get_global_parameters(_args(omega_pvalue_refine_ci_alpha=0.1))
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_rounding():

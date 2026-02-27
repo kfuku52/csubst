@@ -38,8 +38,9 @@ _EPI_AUTO_CLIP_QUANTILE = 0.995
 _EPI_AUTO_CLIP_MIN = 1.5
 _EPI_AUTO_CLIP_MAX = 5.0
 _EPI_CV_FOLDS = 5
-_OMEGA_PVALUE_REFINE_P_THRESHOLD = 0.05
-_OMEGA_PVALUE_REFINE_CI_ALPHA = 0.01
+_OMEGA_PVALUE_REFINE_UPPER_EDGE_BINS = 2
+_OMEGA_PVALUE_AUTO_NITER_SCHEDULE = (100, 1000)
+_OMEGA_PVALUE_MAX_NITER = 10000
 
 
 def _get_cb_ids(cb):
@@ -2530,10 +2531,7 @@ def _resolve_omega_pvalue_null_model(g):
     return model
 
 
-def _resolve_omega_pvalue_niter_schedule(g, omega_pvalue_niter):
-    niter = int(omega_pvalue_niter)
-    if niter <= 0:
-        raise ValueError('omega_pvalue_niter should be a positive integer.')
+def _resolve_omega_pvalue_niter_schedule(g):
     schedule = None
     if g is not None:
         schedule = g.get('omega_pvalue_niter_schedule', None)
@@ -2554,44 +2552,21 @@ def _resolve_omega_pvalue_niter_schedule(g, omega_pvalue_niter):
         for prev, curr in zip(schedule, schedule[1:]):
             if curr <= prev:
                 raise ValueError('omega_pvalue_niter_schedule should be strictly increasing.')
-        if schedule[-1] > niter:
-            txt = 'omega_pvalue_niter_schedule should not exceed omega_pvalue_niter ({:,}).'
-            raise ValueError(txt.format(niter))
-        if schedule[-1] < niter:
-            schedule.append(niter)
+        if schedule[-1] > int(_OMEGA_PVALUE_MAX_NITER):
+            txt = 'omega_pvalue_niter_schedule upper bound should be <= {}.'
+            raise ValueError(txt.format(int(_OMEGA_PVALUE_MAX_NITER)))
         return schedule
-    auto_schedule = list()
-    for stage_niter in [100, 1000, niter]:
-        stage_niter = int(stage_niter)
-        if stage_niter <= 0:
-            continue
-        if stage_niter > niter:
-            continue
-        if (len(auto_schedule) == 0) or (stage_niter > auto_schedule[-1]):
-            auto_schedule.append(stage_niter)
-    if len(auto_schedule) == 0:
-        auto_schedule = [niter]
-    elif auto_schedule[-1] < niter:
-        auto_schedule.append(niter)
+    auto_schedule = [int(v) for v in _OMEGA_PVALUE_AUTO_NITER_SCHEDULE]
     return auto_schedule
 
 
-def _resolve_omega_pvalue_refine_threshold(g):
-    threshold = _OMEGA_PVALUE_REFINE_P_THRESHOLD
+def _resolve_omega_pvalue_refine_upper_edge_bins(g):
+    edge_bins = int(_OMEGA_PVALUE_REFINE_UPPER_EDGE_BINS)
     if g is not None:
-        threshold = float(g.get('omega_pvalue_refine_threshold', threshold))
-    if (not np.isfinite(threshold)) or (threshold <= 0) or (threshold >= 1):
-        raise ValueError('omega_pvalue_refine_threshold should be a finite value in (0, 1).')
-    return float(threshold)
-
-
-def _resolve_omega_pvalue_refine_ci_alpha(g):
-    ci_alpha = _OMEGA_PVALUE_REFINE_CI_ALPHA
-    if g is not None:
-        ci_alpha = float(g.get('omega_pvalue_refine_ci_alpha', ci_alpha))
-    if (not np.isfinite(ci_alpha)) or (ci_alpha <= 0) or (ci_alpha >= 1):
-        raise ValueError('omega_pvalue_refine_ci_alpha should be a finite value in (0, 1).')
-    return float(ci_alpha)
+        edge_bins = int(g.get('omega_pvalue_refine_upper_edge_bins', edge_bins))
+    if edge_bins < 0:
+        raise ValueError('omega_pvalue_refine_upper_edge_bins should be >= 0.')
+    return edge_bins
 
 
 def _calc_poisson_count_matrix(
@@ -3067,46 +3042,12 @@ def _calc_omega_empirical_upper_tail_counts(
     )
 
 
-def _calc_binomial_clopper_pearson_interval(successes, trials, alpha):
-    successes = np.asarray(successes, dtype=np.int64).reshape(-1)
-    trials = np.asarray(trials, dtype=np.int64).reshape(-1)
-    alpha = float(alpha)
-    if successes.shape[0] != trials.shape[0]:
-        txt = 'successes rows ({}) and trials rows ({}) should match.'
-        raise ValueError(txt.format(successes.shape[0], trials.shape[0]))
-    if (successes < 0).any():
-        raise ValueError('successes should be >= 0.')
-    if (trials < 0).any():
-        raise ValueError('trials should be >= 0.')
-    if (successes > trials).any():
-        raise ValueError('successes should be <= trials.')
-    if (not np.isfinite(alpha)) or (alpha <= 0) or (alpha >= 1):
-        raise ValueError('alpha should be in (0, 1).')
-    lower = np.full(shape=successes.shape, fill_value=np.nan, dtype=np.float64)
-    upper = np.full(shape=successes.shape, fill_value=np.nan, dtype=np.float64)
-    valid = (trials > 0)
-    if not valid.any():
-        return lower, upper
-    k = successes[valid].astype(np.float64)
-    n = trials[valid].astype(np.float64)
-    lower_valid = np.zeros(shape=k.shape, dtype=np.float64)
-    upper_valid = np.ones(shape=k.shape, dtype=np.float64)
-    mask_lower = (k > 0)
-    if mask_lower.any():
-        lower_valid[mask_lower] = stats.beta.ppf(alpha / 2.0, k[mask_lower], n[mask_lower] - k[mask_lower] + 1.0)
-    mask_upper = (k < n)
-    if mask_upper.any():
-        upper_valid[mask_upper] = stats.beta.ppf(1.0 - (alpha / 2.0), k[mask_upper] + 1.0, n[mask_upper] - k[mask_upper])
-    lower[valid] = lower_valid
-    upper[valid] = upper_valid
-    return lower, upper
-
-
-def _needs_omega_pvalue_refinement(obs_omega, exp_S, ge_ranks, valid_niter, p_threshold, ci_alpha):
+def _needs_omega_pvalue_upper_tail_edge_refinement(obs_omega, exp_S, ge_ranks, valid_niter, edge_bins):
     obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
     exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
     ge_ranks = np.asarray(ge_ranks, dtype=np.int64).reshape(-1)
     valid_niter = np.asarray(valid_niter, dtype=np.int64).reshape(-1)
+    edge_bins = int(edge_bins)
     if obs_omega.shape[0] != exp_S.shape[0]:
         txt = 'obs_omega rows ({}) and exp_S rows ({}) should match.'
         raise ValueError(txt.format(obs_omega.shape[0], exp_S.shape[0]))
@@ -3116,19 +3057,21 @@ def _needs_omega_pvalue_refinement(obs_omega, exp_S, ge_ranks, valid_niter, p_th
     if valid_niter.shape[0] != obs_omega.shape[0]:
         txt = 'valid_niter rows ({}) and obs_omega rows ({}) should match.'
         raise ValueError(txt.format(valid_niter.shape[0], obs_omega.shape[0]))
-    lower, upper = _calc_binomial_clopper_pearson_interval(
-        successes=ge_ranks,
-        trials=valid_niter,
-        alpha=ci_alpha,
-    )
+    if (ge_ranks < 0).any():
+        raise ValueError('ge_ranks should be >= 0.')
+    if (valid_niter < 0).any():
+        raise ValueError('valid_niter should be >= 0.')
+    if (ge_ranks > valid_niter).any():
+        raise ValueError('ge_ranks should be <= valid_niter.')
+    if edge_bins < 0:
+        raise ValueError('edge_bins should be >= 0.')
     refine = np.zeros(shape=obs_omega.shape, dtype=bool)
     valid_rows = np.isfinite(obs_omega) & np.isfinite(exp_S)
     refine[valid_rows] = (valid_niter[valid_rows] <= 0)
+    if edge_bins <= 0:
+        return refine
     overlap_rows = valid_rows & (valid_niter > 0)
-    refine[overlap_rows] = (
-        (lower[overlap_rows] <= float(p_threshold)) &
-        (upper[overlap_rows] >= float(p_threshold))
-    )
+    refine[overlap_rows] = (ge_ranks[overlap_rows] <= edge_bins)
     return refine
 
 
@@ -3201,21 +3144,13 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
     if str(g.get('omegaC_method', '')).strip().lower() != 'modelfree':
         sys.stderr.write('Skipping --calc_omega_pvalue because --omegaC_method is not "modelfree".\n')
         return cb
-    niter = int(g.get('omega_pvalue_niter', 1000))
-    if niter <= 0:
-        raise ValueError('omega_pvalue_niter should be a positive integer.')
     null_model = _resolve_omega_pvalue_null_model(g=g)
     txt = 'omega_C empirical p-value null model: {}'
     print(txt.format(null_model), flush=True)
-    pvalue_schedule = None
-    pvalue_refine_threshold = None
-    pvalue_refine_ci_alpha = None
-    if null_model == 'hypergeom':
-        pvalue_schedule = _resolve_omega_pvalue_niter_schedule(g=g, omega_pvalue_niter=niter)
-        pvalue_refine_threshold = _resolve_omega_pvalue_refine_threshold(g=g)
-        pvalue_refine_ci_alpha = _resolve_omega_pvalue_refine_ci_alpha(g=g)
-        txt = 'omega_C empirical p-value staged schedule (hypergeom): {}'
-        print(txt.format(','.join([str(int(v)) for v in pvalue_schedule])), flush=True)
+    pvalue_schedule = _resolve_omega_pvalue_niter_schedule(g=g)
+    pvalue_refine_upper_edge_bins = _resolve_omega_pvalue_refine_upper_edge_bins(g=g)
+    txt = 'omega_C empirical p-value staged schedule ({}): {}'
+    print(txt.format(null_model, ','.join([str(int(v)) for v in pvalue_schedule])), flush=True)
     cb_ids = _get_cb_ids(cb)
     output_stats = _resolve_requested_output_stats(g)
     for sub in output_stats:
@@ -3232,131 +3167,58 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
         obs_omega_values = cb.loc[:, col_omega].to_numpy(dtype=np.float64, copy=False)
         exp_N_values = cb.loc[:, col_exp_N].to_numpy(dtype=np.float64, copy=False)
         exp_S_values = cb.loc[:, col_exp_S].to_numpy(dtype=np.float64, copy=False)
-        if null_model == 'hypergeom':
-            ge_ranks = np.zeros(shape=(cb.shape[0],), dtype=np.int64)
-            valid_niter = np.zeros(shape=(cb.shape[0],), dtype=np.int64)
-            active_rows = np.arange(cb.shape[0], dtype=np.int64)
-            prev_total_niter = 0
-            for stage_index, stage_niter in enumerate(pvalue_schedule):
-                stage_niter = int(stage_niter)
-                incremental_niter = stage_niter - prev_total_niter
-                if incremental_niter <= 0:
-                    txt = 'omega_pvalue_niter_schedule should be strictly increasing; got {} after {}.'
-                    raise ValueError(txt.format(stage_niter, prev_total_niter))
-                txt = 'pomegaC {} stage {}/{}: cumulative_niter={:,}, incremental_niter={:,}, rows={:,}'
-                print(
-                    txt.format(
-                        sub,
-                        stage_index + 1,
-                        len(pvalue_schedule),
-                        stage_niter,
-                        incremental_niter,
-                        active_rows.shape[0],
-                    ),
-                    flush=True,
-                )
-                if active_rows.shape[0] == 0:
-                    break
-                mode_to_count_N = dict()
-                mode_to_count_S = dict()
-                active_cb_ids = cb_ids[active_rows, :]
-                for mode in required_modes:
-                    mode_to_count_N[mode] = _get_mode_permutation_count_matrix(
-                        cb_ids=active_cb_ids,
-                        sub_tensor=ON_tensor,
-                        mode=mode,
-                        SN='N',
-                        niter=incremental_niter,
-                        g=g,
-                    )
-                    mode_to_count_S[mode] = _get_mode_permutation_count_matrix(
-                        cb_ids=active_cb_ids,
-                        sub_tensor=OS_tensor,
-                        mode=mode,
-                        SN='S',
-                        niter=incremental_niter,
-                        g=g,
-                    )
-                perm_count_N = _compose_permutation_count_matrix(
-                    stat=sub,
-                    mode_to_count=mode_to_count_N,
-                    tol=g['float_tol'],
-                )
-                perm_count_S = _compose_permutation_count_matrix(
-                    stat=sub,
-                    mode_to_count=mode_to_count_S,
-                    tol=g['float_tol'],
-                )
-                ge_increment, valid_increment = _calc_omega_empirical_upper_tail_counts(
-                    obs_omega=obs_omega_values[active_rows],
-                    exp_N=exp_N_values[active_rows],
-                    exp_S=exp_S_values[active_rows],
-                    perm_count_N=perm_count_N,
-                    perm_count_S=perm_count_S,
-                    float_tol=g['float_tol'],
-                    calibrate_dsc_transformation=calibrate_dsc_transformation,
-                )
-                ge_ranks[active_rows] += ge_increment
-                valid_niter[active_rows] += valid_increment
-                is_last_stage = (stage_index == (len(pvalue_schedule) - 1))
-                if is_last_stage:
-                    break
-                refine_mask = _needs_omega_pvalue_refinement(
-                    obs_omega=obs_omega_values[active_rows],
-                    exp_S=exp_S_values[active_rows],
-                    ge_ranks=ge_ranks[active_rows],
-                    valid_niter=valid_niter[active_rows],
-                    p_threshold=pvalue_refine_threshold,
-                    ci_alpha=pvalue_refine_ci_alpha,
-                )
-                next_rows = active_rows[refine_mask]
-                txt = 'pomegaC {} refinement after stage {}: rows {} -> {} (p_threshold={:.3g}, ci_alpha={:.3g})'
-                print(
-                    txt.format(
-                        sub,
-                        stage_index + 1,
-                        active_rows.shape[0],
-                        next_rows.shape[0],
-                        float(pvalue_refine_threshold),
-                        float(pvalue_refine_ci_alpha),
-                    ),
-                    flush=True,
-                )
-                active_rows = next_rows
-                prev_total_niter = stage_niter
-            pvalue = _calc_omega_empirical_upper_tail_pvalues_from_counts(
-                obs_omega=obs_omega_values,
-                exp_S=exp_S_values,
-                ge_ranks=ge_ranks,
-                valid_niter=valid_niter,
+        ge_ranks = np.zeros(shape=(cb.shape[0],), dtype=np.int64)
+        valid_niter = np.zeros(shape=(cb.shape[0],), dtype=np.int64)
+        active_rows = np.arange(cb.shape[0], dtype=np.int64)
+        prev_total_niter = 0
+        for stage_index, stage_niter in enumerate(pvalue_schedule):
+            stage_niter = int(stage_niter)
+            incremental_niter = stage_niter - prev_total_niter
+            if incremental_niter <= 0:
+                txt = 'omega_pvalue_niter_schedule should be strictly increasing; got {} after {}.'
+                raise ValueError(txt.format(stage_niter, prev_total_niter))
+            txt = 'pomegaC {} stage {}/{}: cumulative_niter={:,}, incremental_niter={:,}, rows={:,}'
+            print(
+                txt.format(
+                    sub,
+                    stage_index + 1,
+                    len(pvalue_schedule),
+                    stage_niter,
+                    incremental_niter,
+                    active_rows.shape[0],
+                ),
+                flush=True,
             )
-        else:
+            if active_rows.shape[0] == 0:
+                break
             mode_to_count_N = dict()
             mode_to_count_S = dict()
+            active_cb_ids = cb_ids[active_rows, :]
             for mode in required_modes:
-                obs_col_N = 'OCN' + mode
-                obs_col_S = 'OCS' + mode
                 obs_count_N = None
                 obs_count_S = None
-                if obs_col_N in cb.columns:
-                    obs_count_N = cb.loc[:, obs_col_N].to_numpy(dtype=np.float64, copy=False)
-                if obs_col_S in cb.columns:
-                    obs_count_S = cb.loc[:, obs_col_S].to_numpy(dtype=np.float64, copy=False)
+                if null_model == 'nbinom':
+                    obs_col_N = 'OCN' + mode
+                    obs_col_S = 'OCS' + mode
+                    if obs_col_N in cb.columns:
+                        obs_count_N = cb.loc[:, obs_col_N].to_numpy(dtype=np.float64, copy=False)[active_rows]
+                    if obs_col_S in cb.columns:
+                        obs_count_S = cb.loc[:, obs_col_S].to_numpy(dtype=np.float64, copy=False)[active_rows]
                 mode_to_count_N[mode] = _get_mode_permutation_count_matrix(
-                    cb_ids=cb_ids,
+                    cb_ids=active_cb_ids,
                     sub_tensor=ON_tensor,
                     mode=mode,
                     SN='N',
-                    niter=niter,
+                    niter=incremental_niter,
                     g=g,
                     obs_count=obs_count_N,
                 )
                 mode_to_count_S[mode] = _get_mode_permutation_count_matrix(
-                    cb_ids=cb_ids,
+                    cb_ids=active_cb_ids,
                     sub_tensor=OS_tensor,
                     mode=mode,
                     SN='S',
-                    niter=niter,
+                    niter=incremental_niter,
                     g=g,
                     obs_count=obs_count_S,
                 )
@@ -3370,15 +3232,47 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
                 mode_to_count=mode_to_count_S,
                 tol=g['float_tol'],
             )
-            pvalue = _calc_omega_empirical_upper_tail_pvalues(
-                obs_omega=obs_omega_values,
-                exp_N=exp_N_values,
-                exp_S=exp_S_values,
+            ge_increment, valid_increment = _calc_omega_empirical_upper_tail_counts(
+                obs_omega=obs_omega_values[active_rows],
+                exp_N=exp_N_values[active_rows],
+                exp_S=exp_S_values[active_rows],
                 perm_count_N=perm_count_N,
                 perm_count_S=perm_count_S,
                 float_tol=g['float_tol'],
                 calibrate_dsc_transformation=calibrate_dsc_transformation,
             )
+            ge_ranks[active_rows] += ge_increment
+            valid_niter[active_rows] += valid_increment
+            is_last_stage = (stage_index == (len(pvalue_schedule) - 1))
+            if is_last_stage:
+                break
+            refine_mask = _needs_omega_pvalue_upper_tail_edge_refinement(
+                obs_omega=obs_omega_values[active_rows],
+                exp_S=exp_S_values[active_rows],
+                ge_ranks=ge_ranks[active_rows],
+                valid_niter=valid_niter[active_rows],
+                edge_bins=pvalue_refine_upper_edge_bins,
+            )
+            next_rows = active_rows[refine_mask]
+            txt = 'pomegaC {} refinement after stage {}: rows {} -> {} (upper_edge_bins={})'
+            print(
+                txt.format(
+                    sub,
+                    stage_index + 1,
+                    active_rows.shape[0],
+                    next_rows.shape[0],
+                    int(pvalue_refine_upper_edge_bins),
+                ),
+                flush=True,
+            )
+            active_rows = next_rows
+            prev_total_niter = stage_niter
+        pvalue = _calc_omega_empirical_upper_tail_pvalues_from_counts(
+            obs_omega=obs_omega_values,
+            exp_S=exp_S_values,
+            ge_ranks=ge_ranks,
+            valid_niter=valid_niter,
+        )
         col_p = 'pomegaC' + sub
         cb.loc[:, col_p] = pvalue
         col_q = 'qomegaC' + sub

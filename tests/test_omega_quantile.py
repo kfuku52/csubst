@@ -372,40 +372,30 @@ def test_resolve_hypergeom_parallel_plan_keeps_parallel_for_large_workload():
     assert chunk_factor == 4
 
 
-def test_resolve_omega_pvalue_niter_schedule_auto_includes_target():
-    schedule = omega._resolve_omega_pvalue_niter_schedule(
-        g={},
-        omega_pvalue_niter=5000,
-    )
-    assert schedule == [100, 1000, 5000]
-
-
-def test_resolve_omega_pvalue_niter_schedule_accepts_auto_string():
-    schedule = omega._resolve_omega_pvalue_niter_schedule(
-        g={"omega_pvalue_niter_schedule": "auto"},
-        omega_pvalue_niter=1000,
-    )
+def test_resolve_omega_pvalue_niter_schedule_auto_defaults():
+    schedule = omega._resolve_omega_pvalue_niter_schedule(g={})
     assert schedule == [100, 1000]
 
 
-def test_resolve_omega_pvalue_niter_schedule_appends_target_when_needed():
-    schedule = omega._resolve_omega_pvalue_niter_schedule(
-        g={"omega_pvalue_niter_schedule": [200, 600]},
-        omega_pvalue_niter=1000,
-    )
-    assert schedule == [200, 600, 1000]
+def test_resolve_omega_pvalue_niter_schedule_accepts_auto_string():
+    schedule = omega._resolve_omega_pvalue_niter_schedule(g={"omega_pvalue_niter_schedule": "auto"})
+    assert schedule == [100, 1000]
 
 
-def test_needs_omega_pvalue_refinement_uses_ci_overlap():
-    refine = omega._needs_omega_pvalue_refinement(
-        obs_omega=np.array([1.0, 1.0, 1.0], dtype=np.float64),
-        exp_S=np.array([1.0, 1.0, 1.0], dtype=np.float64),
-        ge_ranks=np.array([0, 5, 20], dtype=np.int64),
-        valid_niter=np.array([100, 100, 100], dtype=np.int64),
-        p_threshold=0.05,
-        ci_alpha=0.05,
+def test_resolve_omega_pvalue_niter_schedule_uses_custom_schedule():
+    schedule = omega._resolve_omega_pvalue_niter_schedule(g={"omega_pvalue_niter_schedule": [200, 600]})
+    assert schedule == [200, 600]
+
+
+def test_needs_omega_pvalue_upper_tail_edge_refinement():
+    refine = omega._needs_omega_pvalue_upper_tail_edge_refinement(
+        obs_omega=np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float64),
+        exp_S=np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float64),
+        ge_ranks=np.array([0, 2, 3, 0], dtype=np.int64),
+        valid_niter=np.array([100, 100, 100, 0], dtype=np.int64),
+        edge_bins=2,
     )
-    np.testing.assert_array_equal(refine, np.array([False, True, False], dtype=bool))
+    np.testing.assert_array_equal(refine, np.array([True, True, False, True], dtype=bool))
 
 
 def test_calc_e_stat_rejects_quantile_stat():
@@ -890,7 +880,7 @@ def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
         g={
             "calc_omega_pvalue": True,
             "omegaC_method": "modelfree",
-            "omega_pvalue_niter": 3,
+            "omega_pvalue_niter_schedule": [3],
             "output_stats": ["any2dif"],
             "float_tol": 1e-12,
         },
@@ -905,7 +895,7 @@ def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
     np.testing.assert_allclose(out.loc[:, "qomegaCany2dif"].to_numpy(dtype=np.float64), np.array([1.0, 1.0]))
 
 
-def test_add_omega_empirical_pvalues_hypergeom_refines_only_ambiguous_rows(monkeypatch):
+def test_add_omega_empirical_pvalues_hypergeom_refines_only_upper_edge_rows(monkeypatch):
     cb = pd.DataFrame(
         {
             "branch_id_1": [0, 1, 2],
@@ -942,9 +932,8 @@ def test_add_omega_empirical_pvalues_hypergeom_refines_only_ambiguous_rows(monke
             "calc_omega_pvalue": True,
             "omegaC_method": "modelfree",
             "omega_pvalue_null_model": "hypergeom",
-            "omega_pvalue_niter": 1000,
             "omega_pvalue_niter_schedule": [100, 1000],
-            "omega_pvalue_refine_ci_alpha": 0.05,
+            "omega_pvalue_refine_upper_edge_bins": 2,
             "output_stats": ["any2spe"],
             "float_tol": 1e-12,
         },
@@ -957,11 +946,11 @@ def test_add_omega_empirical_pvalues_hypergeom_refines_only_ambiguous_rows(monke
     ]
     np.testing.assert_allclose(
         out.loc[:, "pomegaCany2spe"].to_numpy(dtype=np.float64),
-        np.array([(0.0 + 1.0) / (100.0 + 1.0), 1.0, (5.0 + 1.0) / (1000.0 + 1.0)], dtype=np.float64),
+        np.array([(0.0 + 1.0) / (1000.0 + 1.0), 1.0, (5.0 + 1.0) / (100.0 + 1.0)], dtype=np.float64),
         rtol=0.0,
         atol=1e-12,
     )
-    assert float(out.loc[2, "pomegaCany2spe"]) < float(out.loc[0, "pomegaCany2spe"])
+    assert float(out.loc[0, "pomegaCany2spe"]) < float(out.loc[2, "pomegaCany2spe"])
 
 
 def test_add_omega_empirical_pvalues_uses_dsc_calibrated_null_when_columns_present(monkeypatch):
@@ -993,7 +982,7 @@ def test_add_omega_empirical_pvalues_uses_dsc_calibrated_null_when_columns_prese
         g={
             "calc_omega_pvalue": True,
             "omegaC_method": "modelfree",
-            "omega_pvalue_niter": 3,
+            "omega_pvalue_niter_schedule": [3],
             "output_stats": ["any2spe"],
             "float_tol": 1e-12,
             "calibrate_longtail_transformation": "quantile",

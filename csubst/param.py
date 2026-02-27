@@ -247,40 +247,30 @@ def get_global_parameters(args):
     if g['min_sub_pp'] > 1:
         raise ValueError('--min_sub_pp should be <= 1.')
     if 'omega_pvalue_niter' in g.keys():
-        g['omega_pvalue_niter'] = int(g['omega_pvalue_niter'])
-    else:
-        g['omega_pvalue_niter'] = 1000
-    if g['omega_pvalue_niter'] <= 0:
-        raise ValueError('--omega_pvalue_niter should be a positive integer.')
-    if g['omega_pvalue_niter'] > int(MAX_QUANTILE_NITER):
-        txt = '--omega_pvalue_niter upper bound should be <= {}.'
-        raise ValueError(txt.format(int(MAX_QUANTILE_NITER)))
+        raise ValueError(
+            '--omega_pvalue_niter was removed. '
+            'Use --omega_pvalue_niter_schedule.'
+        )
     if 'omega_pvalue_niter_schedule' in g.keys():
         g['omega_pvalue_niter_schedule'] = _parse_omega_pvalue_niter_schedule(g['omega_pvalue_niter_schedule'])
     else:
         g['omega_pvalue_niter_schedule'] = None
-    if g['omega_pvalue_niter_schedule'] is not None:
-        if max(g['omega_pvalue_niter_schedule']) > g['omega_pvalue_niter']:
-            txt = '--omega_pvalue_niter_schedule should not exceed --omega_pvalue_niter ({:,}).'
-            raise ValueError(txt.format(int(g['omega_pvalue_niter'])))
     if 'omega_pvalue_refine_threshold' in g.keys():
-        g['omega_pvalue_refine_threshold'] = _require_finite_float(
-            value=float(g['omega_pvalue_refine_threshold']),
-            param_name='--omega_pvalue_refine_threshold',
+        raise ValueError(
+            '--omega_pvalue_refine_threshold was removed. '
+            'Use --omega_pvalue_refine_upper_edge_bins.'
         )
-    else:
-        g['omega_pvalue_refine_threshold'] = 0.05
-    if (g['omega_pvalue_refine_threshold'] <= 0) or (g['omega_pvalue_refine_threshold'] >= 1):
-        raise ValueError('--omega_pvalue_refine_threshold should be in (0, 1).')
     if 'omega_pvalue_refine_ci_alpha' in g.keys():
-        g['omega_pvalue_refine_ci_alpha'] = _require_finite_float(
-            value=float(g['omega_pvalue_refine_ci_alpha']),
-            param_name='--omega_pvalue_refine_ci_alpha',
+        raise ValueError(
+            '--omega_pvalue_refine_ci_alpha was removed. '
+            'Use --omega_pvalue_refine_upper_edge_bins.'
         )
+    if 'omega_pvalue_refine_upper_edge_bins' in g.keys():
+        g['omega_pvalue_refine_upper_edge_bins'] = int(g['omega_pvalue_refine_upper_edge_bins'])
     else:
-        g['omega_pvalue_refine_ci_alpha'] = 0.01
-    if (g['omega_pvalue_refine_ci_alpha'] <= 0) or (g['omega_pvalue_refine_ci_alpha'] >= 1):
-        raise ValueError('--omega_pvalue_refine_ci_alpha should be in (0, 1).')
+        g['omega_pvalue_refine_upper_edge_bins'] = 2
+    if g['omega_pvalue_refine_upper_edge_bins'] < 0:
+        raise ValueError('--omega_pvalue_refine_upper_edge_bins should be >= 0.')
     if 'omega_pvalue_rounding' in g.keys():
         g['omega_pvalue_rounding'] = str(g['omega_pvalue_rounding']).strip().lower()
     else:
