@@ -191,16 +191,6 @@ def test_get_global_parameters_rejects_incompatible_custom_cutoff_stat():
         )
 
 
-def test_get_global_parameters_rejects_incompatible_qc_cutoff_stat():
-    with pytest.raises(ValueError, match='requires --output_stat to include "any2spe"'):
-        param.get_global_parameters(
-            _args(
-                output_stat="any2any",
-                cutoff_stat="QCNany2spe,0.95|omegaCany2any,5.0",
-            )
-        )
-
-
 def test_get_global_parameters_rejects_incompatible_regex_cutoff_stat():
     with pytest.raises(ValueError, match='requires --output_stat to include "any2spe,dif2spe"'):
         param.get_global_parameters(
@@ -246,11 +236,6 @@ def test_get_global_parameters_requires_foreground_for_exhaustive_until_one():
 def test_get_global_parameters_requires_foreground_for_clade_permutation():
     with pytest.raises(ValueError, match="fg_clade_permutation"):
         param.get_global_parameters(_args(fg_clade_permutation=1, foreground=None))
-
-
-def test_get_global_parameters_rejects_calc_quantile_without_modelfree():
-    with pytest.raises(ValueError, match='--omegaC_method "modelfree"'):
-        param.get_global_parameters(_args(calc_quantile=True, omegaC_method="submodel"))
 
 
 def test_get_global_parameters_rejects_calc_omega_pvalue_without_modelfree():
@@ -557,36 +542,6 @@ def test_get_global_parameters_rejects_invalid_pseudocount_options(kwargs, expec
 def test_get_global_parameters_rejects_removed_pseudocount_strength_option():
     with pytest.raises(ValueError, match="pseudocount_strength"):
         param.get_global_parameters(_args(pseudocount_strength=2.0))
-
-
-def test_get_global_parameters_sets_quantile_refine_defaults():
-    g = param.get_global_parameters(_args())
-    assert g["quantile_refine_edge_bins"] == 2
-    assert g["quantile_niter_schedule"] == [100, 1000, 10000]
-
-
-def test_get_global_parameters_parses_quantile_schedule_auto_alias():
-    g = param.get_global_parameters(_args(quantile_niter_schedule="auto"))
-    assert g["quantile_niter_schedule"] == [100, 1000, 10000]
-
-
-def test_get_global_parameters_parses_custom_quantile_schedule():
-    g = param.get_global_parameters(_args(quantile_niter_schedule="200,2000,10000"))
-    assert g["quantile_niter_schedule"] == [200, 2000, 10000]
-
-
-def test_get_global_parameters_rejects_invalid_quantile_schedule():
-    with pytest.raises(ValueError, match="integers"):
-        param.get_global_parameters(_args(quantile_niter_schedule="100,abc"))
-    with pytest.raises(ValueError, match="strictly increasing"):
-        param.get_global_parameters(_args(quantile_niter_schedule="1000,100"))
-    with pytest.raises(ValueError, match="upper bound"):
-        param.get_global_parameters(_args(quantile_niter_schedule="100,100000"))
-
-
-def test_get_global_parameters_rejects_negative_quantile_refine_edge_bins():
-    with pytest.raises(ValueError, match="quantile_refine_edge_bins"):
-        param.get_global_parameters(_args(quantile_refine_edge_bins=-1))
 
 
 def test_get_global_parameters_rejects_invalid_percent_biased_sub():

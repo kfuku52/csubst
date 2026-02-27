@@ -25,7 +25,6 @@ DEPENDENCY_DISTRIBUTIONS = (
     'matplotlib',
 )
 
-DEFAULT_QUANTILE_NITER_AUTO_SCHEDULE = [100, 1000, 10000]
 MAX_QUANTILE_NITER = 10000
 
 
@@ -117,34 +116,6 @@ def _parse_float_grid(value, param_name, min_value=None, strict_min=False):
     return out
 
 
-def _parse_quantile_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
-    if isinstance(value, (list, tuple, np.ndarray)):
-        raw_tokens = [str(v).strip() for v in value]
-    else:
-        raw_txt = '' if value is None else str(value).strip()
-        if raw_txt.lower() in ['', '0', 'auto']:
-            raw_tokens = [str(v) for v in DEFAULT_QUANTILE_NITER_AUTO_SCHEDULE]
-        else:
-            raw_tokens = [token.strip() for token in raw_txt.split(',') if token.strip() != '']
-    if len(raw_tokens) == 0:
-        raise ValueError('--quantile_niter_schedule should not be empty.')
-    schedule = list()
-    for token in raw_tokens:
-        if not re.fullmatch(r'[0-9]+', token):
-            raise ValueError('--quantile_niter_schedule should contain integers.')
-        niter = int(token)
-        if niter <= 0:
-            raise ValueError('--quantile_niter_schedule should contain positive integers.')
-        schedule.append(niter)
-    for prev, curr in zip(schedule, schedule[1:]):
-        if curr <= prev:
-            raise ValueError('--quantile_niter_schedule should be strictly increasing.')
-    if max(schedule) > int(max_niter):
-        txt = '--quantile_niter_schedule upper bound should be <= {}.'
-        raise ValueError(txt.format(int(max_niter)))
-    return schedule
-
-
 def _parse_omega_pvalue_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
     if isinstance(value, (list, tuple, np.ndarray)):
         raw_tokens = [str(v).strip() for v in value]
@@ -230,10 +201,6 @@ def get_global_parameters(args):
                 txt = '--alignment_file is disabled when --nonsyn_recode is 3di20. Use --full_cds_alignment_file.'
                 raise ValueError(txt)
             g['alignment_file'] = full_path
-    if 'calc_quantile' in g.keys():
-        if g['calc_quantile']:
-            if g['omegaC_method'] != 'modelfree':
-                raise ValueError('--calc_quantile "yes" should be used with --omegaC_method "modelfree".')
     if 'calc_omega_pvalue' in g.keys():
         g['calc_omega_pvalue'] = _parse_bool_like(g['calc_omega_pvalue'], '--calc_omega_pvalue')
     else:
@@ -514,16 +481,6 @@ def get_global_parameters(args):
     g['epistasis_requested'] = bool(g['epistasis_beta_auto'] or (g['epistasis_beta_value'] > 0))
     pseudocount_config = pseudocount.validate_args(g)
     g.update(pseudocount_config)
-    if 'quantile_refine_edge_bins' in g.keys():
-        g['quantile_refine_edge_bins'] = int(g['quantile_refine_edge_bins'])
-    else:
-        g['quantile_refine_edge_bins'] = 2
-    if g['quantile_refine_edge_bins'] < 0:
-        raise ValueError('--quantile_refine_edge_bins should be >= 0.')
-    if 'quantile_niter_schedule' in g.keys():
-        g['quantile_niter_schedule'] = _parse_quantile_niter_schedule(g['quantile_niter_schedule'])
-    else:
-        g['quantile_niter_schedule'] = _parse_quantile_niter_schedule('0')
     if 'exhaustive_until' in g.keys():
         if (g['exhaustive_until']==1)&(g['foreground'] is None):
             raise ValueError('To enable --exhaustive_until 1, use --foreground')

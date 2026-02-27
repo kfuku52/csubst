@@ -517,10 +517,6 @@ def _main():
                               'Described in Fukushima and Pollock (2023, https://doi.org/10.1038/s41559-022-01932-7). '
                               '"modelfree" (experimental) for expected values from among-site randomization '
                               '(urn sampling) of substitutions. ')
-    analyze.add_argument('--calc_quantile', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Experimental. Calculate resampling-based quantiles in '
-                              'Wallenius\' noncentral hypergeometric distribution for combinatorial substitutions. '
-                              'This option should be used with --omegaC_method "modelfree".')
     analyze.add_argument('--calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
                               'P values of omega_C by substitution randomization (modelfree only). '
@@ -558,20 +554,12 @@ def _main():
     analyze.add_argument('--omega_pvalue_rounding', metavar='round|stochastic|floor|ceil', default='stochastic', type=str,
                          choices=['round', 'stochastic', 'floor', 'ceil'],
                          help='default=%(default)s: Experimental feature. How fractional branch-wise substitution masses are converted to '
-                              'integer draw sizes in randomization for --calc_omega_pvalue (and quantile count '
-                              'sampling). "round" reproduces legacy behavior; "stochastic" applies per-iteration '
+                              'integer draw sizes in randomization for --calc_omega_pvalue. '
+                              '"round" reproduces legacy behavior; "stochastic" applies per-iteration '
                               'stochastic rounding; "floor"/"ceil" provide deterministic lower/upper bounds.')
-    analyze.add_argument('--quantile_niter_schedule', metavar='0|N1,N2,...', default='0', type=str,
-                         help='default=%(default)s: Quantile resampling iteration schedule. '
-                              'Set 0 (auto) to use 100,1000,10000. '
-                              'Custom values should be comma-delimited strictly increasing integers '
-                              '(e.g., 200,2000,10000).')
-    analyze.add_argument('--quantile_refine_edge_bins', metavar='INTEGER', default=2, type=int,
-                         help='default=%(default)s: Number of edge probability bins used to decide '
-                              'which rows are refined to the next quantile iteration stage.')
     analyze.add_argument('--asrv', metavar='no|pool|sn|each|file|file_each', default='each', type=str,
                          choices=['no', 'pool', 'sn', 'each', 'file', 'file_each'],
-                         help='default=%(default)s: Experimental. Correct among-site rate variation in omega/quantile calculation. '
+                         help='default=%(default)s: Experimental. Correct among-site rate variation in omega calculation. '
                               'This option is used in --omegaC_method modelfree but not with --omegaC_method submodel. '
                               '"no", No ASRV, meaning a uniform rate among sites. '
                               '"pool", All categories of substitutions are pooled to calculate a single set of ASRV. '

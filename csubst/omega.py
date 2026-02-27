@@ -1015,7 +1015,7 @@ def _weighted_sample_without_replacement_packed(p, size, niter):
     if (size == 0) or (num_positive_sites == 0) or (niter == 0):
         return packed
     if size > num_positive_sites:
-        txt = 'Sample size ({}) exceeded number of positive-probability sites ({}) in quantile sampling.'
+        txt = 'Sample size ({}) exceeded number of positive-probability sites ({}) in hypergeometric sampling.'
         raise ValueError(txt.format(size, num_positive_sites))
     if size == num_positive_sites:
         row_mask = np.zeros((num_packed_site,), dtype=np.uint8)
@@ -1175,7 +1175,7 @@ def _weighted_sample_without_replacement_masks(p, size, niter):
     if (size == 0) or (num_positive_sites == 0):
         return masks
     if size > num_positive_sites:
-        txt = 'Sample size ({}) exceeded number of positive-probability sites ({}) in quantile sampling.'
+        txt = 'Sample size ({}) exceeded number of positive-probability sites ({}) in hypergeometric sampling.'
         raise ValueError(txt.format(size, num_positive_sites))
     if size == num_positive_sites:
         masks[:, positive_sites] = True
@@ -1572,66 +1572,25 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
     return out
 
 
-def _resolve_quantile_parallel_plan(cb_rows, num_categories, quantile_niter, requested_n_jobs, requested_chunk_factor):
+def _resolve_hypergeom_parallel_plan(cb_rows, num_categories, niter, requested_n_jobs, requested_chunk_factor):
     n_jobs = int(requested_n_jobs)
     chunk_factor = int(requested_chunk_factor)
     if n_jobs <= 1:
         return 1, max(chunk_factor, 1)
     # For small branch-set workloads, thread startup and local-buffer reduction dominate.
     # Fall back to single-thread execution to avoid regressions under --threads > 1.
-    workload = int(cb_rows) * int(num_categories) * int(quantile_niter)
+    workload = int(cb_rows) * int(num_categories) * int(niter)
     if (cb_rows <= 4) or (workload < 20_000_000):
         return 1, max(chunk_factor, 1)
     return n_jobs, max(chunk_factor, 4)
 
 
-def _resolve_quantile_niter_schedule(g, quantile_niter):
-    if g is not None:
-        schedule = g.get('quantile_niter_schedule', None)
-        if schedule is not None:
-            schedule = [int(v) for v in schedule]
-            if len(schedule) == 0:
-                raise ValueError('quantile_niter_schedule should contain at least one stage.')
-            if min(schedule) <= 0:
-                raise ValueError('quantile_niter_schedule should contain positive integers.')
-            for prev, curr in zip(schedule, schedule[1:]):
-                if curr <= prev:
-                    raise ValueError('quantile_niter_schedule should be strictly increasing.')
-            return schedule
-    niter = int(quantile_niter)
-    if niter <= 0:
-        raise ValueError('quantile_niter should be a positive integer.')
-    return [niter]
-
-
-def _resolve_quantile_refine_edge_bins(g):
-    if g is None:
-        return 0
-    edge_bins = int(g.get('quantile_refine_edge_bins', 0))
-    if edge_bins < 0:
-        raise ValueError('quantile_refine_edge_bins should be >= 0.')
-    return edge_bins
-
-
-def _needs_quantile_refinement(probability_values, quantile_niter, edge_bins):
-    probability_values = np.asarray(probability_values, dtype=np.float64)
-    if probability_values.ndim != 1:
-        raise ValueError('probability_values should be a 1D array.')
-    if int(edge_bins) <= 0:
-        return np.zeros(shape=probability_values.shape, dtype=bool)
-    niter = int(quantile_niter)
-    if niter <= 0:
-        raise ValueError('quantile_niter should be a positive integer.')
-    edge = float(edge_bins) / float(niter)
-    return (probability_values <= edge) | (probability_values >= (1.0 - edge))
-
-
-def _calc_quantile_count_matrix(
+def _calc_hypergeom_count_matrix(
     mode,
     cb_ids,
     sub_sg,
     sub_bg,
-    quantile_niter,
+    niter,
     obs_col,
     num_gad_combinat,
     list_igad,
@@ -1639,33 +1598,33 @@ def _calc_quantile_count_matrix(
     static_sub_sites,
 ):
     cb_ids = np.asarray(cb_ids, dtype=np.int64)
-    quantile_niter = int(quantile_niter)
+    niter = int(niter)
     if cb_ids.ndim != 2:
         raise ValueError('cb_ids should be a 2D array.')
-    if quantile_niter <= 0:
-        raise ValueError('quantile_niter should be a positive integer.')
+    if niter <= 0:
+        raise ValueError('niter should be a positive integer.')
     if cb_ids.shape[0] == 0:
-        return np.zeros(shape=(0, quantile_niter), dtype=np.int32)
+        return np.zeros(shape=(0, niter), dtype=np.int32)
     requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
     chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
-    n_jobs, chunk_factor = _resolve_quantile_parallel_plan(
+    n_jobs, chunk_factor = _resolve_hypergeom_parallel_plan(
         cb_rows=cb_ids.shape[0],
         num_categories=len(list_igad),
-        quantile_niter=quantile_niter,
+        niter=niter,
         requested_n_jobs=requested_n_jobs,
         requested_chunk_factor=chunk_factor,
     )
     igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(list_igad, n_jobs, chunk_factor=chunk_factor)
-    axis = (cb_ids.shape[0], quantile_niter)
+    axis = (cb_ids.shape[0], niter)
     dfq = np.zeros(shape=axis, dtype=np.int32)
     if n_jobs == 1:
-        joblib_calc_quantile(
+        joblib_calc_hypergeom(
             mode,
             cb_ids,
             sub_sg,
             sub_bg,
             dfq,
-            quantile_niter,
+            niter,
             obs_col,
             num_gad_combinat,
             list_igad,
@@ -1679,7 +1638,7 @@ def _calc_quantile_count_matrix(
             cb_ids,
             sub_sg,
             sub_bg,
-            quantile_niter,
+            niter,
             obs_col,
             num_gad_combinat,
             igad_chunk,
@@ -1689,7 +1648,7 @@ def _calc_quantile_count_matrix(
         for igad_chunk in igad_chunks
     ]
     chunk_dfs = parallel.run_starmap(
-        func=_calc_quantile_chunk_local,
+        func=_calc_hypergeom_chunk_local,
         args_iterable=tasks,
         n_jobs=n_jobs,
         backend='threading',
@@ -1697,51 +1656,6 @@ def _calc_quantile_count_matrix(
     for dfq_chunk in chunk_dfs:
         dfq += dfq_chunk
     return dfq
-
-
-def _calc_quantile_probabilities(
-    mode,
-    cb_ids,
-    obs_values,
-    sub_sg,
-    sub_bg,
-    quantile_niter,
-    obs_col,
-    num_gad_combinat,
-    list_igad,
-    g,
-    static_sub_sites,
-):
-    cb_ids = np.asarray(cb_ids, dtype=np.int64)
-    obs_values = np.asarray(obs_values, dtype=g['float_type']).reshape(-1)
-    quantile_niter = int(quantile_niter)
-    if cb_ids.ndim != 2:
-        raise ValueError('cb_ids should be a 2D array.')
-    if obs_values.ndim != 1:
-        raise ValueError('obs_values should be a 1D array.')
-    if cb_ids.shape[0] != obs_values.shape[0]:
-        txt = 'cb_ids rows ({}) and obs_values length ({}) should match.'
-        raise ValueError(txt.format(cb_ids.shape[0], obs_values.shape[0]))
-    if quantile_niter <= 0:
-        raise ValueError('quantile_niter should be a positive integer.')
-    if cb_ids.shape[0] == 0:
-        return np.zeros(shape=(0,), dtype=g['float_type'])
-    dfq = _calc_quantile_count_matrix(
-        mode=mode,
-        cb_ids=cb_ids,
-        sub_sg=sub_sg,
-        sub_bg=sub_bg,
-        quantile_niter=quantile_niter,
-        obs_col=obs_col,
-        num_gad_combinat=num_gad_combinat,
-        list_igad=list_igad,
-        g=g,
-        static_sub_sites=static_sub_sites,
-    )
-    gt_ranks = (dfq < obs_values[:, None]).sum(axis=1, dtype=np.int64)
-    ge_ranks = (dfq <= obs_values[:, None]).sum(axis=1, dtype=np.int64)
-    probabilities = ((gt_ranks + ge_ranks) / 2) / quantile_niter
-    return probabilities.astype(g['float_type'], copy=False)
 
 
 def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol):
@@ -1873,13 +1787,13 @@ def joblib_calc_E_mean(
     print(txt.format(obs_col, i_start, i, num_gad_combinat, int(time.time()-iter_start)), flush=True)
 
 
-def joblib_calc_quantile(
+def joblib_calc_hypergeom(
     mode,
     cb_ids,
     sub_sg,
     sub_bg,
     dfq,
-    quantile_niter,
+    niter,
     obs_col,
     num_gad_combinat,
     igad_chunk,
@@ -1905,12 +1819,12 @@ def joblib_calc_quantile(
         pm_start = time.time()
         sub_branches = _prepare_permutation_branch_sizes(
             sub_branches=sub_branches,
-            niter=quantile_niter,
+            niter=niter,
             g=g,
         )
-        dfq[:,:] += _get_permutations_fast(cb_ids, sub_branches, p, quantile_niter)
+        dfq[:, :] += _get_permutations_fast(cb_ids, sub_branches, p, niter)
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
-        print(txt.format(obs_col, i+1, num_gad_combinat, quantile_niter, int(time.time()-pm_start)), flush=True)
+        print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
 
 def _calc_E_mean_chunk_to_mmap(
     mode,
@@ -1943,26 +1857,26 @@ def _calc_E_mean_chunk_to_mmap(
     )
     dfEb.flush()
 
-def _calc_quantile_chunk_local(
+def _calc_hypergeom_chunk_local(
     mode,
     cb_ids,
     sub_sg,
     sub_bg,
-    quantile_niter,
+    niter,
     obs_col,
     num_gad_combinat,
     igad_chunk,
     g,
     static_sub_sites,
 ):
-    dfq_local = np.zeros(shape=(cb_ids.shape[0], quantile_niter), dtype=np.int32)
-    joblib_calc_quantile(
+    dfq_local = np.zeros(shape=(cb_ids.shape[0], niter), dtype=np.int32)
+    joblib_calc_hypergeom(
         mode,
         cb_ids,
         sub_sg,
         sub_bg,
         dfq_local,
-        quantile_niter,
+        niter,
         obs_col,
         num_gad_combinat,
         igad_chunk,
@@ -1972,7 +1886,7 @@ def _calc_quantile_chunk_local(
     return dfq_local
 
 
-def _prepare_substitution_quantile_components(sub_tensor, mode, SN, g):
+def _prepare_substitution_permutation_components(sub_tensor, mode, SN, g):
     supported_modes = {'spe2spe', 'spe2any', 'any2spe', 'any2any'}
     if mode not in supported_modes:
         raise ValueError('Unsupported E-stat mode: {}'.format(mode))
@@ -2004,13 +1918,12 @@ def _prepare_substitution_quantile_components(sub_tensor, mode, SN, g):
     return sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat
 
 
-def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g=None):
+def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
     if g is None:
         raise ValueError('g is required.')
-    supported_stats = {'mean', 'quantile'}
-    if stat not in supported_stats:
+    if stat != 'mean':
         raise ValueError('Unsupported E-stat summary statistic: {}'.format(stat))
-    sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_quantile_components(
+    sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_permutation_components(
         sub_tensor=sub_tensor,
         mode=mode,
         SN=SN,
@@ -2031,121 +1944,53 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
             n_jobs,
             chunk_factor=chunk_factor,
         )
-    if stat=='mean':
-        if n_jobs == 1:
-            E_b = calc_E_mean(
+    if n_jobs == 1:
+        E_b = calc_E_mean(
+            mode,
+            cb_ids,
+            sub_sg,
+            sub_bg,
+            obs_col,
+            list_igad,
+            g,
+            static_sub_sites=static_sub_sites,
+            cb_site_overlap=cb_site_overlap,
+        )
+    else:
+        my_dtype = sub_tensor.dtype
+        if 'bool' in str(my_dtype): my_dtype = g['float_type']
+        mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
+        if os.path.exists(mmap_out): os.unlink(mmap_out)
+        axis = (cb.shape[0],)
+        dfEb = np.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
+        tasks = [
+            (
                 mode,
                 cb_ids,
                 sub_sg,
                 sub_bg,
-                obs_col,
-                list_igad,
-                g,
-                static_sub_sites=static_sub_sites,
-                cb_site_overlap=cb_site_overlap,
-            )
-        else:
-            my_dtype = sub_tensor.dtype
-            if 'bool' in str(my_dtype): my_dtype = g['float_type']
-            mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
-            if os.path.exists(mmap_out): os.unlink(mmap_out)
-            axis = (cb.shape[0],)
-            dfEb = np.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
-            tasks = [
-                (
-                    mode,
-                    cb_ids,
-                    sub_sg,
-                    sub_bg,
-                    mmap_out,
-                    my_dtype,
-                    axis,
-                    obs_col,
-                    num_gad_combinat,
-                    igad_chunk,
-                    g,
-                    static_sub_sites,
-                    cb_site_overlap,
-                )
-                for igad_chunk in igad_chunks
-            ]
-            parallel.run_starmap(
-                func=_calc_E_mean_chunk_to_mmap,
-                args_iterable=tasks,
-                n_jobs=n_jobs,
-                backend='threading',
-            )
-            dfEb.flush()
-            E_b = dfEb
-            del dfEb
-            if os.path.exists(mmap_out): os.unlink(mmap_out)
-    elif stat=='quantile':
-        quantile_schedule = _resolve_quantile_niter_schedule(g=g, quantile_niter=quantile_niter)
-        edge_bins = _resolve_quantile_refine_edge_bins(g=g)
-        obs_values = cb.loc[:,obs_col].values.astype(g['float_type'], copy=False)
-        E_b = np.zeros(shape=(cb.shape[0],), dtype=g['float_type'])
-        active_rows = np.arange(cb.shape[0], dtype=np.int64)
-        active_probs = None
-        prev_total_niter = 0
-        for stage_index, stage_niter in enumerate(quantile_schedule):
-            stage_niter = int(stage_niter)
-            incremental_niter = stage_niter - prev_total_niter
-            if incremental_niter <= 0:
-                txt = 'quantile_niter_schedule should be strictly increasing; got {} after {}.'
-                raise ValueError(txt.format(stage_niter, prev_total_niter))
-            txt = 'E{}{} quantile stage {}/{}: cumulative_niter={:,}, incremental_niter={:,}, rows={:,}'
-            print(
-                txt.format(
-                    SN,
-                    mode,
-                    stage_index + 1,
-                    len(quantile_schedule),
-                    stage_niter,
-                    incremental_niter,
-                    active_rows.shape[0],
-                ),
-                flush=True,
-            )
-            if active_rows.shape[0] == 0:
-                break
-            incremental_probs = _calc_quantile_probabilities(
-                mode,
-                cb_ids[active_rows, :],
-                obs_values[active_rows],
-                sub_sg,
-                sub_bg,
-                incremental_niter,
+                mmap_out,
+                my_dtype,
+                axis,
                 obs_col,
                 num_gad_combinat,
-                list_igad,
+                igad_chunk,
                 g,
-                static_sub_sites=static_sub_sites,
+                static_sub_sites,
+                cb_site_overlap,
             )
-            if prev_total_niter == 0:
-                stage_probs = incremental_probs
-            else:
-                stage_probs = (
-                    (active_probs * prev_total_niter) +
-                    (incremental_probs * incremental_niter)
-                ) / stage_niter
-            E_b[active_rows] = stage_probs
-            is_last_stage = (stage_index == (len(quantile_schedule) - 1))
-            if is_last_stage:
-                break
-            refine_mask = _needs_quantile_refinement(
-                probability_values=stage_probs,
-                quantile_niter=stage_niter,
-                edge_bins=edge_bins,
-            )
-            next_rows = active_rows[refine_mask]
-            txt = 'E{}{} quantile refinement after stage {}: rows {} -> {} (edge_bins={})'
-            print(
-                txt.format(SN, mode, stage_index + 1, active_rows.shape[0], next_rows.shape[0], edge_bins),
-                flush=True,
-            )
-            active_rows = next_rows
-            active_probs = stage_probs[refine_mask]
-            prev_total_niter = stage_niter
+            for igad_chunk in igad_chunks
+        ]
+        parallel.run_starmap(
+            func=_calc_E_mean_chunk_to_mmap,
+            args_iterable=tasks,
+            n_jobs=n_jobs,
+            backend='threading',
+        )
+        dfEb.flush()
+        E_b = dfEb
+        del dfEb
+        if os.path.exists(mmap_out): os.unlink(mmap_out)
     return E_b
 
 def subroot_E2nan(cb, tree):
@@ -2213,10 +2058,6 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         )
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
-    if g['calc_quantile']:
-        for st in base_stats:
-            cb['QCN'+st] = calc_E_stat(cb, ON_tensor, mode=st, stat='quantile', SN='N', g=g)
-            cb['QCS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='quantile', SN='S', g=g)
     cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC', output_stats=requested_output_stats)
     cb = subroot_E2nan(cb, tree=g['tree'])
     return cb
@@ -3027,7 +2868,7 @@ def _calc_poisson_full_count_matrix(
 
 
 def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, obs_count=None):
-    sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_quantile_components(
+    sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_permutation_components(
         sub_tensor=sub_tensor,
         mode=mode,
         SN=SN,
@@ -3045,12 +2886,12 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
         model_label = 'nbinom-rate'
     print(txt.format(SN, mode, model_label, cb_ids.shape[0], int(niter), int(num_gad_combinat)), flush=True)
     if null_model == 'hypergeom':
-        return _calc_quantile_count_matrix(
+        return _calc_hypergeom_count_matrix(
             mode=mode,
             cb_ids=cb_ids,
             sub_sg=sub_sg,
             sub_bg=sub_bg,
-            quantile_niter=int(niter),
+            niter=int(niter),
             obs_col=obs_col,
             num_gad_combinat=num_gad_combinat,
             list_igad=list_igad,

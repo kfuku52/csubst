@@ -348,11 +348,11 @@ def test_get_cb_ids_requires_branch_id_columns():
         omega._get_cb_ids(cb)
 
 
-def test_resolve_quantile_parallel_plan_falls_back_for_small_workload():
-    n_jobs, chunk_factor = omega._resolve_quantile_parallel_plan(
+def test_resolve_hypergeom_parallel_plan_falls_back_for_small_workload():
+    n_jobs, chunk_factor = omega._resolve_hypergeom_parallel_plan(
         cb_rows=1,
         num_categories=200,
-        quantile_niter=1000,
+        niter=1000,
         requested_n_jobs=4,
         requested_chunk_factor=1,
     )
@@ -360,32 +360,16 @@ def test_resolve_quantile_parallel_plan_falls_back_for_small_workload():
     assert chunk_factor == 1
 
 
-def test_resolve_quantile_parallel_plan_keeps_parallel_for_large_workload():
-    n_jobs, chunk_factor = omega._resolve_quantile_parallel_plan(
+def test_resolve_hypergeom_parallel_plan_keeps_parallel_for_large_workload():
+    n_jobs, chunk_factor = omega._resolve_hypergeom_parallel_plan(
         cb_rows=1000,
         num_categories=300,
-        quantile_niter=1000,
+        niter=1000,
         requested_n_jobs=4,
         requested_chunk_factor=1,
     )
     assert n_jobs == 4
     assert chunk_factor == 4
-
-
-def test_resolve_quantile_niter_schedule_prefers_global_schedule():
-    schedule = omega._resolve_quantile_niter_schedule(
-        g={"quantile_niter_schedule": [100, 1000, 10000]},
-        quantile_niter=500,
-    )
-    assert schedule == [100, 1000, 10000]
-
-
-def test_resolve_quantile_niter_schedule_rejects_non_increasing_schedule():
-    with pytest.raises(ValueError, match="strictly increasing"):
-        omega._resolve_quantile_niter_schedule(
-            g={"quantile_niter_schedule": [100, 100, 1000]},
-            quantile_niter=500,
-        )
 
 
 def test_resolve_omega_pvalue_niter_schedule_auto_includes_target():
@@ -424,70 +408,19 @@ def test_needs_omega_pvalue_refinement_uses_ci_overlap():
     np.testing.assert_array_equal(refine, np.array([False, True, False], dtype=bool))
 
 
-def test_needs_quantile_refinement_detects_edge_rows():
-    mask = omega._needs_quantile_refinement(
-        probability_values=np.array([0.99, 0.5, 0.01], dtype=np.float64),
-        quantile_niter=100,
-        edge_bins=2,
-    )
-    np.testing.assert_array_equal(mask, np.array([True, False, True], dtype=bool))
-
-
-def test_calc_e_stat_quantile_refines_only_edge_rows(monkeypatch):
-    stage_calls = list()
-    staged_outputs = [
-        np.array([0.99, 0.50, 0.01], dtype=np.float64),
-        np.array([1.0, 0.0], dtype=np.float64),
-        np.array([1.0, 0.0], dtype=np.float64),
-    ]
-
-    def fake_calc_quantile_probabilities(
-        mode,
-        cb_ids,
-        obs_values,
-        sub_sg,
-        sub_bg,
-        quantile_niter,
-        obs_col,
-        num_gad_combinat,
-        list_igad,
-        g,
-        static_sub_sites,
-    ):
-        call_index = len(stage_calls)
-        out = staged_outputs[call_index]
-        assert cb_ids.shape[0] == out.shape[0]
-        stage_calls.append((cb_ids.shape[0], int(quantile_niter)))
-        return out
-
-    monkeypatch.setattr(omega, "_calc_quantile_probabilities", fake_calc_quantile_probabilities)
-
-    cb = pd.DataFrame(
-        {
-            "branch_id_1": [0, 1, 2],
-            "OCNany2any": [3.0, 2.0, 1.0],
-        }
-    )
-    sub_tensor = np.zeros((4, 5, 1, 2, 2), dtype=np.float64)
-    g = {
-        "float_type": np.float64,
-        "threads": 1,
-        "asrv": "each",
-        "quantile_niter_schedule": [100, 1000, 10000],
-        "quantile_refine_edge_bins": 2,
-    }
-
-    out = omega.calc_E_stat(
-        cb=cb,
-        sub_tensor=sub_tensor,
-        mode="any2any",
-        stat="quantile",
-        SN="N",
-        g=g,
-    )
-
-    np.testing.assert_allclose(out, np.array([0.9999, 0.50, 0.0001], dtype=np.float64))
-    assert stage_calls == [(3, 100), (2, 900), (2, 9000)]
+def test_calc_e_stat_rejects_quantile_stat():
+    cb = pd.DataFrame({"branch_id_1": [0], "OCNany2any": [1.0]})
+    sub_tensor = np.zeros((2, 3, 1, 2, 2), dtype=np.float64)
+    g = {"float_type": np.float64, "threads": 1, "asrv": "each"}
+    with pytest.raises(ValueError, match="Unsupported E-stat summary statistic"):
+        omega.calc_E_stat(
+            cb=cb,
+            sub_tensor=sub_tensor,
+            mode="any2any",
+            stat="quantile",
+            SN="N",
+            g=g,
+        )
 
 
 def test_get_cod_skips_when_required_columns_missing():
@@ -795,10 +728,10 @@ def test_get_mode_permutation_count_matrix_uses_poisson_model(monkeypatch):
     def fake_quantile(*args, **kwargs):
         raise AssertionError("hypergeom path should not be used for poisson null model")
 
-    monkeypatch.setattr(omega, "_prepare_substitution_quantile_components", fake_prepare)
+    monkeypatch.setattr(omega, "_prepare_substitution_permutation_components", fake_prepare)
     monkeypatch.setattr(omega, "_get_static_sub_sites_if_available", fake_static)
     monkeypatch.setattr(omega, "_calc_poisson_count_matrix", fake_poisson)
-    monkeypatch.setattr(omega, "_calc_quantile_count_matrix", fake_quantile)
+    monkeypatch.setattr(omega, "_calc_hypergeom_count_matrix", fake_quantile)
 
     out = omega._get_mode_permutation_count_matrix(
         cb_ids=cb_ids,
@@ -830,11 +763,11 @@ def test_get_mode_permutation_count_matrix_uses_poisson_full_model(monkeypatch):
     def fake_quantile(*args, **kwargs):
         raise AssertionError("hypergeom path should not be used for poisson_full null model")
 
-    monkeypatch.setattr(omega, "_prepare_substitution_quantile_components", fake_prepare)
+    monkeypatch.setattr(omega, "_prepare_substitution_permutation_components", fake_prepare)
     monkeypatch.setattr(omega, "_get_static_sub_sites_if_available", fake_static)
     monkeypatch.setattr(omega, "_calc_poisson_count_matrix", fake_poisson)
     monkeypatch.setattr(omega, "_calc_poisson_full_count_matrix", fake_poisson_full)
-    monkeypatch.setattr(omega, "_calc_quantile_count_matrix", fake_quantile)
+    monkeypatch.setattr(omega, "_calc_hypergeom_count_matrix", fake_quantile)
 
     out = omega._get_mode_permutation_count_matrix(
         cb_ids=cb_ids,
@@ -867,11 +800,11 @@ def test_get_mode_permutation_count_matrix_uses_nbinom_model(monkeypatch):
     def fake_quantile(*args, **kwargs):
         raise AssertionError("hypergeom path should not be used for nbinom null model")
 
-    monkeypatch.setattr(omega, "_prepare_substitution_quantile_components", fake_prepare)
+    monkeypatch.setattr(omega, "_prepare_substitution_permutation_components", fake_prepare)
     monkeypatch.setattr(omega, "_get_static_sub_sites_if_available", fake_static)
     monkeypatch.setattr(omega, "_calc_nbinom_count_matrix", fake_nbinom)
     monkeypatch.setattr(omega, "_calc_poisson_count_matrix", fake_poisson)
-    monkeypatch.setattr(omega, "_calc_quantile_count_matrix", fake_quantile)
+    monkeypatch.setattr(omega, "_calc_hypergeom_count_matrix", fake_quantile)
 
     out = omega._get_mode_permutation_count_matrix(
         cb_ids=cb_ids,
