@@ -525,7 +525,7 @@ def _main():
                          help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
                               'P values of omega_C by substitution randomization (modelfree only). '
                               'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib".')
-    analyze.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full|nbinom', default='poisson', type=str,
+    analyze.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full|nbinom', default='hypergeom', type=str,
                          choices=['hypergeom', 'poisson', 'poisson_full', 'nbinom'],
                          help='default=%(default)s: Experimental feature. Null count generator for --calc_omega_pvalue. '
                               '"hypergeom" uses legacy site-subset randomization with integer draw sizes. '
@@ -540,7 +540,7 @@ def _main():
     analyze.add_argument('--omega_pvalue_niter', metavar='INT', default=1000, type=int,
                          help='default=%(default)s: Experimental feature. Number of randomization iterations for --calc_omega_pvalue. '
                               'Larger values improve tail resolution but increase runtime and memory.')
-    analyze.add_argument('--omega_pvalue_rounding', metavar='round|stochastic|floor|ceil', default='round', type=str,
+    analyze.add_argument('--omega_pvalue_rounding', metavar='round|stochastic|floor|ceil', default='stochastic', type=str,
                          choices=['round', 'stochastic', 'floor', 'ceil'],
                          help='default=%(default)s: Experimental feature. How fractional branch-wise substitution masses are converted to '
                               'integer draw sizes in randomization for --calc_omega_pvalue (and quantile count '

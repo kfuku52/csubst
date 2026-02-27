@@ -1192,9 +1192,9 @@ def _weighted_sample_without_replacement_masks(p, size, niter):
 
 
 def _resolve_omega_pvalue_rounding_mode(g):
-    mode = 'round'
+    mode = 'stochastic'
     if g is not None:
-        mode = str(g.get('omega_pvalue_rounding', 'round')).strip().lower()
+        mode = str(g.get('omega_pvalue_rounding', 'stochastic')).strip().lower()
     allowed = {'round', 'stochastic', 'floor', 'ceil'}
     if mode not in allowed:
         raise ValueError('omega_pvalue_rounding should be one of round, stochastic, floor, ceil.')
@@ -2679,9 +2679,9 @@ def _compose_permutation_count_matrix(stat, mode_to_count, tol):
 
 
 def _resolve_omega_pvalue_null_model(g):
-    model = 'poisson'
+    model = 'hypergeom'
     if g is not None:
-        model = str(g.get('omega_pvalue_null_model', 'poisson')).strip().lower()
+        model = str(g.get('omega_pvalue_null_model', 'hypergeom')).strip().lower()
     if model not in ['hypergeom', 'poisson', 'poisson_full', 'nbinom']:
         raise ValueError('omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full, nbinom.')
     return model

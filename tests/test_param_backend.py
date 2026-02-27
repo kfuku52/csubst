@@ -261,9 +261,9 @@ def test_get_global_parameters_rejects_calc_omega_pvalue_without_modelfree():
 def test_get_global_parameters_sets_omega_pvalue_defaults():
     g = param.get_global_parameters(_args())
     assert g["calc_omega_pvalue"] is False
-    assert g["omega_pvalue_null_model"] == "poisson"
+    assert g["omega_pvalue_null_model"] == "hypergeom"
     assert g["omega_pvalue_niter"] == 1000
-    assert g["omega_pvalue_rounding"] == "round"
+    assert g["omega_pvalue_rounding"] == "stochastic"
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_niter():

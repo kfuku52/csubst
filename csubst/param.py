@@ -216,7 +216,7 @@ def get_global_parameters(args):
     if 'omega_pvalue_null_model' in g.keys():
         g['omega_pvalue_null_model'] = str(g['omega_pvalue_null_model']).strip().lower()
     else:
-        g['omega_pvalue_null_model'] = 'poisson'
+        g['omega_pvalue_null_model'] = 'hypergeom'
     if g['omega_pvalue_null_model'] not in ['hypergeom', 'poisson', 'poisson_full', 'nbinom']:
         raise ValueError('--omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full, nbinom.')
     if 'omega_pvalue_nbinom_alpha' in g.keys():
@@ -264,7 +264,7 @@ def get_global_parameters(args):
     if 'omega_pvalue_rounding' in g.keys():
         g['omega_pvalue_rounding'] = str(g['omega_pvalue_rounding']).strip().lower()
     else:
-        g['omega_pvalue_rounding'] = 'round'
+        g['omega_pvalue_rounding'] = 'stochastic'
     if g['omega_pvalue_rounding'] not in ['round', 'stochastic', 'floor', 'ceil']:
         raise ValueError('--omega_pvalue_rounding should be one of round, stochastic, floor, ceil.')
     if 'asrv' in g.keys():
