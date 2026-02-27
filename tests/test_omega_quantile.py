@@ -534,6 +534,45 @@ def test_calc_omega_empirical_upper_tail_pvalues_from_perm_matches_wrapper():
     np.testing.assert_allclose(wrapper_out, from_perm_out)
 
 
+def test_calc_omega_empirical_upper_tail_pvalues_supports_dsc_calibrated_null():
+    obs_omega = np.array([1.0, 1.0], dtype=np.float64)
+    exp_N = np.array([1.0, 1.0], dtype=np.float64)
+    exp_S = np.array([1.0, 1.0], dtype=np.float64)
+    perm_count_N = np.array([[2.0, 4.0, 6.0], [1.0, 1.0, 1.0]], dtype=np.float64)
+    perm_count_S = np.array([[1.0, 2.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64)
+    wrapper_out = omega._calc_omega_empirical_upper_tail_pvalues(
+        obs_omega=obs_omega,
+        exp_N=exp_N,
+        exp_S=exp_S,
+        perm_count_N=perm_count_N,
+        perm_count_S=perm_count_S,
+        float_tol=1e-12,
+        calibrate_dsc_transformation="quantile",
+    )
+    perm_omega = omega._calc_permutation_omega_matrix(
+        exp_N=exp_N,
+        exp_S=exp_S,
+        perm_count_N=perm_count_N,
+        perm_count_S=perm_count_S,
+        float_tol=1e-12,
+        calibrate_dsc_transformation="quantile",
+    )
+    perm_omega_raw = omega._calc_permutation_omega_matrix(
+        exp_N=exp_N,
+        exp_S=exp_S,
+        perm_count_N=perm_count_N,
+        perm_count_S=perm_count_S,
+        float_tol=1e-12,
+    )
+    from_perm_out = omega._calc_omega_empirical_upper_tail_pvalues_from_perm(
+        obs_omega=obs_omega,
+        exp_S=exp_S,
+        perm_omega=perm_omega,
+    )
+    assert not np.allclose(perm_omega, perm_omega_raw)
+    np.testing.assert_allclose(wrapper_out, from_perm_out)
+
+
 def test_calc_bh_fdr_qvalues_handles_nan_and_monotonicity():
     pvalues = np.array([0.01, 0.04, 0.03, np.nan], dtype=np.float64)
     out = omega._calc_bh_fdr_qvalues(pvalues)
@@ -895,6 +934,51 @@ def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
     ]
     np.testing.assert_allclose(out.loc[:, "pomegaCany2dif"].to_numpy(dtype=np.float64), np.array([0.5, 1.0]))
     np.testing.assert_allclose(out.loc[:, "qomegaCany2dif"].to_numpy(dtype=np.float64), np.array([1.0, 1.0]))
+
+
+def test_add_omega_empirical_pvalues_uses_dsc_calibrated_null_when_columns_present(monkeypatch):
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [0, 1],
+            "branch_id_2": [2, 3],
+            "omegaCany2spe": [1.0, 1.0],
+            "omegaCany2spe_nocalib": [2.0, 1.0],
+            "dSCany2spe": [2.0, 2.0],
+            "dSCany2spe_nocalib": [1.0, 1.0],
+            "ECNany2spe": [1.0, 1.0],
+            "ECSany2spe": [1.0, 1.0],
+        }
+    )
+    mode_counts = {
+        ("N", "any2spe"): np.array([[2.0, 4.0, 6.0], [1.0, 1.0, 1.0]], dtype=np.float64),
+        ("S", "any2spe"): np.array([[1.0, 2.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64),
+    }
+
+    def fake_get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, obs_count=None):
+        return mode_counts[(SN, mode)]
+
+    monkeypatch.setattr(omega, "_get_mode_permutation_count_matrix", fake_get_mode_permutation_count_matrix)
+    out = omega.add_omega_empirical_pvalues(
+        cb=cb.copy(),
+        ON_tensor=None,
+        OS_tensor=None,
+        g={
+            "calc_omega_pvalue": True,
+            "omegaC_method": "modelfree",
+            "omega_pvalue_niter": 3,
+            "output_stats": ["any2spe"],
+            "float_tol": 1e-12,
+            "calibrate_longtail_transformation": "quantile",
+        },
+    )
+    np.testing.assert_allclose(
+        out.loc[:, "pomegaCany2spe"].to_numpy(dtype=np.float64),
+        np.array([1.0, 0.25], dtype=np.float64),
+    )
+    np.testing.assert_allclose(
+        out.loc[:, "qomegaCany2spe"].to_numpy(dtype=np.float64),
+        np.array([1.0, 0.5], dtype=np.float64),
+    )
 
 
 def test_calibrate_dsc_renames_empirical_pq_columns_to_nocalib():

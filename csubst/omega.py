@@ -2308,6 +2308,52 @@ def _calc_raw_omega(dNc, dSc, float_tol):
     return omega
 
 
+def _calibrate_dsc_vector(dNc_values, dSc_values, transformation='quantile'):
+    dNc_values = np.asarray(dNc_values, dtype=np.float64).reshape(-1)
+    dSc_values = np.asarray(dSc_values, dtype=np.float64).reshape(-1)
+    if dNc_values.shape != dSc_values.shape:
+        raise ValueError('dNc_values and dSc_values should have identical shapes.')
+    fit_mask = np.isfinite(dNc_values) & np.isfinite(dSc_values)
+    calibrated_dSc = np.array(dSc_values, dtype=np.float64, copy=True)
+    if not fit_mask.any():
+        return calibrated_dSc, fit_mask, np.zeros(shape=dSc_values.shape, dtype=bool)
+    dNc_values_wo_na = dNc_values[fit_mask]
+    dSc_values_wo_na = dSc_values[fit_mask]
+    ranks = stats.rankdata(dSc_values_wo_na)
+    quantiles = ranks / ranks.max()
+    if transformation == 'gamma':
+        alpha, loc, beta = stats.gamma.fit(dNc_values_wo_na)
+        calibrated_dSc[fit_mask] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
+    elif transformation == 'quantile':
+        calibrated_dSc[fit_mask] = np.quantile(dNc_values_wo_na, quantiles)
+    else:
+        raise ValueError('Unsupported transformation: {}'.format(transformation))
+    is_nocalib_higher = (
+        np.isfinite(dSc_values) &
+        np.isfinite(calibrated_dSc) &
+        (dSc_values > calibrated_dSc)
+    )
+    calibrated_dSc[is_nocalib_higher] = dSc_values[is_nocalib_higher]
+    return calibrated_dSc, fit_mask, is_nocalib_higher
+
+
+def _calibrate_dsc_matrix(dNc_matrix, dSc_matrix, transformation='quantile'):
+    dNc_matrix = np.asarray(dNc_matrix, dtype=np.float64)
+    dSc_matrix = np.asarray(dSc_matrix, dtype=np.float64)
+    if dNc_matrix.shape != dSc_matrix.shape:
+        raise ValueError('dNc_matrix and dSc_matrix should have identical shapes.')
+    if dNc_matrix.ndim != 2:
+        raise ValueError('dNc_matrix and dSc_matrix should be 2D arrays.')
+    calibrated = np.array(dSc_matrix, dtype=np.float64, copy=True)
+    for col_i in range(dNc_matrix.shape[1]):
+        calibrated[:, col_i], _, _ = _calibrate_dsc_vector(
+            dNc_values=dNc_matrix[:, col_i],
+            dSc_values=dSc_matrix[:, col_i],
+            transformation=transformation,
+        )
+    return calibrated
+
+
 def _collect_stat_masses(cb, prefix):
     stat_masses = dict()
     for stat_name in output_stat.ALL_OUTPUT_STATS:
@@ -2986,7 +3032,14 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
     raise ValueError('Unsupported omega_pvalue_null_model: {}'.format(null_model))
 
 
-def _calc_permutation_omega_matrix(exp_N, exp_S, perm_count_N, perm_count_S, float_tol):
+def _calc_permutation_omega_matrix(
+    exp_N,
+    exp_S,
+    perm_count_N,
+    perm_count_S,
+    float_tol,
+    calibrate_dsc_transformation=None,
+):
     exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
     exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
     perm_count_N = np.asarray(perm_count_N, dtype=np.float64)
@@ -3003,6 +3056,12 @@ def _calc_permutation_omega_matrix(exp_N, exp_S, perm_count_N, perm_count_S, flo
         raise ValueError(txt.format(exp_S.shape[0], perm_count_N.shape[0]))
     perm_dNc = _calc_raw_rate(obs=perm_count_N, exp=exp_N[:, None], float_tol=float_tol)
     perm_dSc = _calc_raw_rate(obs=perm_count_S, exp=exp_S[:, None], float_tol=float_tol)
+    if calibrate_dsc_transformation is not None:
+        perm_dSc = _calibrate_dsc_matrix(
+            dNc_matrix=perm_dNc,
+            dSc_matrix=perm_dSc,
+            transformation=calibrate_dsc_transformation,
+        )
     return _calc_raw_omega(dNc=perm_dNc, dSc=perm_dSc, float_tol=float_tol)
 
 
@@ -3035,6 +3094,7 @@ def _calc_omega_empirical_upper_tail_pvalues(
     perm_count_N,
     perm_count_S,
     float_tol,
+    calibrate_dsc_transformation=None,
 ):
     obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
     exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
@@ -3060,6 +3120,7 @@ def _calc_omega_empirical_upper_tail_pvalues(
         perm_count_N=perm_count_N,
         perm_count_S=perm_count_S,
         float_tol=float_tol,
+        calibrate_dsc_transformation=calibrate_dsc_transformation,
     )
     return _calc_omega_empirical_upper_tail_pvalues_from_perm(
         obs_omega=obs_omega,
@@ -3085,6 +3146,24 @@ def _calc_bh_fdr_qvalues(pvalues):
     q_finite[order] = bh
     qvalues[is_finite] = q_finite
     return qvalues
+
+
+def _resolve_omega_pvalue_dsc_calibration_transformation(cb, sub, g):
+    col_dSc = 'dSC' + sub
+    col_noncalibrated_dSc = col_dSc + '_nocalib'
+    col_omega = 'omegaC' + sub
+    col_noncalibrated_omega = col_omega + '_nocalib'
+    has_calibrated_columns = all(
+        [col in cb.columns for col in [col_dSc, col_noncalibrated_dSc, col_omega, col_noncalibrated_omega]]
+    )
+    if not has_calibrated_columns:
+        return None
+    transformation = str(g.get('calibrate_longtail_transformation', 'quantile')).strip().lower()
+    if transformation == '':
+        transformation = 'quantile'
+    if transformation not in ['quantile', 'gamma']:
+        raise ValueError('Unsupported calibrate_longtail_transformation: {}'.format(transformation))
+    return transformation
 
 
 def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
@@ -3147,6 +3226,10 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
             mode_to_count=mode_to_count_S,
             tol=g['float_tol'],
         )
+        calibrate_dsc_transformation = _resolve_omega_pvalue_dsc_calibration_transformation(cb=cb, sub=sub, g=g)
+        if calibrate_dsc_transformation is not None:
+            txt = 'pomegaC {}: applying dSc {} calibration to permutation omega null'
+            print(txt.format(sub, calibrate_dsc_transformation), flush=True)
         obs_omega_values = cb.loc[:, col_omega].to_numpy(dtype=np.float64, copy=False)
         exp_N_values = cb.loc[:, col_exp_N].to_numpy(dtype=np.float64, copy=False)
         exp_S_values = cb.loc[:, col_exp_S].to_numpy(dtype=np.float64, copy=False)
@@ -3157,6 +3240,7 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
             perm_count_N=perm_count_N,
             perm_count_S=perm_count_S,
             float_tol=g['float_tol'],
+            calibrate_dsc_transformation=calibrate_dsc_transformation,
         )
         col_p = 'pomegaC' + sub
         cb.loc[:, col_p] = pvalue
@@ -3250,25 +3334,11 @@ def calibrate_dsc(cb, transformation='quantile', output_stats=None, float_tol=1e
         if col_qvalue in cb.columns:
             rename_map[col_qvalue] = col_qvalue + '_nocalib'
         cb = cb.rename(columns=rename_map)
-        dNc_values_wo_na = dNc_values[fit_mask]
-        uncorrected_dSc_values_wo_na = uncorrected_dSc_values[fit_mask]
-        ranks = stats.rankdata(uncorrected_dSc_values_wo_na)
-        quantiles = ranks / ranks.max()
-        calibrated_dSc_values = np.array(uncorrected_dSc_values, copy=True)
-        if (transformation=='gamma'):
-            alpha,loc,beta = stats.gamma.fit(dNc_values_wo_na)
-            calibrated_dSc_values[fit_mask] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
-        elif (transformation=='quantile'):
-            calibrated_dSc_values[fit_mask] = np.quantile(dNc_values_wo_na, quantiles)
-        else:
-            raise ValueError('Unsupported transformation: {}'.format(transformation))
-        noncalibrated_dSc_values = cb.loc[:, col_noncalibrated_dSc].to_numpy(dtype=np.float64, copy=False)
-        is_nocalib_higher = (
-            np.isfinite(noncalibrated_dSc_values) &
-            np.isfinite(calibrated_dSc_values) &
-            (noncalibrated_dSc_values > calibrated_dSc_values)
+        calibrated_dSc_values, _, is_nocalib_higher = _calibrate_dsc_vector(
+            dNc_values=dNc_values,
+            dSc_values=uncorrected_dSc_values,
+            transformation=transformation,
         )
-        calibrated_dSc_values[is_nocalib_higher] = noncalibrated_dSc_values[is_nocalib_higher]
         cb.loc[:, col_dSc] = calibrated_dSc_values
         calibrated_dNc = cb.loc[:,col_dNc].to_numpy(dtype=np.float64, copy=False)
         calibrated_dSc = cb.loc[:, col_dSc].to_numpy(dtype=np.float64, copy=False)
