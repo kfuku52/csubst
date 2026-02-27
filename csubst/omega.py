@@ -2518,15 +2518,16 @@ def get_omega(cb, g):
             col_ES = 'ECS'+sub
             col_dSc = 'dSC'+sub
             if all([ col in cb.columns for col in [col_N,col_EN,col_S,col_ES] ]):
-                cb.loc[:,col_dNc] = (cb.loc[:,col_N] / cb.loc[:,col_EN])
-                is_N_zero = (cb.loc[:,col_N]<g['float_tol'])
-                cb.loc[is_N_zero,col_dNc] = 0
-                cb.loc[:,col_dSc] = (cb.loc[:,col_S] / cb.loc[:,col_ES])
-                is_S_zero = (cb.loc[:,col_S]<g['float_tol'])
-                cb.loc[is_S_zero,col_dSc] = 0
-                cb.loc[:,col_omega] = cb.loc[:,col_dNc] / cb.loc[:,col_dSc]
-                is_dN_zero = (cb.loc[:,col_dNc]<g['float_tol'])
-                cb.loc[is_dN_zero,col_omega] = 0
+                obs_N = cb.loc[:, col_N].to_numpy(dtype=np.float64, copy=False)
+                exp_N = cb.loc[:, col_EN].to_numpy(dtype=np.float64, copy=False)
+                obs_S = cb.loc[:, col_S].to_numpy(dtype=np.float64, copy=False)
+                exp_S = cb.loc[:, col_ES].to_numpy(dtype=np.float64, copy=False)
+                dNc = _calc_raw_rate(obs=obs_N, exp=exp_N, float_tol=g['float_tol'])
+                dSc = _calc_raw_rate(obs=obs_S, exp=exp_S, float_tol=g['float_tol'])
+                omegaC = _calc_raw_omega(dNc=dNc, dSc=dSc, float_tol=g['float_tol'])
+                cb.loc[:, col_dNc] = dNc
+                cb.loc[:, col_dSc] = dSc
+                cb.loc[:, col_omega] = omegaC
         return cb
     for i, sub in enumerate(requested_output_stats):
         col_omega = 'omegaC'+sub
@@ -2557,7 +2558,18 @@ def get_omega(cb, g):
                     alpha_obs=context['alpha_obs_S'][i],
                     alpha_exp=context['alpha_exp_S'][i],
                 )
-                sm_omega = pseudocount.smooth_ratio(O=sm_dNc, E=sm_dSc, alpha_obs=0, alpha_exp=0)
+                sm_omega = np.asarray(
+                    pseudocount.smooth_ratio(O=sm_dNc, E=sm_dSc, alpha_obs=0, alpha_exp=0),
+                    dtype=np.float64,
+                )
+                # Enforce the same convention as raw ratios: 0/0 -> 0.
+                is_zero_over_zero = (
+                    np.isfinite(sm_dNc) &
+                    np.isfinite(sm_dSc) &
+                    (sm_dNc < g['float_tol']) &
+                    (sm_dSc < g['float_tol'])
+                )
+                sm_omega[is_zero_over_zero] = 0
                 log_sm_omega = pseudocount.smooth_log_ratio(O=sm_dNc, E=sm_dSc, alpha_obs=0, alpha_exp=0)
             else:
                 sm_dNc = raw_dNc.copy()
@@ -2585,11 +2597,9 @@ def get_CoD(cb, g):
         col_cod = NS + 'CoD'
         if not all([col in cb.columns for col in [col_spe, col_dif]]):
             continue
-        cb.loc[:,col_cod] = cb[col_spe] / cb[col_dif]
-        is_Nzero = (cb[col_spe] < g['float_tol'])
-        is_inf = np.isinf(cb.loc[:,col_cod])
-        if (is_Nzero&is_inf).sum():
-            cb.loc[(is_Nzero&is_inf), col_cod] = np.nan
+        spe_values = cb.loc[:, col_spe].to_numpy(dtype=np.float64, copy=False)
+        dif_values = cb.loc[:, col_dif].to_numpy(dtype=np.float64, copy=False)
+        cb.loc[:, col_cod] = _calc_raw_rate(obs=spe_values, exp=dif_values, float_tol=g['float_tol'])
     return cb
 
 
@@ -2660,10 +2670,11 @@ def _calc_poisson_count_matrix(
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        mean_count = _calc_tmp_E_sum(
+        mean_count = _calc_wallenius_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
+            g=g,
             float_type=np.float64,
         )
         mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
@@ -2778,10 +2789,11 @@ def _calc_nbinom_count_matrix(
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        mean_count = _calc_tmp_E_sum(
+        mean_count = _calc_wallenius_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
+            g=g,
             float_type=np.float64,
         )
         mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
@@ -2847,6 +2859,7 @@ def _calc_poisson_full_count_matrix(
     obs_col,
     num_gad_combinat,
     list_igad,
+    g,
 ):
     cb_ids = np.asarray(cb_ids, dtype=np.int64)
     niter = int(niter)
@@ -2857,22 +2870,30 @@ def _calc_poisson_full_count_matrix(
     out = np.zeros(shape=(cb_ids.shape[0], niter), dtype=np.float64)
     if cb_ids.shape[0] == 0:
         return out
-    num_branch = int(sub_tensor.shape[0])
-    branch_ones = np.ones(shape=(num_branch,), dtype=np.float64)
     for i, sg, a, d in list_igad:
         if a == d:
             continue
-        sub_sites = _get_mode_branch_site_mass(
+        sub_site_mass = _get_mode_branch_site_mass(
             sub_tensor=sub_tensor,
             mode=mode,
             sg=sg,
             a=a,
             d=d,
         )
-        mean_count = _calc_tmp_E_sum(
+        np.clip(sub_site_mass, a_min=0.0, a_max=None, out=sub_site_mass)
+        sub_branches = sub_site_mass.sum(axis=1, dtype=np.float64)
+        sub_sites = np.zeros_like(sub_site_mass, dtype=np.float64)
+        nonzero_branch = (sub_branches > 0)
+        if nonzero_branch.any():
+            sub_sites[nonzero_branch, :] = (
+                sub_site_mass[nonzero_branch, :] /
+                sub_branches[nonzero_branch, None]
+            )
+        mean_count = _calc_wallenius_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
-            sub_branches=branch_ones,
+            sub_branches=sub_branches,
+            g=g,
             float_type=np.float64,
         )
         mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
@@ -2946,6 +2967,7 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
             obs_col=obs_col,
             num_gad_combinat=num_gad_combinat,
             list_igad=list_igad,
+            g=g,
         )
     if null_model == 'nbinom':
         return _calc_nbinom_count_matrix(
@@ -3195,7 +3217,7 @@ def calc_omega(cb, OS_tensor, ON_tensor, g):
     print_cb_stats(cb=cb, prefix='cb', output_stats=output_stats)
     return(cb, g)
 
-def calibrate_dsc(cb, transformation='quantile', output_stats=None):
+def calibrate_dsc(cb, transformation='quantile', output_stats=None, float_tol=1e-12):
     prefix='cb'
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'Arity = {:,}, {}:'.format(arity, prefix)
@@ -3211,37 +3233,55 @@ def calibrate_dsc(cb, transformation='quantile', output_stats=None):
         col_noncalibrated_omega = 'omegaC'+sub+'_nocalib'
         if not all([col in cb.columns for col in [col_dNc, col_dSc, col_omega]]):
             continue
-        dNc_values = cb.loc[:,col_dNc].replace([np.inf, -np.inf], np.nan)
-        uncorrected_dSc_values = cb.loc[:,col_dSc].replace([np.inf, -np.inf], np.nan)
-        is_na = (uncorrected_dSc_values.isnull() | dNc_values.isnull())
-        if is_na.all():
+        dNc_values = cb.loc[:, col_dNc].to_numpy(dtype=np.float64, copy=False)
+        uncorrected_dSc_values = cb.loc[:, col_dSc].to_numpy(dtype=np.float64, copy=False)
+        fit_mask = (np.isfinite(dNc_values) & np.isfinite(uncorrected_dSc_values))
+        if (~fit_mask).all():
             txt = 'dSc calibration could not be applied: {} (no finite dNc/dSc pairs)\n'
             sys.stderr.write(txt.format(sub))
             continue
-        if (is_na.sum()>0):
+        excluded_count = int((~fit_mask).sum())
+        if (excluded_count > 0):
             txt = 'dSc calibration could not be applied to {:,}/{:,} branch combinations for {}\n'
-            sys.stderr.write(txt.format(is_na.sum(), cb.shape[0], sub))
+            sys.stderr.write(txt.format(excluded_count, cb.shape[0], sub))
         rename_map = {col_dSc: col_noncalibrated_dSc, col_omega: col_noncalibrated_omega}
         if col_pvalue in cb.columns:
             rename_map[col_pvalue] = col_pvalue + '_nocalib'
         if col_qvalue in cb.columns:
             rename_map[col_qvalue] = col_qvalue + '_nocalib'
         cb = cb.rename(columns=rename_map)
-        dNc_values_wo_na = dNc_values[~is_na]
-        uncorrected_dSc_values_wo_na = uncorrected_dSc_values[~is_na]
+        dNc_values_wo_na = dNc_values[fit_mask]
+        uncorrected_dSc_values_wo_na = uncorrected_dSc_values[fit_mask]
         ranks = stats.rankdata(uncorrected_dSc_values_wo_na)
         quantiles = ranks / ranks.max()
+        calibrated_dSc_values = np.array(uncorrected_dSc_values, copy=True)
         if (transformation=='gamma'):
             alpha,loc,beta = stats.gamma.fit(dNc_values_wo_na)
-            cb.loc[~is_na,col_dSc] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
+            calibrated_dSc_values[fit_mask] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
         elif (transformation=='quantile'):
-            cb.loc[~is_na,col_dSc] = np.quantile(dNc_values_wo_na, quantiles)
-        noncalibrated_dSc_values = cb.loc[:,col_noncalibrated_dSc].values
-        is_nocalib_higher = (noncalibrated_dSc_values>cb.loc[:,col_dSc]).fillna(False)
-        cb.loc[is_nocalib_higher,col_dSc] = noncalibrated_dSc_values[is_nocalib_higher]
-        cb.loc[:,col_omega] = np.nan
-        cb.loc[:,col_omega] = cb.loc[:,col_dNc] / cb.loc[:,col_dSc]
+            calibrated_dSc_values[fit_mask] = np.quantile(dNc_values_wo_na, quantiles)
+        else:
+            raise ValueError('Unsupported transformation: {}'.format(transformation))
+        noncalibrated_dSc_values = cb.loc[:, col_noncalibrated_dSc].to_numpy(dtype=np.float64, copy=False)
+        is_nocalib_higher = (
+            np.isfinite(noncalibrated_dSc_values) &
+            np.isfinite(calibrated_dSc_values) &
+            (noncalibrated_dSc_values > calibrated_dSc_values)
+        )
+        calibrated_dSc_values[is_nocalib_higher] = noncalibrated_dSc_values[is_nocalib_higher]
+        cb.loc[:, col_dSc] = calibrated_dSc_values
+        calibrated_dNc = cb.loc[:,col_dNc].to_numpy(dtype=np.float64, copy=False)
+        calibrated_dSc = cb.loc[:, col_dSc].to_numpy(dtype=np.float64, copy=False)
+        calibrated_omega = _calc_raw_omega(
+            dNc=calibrated_dNc,
+            dSc=calibrated_dSc,
+            float_tol=float(float_tol),
+        )
+        noncalibrated_omega_values = cb.loc[:, col_noncalibrated_omega].to_numpy(dtype=np.float64, copy=False)
+        calibrated_omega[~fit_mask] = noncalibrated_omega_values[~fit_mask]
+        cb.loc[:, col_omega] = calibrated_omega
         median_value = cb.loc[:,col_omega].median()
+        corrected_count = int(fit_mask.sum() - is_nocalib_higher[fit_mask].sum())
         txt = '{} median {} ({:,}/{:,} branch combinations were corrected for dNc vs dSc distribution ranges): {:.3f}'
-        print(txt.format(hd, col_omega, (~is_nocalib_higher).sum(), cb.shape[0], median_value), flush=True)
+        print(txt.format(hd, col_omega, corrected_count, cb.shape[0], median_value), flush=True)
     return cb

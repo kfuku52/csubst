@@ -162,7 +162,11 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                 g['df_cb_stats'].at[0, 'epistasis_alpha_' + channel] = float(channel_state.get('alpha', np.nan))
         if (g['calibrate_longtail']):
             if (g['exhaustive_until'] >= current_arity):
-                cb = omega.calibrate_dsc(cb, output_stats=g.get('output_stats'))
+                cb = omega.calibrate_dsc(
+                    cb,
+                    output_stats=g.get('output_stats'),
+                    float_tol=g.get('float_tol', 1e-12),
+                )
                 if bool(g.get('calc_omega_pvalue', False)):
                     # Recompute empirical p/q values on calibrated omegaC columns.
                     # Non-calibrated p/q columns are retained as *_nocalib by calibrate_dsc().

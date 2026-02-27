@@ -137,13 +137,21 @@ def _safe_divide(numerator, denominator):
     denominator = np.asarray(denominator, dtype=np.float64)
     out_shape = np.broadcast(numerator, denominator).shape
     out = np.full(shape=out_shape, fill_value=np.nan, dtype=np.float64)
+    numerator_b = np.broadcast_to(numerator, out_shape)
+    denominator_b = np.broadcast_to(denominator, out_shape)
     with np.errstate(divide="ignore", invalid="ignore"):
         np.divide(
-            numerator,
-            denominator,
+            numerator_b,
+            denominator_b,
             out=out,
-            where=(np.isfinite(denominator) & (denominator != 0)),
         )
+    zero_over_zero = (
+        np.isfinite(numerator_b) &
+        np.isfinite(denominator_b) &
+        (numerator_b == 0) &
+        (denominator_b == 0)
+    )
+    out = np.where(zero_over_zero, 0.0, out)
     if out_shape == ():
         return float(out)
     return out

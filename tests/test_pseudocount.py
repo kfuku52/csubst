@@ -54,6 +54,14 @@ def test_smooth_ratio_alpha_zero_matches_raw_ratio():
     np.testing.assert_allclose(out, O / E, atol=1e-12)
 
 
+def test_smooth_ratio_alpha_zero_maps_zero_over_zero_to_zero_only():
+    O = np.array([0.0, 1.0], dtype=np.float64)
+    E = np.array([0.0, 0.0], dtype=np.float64)
+    out = pseudocount.smooth_ratio(O=O, E=E, alpha_obs=0.0, alpha_exp=0.0)
+    assert out[0] == pytest.approx(0.0)
+    assert np.isinf(out[1])
+
+
 def test_smooth_ratio_zero_zero_is_finite_with_positive_alpha():
     out = pseudocount.smooth_ratio(O=0.0, E=0.0, alpha_obs=0.5, alpha_exp=0.5)
     assert np.isfinite(out)

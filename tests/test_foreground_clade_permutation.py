@@ -516,6 +516,81 @@ def test_clade_permutation_recomputes_missing_randomized_combinations(monkeypatc
     assert "permuted foreground branch combinations were dropped" not in captured.out
 
 
+def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(monkeypatch):
+    missing_id_combinations = np.array([[1, 2], [2, 3]], dtype=np.int64)
+    captured = {}
+
+    def fake_get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
+        return pd.DataFrame(
+            {
+                "branch_id_1": id_combinations[:, 0],
+                "branch_id_2": id_combinations[:, 1],
+            }
+        )
+
+    def fake_merge_tables(cbOS, cbON):
+        return cbOS.copy(deep=True)
+
+    def fake_calc_omega(cb_missing, OS_tensor_reducer, ON_tensor_reducer, g):
+        out = cb_missing.copy(deep=True)
+        out["dNCany2spe"] = np.array([1.0, np.inf], dtype=np.float64)
+        out["dSCany2spe"] = np.array([1.0, 1.0], dtype=np.float64)
+        out["omegaCany2spe"] = np.array([1.0, np.inf], dtype=np.float64)
+        return out, g
+
+    original_calibrate_dsc = foreground.omega.calibrate_dsc
+
+    def capture_calibrate_dsc(cb_missing, output_stats=None, float_tol=1e-12):
+        captured["float_tol"] = float(float_tol)
+        captured["output_stats"] = output_stats
+        return original_calibrate_dsc(
+            cb=cb_missing,
+            output_stats=output_stats,
+            float_tol=float_tol,
+        )
+
+    monkeypatch.setattr(foreground.substitution, "get_cb", fake_get_cb)
+    monkeypatch.setattr(foreground.table, "merge_tables", fake_merge_tables)
+    monkeypatch.setattr(
+        foreground.substitution,
+        "add_dif_stats",
+        lambda cb, tol, prefix, output_stats=None: cb,
+    )
+    monkeypatch.setattr(foreground.omega, "calc_omega", fake_calc_omega)
+    monkeypatch.setattr(foreground.omega, "calibrate_dsc", capture_calibrate_dsc)
+    monkeypatch.setattr(foreground.substitution, "get_substitutions_per_branch", lambda cb, b, g: cb)
+    monkeypatch.setattr(foreground.table, "get_linear_regression", lambda cb: cb)
+    monkeypatch.setattr(foreground.output_stat, "drop_unrequested_stat_columns", lambda cb, output_stats=None: cb)
+    monkeypatch.setattr(foreground, "get_foreground_branch_num", lambda cb, g: (cb, g))
+    monkeypatch.setattr(foreground.table, "sort_cb", lambda cb: cb)
+
+    g = {
+        "float_tol": 1e-7,
+        "output_stats": ["any2spe"],
+        "output_base_stats": ["any2spe"],
+        "calibrate_longtail": True,
+        "exhaustive_until": 2,
+        "current_arity": 2,
+        "branch_dist": False,
+        "branch_table": None,
+        "threads": 1,
+        "float_type": np.float64,
+    }
+    out, _ = foreground._recompute_missing_permutation_rows(
+        g=g,
+        missing_id_combinations=missing_id_combinations,
+        OS_tensor_reducer=object(),
+        ON_tensor_reducer=object(),
+    )
+
+    assert captured["float_tol"] == pytest.approx(1e-7)
+    assert captured["output_stats"] == ["any2spe"]
+    assert "omegaCany2spe_nocalib" in out.columns
+    is_inf = np.isinf(out.loc[:, "omegaCany2spe"].to_numpy(dtype=np.float64))
+    assert int(is_inf.sum()) == 1
+    assert np.isinf(out.loc[is_inf, "omegaCany2spe_nocalib"].to_numpy(dtype=np.float64)).all()
+
+
 def test_clade_permutation_reports_dropped_without_recomputation(monkeypatch, capsys):
     observed = pd.DataFrame(
         {

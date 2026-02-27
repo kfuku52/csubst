@@ -466,6 +466,20 @@ def test_get_cod_skips_when_required_columns_missing():
     assert "OCSCoD" not in out.columns
 
 
+def test_get_cod_maps_zero_over_zero_to_zero_and_keeps_positive_over_zero_infinite():
+    cb = pd.DataFrame(
+        {
+            "OCNany2spe": [0.0, 2.0],
+            "OCNany2dif": [0.0, 0.0],
+            "OCSany2spe": [0.0, 1.0],
+            "OCSany2dif": [0.0, 2.0],
+        }
+    )
+    out = omega.get_CoD(cb.copy(), g={"float_tol": 1e-12})
+    np.testing.assert_allclose(out.loc[:, "OCNCoD"].to_numpy(dtype=np.float64), np.array([0.0, np.inf]))
+    np.testing.assert_allclose(out.loc[:, "OCSCoD"].to_numpy(dtype=np.float64), np.array([0.0, 0.5]))
+
+
 def test_calc_dif_count_matrix_marks_negative_counts_as_nan():
     any_count = np.array([[4.0, 1.0], [0.0, 2.0]], dtype=np.float64)
     spe_count = np.array([[2.0, 2.0], [1.0, 2.0]], dtype=np.float64)
@@ -540,10 +554,11 @@ def test_calc_poisson_count_matrix_matches_expected_means():
         dtype=np.float64,
     )
     list_igad = [[0, 0, "any2", "2any"]]
-    expected_mean = omega._calc_tmp_E_sum(
+    expected_mean = omega._calc_wallenius_expected_overlap(
         cb_ids=cb_ids,
         sub_sites=static_sub_sites,
         sub_branches=sub_bg[:, 0],
+        g={"omega_pvalue_rounding": "round"},
         float_type=np.float64,
     )
     np.random.seed(7)
@@ -566,6 +581,45 @@ def test_calc_poisson_count_matrix_matches_expected_means():
     np.testing.assert_allclose(out.mean(axis=1), expected_mean, atol=0.12)
 
 
+def test_calc_poisson_count_matrix_uses_wallenius_mean_for_skewed_weights():
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    sub_bg = np.array([[80.0], [80.0]], dtype=np.float64)
+    sub_sg = np.zeros((100, 1), dtype=np.float64)
+    static_sub_sites = np.zeros((2, 100), dtype=np.float64)
+    static_sub_sites[:, 0] = 0.9
+    static_sub_sites[:, 1:] = 0.1 / 99.0
+    list_igad = [[0, 0, "any2", "2any"]]
+    expected_mean = omega._calc_wallenius_expected_overlap(
+        cb_ids=cb_ids,
+        sub_sites=static_sub_sites,
+        sub_branches=sub_bg[:, 0],
+        g={"omega_pvalue_rounding": "round"},
+        float_type=np.float64,
+    )
+    legacy_mean = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=static_sub_sites,
+        sub_branches=sub_bg[:, 0],
+        float_type=np.float64,
+    )
+    np.random.seed(17)
+    out = omega._calc_poisson_count_matrix(
+        mode="any2any",
+        cb_ids=cb_ids,
+        sub_sg=sub_sg,
+        sub_bg=sub_bg,
+        niter=8000,
+        obs_col="OCNany2any",
+        num_gad_combinat=1,
+        list_igad=list_igad,
+        g={"float_tol": 1e-12},
+        static_sub_sites=static_sub_sites,
+    )
+    assert out.shape == (1, 8000)
+    np.testing.assert_allclose(out.mean(axis=1), expected_mean, atol=0.35)
+    assert abs(float(out.mean()) - float(legacy_mean[0])) > 1000.0
+
+
 def test_calc_poisson_full_count_matrix_matches_expected_means():
     cb_ids = np.array([[0, 1], [1, 2]], dtype=np.int64)
     sub_tensor = np.zeros((3, 2, 1, 2, 2), dtype=np.float64)
@@ -579,7 +633,17 @@ def test_calc_poisson_full_count_matrix_matches_expected_means():
     )
     list_igad = [[0, 0, "any2", "2any"]]
     site_mass = sub_tensor[:, :, 0, :, :].sum(axis=(2, 3))
-    expected_mean = (site_mass[cb_ids[:, 0], :] * site_mass[cb_ids[:, 1], :]).sum(axis=1)
+    branch_totals = site_mass.sum(axis=1, dtype=np.float64)
+    site_probs = np.zeros_like(site_mass, dtype=np.float64)
+    nz = (branch_totals > 0)
+    site_probs[nz, :] = site_mass[nz, :] / branch_totals[nz, None]
+    expected_mean = omega._calc_wallenius_expected_overlap(
+        cb_ids=cb_ids,
+        sub_sites=site_probs,
+        sub_branches=branch_totals,
+        g={"omega_pvalue_rounding": "round"},
+        float_type=np.float64,
+    )
     np.random.seed(11)
     out = omega._calc_poisson_full_count_matrix(
         mode="any2any",
@@ -589,12 +653,55 @@ def test_calc_poisson_full_count_matrix_matches_expected_means():
         obs_col="OCNany2any",
         num_gad_combinat=1,
         list_igad=list_igad,
+        g={"omega_pvalue_rounding": "round"},
     )
     assert out.shape == (2, 4000)
     assert out.dtype == np.float64
     assert np.all(out >= 0)
     np.testing.assert_allclose(out, np.round(out), atol=0.0)
     np.testing.assert_allclose(out.mean(axis=1), expected_mean, atol=0.06)
+
+
+def test_calc_poisson_full_count_matrix_uses_wallenius_mean_for_skewed_weights():
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    sub_tensor = np.zeros((2, 100, 1, 1, 1), dtype=np.float64)
+    p = np.zeros(100, dtype=np.float64)
+    p[0] = 0.9
+    p[1:] = 0.1 / 99.0
+    sub_tensor[:, :, 0, 0, 0] = 80.0 * np.broadcast_to(p.reshape(1, -1), (2, p.shape[0]))
+    list_igad = [[0, 0, "any2", "2any"]]
+    site_mass = sub_tensor[:, :, 0, :, :].sum(axis=(2, 3))
+    branch_totals = site_mass.sum(axis=1, dtype=np.float64)
+    site_probs = np.zeros_like(site_mass, dtype=np.float64)
+    nz = (branch_totals > 0)
+    site_probs[nz, :] = site_mass[nz, :] / branch_totals[nz, None]
+    expected_mean = omega._calc_wallenius_expected_overlap(
+        cb_ids=cb_ids,
+        sub_sites=site_probs,
+        sub_branches=branch_totals,
+        g={"omega_pvalue_rounding": "round"},
+        float_type=np.float64,
+    )
+    legacy_mean = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=site_mass,
+        sub_branches=np.ones(shape=(site_mass.shape[0],), dtype=np.float64),
+        float_type=np.float64,
+    )
+    np.random.seed(19)
+    out = omega._calc_poisson_full_count_matrix(
+        mode="any2any",
+        cb_ids=cb_ids,
+        sub_tensor=sub_tensor,
+        niter=8000,
+        obs_col="OCNany2any",
+        num_gad_combinat=1,
+        list_igad=list_igad,
+        g={"omega_pvalue_rounding": "round"},
+    )
+    assert out.shape == (1, 8000)
+    np.testing.assert_allclose(out.mean(axis=1), expected_mean, atol=0.35)
+    assert abs(float(out.mean()) - float(legacy_mean[0])) > 1000.0
 
 
 def test_get_mode_permutation_count_matrix_uses_poisson_model(monkeypatch):
@@ -642,7 +749,7 @@ def test_get_mode_permutation_count_matrix_uses_poisson_full_model(monkeypatch):
     def fake_poisson(*args, **kwargs):
         raise AssertionError("factorized poisson path should not be used for poisson_full null model")
 
-    def fake_poisson_full(mode, cb_ids, sub_tensor, niter, obs_col, num_gad_combinat, list_igad):
+    def fake_poisson_full(mode, cb_ids, sub_tensor, niter, obs_col, num_gad_combinat, list_igad, g):
         return expected.copy()
 
     def fake_quantile(*args, **kwargs):
@@ -716,10 +823,11 @@ def test_calc_nbinom_count_matrix_supports_fixed_overdispersion():
         dtype=np.float64,
     )
     list_igad = [[0, 0, "any2", "2any"]]
-    expected_mean = omega._calc_tmp_E_sum(
+    expected_mean = omega._calc_wallenius_expected_overlap(
         cb_ids=cb_ids,
         sub_sites=static_sub_sites,
         sub_branches=sub_bg[:, 0],
+        g={"omega_pvalue_rounding": "round"},
         float_type=np.float64,
     )
     np.random.seed(13)
@@ -814,6 +922,49 @@ def test_calibrate_dsc_renames_empirical_pq_columns_to_nocalib():
         out.loc[:, "qomegaCany2spe_nocalib"].to_numpy(dtype=np.float64),
         np.array([0.10, 0.20], dtype=np.float64),
     )
+
+
+def test_calibrate_dsc_sets_zero_for_zero_over_zero():
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [0, 1],
+            "branch_id_2": [2, 3],
+            "dNCany2spe": [0.0, 0.0],
+            "dSCany2spe": [0.0, 1.0],
+            "omegaCany2spe": [np.nan, np.nan],
+        }
+    )
+    out = omega.calibrate_dsc(
+        cb.copy(),
+        output_stats=["any2spe"],
+        float_tol=1e-12,
+    )
+    np.testing.assert_allclose(
+        out.loc[:, "omegaCany2spe"].to_numpy(dtype=np.float64),
+        np.array([0.0, 0.0], dtype=np.float64),
+        atol=0.0,
+    )
+    assert np.isfinite(out.loc[:, "omegaCany2spe"].to_numpy(dtype=np.float64)).all()
+
+
+def test_calibrate_dsc_excludes_infinite_rows_from_fit_and_preserves_original_omega():
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [0, 1, 2],
+            "branch_id_2": [3, 4, 5],
+            "dNCany2spe": [1.0, np.inf, 0.0],
+            "dSCany2spe": [1.0, 1.0, 0.0],
+            "omegaCany2spe": [1.0, np.inf, np.nan],
+        }
+    )
+    out = omega.calibrate_dsc(
+        cb.copy(),
+        output_stats=["any2spe"],
+        float_tol=1e-12,
+    )
+    assert np.isinf(out.loc[1, "omegaCany2spe_nocalib"])
+    assert np.isinf(out.loc[1, "omegaCany2spe"])
+    assert out.loc[1, "dSCany2spe"] == pytest.approx(1.0)
 
 
 def test_prepare_epistasis_supports_s_channel_and_applies_only_to_ocs():

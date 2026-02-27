@@ -1585,7 +1585,11 @@ def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_re
     )
     cb_missing, g = omega.calc_omega(cb_missing, OS_tensor_reducer, ON_tensor_reducer, g)
     if g['calibrate_longtail'] and (g['exhaustive_until'] >= g['current_arity']):
-        cb_missing = omega.calibrate_dsc(cb_missing, output_stats=g.get('output_stats'))
+        cb_missing = omega.calibrate_dsc(
+            cb_missing,
+            output_stats=g.get('output_stats'),
+            float_tol=g.get('float_tol', 1e-12),
+        )
     if g['branch_dist']:
         cb_missing = tree.get_node_distance(
             tree=g['tree'],
