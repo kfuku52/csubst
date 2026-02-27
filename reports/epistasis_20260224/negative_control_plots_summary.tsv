@@ -1,0 +1,4 @@
+mode	label	pearson_r_log10_omegaCany2spe	jaccard_omegaCany2spe_ge5	runtime_sec	peak_ram_mib
+epi_N_auto	N	0.9997889748823524	0.9813829787234044	8.71	892.3052978515625
+epi_S_auto	S (negative-control)	0.9999228357457668	0.992	8.99	894.6178588867188
+epi_NS_auto	NS	0.999717212431973	0.9761904761904762	9.77	892.164794921875
