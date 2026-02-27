@@ -1,7 +1,9 @@
-output_stat	null_model	real_sec	maxrss_bytes	peak_mem_bytes	auto_guard_msg
-any2any	hypergeom	11.45	1838825472	611915904	False
-any2any	poisson	3.6	1535180800	488691008	False
-any2any	poisson_full	3.56	1533247488	486724544	False
-any2spe	hypergeom	15.0	1685782528	490558720	False
-any2spe	poisson	5.86	1551695872	489510272	False
-any2spe	poisson_full	5.75	1535033344	492279040	False
+output_stat	null_model	real_sec	maxrss_bytes	peak_mem_bytes
+any2any	hypergeom	16.94	1849384960	1229557296
+any2any	nbinom	4.43	1740734464	1120861648
+any2any	poisson	5.39	1712525312	1092648352
+any2any	poisson_full	5.68	1730002944	1109990648
+any2spe	hypergeom	270.22	1913933824	1312378896
+any2spe	nbinom	5.18	1794400256	1174605360
+any2spe	poisson	11.19	1776144384	1156279712
+any2spe	poisson_full	8.96	1775263744	1155390904

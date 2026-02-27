@@ -525,13 +525,23 @@ def _main():
                          help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
                               'P values of omega_C by substitution randomization (modelfree only). '
                               'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib".')
-    analyze.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full', default='poisson', type=str,
-                         choices=['hypergeom', 'poisson', 'poisson_full'],
+    analyze.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full|nbinom', default='poisson', type=str,
+                         choices=['hypergeom', 'poisson', 'poisson_full', 'nbinom'],
                          help='default=%(default)s: Experimental feature. Null count generator for --calc_omega_pvalue. '
                               '"hypergeom" uses legacy site-subset randomization with integer draw sizes. '
                               '"poisson" uses factorized branch/site continuous-rate nulls (Poisson sampling from expected counts). '
                               '"poisson_full" uses branch-specific site masses without branch-site factorization; '
-                              'both Poisson models reduce sensitivity to --min_sub_pp.')
+                              '"nbinom" adds Gamma-Poisson overdispersion on factorized mean counts. '
+                              'Both Poisson-based models reduce sensitivity to --min_sub_pp.')
+    analyze.add_argument('--omega_pvalue_nbinom_alpha', metavar='auto|FLOAT', default='auto', type=str,
+                         help='default=%(default)s: Experimental feature. Overdispersion coefficient for '
+                              '--omega_pvalue_null_model nbinom. Variance is mean + alpha*mean^2. '
+                              '"auto" estimates alpha from observed-vs-expected count dispersion.')
+    analyze.add_argument('--omega_pvalue_min_expected_S', metavar='FLOAT', default=0.01, type=float,
+                         help='default=%(default)s: Experimental feature. Minimum expected synonymous count '
+                              '(ECS) required to report empirical omega_C p-values. '
+                              'Rows with ECS below the resolved threshold are set to NaN because denominator-zero '
+                              'regimes are unstable for ratio-tail p-values.')
     analyze.add_argument('--omega_pvalue_niter', metavar='INT', default=1000, type=int,
                          help='default=%(default)s: Experimental feature. Number of randomization iterations for --calc_omega_pvalue. '
                               'Larger values improve tail resolution but increase runtime and memory.')

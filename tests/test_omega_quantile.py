@@ -128,6 +128,82 @@ def test_prepare_permutation_branch_sizes_supports_stochastic_mode():
     assert np.all(out[2, :] == 2)
 
 
+def test_calc_wallenius_inclusion_probabilities_matches_sampling():
+    p = np.array([0.5, 0.25, 0.15, 0.10, 0.0], dtype=np.float64)
+    draw_size = 3
+    expected = omega._calc_wallenius_inclusion_probabilities(
+        site_weights=p,
+        draw_size=draw_size,
+        float_type=np.float64,
+    )
+    np.random.seed(2)
+    masks = omega._weighted_sample_without_replacement_masks(p=p, size=draw_size, niter=16000)
+    empirical = masks.mean(axis=0)
+    np.testing.assert_allclose(expected, empirical, atol=0.03)
+    np.testing.assert_allclose(expected.sum(), float(draw_size), atol=1e-8)
+
+
+def test_calc_wallenius_expected_overlap_matches_permutation_mean_for_skewed_weights():
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    sub_branches = np.array([80.0, 80.0], dtype=np.float64)
+    p = np.zeros(100, dtype=np.float64)
+    p[0] = 0.9
+    p[1:] = 0.1 / 99.0
+
+    expected = omega._calc_wallenius_expected_overlap(
+        cb_ids=cb_ids,
+        sub_sites=p,
+        sub_branches=sub_branches,
+        g={"omega_pvalue_rounding": "round"},
+        float_type=np.float64,
+    )
+
+    np.random.seed(3)
+    sizes = omega._prepare_permutation_branch_sizes(
+        sub_branches=sub_branches,
+        niter=1,
+        g={"omega_pvalue_rounding": "round"},
+    )
+    perm = omega._get_permutations_fast(
+        cb_ids=cb_ids,
+        sub_branches=sizes,
+        p=p,
+        niter=20000,
+    )
+    perm_mean = float(perm.mean())
+    assert expected.shape == (1,)
+    assert expected[0] <= 80.0 + 1e-9
+    np.testing.assert_allclose(expected[0], perm_mean, atol=0.6)
+
+
+def test_calc_wallenius_expected_overlap_supports_stochastic_rounding():
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    sub_branches = np.array([3.4, 2.6], dtype=np.float64)
+    p = np.array([0.35, 0.30, 0.20, 0.10, 0.05], dtype=np.float64)
+    g = {"omega_pvalue_rounding": "stochastic"}
+
+    expected = omega._calc_wallenius_expected_overlap(
+        cb_ids=cb_ids,
+        sub_sites=p,
+        sub_branches=sub_branches,
+        g=g,
+        float_type=np.float64,
+    )
+    np.random.seed(5)
+    size_by_iter = omega._prepare_permutation_branch_sizes(
+        sub_branches=sub_branches,
+        niter=20000,
+        g=g,
+    )
+    perm = omega._get_permutations_fast(
+        cb_ids=cb_ids,
+        sub_branches=size_by_iter,
+        p=p,
+        niter=20000,
+    )
+    np.testing.assert_allclose(expected[0], float(perm.mean()), atol=0.08)
+
+
 def test_get_permutations_fast_accepts_per_iteration_branch_sizes():
     cb_ids = np.array([[0, 1], [1, 2]], dtype=np.int64)
     sub_branches = np.array(
@@ -415,6 +491,55 @@ def test_calc_omega_empirical_upper_tail_pvalues_uses_upper_tail_mid_p():
     np.testing.assert_allclose(out, np.array([0.75, 0.75], dtype=np.float64))
 
 
+def test_calc_omega_empirical_upper_tail_pvalues_masks_low_expected_s_rows():
+    obs_omega = np.array([2.0, 1.0], dtype=np.float64)
+    exp_N = np.array([1.0, 1.0], dtype=np.float64)
+    exp_S = np.array([0.005, 1.0], dtype=np.float64)
+    perm_count_N = np.array([[2.0, 1.0, 3.0], [0.0, 1.0, 1.0]], dtype=np.float64)
+    perm_count_S = np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64)
+    out = omega._calc_omega_empirical_upper_tail_pvalues(
+        obs_omega=obs_omega,
+        exp_N=exp_N,
+        exp_S=exp_S,
+        perm_count_N=perm_count_N,
+        perm_count_S=perm_count_S,
+        float_tol=1e-12,
+        min_expected_s=0.01,
+    )
+    np.testing.assert_allclose(out, np.array([np.nan, 0.75], dtype=np.float64), equal_nan=True)
+
+
+def test_calc_omega_empirical_upper_tail_pvalues_from_perm_matches_wrapper():
+    obs_omega = np.array([2.0, 1.0], dtype=np.float64)
+    exp_N = np.array([1.0, 1.0], dtype=np.float64)
+    exp_S = np.array([1.0, 1.0], dtype=np.float64)
+    perm_count_N = np.array([[2.0, 1.0, 3.0], [0.0, 1.0, 1.0]], dtype=np.float64)
+    perm_count_S = np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64)
+    wrapper_out = omega._calc_omega_empirical_upper_tail_pvalues(
+        obs_omega=obs_omega,
+        exp_N=exp_N,
+        exp_S=exp_S,
+        perm_count_N=perm_count_N,
+        perm_count_S=perm_count_S,
+        float_tol=1e-12,
+        min_expected_s=0.0,
+    )
+    perm_omega = omega._calc_permutation_omega_matrix(
+        exp_N=exp_N,
+        exp_S=exp_S,
+        perm_count_N=perm_count_N,
+        perm_count_S=perm_count_S,
+        float_tol=1e-12,
+    )
+    from_perm_out = omega._calc_omega_empirical_upper_tail_pvalues_from_perm(
+        obs_omega=obs_omega,
+        exp_S=exp_S,
+        perm_omega=perm_omega,
+        min_expected_s=0.0,
+    )
+    np.testing.assert_allclose(wrapper_out, from_perm_out)
+
+
 def test_calc_bh_fdr_qvalues_handles_nan_and_monotonicity():
     pvalues = np.array([0.01, 0.04, 0.03, np.nan], dtype=np.float64)
     out = omega._calc_bh_fdr_qvalues(pvalues)
@@ -560,6 +685,85 @@ def test_get_mode_permutation_count_matrix_uses_poisson_full_model(monkeypatch):
     np.testing.assert_allclose(out, expected)
 
 
+def test_get_mode_permutation_count_matrix_uses_nbinom_model(monkeypatch):
+    cb_ids = np.array([[0, 1]], dtype=np.int64)
+    expected = np.full((1, 5), 4.0, dtype=np.float64)
+
+    def fake_prepare(sub_tensor, mode, SN, g):
+        return np.zeros((2, 1), dtype=np.float64), np.zeros((3, 1), dtype=np.float64), [[0, 0, "any2", "2any"]], "OCNany2any", 1
+
+    def fake_static(g, sub_sg, mode, obs_col):
+        return np.ones((2, 3), dtype=np.float64) / 3.0
+
+    def fake_nbinom(mode, cb_ids, sub_sg, sub_bg, niter, obs_col, num_gad_combinat, list_igad, g, static_sub_sites, obs_count):
+        assert obs_count is not None
+        return expected.copy()
+
+    def fake_poisson(*args, **kwargs):
+        raise AssertionError("poisson path should not be used for nbinom null model")
+
+    def fake_quantile(*args, **kwargs):
+        raise AssertionError("hypergeom path should not be used for nbinom null model")
+
+    monkeypatch.setattr(omega, "_prepare_substitution_quantile_components", fake_prepare)
+    monkeypatch.setattr(omega, "_get_static_sub_sites_if_available", fake_static)
+    monkeypatch.setattr(omega, "_calc_nbinom_count_matrix", fake_nbinom)
+    monkeypatch.setattr(omega, "_calc_poisson_count_matrix", fake_poisson)
+    monkeypatch.setattr(omega, "_calc_quantile_count_matrix", fake_quantile)
+
+    out = omega._get_mode_permutation_count_matrix(
+        cb_ids=cb_ids,
+        sub_tensor=None,
+        mode="any2any",
+        SN="N",
+        niter=5,
+        g={"omega_pvalue_null_model": "nbinom"},
+        obs_count=np.array([2.0], dtype=np.float64),
+    )
+    np.testing.assert_allclose(out, expected)
+
+
+def test_calc_nbinom_count_matrix_supports_fixed_overdispersion():
+    cb_ids = np.array([[0, 1], [1, 2]], dtype=np.int64)
+    sub_bg = np.array([[1.0], [2.0], [3.0]], dtype=np.float64)
+    sub_sg = np.zeros((2, 1), dtype=np.float64)
+    static_sub_sites = np.array(
+        [
+            [0.6, 0.4],
+            [0.5, 0.5],
+            [0.2, 0.8],
+        ],
+        dtype=np.float64,
+    )
+    list_igad = [[0, 0, "any2", "2any"]]
+    expected_mean = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=static_sub_sites,
+        sub_branches=sub_bg[:, 0],
+        float_type=np.float64,
+    )
+    np.random.seed(13)
+    out = omega._calc_nbinom_count_matrix(
+        mode="any2any",
+        cb_ids=cb_ids,
+        sub_sg=sub_sg,
+        sub_bg=sub_bg,
+        niter=4000,
+        obs_col="OCNany2any",
+        num_gad_combinat=1,
+        list_igad=list_igad,
+        g={"float_tol": 1e-12, "omega_pvalue_nbinom_alpha": 0.8},
+        static_sub_sites=static_sub_sites,
+        obs_count=np.array([2.0, 3.0], dtype=np.float64),
+    )
+    assert out.shape == (2, 4000)
+    assert out.dtype == np.float64
+    assert np.all(out >= 0)
+    np.testing.assert_allclose(out.mean(axis=1), expected_mean, atol=0.18)
+    # With alpha>0, variance should exceed mean for overdispersed rows.
+    assert np.all(out.var(axis=1) > out.mean(axis=1))
+
+
 def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
     cb = pd.DataFrame(
         {
@@ -578,7 +782,7 @@ def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
     }
     calls = []
 
-    def fake_get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g):
+    def fake_get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, obs_count=None):
         calls.append((SN, mode, int(niter), cb_ids.shape))
         return mode_counts[(SN, mode)]
 

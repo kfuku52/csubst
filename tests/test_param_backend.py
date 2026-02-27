@@ -262,6 +262,7 @@ def test_get_global_parameters_sets_omega_pvalue_defaults():
     g = param.get_global_parameters(_args())
     assert g["calc_omega_pvalue"] is False
     assert g["omega_pvalue_null_model"] == "poisson"
+    assert g["omega_pvalue_min_expected_S"] == pytest.approx(0.01)
     assert g["omega_pvalue_niter"] == 1000
     assert g["omega_pvalue_rounding"] == "round"
 
@@ -271,6 +272,18 @@ def test_get_global_parameters_rejects_invalid_omega_pvalue_niter():
         param.get_global_parameters(_args(omega_pvalue_niter=0))
     with pytest.raises(ValueError, match="omega_pvalue_niter"):
         param.get_global_parameters(_args(omega_pvalue_niter=100000))
+
+
+def test_get_global_parameters_rejects_invalid_omega_pvalue_min_expected_S():
+    with pytest.raises(ValueError, match="omega_pvalue_min_expected_S"):
+        param.get_global_parameters(_args(omega_pvalue_min_expected_S=-0.01))
+    with pytest.raises(ValueError, match="omega_pvalue_min_expected_S"):
+        param.get_global_parameters(_args(omega_pvalue_min_expected_S=float("nan")))
+
+
+def test_get_global_parameters_accepts_fixed_omega_pvalue_min_expected_S():
+    g = param.get_global_parameters(_args(omega_pvalue_min_expected_S=0.02))
+    assert g["omega_pvalue_min_expected_S"] == pytest.approx(0.02)
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_rounding():
@@ -286,6 +299,28 @@ def test_get_global_parameters_rejects_invalid_omega_pvalue_null_model():
 def test_get_global_parameters_accepts_omega_pvalue_poisson_full_model():
     g = param.get_global_parameters(_args(omega_pvalue_null_model="poisson_full"))
     assert g["omega_pvalue_null_model"] == "poisson_full"
+
+
+def test_get_global_parameters_accepts_omega_pvalue_nbinom_model():
+    g = param.get_global_parameters(_args(omega_pvalue_null_model="nbinom"))
+    assert g["omega_pvalue_null_model"] == "nbinom"
+
+
+def test_get_global_parameters_sets_omega_pvalue_nbinom_alpha_defaults():
+    g = param.get_global_parameters(_args())
+    assert g["omega_pvalue_nbinom_alpha"] == "auto"
+
+
+def test_get_global_parameters_accepts_fixed_omega_pvalue_nbinom_alpha():
+    g = param.get_global_parameters(_args(omega_pvalue_nbinom_alpha=0.5))
+    assert g["omega_pvalue_nbinom_alpha"] == pytest.approx(0.5)
+
+
+def test_get_global_parameters_rejects_invalid_omega_pvalue_nbinom_alpha():
+    with pytest.raises(ValueError, match="omega_pvalue_nbinom_alpha"):
+        param.get_global_parameters(_args(omega_pvalue_nbinom_alpha=-0.1))
+    with pytest.raises(ValueError, match="omega_pvalue_nbinom_alpha"):
+        param.get_global_parameters(_args(omega_pvalue_nbinom_alpha=float("nan")))
 
 
 def test_get_global_parameters_keeps_min_sub_pp_unchanged_for_omega_pvalue(capsys):

@@ -217,8 +217,30 @@ def get_global_parameters(args):
         g['omega_pvalue_null_model'] = str(g['omega_pvalue_null_model']).strip().lower()
     else:
         g['omega_pvalue_null_model'] = 'poisson'
-    if g['omega_pvalue_null_model'] not in ['hypergeom', 'poisson', 'poisson_full']:
-        raise ValueError('--omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full.')
+    if g['omega_pvalue_null_model'] not in ['hypergeom', 'poisson', 'poisson_full', 'nbinom']:
+        raise ValueError('--omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full, nbinom.')
+    if 'omega_pvalue_nbinom_alpha' in g.keys():
+        token = g['omega_pvalue_nbinom_alpha']
+    else:
+        token = 'auto'
+    if isinstance(token, str) and (token.strip().lower() == 'auto'):
+        g['omega_pvalue_nbinom_alpha'] = 'auto'
+    else:
+        g['omega_pvalue_nbinom_alpha'] = _require_finite_float(
+            value=float(token),
+            param_name='--omega_pvalue_nbinom_alpha',
+        )
+        if g['omega_pvalue_nbinom_alpha'] < 0:
+            raise ValueError('--omega_pvalue_nbinom_alpha should be >= 0.')
+    if 'omega_pvalue_min_expected_S' in g.keys():
+        g['omega_pvalue_min_expected_S'] = _require_finite_float(
+            value=float(g['omega_pvalue_min_expected_S']),
+            param_name='--omega_pvalue_min_expected_S',
+        )
+    else:
+        g['omega_pvalue_min_expected_S'] = 0.01
+    if g['omega_pvalue_min_expected_S'] < 0:
+        raise ValueError('--omega_pvalue_min_expected_S should be >= 0.')
     if 'omega_pvalue_safe_min_sub_pp' in g.keys():
         raise ValueError(
             '--omega_pvalue_safe_min_sub_pp was removed. '

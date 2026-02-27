@@ -1240,6 +1240,129 @@ def _prepare_permutation_branch_sizes(sub_branches, niter, g):
     return out
 
 
+def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=np.float64):
+    site_weights = np.asarray(site_weights, dtype=np.float64).reshape(-1)
+    if site_weights.ndim != 1:
+        raise ValueError('site_weights should be a 1D array.')
+    if (site_weights < 0).any():
+        raise ValueError('site_weights should be non-negative.')
+    draw_size = int(draw_size)
+    if draw_size < 0:
+        raise ValueError('draw_size should be >= 0.')
+    out = np.zeros(shape=site_weights.shape, dtype=np.float64)
+    positive_mask = (site_weights > 0)
+    positive_weights = site_weights[positive_mask]
+    num_positive = int(positive_weights.shape[0])
+    if (draw_size == 0) or (num_positive == 0):
+        return out.astype(float_type, copy=False)
+    if draw_size >= num_positive:
+        out[positive_mask] = 1.0
+        return out.astype(float_type, copy=False)
+
+    target = float(draw_size)
+    lo = 0.0
+    hi = 1.0
+    for _ in range(128):
+        current = (-np.expm1(-hi * positive_weights)).sum(dtype=np.float64)
+        if current >= target:
+            break
+        hi *= 2.0
+    for _ in range(96):
+        mid = (lo + hi) / 2.0
+        current = (-np.expm1(-mid * positive_weights)).sum(dtype=np.float64)
+        if current < target:
+            lo = mid
+        else:
+            hi = mid
+    lam = (lo + hi) / 2.0
+    out_positive = -np.expm1(-lam * positive_weights)
+    out[positive_mask] = np.clip(out_positive, a_min=0.0, a_max=1.0)
+    return out.astype(float_type, copy=False)
+
+
+def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if cb_ids.shape[0] == 0:
+        return np.zeros(shape=(0,), dtype=float_type)
+    if (cb_ids < 0).any():
+        raise ValueError('cb_ids should be non-negative.')
+
+    sub_branches = np.asarray(sub_branches, dtype=np.float64).reshape(-1)
+    if sub_branches.ndim != 1:
+        raise ValueError('sub_branches should be a 1D array.')
+    if not np.isfinite(sub_branches).all():
+        raise ValueError('sub_branches should be finite.')
+    np.clip(sub_branches, a_min=0.0, a_max=None, out=sub_branches)
+
+    sub_sites = np.asarray(sub_sites, dtype=np.float64)
+    if sub_sites.ndim == 1:
+        sub_sites = np.broadcast_to(sub_sites.reshape(1, -1), (sub_branches.shape[0], sub_sites.shape[0]))
+    elif sub_sites.ndim != 2:
+        raise ValueError('sub_sites should be a 1D or 2D array.')
+    if sub_sites.shape[0] != sub_branches.shape[0]:
+        txt = 'sub_sites branch axis ({}) and sub_branches length ({}) should match.'
+        raise ValueError(txt.format(sub_sites.shape[0], sub_branches.shape[0]))
+    if (sub_sites < 0).any():
+        raise ValueError('sub_sites should be non-negative.')
+    if sub_sites.shape[0] <= cb_ids.max():
+        raise ValueError('cb_ids contain out-of-range branch IDs.')
+
+    rounding_mode = _resolve_omega_pvalue_rounding_mode(g=g)
+    inclusion_prob = np.zeros(shape=sub_sites.shape, dtype=np.float64)
+    if rounding_mode == 'stochastic':
+        base = np.floor(sub_branches).astype(np.int64, copy=False)
+        frac = sub_branches - base
+        for branch_id in range(sub_sites.shape[0]):
+            branch_weights = sub_sites[branch_id, :]
+            num_positive = int((branch_weights > 0).sum())
+            if num_positive == 0:
+                continue
+            size_lo = int(np.clip(base[branch_id], a_min=0, a_max=num_positive))
+            size_hi = int(np.clip(base[branch_id] + 1, a_min=0, a_max=num_positive))
+            prob_lo = _calc_wallenius_inclusion_probabilities(
+                site_weights=branch_weights,
+                draw_size=size_lo,
+                float_type=np.float64,
+            )
+            if (frac[branch_id] <= 0) or (size_lo == size_hi):
+                inclusion_prob[branch_id, :] = prob_lo
+            else:
+                prob_hi = _calc_wallenius_inclusion_probabilities(
+                    site_weights=branch_weights,
+                    draw_size=size_hi,
+                    float_type=np.float64,
+                )
+                inclusion_prob[branch_id, :] = (
+                    (1.0 - float(frac[branch_id])) * prob_lo +
+                    float(frac[branch_id]) * prob_hi
+                )
+    else:
+        rounded_sizes = _prepare_permutation_branch_sizes(
+            sub_branches=sub_branches,
+            niter=1,
+            g=g,
+        )
+        rounded_sizes = np.asarray(rounded_sizes, dtype=np.int64).reshape(-1)
+        for branch_id in range(sub_sites.shape[0]):
+            branch_weights = sub_sites[branch_id, :]
+            num_positive = int((branch_weights > 0).sum())
+            if num_positive == 0:
+                continue
+            draw_size = int(np.clip(rounded_sizes[branch_id], a_min=0, a_max=num_positive))
+            inclusion_prob[branch_id, :] = _calc_wallenius_inclusion_probabilities(
+                site_weights=branch_weights,
+                draw_size=draw_size,
+                float_type=np.float64,
+            )
+    return _calc_cb_site_overlap(
+        cb_ids=cb_ids,
+        sub_sites=inclusion_prob,
+        float_type=float_type,
+    )
+
+
 def _fill_packed_masks_for_sizes(packed_masks_branch, site_p, size_values):
     size_values = np.asarray(size_values, dtype=np.int64).reshape(-1)
     if packed_masks_branch.shape[0] != size_values.shape[0]:
@@ -1702,12 +1825,12 @@ def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g, static_sub_
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        E_b += _calc_tmp_E_sum(
+        E_b += _calc_wallenius_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
+            g=g,
             float_type=g['float_type'],
-            cb_site_overlap=cb_site_overlap,
         )
     return E_b
 
@@ -1737,12 +1860,12 @@ def joblib_calc_E_mean(
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        dfEb += _calc_tmp_E_sum(
+        dfEb += _calc_wallenius_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
+            g=g,
             float_type=g['float_type'],
-            cb_site_overlap=cb_site_overlap,
         )
     txt = 'E{}: {}-{}th of {} matrix_group/ancestral_state/derived_state combinations. Time elapsed: {:,} [sec]'
     print(txt.format(obs_col, i_start, i, num_gad_combinat, int(time.time()-iter_start)), flush=True)
@@ -1896,12 +2019,6 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', quantile_niter=1000, SN='', g
     cb_ids = _get_cb_ids(cb)
     static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
     cb_site_overlap = None
-    if static_sub_sites is not None:
-        cb_site_overlap = _calc_cb_site_overlap(
-            cb_ids=cb_ids,
-            sub_sites=static_sub_sites,
-            float_type=g['float_type'],
-        )
     requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
     chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
     n_jobs = requested_n_jobs
@@ -2509,8 +2626,8 @@ def _resolve_omega_pvalue_null_model(g):
     model = 'poisson'
     if g is not None:
         model = str(g.get('omega_pvalue_null_model', 'poisson')).strip().lower()
-    if model not in ['hypergeom', 'poisson', 'poisson_full']:
-        raise ValueError('omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full.')
+    if model not in ['hypergeom', 'poisson', 'poisson_full', 'nbinom']:
+        raise ValueError('omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full, nbinom.')
     return model
 
 
@@ -2564,6 +2681,135 @@ def _calc_poisson_count_matrix(
         txt = '{} (poisson): {}/{} matrix_group/ancestral_state/derived_state combinations. '
         txt += 'Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
+    return out
+
+
+def _estimate_nbinom_alpha(obs_count, mean_count, float_tol, max_alpha=10.0):
+    obs_count = np.asarray(obs_count, dtype=np.float64).reshape(-1)
+    mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
+    if obs_count.shape[0] != mean_count.shape[0]:
+        txt = 'obs_count rows ({}) and mean_count rows ({}) should match.'
+        raise ValueError(txt.format(obs_count.shape[0], mean_count.shape[0]))
+    valid = np.isfinite(obs_count) & np.isfinite(mean_count) & (mean_count > float(float_tol))
+    if int(valid.sum()) < 20:
+        return 0.0, 'auto_insufficient_rows'
+    mu = np.clip(mean_count[valid], a_min=float(float_tol), a_max=None)
+    resid2 = (obs_count[valid] - mu) ** 2
+    alpha_i = (resid2 - mu) / (mu ** 2)
+    alpha_i = alpha_i[np.isfinite(alpha_i)]
+    if alpha_i.shape[0] == 0:
+        return 0.0, 'auto_no_finite_estimates'
+    alpha_i = np.clip(alpha_i, a_min=0.0, a_max=float(max_alpha))
+    alpha = float(np.median(alpha_i))
+    if not np.isfinite(alpha):
+        return 0.0, 'auto_non_finite'
+    return alpha, 'auto'
+
+
+def _resolve_nbinom_alpha(g, obs_count, mean_count):
+    token = 'auto'
+    if g is not None:
+        token = g.get('omega_pvalue_nbinom_alpha', 'auto')
+    if isinstance(token, str) and (token.strip().lower() == 'auto'):
+        alpha, source = _estimate_nbinom_alpha(
+            obs_count=obs_count,
+            mean_count=mean_count,
+            float_tol=float(g.get('float_tol', 1e-12)) if g is not None else 1e-12,
+        )
+        return float(alpha), source
+    alpha = float(token)
+    if (not np.isfinite(alpha)) or (alpha < 0):
+        raise ValueError('omega_pvalue_nbinom_alpha should be a finite value >= 0 or "auto".')
+    return float(alpha), 'fixed'
+
+
+def _sample_nbinom_count_matrix(mean_count, niter, alpha):
+    mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
+    if mean_count.ndim != 1:
+        raise ValueError('mean_count should be a 1D array.')
+    if int(niter) <= 0:
+        raise ValueError('niter should be a positive integer.')
+    mean_count = np.clip(mean_count, a_min=0.0, a_max=None)
+    if mean_count.shape[0] == 0:
+        return np.zeros(shape=(0, int(niter)), dtype=np.float64)
+    if alpha <= 0:
+        return np.random.poisson(
+            lam=mean_count[:, None],
+            size=(mean_count.shape[0], int(niter)),
+        ).astype(np.float64, copy=False)
+    gamma_shape = 1.0 / float(alpha)
+    gamma_scale = float(alpha) * mean_count[:, None]
+    lam = np.random.gamma(
+        shape=gamma_shape,
+        scale=gamma_scale,
+        size=(mean_count.shape[0], int(niter)),
+    )
+    return np.random.poisson(lam=lam).astype(np.float64, copy=False)
+
+
+def _calc_nbinom_count_matrix(
+    mode,
+    cb_ids,
+    sub_sg,
+    sub_bg,
+    niter,
+    obs_col,
+    num_gad_combinat,
+    list_igad,
+    g,
+    static_sub_sites,
+    obs_count,
+):
+    cb_ids = np.asarray(cb_ids, dtype=np.int64)
+    niter = int(niter)
+    if cb_ids.ndim != 2:
+        raise ValueError('cb_ids should be a 2D array.')
+    if niter <= 0:
+        raise ValueError('niter should be a positive integer.')
+    out = np.zeros(shape=(cb_ids.shape[0], niter), dtype=np.float64)
+    if cb_ids.shape[0] == 0:
+        return out
+    mean_total = np.zeros(shape=(cb_ids.shape[0],), dtype=np.float64)
+    for i, sg, a, d in list_igad:
+        if a == d:
+            continue
+        if static_sub_sites is None:
+            sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+        else:
+            sub_sites = static_sub_sites
+        sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
+        mean_count = _calc_tmp_E_sum(
+            cb_ids=cb_ids,
+            sub_sites=sub_sites,
+            sub_branches=sub_branches,
+            float_type=np.float64,
+        )
+        mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
+        if mean_count.shape[0] != cb_ids.shape[0]:
+            txt = 'mean_count rows ({}) and cb_ids rows ({}) should match.'
+            raise ValueError(txt.format(mean_count.shape[0], cb_ids.shape[0]))
+        np.clip(mean_count, a_min=0.0, a_max=None, out=mean_count)
+        mean_total += mean_count
+    if (mean_total > 0).sum() == 0:
+        return out
+    if obs_count is None:
+        obs_count = mean_total
+    alpha, alpha_source = _resolve_nbinom_alpha(
+        g=g,
+        obs_count=obs_count,
+        mean_count=mean_total,
+    )
+    pm_start = time.time()
+    out = _sample_nbinom_count_matrix(
+        mean_count=mean_total,
+        niter=niter,
+        alpha=alpha,
+    )
+    txt = '{} (nbinom): categories={}, alpha={:.6g} (source={}), niter={}, elapsed={} sec'
+    print(
+        txt.format(obs_col, int(num_gad_combinat), float(alpha), alpha_source, int(niter), int(time.time() - pm_start)),
+        flush=True,
+    )
     return out
 
 
@@ -2647,7 +2893,7 @@ def _calc_poisson_full_count_matrix(
     return out
 
 
-def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g):
+def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, obs_count=None):
     sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_quantile_components(
         sub_tensor=sub_tensor,
         mode=mode,
@@ -2662,6 +2908,8 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g):
         model_label = 'poisson-rate'
     if null_model == 'poisson_full':
         model_label = 'poisson-full-rate'
+    if null_model == 'nbinom':
+        model_label = 'nbinom-rate'
     print(txt.format(SN, mode, model_label, cb_ids.shape[0], int(niter), int(num_gad_combinat)), flush=True)
     if null_model == 'hypergeom':
         return _calc_quantile_count_matrix(
@@ -2699,10 +2947,75 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g):
             num_gad_combinat=num_gad_combinat,
             list_igad=list_igad,
         )
+    if null_model == 'nbinom':
+        return _calc_nbinom_count_matrix(
+            mode=mode,
+            cb_ids=cb_ids,
+            sub_sg=sub_sg,
+            sub_bg=sub_bg,
+            niter=int(niter),
+            obs_col=obs_col,
+            num_gad_combinat=num_gad_combinat,
+            list_igad=list_igad,
+            g=g,
+            static_sub_sites=static_sub_sites,
+            obs_count=obs_count,
+        )
     raise ValueError('Unsupported omega_pvalue_null_model: {}'.format(null_model))
 
 
-def _calc_omega_empirical_upper_tail_pvalues(obs_omega, exp_N, exp_S, perm_count_N, perm_count_S, float_tol):
+def _calc_permutation_omega_matrix(exp_N, exp_S, perm_count_N, perm_count_S, float_tol):
+    exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
+    exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
+    perm_count_N = np.asarray(perm_count_N, dtype=np.float64)
+    perm_count_S = np.asarray(perm_count_S, dtype=np.float64)
+    if perm_count_N.shape != perm_count_S.shape:
+        raise ValueError('perm_count_N and perm_count_S should have identical shapes.')
+    if perm_count_N.ndim != 2:
+        raise ValueError('perm_count_N should be a 2D array.')
+    if exp_N.shape[0] != perm_count_N.shape[0]:
+        txt = 'exp_N rows ({}) and permutation rows ({}) should match.'
+        raise ValueError(txt.format(exp_N.shape[0], perm_count_N.shape[0]))
+    if exp_S.shape[0] != perm_count_N.shape[0]:
+        txt = 'exp_S rows ({}) and permutation rows ({}) should match.'
+        raise ValueError(txt.format(exp_S.shape[0], perm_count_N.shape[0]))
+    perm_dNc = _calc_raw_rate(obs=perm_count_N, exp=exp_N[:, None], float_tol=float_tol)
+    perm_dSc = _calc_raw_rate(obs=perm_count_S, exp=exp_S[:, None], float_tol=float_tol)
+    return _calc_raw_omega(dNc=perm_dNc, dSc=perm_dSc, float_tol=float_tol)
+
+
+def _calc_omega_empirical_upper_tail_pvalues_from_perm(obs_omega, exp_S, perm_omega, min_expected_s=0.0):
+    obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
+    exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
+    perm_omega = np.asarray(perm_omega, dtype=np.float64)
+    if perm_omega.ndim != 2:
+        raise ValueError('perm_omega should be a 2D array.')
+    if perm_omega.shape[0] != obs_omega.shape[0]:
+        txt = 'Permutation rows ({}) and observed rows ({}) should match.'
+        raise ValueError(txt.format(perm_omega.shape[0], obs_omega.shape[0]))
+    if exp_S.shape[0] != obs_omega.shape[0]:
+        txt = 'exp_S rows ({}) and observed rows ({}) should match.'
+        raise ValueError(txt.format(exp_S.shape[0], obs_omega.shape[0]))
+    valid_perm = ~np.isnan(perm_omega)
+    ge_ranks = (valid_perm & (perm_omega >= obs_omega[:, None])).sum(axis=1, dtype=np.int64)
+    valid_niter = valid_perm.sum(axis=1, dtype=np.int64)
+    pvalue = np.full(shape=obs_omega.shape, fill_value=np.nan, dtype=np.float64)
+    valid_rows = (~np.isnan(obs_omega)) & (valid_niter > 0)
+    valid_rows &= np.isfinite(exp_S)
+    valid_rows &= (exp_S >= float(min_expected_s))
+    pvalue[valid_rows] = (ge_ranks[valid_rows] + 1.0) / (valid_niter[valid_rows] + 1.0)
+    return pvalue
+
+
+def _calc_omega_empirical_upper_tail_pvalues(
+    obs_omega,
+    exp_N,
+    exp_S,
+    perm_count_N,
+    perm_count_S,
+    float_tol,
+    min_expected_s=0.0,
+):
     obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
     exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
     exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
@@ -2721,16 +3034,19 @@ def _calc_omega_empirical_upper_tail_pvalues(obs_omega, exp_N, exp_S, perm_count
     if exp_S.shape[0] != obs_omega.shape[0]:
         txt = 'exp_S rows ({}) and observed rows ({}) should match.'
         raise ValueError(txt.format(exp_S.shape[0], obs_omega.shape[0]))
-    perm_dNc = _calc_raw_rate(obs=perm_count_N, exp=exp_N[:, None], float_tol=float_tol)
-    perm_dSc = _calc_raw_rate(obs=perm_count_S, exp=exp_S[:, None], float_tol=float_tol)
-    perm_omega = _calc_raw_omega(dNc=perm_dNc, dSc=perm_dSc, float_tol=float_tol)
-    valid_perm = np.isfinite(perm_omega)
-    ge_ranks = (valid_perm & (perm_omega >= obs_omega[:, None])).sum(axis=1, dtype=np.int64)
-    valid_niter = valid_perm.sum(axis=1, dtype=np.int64)
-    pvalue = np.full(shape=obs_omega.shape, fill_value=np.nan, dtype=np.float64)
-    valid_rows = np.isfinite(obs_omega) & (valid_niter > 0)
-    pvalue[valid_rows] = (ge_ranks[valid_rows] + 1.0) / (valid_niter[valid_rows] + 1.0)
-    return pvalue
+    perm_omega = _calc_permutation_omega_matrix(
+        exp_N=exp_N,
+        exp_S=exp_S,
+        perm_count_N=perm_count_N,
+        perm_count_S=perm_count_S,
+        float_tol=float_tol,
+    )
+    return _calc_omega_empirical_upper_tail_pvalues_from_perm(
+        obs_omega=obs_omega,
+        exp_S=exp_S,
+        perm_omega=perm_omega,
+        min_expected_s=min_expected_s,
+    )
 
 
 def _calc_bh_fdr_qvalues(pvalues):
@@ -2761,6 +3077,9 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
     niter = int(g.get('omega_pvalue_niter', 1000))
     if niter <= 0:
         raise ValueError('omega_pvalue_niter should be a positive integer.')
+    min_expected_s = float(g.get('omega_pvalue_min_expected_S', 0.01))
+    if min_expected_s < 0:
+        raise ValueError('omega_pvalue_min_expected_S should be >= 0.')
     null_model = _resolve_omega_pvalue_null_model(g=g)
     txt = 'omega_C empirical p-value null model: {}'
     print(txt.format(null_model), flush=True)
@@ -2776,6 +3095,14 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
         mode_to_count_S = dict()
         required_modes = output_stat.get_required_base_stats([sub])
         for mode in required_modes:
+            obs_col_N = 'OCN' + mode
+            obs_col_S = 'OCS' + mode
+            obs_count_N = None
+            obs_count_S = None
+            if obs_col_N in cb.columns:
+                obs_count_N = cb.loc[:, obs_col_N].to_numpy(dtype=np.float64, copy=False)
+            if obs_col_S in cb.columns:
+                obs_count_S = cb.loc[:, obs_col_S].to_numpy(dtype=np.float64, copy=False)
             mode_to_count_N[mode] = _get_mode_permutation_count_matrix(
                 cb_ids=cb_ids,
                 sub_tensor=ON_tensor,
@@ -2783,6 +3110,7 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
                 SN='N',
                 niter=niter,
                 g=g,
+                obs_count=obs_count_N,
             )
             mode_to_count_S[mode] = _get_mode_permutation_count_matrix(
                 cb_ids=cb_ids,
@@ -2791,6 +3119,7 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
                 SN='S',
                 niter=niter,
                 g=g,
+                obs_count=obs_count_S,
             )
         perm_count_N = _compose_permutation_count_matrix(
             stat=sub,
@@ -2802,19 +3131,35 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
             mode_to_count=mode_to_count_S,
             tol=g['float_tol'],
         )
+        obs_omega_values = cb.loc[:, col_omega].to_numpy(dtype=np.float64, copy=False)
+        exp_N_values = cb.loc[:, col_exp_N].to_numpy(dtype=np.float64, copy=False)
+        exp_S_values = cb.loc[:, col_exp_S].to_numpy(dtype=np.float64, copy=False)
         pvalue = _calc_omega_empirical_upper_tail_pvalues(
-            obs_omega=cb.loc[:, col_omega].to_numpy(dtype=np.float64, copy=False),
-            exp_N=cb.loc[:, col_exp_N].to_numpy(dtype=np.float64, copy=False),
-            exp_S=cb.loc[:, col_exp_S].to_numpy(dtype=np.float64, copy=False),
+            obs_omega=obs_omega_values,
+            exp_N=exp_N_values,
+            exp_S=exp_S_values,
             perm_count_N=perm_count_N,
             perm_count_S=perm_count_S,
             float_tol=g['float_tol'],
+            min_expected_s=min_expected_s,
         )
         col_p = 'pomegaC' + sub
         cb.loc[:, col_p] = pvalue
         col_q = 'qomegaC' + sub
         qvalue = _calc_bh_fdr_qvalues(pvalue)
         cb.loc[:, col_q] = qvalue
+        low_exp_s = np.isfinite(exp_S_values) & (exp_S_values < min_expected_s)
+        if low_exp_s.any():
+            txt = 'Arity = {:,}, cb: {} rows with ECS<{} were set to NaN for {}'
+            print(
+                txt.format(
+                    cb_ids.shape[1],
+                    int(low_exp_s.sum()),
+                    '{:.6g}'.format(min_expected_s),
+                    col_p,
+                ),
+                flush=True,
+            )
         finite = np.isfinite(pvalue)
         if finite.any():
             txt = 'Arity = {:,}, cb: median {} = {:.4f} ({:,}/{:,} finite)'
