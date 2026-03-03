@@ -48,6 +48,18 @@ def _normalize_sa_state_cache_mode(value):
     raise ValueError('--sa_state_cache should be one of auto, yes, no.')
 
 
+def _resolve_expectation_method(g):
+    token = g.get('expectation_method', None)
+    if (token is None) or (str(token).strip() == ''):
+        token = g.get('omegaC_method', 'submodel')
+    normalized = str(token).strip().lower()
+    if normalized in ['codon_model', 'submodel', '']:
+        return 'codon_model'
+    if normalized in ['urn', 'modelfree']:
+        return 'urn'
+    raise ValueError('Unsupported expectation method: {}'.format(token))
+
+
 def _normalize_branch_ids_for_3di_cache(branch_ids):
     if branch_ids is None:
         return []
@@ -199,10 +211,8 @@ def read_input(g):
         g = parser_phylobayes.get_input_information(g)
     elif (g['infile_type'] == 'iqtree'):
         g = parser_iqtree.get_input_information(g)
-    if ('omegaC_method' not in g.keys()):
-        g = _initialize_and_report_nonsyn_recode(g)
-        return g
-    if (g['omegaC_method']!='submodel'):
+    expectation_method = _resolve_expectation_method(g)
+    if expectation_method != 'codon_model':
         g = _initialize_and_report_nonsyn_recode(g)
         return g
     base_model = re.sub(r'\+G.*', '', g['substitution_model'])
@@ -237,7 +247,7 @@ def read_input(g):
             raise AssertionError(txt)
         g['instantaneous_codon_rate_matrix'] = get_mechanistic_instantaneous_rate_matrix(g=g)
     else:
-        txt = 'Unsupported substitution model for --omegaC_method submodel: {}'
+        txt = 'Unsupported substitution model for --expectation_method codon_model: {}'
         raise ValueError(txt.format(g['substitution_model']))
     g = _initialize_and_report_nonsyn_recode(g)
     g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)

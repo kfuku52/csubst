@@ -1204,6 +1204,32 @@ def _resolve_omega_pvalue_rounding_mode(g):
     return mode
 
 
+def _resolve_expectation_method(g):
+    token = 'codon_model'
+    if g is not None:
+        token = g.get('expectation_method', None)
+        if (token is None) or (str(token).strip() == ''):
+            token = g.get('omegaC_method', 'submodel')
+    normalized = str(token).strip().lower()
+    if normalized in ['codon_model', 'submodel', '']:
+        return 'codon_model'
+    if normalized in ['urn', 'modelfree']:
+        return 'urn'
+    raise ValueError('Unsupported expectation_method: {}'.format(token))
+
+
+def _resolve_urn_model(g):
+    token = 'wallenius'
+    if g is not None:
+        token = g.get('urn_model', 'wallenius')
+    normalized = str(token).strip().lower()
+    if normalized in ['wallenius', 'fisher']:
+        return normalized
+    if normalized in ['factorized_approx', 'factorized', 'legacy_factorized', 'approx']:
+        return 'factorized_approx'
+    raise ValueError('urn_model should be one of wallenius, fisher, factorized_approx.')
+
+
 def _prepare_permutation_branch_sizes(sub_branches, niter, g):
     sub_branches = np.asarray(sub_branches)
     if sub_branches.ndim != 1:
@@ -1283,7 +1309,71 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
     return out.astype(float_type, copy=False)
 
 
-def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
+def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.float64):
+    site_weights = np.asarray(site_weights, dtype=np.float64).reshape(-1)
+    if site_weights.ndim != 1:
+        raise ValueError('site_weights should be a 1D array.')
+    if (site_weights < 0).any():
+        raise ValueError('site_weights should be non-negative.')
+    draw_size = int(draw_size)
+    if draw_size < 0:
+        raise ValueError('draw_size should be >= 0.')
+    out = np.zeros(shape=site_weights.shape, dtype=np.float64)
+    positive_mask = (site_weights > 0)
+    positive_weights = site_weights[positive_mask]
+    num_positive = int(positive_weights.shape[0])
+    if (draw_size == 0) or (num_positive == 0):
+        return out.astype(float_type, copy=False)
+    if draw_size >= num_positive:
+        out[positive_mask] = 1.0
+        return out.astype(float_type, copy=False)
+
+    target = float(draw_size)
+    lo = 0.0
+    hi = 1.0
+    for _ in range(128):
+        scaled = hi * positive_weights
+        current = (1.0 - (1.0 / (1.0 + scaled))).sum(dtype=np.float64)
+        if current >= target:
+            break
+        hi *= 2.0
+    for _ in range(96):
+        mid = (lo + hi) / 2.0
+        scaled = mid * positive_weights
+        current = (1.0 - (1.0 / (1.0 + scaled))).sum(dtype=np.float64)
+        if current < target:
+            lo = mid
+        else:
+            hi = mid
+    lam = (lo + hi) / 2.0
+    scaled = lam * positive_weights
+    out_positive = 1.0 - (1.0 / (1.0 + scaled))
+    out[positive_mask] = np.clip(out_positive, a_min=0.0, a_max=1.0)
+    return out.astype(float_type, copy=False)
+
+
+def _normalize_sub_sites_for_urn_overlap(sub_sites, num_branch):
+    sub_sites = np.asarray(sub_sites, dtype=np.float64)
+    if sub_sites.ndim == 1:
+        sub_sites = np.broadcast_to(sub_sites.reshape(1, -1), (int(num_branch), sub_sites.shape[0]))
+    elif sub_sites.ndim != 2:
+        raise ValueError('sub_sites should be a 1D or 2D array.')
+    if sub_sites.shape[0] != int(num_branch):
+        txt = 'sub_sites branch axis ({}) and sub_branches length ({}) should match.'
+        raise ValueError(txt.format(sub_sites.shape[0], int(num_branch)))
+    if (sub_sites < 0).any():
+        raise ValueError('sub_sites should be non-negative.')
+    return sub_sites
+
+
+def _calc_weighted_urn_expected_overlap(
+    cb_ids,
+    sub_sites,
+    sub_branches,
+    g,
+    float_type,
+    inclusion_probability_func,
+):
     cb_ids = np.asarray(cb_ids, dtype=np.int64)
     if cb_ids.ndim != 2:
         raise ValueError('cb_ids should be a 2D array.')
@@ -1298,17 +1388,7 @@ def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_t
     if not np.isfinite(sub_branches).all():
         raise ValueError('sub_branches should be finite.')
     np.clip(sub_branches, a_min=0.0, a_max=None, out=sub_branches)
-
-    sub_sites = np.asarray(sub_sites, dtype=np.float64)
-    if sub_sites.ndim == 1:
-        sub_sites = np.broadcast_to(sub_sites.reshape(1, -1), (sub_branches.shape[0], sub_sites.shape[0]))
-    elif sub_sites.ndim != 2:
-        raise ValueError('sub_sites should be a 1D or 2D array.')
-    if sub_sites.shape[0] != sub_branches.shape[0]:
-        txt = 'sub_sites branch axis ({}) and sub_branches length ({}) should match.'
-        raise ValueError(txt.format(sub_sites.shape[0], sub_branches.shape[0]))
-    if (sub_sites < 0).any():
-        raise ValueError('sub_sites should be non-negative.')
+    sub_sites = _normalize_sub_sites_for_urn_overlap(sub_sites=sub_sites, num_branch=sub_branches.shape[0])
     if sub_sites.shape[0] <= cb_ids.max():
         raise ValueError('cb_ids contain out-of-range branch IDs.')
 
@@ -1324,7 +1404,7 @@ def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_t
                 continue
             size_lo = int(np.clip(base[branch_id], a_min=0, a_max=num_positive))
             size_hi = int(np.clip(base[branch_id] + 1, a_min=0, a_max=num_positive))
-            prob_lo = _calc_wallenius_inclusion_probabilities(
+            prob_lo = inclusion_probability_func(
                 site_weights=branch_weights,
                 draw_size=size_lo,
                 float_type=np.float64,
@@ -1332,7 +1412,7 @@ def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_t
             if (frac[branch_id] <= 0) or (size_lo == size_hi):
                 inclusion_prob[branch_id, :] = prob_lo
             else:
-                prob_hi = _calc_wallenius_inclusion_probabilities(
+                prob_hi = inclusion_probability_func(
                     site_weights=branch_weights,
                     draw_size=size_hi,
                     float_type=np.float64,
@@ -1354,7 +1434,7 @@ def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_t
             if num_positive == 0:
                 continue
             draw_size = int(np.clip(rounded_sizes[branch_id], a_min=0, a_max=num_positive))
-            inclusion_prob[branch_id, :] = _calc_wallenius_inclusion_probabilities(
+            inclusion_prob[branch_id, :] = inclusion_probability_func(
                 site_weights=branch_weights,
                 draw_size=draw_size,
                 float_type=np.float64,
@@ -1364,6 +1444,63 @@ def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_t
         sub_sites=inclusion_prob,
         float_type=float_type,
     )
+
+
+def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
+    return _calc_weighted_urn_expected_overlap(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        sub_branches=sub_branches,
+        g=g,
+        float_type=float_type,
+        inclusion_probability_func=_calc_wallenius_inclusion_probabilities,
+    )
+
+
+def _calc_fisher_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
+    return _calc_weighted_urn_expected_overlap(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        sub_branches=sub_branches,
+        g=g,
+        float_type=float_type,
+        inclusion_probability_func=_calc_fisher_inclusion_probabilities,
+    )
+
+
+def _calc_urn_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
+    urn_model = _resolve_urn_model(g=g)
+    if urn_model == 'wallenius':
+        return _calc_wallenius_expected_overlap(
+            cb_ids=cb_ids,
+            sub_sites=sub_sites,
+            sub_branches=sub_branches,
+            g=g,
+            float_type=float_type,
+        )
+    if urn_model == 'fisher':
+        return _calc_fisher_expected_overlap(
+            cb_ids=cb_ids,
+            sub_sites=sub_sites,
+            sub_branches=sub_branches,
+            g=g,
+            float_type=float_type,
+        )
+    if urn_model == 'factorized_approx':
+        sub_branches = np.asarray(sub_branches, dtype=np.float64).reshape(-1)
+        if sub_branches.ndim != 1:
+            raise ValueError('sub_branches should be a 1D array.')
+        if not np.isfinite(sub_branches).all():
+            raise ValueError('sub_branches should be finite.')
+        np.clip(sub_branches, a_min=0.0, a_max=None, out=sub_branches)
+        sub_sites = _normalize_sub_sites_for_urn_overlap(sub_sites=sub_sites, num_branch=sub_branches.shape[0])
+        return _calc_tmp_E_sum(
+            cb_ids=cb_ids,
+            sub_sites=sub_sites,
+            sub_branches=sub_branches,
+            float_type=float_type,
+        )
+    raise ValueError('Unsupported urn_model: {}'.format(urn_model))
 
 
 def _fill_packed_masks_for_sizes(packed_masks_branch, site_p, size_values):
@@ -1742,7 +1879,7 @@ def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g, static_sub_
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        E_b += _calc_wallenius_expected_overlap(
+        E_b += _calc_urn_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
@@ -1777,7 +1914,7 @@ def joblib_calc_E_mean(
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        dfEb += _calc_wallenius_expected_overlap(
+        dfEb += _calc_urn_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
@@ -2015,7 +2152,8 @@ def subroot_E2nan(cb, tree):
 def get_E(cb, g, ON_tensor, OS_tensor):
     requested_output_stats = _resolve_requested_output_stats(g)
     base_stats = output_stat.get_required_base_stats(requested_output_stats)
-    if (g['omegaC_method']=='modelfree'):
+    expectation_method = _resolve_expectation_method(g=g)
+    if expectation_method == 'urn':
         ON_gad, ON_ga, ON_gd = substitution.get_group_state_totals(ON_tensor)
         OS_gad, OS_ga, OS_gd = substitution.get_group_state_totals(OS_tensor)
         g['N_ind_nomissing_gad'] = np.where(ON_gad!=0)
@@ -2027,7 +2165,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         for st in base_stats:
             cb['ECN'+st] = calc_E_stat(cb, ON_tensor, mode=st, stat='mean', SN='N', g=g)
             cb['ECS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='mean', SN='S', g=g)
-    if (g['omegaC_method']=='submodel'):
+    elif expectation_method == 'codon_model':
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         state_nsyE = get_exp_state(g=g, mode='nsy')
         if (g['current_arity']==2):
@@ -2059,6 +2197,8 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         )
         cb = table.merge_tables(cb, cbES)
         del state_cdnE,cbES
+    else:
+        raise ValueError('Unsupported expectation_method: {}'.format(expectation_method))
     cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC', output_stats=requested_output_stats)
     cb = subroot_E2nan(cb, tree=g['tree'])
     return cb
@@ -2598,7 +2738,7 @@ def _calc_poisson_count_matrix(
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        mean_count = _calc_wallenius_expected_overlap(
+        mean_count = _calc_urn_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
@@ -2717,7 +2857,7 @@ def _calc_nbinom_count_matrix(
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        mean_count = _calc_wallenius_expected_overlap(
+        mean_count = _calc_urn_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
@@ -2817,7 +2957,7 @@ def _calc_poisson_full_count_matrix(
                 sub_site_mass[nonzero_branch, :] /
                 sub_branches[nonzero_branch, None]
             )
-        mean_count = _calc_wallenius_expected_overlap(
+        mean_count = _calc_urn_expected_overlap(
             cb_ids=cb_ids,
             sub_sites=sub_sites,
             sub_branches=sub_branches,
@@ -3141,8 +3281,9 @@ def _resolve_omega_pvalue_dsc_calibration_transformation(cb, sub, g):
 def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
     if not bool(g.get('calc_omega_pvalue', False)):
         return cb
-    if str(g.get('omegaC_method', '')).strip().lower() != 'modelfree':
-        sys.stderr.write('Skipping --calc_omega_pvalue because --omegaC_method is not "modelfree".\n')
+    if _resolve_expectation_method(g=g) != 'urn':
+        txt = 'Skipping --calc_omega_pvalue because --expectation_method is not "urn".\n'
+        sys.stderr.write(txt)
         return cb
     null_model = _resolve_omega_pvalue_null_model(g=g)
     txt = 'omega_C empirical p-value null model: {}'

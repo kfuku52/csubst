@@ -143,6 +143,53 @@ def test_calc_wallenius_inclusion_probabilities_matches_sampling():
     np.testing.assert_allclose(expected.sum(), float(draw_size), atol=1e-8)
 
 
+def test_calc_fisher_inclusion_probabilities_returns_valid_probabilities():
+    p = np.array([0.8, 0.1, 0.05, 0.05, 0.0], dtype=np.float64)
+    draw_size = 2
+    fisher = omega._calc_fisher_inclusion_probabilities(
+        site_weights=p,
+        draw_size=draw_size,
+        float_type=np.float64,
+    )
+    wallenius = omega._calc_wallenius_inclusion_probabilities(
+        site_weights=p,
+        draw_size=draw_size,
+        float_type=np.float64,
+    )
+    assert fisher.shape == p.shape
+    assert np.all(fisher >= 0)
+    assert np.all(fisher <= 1)
+    np.testing.assert_allclose(fisher.sum(), float(draw_size), atol=1e-8)
+    assert not np.allclose(fisher, wallenius)
+
+
+def test_calc_urn_expected_overlap_factorized_approx_matches_legacy_tmp_E_sum():
+    cb_ids = np.array([[0, 1], [1, 2]], dtype=np.int64)
+    sub_sites = np.array(
+        [
+            [0.5, 0.3, 0.2],
+            [0.2, 0.7, 0.1],
+            [0.4, 0.3, 0.3],
+        ],
+        dtype=np.float64,
+    )
+    sub_branches = np.array([1.5, 2.0, 0.7], dtype=np.float64)
+    expected = omega._calc_tmp_E_sum(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        sub_branches=sub_branches,
+        float_type=np.float64,
+    )
+    observed = omega._calc_urn_expected_overlap(
+        cb_ids=cb_ids,
+        sub_sites=sub_sites,
+        sub_branches=sub_branches,
+        g={"urn_model": "factorized_approx"},
+        float_type=np.float64,
+    )
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
 def test_calc_wallenius_expected_overlap_matches_permutation_mean_for_skewed_weights():
     cb_ids = np.array([[0, 1]], dtype=np.int64)
     sub_branches = np.array([80.0, 80.0], dtype=np.float64)

@@ -143,6 +143,26 @@ def _parse_omega_pvalue_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
     return schedule
 
 
+def _normalize_expectation_method(value, param_name='--expectation_method'):
+    normalized = str(value).strip().lower()
+    if normalized in ['codon_model', 'submodel']:
+        return 'codon_model'
+    if normalized in ['urn', 'modelfree']:
+        return 'urn'
+    txt = '{} should be one of codon_model, urn.'
+    raise ValueError(txt.format(param_name))
+
+
+def _normalize_urn_model(value, param_name='--urn_model'):
+    normalized = str(value).strip().lower()
+    if normalized in ['wallenius', 'fisher']:
+        return normalized
+    if normalized in ['factorized_approx', 'factorized', 'legacy_factorized', 'approx']:
+        return 'factorized_approx'
+    txt = '{} should be one of wallenius, fisher, factorized_approx.'
+    raise ValueError(txt.format(param_name))
+
+
 def _get_dependency_version(distribution_name):
     try:
         return importlib_metadata.version(distribution_name)
@@ -205,8 +225,32 @@ def get_global_parameters(args):
         g['calc_omega_pvalue'] = _parse_bool_like(g['calc_omega_pvalue'], '--calc_omega_pvalue')
     else:
         g['calc_omega_pvalue'] = False
-    if g['calc_omega_pvalue'] and (g['omegaC_method'] != 'modelfree'):
-        raise ValueError('--calc_omega_pvalue "yes" should be used with --omegaC_method "modelfree".')
+    expectation_method = None
+    raw_expectation_method = g.get('expectation_method', None)
+    if (raw_expectation_method is not None) and (str(raw_expectation_method).strip() != ''):
+        expectation_method = _normalize_expectation_method(raw_expectation_method, param_name='--expectation_method')
+    raw_urn_model = g.get('urn_model', None)
+    urn_model = None
+    if (raw_urn_model is not None) and (str(raw_urn_model).strip() != ''):
+        urn_model = _normalize_urn_model(raw_urn_model, param_name='--urn_model')
+    raw_legacy_omega_method = g.get('omegaC_method', None)
+    if (raw_legacy_omega_method is not None) and (str(raw_legacy_omega_method).strip() != ''):
+        legacy_expectation_method = _normalize_expectation_method(raw_legacy_omega_method, param_name='--omegaC_method')
+        if (expectation_method is not None) and (expectation_method != legacy_expectation_method):
+            raise ValueError('--omegaC_method conflicts with --expectation_method.')
+        expectation_method = legacy_expectation_method
+        sys.stderr.write('Deprecated option --omegaC_method detected. Use --expectation_method instead.\n')
+    if expectation_method is None:
+        expectation_method = 'codon_model'
+    if urn_model is None:
+        urn_model = 'wallenius'
+    g['expectation_method'] = expectation_method
+    g['urn_model'] = urn_model
+    g['omegaC_method'] = 'modelfree' if (expectation_method == 'urn') else 'submodel'
+    if g['calc_omega_pvalue'] and (g['expectation_method'] != 'urn'):
+        txt = '--calc_omega_pvalue "yes" should be used with --expectation_method "urn" '
+        txt += '(legacy alias: --omegaC_method "modelfree").'
+        raise ValueError(txt)
     if 'omega_pvalue_null_model' in g.keys():
         g['omega_pvalue_null_model'] = str(g['omega_pvalue_null_model']).strip().lower()
     else:

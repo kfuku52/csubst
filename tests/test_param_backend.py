@@ -243,6 +243,34 @@ def test_get_global_parameters_rejects_calc_omega_pvalue_without_modelfree():
         param.get_global_parameters(_args(calc_omega_pvalue=True, omegaC_method="submodel"))
 
 
+def test_get_global_parameters_sets_expectation_defaults():
+    g = param.get_global_parameters(_args())
+    assert g["expectation_method"] == "codon_model"
+    assert g["urn_model"] == "wallenius"
+    assert g["omegaC_method"] == "submodel"
+
+
+def test_get_global_parameters_maps_legacy_omegaC_method_to_expectation_method():
+    g = param.get_global_parameters(_args(omegaC_method="modelfree"))
+    assert g["expectation_method"] == "urn"
+    assert g["urn_model"] == "wallenius"
+    assert g["omegaC_method"] == "modelfree"
+
+
+def test_get_global_parameters_accepts_fisher_urn_model():
+    g = param.get_global_parameters(_args(expectation_method="urn", urn_model="fisher"))
+    assert g["expectation_method"] == "urn"
+    assert g["urn_model"] == "fisher"
+    assert g["omegaC_method"] == "modelfree"
+
+
+def test_get_global_parameters_rejects_conflicting_legacy_and_new_expectation_methods():
+    with pytest.raises(ValueError, match="conflicts with --expectation_method"):
+        param.get_global_parameters(
+            _args(expectation_method="codon_model", omegaC_method="modelfree")
+        )
+
+
 def test_get_global_parameters_sets_omega_pvalue_defaults():
     g = param.get_global_parameters(_args())
     assert g["calc_omega_pvalue"] is False

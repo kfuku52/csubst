@@ -20,6 +20,18 @@ from csubst import output_stat
 from csubst import tree
 
 
+def _resolve_expectation_method(g):
+    token = g.get('expectation_method', None)
+    if (token is None) or (str(token).strip() == ''):
+        token = g.get('omegaC_method', 'submodel')
+    normalized = str(token).strip().lower()
+    if normalized in ['codon_model', 'submodel', '']:
+        return 'codon_model'
+    if normalized in ['urn', 'modelfree']:
+        return 'urn'
+    raise ValueError('Unsupported expectation method: {}'.format(token))
+
+
 def _remap_site_column_to_alignment(df, g, column_name='site'):
     if column_name not in df.columns:
         return df
@@ -541,8 +553,8 @@ def _prepare_epistasis_configuration(g, ON_tensor, OS_tensor):
     if not bool(g.get('epistasis_requested', False)):
         g['epistasis_enabled'] = False
         return g
-    if str(g.get('omegaC_method', '')).strip().lower() != 'modelfree':
-        raise ValueError('--epistasis_beta should be used with --omegaC_method "modelfree".')
+    if _resolve_expectation_method(g) != 'urn':
+        raise ValueError('--epistasis_beta should be used with --expectation_method "urn".')
     num_site = int(ON_tensor.shape[1])
     degree_internal = _load_epistasis_degree_from_file(g=g, num_site=num_site)
     if degree_internal is None:
@@ -659,7 +671,7 @@ def main_analyze(g):
         elapsed_time = int(time.time() - start)
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
-    if (g['omegaC_method']!='submodel'):
+    if _resolve_expectation_method(g) != 'codon_model':
         g['state_cdn'] = None
         g['state_pep'] = None
         g['state_nsy'] = None
