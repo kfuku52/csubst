@@ -1,0 +1,9 @@
+run	method	pseudocount	mode	alpha	alpha_source	target	enabled	fit_pairs	fit_logL
+codon_model_pc_auto	codon_model	auto	empirical	8.29373204479629	auto	both	1	49848.0	-78924.97
+codon_model_pc_off	codon_model	off	none	0.0	fixed	both	0		
+urn_factorized_approx_pc_auto	urn_factorized_approx	auto	empirical	1.291962773152175	auto	both	1	49848.0	-105758.169
+urn_factorized_approx_pc_off	urn_factorized_approx	off	none	0.0	fixed	both	0		
+urn_fisher_pc_auto	urn_fisher	auto	empirical	1.083926914021204	auto	both	1	49848.0	-108049.002
+urn_fisher_pc_off	urn_fisher	off	none	0.0	fixed	both	0		
+urn_wallenius_pc_auto	urn_wallenius	auto	empirical	1.1782840531591048	auto	both	1	49848.0	-106925.84
+urn_wallenius_pc_off	urn_wallenius	off	none	0.0	fixed	both	0		

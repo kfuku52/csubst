@@ -1,0 +1,9 @@
+run	method	method_label	pseudocount	max_arity_reached	stop_type	stop_k	real_sec	user_sec	sys_sec	peak_memory_bytes
+codon_model_pc_auto	codon_model	codon_model	auto	2	terminated_before_max_arity	3	11.22	11.56	11.34	2696099264.0
+codon_model_pc_off	codon_model	codon_model	off	6	terminated_before_max_arity	7	14.57	17.32	28.29	2784106160.0
+urn_factorized_approx_pc_auto	urn_factorized_approx	urn factorized_approx	auto	3	terminated_before_max_arity	4	9.91	10.47	5.96	2076364920.0
+urn_factorized_approx_pc_off	urn_factorized_approx	urn factorized_approx	off	3	terminated_before_max_arity	4	9.15	9.65	5.74	2089595072.0
+urn_fisher_pc_auto	urn_fisher	urn fisher	auto	3	terminated_before_max_arity	4	31.79	32.45	5.82	2108424000.0
+urn_fisher_pc_off	urn_fisher	urn fisher	off	3	terminated_before_max_arity	4	30.48	31.31	5.35	2113048480.0
+urn_wallenius_pc_auto	urn_wallenius	urn wallenius	auto	3	terminated_before_max_arity	4	35.96	36.82	5.58	2062168136.0
+urn_wallenius_pc_off	urn_wallenius	urn wallenius	off	3	terminated_before_max_arity	4	35.96	36.02	6.1	2123317368.0

@@ -1,0 +1,19 @@
+run	method	method_label	pseudocount	arity	mode	elapsed_sec	num_all	num_fg	num_qualified_all	num_qualified_fg	median_omegaCany2spe_all	median_omegaCany2spe_fg	total_OCNany2spe_all	total_ECNany2spe_all	total_OCSany2spe_all	total_ECSany2spe_all
+codon_model_pc_auto	codon_model	codon_model	auto	2	exhaustive	5.0	8308.0	36.0	0.0	0.0	1.0051	1.8313	3698.8441	2522.0414	23675.1249	29191.3588
+codon_model_pc_off	codon_model	codon_model	off	2	exhaustive	4.0	8308.0	36.0	84.0	17.0	0.3586	4.3615	3698.8441	2522.0414	23675.1249	29191.3588
+codon_model_pc_off	codon_model	codon_model	off	3	branch_and_bound	1.0	42.0	42.0	18.0	18.0	6901.4284	6901.4284	90.7773	0.5807	3.0025	2.7536
+codon_model_pc_off	codon_model	codon_model	off	4	branch_and_bound	1.0	21.0	21.0	13.0	13.0	9139457474.4594	9139457474.4594	45.6089	0.0058	0.0	0.0381
+codon_model_pc_off	codon_model	codon_model	off	5	branch_and_bound	1.0	8.0	8.0	5.0	5.0	inf	inf	17.1712	0.0001	0.0	0.0009
+codon_model_pc_off	codon_model	codon_model	off	6	branch_and_bound	0.0	1.0	1.0	1.0	1.0	inf	inf	2.4994	0.0	0.0	0.0
+urn_factorized_approx_pc_auto	urn_factorized_approx	urn factorized_approx	auto	2	exhaustive	4.0	8308.0	36.0	11.0	5.0	0.9778	1.5867	3698.8441	563.7646	23675.1249	2733.3234
+urn_factorized_approx_pc_auto	urn_factorized_approx	urn factorized_approx	auto	3	branch_and_bound	0.0	3.0	3.0	1.0	1.0	129.3246	129.3246	4.8922	0.0125	0.0256	0.0034
+urn_factorized_approx_pc_off	urn_factorized_approx	urn factorized_approx	off	2	exhaustive	3.0	8308.0	36.0	17.0	6.0	0.1852	1.1005	3698.8441	563.7646	23675.1249	2733.3234
+urn_factorized_approx_pc_off	urn_factorized_approx	urn factorized_approx	off	3	branch_and_bound	0.0	4.0	4.0	1.0	1.0	3415.3489	3415.3489	6.511	0.0175	0.0256	0.0037
+urn_fisher_pc_auto	urn_fisher	urn fisher	auto	2	exhaustive	14.0	8308.0	36.0	11.0	5.0	0.9271	1.6184	3698.8441	554.2569	23675.1249	2662.9948
+urn_fisher_pc_auto	urn_fisher	urn fisher	auto	3	branch_and_bound	11.0	3.0	3.0	1.0	1.0	148.0082	148.0082	4.8922	0.0114	0.0256	0.0033
+urn_fisher_pc_off	urn_fisher	urn fisher	off	2	exhaustive	13.0	8308.0	36.0	17.0	6.0	0.184	1.1046	3698.8441	554.2569	23675.1249	2662.9948
+urn_fisher_pc_off	urn_fisher	urn fisher	off	3	branch_and_bound	11.0	4.0	4.0	1.0	1.0	3486.7429	3486.7429	6.511	0.016	0.0256	0.0035
+urn_wallenius_pc_auto	urn_wallenius	urn wallenius	auto	2	exhaustive	17.0	8308.0	36.0	11.0	5.0	0.9501	1.605	3698.8441	558.8596	23675.1249	2697.0335
+urn_wallenius_pc_auto	urn_wallenius	urn wallenius	auto	3	branch_and_bound	13.0	3.0	3.0	1.0	1.0	137.8181	137.8181	4.8922	0.0119	0.0256	0.0034
+urn_wallenius_pc_off	urn_wallenius	urn wallenius	off	2	exhaustive	16.0	8308.0	36.0	17.0	6.0	0.1846	1.1007	3698.8441	558.8596	23675.1249	2697.0335
+urn_wallenius_pc_off	urn_wallenius	urn wallenius	off	3	branch_and_bound	14.0	4.0	4.0	1.0	1.0	3452.73	3452.73	6.511	0.0167	0.0256	0.0036
