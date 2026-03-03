@@ -1,0 +1,5 @@
+method	real_sec	user_sec	sys_sec	peak_memory_bytes
+codon_model	9.92	10.34	9.43	2664158560.0
+urn_wallenius	18.84	18.16	4.02	2132685208.0
+urn_fisher	16.71	16.44	3.68	2118267072.0
+urn_factorized_approx	8.3	8.37	3.24	2080096208.0

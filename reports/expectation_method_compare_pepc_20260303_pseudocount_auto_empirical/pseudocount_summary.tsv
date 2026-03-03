@@ -1,0 +1,5 @@
+method	mode	alpha	alpha_source	target	enabled	fit_pairs	fit_logL
+codon_model	empirical	0.0	fixed	both	0		
+urn_wallenius	empirical	0.0	fixed	both	0		
+urn_fisher	empirical	0.0	fixed	both	0		
+urn_factorized_approx	empirical	0.0	fixed	both	0		
