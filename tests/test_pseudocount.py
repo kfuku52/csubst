@@ -27,6 +27,20 @@ def test_validate_args_accepts_auto_alpha_token():
     assert out["pseudocount_enabled"] is True
 
 
+def test_validate_args_preserves_auto_flag_for_prevalidated_mapping():
+    out = pseudocount.validate_args(
+        {
+            "pseudocount_alpha": 0.0,
+            "pseudocount_alpha_auto": True,
+            "pseudocount_mode": "symmetric",
+            "pseudocount_target": "both",
+        }
+    )
+    assert out["pseudocount_alpha"] == pytest.approx(0.0)
+    assert out["pseudocount_alpha_auto"] is True
+    assert out["pseudocount_enabled"] is True
+
+
 @pytest.mark.parametrize(
     "kwargs, expected",
     [

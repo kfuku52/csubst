@@ -27,6 +27,7 @@ def _has_arg(args, key):
 
 def validate_args(args):
     raw_alpha = _get_arg(args, "pseudocount_alpha", 0.0)
+    prevalidated_alpha_auto = bool(_get_arg(args, "pseudocount_alpha_auto", False))
     alpha_auto = False
     if isinstance(raw_alpha, str) and (raw_alpha.strip().lower() == "auto"):
         alpha = 0.0
@@ -40,6 +41,10 @@ def validate_args(args):
             raise ValueError("--pseudocount_alpha should be a finite number or 'auto'.")
         if alpha < 0:
             raise ValueError("--pseudocount_alpha should be >= 0.")
+        # validate_args() may be called on a prevalidated mapping where
+        # --pseudocount_alpha auto was already normalized to alpha=0.0.
+        if prevalidated_alpha_auto and (alpha == 0.0):
+            alpha_auto = True
 
     mode = str(_get_arg(args, "pseudocount_mode", "none")).strip().lower()
     if mode not in _PSEUDOCOUNT_MODES:

@@ -503,6 +503,34 @@ def test_get_omega_accepts_auto_alpha_and_estimates_finite_smoothed_rates():
     assert np.isfinite(out["omegaCany2spe"].to_numpy()).all()
 
 
+def test_get_omega_accepts_prevalidated_auto_alpha_configuration():
+    cb = pd.DataFrame(
+        {
+            "OCNany2spe": [0.0, 1.0, 0.0, 3.0],
+            "ECNany2spe": [0.0, 1.0, 2.0, 0.0],
+            "OCSany2spe": [0.0, 0.0, 1.0, 2.0],
+            "ECSany2spe": [0.0, 1.0, 1.0, 0.0],
+        }
+    )
+    g = {
+        "float_tol": 1e-12,
+        "output_stat": "any2spe",
+        "pseudocount_alpha": 0.0,
+        "pseudocount_alpha_auto": True,
+        "pseudocount_mode": "symmetric",
+        "pseudocount_target": "both",
+        "pseudocount_report": False,
+    }
+    out = omega.get_omega(cb=cb.copy(), g=g)
+    assert "omegaCany2spe_raw" in out.columns
+    assert np.isfinite(out["omegaCany2spe"].to_numpy()).all()
+    assert not np.allclose(
+        out["omegaCany2spe"].to_numpy(dtype=np.float64),
+        out["omegaCany2spe_raw"].to_numpy(dtype=np.float64),
+        equal_nan=True,
+    )
+
+
 def test_get_omega_empirical_mode_returns_finite_values():
     cb = pd.DataFrame(
         {
