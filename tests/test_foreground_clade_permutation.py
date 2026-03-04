@@ -88,6 +88,12 @@ def test_count_branch_memberships_accepts_scalar_ids():
     assert out.tolist() == [1, 0]
 
 
+def test_count_branch_memberships_from_bid_matrix_accepts_scalar_ids():
+    bid_matrix = np.array([[1, 3], [2, 4]], dtype=np.int64)
+    out = foreground._count_branch_memberships_from_bid_matrix(bid_matrix=bid_matrix, ids=np.int64(3))
+    assert out.tolist() == [1, 0]
+
+
 def test_mark_dependent_foreground_rows_is_order_invariant_for_pairs():
     cb = pd.DataFrame(
         {
@@ -123,6 +129,100 @@ def test_mark_dependent_foreground_rows_is_order_invariant_for_higher_arity():
         dependent_id_combinations=dep,
     )
     assert out.loc[:, "is_fg_traitA"].tolist() == ["N", "Y", "N"]
+
+
+def test_compute_dependent_foreground_mask_is_order_invariant_for_pairs():
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [1, 1, 2, 3],
+            "branch_id_2": [5, 3, 5, 4],
+        }
+    )
+    dep = np.array([[5, 1], [5, 2]], dtype=np.int64)
+    out = foreground._compute_dependent_foreground_mask(
+        cb=cb,
+        bid_cols=["branch_id_1", "branch_id_2"],
+        dependent_id_combinations=dep,
+    )
+    assert out.tolist() == [True, False, True, False]
+
+
+def test_compute_dependent_foreground_mask_accepts_precomputed_bid_key():
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [1, 1, 2, 3],
+            "branch_id_2": [5, 3, 5, 4],
+        }
+    )
+    dep = np.array([[5, 1], [5, 2]], dtype=np.int64)
+    bid_matrix = cb.loc[:, ["branch_id_1", "branch_id_2"]].to_numpy(copy=False)
+    bid_key = foreground._build_order_invariant_row_keys(bid_matrix, assume_sorted=False)
+    out = foreground._compute_dependent_foreground_mask(
+        cb=cb,
+        bid_cols=["branch_id_1", "branch_id_2"],
+        dependent_id_combinations=dep,
+        precomputed_bid_key=bid_key,
+    )
+    assert out.tolist() == [True, False, True, False]
+
+
+def test_assign_trait_labels_applies_dependent_mask_to_foreground_only():
+    cb = pd.DataFrame(
+        {
+            "branch_num_fg_traitA": [2, 2, 1, 0],
+            "branch_num_mg_traitA": [0, 0, 1, 2],
+        }
+    )
+    out = foreground._assign_trait_labels(
+        cb=cb.copy(deep=True),
+        trait_name="traitA",
+        arity=2,
+        is_fg_dependent=np.array([True, False, False, False], dtype=bool),
+    )
+    assert out.loc[:, "is_fg_traitA"].tolist() == ["N", "Y", "N", "N"]
+    assert out.loc[:, "is_mf_traitA"].tolist() == ["N", "N", "Y", "N"]
+    assert out.loc[:, "is_mg_traitA"].tolist() == ["N", "N", "N", "Y"]
+
+
+def test_assign_trait_labels_rejects_mismatched_dependent_mask_length():
+    cb = pd.DataFrame(
+        {
+            "branch_num_fg_traitA": [2, 2],
+            "branch_num_mg_traitA": [0, 0],
+        }
+    )
+    with pytest.raises(ValueError, match="did not match cb rows"):
+        foreground._assign_trait_labels(
+            cb=cb.copy(deep=True),
+            trait_name="traitA",
+            arity=2,
+            is_fg_dependent=np.array([True], dtype=bool),
+        )
+
+
+def test_assign_trait_labels_rejects_mismatched_num_fg_num_mg_length():
+    cb = pd.DataFrame(
+        {
+            "branch_num_fg_traitA": [2, 2],
+            "branch_num_mg_traitA": [0, 0],
+        }
+    )
+    with pytest.raises(ValueError, match="num_fg length"):
+        foreground._assign_trait_labels(
+            cb=cb.copy(deep=True),
+            trait_name="traitA",
+            arity=2,
+            num_fg=np.array([2], dtype=np.int64),
+            num_mg=np.array([0, 0], dtype=np.int64),
+        )
+    with pytest.raises(ValueError, match="num_mg length"):
+        foreground._assign_trait_labels(
+            cb=cb.copy(deep=True),
+            trait_name="traitA",
+            arity=2,
+            num_fg=np.array([2, 2], dtype=np.int64),
+            num_mg=np.array([0], dtype=np.int64),
+        )
 
 
 def test_annotate_foreground_fg_stem_only_keeps_lineage_specific_stem_colors():

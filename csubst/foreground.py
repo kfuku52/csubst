@@ -160,50 +160,102 @@ def _normalize_branch_ids(branch_ids):
 def _count_branch_memberships(cb, bid_cols, ids):
     if len(bid_cols) == 0:
         return np.zeros(shape=(cb.shape[0],), dtype=np.int64)
-    id_list = _normalize_branch_ids(ids).tolist()
-    if len(id_list) == 0:
-        return np.zeros(shape=(cb.shape[0],), dtype=np.int64)
     bid_matrix = cb.loc[:, bid_cols].to_numpy(copy=False)
-    return np.isin(bid_matrix, id_list).sum(axis=1).astype(np.int64)
+    return _count_branch_memberships_from_bid_matrix(bid_matrix=bid_matrix, ids=ids)
 
 
-def _mark_dependent_foreground_rows(cb, bid_cols, trait_name, dependent_id_combinations):
+def _count_branch_memberships_from_bid_matrix(bid_matrix, ids):
+    bid_matrix = np.asarray(bid_matrix, dtype=np.int64)
+    if bid_matrix.ndim != 2:
+        raise ValueError('bid_matrix should be a 2D array.')
+    if bid_matrix.shape[1] == 0:
+        return np.zeros(shape=(bid_matrix.shape[0],), dtype=np.int64)
+    id_array = _normalize_branch_ids(ids)
+    if id_array.shape[0] == 0:
+        return np.zeros(shape=(bid_matrix.shape[0],), dtype=np.int64)
+    id_array = np.unique(id_array)
+    return np.isin(bid_matrix, id_array).sum(axis=1).astype(np.int64)
+
+
+def _build_order_invariant_row_keys(matrix, assume_sorted=False):
+    matrix = np.asarray(matrix, dtype=np.int64)
+    if matrix.ndim != 2:
+        raise ValueError('matrix should be a 2D array.')
+    if not assume_sorted:
+        matrix = np.sort(matrix, axis=1)
+    key_dtype = np.dtype((np.void, matrix.dtype.itemsize * matrix.shape[1]))
+    if matrix.shape[0] == 0:
+        return np.zeros(shape=(0,), dtype=key_dtype)
+    return np.ascontiguousarray(matrix).view(key_dtype).reshape(-1)
+
+
+def _compute_dependent_foreground_mask(cb, bid_cols, dependent_id_combinations, precomputed_bid_key=None):
     if len(bid_cols) == 0:
-        return cb
+        return np.zeros(shape=(cb.shape[0],), dtype=bool)
     dep = np.asarray(dependent_id_combinations, dtype=np.int64)
     if dep.size == 0:
-        return cb
+        return np.zeros(shape=(cb.shape[0],), dtype=bool)
     if dep.size % len(bid_cols) != 0:
         raise ValueError('dependent_id_combinations had an unexpected shape.')
-    col_is_fg = 'is_fg_' + trait_name
-    # Branch-combination semantics are order-invariant; compare sorted row tuples.
     dep = dep.reshape(-1, len(bid_cols))
     dep_sorted = np.sort(dep, axis=1)
     dep_sorted = np.unique(dep_sorted, axis=0)
-    bid_matrix = cb.loc[:, bid_cols].to_numpy(copy=False)
-    if bid_matrix.shape[0] == 0:
-        return cb
-    bid_sorted = np.sort(np.asarray(bid_matrix, dtype=np.int64), axis=1)
-    dep_key = np.ascontiguousarray(dep_sorted).view(np.dtype((np.void, dep_sorted.dtype.itemsize * dep_sorted.shape[1]))).reshape(-1)
-    bid_key = np.ascontiguousarray(bid_sorted).view(np.dtype((np.void, bid_sorted.dtype.itemsize * bid_sorted.shape[1]))).reshape(-1)
-    is_dep = np.isin(bid_key, dep_key)
+    dep_key = _build_order_invariant_row_keys(dep_sorted, assume_sorted=True)
+    if precomputed_bid_key is None:
+        bid_matrix = cb.loc[:, bid_cols].to_numpy(copy=False)
+        bid_key = _build_order_invariant_row_keys(bid_matrix, assume_sorted=False)
+    else:
+        bid_key = np.asarray(precomputed_bid_key).reshape(-1)
+        if bid_key.shape[0] != cb.shape[0]:
+            txt = 'precomputed_bid_key length ({}) did not match cb rows ({}).'
+            raise ValueError(txt.format(bid_key.shape[0], cb.shape[0]))
+    return np.isin(bid_key, dep_key)
+
+
+def _mark_dependent_foreground_rows(cb, bid_cols, trait_name, dependent_id_combinations):
+    col_is_fg = 'is_fg_' + trait_name
+    is_dep = _compute_dependent_foreground_mask(
+        cb=cb,
+        bid_cols=bid_cols,
+        dependent_id_combinations=dependent_id_combinations,
+    )
     cb.loc[is_dep, col_is_fg] = 'N'
     return cb
 
 
-def _assign_trait_labels(cb, trait_name, arity):
+def _assign_trait_labels(cb, trait_name, arity, is_fg_dependent=None, num_fg=None, num_mg=None):
     col_num_fg = 'branch_num_fg_' + trait_name
     col_num_mg = 'branch_num_mg_' + trait_name
     col_is_fg = 'is_fg_' + trait_name
     col_is_mg = 'is_mg_' + trait_name
     col_is_mf = 'is_mf_' + trait_name
-    cb.loc[:, col_is_fg] = 'N'
-    cb.loc[cb.loc[:, col_num_fg] == arity, col_is_fg] = 'Y'
-    cb.loc[:, col_is_mg] = 'N'
-    cb.loc[cb.loc[:, col_num_mg] == arity, col_is_mg] = 'Y'
+    if num_fg is None:
+        num_fg = cb.loc[:, col_num_fg].to_numpy(copy=False)
+    else:
+        num_fg = np.asarray(num_fg, dtype=np.int64).reshape(-1)
+        if num_fg.shape[0] != cb.shape[0]:
+            txt = 'num_fg length ({}) did not match cb rows ({}).'
+            raise ValueError(txt.format(num_fg.shape[0], cb.shape[0]))
+    if num_mg is None:
+        num_mg = cb.loc[:, col_num_mg].to_numpy(copy=False)
+    else:
+        num_mg = np.asarray(num_mg, dtype=np.int64).reshape(-1)
+        if num_mg.shape[0] != cb.shape[0]:
+            txt = 'num_mg length ({}) did not match cb rows ({}).'
+            raise ValueError(txt.format(num_mg.shape[0], cb.shape[0]))
+    is_fg = (num_fg == arity)
+    if is_fg_dependent is not None:
+        is_fg_dependent = np.asarray(is_fg_dependent, dtype=bool).reshape(-1)
+        if is_fg_dependent.shape[0] != cb.shape[0]:
+            txt = 'is_fg_dependent length ({}) did not match cb rows ({}).'
+            raise ValueError(txt.format(is_fg_dependent.shape[0], cb.shape[0]))
+        is_fg &= (~is_fg_dependent)
+    is_mg = (num_mg == arity)
+    is_mf = (num_fg > 0) & (num_mg > 0)
+    is_mf = is_mf & ((num_fg + num_mg) == arity)
+    cb.loc[:, col_is_fg] = np.where(is_fg, 'Y', 'N')
+    cb.loc[:, col_is_mg] = np.where(is_mg, 'Y', 'N')
     cb.loc[:, col_is_mf] = 'N'
-    is_mf = (cb.loc[:, col_num_fg] > 0) & (cb.loc[:, col_num_mg] > 0)
-    is_mf = is_mf & ((cb.loc[:, col_num_fg] + cb.loc[:, col_num_mg]) == arity)
     cb.loc[is_mf, col_is_mf] = 'Y'
     return cb
 
@@ -812,29 +864,43 @@ def get_foreground_branch_num(cb, g):
     start_time = time.time()
     bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
     arity = len(bid_cols)
+    bid_matrix = np.asarray(cb.loc[:, bid_cols].to_numpy(copy=False), dtype=np.int64)
+    precomputed_bid_key = _build_order_invariant_row_keys(bid_matrix, assume_sorted=False)
     trait_names = _get_trait_names(g)
     for trait_name in trait_names:
         col_num_fg = 'branch_num_fg_' + trait_name
         col_num_mg = 'branch_num_mg_' + trait_name
         col_num_fg_stem = 'branch_num_fg_stem_' + trait_name
-        col_is_fg = 'is_fg_' + trait_name
-        cb.loc[:, col_num_fg] = _count_branch_memberships(cb=cb, bid_cols=bid_cols, ids=g['fg_ids'][trait_name])
-        cb.loc[:, col_num_mg] = _count_branch_memberships(cb=cb, bid_cols=bid_cols, ids=g['mg_ids'][trait_name])
-        cb = _assign_trait_labels(cb=cb, trait_name=trait_name, arity=arity)
-        cb = _mark_dependent_foreground_rows(
+        num_fg_array = _count_branch_memberships_from_bid_matrix(bid_matrix=bid_matrix, ids=g['fg_ids'][trait_name])
+        num_mg_array = _count_branch_memberships_from_bid_matrix(bid_matrix=bid_matrix, ids=g['mg_ids'][trait_name])
+        cb.loc[:, col_num_fg] = num_fg_array
+        cb.loc[:, col_num_mg] = num_mg_array
+        is_fg_dependent = _compute_dependent_foreground_mask(
             cb=cb,
             bid_cols=bid_cols,
-            trait_name=trait_name,
             dependent_id_combinations=g['fg_dependent_id_combinations'][trait_name],
+            precomputed_bid_key=precomputed_bid_key,
+        )
+        cb = _assign_trait_labels(
+            cb=cb,
+            trait_name=trait_name,
+            arity=arity,
+            is_fg_dependent=is_fg_dependent,
+            num_fg=num_fg_array,
+            num_mg=num_mg_array,
         )
         df_clade_size = get_df_clade_size(g, trait_name)
         fg_stem_bids = df_clade_size.loc[df_clade_size.loc[:,'is_fg_stem_'+trait_name],'branch_id'].values
-        cb.loc[:, col_num_fg_stem] = _count_branch_memberships(cb=cb, bid_cols=bid_cols, ids=fg_stem_bids)
-        is_fg = (cb[col_is_fg] == 'Y')
+        cb.loc[:, col_num_fg_stem] = _count_branch_memberships_from_bid_matrix(bid_matrix=bid_matrix, ids=fg_stem_bids)
+        is_fg = (num_fg_array == arity) & (~is_fg_dependent)
         is_enough_stat = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
-        num_enough = is_enough_stat.sum()
-        num_fg = is_fg.sum()
-        num_fg_enough = (is_enough_stat&is_fg).sum()
+        if isinstance(is_enough_stat, (bool, np.bool_)):
+            is_enough_stat = np.full(shape=(cb.shape[0],), fill_value=bool(is_enough_stat), dtype=bool)
+        else:
+            is_enough_stat = np.asarray(is_enough_stat, dtype=bool).reshape(-1)
+        num_enough = int(is_enough_stat.sum())
+        num_fg = int(is_fg.sum())
+        num_fg_enough = int((is_enough_stat & is_fg).sum())
         num_all = cb.shape[0]
         percent_fg_enough, enrichment_factor = _calculate_fg_enrichment(
             num_enough=num_enough,
