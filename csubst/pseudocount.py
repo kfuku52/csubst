@@ -26,7 +26,7 @@ def _has_arg(args, key):
 
 
 def validate_args(args):
-    raw_alpha = _get_arg(args, "pseudocount_alpha", 0.0)
+    raw_alpha = _get_arg(args, "pseudocount_alpha", "auto")
     prevalidated_alpha_auto = bool(_get_arg(args, "pseudocount_alpha_auto", False))
     alpha_auto = False
     if isinstance(raw_alpha, str) and (raw_alpha.strip().lower() == "auto"):
@@ -51,7 +51,7 @@ def validate_args(args):
         txt = "--pseudocount_mode should be one of {}."
         raise ValueError(txt.format(", ".join(_PSEUDOCOUNT_MODES)))
 
-    target = str(_get_arg(args, "pseudocount_target", "both")).strip().lower()
+    target = str(_get_arg(args, "pseudocount_target", "expected")).strip().lower()
     if target not in _PSEUDOCOUNT_TARGETS:
         txt = "--pseudocount_target should be one of {}."
         raise ValueError(txt.format(", ".join(_PSEUDOCOUNT_TARGETS)))

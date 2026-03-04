@@ -643,7 +643,7 @@ def _main():
                          help='default=%(default)s: Experimental feature. Maximum chain count threshold for candidate structures in --epistasis_pdb besthit.')
     analyze.add_argument('--epistasis_degree_outfile', metavar='PATH', default='csubst_epistasis_structure_degree.tsv', type=str,
                          help='default=%(default)s: Experimental feature. Output TSV path for analyze-time structure degree table.')
-    analyze.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='0.0', type=str,
+    analyze.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='auto', type=str,
                          help='default=%(default)s: Dirichlet pseudo-count alpha for convergence-statistic '
                               'shrinkage. Set 0 to disable smoothing. '
                               'Use "auto" for Empirical-Bayes alpha estimation.')
@@ -653,7 +653,7 @@ def _main():
                               '"none" keeps legacy behavior; '
                               '"symmetric" applies equal pseudo-counts; '
                               '"empirical" shrinks toward global substitution-category frequencies.')
-    analyze.add_argument('--pseudocount_target', metavar='observed|expected|both', default='both', type=str,
+    analyze.add_argument('--pseudocount_target', metavar='observed|expected|both', default='expected', type=str,
                          choices=['observed', 'expected', 'both'],
                          help='default=%(default)s: Apply pseudo-counts to observed counts, expected counts, or both.')
     analyze.add_argument('--pseudocount_report', action='store_true',

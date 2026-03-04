@@ -513,9 +513,9 @@ def test_get_global_parameters_rejects_invalid_epistasis_options():
 def test_get_global_parameters_sets_pseudocount_defaults():
     g = param.get_global_parameters(_args())
     assert g["pseudocount_alpha"] == pytest.approx(0.0)
-    assert g["pseudocount_alpha_auto"] is False
+    assert g["pseudocount_alpha_auto"] is True
     assert g["pseudocount_mode"] == "none"
-    assert g["pseudocount_target"] == "both"
+    assert g["pseudocount_target"] == "expected"
     assert g["pseudocount_enabled"] is False
     assert g["pseudocount_add_output_columns"] is False
 
