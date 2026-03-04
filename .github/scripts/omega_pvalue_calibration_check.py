@@ -154,6 +154,20 @@ def ensure_precomputed_iqtree_outputs(repo_root, dataset_name):
     return required
 
 
+def read_iqtree_model(iqtree_report_path):
+    iqtree_report_path = Path(iqtree_report_path)
+    pattern = re.compile(r"^\s*Model of substitution:\s*(.+?)\s*$")
+    with iqtree_report_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            match = pattern.match(line)
+            if match is not None:
+                model = match.group(1).strip()
+                if model != "":
+                    return model
+                break
+    raise RuntimeError("Failed to read IQ-TREE model from {}".format(str(iqtree_report_path)))
+
+
 def parse_min_sub_pp_levels(levels_text):
     out = []
     for token in [s.strip() for s in str(levels_text).split(",") if s.strip()]:
@@ -188,6 +202,7 @@ def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter):
     dataset_dir = repo_root / "csubst" / "dataset"
     python_exe = sys.executable
     csubst_exe = repo_root / "csubst" / "csubst"
+    iqtree_model = read_iqtree_model(dataset_dir / "{}.alignment.fa.iqtree".format(DATASET_NAME))
 
     cmd = [
         python_exe,
@@ -225,6 +240,8 @@ def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter):
         str(dataset_dir / "{}.alignment.fa.iqtree".format(DATASET_NAME)),
         "--iqtree_log",
         str(dataset_dir / "{}.alignment.fa.log".format(DATASET_NAME)),
+        "--iqtree_model",
+        iqtree_model,
         "--branch_dist",
         "no",
         "--b",

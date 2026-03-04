@@ -136,6 +136,20 @@ def ensure_precomputed_iqtree_outputs(repo_root, dataset_name):
     return required
 
 
+def read_iqtree_model(iqtree_report_path):
+    iqtree_report_path = Path(iqtree_report_path)
+    pattern = re.compile(r"^\s*Model of substitution:\s*(.+?)\s*$")
+    with iqtree_report_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            match = pattern.match(line)
+            if match is not None:
+                model = match.group(1).strip()
+                if model != "":
+                    return model
+                break
+    raise RuntimeError("Failed to read IQ-TREE model from {}".format(str(iqtree_report_path)))
+
+
 def write_pepc_foreground_file(repo_root, run_dir):
     tree_file = repo_root / "csubst" / "dataset" / "PEPC.tree.nwk"
     tr = ete.PhyloNode(str(tree_file), format=1)
@@ -166,6 +180,7 @@ def run_dataset(repo_root, run_root, dataset_name):
         os.pathsep + env["PYTHONPATH"] if "PYTHONPATH" in env else ""
     )
     ensure_precomputed_iqtree_outputs(repo_root=repo_root, dataset_name=dataset_name)
+    iqtree_model = read_iqtree_model(dataset_dir / f"{dataset_name}.alignment.fa.iqtree")
 
     if dataset_name == "PGK":
         foreground = dataset_dir / "PGK.foreground.txt"
@@ -200,6 +215,8 @@ def run_dataset(repo_root, run_root, dataset_name):
         str(dataset_dir / f"{dataset_name}.alignment.fa.iqtree"),
         "--iqtree_log",
         str(dataset_dir / f"{dataset_name}.alignment.fa.log"),
+        "--iqtree_model",
+        iqtree_model,
     ]
     analyze_elapsed_sec, analyze_max_rss_kb = run_timed_command(
         cmd=analyze_cmd,
@@ -257,6 +274,8 @@ def run_dataset(repo_root, run_root, dataset_name):
         str(dataset_dir / f"{dataset_name}.alignment.fa.iqtree"),
         "--iqtree_log",
         str(dataset_dir / f"{dataset_name}.alignment.fa.log"),
+        "--iqtree_model",
+        iqtree_model,
     ]
     site_elapsed_sec, site_max_rss_kb = run_timed_command(
         cmd=site_cmd,
