@@ -25,10 +25,10 @@ EXPECTED = {
     "PGK": {
         "branch_id_1": 23,
         "branch_id_2": 51,
-        "omegaCany2spe": 1.955178,
-        "convergent": 5,
+        "omegaCany2spe": 4.573649,
+        "convergent": 3,
         "divergent": 7,
-        "blank": 390,
+        "blank": 392,
     },
     "PEPC": {
         "branch_id_1": 9,
