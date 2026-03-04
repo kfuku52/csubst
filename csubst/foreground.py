@@ -168,13 +168,26 @@ def _count_branch_memberships(cb, bid_cols, ids):
 
 
 def _mark_dependent_foreground_rows(cb, bid_cols, trait_name, dependent_id_combinations):
-    if dependent_id_combinations.shape[0] == 0:
+    if len(bid_cols) == 0:
         return cb
+    dep = np.asarray(dependent_id_combinations, dtype=np.int64)
+    if dep.size == 0:
+        return cb
+    if dep.size % len(bid_cols) != 0:
+        raise ValueError('dependent_id_combinations had an unexpected shape.')
     col_is_fg = 'is_fg_' + trait_name
-    for bids in dependent_id_combinations:
-        conditions = [(cb[bid_col] == bid) for bid_col, bid in zip(bid_cols, bids)]
-        is_dep = np.logical_and.reduce(conditions)
-        cb.loc[is_dep, col_is_fg] = 'N'
+    # Branch-combination semantics are order-invariant; compare sorted row tuples.
+    dep = dep.reshape(-1, len(bid_cols))
+    dep_sorted = np.sort(dep, axis=1)
+    dep_sorted = np.unique(dep_sorted, axis=0)
+    bid_matrix = cb.loc[:, bid_cols].to_numpy(copy=False)
+    if bid_matrix.shape[0] == 0:
+        return cb
+    bid_sorted = np.sort(np.asarray(bid_matrix, dtype=np.int64), axis=1)
+    dep_key = np.ascontiguousarray(dep_sorted).view(np.dtype((np.void, dep_sorted.dtype.itemsize * dep_sorted.shape[1]))).reshape(-1)
+    bid_key = np.ascontiguousarray(bid_sorted).view(np.dtype((np.void, bid_sorted.dtype.itemsize * bid_sorted.shape[1]))).reshape(-1)
+    is_dep = np.isin(bid_key, dep_key)
+    cb.loc[is_dep, col_is_fg] = 'N'
     return cb
 
 

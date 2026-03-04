@@ -88,6 +88,43 @@ def test_count_branch_memberships_accepts_scalar_ids():
     assert out.tolist() == [1, 0]
 
 
+def test_mark_dependent_foreground_rows_is_order_invariant_for_pairs():
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [1, 1, 2, 3],
+            "branch_id_2": [5, 3, 5, 4],
+            "is_fg_traitA": ["Y", "Y", "Y", "Y"],
+        }
+    )
+    dep = np.array([[5, 1], [5, 2]], dtype=np.int64)
+    out = foreground._mark_dependent_foreground_rows(
+        cb=cb.copy(deep=True),
+        bid_cols=["branch_id_1", "branch_id_2"],
+        trait_name="traitA",
+        dependent_id_combinations=dep,
+    )
+    assert out.loc[:, "is_fg_traitA"].tolist() == ["N", "Y", "N", "Y"]
+
+
+def test_mark_dependent_foreground_rows_is_order_invariant_for_higher_arity():
+    cb = pd.DataFrame(
+        {
+            "branch_id_1": [1, 1, 2],
+            "branch_id_2": [2, 2, 3],
+            "branch_id_3": [3, 4, 4],
+            "is_fg_traitA": ["Y", "Y", "Y"],
+        }
+    )
+    dep = np.array([[3, 2, 1], [4, 3, 2]], dtype=np.int64)
+    out = foreground._mark_dependent_foreground_rows(
+        cb=cb.copy(deep=True),
+        bid_cols=["branch_id_1", "branch_id_2", "branch_id_3"],
+        trait_name="traitA",
+        dependent_id_combinations=dep,
+    )
+    assert out.loc[:, "is_fg_traitA"].tolist() == ["N", "Y", "N"]
+
+
 def test_annotate_foreground_fg_stem_only_keeps_lineage_specific_stem_colors():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((Nep1:1,Nep2:1)N:1,Ceph:1)R;", format=1))
     g = {
