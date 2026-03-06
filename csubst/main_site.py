@@ -3231,6 +3231,30 @@ def _build_site_outdir(mode, branch_txt, lineage_input_branch_txt=None, mode_exp
     return './csubst_site.mode' + mode + '.branch_id' + branch_txt
 
 
+def _maybe_relocate_site_log_file(g):
+    site_jobs = g.get('site_jobs', [])
+    if len(site_jobs) != 1:
+        return g
+    log_file = str(g.get('log_file', '')).strip()
+    if log_file == '':
+        return g
+    current_log_path = os.path.abspath(log_file)
+    default_log_path = runtime.default_site_log_path(base_dir=os.getcwd(), create_dir=False)
+    if current_log_path != default_log_path:
+        return g
+    target_dir = os.path.abspath(site_jobs[0]['site_outdir'])
+    os.makedirs(target_dir, exist_ok=True)
+    target_log_path = os.path.join(target_dir, os.path.basename(default_log_path))
+    if current_log_path != target_log_path:
+        if os.path.exists(current_log_path):
+            os.replace(current_log_path, target_log_path)
+        parent_dir = os.path.dirname(current_log_path)
+        if (parent_dir != '') and os.path.isdir(parent_dir) and (len(os.listdir(parent_dir)) == 0):
+            os.rmdir(parent_dir)
+    g['log_file'] = target_log_path
+    return g
+
+
 def resolve_site_jobs(g):
     raw_mode = str(g.get('mode', 'intersection')).strip()
     mode, mode_expression, set_stat_type = _parse_mode_and_expression(raw_mode)
@@ -3335,6 +3359,7 @@ def main_site(g):
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
     g = resolve_site_jobs(g)
+    g = _maybe_relocate_site_log_file(g)
     for site_job in g['site_jobs']:
         branch_ids = _normalize_branch_ids(site_job['branch_ids'])
         g['single_branch_mode'] = site_job['single_branch_mode']

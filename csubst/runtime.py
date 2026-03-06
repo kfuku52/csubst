@@ -12,6 +12,7 @@ _RUN_TMPDIR_PREFIX = ".csubst_tmp_"
 _DEFAULT_OUTPUT_DIR = "."
 _DEFAULT_OUTPUT_PREFIX = "csubst"
 _DEFAULT_IQTREE_OUTDIR = "csubst_iqtree"
+_DEFAULT_SITE_LOG_DIR = "csubst_site"
 _MISSING = object()
 
 
@@ -142,6 +143,15 @@ def ensure_iqtree_layout(g, create_dir=False):
         os.makedirs(iqtree_outdir, exist_ok=True)
     g["iqtree_outdir"] = iqtree_outdir
     return g
+
+
+def default_site_log_path(base_dir=None, create_dir=False):
+    if base_dir is None:
+        base_dir = os.getcwd()
+    site_log_dir = os.path.abspath(os.path.join(str(base_dir), _DEFAULT_SITE_LOG_DIR))
+    if create_dir:
+        os.makedirs(site_log_dir, exist_ok=True)
+    return os.path.join(site_log_dir, _DEFAULT_OUTPUT_PREFIX + ".log")
 
 
 def _strip_gzip_suffix(path):

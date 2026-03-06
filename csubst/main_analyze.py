@@ -10,7 +10,6 @@ from csubst import foreground
 from csubst import omega
 from csubst import param
 from csubst import parser_misc
-from csubst import sequence
 from csubst import substitution
 from csubst import table
 from csubst import ete
@@ -598,29 +597,6 @@ def main_analyze(g):
         prepare_state=False,
     )
     g = parser_misc.prep_state(g, apply_site_filtering=False)
-    loaded_branch_ids = g.get('state_loaded_branch_ids', None)
-    if loaded_branch_ids is not None:
-        txt = 'Selective state loading active: writing alignments only for loaded nodes ({:,}).'
-        print(txt.format(loaded_branch_ids.shape[0]), flush=True)
-    sequence.write_alignment(
-        runtime.output_path(g, 'alignment_codon.fa'),
-        mode='codon',
-        g=g,
-        branch_ids=loaded_branch_ids,
-    )
-    sequence.write_alignment(
-        runtime.output_path(g, 'alignment_aa.fa'),
-        mode='aa',
-        g=g,
-        branch_ids=loaded_branch_ids,
-    )
-    if str(g.get('nonsyn_recode', 'no')).strip().lower() == '3di20':
-        sequence.write_alignment(
-            runtime.output_path(g, 'alignment_3di.fa'),
-            mode='nsy',
-            g=g,
-            branch_ids=loaded_branch_ids,
-        )
     g = parser_misc.apply_site_filters(g)
     g = combination.get_dep_ids(g)
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')

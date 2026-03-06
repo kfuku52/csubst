@@ -65,6 +65,11 @@ def _resolve_output_namespace_defaults(argv):
                 'outdir': 'csubst_inspect',
                 'output_prefix': 'csubst',
             }
+        if token == 'site':
+            return {
+                'outdir': 'csubst_site',
+                'output_prefix': 'csubst',
+            }
         break
     return {
         'outdir': '.',
@@ -143,6 +148,8 @@ def command_simulate(args):
 def command_site(args):
     print('csubst site start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
+    if str(getattr(args, 'log_file', '')).strip() == '':
+        args.log_file = runtime.default_site_log_path(base_dir=os.getcwd(), create_dir=False)
     g = get_global_parameters_or_exit(args)
     from csubst.main_site import main_site
     main_site(g)

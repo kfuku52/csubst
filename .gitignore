@@ -3,7 +3,7 @@
 !/tests/test_*.py
 /data/
 build/*
-csubst/__pycache__
+__pycache__/
 csubst/*-darwin.so
 csubst/*.c
 csubst/.DS_Store

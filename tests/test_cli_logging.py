@@ -62,6 +62,14 @@ def test_simulate_help_uses_simulate_default_log_name(tmp_path):
     assert not (tmp_path / "csubst.log").exists()
 
 
+def test_site_help_uses_site_default_log_name(tmp_path):
+    result = _run_csubst(["site", "-h"], cwd=tmp_path)
+    assert result.returncode == 0
+    log_file = tmp_path / "csubst_site" / "csubst.log"
+    assert log_file.exists()
+    assert not (tmp_path / "csubst.log").exists()
+
+
 def test_subcommand_output_namespace_defaults_are_command_specific():
     repo_root = Path(__file__).resolve().parents[1]
     script_path = repo_root / "csubst" / "csubst"

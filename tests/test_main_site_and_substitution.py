@@ -5,6 +5,7 @@ import pytest
 from pathlib import Path
 
 from csubst import main_site
+from csubst import runtime
 from csubst import substitution
 from csubst import substitution_sparse
 from csubst import tree
@@ -585,6 +586,25 @@ def test_resolve_site_jobs_rejects_duplicate_branch_ids(tiny_tree):
     g = {"tree": tiny_tree, "mode": "intersection", "branch_id": "{},{}".format(labels["A"], labels["A"])}
     with pytest.raises(ValueError, match="duplicate IDs"):
         main_site.resolve_site_jobs(g)
+
+
+def test_maybe_relocate_site_log_file_moves_default_log_into_single_job_outdir(tmp_path, monkeypatch):
+    default_log = Path(runtime.default_site_log_path(base_dir=tmp_path, create_dir=True))
+    default_log.write_text("hello\n", encoding="utf-8")
+    site_outdir = tmp_path / "csubst_site.branch_id1,2"
+    g = {
+        "log_file": str(default_log),
+        "site_jobs": [{"site_outdir": str(site_outdir)}],
+    }
+
+    monkeypatch.chdir(tmp_path)
+    out = main_site._maybe_relocate_site_log_file(g)
+
+    relocated_log = site_outdir / "csubst.log"
+    assert out["log_file"] == str(relocated_log.resolve())
+    assert relocated_log.exists()
+    assert relocated_log.read_text(encoding="utf-8") == "hello\n"
+    assert not default_log.exists()
 
 
 def test_normalize_branch_ids_rejects_non_integer_like_values():
