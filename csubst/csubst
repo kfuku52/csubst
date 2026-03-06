@@ -42,11 +42,11 @@ _OUTPUT_NAMESPACE_DEFAULTS = {
         'output_prefix': 'csubst',
     },
     'search': {
-        'outdir': 'csubst_analyze',
+        'outdir': 'csubst_search',
         'output_prefix': 'csubst',
     },
     'analyze': {
-        'outdir': 'csubst_analyze',
+        'outdir': 'csubst_search',
         'output_prefix': 'csubst',
     },
     'inspect': {
@@ -279,7 +279,7 @@ def _build_parser():
     psr_co.add_argument('--write_instantaneous_rate_matrix', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Write csubst instantaneous codon rate matrix TSV.')
 
-    psr_out_analyze = _make_output_parent_parser(default_outdir='csubst_analyze', default_prefix='csubst')
+    psr_out_analyze = _make_output_parent_parser(default_outdir='csubst_search', default_prefix='csubst')
     psr_out_inspect = _make_output_parent_parser(default_outdir='csubst_inspect', default_prefix='csubst')
     psr_out_simulate = _make_output_parent_parser(default_outdir='csubst_simulate', default_prefix='csubst')
 
@@ -361,7 +361,7 @@ def _build_parser():
                              '"auto" uses --sa_state_cache_file when a compatible cache exists, otherwise computes and writes it. '
                              '"yes" requires a compatible cache file. "no" disables cache read/write.')
     psr_rc.add_argument('--sa_state_cache_file', metavar='PATH', default=_default_sa_state_cache_file(), type=str,
-                        help='default=%(default)s: Shared 3Di-state cache file path used by analyze and inspect.')
+                        help='default=%(default)s: Shared 3Di-state cache file path used by search and inspect.')
     psr_rc.add_argument('--sa_iqtree_model', metavar='STR', default='GTR', type=str,
                         help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20 '
                              '(used with --seqtype MORPH).')

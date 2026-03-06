@@ -16,9 +16,9 @@ def _resolve_log_path(repo_root, args):
         if args[0] == "simulate":
             return repo_root / "csubst_simulate" / "csubst.log"
         if args[0] == "search":
-            return repo_root / "csubst_analyze" / "csubst.log"
+            return repo_root / "csubst_search" / "csubst.log"
         if args[0] == "analyze":
-            return repo_root / "csubst_analyze" / "csubst.log"
+            return repo_root / "csubst_search" / "csubst.log"
         if args[0] == "inspect":
             return repo_root / "csubst_inspect" / "csubst.log"
         if args[0] == "sites":

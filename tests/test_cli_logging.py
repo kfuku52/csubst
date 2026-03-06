@@ -31,17 +31,17 @@ def test_cli_writes_help_output_to_csubst_log(tmp_path):
 def test_cli_writes_stderr_output_to_csubst_log(tmp_path):
     result = _run_csubst(["search", "--does_not_exist"], cwd=tmp_path)
     assert result.returncode != 0
-    log_file = tmp_path / "csubst_analyze" / "csubst.log"
+    log_file = tmp_path / "csubst_search" / "csubst.log"
     assert log_file.exists()
     log_text = log_file.read_text(encoding="utf-8")
     assert "error:" in log_text.lower()
     assert "--does_not_exist" in log_text
 
 
-def test_legacy_analyze_alias_still_writes_to_csubst_analyze_log(tmp_path):
+def test_legacy_analyze_alias_still_writes_to_csubst_search_log(tmp_path):
     result = _run_csubst(["analyze", "--does_not_exist"], cwd=tmp_path)
     assert result.returncode != 0
-    log_file = tmp_path / "csubst_analyze" / "csubst.log"
+    log_file = tmp_path / "csubst_search" / "csubst.log"
     assert log_file.exists()
     log_text = log_file.read_text(encoding="utf-8")
     assert "error:" in log_text.lower()
@@ -95,11 +95,11 @@ def test_subcommand_output_namespace_defaults_are_command_specific():
     parser = ns["_build_parser"]()
 
     search = parser.parse_args(["search"])
-    assert search.outdir == "csubst_analyze"
+    assert search.outdir == "csubst_search"
     assert search.output_prefix == "csubst"
 
     analyze = parser.parse_args(["analyze"])
-    assert analyze.outdir == "csubst_analyze"
+    assert analyze.outdir == "csubst_search"
     assert analyze.output_prefix == "csubst"
 
     inspect = parser.parse_args(["inspect"])

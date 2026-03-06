@@ -62,7 +62,7 @@ csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --for
 CSUBST provides five main subcommands:
 
 - `csubst dataset`: generate bundled example datasets (e.g., `PGK`, `PEPC`).
-- `csubst search` (legacy alias: `csubst analyze`): run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
+- `csubst search` (legacy alias: `csubst analyze`): run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`. Outputs are written to `csubst_search/` by default.
 - `csubst inspect`: summarize branch mappings and inspect ancestral states.
 - `csubst sites` (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree + site summary plots, and optionally map sites to protein structures.
 - `csubst simulate`: simulate codon sequence evolution under user-defined convergent scenarios.
