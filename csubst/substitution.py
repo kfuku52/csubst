@@ -12,6 +12,7 @@ from collections import defaultdict
 
 from csubst import table
 from csubst import parallel
+from csubst import runtime
 from csubst import substitution_cy
 from csubst import substitution_sparse
 try:
@@ -728,6 +729,26 @@ def get_group_state_totals(sub_tensor):
     return gad, ga, gd
 
 
+def get_site_group_state_totals(sub_tensor):
+    if _is_sparse_sub_tensor(sub_tensor):
+        _, sub_sg = substitution_sparse.summarize_sparse_sub_tensor(
+            sparse_tensor=sub_tensor,
+            mode='spe2spe',
+        )
+        return sub_sg
+    return sub_tensor.sum(axis=0)
+
+
+def get_branch_group_state_totals(sub_tensor):
+    if _is_sparse_sub_tensor(sub_tensor):
+        sub_bg, _ = substitution_sparse.summarize_sparse_sub_tensor(
+            sparse_tensor=sub_tensor,
+            mode='spe2spe',
+        )
+        return sub_bg
+    return sub_tensor.sum(axis=1)
+
+
 def _get_sparse_branch_tensor(sub_tensor, branch_id):
     out = np.zeros(
         shape=(sub_tensor.num_site, sub_tensor.num_group, sub_tensor.num_state_from, sub_tensor.num_state_to),
@@ -918,7 +939,7 @@ def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None)
         num_syngroup = len(g['amino_acid_orders'])
         num_state = g['max_synonymous_size']
     axis = (num_branch,num_site,num_syngroup,num_state,num_state) # axis = [branch,site,matrix_group,state_from,state_to]
-    mmap_tensor = os.path.join(os.getcwd(), 'tmp.csubst.sub_tensor.'+mmap_attr+'.mmap')
+    mmap_tensor = runtime.temp_path('tmp.csubst.sub_tensor.'+mmap_attr+'.mmap')
     if os.path.exists(mmap_tensor): os.unlink(mmap_tensor)
     txt = 'Generating memory map: dtype={}, axis={}, path={}'
     print(txt.format(state_tensor.dtype, axis, mmap_tensor), flush=True)
@@ -2001,7 +2022,7 @@ def _run_cb_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, selecte
             columns=columns,
         )
     id_chunks, mmap_starts = _resolve_reducer_chunks(id_combinations=id_combinations, n_jobs=n_jobs, g=g)
-    mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cb.out.mmap')
+    mmap_out = runtime.temp_path('tmp.csubst.cb.out.mmap')
     axis = (id_combinations.shape[0], arity + len(selected))
     my_dtype = _resolve_output_dtype(source_dtype=sub_tensor.dtype, default_dtype=sub_tensor.dtype)
     tasks = [
@@ -2208,7 +2229,7 @@ def _run_cbs_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, column
             columns=columns,
         )
     id_chunks, mmap_starts = _resolve_reducer_chunks(id_combinations=id_combinations, n_jobs=n_jobs, g=g)
-    mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.cbs.out.mmap')
+    mmap_out = runtime.temp_path('tmp.csubst.cbs.out.mmap')
     axis = (id_combinations.shape[0] * sub_tensor.shape[1], arity + 5)
     my_dtype = _resolve_output_dtype(source_dtype=sub_tensor.dtype, default_dtype=sub_tensor.dtype)
     tasks = [

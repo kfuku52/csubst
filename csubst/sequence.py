@@ -6,6 +6,7 @@ import re
 import numpy as np
 
 from csubst import ete
+from csubst import runtime
 
 _NSY_ALIGNMENT_SYMBOLS = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz")
 _GROUP_SUM_MATRIX_CACHE = dict()
@@ -32,7 +33,7 @@ def _initialize_state_array(axis, dtype, mmap_name=None):
     axis = tuple(axis)
     if mmap_name is None:
         return np.zeros(axis, dtype=dtype)
-    mmap_path = os.path.join(os.getcwd(), mmap_name)
+    mmap_path = runtime.temp_path(mmap_name)
     if os.path.exists(mmap_path):
         os.unlink(mmap_path)
     txt = 'Generating memory map: dtype={}, axis={}, path={}'

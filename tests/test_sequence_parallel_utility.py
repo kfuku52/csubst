@@ -3,11 +3,13 @@ import os
 import numpy as np
 import pandas as pd
 import pytest
+from pathlib import Path
 
 from csubst import foreground
 from csubst import ete
 from csubst import genetic_code
 from csubst import parallel
+from csubst import runtime
 from csubst import sequence
 from csubst import tree
 from csubst import utility
@@ -132,6 +134,15 @@ def test_run_starmap_threading_backend_works():
     args = [(2, 3), (4, 5), (6, 7)]
     out = parallel.run_starmap(_starmap_add_mul, args, n_jobs=2, backend="threading")
     assert out == [10, 18, 26]
+
+
+def test_runtime_temp_path_uses_per_run_tempdir(tmp_path):
+    with runtime.run_tempdir_context(base_dir=str(tmp_path)) as run_tmpdir:
+        temp_path = runtime.temp_path("tmp.csubst.demo.txt")
+        assert temp_path.startswith(str(run_tmpdir))
+        Path(temp_path).write_text("demo", encoding="utf-8")
+        assert Path(temp_path).exists()
+    assert Path(run_tmpdir).exists() is False
 
 
 def test_calc_omega_state_matches_manual_tensor_product():

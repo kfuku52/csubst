@@ -9,6 +9,7 @@ from collections import OrderedDict
 from itertools import zip_longest
 
 from csubst import genetic_code
+from csubst import runtime
 from csubst import sequence
 from csubst import tree
 from csubst import ete
@@ -240,15 +241,16 @@ def check_iqtree_dependency(g):
 
 
 def _infer_iqtree_output_prefix_from_alignment(alignment_file):
-    alignment_file = str(alignment_file).strip()
-    if alignment_file.lower().endswith('.gz'):
-        return alignment_file[:-3]
-    return alignment_file
+    return runtime.infer_iqtree_output_prefix(alignment_file=alignment_file)
 
 
 def check_intermediate_files(g):
     all_exist = True
-    iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g.get('alignment_file', ''))
+    g = runtime.ensure_iqtree_layout(g, create_dir=False)
+    iqtree_prefix = runtime.infer_iqtree_output_prefix(
+        alignment_file=g.get('alignment_file', ''),
+        iqtree_outdir=g['iqtree_outdir'],
+    )
     extensions = ['iqtree','log','rate','state','treefile']
     for ext in extensions:
         if (g['iqtree_'+ext]=='infer'):
@@ -261,9 +263,14 @@ def check_intermediate_files(g):
     return g,all_exist
 
 def run_iqtree_ancestral(g, force_notree_run=False):
-    file_tree = 'tmp.csubst.nwk'
+    file_tree = runtime.temp_path('tmp.csubst.nwk')
     tree.write_tree(g['rooted_tree'], outfile=file_tree, add_numerical_label=False)
-    iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g.get('alignment_file', ''))
+    g = runtime.ensure_iqtree_layout(g, create_dir=True)
+    iqtree_prefix = runtime.infer_iqtree_output_prefix(
+        alignment_file=g.get('alignment_file', ''),
+        iqtree_outdir=g['iqtree_outdir'],
+        create_dir=True,
+    )
     try:
         is_consistent = tree.is_consistent_tree_and_aln(g=g)
         if is_consistent:
@@ -429,7 +436,7 @@ def _initialize_state_tensor(axis, dtype, selective, mmap_name):
     axis = tuple(axis)
     if not selective:
         return np.zeros(axis, dtype=dtype)
-    mmap_tensor = os.path.join(os.getcwd(), mmap_name)
+    mmap_tensor = runtime.temp_path(mmap_name)
     if os.path.exists(mmap_tensor):
         os.unlink(mmap_tensor)
     txt = 'Generating memory map: dtype={}, axis={}, path={}'

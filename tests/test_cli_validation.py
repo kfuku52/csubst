@@ -4,6 +4,24 @@ import os
 from pathlib import Path
 
 
+def _resolve_log_path(repo_root, args):
+    args = tuple(args)
+    if "--log_file" in args:
+        log_index = args.index("--log_file") + 1
+        return Path(args[log_index])
+    for token in args:
+        if token.startswith("--log_file="):
+            return Path(token.split("=", 1)[1])
+    if len(args) > 0:
+        if args[0] == "simulate":
+            return repo_root / "csubst_simulate" / "csubst.log"
+        if args[0] == "analyze":
+            return repo_root / "csubst_analyze" / "csubst.log"
+        if args[0] == "inspect":
+            return repo_root / "csubst_inspect" / "csubst.log"
+    return repo_root / "csubst.log"
+
+
 def _run_cli(*args):
     repo_root = Path(__file__).resolve().parents[1]
     cmd = [sys.executable, str(repo_root / "csubst" / "csubst")]
@@ -15,7 +33,7 @@ def _run_cli(*args):
     proc = subprocess.run(
         cmd, cwd=str(repo_root), env=env, capture_output=True, text=True
     )
-    log_path = repo_root / "csubst.log"
+    log_path = _resolve_log_path(repo_root, args)
     log_text = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
     return proc, log_text
 
@@ -93,6 +111,12 @@ def test_inspect_help_includes_nonsyn_recode_pca_option():
     assert "--download_prostt5" in help_text
     assert "--sa_smoke_max_branches" in help_text
     assert "--nonsyn_recode" in help_text
+
+
+def test_inspect_rejects_legacy_yes_state_plot_option():
+    proc, log_text = _run_cli("inspect", "--plot_state_aa", "yes")
+    assert proc.returncode == 2
+    assert "no longer accepts yes/no" in log_text
 
 
 def test_cli_entrypoint_runs_from_repo_root_without_pythonpath():

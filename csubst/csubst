@@ -14,6 +14,7 @@ if (__package__ is None) or (__package__ == ''):
 
 from csubst.__init__ import __version__
 from csubst import param
+from csubst import runtime
 
 
 def strtobool(value):
@@ -33,6 +34,85 @@ def _default_prostt5_cache_file():
 
 def _default_sa_state_cache_file():
     return "csubst_3di_state_cache.npz"
+
+
+def _resolve_output_namespace_defaults(argv):
+    tokens_with_values = {'--outdir', '--output_prefix', '--log_file'}
+    i = 0
+    while i < len(argv):
+        token = str(argv[i])
+        if token in tokens_with_values:
+            i += 2
+            continue
+        if any([token.startswith(opt + '=') for opt in tokens_with_values]):
+            i += 1
+            continue
+        if token.startswith('-'):
+            i += 1
+            continue
+        if token == 'simulate':
+            return {
+                'outdir': 'csubst_simulate',
+                'output_prefix': 'csubst',
+            }
+        if token == 'analyze':
+            return {
+                'outdir': 'csubst_analyze',
+                'output_prefix': 'csubst',
+            }
+        if token == 'inspect':
+            return {
+                'outdir': 'csubst_inspect',
+                'output_prefix': 'csubst',
+            }
+        break
+    return {
+        'outdir': '.',
+        'output_prefix': 'csubst',
+    }
+
+
+def _add_output_namespace_args(parser, default_outdir='.', default_prefix='csubst', include_outdir=True, include_output_prefix=True, include_log_file=True):
+    if include_outdir:
+        parser.add_argument('--outdir', metavar='PATH', default=default_outdir, type=str,
+                            help='default=%(default)s: Output directory for generated files.')
+    if include_output_prefix:
+        parser.add_argument('--output_prefix', metavar='STEM', default=default_prefix, type=str,
+                            help='default=%(default)s: Output filename stem used inside --outdir.')
+    if include_log_file:
+        parser.add_argument('--log_file', metavar='PATH', default='', type=str,
+                            help='default=infer from --outdir/--output_prefix: PATH to log file. '
+                                 'Relative paths are resolved under --outdir.')
+
+
+def _make_output_parent_parser(default_outdir='.', default_prefix='csubst'):
+    parser = argparse.ArgumentParser(add_help=False)
+    _add_output_namespace_args(parser, default_outdir=default_outdir, default_prefix=default_prefix)
+    return parser
+
+
+def _resolve_log_file_from_argv(argv):
+    parser = argparse.ArgumentParser(add_help=False)
+    defaults = _resolve_output_namespace_defaults(argv)
+    _add_output_namespace_args(
+        parser,
+        default_outdir=defaults['outdir'],
+        default_prefix=defaults['output_prefix'],
+        include_outdir=True,
+        include_output_prefix=True,
+        include_log_file=True,
+    )
+    try:
+        args, _ = parser.parse_known_args(argv)
+        layout = {
+            'outdir': args.outdir,
+            'output_prefix': args.output_prefix,
+            'log_file': args.log_file,
+        }
+        runtime.ensure_output_layout(layout, create_dir=True)
+        return layout['log_file']
+    except Exception:
+        return os.path.abspath('csubst.log')
 
 
 def get_global_parameters_or_exit(args):
@@ -91,14 +171,11 @@ def command_inspect(args):
     print('csubst inspect: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst inspect end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
-def _main():
-    # Start time
-    csubst_start = time.time()
-    print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
-
+def _build_parser():
     # Main parser
     parser = argparse.ArgumentParser(description='CSUBST - a toolkit for molecular convergence detection. For details, see https://github.com/kfuku52/csubst')
     parser.add_argument('--version', action='version', version='CSUBST version: {}'.format(__version__))
+    _add_output_namespace_args(parser, include_outdir=False, include_output_prefix=False, include_log_file=True)
     subparsers = parser.add_subparsers()
 
     # shared: common
@@ -129,8 +206,8 @@ def _main():
     psr_co.add_argument('--sub_tensor_auto_sparse_min_elements', metavar='INT', default=100000000, type=int, required=False,
                         help='default=%(default)s: For --sub_tensor_backend auto, build sparse substitution tensors '
                              'when estimated tensor elements (branch x site x group x from x to) are >= this threshold.')
-    psr_co.add_argument('--parallel_backend', metavar='auto|multiprocessing|threading|loky', default='auto', type=str,
-                        choices=['auto', 'multiprocessing', 'threading', 'loky'],
+    psr_co.add_argument('--parallel_backend', metavar='auto|multiprocessing|threading', default='auto', type=str,
+                        choices=['auto', 'multiprocessing', 'threading'],
                         help='default=%(default)s: Backend policy for parallel workloads. '
                              '"auto" uses multiprocessing.')
     psr_co.add_argument('--parallel_chunk_factor', metavar='INT', default=1, type=int, required=False,
@@ -168,11 +245,19 @@ def _main():
                         help='default=%(default)s: Minimum estimated expected-state workload per worker.')
     psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')
+    psr_co.add_argument('--write_instantaneous_rate_matrix', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Write csubst instantaneous codon rate matrix TSV.')
+
+    psr_out_analyze = _make_output_parent_parser(default_outdir='csubst_analyze', default_prefix='csubst')
+    psr_out_inspect = _make_output_parent_parser(default_outdir='csubst_inspect', default_prefix='csubst')
+    psr_out_simulate = _make_output_parent_parser(default_outdir='csubst_simulate', default_prefix='csubst')
 
     # shared: IQ-TREE inputs
     psr_iq = argparse.ArgumentParser(add_help=False)
     psr_iq.add_argument('--iqtree_exe', metavar='PATH', default='iqtree', type=str, required=False,
                         help='default=%(default)s: PATH to the IQ-TREE executable')
+    psr_iq.add_argument('--iqtree_outdir', metavar='PATH', default='csubst_iqtree', type=str, required=False,
+                        help='default=%(default)s: Shared directory used when --iqtree_* paths are "infer".')
     psr_iq.add_argument('--iqtree_model', metavar='STR', default='ECMK07+F+R4', type=str, required=False,
                         help='default=%(default)s: Codon substitution model for ancestral state reconstruction. '
                              'Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. '
@@ -181,15 +266,20 @@ def _main():
     psr_iq.add_argument('--iqtree_redo', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Whether to rerun IQ-TREE even if all intermediate files exist.')
     psr_iq.add_argument('--iqtree_treefile', metavar='PATH', default='infer', type=str, required=False,
-                       help='default=%(default)s: PATH to the IQ-TREE\'s .treefile output. "infer" from --alignment_file')
+                       help='default=%(default)s: PATH to the IQ-TREE\'s .treefile output. '
+                            '"infer" resolves inside --iqtree_outdir from --alignment_file')
     psr_iq.add_argument('--iqtree_state', metavar='PATH', default='infer', type=str, required=False,
-                       help='default=%(default)s: PATH to the IQ-TREE\'s .state output. "infer" from --alignment_file')
+                       help='default=%(default)s: PATH to the IQ-TREE\'s .state output. '
+                            '"infer" resolves inside --iqtree_outdir from --alignment_file')
     psr_iq.add_argument('--iqtree_rate', metavar='PATH', default='infer', type=str, required=False,
-                       help='default=%(default)s: PATH to the IQ-TREE\'s .rate output. "infer" from --alignment_file')
+                       help='default=%(default)s: PATH to the IQ-TREE\'s .rate output. '
+                            '"infer" resolves inside --iqtree_outdir from --alignment_file')
     psr_iq.add_argument('--iqtree_iqtree', metavar='PATH', default='infer', type=str, required=False,
-                       help='default=%(default)s: PATH to the IQ-TREE\'s .iqtree output. "infer" from --alignment_file')
+                       help='default=%(default)s: PATH to the IQ-TREE\'s .iqtree output. '
+                            '"infer" resolves inside --iqtree_outdir from --alignment_file')
     psr_iq.add_argument('--iqtree_log', metavar='PATH', default='infer', type=str, required=False,
-                        help='default=%(default)s: PATH to the IQ-TREE\'s .log output. "infer" from --alignment_file')
+                        help='default=%(default)s: PATH to the IQ-TREE\'s .log output. '
+                             '"infer" resolves inside --iqtree_outdir from --alignment_file')
 
     # shared: Ancestral_state
     psr_as = argparse.ArgumentParser(add_help=False)
@@ -206,7 +296,7 @@ def _main():
                              '(including sites with only one unambiguous tip codon). '
                              '"zero_sub_mass" drops only sites guaranteed to have zero observed substitution mass '
                              '(both N and S) across analyzed branches. '
-                             'When dropping is enabled, csubst_site_index_map.tsv is written to map retained internal '
+                             'In `inspect`, csubst_site_index_map.tsv is written to map retained internal '
                              'site indices to original alignment positions.')
     psr_rc = argparse.ArgumentParser(add_help=False)
     psr_rc.add_argument('--nonsyn_recode', metavar='no|3di20|dayhoff6|sr6|kgb6|sr4|dayhoff9|dayhoff12|dayhoff15|dayhoff18|srchisq6|kgbauto6',
@@ -245,11 +335,6 @@ def _main():
                         help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20 '
                              '(used with --seqtype MORPH).')
 
-    # shared: PhyloBayes inputs, but PhyloBayes is no longer supported.
-    psr_pb = argparse.ArgumentParser(add_help=False)
-    #psr_pb.add_argument('--phylobayes_dir', metavar='PATH', default='./', type=str, required=False,
-    #                   help='default=%(default)s: PATH to the PhyloBayes output directory.')
-
     # shared: foreground
     psr_fg = argparse.ArgumentParser(add_help=False)
     psr_fg.add_argument('--foreground', metavar='PATH', default=None, type=str, required=False,
@@ -284,11 +369,13 @@ def _main():
     dataset = subparsers.add_parser('dataset', help=help_txt, parents=[])
     dataset.add_argument('--name', metavar='STR', default='PGK', type=str, choices=['PGK','PEPC'],
                          help='default=%(default)s: Name of dataset to generate.')
+    dataset.add_argument('--iqtree_outdir', metavar='PATH', default='csubst_iqtree', type=str,
+                         help='default=%(default)s: Directory for bundled IQ-TREE intermediate files.')
     dataset.set_defaults(handler=command_dataset)
 
     # simulate
     help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
-    simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg])
+    simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_out_simulate])
     simulate.add_argument('--background_omega', metavar='FLOAT', default=None, type=float,
                           help='default=IQ-TREE estimate (fallback 0.2): dN/dS for background branches. '
                                'Set explicitly to override IQ-TREE estimated omega.')
@@ -337,8 +424,8 @@ def _main():
     simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
                           help='default=%(default)s: Export true ancestral-state bundle from simulation '
                                '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for analyze-time evaluation.')
-    simulate.add_argument('--true_asr_prefix', metavar='PATH_PREFIX', default='simulate_true_asr', type=str,
-                          help='default=%(default)s: Output path prefix for true-ASR bundle files.')
+    simulate.add_argument('--true_asr_prefix', metavar='PATH_PREFIX', default='', type=str,
+                          help='default=infer from --outdir/--output_prefix: Output path prefix for true-ASR bundle files.')
     simulate.set_defaults(handler=command_simulate)
 
 
@@ -462,7 +549,7 @@ def _main():
 
     # analyze
     help_txt = 'calculates convergence rates and other metrics on branch combinations.  See `csubst analyze -h`'
-    analyze = subparsers.add_parser('analyze', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as,psr_rc])
+    analyze = subparsers.add_parser('analyze', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_analyze])
     analyze.set_defaults(handler=command_analyze)
     # branch combinations
     analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
@@ -643,7 +730,7 @@ def _main():
                          help='default=%(default)s: Experimental feature. Maximum chain count threshold for candidate structures in --epistasis_pdb besthit.')
     analyze.add_argument('--epistasis_degree_outfile', metavar='PATH', default='csubst_epistasis_structure_degree.tsv', type=str,
                          help='default=%(default)s: Experimental feature. Output TSV path for analyze-time structure degree table.')
-    analyze.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='auto', type=str,
+    analyze.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='0.0', type=str,
                          help='default=%(default)s: Dirichlet pseudo-count alpha for convergence-statistic '
                               'shrinkage. Set 0 to disable smoothing. '
                               'Use "auto" for Empirical-Bayes alpha estimation.')
@@ -653,7 +740,7 @@ def _main():
                               '"none" keeps legacy behavior; '
                               '"symmetric" applies equal pseudo-counts; '
                               '"empirical" shrinks toward global substitution-category frequencies.')
-    analyze.add_argument('--pseudocount_target', metavar='observed|expected|both', default='expected', type=str,
+    analyze.add_argument('--pseudocount_target', metavar='observed|expected|both', default='both', type=str,
                          choices=['observed', 'expected', 'both'],
                          help='default=%(default)s: Apply pseudo-counts to observed counts, expected counts, or both.')
     analyze.add_argument('--pseudocount_report', action='store_true',
@@ -664,11 +751,17 @@ def _main():
 
     # inspect
     help_txt = 'writes branch/tree/state inspection outputs without running convergence statistics. See `csubst inspect -h`'
-    inspect = subparsers.add_parser('inspect', help=help_txt, parents=[psr_co,psr_iq,psr_pb,psr_fg,psr_as,psr_rc])
-    inspect.add_argument('--plot_state_aa', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Write per-site ancestral amino-acid state trees into csubst_plot_state_aa/.')
-    inspect.add_argument('--plot_state_codon', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Write per-site ancestral codon state trees into csubst_plot_state_codon/.')
+    inspect = subparsers.add_parser('inspect', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_inspect])
+    inspect.add_argument('--plot_state_aa', metavar='no|all|SITE_SPEC', default='no', type=str,
+                         help='default=%(default)s: Write ancestral amino-acid state trees from unfiltered sites. '
+                              'Use "all" for one multi-page PDF with every site, '
+                              '"2,5,10" for one multi-page PDF with one site per page, '
+                              'or "2-5-10" for one single-page PDF with concatenated site labels.')
+    inspect.add_argument('--plot_state_codon', metavar='no|all|SITE_SPEC', default='no', type=str,
+                         help='default=%(default)s: Write ancestral codon state trees from unfiltered sites. '
+                              'Use "all" for one multi-page PDF with every site, '
+                              '"2,5,10" for one multi-page PDF with one site per page, '
+                              'or "2-5-10" for one single-page PDF with concatenated site labels.')
     inspect.add_argument('--plot_nonsyn_recode_pca', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Write csubst_nonsyn_recoding_pca.png from input alignment.')
     inspect.add_argument('--plot_nonsyn_recode_pca_3di20', metavar='yes|no', default='no', type=strtobool,
@@ -680,13 +773,22 @@ def _main():
     inspect.add_argument('--download_prostt5', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Download/check ProstT5 model files and exit.')
     inspect.set_defaults(handler=command_inspect)
+    return parser
+
+
+def _main():
+    # Start time
+    csubst_start = time.time()
+    print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    parser = _build_parser()
 
     # Handler
     args = parser.parse_args()
     #param.set_num_thread_variables(num_thread=args.threads)
     if hasattr(args, 'handler'):
         try:
-            args.handler(args)
+            with runtime.run_tempdir_context(base_dir=os.getcwd()):
+                args.handler(args)
         except (ValueError, AssertionError) as e:
             sys.stderr.write(str(e).strip() + '\n')
             sys.exit(2)
@@ -699,6 +801,7 @@ def _main():
 
 
 if __name__ == "__main__":
-    with open('csubst.log', 'w', buffering=1, encoding='utf-8') as log_file:
+    log_path = _resolve_log_file_from_argv(sys.argv[1:])
+    with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
         with contextlib.redirect_stdout(log_file), contextlib.redirect_stderr(log_file):
             _main()

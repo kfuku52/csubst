@@ -14,6 +14,7 @@ from csubst.__init__ import __version__
 from csubst import output_stat
 from csubst import pseudocount
 from csubst import recoding
+from csubst import runtime
 from csubst import table
 
 DEPENDENCY_DISTRIBUTIONS = (
@@ -37,10 +38,7 @@ def _default_sa_state_cache_file():
 
 
 def _infer_iqtree_output_prefix_from_alignment(alignment_file):
-    alignment_file = str(alignment_file).strip()
-    if alignment_file.lower().endswith('.gz'):
-        return alignment_file[:-3]
-    return alignment_file
+    return runtime.infer_iqtree_output_prefix(alignment_file=alignment_file)
 
 
 def _parse_bool_like(value, param_name):
@@ -522,22 +520,37 @@ def get_global_parameters(args):
         if g['fg_clade_permutation']>0:
             if (g['foreground'] is None):
                 raise ValueError('To enable --fg_clade_permutation, use --foreground')
-    if 'iqtree_treefile' in g.keys():
-        if (g['iqtree_treefile']=='infer'):
-            iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g['alignment_file'])
-            g['iqtree_treefile'] = iqtree_prefix+'.treefile'
-    if 'iqtree_state' in g.keys():
-        if (g['iqtree_state']=='infer'):
-            iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g['alignment_file'])
-            g['iqtree_state'] = iqtree_prefix+'.state'
-    if 'iqtree_rate' in g.keys():
-        if (g['iqtree_rate']=='infer'):
-            iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g['alignment_file'])
-            g['iqtree_rate'] = iqtree_prefix+'.rate'
-    if 'iqtree_iqtree' in g.keys():
-        if (g['iqtree_iqtree']=='infer'):
-            iqtree_prefix = _infer_iqtree_output_prefix_from_alignment(g['alignment_file'])
-            g['iqtree_iqtree'] = iqtree_prefix+'.iqtree'
+    g = runtime.ensure_iqtree_layout(g, create_dir=False)
+    alignment_file_txt = str(g.get('alignment_file', '')).strip()
+    if alignment_file_txt != '':
+        if 'iqtree_treefile' in g.keys():
+            if (g['iqtree_treefile']=='infer'):
+                iqtree_prefix = runtime.infer_iqtree_output_prefix(
+                    alignment_file=g['alignment_file'],
+                    iqtree_outdir=g['iqtree_outdir'],
+                )
+                g['iqtree_treefile'] = iqtree_prefix+'.treefile'
+        if 'iqtree_state' in g.keys():
+            if (g['iqtree_state']=='infer'):
+                iqtree_prefix = runtime.infer_iqtree_output_prefix(
+                    alignment_file=g['alignment_file'],
+                    iqtree_outdir=g['iqtree_outdir'],
+                )
+                g['iqtree_state'] = iqtree_prefix+'.state'
+        if 'iqtree_rate' in g.keys():
+            if (g['iqtree_rate']=='infer'):
+                iqtree_prefix = runtime.infer_iqtree_output_prefix(
+                    alignment_file=g['alignment_file'],
+                    iqtree_outdir=g['iqtree_outdir'],
+                )
+                g['iqtree_rate'] = iqtree_prefix+'.rate'
+        if 'iqtree_iqtree' in g.keys():
+            if (g['iqtree_iqtree']=='infer'):
+                iqtree_prefix = runtime.infer_iqtree_output_prefix(
+                    alignment_file=g['alignment_file'],
+                    iqtree_outdir=g['iqtree_outdir'],
+                )
+                g['iqtree_iqtree'] = iqtree_prefix+'.iqtree'
     if 'float_type' in g.keys():
         g['float_type'] = int(g['float_type'])
         if (g['float_type']==16):
@@ -576,8 +589,8 @@ def get_global_parameters(args):
         g['parallel_backend'] = str(g['parallel_backend']).lower()
     else:
         g['parallel_backend'] = 'auto'
-    if g['parallel_backend'] not in ['auto', 'multiprocessing', 'threading', 'loky']:
-        raise ValueError('--parallel_backend should be one of auto, multiprocessing, threading, loky.')
+    if g['parallel_backend'] not in ['auto', 'multiprocessing', 'threading']:
+        raise ValueError('--parallel_backend should be one of auto, multiprocessing, threading.')
     if 'parallel_chunk_factor' in g.keys():
         g['parallel_chunk_factor'] = int(g['parallel_chunk_factor'])
     else:
@@ -693,9 +706,7 @@ def get_global_parameters(args):
             g['true_asr_prefix'] = ''
         g['true_asr_prefix'] = str(g['true_asr_prefix']).strip()
     else:
-        g['true_asr_prefix'] = 'simulate_true_asr'
-    if g['export_true_asr'] and (g['true_asr_prefix'] == ''):
-        raise ValueError('--true_asr_prefix should be non-empty when --export_true_asr is enabled.')
+        g['true_asr_prefix'] = ''
     if 'tree_scaling_factor' in g.keys():
         g['tree_scaling_factor'] = _require_finite_float(
             value=float(g['tree_scaling_factor']),
@@ -895,6 +906,12 @@ def get_global_parameters(args):
         value=g['download_prostt5'],
         param_name='--download_prostt5',
     )
+    if 'write_instantaneous_rate_matrix' not in g.keys():
+        g['write_instantaneous_rate_matrix'] = False
+    g['write_instantaneous_rate_matrix'] = _parse_bool_like(
+        value=g['write_instantaneous_rate_matrix'],
+        param_name='--write_instantaneous_rate_matrix',
+    )
     if 'prostt5_device' not in g.keys():
         g['prostt5_device'] = 'auto'
     g['prostt5_device'] = str(g['prostt5_device']).strip().lower()
@@ -967,7 +984,8 @@ def get_global_parameters(args):
         output_stat.validate_cutoff_stat_compatibility(g['cutoff_stat'], g['output_stats'])
         # Fail fast on malformed cutoff tokens/regex/value ranges.
         table.parse_cutoff_stat(cutoff_stat_str=g['cutoff_stat'])
-    return g
+    g = runtime.ensure_output_layout(g, create_dir=False)
+    return runtime.ensure_run_context(g)
 
 def initialize_df_cb_stats(g):
     cols = ['arity','elapsed_sec','fg_enrichment_factor','mode','dSC_calibration',]

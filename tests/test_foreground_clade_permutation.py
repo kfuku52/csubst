@@ -329,7 +329,7 @@ def test_get_df_clade_size_handles_noncontiguous_branch_ids():
     assert not bool(out.loc[29, "is_fg_stem_traitA"])
 
 
-def test_get_marginal_branch_accepts_scalar_target_ids():
+def test_get_marginal_branch_accepts_scalar_target_ids(tmp_path):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
     for node in tr.traverse():
@@ -342,10 +342,31 @@ def test_get_marginal_branch_accepts_scalar_target_ids():
         "mg_parent": False,
         "mg_sister": True,
         "mg_sister_stem_only": True,
+        "outdir": str(tmp_path),
+        "output_prefix": "margin_run",
     }
     out = foreground.get_marginal_branch(g)
     assert set(out["mg_ids"]["traitA"].tolist()) == {labels["C"]}
     assert set(out["target_ids"]["traitA"].tolist()) == {labels["B"], labels["C"]}
+    assert (tmp_path / "margin_run_marginal_branch_traitA.txt").exists()
+
+
+def test_get_foreground_ids_writes_target_file_under_output_namespace(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"name": ["B"], "traitA": [1]}),
+        "fg_stem_only": True,
+        "outdir": str(tmp_path),
+        "output_prefix": "fg_run",
+    }
+
+    out = foreground.get_foreground_ids(g, write=True)
+
+    target_path = tmp_path / "fg_run_foreground_branch_traitA.txt"
+    assert target_path.exists()
+    target_ids = [int(line.strip()) for line in target_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert target_ids == out["target_ids"]["traitA"].tolist()
 
 
 def test_randomize_foreground_flags_without_sample_original_preserves_target_count():

@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from csubst import ete
+from csubst import runtime
 from csubst import sequence
 from csubst import tree
 
@@ -856,7 +857,7 @@ def _run_iqtree_direct_3di(g, tip_alignment_path):
             "iqtree": path_iqtree,
             "log": path_log,
         }
-    file_tree = "tmp.csubst.3di.nwk"
+    file_tree = runtime.temp_path("tmp.csubst.3di.nwk")
     tree.write_tree(g["rooted_tree"], outfile=file_tree, add_numerical_label=False)
     try:
         model, did_remap_gtr20 = _normalize_direct_iqtree_model(g.get("sa_iqtree_model", "GTR"))
@@ -1005,7 +1006,7 @@ def build_3di_state_direct(g, selected_branch_ids=None, predictor=None):
     tip_3di_by_name_full = build_tip_3di_alignment_from_full_cds(
         g=g,
         predictor=predictor,
-        output_path="csubst_alignment_3di_tip.fa",
+        output_path=runtime.temp_path("csubst_alignment_3di_tip.fa"),
     )
     g.pop("_precomputed_tip_invariant_site_mask", None)
     tip_3di_by_name_direct = tip_3di_by_name_full
@@ -1027,7 +1028,7 @@ def build_3di_state_direct(g, selected_branch_ids=None, predictor=None):
                 print(txt.format(int(is_drop_site.sum())), flush=True)
     _encode_tip_3di_alignment_for_morph(
         tip_3di_by_name=tip_3di_by_name_direct,
-        output_path="csubst_alignment_3di_tip_morph.fa",
+        output_path=runtime.temp_path("csubst_alignment_3di_tip_morph.fa"),
     )
     iqtree_paths = _run_iqtree_direct_3di(g=g, tip_alignment_path="csubst_alignment_3di_tip_morph.fa")
     state_tensor_direct, state_orders = _read_direct_3di_state_tensor(

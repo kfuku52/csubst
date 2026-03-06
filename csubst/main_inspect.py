@@ -1,29 +1,33 @@
 import os
-import shutil
 import time
+from glob import glob
 
 import numpy as np
 import pandas as pd
 
 from csubst import ete
-from csubst import foreground
-from csubst import genetic_code
 from csubst import parser_misc
+from csubst import runtime
 from csubst import sequence
 from csubst import structural_alphabet
 from csubst import tree
 
 
-def _plot_state_tree_in_directory(output_dir, state, orders, mode, g):
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    os.mkdir(output_dir)
-    cwd = os.getcwd()
-    try:
-        os.chdir(output_dir)
-        tree.plot_state_tree(state=state, orders=orders, mode=mode, g=g)
-    finally:
-        os.chdir(cwd)
+def _plot_state_tree_in_directory(output_dir, state, orders, mode, g, plot_request, plot_request_name):
+    pattern = os.path.join(str(output_dir), 'csubst_state_*_' + str(mode) + '_*.pdf')
+    for path in glob(pattern):
+        if os.path.isfile(path):
+            os.remove(path)
+    os.makedirs(output_dir, exist_ok=True)
+    tree.plot_state_tree(
+        state=state,
+        orders=orders,
+        mode=mode,
+        g=g,
+        output_dir=output_dir,
+        plot_request=plot_request,
+        plot_request_name=plot_request_name,
+    )
 
 
 def _collect_branch_rows(tree_obj):
@@ -106,10 +110,15 @@ def _write_branch_maps(g):
         combined_df.loc[:, "foreground_lineage_id_" + trait_name] = trait_df.loc[:, "foreground_lineage_id"].values
         combined_df.loc[:, "branch_color_" + trait_name] = trait_df.loc[:, "branch_color"].values
         combined_df.loc[:, "label_color_" + trait_name] = trait_df.loc[:, "label_color"].values
-    _sanitize_placeholder_columns(combined_df).to_csv("csubst_branch_map.tsv", sep="\t", index=False)
+    _sanitize_placeholder_columns(combined_df).to_csv(
+        runtime.output_path(g, "branch_map.tsv"),
+        sep="\t",
+        index=False,
+    )
     for trait_name in trait_names:
-        out_file = ("csubst_branch_map_" + str(trait_name) + ".tsv").replace("_PLACEHOLDER", "")
-        if out_file == "csubst_branch_map.tsv":
+        out_file = runtime.output_path(g, "branch_map_" + str(trait_name) + ".tsv")
+        out_file = out_file.replace("_PLACEHOLDER", "")
+        if out_file == runtime.output_path(g, "branch_map.tsv"):
             continue
         _sanitize_placeholder_columns(trait_specific_frames[trait_name]).to_csv(out_file, sep="\t", index=False)
 
@@ -152,6 +161,16 @@ def _configure_3di_smoke_mode(g):
 
 def main_inspect(g):
     start = time.time()
+    g = runtime.ensure_output_layout(g, create_dir=True)
+    g["plot_state_aa"] = tree.normalize_state_plot_request(
+        g.get("plot_state_aa", "no"),
+        param_name="--plot_state_aa",
+    )
+    g["plot_state_codon"] = tree.normalize_state_plot_request(
+        g.get("plot_state_codon", "no"),
+        param_name="--plot_state_codon",
+    )
+    g["write_site_index_map"] = True
     if bool(g.get("download_prostt5", False)):
         model_source = structural_alphabet.ensure_prostt5_model_files(g=g)
         print("ProstT5 model files are ready: {}".format(model_source), flush=True)
@@ -159,47 +178,77 @@ def main_inspect(g):
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
         return
     print("Reading and parsing input files.", flush=True)
-    g["codon_table"] = genetic_code.get_codon_table(ncbi_id=g["genetic_code"])
-    g = tree.read_treefile(g)
-    g = parser_misc.generate_intermediate_files(g)
-    g = parser_misc.annotate_tree(g)
-    g = parser_misc.read_input(g)
-    g = foreground.get_foreground_branch(g)
-    g = foreground.get_marginal_branch(g)
-    g = parser_misc.resolve_state_loading(g)
+    g = parser_misc.prepare_input_context(
+        g,
+        include_foreground=True,
+        include_marginal=True,
+        resolve_state_subset=True,
+        prepare_state=False,
+    )
     g = _configure_3di_smoke_mode(g)
-    g = parser_misc.prep_state(g)
+    g = parser_misc.prep_state(g, apply_site_filtering=False)
     loaded_branch_ids = g.get("state_loaded_branch_ids", None)
-    sequence.write_alignment("csubst_alignment_codon.fa", mode="codon", g=g, branch_ids=loaded_branch_ids)
-    aa_state, aa_orders, aa_mode = _get_aa_state_view_for_inspect(g)
-    sequence.write_alignment("csubst_alignment_aa.fa", mode=aa_mode, g=g, branch_ids=loaded_branch_ids)
+    aa_state_unfiltered, aa_orders_unfiltered, aa_mode_unfiltered = _get_aa_state_view_for_inspect(g)
+    codon_state_unfiltered = g["state_cdn"]
+    sequence.write_alignment(
+        runtime.output_path(g, "alignment_codon.fa"),
+        mode="codon",
+        g=g,
+        branch_ids=loaded_branch_ids,
+    )
+    sequence.write_alignment(
+        runtime.output_path(g, "alignment_aa.fa"),
+        mode=aa_mode_unfiltered,
+        g=g,
+        branch_ids=loaded_branch_ids,
+    )
     if str(g.get("nonsyn_recode", "no")).strip().lower() == "3di20":
         nsy_branch_ids = g.get("sa_smoke_inferred_nonroot_branch_ids", None)
         if nsy_branch_ids is None:
             nsy_branch_ids = loaded_branch_ids
-        sequence.write_alignment("csubst_alignment_3di.fa", mode="nsy", g=g, branch_ids=nsy_branch_ids)
-
-    tree.write_tree(g["tree"])
-    tree.plot_branch_category(g, file_base="csubst_branch_id", label="all")
-    tree.plot_branch_category(g, file_base="csubst_branch_id_leaf", label="leaf")
-    tree.plot_branch_category(g, file_base="csubst_branch_id_nolabel", label="no")
-
-    if bool(g.get("plot_state_aa", False)):
-        _plot_state_tree_in_directory(
-            output_dir="csubst_plot_state_aa",
-            state=aa_state,
-            orders=aa_orders,
-            mode=aa_mode,
+        sequence.write_alignment(
+            runtime.output_path(g, "alignment_3di.fa"),
+            mode="nsy",
             g=g,
+            branch_ids=nsy_branch_ids,
         )
-    if bool(g.get("plot_state_codon", False)):
+    if tree.has_state_plot_request(g.get("plot_state_aa", "no")):
+        legacy_aa_dir = runtime.output_path(g, "plot_state_aa")
+        if os.path.isdir(legacy_aa_dir):
+            import shutil
+
+            shutil.rmtree(legacy_aa_dir)
         _plot_state_tree_in_directory(
-            output_dir="csubst_plot_state_codon",
-            state=g["state_cdn"],
+            output_dir=g["outdir"],
+            state=aa_state_unfiltered,
+            orders=aa_orders_unfiltered,
+            mode=aa_mode_unfiltered,
+            g=g,
+            plot_request=g["plot_state_aa"],
+            plot_request_name="--plot_state_aa",
+        )
+    if tree.has_state_plot_request(g.get("plot_state_codon", "no")):
+        legacy_codon_dir = runtime.output_path(g, "plot_state_codon")
+        if os.path.isdir(legacy_codon_dir):
+            import shutil
+
+            shutil.rmtree(legacy_codon_dir)
+        _plot_state_tree_in_directory(
+            output_dir=g["outdir"],
+            state=codon_state_unfiltered,
             orders=g["codon_orders"],
             mode="codon",
             g=g,
+            plot_request=g["plot_state_codon"],
+            plot_request_name="--plot_state_codon",
         )
+
+    g = parser_misc.apply_site_filters(g)
+
+    tree.write_tree(g["tree"], outfile=runtime.output_path(g, "tree.nwk"))
+    tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id"), label="all")
+    tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id_leaf"), label="leaf")
+    tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id_nolabel"), label="no")
 
     _write_branch_maps(g)
 

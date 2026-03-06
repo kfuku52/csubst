@@ -5,6 +5,7 @@ import pytest
 
 from csubst import param
 from csubst import output_stat
+from csubst import runtime
 from csubst import substitution
 
 
@@ -35,9 +36,27 @@ def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     assert g["parallel_min_items_per_job_expected_state"] == 10000000
 
 
+def test_get_global_parameters_builds_run_context_and_output_namespace(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    g = param.get_global_parameters(_args(outdir="results", output_prefix="scan"))
+    assert isinstance(g, runtime.RunContext)
+    assert g["outdir"] == str((tmp_path / "results").resolve())
+    assert g["output_prefix"] == "scan"
+    assert g["log_file"] == str((tmp_path / "results" / "scan.log").resolve())
+    assert g.config["threads"] == 1
+    g["threads"] = 8
+    assert g["threads"] == 8
+    assert g.config["threads"] == 1
+
+
 def test_get_global_parameters_rejects_unsupported_float_type():
     with pytest.raises(ValueError, match="float_type"):
         param.get_global_parameters(_args(float_type=128))
+
+
+def test_get_global_parameters_rejects_output_prefix_paths():
+    with pytest.raises(ValueError, match="output_prefix"):
+        param.get_global_parameters(_args(output_prefix="nested/run"))
 
 
 def test_get_global_parameters_normalizes_sub_tensor_backend_case():
@@ -100,6 +119,11 @@ def test_get_global_parameters_rejects_non_finite_float_values(kwargs, expected)
 def test_get_global_parameters_rejects_invalid_parallel_backend():
     with pytest.raises(ValueError, match="parallel_backend"):
         param.get_global_parameters(_args(parallel_backend="invalid"))
+
+
+def test_get_global_parameters_rejects_removed_loky_backend():
+    with pytest.raises(ValueError, match="parallel_backend"):
+        param.get_global_parameters(_args(parallel_backend="loky"))
 
 
 def test_get_global_parameters_rejects_invalid_chunk_factors():
@@ -513,9 +537,9 @@ def test_get_global_parameters_rejects_invalid_epistasis_options():
 def test_get_global_parameters_sets_pseudocount_defaults():
     g = param.get_global_parameters(_args())
     assert g["pseudocount_alpha"] == pytest.approx(0.0)
-    assert g["pseudocount_alpha_auto"] is True
+    assert g["pseudocount_alpha_auto"] is False
     assert g["pseudocount_mode"] == "none"
-    assert g["pseudocount_target"] == "expected"
+    assert g["pseudocount_target"] == "both"
     assert g["pseudocount_enabled"] is False
     assert g["pseudocount_add_output_columns"] is False
 
@@ -721,6 +745,15 @@ def test_get_global_parameters_parses_plot_nonsyn_recode_pca_3di20_bool():
         param.get_global_parameters(_args(plot_nonsyn_recode_pca_3di20="maybe"))
 
 
+def test_get_global_parameters_parses_write_instantaneous_rate_matrix_bool():
+    g_default = param.get_global_parameters(_args())
+    assert g_default["write_instantaneous_rate_matrix"] is False
+    g_yes = param.get_global_parameters(_args(write_instantaneous_rate_matrix="yes"))
+    assert g_yes["write_instantaneous_rate_matrix"] is True
+    with pytest.raises(ValueError, match="write_instantaneous_rate_matrix"):
+        param.get_global_parameters(_args(write_instantaneous_rate_matrix="maybe"))
+
+
 def test_get_global_parameters_requires_full_cds_alignment_for_3di20():
     with pytest.raises(ValueError, match="full_cds_alignment_file"):
         param.get_global_parameters(_args(nonsyn_recode="3di20"))
@@ -754,7 +787,8 @@ def test_get_global_parameters_disables_alignment_file_for_3di20():
     assert g_alias["alignment_file"] == "full_alias.fa"
 
 
-def test_get_global_parameters_infers_iqtree_paths_from_gz_alignment():
+def test_get_global_parameters_infers_iqtree_paths_from_gz_alignment(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     g = param.get_global_parameters(
         _args(
             alignment_file="input.fa.gz",
@@ -764,10 +798,11 @@ def test_get_global_parameters_infers_iqtree_paths_from_gz_alignment():
             iqtree_iqtree="infer",
         )
     )
-    assert g["iqtree_treefile"] == "input.fa.treefile"
-    assert g["iqtree_state"] == "input.fa.state"
-    assert g["iqtree_rate"] == "input.fa.rate"
-    assert g["iqtree_iqtree"] == "input.fa.iqtree"
+    prefix = (tmp_path / "csubst_iqtree" / "input.fa").resolve()
+    assert g["iqtree_treefile"] == str(prefix) + ".treefile"
+    assert g["iqtree_state"] == str(prefix) + ".state"
+    assert g["iqtree_rate"] == str(prefix) + ".rate"
+    assert g["iqtree_iqtree"] == str(prefix) + ".iqtree"
 
 
 def test_get_global_parameters_validates_database_timeout():
@@ -853,6 +888,11 @@ def test_get_global_parameters_validates_simulate_seed():
     assert g["simulate_seed"] == -1
     g = param.get_global_parameters(_args(simulate_seed=123))
     assert g["simulate_seed"] == 123
+
+
+def test_get_global_parameters_allows_empty_true_asr_prefix_for_runtime_default():
+    g = param.get_global_parameters(_args(export_true_asr=True, true_asr_prefix=""))
+    assert g["true_asr_prefix"] == ""
 
 
 def test_get_global_parameters_validates_simulate_asrv_mode():

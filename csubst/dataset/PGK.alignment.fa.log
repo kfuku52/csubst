@@ -3,19 +3,19 @@ Developed by Bui Quang Minh, Nguyen Lam Tung, Olga Chernomor, Heiko Schmidt,
 Dominik Schrempf, Michael Woodhams, Ly Trong Nhan, Thomas Wong
 
 Host:    fukushimakenjis-Mac-Studio.local (SSE4.2, 64 GB RAM)
-Command: iqtree -s /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa -te tmp.csubst.nwk -m GY+F3X4+R4 --seqtype CODON1 --threads-max 1 -T AUTO --ancestral --rate --redo --prefix /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa
-Seed:    765051 (Using SPRNG - Scalable Parallel Random Number Generator)
-Time:    Thu Feb 26 17:28:27 2026
+Command: iqtree -s /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa -te tmp.csubst.nwk -m ECMK07+F+R4 --seqtype CODON1 --threads-max 1 -T AUTO --ancestral --rate --redo --prefix /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa
+Seed:    693358 (Using SPRNG - Scalable Parallel Random Number Generator)
+Time:    Wed Mar  4 11:11:32 2026
 Kernel:  SSE2 - auto-detect threads (12 CPU cores detected)
 
 Reading alignment file /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa ... Fasta format detected
-Reading fasta file: done in 0.00137806 secs using 91.94% CPU
+Reading fasta file: done in 0.00157714 secs using 74.63% CPU
 Alignment most likely contains DNA/RNA sequences
 Converting to codon sequences with genetic code 1 ...
 Alignment has 33 sequences with 417 columns, 405 distinct patterns
 388 parsimony-informative, 14 singleton sites, 15 constant sites
                                           Gap/Ambiguity  Composition  p-value
-Analyzing sequences: done in 2.31266e-05 secs using 86.48% CPU
+Analyzing sequences: done in 2.40803e-05 secs using 78.9% CPU
    1  Anolis_carolinensis_ENSACAG00000003255      0.00%    failed      0.00%
    2  Astyanax_mexicanus_ENSAMXG00000007127       0.00%    passed     86.24%
    3  Bos_taurus_ENSBTAG00000000894               0.00%    passed     99.67%
@@ -55,34 +55,32 @@ Reading input tree file tmp.csubst.nwk ... rooted tree
 NOTE: 28 MB RAM (0 GB) is required!
 Measuring multi-threading efficiency up to 1 CPU cores
 4 trees examined
-Threads: 1 / Time: 1.229 sec / Speedup: 1.000 / Efficiency: 100% / LogL: -20897
+Threads: 1 / Time: 1.105 sec / Speedup: 1.000 / Efficiency: 100% / LogL: -17770
 BEST NUMBER OF THREADS: 1
 
 Estimate model parameters (epsilon = 0.010)
-1. Initial log-likelihood: -15505.420
-2. Current log-likelihood: -13440.786
-3. Current log-likelihood: -13226.275
-4. Current log-likelihood: -13213.524
-5. Current log-likelihood: -13212.687
-6. Current log-likelihood: -13212.589
-7. Current log-likelihood: -13212.570
-Optimal log-likelihood: -13212.563
-Nonsynonymous/synonymous ratio (omega): 0.088
-Transition/transversion ratio (kappa): 1.906
-Site proportion and rates:  (0.007,0.320) (0.024,0.336) (0.523,0.615) (0.446,1.499)
-Parameters optimization took 7 rounds (32.168 sec)
+1. Initial log-likelihood: -13672.031
+2. Current log-likelihood: -13349.849
+3. Current log-likelihood: -13287.140
+4. Current log-likelihood: -13284.171
+5. Current log-likelihood: -13284.156
+Optimal log-likelihood: -13284.152
+Nonsynonymous/synonymous ratio (omega): 1.000
+Transition/transversion ratio (kappa): 1.000
+Site proportion and rates:  (0.009,0.265) (0.032,0.379) (0.759,0.828) (0.200,1.785)
+Parameters optimization took 5 rounds (15.563 sec)
 Wrote distance file to... 
-BEST SCORE FOUND : -13212.563
+BEST SCORE FOUND : -13284.152
 Ancestral state probabilities printed to /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.state
-Empirical proportions for each category: 0.000 0.000 0.571 0.429
+Empirical proportions for each category: 0.000 0.000 0.835 0.165
 Site rates printed to /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.rate
-Total tree length: 8.904
+Total tree length: 7.570
 
 Total number of iterations: 0
 CPU time used for tree search: 0.000 sec (0h:0m:0s)
 Wall-clock time used for tree search: 0.000 sec (0h:0m:0s)
-Total CPU time used: 33.367 sec (0h:0m:33s)
-Total wall-clock time used: 34.065 sec (0h:0m:34s)
+Total CPU time used: 17.113 sec (0h:0m:17s)
+Total wall-clock time used: 17.267 sec (0h:0m:17s)
 
 Analysis results written to: 
   IQ-TREE report:                /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.iqtree
@@ -91,4 +89,4 @@ Analysis results written to:
   Ancestral state:               /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.state
   Screen log file:               /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.log
 
-Date and Time: Thu Feb 26 17:29:01 2026
+Date and Time: Wed Mar  4 11:11:49 2026

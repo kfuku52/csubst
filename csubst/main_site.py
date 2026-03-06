@@ -11,6 +11,7 @@ import sys
 
 from csubst import genetic_code
 from csubst import parser_misc
+from csubst import runtime
 from csubst import sequence
 from csubst import substitution
 from csubst import tree
@@ -32,8 +33,8 @@ matplotlib.rc('ytick', labelsize=font_size)
 matplotlib.rc('legend', fontsize=font_size)
 matplotlib.rc('figure', titlesize=font_size)
 
-def bool2yesno(flag):
-    return 'yes' if bool(flag) else 'no'
+def bool2yn(flag):
+    return 'Y' if bool(flag) else 'N'
 
 
 def _normalize_branch_ids(branch_ids):
@@ -86,20 +87,20 @@ def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, bra
         'generated_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'branch_ids': ','.join([str(int(bid)) for bid in normalized_branch_ids.tolist()]),
         'branch_count': int(normalized_branch_ids.shape[0]),
-        'single_branch_mode': bool2yesno(g.get('single_branch_mode', False)),
+        'single_branch_mode': bool2yn(g.get('single_branch_mode', False)),
         'output_kind': str(output_kind),
         'output_file': str(output_file),
         'output_path': output_path_abs,
-        'file_exists': bool2yesno(exists),
+        'file_exists': bool2yn(exists),
         'file_size_bytes': int(size_bytes),
-        'tree_site_plot': bool2yesno(g.get('tree_site_plot', True)),
-        'site_state_plot': bool2yesno(g.get('site_state_plot', True)),
+        'tree_site_plot': bool2yn(g.get('tree_site_plot', True)),
+        'site_state_plot': bool2yn(g.get('site_state_plot', True)),
         'tree_site_plot_format': str(g.get('tree_site_plot_format', 'pdf')).lower(),
         'min_prob_effective': effective_min_prob,
         # Backward-compatible alias for downstream consumers.
         'tree_site_plot_min_prob_effective': effective_min_prob,
         'tree_site_plot_max_sites': int(get_tree_site_plot_max_sites(g)),
-        'pdb_mode': bool2yesno(g.get('pdb', None) is not None),
+        'pdb_mode': bool2yn(g.get('pdb', None) is not None),
         'note': str(note),
     }
     manifest_rows.append(row)
@@ -992,7 +993,7 @@ def get_state_orders(g, mode):
 
 def get_df_ad(sub_tensor, g, mode):
     state_orders,state_keys = get_state_orders(g, mode)
-    gad = sub_tensor.sum(axis=(0,1))
+    gad, _, _ = substitution.get_group_state_totals(sub_tensor=sub_tensor)
     cols = ['group','state_from','state_to','value']
     nrow = sum([ len(v)**2-len(v) for v in state_orders.values() ])
     df_ad = pd.DataFrame(np.zeros(shape=(nrow, len(cols))))
@@ -1021,7 +1022,7 @@ def add_site_stats(df_ad, sub_tensor, g, mode, method='tau'):
     state_orders,state_keys = get_state_orders(g, mode)
     outcol = 'site_'+method
     df_ad.loc[:,outcol] = np.nan
-    sgad = sub_tensor.sum(axis=0)
+    sgad = substitution.get_site_group_state_totals(sub_tensor=sub_tensor)
     current_row = 0
     for g in np.arange(sgad.shape[1]):
         state_key = state_keys[g]
@@ -1065,7 +1066,7 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
     state_orders,state_keys = get_state_orders(g, mode)
     outcol = 'has_target_high_combinat_prob_site'
     df_ad.loc[:,outcol] = False
-    sgad = sub_tensor.sum(axis=0)
+    sgad = substitution.get_site_group_state_totals(sub_tensor=sub_tensor)
     min_prob = get_min_combinat_prob(g)
     current_row = 0
     for g in np.arange(sgad.shape[1]):
@@ -1088,7 +1089,7 @@ def get_df_dist(sub_tensor, g, mode):
     cols = ['group','state_from','state_to','max_dist_bl']
     inds = np.arange(np.array(sub_tensor.shape[2:]).prod()-sub_tensor.shape[4])
     df_dist = pd.DataFrame(columns=cols, index=inds)
-    bgad = sub_tensor.sum(axis=1)
+    bgad = substitution.get_branch_group_state_totals(sub_tensor=sub_tensor)
     b_index = np.arange(bgad.shape[0])
     g_index = np.arange(bgad.shape[1])
     a_index = np.arange(bgad.shape[2])
@@ -3111,7 +3112,11 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
                 n_other_prob_matrix = np.stack(other_prob_rows, axis=0).max(axis=0)
                 other_bool_matrix = (n_other_prob_matrix >= min_single_prob)
                 if OS_tensor is not None:
-                    other_syn_probs = OS_tensor[other_branch_ids, :, :, :, :].sum(axis=(2, 3, 4))
+                    other_syn_rows = [
+                        substitution.get_branch_site_sub_counts(OS_tensor, branch_id=other_bid)
+                        for other_bid in other_branch_ids
+                    ]
+                    other_syn_probs = np.stack(other_syn_rows, axis=0)
                     if other_syn_probs.ndim == 1:
                         other_syn_probs = other_syn_probs[np.newaxis, :]
                     s_other_prob = other_syn_probs.max(axis=0)
@@ -3318,12 +3323,13 @@ def main_site(g):
     if g['pdb'] is not None:
         from csubst import parser_pymol
     print("Reading and parsing input files.", flush=True)
-    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
-    g = tree.read_treefile(g)
-    g = parser_misc.generate_intermediate_files(g)
-    g = parser_misc.annotate_tree(g)
-    g = parser_misc.read_input(g)
-    g = parser_misc.prep_state(g)
+    g = parser_misc.prepare_input_context(
+        g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=True,
+    )
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
@@ -3547,6 +3553,5 @@ def main_site(g):
             print('Skipping site output manifest (--site_output_manifest no).', flush=True)
     print('To visualize the convergence probability on protein structure, please see: https://github.com/kfuku52/csubst/wiki')
     print('')
-    tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
-    _ = [os.remove(ts) for ts in tmp_files]
+    runtime.cleanup_legacy_temp_artifacts()
     return None

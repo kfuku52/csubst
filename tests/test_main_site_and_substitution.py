@@ -6,6 +6,7 @@ from pathlib import Path
 
 from csubst import main_site
 from csubst import substitution
+from csubst import substitution_sparse
 from csubst import tree
 from csubst import ete
 
@@ -2139,12 +2140,12 @@ def test_write_site_output_manifest_records_files_and_parameters(tmp_path):
     assert set(["output_kind", "output_file", "file_exists", "site_state_plot"]).issubset(set(out_df.columns))
     assert (out_df.loc[:, "output_kind"] == "output_manifest").any()
     manifest_row = out_df.loc[out_df.loc[:, "output_kind"] == "output_manifest", :].iloc[0]
-    assert manifest_row["file_exists"] == "yes"
+    assert manifest_row["file_exists"] == "Y"
     site_row = out_df.loc[out_df.loc[:, "output_kind"] == "site_table_tsv", :].iloc[0]
-    assert site_row["file_exists"] == "yes"
+    assert site_row["file_exists"] == "Y"
     assert int(site_row["file_size_bytes"]) > 0
     skipped_row = out_df.loc[out_df.loc[:, "output_kind"] == "state_pattern_pdf", :].iloc[0]
-    assert skipped_row["file_exists"] == "no"
+    assert skipped_row["file_exists"] == "N"
     assert skipped_row["note"] == "skipped"
 
 
@@ -2211,6 +2212,32 @@ def test_get_df_ad_add_site_stats_and_target_flag():
         "nsy",
     )
     assert scaled_flagged["has_target_high_combinat_prob_site"].tolist() == [False, True]
+
+
+def test_site_summary_stats_support_sparse_substitution_tensors(monkeypatch):
+    g = {"amino_acid_orders": np.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
+    dense_tensor = np.zeros((2, 2, 1, 2, 2), dtype=float)
+    dense_tensor[0, 0, 0, 0, 1] = 2.0
+    dense_tensor[0, 1, 0, 0, 1] = 1.0
+    dense_tensor[1, 0, 0, 1, 0] = 3.0
+    dense_tensor[1, 1, 0, 1, 0] = 1.0
+    sparse_tensor = substitution_sparse.SparseSubstitutionTensor.from_dense(dense_tensor)
+
+    monkeypatch.setattr(
+        substitution_sparse.SparseSubstitutionTensor,
+        "sum",
+        lambda self, axis=None: (_ for _ in ()).throw(AssertionError("dense fallback should not run")),
+    )
+
+    df_ad = main_site.get_df_ad(sub_tensor=sparse_tensor, g=g, mode="nsy")
+    df_ad = main_site.add_site_stats(df_ad, sparse_tensor, g, "nsy", method="tau")
+    df_ad = main_site.add_site_stats(df_ad, sparse_tensor, g, "nsy", method="tsi")
+    flagged = main_site.add_has_target_high_combinat_prob_site(df_ad, sparse_tensor, g, "nsy")
+
+    np.testing.assert_allclose(flagged["value"].to_numpy(), [3.0, 4.0], atol=1e-12)
+    np.testing.assert_allclose(flagged["site_tau"].to_numpy(), [0.5, 2.0 / 3.0], atol=1e-12)
+    np.testing.assert_allclose(flagged["site_tsi"].to_numpy(), [2.0 / 3.0, 3.0 / 4.0], atol=1e-12)
+    assert flagged["has_target_high_combinat_prob_site"].tolist() == [True, True]
 
 
 def test_add_site_stats_hg_ignores_zero_probabilities():

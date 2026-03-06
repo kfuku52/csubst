@@ -2,13 +2,11 @@ import numpy as np
 import pandas as pd
 
 import os
-import shutil
 import sys
 import time
 
 from csubst import combination
 from csubst import foreground
-from csubst import genetic_code
 from csubst import omega
 from csubst import param
 from csubst import parser_misc
@@ -17,6 +15,7 @@ from csubst import substitution
 from csubst import table
 from csubst import ete
 from csubst import output_stat
+from csubst import runtime
 from csubst import tree
 
 
@@ -51,14 +50,14 @@ def _remap_site_column_to_alignment(df, g, column_name='site'):
 
 def _plot_state_tree_in_directory(output_dir, state, orders, mode, g):
     if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    os.mkdir(output_dir)
-    cwd = os.getcwd()
-    try:
-        os.chdir(output_dir)
-        tree.plot_state_tree(state=state, orders=orders, mode=mode, g=g)
-    finally:
-        os.chdir(cwd)
+        if os.path.isdir(output_dir):
+            import shutil
+
+            shutil.rmtree(output_dir)
+        else:
+            os.remove(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+    tree.plot_state_tree(state=state, orders=orders, mode=mode, g=g, output_dir=output_dir)
 
 
 def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
@@ -212,7 +211,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         cb, g = foreground.get_foreground_branch_num(cb, g)
         cb = table.sort_cb(cb)
         if write_cb:
-            file_name = "csubst_cb_" + str(current_arity) + ".tsv"
+            file_name = runtime.output_path(g, "cb_" + str(current_arity) + ".tsv")
             cb_column_original = cb.columns.tolist()
             cb.columns = cb.columns.str.replace('_PLACEHOLDER', '')
             cb.to_csv(file_name, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
@@ -495,7 +494,7 @@ def _compute_epistasis_degree_from_structure(g, num_site):
         print('Using epistasis user alignment for structure mapping: {}'.format(epistasis_user_alignment), flush=True)
         df = parser_pymol.add_coordinate_from_user_alignment(df=df, user_alignment=epistasis_user_alignment)
     else:
-        g_pdb['mafft_add_fasta'] = os.path.abspath('tmp.csubst.epistasis.pdb_seq.fa')
+        g_pdb['mafft_add_fasta'] = runtime.temp_path('tmp.csubst.epistasis.pdb_seq.fa')
         parser_pymol.write_mafft_alignment(g=g_pdb)
         df = parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
     df = parser_pymol.add_pdb_residue_numbering(df=df)
@@ -503,7 +502,12 @@ def _compute_epistasis_degree_from_structure(g, num_site):
         df=df,
         distance_cutoff=float(g['epistasis_contact_distance']),
     )
-    degree_outfile = os.path.abspath(g['epistasis_degree_outfile'])
+    degree_outfile = runtime.resolve_user_output_path(
+        g,
+        g.get('epistasis_degree_outfile', ''),
+        default_suffix='epistasis_structure_degree.tsv',
+        create_dir=True,
+    )
     degree_cols = [
         'site',
         'codon_site_alignment',
@@ -583,25 +587,41 @@ def _prepare_epistasis_configuration(g, ON_tensor, OS_tensor):
 
 def main_analyze(g):
     start = time.time()
+    g = runtime.ensure_output_layout(g, create_dir=True)
     print("Reading and parsing input files.", flush=True)
     g['current_arity'] = 2
-    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
-    g = tree.read_treefile(g)
-    g = parser_misc.generate_intermediate_files(g)
-    g = parser_misc.annotate_tree(g)
-    g = parser_misc.read_input(g)
-    g = foreground.get_foreground_branch(g)
-    g = foreground.get_marginal_branch(g)
-    g = parser_misc.resolve_state_loading(g)
-    g = parser_misc.prep_state(g)
+    g = parser_misc.prepare_input_context(
+        g,
+        include_foreground=True,
+        include_marginal=True,
+        resolve_state_subset=True,
+        prepare_state=False,
+    )
+    g = parser_misc.prep_state(g, apply_site_filtering=False)
     loaded_branch_ids = g.get('state_loaded_branch_ids', None)
     if loaded_branch_ids is not None:
         txt = 'Selective state loading active: writing alignments only for loaded nodes ({:,}).'
         print(txt.format(loaded_branch_ids.shape[0]), flush=True)
-    sequence.write_alignment('csubst_alignment_codon.fa', mode='codon', g=g, branch_ids=loaded_branch_ids)
-    sequence.write_alignment('csubst_alignment_aa.fa', mode='aa', g=g, branch_ids=loaded_branch_ids)
+    sequence.write_alignment(
+        runtime.output_path(g, 'alignment_codon.fa'),
+        mode='codon',
+        g=g,
+        branch_ids=loaded_branch_ids,
+    )
+    sequence.write_alignment(
+        runtime.output_path(g, 'alignment_aa.fa'),
+        mode='aa',
+        g=g,
+        branch_ids=loaded_branch_ids,
+    )
     if str(g.get('nonsyn_recode', 'no')).strip().lower() == '3di20':
-        sequence.write_alignment('csubst_alignment_3di.fa', mode='nsy', g=g, branch_ids=loaded_branch_ids)
+        sequence.write_alignment(
+            runtime.output_path(g, 'alignment_3di.fa'),
+            mode='nsy',
+            g=g,
+            branch_ids=loaded_branch_ids,
+        )
+    g = parser_misc.apply_site_filters(g)
     g = combination.get_dep_ids(g)
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
@@ -639,7 +659,7 @@ def main_analyze(g):
                 site_is_one_based=False,
             )
         bs = table.sort_branch_ids(df=bs)
-        bs.to_csv("csubst_bs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        bs.to_csv(runtime.output_path(g, "bs.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(bs.values.nbytes/1024/1024, bs.values.dtype), flush=True)
         del bs
@@ -665,7 +685,7 @@ def main_analyze(g):
                     group_cols=[],
                     site_is_one_based=False,
                 )
-            s.to_csv("csubst_s.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+            s.to_csv(runtime.output_path(g, "s.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(s.values.nbytes/1024/1024, s.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
@@ -693,7 +713,7 @@ def main_analyze(g):
         if (g['b']):
             b_column_original = b.columns.tolist()
             b.columns = b.columns.str.replace('_PLACEHOLDER', '')
-            b.to_csv("csubst_b.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+            b.to_csv(runtime.output_path(g, "b.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
             b.columns = b_column_original
         txt = 'Memory consumption of b table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(b.values.nbytes/1024/1024, b.values.dtype), flush=True)
@@ -720,7 +740,7 @@ def main_analyze(g):
                 group_cols=[],
                 site_is_one_based=False,
             )
-        cs.to_csv("csubst_cs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        cs.to_csv(runtime.output_path(g, "cs.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of cs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cs.values.nbytes/1024/1024, cs.values.dtype), flush=True)
         del cs
@@ -746,7 +766,7 @@ def main_analyze(g):
                 group_cols=cbs_group_cols,
                 site_is_one_based=False,
             )
-        cbs.to_csv("csubst_cbs.tsv", sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        cbs.to_csv(runtime.output_path(g, "cbs.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
         txt = 'Memory consumption of cbs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cbs.values.nbytes/1024/1024, cbs.values.dtype), flush=True)
         del cbs
@@ -760,13 +780,18 @@ def main_analyze(g):
         #    g = foreground.clade_permutation(cb, g)
         #del cb
         g['df_cb_stats_main'] = table.sort_cb_stats(cb_stats=g['df_cb_stats_main'])
-        print('Writing csubst_cb_stats.tsv', flush=True)
+        print('Writing {}'.format(runtime.output_path(g, 'cb_stats.tsv')), flush=True)
         column_original = g['df_cb_stats_main'].columns
         g['df_cb_stats_main'].columns = pd.Index(
             [str(col).replace('_PLACEHOLDER', '') for col in column_original]
         )
-        g['df_cb_stats_main'].to_csv('csubst_cb_stats.tsv', sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        g['df_cb_stats_main'].to_csv(
+            runtime.output_path(g, 'cb_stats.tsv'),
+            sep="\t",
+            index=False,
+            float_format=g['float_format'],
+            chunksize=10000,
+        )
         g['df_cb_stats_main'].columns = column_original
 
-    tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
-    _ = [os.remove(ts) for ts in tmp_files]
+    runtime.cleanup_legacy_temp_artifacts()

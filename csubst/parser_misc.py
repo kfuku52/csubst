@@ -9,15 +9,16 @@ import re
 import sys
 
 from csubst import genetic_code
+from csubst import foreground
 from csubst import sequence
-from csubst import parser_phylobayes
 from csubst import parser_iqtree
 from csubst import recoding
+from csubst import runtime
 from csubst import structural_alphabet
 from csubst import tree
 from csubst import ete
 
-_THREEDI_STATE_CACHE_FORMAT_VERSION = 1
+_THREEDI_STATE_CACHE_FORMAT_VERSION = 2
 
 
 def _initialize_and_report_nonsyn_recode(g):
@@ -35,9 +36,40 @@ def _initialize_and_report_nonsyn_recode(g):
                     g.get("sa_iqtree_model", "GTR"),
                 )
             )
-        recoding.write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv")
+        recoding.write_nonsyn_recoding_table(
+            g,
+            output_path=runtime.output_path(g, "nonsyn_recoding.tsv"),
+        )
     if write_pca:
-        recoding.write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.png")
+        recoding.write_nonsyn_recoding_pca_plot(
+            g,
+            output_path=runtime.output_path(g, "nonsyn_recoding_pca.png"),
+        )
+    return g
+
+
+def prepare_input_context(
+    g,
+    include_foreground=False,
+    include_marginal=False,
+    resolve_state_subset=False,
+    prepare_state=False,
+    force_notree_run=False,
+    ignore_tree_inconsistency=False,
+):
+    g["codon_table"] = genetic_code.get_codon_table(ncbi_id=g["genetic_code"])
+    g = tree.read_treefile(g)
+    g = generate_intermediate_files(g, force_notree_run=force_notree_run)
+    g = annotate_tree(g, ignore_tree_inconsistency=ignore_tree_inconsistency)
+    g = read_input(g)
+    if include_foreground:
+        g = foreground.get_foreground_branch(g)
+        if include_marginal:
+            g = foreground.get_marginal_branch(g)
+    if resolve_state_subset:
+        g = resolve_state_loading(g)
+    if prepare_state:
+        g = prep_state(g)
     return g
 
 
@@ -96,12 +128,24 @@ def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
     full_cds_path = str(g.get('full_cds_alignment_file', '')).strip()
     if full_cds_path == '':
         full_cds_path = str(g.get('alignment_file', '')).strip()
+    ml_anc_value = str(g.get('ml_anc', False)).strip().lower()
+    drop_mode = str(g.get('drop_invariant_tip_sites_mode', g.get('drop_invariant_tip_sites', 'tip_invariant'))).strip().lower()
+    if drop_mode in ['1', 'true', 'yes', 'on']:
+        drop_mode = 'tip_invariant'
+    elif drop_mode in ['0', 'false', 'off']:
+        drop_mode = 'no'
     context = {
         'format_version': int(_THREEDI_STATE_CACHE_FORMAT_VERSION),
         'nonsyn_recode': '3di20',
         'sa_asr_mode': str(g.get('sa_asr_mode', 'direct')).strip().lower(),
         'infile_type': str(g.get('infile_type', '')).strip().lower(),
         'input_data_type': str(g.get('input_data_type', '')).strip().lower(),
+        'ml_anc': ml_anc_value in ['1', 'true', 'yes', 'y', 'on'],
+        'drop_invariant_tip_sites': drop_mode != 'no',
+        'drop_invariant_tip_sites_mode': drop_mode,
+        'prostt5_model': str(g.get('prostt5_model', 'Rostlab/ProstT5')).strip(),
+        'prostt5_local_dir': str(g.get('prostt5_local_dir', '')).strip(),
+        'sa_iqtree_model': str(g.get('sa_iqtree_model', 'GTR')).strip(),
         'selected_branch_ids': _normalize_branch_ids_for_3di_cache(selected_branch_ids),
         'state_cdn_shape': [int(v) for v in list(state_cdn_shape)],
         'full_cds_alignment': _get_file_signature(full_cds_path),
@@ -183,9 +227,7 @@ def _read_package_text(file):
     return txt
 
 def generate_intermediate_files(g, force_notree_run=False):
-    if (g['infile_type'] == 'phylobayes'):
-        raise ValueError("PhyloBayes is not supported.")
-    elif (g['infile_type'] == 'iqtree'):
+    if g['infile_type'] == 'iqtree':
         g,all_exist = parser_iqtree.check_intermediate_files(g)
         if (all_exist)&(not g['iqtree_redo']):
             print('IQ-TREE\'s intermediate files exist.')
@@ -204,13 +246,15 @@ def generate_intermediate_files(g, force_notree_run=False):
         print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)
         parser_iqtree.check_iqtree_dependency(g)
         parser_iqtree.run_iqtree_ancestral(g, force_notree_run=force_notree_run)
+    else:
+        raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     return g
 
 def read_input(g):
-    if (g['infile_type'] == 'phylobayes'):
-        g = parser_phylobayes.get_input_information(g)
-    elif (g['infile_type'] == 'iqtree'):
+    if g['infile_type'] == 'iqtree':
         g = parser_iqtree.get_input_information(g)
+    else:
+        raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     expectation_method = _resolve_expectation_method(g)
     if expectation_method != 'codon_model':
         g = _initialize_and_report_nonsyn_recode(g)
@@ -269,7 +313,12 @@ def read_input(g):
     txt = txt.format(g['codon_table'], g['reconstruction_codon_table'])
     if abs(sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa) >= g['float_tol']:
         raise AssertionError(txt)
-    np.savetxt('csubst_instantaneous_rate_matrix.tsv', g['instantaneous_codon_rate_matrix'], delimiter='\t')
+    if bool(g.get('write_instantaneous_rate_matrix', False)):
+        np.savetxt(
+            runtime.output_path(g, 'instantaneous_rate_matrix.tsv'),
+            g['instantaneous_codon_rate_matrix'],
+            delimiter='\t',
+        )
     q_ij_x_pi_i = g['instantaneous_codon_rate_matrix'][0,1]*g['equilibrium_frequency'][0]
     q_ji_x_pi_j = g['instantaneous_codon_rate_matrix'][1,0]*g['equilibrium_frequency'][1]
     if abs(q_ij_x_pi_i - q_ji_x_pi_j) >= g['float_tol']:
@@ -429,7 +478,7 @@ def _can_use_selective_state_loading(g):
     if len(blocking_outputs) > 0:
         txt = 'full-tree outputs are enabled ({})'
         return False, txt.format(', '.join(blocking_outputs))
-    if bool(g.get('plot_state_aa', False)) or bool(g.get('plot_state_codon', False)):
+    if tree.has_state_plot_request(g.get('plot_state_aa', False)) or tree.has_state_plot_request(g.get('plot_state_codon', False)):
         return False, 'state-tree plotting is enabled.'
     if int(g.get('fg_clade_permutation', 0)) > 0:
         return False, '--fg_clade_permutation is enabled.'
@@ -566,7 +615,7 @@ def write_site_index_map(g, output_path='csubst_site_index_map.tsv'):
         'codon_site_alignment_1based': np.arange(1, num_alignment_site + 1, dtype=np.int64),
         'site': internal_site,
         'site_1based': np.where(internal_site >= 0, internal_site + 1, 0).astype(np.int64),
-        'is_retained': np.where(internal_site >= 0, 'yes', 'no'),
+        'is_retained': np.where(internal_site >= 0, 'Y', 'N'),
     })
     out.to_csv(output_path, sep='\t', index=False)
     return os.path.abspath(output_path)
@@ -651,11 +700,11 @@ def expand_site_axis_table_to_alignment(
         else:
             site_values_zero = site_values_full
         is_valid_site = (site_values_zero >= 0) & (site_values_zero < retained_mask.shape[0])
-        retained_values = np.full(shape=(expanded.shape[0],), fill_value='no', dtype=object)
+        retained_values = np.full(shape=(expanded.shape[0],), fill_value='N', dtype=object)
         retained_values[is_valid_site] = np.where(
             retained_mask[site_values_zero[is_valid_site]],
-            'yes',
-            'no',
+            'Y',
+            'N',
         )
         expanded.loc[:, retention_col] = retained_values
     return expanded
@@ -847,7 +896,12 @@ def drop_invariant_tip_sites(g):
         else:
             txt = 'iqtree_rate_values length ({}) did not match num_input_site ({}) or current site axis ({}).'
             raise ValueError(txt.format(rate_values.shape[0], num_input_site, keep_mask.shape[0]))
-    map_path = write_site_index_map(g=g, output_path='csubst_site_index_map.tsv')
+    map_path = None
+    if bool(g.get('write_site_index_map', False)):
+        map_path = write_site_index_map(
+            g=g,
+            output_path=runtime.output_path(g, 'site_index_map.tsv'),
+        )
     txt = 'Dropped {:,} codon site(s) by {} criterion; retained {:,} / {:,} sites.'
     print(txt.format(num_drop, mode_label, int(keep_mask.sum()), int(keep_mask.shape[0])), flush=True)
     if map_path is not None:
@@ -855,7 +909,13 @@ def drop_invariant_tip_sites(g):
     return g
 
 
-def prep_state(g):
+def apply_site_filters(g):
+    if bool(g.get('drop_invariant_tip_sites', False)):
+        g = drop_invariant_tip_sites(g)
+    return g
+
+
+def prep_state(g, apply_site_filtering=True):
     state_nuc = None
     state_cdn = None
     state_pep = None
@@ -928,18 +988,7 @@ def prep_state(g):
                 print(txt.format(str(exc)), flush=True)
         return state_nsy_local
 
-    if (g['infile_type'] == 'phylobayes'):
-        from csubst import parser_phylobayes
-        if g['input_data_type'] == 'nuc': # obsoleted
-            state_nuc = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
-            state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
-        elif g['input_data_type'] == 'cdn':
-            state_cdn = parser_phylobayes.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
-    elif (g['infile_type'] == 'iqtree'):
+    if g['infile_type'] == 'iqtree':
         from csubst import parser_iqtree
         if g['input_data_type'] == 'nuc': # obsoleted
             state_nuc = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
@@ -950,14 +999,16 @@ def prep_state(g):
             state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
             state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
             state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
+    else:
+        raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     g['state_nuc'] = state_nuc
     g['state_cdn'] = state_cdn
     g['state_pep'] = state_pep
     g['state_nsy'] = state_nsy
     if state_cdn is not None:
         get_site_index_alignment(g=g, expected_num_site=state_cdn.shape[1])
-    if bool(g.get('drop_invariant_tip_sites', False)):
-        g = drop_invariant_tip_sites(g)
+    if apply_site_filtering:
+        g = apply_site_filters(g)
     return g
 
 def read_exchangeability_matrix(file, codon_orders):

@@ -6,17 +6,21 @@ from csubst import tree
 from csubst import ete
 
 
-def test_infer_iqtree_output_prefix_from_alignment_strips_gz_suffix():
-    assert parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa.gz") == "input.fa"
-    assert parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa") == "input.fa"
+def test_infer_iqtree_output_prefix_from_alignment_uses_shared_dir(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    expected_prefix = str((tmp_path / "csubst_iqtree" / "input.fa").resolve())
+    assert parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa.gz") == expected_prefix
+    assert parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa") == expected_prefix
 
 
-def test_check_intermediate_files_infer_uses_uncompressed_prefix_for_gz_alignment(tmp_path):
-    prefix = tmp_path / "alignment.fa"
+def test_check_intermediate_files_infer_uses_shared_iqtree_dir_for_gz_alignment(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    prefix = tmp_path / "csubst_iqtree" / "alignment.fa"
+    prefix.parent.mkdir(parents=True, exist_ok=True)
     for ext in ["iqtree", "log", "rate", "state", "treefile"]:
-        (tmp_path / ("alignment.fa." + ext)).write_text("x\n", encoding="utf-8")
+        (tmp_path / "csubst_iqtree" / ("alignment.fa." + ext)).write_text("x\n", encoding="utf-8")
     g = {
-        "alignment_file": str(tmp_path / "alignment.fa.gz"),
+        "alignment_file": "alignment.fa.gz",
         "iqtree_iqtree": "infer",
         "iqtree_log": "infer",
         "iqtree_rate": "infer",

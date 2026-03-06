@@ -681,6 +681,8 @@ def test_read_input_submodel_detects_reverse_signed_rate_sum_mismatch(monkeypatc
                 "equilibrium_frequency": np.array([0.5, 0.5], dtype=float),
                 "codon_orders": np.array(["AAA", "AAC"]),
                 "amino_acid_orders": np.array(["K", "N"]),
+                "codon_table": [("K", "AAA"), ("N", "AAC")],
+                "reconstruction_codon_table": [("K", "AAA"), ("N", "AAC")],
                 "synonymous_indices": {"K": [0], "N": [1]},
                 "matrix_groups": {"K": ["AAA"], "N": ["AAC"]},
             }
@@ -716,6 +718,75 @@ def test_read_input_submodel_detects_reverse_signed_rate_sum_mismatch(monkeypatc
     }
     with pytest.raises(AssertionError, match="Sum of rates did not match"):
         parser_misc.read_input(g)
+
+
+def test_read_input_writes_instantaneous_rate_matrix_only_when_enabled(monkeypatch, tmp_path):
+    writes = []
+
+    def fake_get_input_information(local_g):
+        local_g.update(
+            {
+                "substitution_model": "GY+F+R4",
+                "omega": 1.0,
+                "kappa": 1.0,
+                "equilibrium_frequency": np.array([0.5, 0.5], dtype=float),
+                "codon_orders": np.array(["AAA", "AAC"]),
+                "amino_acid_orders": np.array(["K", "N"]),
+                "codon_table": [("K", "AAA"), ("N", "AAC")],
+                "reconstruction_codon_table": [("K", "AAA"), ("N", "AAC")],
+                "synonymous_indices": {"K": [0], "N": [1]},
+                "matrix_groups": {"K": ["AAA"], "N": ["AAC"]},
+                "float_tol": 1e-12,
+                "outdir": str(tmp_path),
+                "output_prefix": "run1",
+            }
+        )
+        return local_g
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_input_information", fake_get_input_information)
+    monkeypatch.setattr(parser_misc, "_initialize_and_report_nonsyn_recode", lambda g: g)
+    monkeypatch.setattr(
+        parser_misc,
+        "get_mechanistic_instantaneous_rate_matrix",
+        lambda g: np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=float),
+    )
+    monkeypatch.setattr(parser_misc, "cdn2pep_matrix", lambda inst_cdn, g: np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=float))
+    monkeypatch.setattr(parser_misc, "cdn2nsy_matrix", lambda inst_cdn, g: np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=float))
+
+    def fake_get_rate_tensor(inst, mode, g):
+        if mode == "syn":
+            return np.zeros((1, 2, 2), dtype=float)
+        if mode == "asis":
+            return np.array([[[0.0, 1.0], [1.0, 0.0]]], dtype=float)
+        raise AssertionError("unexpected mode")
+
+    monkeypatch.setattr(parser_misc, "get_rate_tensor", fake_get_rate_tensor)
+    monkeypatch.setattr(
+        parser_misc.np,
+        "savetxt",
+        lambda path, arr, delimiter="\t": writes.append((str(path), np.array(arr, copy=True))),
+    )
+
+    g_disabled = {
+        "infile_type": "iqtree",
+        "omegaC_method": "submodel",
+        "float_tol": 1e-12,
+        "write_instantaneous_rate_matrix": False,
+        "nonsyn_recode": "no",
+    }
+    parser_misc.read_input(g_disabled)
+    assert writes == []
+
+    g_enabled = {
+        "infile_type": "iqtree",
+        "omegaC_method": "submodel",
+        "float_tol": 1e-12,
+        "write_instantaneous_rate_matrix": True,
+        "nonsyn_recode": "no",
+    }
+    parser_misc.read_input(g_enabled)
+    assert len(writes) == 1
+    assert writes[0][0].endswith("run1_instantaneous_rate_matrix.tsv")
 
 
 def test_prep_state_3di20_translate_uses_translate_builder(monkeypatch):
@@ -885,6 +956,91 @@ def test_prep_state_3di20_auto_writes_and_reuses_cache(tmp_path, monkeypatch):
     assert out_second["state_nsy"].shape == state_nsy.shape
 
 
+def test_prep_state_can_defer_site_filtering(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 2, 3), dtype=float)
+    state_cdn[:, :, 0] = 1.0
+    state_pep = np.zeros((num_node, 2, 2), dtype=float)
+    state_pep[:, :, 0] = 1.0
+    state_nsy = np.zeros((num_node, 2, 2), dtype=float)
+    state_nsy[:, :, 0] = 1.0
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_state_tensor", lambda g, selected_branch_ids=None: state_cdn)
+    monkeypatch.setattr(sequence, "cdn2pep_state", lambda state_cdn, g, selected_branch_ids=None: state_pep)
+    monkeypatch.setattr(sequence, "cdn2nsy_state", lambda state_cdn, g, selected_branch_ids=None: state_nsy)
+
+    def fake_drop_invariant_tip_sites(local_g):
+        local_g["state_cdn"] = local_g["state_cdn"][:, 1:2, :]
+        local_g["state_pep"] = local_g["state_pep"][:, 1:2, :]
+        local_g["state_nsy"] = local_g["state_nsy"][:, 1:2, :]
+        local_g["site_index_alignment"] = np.array([1], dtype=np.int64)
+        return local_g
+
+    monkeypatch.setattr(parser_misc, "drop_invariant_tip_sites", fake_drop_invariant_tip_sites)
+
+    g = {
+        "tree": tr,
+        "infile_type": "iqtree",
+        "input_data_type": "cdn",
+        "nonsyn_recode": "no",
+        "drop_invariant_tip_sites": True,
+    }
+    out_unfiltered = parser_misc.prep_state(dict(g), apply_site_filtering=False)
+    assert out_unfiltered["state_cdn"].shape[1] == 2
+    np.testing.assert_array_equal(out_unfiltered["site_index_alignment"], np.array([0, 1], dtype=np.int64))
+
+    out_filtered = parser_misc.apply_site_filters(out_unfiltered)
+    assert out_filtered["state_cdn"].shape[1] == 1
+    np.testing.assert_array_equal(out_filtered["site_index_alignment"], np.array([1], dtype=np.int64))
+
+
+def test_3di_state_cache_context_tracks_model_selection(tmp_path):
+    full_cds_file = tmp_path / "full_cds.fa"
+    iqtree_state_file = tmp_path / "input.state"
+    full_cds_file.write_text(">A\nATGATG\n", encoding="utf-8")
+    iqtree_state_file.write_text("# dummy\n", encoding="utf-8")
+
+    g_translate = {
+        "sa_asr_mode": "translate",
+        "infile_type": "iqtree",
+        "input_data_type": "cdn",
+        "full_cds_alignment_file": str(full_cds_file),
+        "alignment_file": str(full_cds_file),
+        "path_iqtree_state": str(iqtree_state_file),
+        "prostt5_model": "Rostlab/ProstT5",
+        "prostt5_local_dir": "",
+        "sa_iqtree_model": "GTR",
+        "ml_anc": False,
+        "drop_invariant_tip_sites": False,
+        "drop_invariant_tip_sites_mode": "tip_invariant",
+    }
+    ctx_translate_a = parser_misc._get_3di_state_cache_context(
+        g=g_translate,
+        selected_branch_ids=np.array([0, 2], dtype=np.int64),
+        state_cdn_shape=(3, 4, 5),
+    )
+    ctx_translate_b = parser_misc._get_3di_state_cache_context(
+        g=dict(g_translate, prostt5_model="custom-model"),
+        selected_branch_ids=np.array([0, 2], dtype=np.int64),
+        state_cdn_shape=(3, 4, 5),
+    )
+    assert ctx_translate_a != ctx_translate_b
+
+    g_direct = dict(g_translate, sa_asr_mode="direct")
+    ctx_direct_a = parser_misc._get_3di_state_cache_context(
+        g=g_direct,
+        selected_branch_ids=np.array([1], dtype=np.int64),
+        state_cdn_shape=(3, 4, 5),
+    )
+    ctx_direct_b = parser_misc._get_3di_state_cache_context(
+        g=dict(g_direct, sa_iqtree_model="JC"),
+        selected_branch_ids=np.array([1], dtype=np.int64),
+        state_cdn_shape=(3, 4, 5),
+    )
+    assert ctx_direct_a != ctx_direct_b
+
+
 def test_prep_state_3di20_yes_requires_compatible_cache(tmp_path, monkeypatch):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))
@@ -961,7 +1117,7 @@ def test_expand_site_axis_table_to_alignment_without_groups():
     )
     assert out.shape[0] == 5
     assert out["site"].tolist() == [0, 1, 2, 3, 4]
-    assert out["is_site_retained"].tolist() == ["no", "yes", "no", "yes", "no"]
+    assert out["is_site_retained"].tolist() == ["N", "Y", "N", "Y", "N"]
     assert np.isnan(out.loc[out["site"] == 0, "N_sub"]).all()
     assert out.loc[out["site"] == 1, "N_sub"].iloc[0] == pytest.approx(0.25)
     assert out.loc[out["site"] == 3, "N_sub"].iloc[0] == pytest.approx(0.75)
@@ -990,7 +1146,7 @@ def test_expand_site_axis_table_to_alignment_with_groups_and_one_based_sites():
     for bid in [10, 11]:
         sub = out.loc[out["branch_id"] == bid, :]
         assert sub["codon_site_alignment"].tolist() == [1, 2, 3, 4]
-        assert sub["is_site_retained"].tolist() == ["yes", "no", "yes", "no"]
+        assert sub["is_site_retained"].tolist() == ["Y", "N", "Y", "N"]
     assert np.isnan(out.loc[(out["branch_id"] == 10) & (out["codon_site_alignment"] == 2), "N_sub"]).all()
     assert out.loc[(out["branch_id"] == 11) & (out["codon_site_alignment"] == 3), "N_sub"].iloc[0] == pytest.approx(4.0)
 
@@ -1019,6 +1175,7 @@ def test_drop_invariant_tip_sites_drops_and_writes_site_map(tmp_path, monkeypatc
     g = {
         "tree": tr,
         "num_input_site": 3,
+        "write_site_index_map": True,
         "codon_orders": np.array(["AAA", "AAG"], dtype=object),
         "state_nuc": state_nuc,
         "state_cdn": state_cdn,
@@ -1040,7 +1197,31 @@ def test_drop_invariant_tip_sites_drops_and_writes_site_map(tmp_path, monkeypatc
     site_map = pd.read_csv(map_path, sep="\t")
     assert site_map["codon_site_alignment"].tolist() == [0, 1, 2]
     assert site_map["site"].tolist() == [-1, -1, 0]
-    assert site_map["is_retained"].tolist() == ["no", "no", "yes"]
+    assert site_map["is_retained"].tolist() == ["N", "N", "Y"]
+
+
+def test_drop_invariant_tip_sites_skips_site_map_when_disabled(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for leaf in ete.iter_leaves(tr):
+        ete.set_prop(leaf, "sequence", "AAAAAAAAA")
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.ones((num_node, 3, 2), dtype=float)
+    state_pep = np.ones((num_node, 3, 2), dtype=float)
+    state_nsy = np.ones((num_node, 3, 2), dtype=float)
+    state_nuc = np.ones((num_node, 9, 4), dtype=float)
+    g = {
+        "tree": tr,
+        "num_input_site": 3,
+        "codon_orders": np.array(["AAA", "AAG"], dtype=object),
+        "state_nuc": state_nuc,
+        "state_cdn": state_cdn,
+        "state_pep": state_pep,
+        "state_nsy": state_nsy,
+        "_precomputed_tip_invariant_site_mask": np.array([True, False, True], dtype=bool),
+    }
+    parser_misc.drop_invariant_tip_sites(g)
+    assert not (tmp_path / "csubst_site_index_map.tsv").exists()
 
 
 def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, monkeypatch):
@@ -1070,6 +1251,7 @@ def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, mon
     g = {
         "tree": tr,
         "num_input_site": 3,
+        "write_site_index_map": True,
         "codon_orders": np.array(["AAA", "AAG"], dtype=object),
         "state_nuc": state_nuc,
         "state_cdn": state_cdn,
@@ -1083,7 +1265,7 @@ def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, mon
     np.testing.assert_array_equal(out["dropped_tip_invariant_site_alignment"], np.array([0, 1], dtype=np.int64))
     site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, -1, 0]
-    assert site_map["is_retained"].tolist() == ["no", "no", "yes"]
+    assert site_map["is_retained"].tolist() == ["N", "N", "Y"]
 
 
 def test_drop_invariant_tip_sites_uses_precomputed_mask_when_available(tmp_path, monkeypatch):
@@ -1099,6 +1281,7 @@ def test_drop_invariant_tip_sites_uses_precomputed_mask_when_available(tmp_path,
     g = {
         "tree": tr,
         "num_input_site": 3,
+        "write_site_index_map": True,
         "codon_orders": np.array(["AAA", "AAG"], dtype=object),
         "state_nuc": state_nuc,
         "state_cdn": state_cdn,
@@ -1116,7 +1299,7 @@ def test_drop_invariant_tip_sites_uses_precomputed_mask_when_available(tmp_path,
     assert out["state_cdn"].shape[1] == 1
     site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, 0, -1]
-    assert site_map["is_retained"].tolist() == ["no", "yes", "no"]
+    assert site_map["is_retained"].tolist() == ["N", "Y", "N"]
 
 
 def test_drop_invariant_tip_sites_zero_sub_mass_mode_drops_only_zero_mass_sites(tmp_path, monkeypatch):
@@ -1144,6 +1327,7 @@ def test_drop_invariant_tip_sites_zero_sub_mass_mode_drops_only_zero_mass_sites(
     g = {
         "tree": tr,
         "num_input_site": 3,
+        "write_site_index_map": True,
         "float_tol": 1e-12,
         "drop_invariant_tip_sites_mode": "zero_sub_mass",
         "codon_orders": np.array(["AAA", "AAG", "AAC"], dtype=object),

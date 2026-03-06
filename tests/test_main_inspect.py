@@ -5,6 +5,7 @@ import pandas as pd
 
 from csubst import ete
 from csubst import main_inspect
+from csubst import runtime
 from csubst import tree
 
 
@@ -82,20 +83,17 @@ def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
     trait_name = "traitA"
     a_id = int(ete.get_prop(node_by_name["A"], "numerical_label"))
 
-    def fake_read_treefile(local_g):
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+    ):
         local_g["tree"] = tr
-        return local_g
-
-    def fake_passthrough(local_g):
-        return local_g
-
-    def fake_read_input(local_g):
         local_g["amino_acid_orders"] = np.array(["A", "C"], dtype=object)
         local_g["codon_orders"] = np.array(["AAA", "AAC"], dtype=object)
         local_g["nonsyn_state_orders"] = np.array(["A", "C"], dtype=object)
-        return local_g
-
-    def fake_get_foreground_branch(local_g):
         local_g["fg_df"] = pd.DataFrame(columns=["name", trait_name])
         local_g["target_ids"] = {trait_name: np.array([a_id], dtype=np.int64)}
         _set_trait_defaults(local_g["tree"], trait_name)
@@ -103,10 +101,13 @@ def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
         ete.set_prop(node_by_name["A"], "foreground_lineage_id_" + trait_name, 1)
         ete.set_prop(node_by_name["A"], "color_" + trait_name, "firebrick")
         ete.set_prop(node_by_name["A"], "labelcolor_" + trait_name, "firebrick")
-        Path("csubst_target_branch_" + trait_name + ".txt").write_text(str(a_id) + "\n", encoding="utf-8")
+        Path(runtime.output_path(local_g, "foreground_branch_" + trait_name + ".txt")).write_text(
+            str(a_id) + "\n",
+            encoding="utf-8",
+        )
         return local_g
 
-    def fake_prep_state(local_g):
+    def fake_prep_state(local_g, apply_site_filtering=True):
         num_node = max([int(ete.get_prop(node, "numerical_label")) for node in local_g["tree"].traverse()]) + 1
         local_g["state_pep"] = np.zeros((num_node, 1, 2), dtype=float)
         local_g["state_cdn"] = np.zeros((num_node, 1, 2), dtype=float)
@@ -120,9 +121,13 @@ def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
         Path(outfile).write_text("aln", encoding="utf-8")
         alignment_calls.append((str(outfile), str(mode)))
 
-    def fake_plot_state_dir(output_dir, state, orders, mode, g):
+    def fake_plot_state_dir(output_dir, state, orders, mode, g, plot_request, plot_request_name):
         Path(output_dir).mkdir(exist_ok=True)
-        plot_calls.append((str(output_dir), str(mode)))
+        plot_token = tree.normalize_state_plot_request(plot_request, param_name=plot_request_name)["token"]
+        for trait_name_local in g["fg_df"].columns[1:].tolist():
+            plot_file = Path(output_dir) / ("csubst_state_" + trait_name_local + "_" + str(mode) + "_" + plot_token + ".pdf")
+            plot_file.write_text("pdf", encoding="utf-8")
+        plot_calls.append((str(output_dir), str(mode), plot_request_name))
 
     def fake_write_tree(tree_obj, outfile="csubst_tree.nwk", add_numerical_label=True):
         Path(outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
@@ -132,13 +137,7 @@ def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
             file_name = (file_base + "_" + this_trait + ".pdf").replace("_PLACEHOLDER", "")
             Path(file_name).write_text("pdf", encoding="utf-8")
 
-    monkeypatch.setattr(main_inspect.tree, "read_treefile", fake_read_treefile)
-    monkeypatch.setattr(main_inspect.parser_misc, "generate_intermediate_files", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "annotate_tree", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "read_input", fake_read_input)
-    monkeypatch.setattr(main_inspect.foreground, "get_foreground_branch", fake_get_foreground_branch)
-    monkeypatch.setattr(main_inspect.foreground, "get_marginal_branch", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "resolve_state_loading", fake_passthrough)
+    monkeypatch.setattr(main_inspect.parser_misc, "prepare_input_context", fake_prepare_input_context)
     monkeypatch.setattr(main_inspect.parser_misc, "prep_state", fake_prep_state)
     monkeypatch.setattr(main_inspect.sequence, "write_alignment", fake_write_alignment)
     monkeypatch.setattr(main_inspect, "_plot_state_tree_in_directory", fake_plot_state_dir)
@@ -152,10 +151,10 @@ def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
         "csubst_branch_id_traitA.pdf",
         "csubst_branch_id_leaf_traitA.pdf",
         "csubst_branch_id_nolabel_traitA.pdf",
-        "csubst_plot_state_aa",
-        "csubst_plot_state_codon",
+        "csubst_state_traitA_aa_all.pdf",
+        "csubst_state_traitA_codon_all.pdf",
         "csubst_tree.nwk",
-        "csubst_target_branch_traitA.txt",
+        "csubst_foreground_branch_traitA.txt",
         "csubst_branch_map.tsv",
         "csubst_branch_map_traitA.tsv",
         "csubst_alignment_codon.fa",
@@ -163,8 +162,87 @@ def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
     ]
     for path in expected:
         assert Path(path).exists(), path
-    assert ("csubst_alignment_aa.fa", "aa") in alignment_calls
-    assert ("csubst_plot_state_aa", "aa") in plot_calls
+    assert ((str((tmp_path / "csubst_alignment_aa.fa").resolve())), "aa") in alignment_calls
+    assert ((str(tmp_path.resolve())), "aa", "--plot_state_aa") in plot_calls
+
+
+def test_main_inspect_routes_outputs_into_configured_namespace(tmp_path, monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1))
+    node_by_name = {node.name: node for node in tr.traverse() if node.name is not None}
+    trait_name = "traitA"
+    a_id = int(ete.get_prop(node_by_name["A"], "numerical_label"))
+    outdir = tmp_path / "inspect_outputs"
+
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+    ):
+        local_g["tree"] = tr
+        local_g["amino_acid_orders"] = np.array(["A", "C"], dtype=object)
+        local_g["codon_orders"] = np.array(["AAA", "AAC"], dtype=object)
+        local_g["nonsyn_state_orders"] = np.array(["A", "C"], dtype=object)
+        local_g["fg_df"] = pd.DataFrame(columns=["name", trait_name])
+        local_g["target_ids"] = {trait_name: np.array([a_id], dtype=np.int64)}
+        _set_trait_defaults(local_g["tree"], trait_name)
+        Path(runtime.output_path(local_g, "foreground_branch_" + trait_name + ".txt")).write_text(
+            str(a_id) + "\n",
+            encoding="utf-8",
+        )
+        return local_g
+
+    def fake_prep_state(local_g, apply_site_filtering=True):
+        num_node = max([int(ete.get_prop(node, "numerical_label")) for node in local_g["tree"].traverse()]) + 1
+        local_g["state_pep"] = np.zeros((num_node, 1, 2), dtype=float)
+        local_g["state_cdn"] = np.zeros((num_node, 1, 2), dtype=float)
+        local_g["state_nsy"] = np.zeros((num_node, 1, 2), dtype=float)
+        return local_g
+
+    def fake_write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
+        Path(outfile).write_text(str(mode), encoding="utf-8")
+
+    def fake_plot_state_dir(output_dir, state, orders, mode, g, plot_request, plot_request_name):
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        plot_token = tree.normalize_state_plot_request(plot_request, param_name=plot_request_name)["token"]
+        for trait_name_local in g["fg_df"].columns[1:].tolist():
+            plot_file = Path(output_dir) / ("csubst_state_" + trait_name_local + "_" + str(mode) + "_" + plot_token + ".pdf")
+            plot_file.write_text("pdf", encoding="utf-8")
+
+    def fake_write_tree(tree_obj, outfile="csubst_tree.nwk", add_numerical_label=True):
+        Path(outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
+
+    def fake_plot_branch_category(local_g, file_base, label="all"):
+        Path(str(file_base) + "_traitA.pdf").write_text(label, encoding="utf-8")
+
+    monkeypatch.setattr(main_inspect.parser_misc, "prepare_input_context", fake_prepare_input_context)
+    monkeypatch.setattr(main_inspect.parser_misc, "prep_state", fake_prep_state)
+    monkeypatch.setattr(main_inspect.sequence, "write_alignment", fake_write_alignment)
+    monkeypatch.setattr(main_inspect, "_plot_state_tree_in_directory", fake_plot_state_dir)
+    monkeypatch.setattr(main_inspect.tree, "write_tree", fake_write_tree)
+    monkeypatch.setattr(main_inspect.tree, "plot_branch_category", fake_plot_branch_category)
+
+    g = {
+        "genetic_code": 1,
+        "plot_state_aa": True,
+        "plot_state_codon": False,
+        "outdir": str(outdir),
+        "output_prefix": "inspect_run",
+    }
+    main_inspect.main_inspect(g)
+
+    expected_paths = [
+        outdir / "inspect_run_alignment_codon.fa",
+        outdir / "inspect_run_alignment_aa.fa",
+        outdir / "inspect_run_tree.nwk",
+        outdir / "inspect_run_branch_id_traitA.pdf",
+        outdir / "csubst_state_traitA_aa_all.pdf",
+        outdir / "inspect_run_branch_map.tsv",
+        outdir / "inspect_run_foreground_branch_traitA.txt",
+    ]
+    for path in expected_paths:
+        assert path.exists(), path
 
 
 def test_main_inspect_uses_recoded_state_for_state_aa_outputs(tmp_path, monkeypatch):
@@ -174,26 +252,23 @@ def test_main_inspect_uses_recoded_state_for_state_aa_outputs(tmp_path, monkeypa
     trait_name = "traitA"
     a_id = int(ete.get_prop(node_by_name["A"], "numerical_label"))
 
-    def fake_read_treefile(local_g):
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+    ):
         local_g["tree"] = tr
-        return local_g
-
-    def fake_passthrough(local_g):
-        return local_g
-
-    def fake_read_input(local_g):
         local_g["amino_acid_orders"] = np.array(["A", "C"], dtype=object)
         local_g["codon_orders"] = np.array(["AAA", "AAC"], dtype=object)
         local_g["nonsyn_state_orders"] = np.array(["AC", "DE"], dtype=object)
-        return local_g
-
-    def fake_get_foreground_branch(local_g):
         local_g["fg_df"] = pd.DataFrame(columns=["name", trait_name])
         local_g["target_ids"] = {trait_name: np.array([a_id], dtype=np.int64)}
         _set_trait_defaults(local_g["tree"], trait_name)
         return local_g
 
-    def fake_prep_state(local_g):
+    def fake_prep_state(local_g, apply_site_filtering=True):
         num_node = max([int(ete.get_prop(node, "numerical_label")) for node in local_g["tree"].traverse()]) + 1
         local_g["state_pep"] = np.zeros((num_node, 1, 2), dtype=float)
         local_g["state_cdn"] = np.zeros((num_node, 1, 2), dtype=float)
@@ -207,9 +282,15 @@ def test_main_inspect_uses_recoded_state_for_state_aa_outputs(tmp_path, monkeypa
         Path(outfile).write_text("aln", encoding="utf-8")
         alignment_calls.append((str(outfile), str(mode)))
 
-    def fake_plot_state_dir(output_dir, state, orders, mode, g):
+    def fake_plot_state_dir(output_dir, state, orders, mode, g, plot_request, plot_request_name):
         Path(output_dir).mkdir(exist_ok=True)
-        plot_calls.append((str(output_dir), str(mode), tuple(np.asarray(orders, dtype=object).tolist())))
+        plot_token = tree.normalize_state_plot_request(plot_request, param_name=plot_request_name)["token"]
+        for trait_name_local in g["fg_df"].columns[1:].tolist():
+            plot_file = Path(output_dir) / ("csubst_state_" + trait_name_local + "_" + str(mode) + "_" + plot_token + ".pdf")
+            plot_file.write_text("pdf", encoding="utf-8")
+        plot_calls.append(
+            (str(output_dir), str(mode), tuple(np.asarray(orders, dtype=object).tolist()), plot_request_name)
+        )
 
     def fake_write_tree(tree_obj, outfile="csubst_tree.nwk", add_numerical_label=True):
         Path(outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
@@ -219,13 +300,7 @@ def test_main_inspect_uses_recoded_state_for_state_aa_outputs(tmp_path, monkeypa
             file_name = (file_base + "_" + this_trait + ".pdf").replace("_PLACEHOLDER", "")
             Path(file_name).write_text("pdf", encoding="utf-8")
 
-    monkeypatch.setattr(main_inspect.tree, "read_treefile", fake_read_treefile)
-    monkeypatch.setattr(main_inspect.parser_misc, "generate_intermediate_files", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "annotate_tree", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "read_input", fake_read_input)
-    monkeypatch.setattr(main_inspect.foreground, "get_foreground_branch", fake_get_foreground_branch)
-    monkeypatch.setattr(main_inspect.foreground, "get_marginal_branch", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "resolve_state_loading", fake_passthrough)
+    monkeypatch.setattr(main_inspect.parser_misc, "prepare_input_context", fake_prepare_input_context)
     monkeypatch.setattr(main_inspect.parser_misc, "prep_state", fake_prep_state)
     monkeypatch.setattr(main_inspect.sequence, "write_alignment", fake_write_alignment)
     monkeypatch.setattr(main_inspect, "_plot_state_tree_in_directory", fake_plot_state_dir)
@@ -234,8 +309,80 @@ def test_main_inspect_uses_recoded_state_for_state_aa_outputs(tmp_path, monkeypa
 
     g = {"genetic_code": 1, "plot_state_aa": True, "plot_state_codon": False, "nonsyn_recode": "dayhoff6"}
     main_inspect.main_inspect(g)
-    assert ("csubst_alignment_aa.fa", "nsy") in alignment_calls
-    assert ("csubst_plot_state_aa", "nsy", ("AC", "DE")) in plot_calls
+    assert ((str((tmp_path / "csubst_alignment_aa.fa").resolve())), "nsy") in alignment_calls
+    assert ((str(tmp_path.resolve())), "nsy", ("AC", "DE"), "--plot_state_aa") in plot_calls
+
+
+def test_main_inspect_writes_unfiltered_alignments_before_site_filtering(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1))
+    recorded = {
+        "prep_flags": [],
+        "alignment_sites": {},
+        "plot_sites": {},
+    }
+
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+    ):
+        local_g["tree"] = tr
+        local_g["amino_acid_orders"] = np.array(["A", "C"], dtype=object)
+        local_g["codon_orders"] = np.array(["AAA", "AAC"], dtype=object)
+        local_g["nonsyn_state_orders"] = np.array(["A", "C"], dtype=object)
+        local_g["fg_df"] = pd.DataFrame(columns=["name"])
+        local_g["target_ids"] = {}
+        local_g["float_tol"] = 1e-12
+        return local_g
+
+    def fake_prep_state(local_g, apply_site_filtering=True):
+        recorded["prep_flags"].append(bool(apply_site_filtering))
+        num_node = max([int(ete.get_prop(node, "numerical_label")) for node in local_g["tree"].traverse()]) + 1
+        local_g["state_pep"] = np.zeros((num_node, 3, 2), dtype=float)
+        local_g["state_cdn"] = np.zeros((num_node, 3, 2), dtype=float)
+        local_g["state_nsy"] = np.zeros((num_node, 3, 2), dtype=float)
+        local_g["state_pep"][:, :, 0] = 1.0
+        local_g["state_cdn"][:, :, 0] = 1.0
+        local_g["state_nsy"][:, :, 0] = 1.0
+        return local_g
+
+    def fake_apply_site_filters(local_g):
+        local_g["state_pep"] = local_g["state_pep"][:, 1:2, :]
+        local_g["state_cdn"] = local_g["state_cdn"][:, 1:2, :]
+        local_g["state_nsy"] = local_g["state_nsy"][:, 1:2, :]
+        local_g["site_index_alignment"] = np.array([1], dtype=np.int64)
+        return local_g
+
+    def fake_write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
+        recorded["alignment_sites"][Path(outfile).name] = int(g["state_cdn"].shape[1])
+        Path(outfile).write_text(str(mode), encoding="utf-8")
+
+    def fake_plot_state_dir(output_dir, state, orders, mode, g, plot_request, plot_request_name):
+        recorded["plot_sites"][str(mode)] = int(state.shape[1])
+        Path(output_dir).mkdir(exist_ok=True)
+
+    def fake_write_tree(tree_obj, outfile="csubst_tree.nwk", add_numerical_label=True):
+        Path(outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
+
+    monkeypatch.setattr(main_inspect.parser_misc, "prepare_input_context", fake_prepare_input_context)
+    monkeypatch.setattr(main_inspect.parser_misc, "prep_state", fake_prep_state)
+    monkeypatch.setattr(main_inspect.parser_misc, "apply_site_filters", fake_apply_site_filters)
+    monkeypatch.setattr(main_inspect.sequence, "write_alignment", fake_write_alignment)
+    monkeypatch.setattr(main_inspect, "_plot_state_tree_in_directory", fake_plot_state_dir)
+    monkeypatch.setattr(main_inspect.tree, "write_tree", fake_write_tree)
+    monkeypatch.setattr(main_inspect.tree, "plot_branch_category", lambda local_g, file_base, label="all": None)
+
+    g = {"genetic_code": 1, "plot_state_aa": True, "plot_state_codon": True}
+    main_inspect.main_inspect(g)
+
+    assert recorded["prep_flags"] == [False]
+    assert recorded["alignment_sites"]["csubst_alignment_codon.fa"] == 3
+    assert recorded["alignment_sites"]["csubst_alignment_aa.fa"] == 3
+    assert recorded["plot_sites"]["aa"] == 3
+    assert recorded["plot_sites"]["codon"] == 3
 
 
 def test_main_inspect_download_prostt5_exits_before_input_loading(monkeypatch):
@@ -265,27 +412,24 @@ def test_main_inspect_applies_3di_smoke_branch_limit(tmp_path, monkeypatch):
     expected_nonroot = np.array(nonroot_ids[:2], dtype=np.int64)
     expected_with_root = np.array([root_id] + expected_nonroot.tolist(), dtype=np.int64)
 
-    def fake_read_treefile(local_g):
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+    ):
         local_g["tree"] = tr
-        return local_g
-
-    def fake_passthrough(local_g):
-        return local_g
-
-    def fake_read_input(local_g):
         local_g["amino_acid_orders"] = np.array(["A", "C"], dtype=object)
         local_g["codon_orders"] = np.array(["AAA", "AAC"], dtype=object)
         local_g["nonsyn_state_orders"] = np.array(["A", "C"], dtype=object)
-        return local_g
-
-    def fake_get_foreground_branch(local_g):
         local_g["fg_df"] = pd.DataFrame(columns=["name"])
         local_g["target_ids"] = {}
         return local_g
 
     observed = {"sa_ids": None, "nsy_branch_ids": None}
 
-    def fake_prep_state(local_g):
+    def fake_prep_state(local_g, apply_site_filtering=True):
         observed["sa_ids"] = np.asarray(local_g.get("sa_inference_branch_ids"), dtype=np.int64)
         num_node = max([int(ete.get_prop(node, "numerical_label")) for node in local_g["tree"].traverse()]) + 1
         local_g["state_pep"] = np.zeros((num_node, 1, 2), dtype=float)
@@ -295,19 +439,13 @@ def test_main_inspect_applies_3di_smoke_branch_limit(tmp_path, monkeypatch):
 
     def fake_write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
         Path(outfile).write_text("aln", encoding="utf-8")
-        if str(outfile) == "csubst_alignment_3di.fa":
+        if Path(outfile).name == "csubst_alignment_3di.fa":
             observed["nsy_branch_ids"] = np.asarray(branch_ids, dtype=np.int64)
 
     def fake_write_tree(tree_obj, outfile="csubst_tree.nwk", add_numerical_label=True):
         Path(outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
 
-    monkeypatch.setattr(main_inspect.tree, "read_treefile", fake_read_treefile)
-    monkeypatch.setattr(main_inspect.parser_misc, "generate_intermediate_files", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "annotate_tree", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "read_input", fake_read_input)
-    monkeypatch.setattr(main_inspect.foreground, "get_foreground_branch", fake_get_foreground_branch)
-    monkeypatch.setattr(main_inspect.foreground, "get_marginal_branch", fake_passthrough)
-    monkeypatch.setattr(main_inspect.parser_misc, "resolve_state_loading", fake_passthrough)
+    monkeypatch.setattr(main_inspect.parser_misc, "prepare_input_context", fake_prepare_input_context)
     monkeypatch.setattr(main_inspect.parser_misc, "prep_state", fake_prep_state)
     monkeypatch.setattr(main_inspect.sequence, "write_alignment", fake_write_alignment)
     monkeypatch.setattr(main_inspect.tree, "write_tree", fake_write_tree)

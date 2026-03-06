@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import itertools
+import os
 import re
 import sys
 import time
@@ -14,10 +15,12 @@ TREE_FIG_MIN_HEIGHT = 1.8
 TREE_FIG_HEIGHT_PER_LEAF = 0.10
 TREE_FIG_MAX_HEIGHT = 28.0
 TREE_LINE_CAPSTYLE = 'round'
+TREE_STATE_TEXT_SIZE = 6
 AA_LOGO_MIN_PROB = 0.03
 AA_LOGO_MAX_RESIDUES = 6
 AA_LOGO_MIN_WIDTH = 0.04
 AA_LOGO_WIDTH_RATIO = 0.015
+AA_LOGO_GAP_RATIO = 0.02
 AA_LOGO_HEIGHT = 0.78
 AA_LOGO_COLORS = {
     'A': '#1b9e77',
@@ -317,6 +320,76 @@ def _draw_aa_logo(ax, x, y, probabilities, orders, logo_width, logo_height,
     return True
 
 
+def _is_missing_state_text(value):
+    if value is None:
+        return False
+    text = str(value)
+    if len(text) == 0:
+        return False
+    return set(text).issubset({'-'})
+
+
+def _has_state_probability(probabilities):
+    if probabilities is None:
+        return False
+    arr = np.asarray(probabilities, dtype=np.float64)
+    if arr.size == 0:
+        return False
+    return (float(arr.max()) > 0.0)
+
+
+def _get_logo_site_count(probabilities):
+    if probabilities is None:
+        return 0
+    arr = np.asarray(probabilities, dtype=np.float64)
+    if arr.ndim <= 1:
+        return 1 if arr.size > 0 else 0
+    return int(arr.shape[0])
+
+
+def _draw_aa_logo_series(ax, x, y, probabilities, orders, logo_width, logo_gap, logo_height,
+                         mpl_patches, mpl_textpath, mpl_transforms, font_properties):
+    arr = np.asarray(probabilities, dtype=np.float64)
+    if arr.ndim <= 1:
+        drawn = _draw_aa_logo(
+            ax=ax,
+            x=x,
+            y=y,
+            probabilities=arr,
+            orders=orders,
+            logo_width=logo_width,
+            logo_height=logo_height,
+            mpl_patches=mpl_patches,
+            mpl_textpath=mpl_textpath,
+            mpl_transforms=mpl_transforms,
+            font_properties=font_properties,
+        )
+        return drawn, logo_width
+    num_site = int(arr.shape[0])
+    if num_site <= 0:
+        return False, 0.0
+    total_width = (num_site * logo_width) + (max(num_site - 1, 0) * logo_gap)
+    left_center = x - (total_width / 2.0) + (logo_width / 2.0)
+    any_drawn = False
+    for idx in range(num_site):
+        logo_x = left_center + (idx * (logo_width + logo_gap))
+        drawn = _draw_aa_logo(
+            ax=ax,
+            x=logo_x,
+            y=y,
+            probabilities=arr[idx, :],
+            orders=orders,
+            logo_width=logo_width,
+            logo_height=logo_height,
+            mpl_patches=mpl_patches,
+            mpl_textpath=mpl_textpath,
+            mpl_transforms=mpl_transforms,
+            font_properties=font_properties,
+        )
+        any_drawn = any_drawn or drawn
+    return any_drawn, total_width
+
+
 def _get_nice_scale_length(max_tree_depth):
     max_tree_depth = float(max_tree_depth)
     if max_tree_depth <= 0:
@@ -390,10 +463,16 @@ def _get_branch_segment_colors(node, trait_name):
 
 
 def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_node=None,
-                            state_prob_by_node=None, state_orders=None, state_mode=None):
+                            state_prob_by_node=None, state_orders=None, state_mode=None,
+                            pdf_pages=None, figure_title=None):
     plt = _get_pyplot()
     xcoord,ycoord,leaves = _get_tree_xy(tree)
     use_aa_logo = (state_mode=='aa') and (state_prob_by_node is not None) and (state_orders is not None)
+    max_logo_sites = 1
+    if use_aa_logo:
+        counts = [_get_logo_site_count(prob) for prob in state_prob_by_node.values() if prob is not None]
+        if len(counts) > 0:
+            max_logo_sites = max(counts)
     labels = []
     show_branch_id_labels = (state_by_node is None)
     branch_id_labels = []
@@ -418,8 +497,10 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             else:
                 nl = ete.get_prop(node, "numerical_label")
                 state_txt = str(state_by_node.get(nl, '-'))
+                if ete.is_root(node) and _is_missing_state_text(state_txt):
+                    continue
                 txt = state_txt + '|' + (node.name or '') if ete.is_leaf(node) else state_txt
-                font_size = 6
+                font_size = TREE_STATE_TEXT_SIZE
             labels.append((node, txt, font_size))
         max_label_len = max([len(lbl[1]) for lbl in labels], default=0)
     num_leaves = max(len(leaves), 1)
@@ -460,7 +541,9 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     if use_aa_logo:
         mpl_patches,mpl_textpath,mpl_transforms,font_properties = _get_logo_modules()
         logo_width = max(AA_LOGO_MIN_WIDTH, xspan * AA_LOGO_WIDTH_RATIO)
-        leaf_name_offset = logo_width + (xspan * 0.01)
+        logo_gap = logo_width * AA_LOGO_GAP_RATIO
+        max_logo_total_width = (max_logo_sites * logo_width) + (max(max_logo_sites - 1, 0) * logo_gap)
+        leaf_name_offset = max_logo_total_width + (xspan * 0.01)
         fallback_leaf_name_offset = xspan * 0.03
         for node in tree.traverse():
             node_x = xcoord[id(node)] + text_offset
@@ -469,14 +552,16 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             nl = ete.get_prop(node, "numerical_label")
             prob = state_prob_by_node.get(nl, None)
             is_logo_drawn = False
+            logo_total_width = logo_width
             if prob is not None:
-                is_logo_drawn = _draw_aa_logo(
+                is_logo_drawn,logo_total_width = _draw_aa_logo_series(
                     ax=ax,
                     x=node_x,
                     y=node_y,
                     probabilities=prob,
                     orders=state_orders,
                     logo_width=logo_width,
+                    logo_gap=logo_gap,
                     logo_height=AA_LOGO_HEIGHT,
                     mpl_patches=mpl_patches,
                     mpl_textpath=mpl_textpath,
@@ -487,18 +572,23 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                 fallback = '-'
                 if state_by_node is not None:
                     fallback = str(state_by_node.get(nl, '-'))
-                ax.text(
-                    node_x,
-                    node_y,
-                    fallback,
-                    fontsize=6,
-                    color=text_color,
-                    va='center',
-                    ha='left',
-                    clip_on=False,
-                )
+                hide_missing_root = ete.is_root(node) and (not _has_state_probability(prob)) and _is_missing_state_text(fallback)
+                if not hide_missing_root:
+                    ax.text(
+                        node_x,
+                        node_y,
+                        fallback,
+                        fontsize=TREE_STATE_TEXT_SIZE,
+                        color=text_color,
+                        va='center',
+                        ha='left',
+                        clip_on=False,
+                    )
             if ete.is_leaf(node) and (node.name is not None) and (len(node.name) > 0):
-                label_x = node_x + (leaf_name_offset if is_logo_drawn else fallback_leaf_name_offset)
+                if is_logo_drawn:
+                    label_x = node_x + logo_total_width + (xspan * 0.01)
+                else:
+                    label_x = node_x + fallback_leaf_name_offset
                 ax.text(
                     label_x,
                     node_y,
@@ -510,7 +600,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     clip_on=False,
                 )
         leaf_label_len = max([len(leaf.name or '') for leaf in leaves], default=0)
-        text_space = logo_width + (leaf_label_len * xspan * 0.03) + (xspan * 0.04)
+        text_space = max_logo_total_width + (leaf_label_len * xspan * 0.03) + (xspan * 0.04)
     elif max_label_len>0:
         for node,txt,font_size in labels:
             text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
@@ -542,7 +632,12 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     ax.set_xlim(-xspan * 0.02, xmax + text_space + text_offset)
     ax.set_ylim(-0.5, num_leaves - 0.5)
     ax.axis('off')
-    fig.savefig(file_name, format='pdf', transparent=True, bbox_inches='tight')
+    if figure_title:
+        fig.suptitle(str(figure_title), fontsize=TREE_STATE_TEXT_SIZE)
+    if pdf_pages is not None:
+        pdf_pages.savefig(fig, transparent=True, bbox_inches='tight')
+    else:
+        fig.savefig(file_name, format='pdf', transparent=True, bbox_inches='tight')
     plt.close(fig)
     return None
 
@@ -561,6 +656,98 @@ def plot_branch_category(g, file_base, label='all'):
             label=label,
             state_by_node=None,
         )
+
+
+def normalize_state_plot_request(value, param_name='state plot selector'):
+    if isinstance(value, dict):
+        mode = str(value.get('mode', 'none')).strip().lower()
+        if mode not in ['none', 'all', 'pages', 'concat']:
+            raise ValueError('{} should be one of no, all, SITE,SITE,..., or SITE-SITE-....'.format(param_name))
+        site_numbers = tuple(int(v) for v in value.get('site_numbers', tuple()))
+        token = str(value.get('token', '')).strip()
+        return {
+            'mode': mode,
+            'site_numbers': site_numbers,
+            'token': token,
+        }
+    if isinstance(value, (bool, np.bool_)):
+        mode = 'all' if bool(value) else 'none'
+        return {
+            'mode': mode,
+            'site_numbers': tuple(),
+            'token': mode,
+        }
+    raw = '' if value is None else str(value).strip()
+    normalized = raw.lower()
+    if normalized in ['', 'no', 'none', 'off', 'false', '0']:
+        return {
+            'mode': 'none',
+            'site_numbers': tuple(),
+            'token': 'no',
+        }
+    if normalized == 'all':
+        return {
+            'mode': 'all',
+            'site_numbers': tuple(),
+            'token': 'all',
+        }
+    if normalized in ['yes', 'y', 'on', 'true', '1']:
+        txt = '{} no longer accepts yes/no. Use "all", a comma-separated site list, '
+        txt += 'or a hyphen-joined site bundle.'
+        raise ValueError(txt.format(param_name))
+    has_comma = ',' in normalized
+    has_hyphen = '-' in normalized
+    if has_comma and has_hyphen:
+        txt = '{} should use either commas (multi-page PDF) or hyphens (concatenated single-page PDF), not both.'
+        raise ValueError(txt.format(param_name))
+    separator = ',' if has_comma else '-'
+    raw_tokens = [token.strip() for token in normalized.split(separator) if token.strip() != '']
+    if len(raw_tokens) == 0:
+        raise ValueError('{} should be "no", "all", or one or more positive site numbers.'.format(param_name))
+    site_numbers = list()
+    seen = set()
+    for token in raw_tokens:
+        if not re.fullmatch(r'[0-9]+', token):
+            raise ValueError('{} should contain positive integer site numbers.'.format(param_name))
+        number = int(token)
+        if number <= 0:
+            raise ValueError('{} should contain positive integer site numbers.'.format(param_name))
+        if number in seen:
+            continue
+        seen.add(number)
+        site_numbers.append(number)
+    mode = 'concat' if has_hyphen else 'pages'
+    if mode == 'concat':
+        token = '-'.join([str(v) for v in site_numbers])
+    else:
+        token = ','.join([str(v) for v in site_numbers])
+    return {
+        'mode': mode,
+        'site_numbers': tuple(site_numbers),
+        'token': token,
+    }
+
+
+def has_state_plot_request(value):
+    return normalize_state_plot_request(value=value).get('mode', 'none') != 'none'
+
+
+def _resolve_state_plot_site_indices(num_site, plot_request, param_name):
+    request = normalize_state_plot_request(value=plot_request, param_name=param_name)
+    mode = request['mode']
+    if mode == 'none':
+        return request, np.array([], dtype=np.int64)
+    if mode == 'all':
+        return request, np.arange(int(num_site), dtype=np.int64)
+    site_numbers = np.asarray(request['site_numbers'], dtype=np.int64)
+    if site_numbers.size == 0:
+        return request, np.array([], dtype=np.int64)
+    invalid = site_numbers[(site_numbers < 1) | (site_numbers > int(num_site))]
+    if invalid.size > 0:
+        invalid_txt = ','.join([str(int(v)) for v in invalid.tolist()])
+        txt = '{} included out-of-range site(s): {}. Valid sites are 1-{}.'
+        raise ValueError(txt.format(param_name, invalid_txt, int(num_site)))
+    return request, (site_numbers - 1).astype(np.int64, copy=False)
 
 
 def _build_state_maps_for_site(tree, site_state, orders, mode, missing_state):
@@ -590,7 +777,38 @@ def _build_state_maps_for_site(tree, site_state, orders, mode, missing_state):
     return state_by_node,state_prob_by_node
 
 
-def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, state_chunk, site_indices, ndigit):
+def _build_state_maps_for_concatenated_sites(tree, state, site_indices, orders, missing_state):
+    state_by_node = dict()
+    state_prob_by_node = dict() if len(site_indices) > 0 else None
+    missing_repeat = missing_state * max(len(site_indices), 1)
+    for node in tree.traverse():
+        nlabel = ete.get_prop(node, "numerical_label")
+        if ete.is_root(node):
+            state_by_node[nlabel] = missing_repeat
+            if state_prob_by_node is not None:
+                state_prob_by_node[nlabel] = None
+            continue
+        symbols = list()
+        site_probabilities = list()
+        for site_index in site_indices.tolist():
+            node_state = state[nlabel, int(site_index), :]
+            max_prob = float(node_state.max()) if node_state.size > 0 else 0.0
+            site_probabilities.append(np.asarray(node_state, dtype=np.float64))
+            if max_prob <= 0:
+                symbols.append(missing_state)
+                continue
+            index = np.where(node_state == max_prob)[0]
+            if len(index) == 1:
+                symbols.append(str(orders[index[0]]))
+            else:
+                symbols.append(missing_state)
+        state_by_node[nlabel] = ''.join(symbols)
+        if state_prob_by_node is not None:
+            state_prob_by_node[nlabel] = np.stack(site_probabilities, axis=0)
+    return state_by_node,state_prob_by_node
+
+
+def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, state_chunk, site_indices, ndigit, output_dir=None):
     for local_idx,site_index in enumerate(site_indices):
         site_state = state_chunk[:, local_idx, :]
         state_by_node,state_prob_by_node = _build_state_maps_for_site(
@@ -602,6 +820,8 @@ def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, stat
         )
         file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(int(site_index)+1).zfill(ndigit)+'.pdf'
         file_name = file_name.replace('_PLACEHOLDER', '')
+        if output_dir is not None:
+            file_name = os.path.join(output_dir, file_name)
         _render_tree_matplotlib(
             tree=tree,
             trait_name=trait_name,
@@ -614,53 +834,122 @@ def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, stat
         )
 
 
-def plot_state_tree(state, orders, mode, g):
-    print('Writing ancestral state trees: mode = {}, number of pdf files = {}'.format(mode, state.shape[1]), flush=True)
+def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, state, site_indices, output_token,
+                              output_dir=None):
+    from matplotlib.backends.backend_pdf import PdfPages
+
+    file_name = 'csubst_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
+    file_name = file_name.replace('_PLACEHOLDER', '')
+    if output_dir is not None:
+        file_name = os.path.join(output_dir, file_name)
+    with PdfPages(file_name) as pdf_pages:
+        for site_index in site_indices.tolist():
+            site_state = state[:, int(site_index), :]
+            state_by_node,state_prob_by_node = _build_state_maps_for_site(
+                tree=tree,
+                site_state=site_state,
+                orders=orders,
+                mode=mode,
+                missing_state=missing_state,
+            )
+            _render_tree_matplotlib(
+                tree=tree,
+                trait_name=trait_name,
+                file_name=file_name,
+                label='all',
+                state_by_node=state_by_node,
+                state_prob_by_node=state_prob_by_node,
+                state_orders=orders if mode=='aa' else None,
+                state_mode=mode,
+                pdf_pages=pdf_pages,
+                figure_title='Site {}'.format(int(site_index) + 1),
+            )
+    return file_name
+
+
+def _render_state_tree_concatenated(tree, trait_name, mode, orders, missing_state, state, site_indices, output_token,
+                                    output_dir=None):
+    file_name = 'csubst_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
+    file_name = file_name.replace('_PLACEHOLDER', '')
+    if output_dir is not None:
+        file_name = os.path.join(output_dir, file_name)
+    state_by_node,state_prob_by_node = _build_state_maps_for_concatenated_sites(
+        tree=tree,
+        state=state,
+        site_indices=site_indices,
+        orders=orders,
+        missing_state=missing_state,
+    )
+    _render_tree_matplotlib(
+        tree=tree,
+        trait_name=trait_name,
+        file_name=file_name,
+        label='all',
+        state_by_node=state_by_node,
+        state_prob_by_node=state_prob_by_node if mode == 'aa' else None,
+        state_orders=orders if mode == 'aa' else None,
+        state_mode=mode,
+        figure_title='Sites {}'.format(str(output_token)),
+    )
+    return file_name
+
+
+def plot_state_tree(state, orders, mode, g, output_dir=None, plot_request='all', plot_request_name=None):
     if not is_ete_plottable():
         return None
     if state.shape[1] == 0:
         print('No sites available for ancestral state tree plotting. Skipping.', flush=True)
         return None
+    if plot_request_name is None:
+        plot_request_name = '--plot_state_{}'.format('aa' if mode == 'aa' else mode)
+    request,param_name = None,plot_request_name
+    request,site_indices = _resolve_state_plot_site_indices(
+        num_site=state.shape[1],
+        plot_request=plot_request,
+        param_name=param_name,
+    )
+    if site_indices.size == 0:
+        print('No sites selected for ancestral state tree plotting. Skipping.', flush=True)
+        return None
+    print('Writing ancestral state trees: mode = {}, number of pdf files = 1'.format(mode), flush=True)
+    if output_dir is not None:
+        os.makedirs(output_dir, exist_ok=True)
     if mode=='codon':
         missing_state = '---'
     else:
         missing_state = '-'
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
-    num_site = int(state.shape[1])
-    threads = int(g.get('threads', 1))
+    out_files = list()
     for trait_name in trait_names:
-        ndigit = int(np.log10(num_site))+1
-        n_jobs = parallel.resolve_n_jobs(num_items=num_site, threads=threads)
-        if n_jobs==1:
-            site_indices = np.arange(num_site, dtype=np.int64)
-            _render_state_tree_chunk(
+        if request['mode'] in ['all', 'pages']:
+            out_files.append(
+                _render_state_tree_bundle(
+                    tree=g['tree'],
+                    trait_name=trait_name,
+                    mode=mode,
+                    orders=orders,
+                    missing_state=missing_state,
+                    state=state,
+                    site_indices=site_indices,
+                    output_token=request['token'],
+                    output_dir=output_dir,
+                )
+            )
+            continue
+        out_files.append(
+            _render_state_tree_concatenated(
                 tree=g['tree'],
                 trait_name=trait_name,
                 mode=mode,
                 orders=orders,
                 missing_state=missing_state,
-                state_chunk=state,
+                state=state,
                 site_indices=site_indices,
-                ndigit=ndigit,
+                output_token=request['token'],
+                output_dir=output_dir,
             )
-            continue
-        backend = parallel.resolve_parallel_backend(g=g, task='plot_state_tree')
-        chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
-        site_indices = np.arange(num_site, dtype=np.int64)
-        site_chunks,_ = parallel.get_chunks(site_indices, threads=n_jobs, chunk_factor=chunk_factor)
-        txt = 'Parallel state-tree plotting: trait = {}, mode = {}, workers = {}, backend = {}, chunks = {}'
-        print(txt.format(trait_name, mode, n_jobs, backend, len(site_chunks)), flush=True)
-        tasks = []
-        for chunk in site_chunks:
-            chunk = np.asarray(chunk, dtype=np.int64)
-            state_chunk = state[:, chunk, :]
-            tasks.append((g['tree'], trait_name, mode, orders, missing_state, state_chunk, chunk, ndigit))
-        parallel.run_starmap(
-            func=_render_state_tree_chunk,
-            args_iterable=tasks,
-            n_jobs=n_jobs,
-            backend=backend,
         )
+    return out_files
 
 def get_num_adjusted_sites(g, node):
     nl = ete.get_prop(node, "numerical_label")

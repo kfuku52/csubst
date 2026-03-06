@@ -14,6 +14,7 @@ import sys
 import time
 
 from csubst import sequence
+from csubst import runtime
 from csubst import utility
 from csubst import ete
 
@@ -31,25 +32,27 @@ def initialize_pymol(pdb_id):
         pymol.cmd.load(pdb_id)
 
 def write_mafft_alignment(g):
-    tmp_pdb_fasta = 'tmp.csubst.pdb_seq.fa'
+    tmp_pdb_fasta = runtime.temp_path('tmp.csubst.pdb_seq.fa')
+    mafft_workdir = os.path.dirname(os.path.abspath(tmp_pdb_fasta)) or os.getcwd()
     mafft_map_file = tmp_pdb_fasta+'.map'
     if os.path.exists(mafft_map_file):
         os.remove(mafft_map_file)
     pdb_seq = pymol.cmd.get_fastastr(selection='polymer.protein', state=-1, quiet=1)
     with open(tmp_pdb_fasta, 'w') as f:
         f.write(pdb_seq)
-    sequence.write_alignment(outfile='tmp.csubst.leaf.aa.fa', mode='aa', g=g, leaf_only=True)
+    leaf_aa_fasta = runtime.temp_path('tmp.csubst.leaf.aa.fa')
+    sequence.write_alignment(outfile=leaf_aa_fasta, mode='aa', g=g, leaf_only=True)
     cmd_mafft = [g['mafft_exe'], '--keeplength', '--mapout', '--quiet',
                  '--thread', '1',]
     if g['mafft_op'] >= 0:
         cmd_mafft += ['--op', str(g['mafft_op']),]
     if g['mafft_ep'] >= 0:
         cmd_mafft += ['--ep', str(g['mafft_ep']),]
-    cmd_mafft += ['--add', tmp_pdb_fasta, 'tmp.csubst.leaf.aa.fa',]
+    cmd_mafft += ['--add', os.path.basename(tmp_pdb_fasta), os.path.basename(leaf_aa_fasta)]
     print('Running MAFFT to align the PDB sequence with the input alignment.', flush=True)
     print('Command: {}'.format(' '.join(cmd_mafft)), flush=True)
     try:
-        out_mafft = subprocess.run(cmd_mafft, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out_mafft = subprocess.run(cmd_mafft, cwd=mafft_workdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except FileNotFoundError as exc:
         raise AssertionError('mafft PATH cannot be found: {}'.format(g['mafft_exe'])) from exc
     if out_mafft.returncode != 0:
@@ -271,6 +274,7 @@ def add_contact_degree_from_structure(df, distance_cutoff=8.0, chain_col=None):
 
 
 def add_coordinate_from_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'):
+    mafft_map_file = runtime.temp_path(mafft_map_file)
     print('Loading amino acid coordinates from: {}'.format(mafft_map_file), flush=True)
     with open(mafft_map_file, 'r') as f:
         map_str = f.read()
@@ -333,7 +337,7 @@ def add_coordinate_from_mafft_map(df, mafft_map_file='tmp.csubst.pdb_seq.fa.map'
 def add_coordinate_from_user_alignment(df, user_alignment):
     print('Loading amino acid coordinates from: {}'.format(user_alignment), flush=True)
     pdb_fasta = pymol.cmd.get_fastastr(selection='polymer.protein', state=-1, quiet=1)
-    tmp_pdb_fasta = 'tmp.csubst.pdb_seq.fa'
+    tmp_pdb_fasta = runtime.temp_path('tmp.csubst.pdb_seq.fa')
     with open(tmp_pdb_fasta, 'w') as f:
         f.write(pdb_fasta)
     with open(tmp_pdb_fasta, 'r') as f:
@@ -898,6 +902,7 @@ def save_six_views(selection='all',
         ],
     }
 
+    prefix = runtime.temp_path(prefix)
     for direction, view in directions.items():
         pymol.cmd.set_view(view)
         pymol.cmd.zoom(selection, buffer=0.5)  
@@ -923,6 +928,7 @@ def save_6view_pdf(image_prefix='tmp.csubst.pymol',
     pdf_filename : str
         Name of the output PDF file.
     """
+    image_prefix = runtime.temp_path(image_prefix)
     if directions is None:
         directions = ['pos_x','neg_x','pos_y','neg_y','pos_z','neg_z']
 

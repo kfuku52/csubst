@@ -15,6 +15,7 @@ import sys
 import time
 
 from csubst import parallel
+from csubst import runtime
 from csubst import substitution
 from csubst import substitution_sparse
 from csubst import table
@@ -2097,7 +2098,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
     else:
         my_dtype = sub_tensor.dtype
         if 'bool' in str(my_dtype): my_dtype = g['float_type']
-        mmap_out = os.path.join(os.getcwd(), 'tmp.csubst.dfEb.mmap')
+        mmap_out = runtime.temp_path('tmp.csubst.dfEb.mmap')
         if os.path.exists(mmap_out): os.unlink(mmap_out)
         axis = (cb.shape[0],)
         dfEb = np.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')

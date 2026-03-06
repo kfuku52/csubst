@@ -5,7 +5,7 @@ import sys
 
 
 _PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_VALID_PARALLEL_BACKENDS = ('auto', 'multiprocessing', 'threading', 'loky')
+_VALID_PARALLEL_BACKENDS = ('auto', 'multiprocessing', 'threading')
 _DEFAULT_AUTO_BACKEND = 'multiprocessing'
 
 
@@ -106,7 +106,7 @@ def resolve_adaptive_n_jobs(num_items, threads, min_items_for_parallel=0, min_it
 def resolve_parallel_backend(g, task='general'):
     backend = str(g.get('parallel_backend', 'auto')).lower()
     if backend not in _VALID_PARALLEL_BACKENDS:
-        raise ValueError('parallel_backend should be one of auto, multiprocessing, threading, loky.')
+        raise ValueError('parallel_backend should be one of auto, multiprocessing, threading.')
     if backend != 'auto':
         return backend
     return _DEFAULT_AUTO_BACKEND
@@ -133,7 +133,7 @@ def _normalize_parallel_backend(backend):
         return _DEFAULT_AUTO_BACKEND
     if backend in _VALID_PARALLEL_BACKENDS:
         return backend
-    raise ValueError('parallel_backend should be one of auto, multiprocessing, threading, loky.')
+    raise ValueError('parallel_backend should be one of auto, multiprocessing, threading.')
 
 
 def run_starmap(func, args_iterable, n_jobs, backend='multiprocessing', chunksize=None):

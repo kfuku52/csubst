@@ -5,8 +5,22 @@ import pytest
 import warnings
 
 from csubst import main_simulate
+from csubst import runtime
 from csubst import tree
 from csubst import ete
+
+
+def _patch_simulation_index_helpers(monkeypatch):
+    monkeypatch.setattr(
+        main_simulate,
+        "get_synonymous_codon_substitution_index",
+        lambda local_g, codon_order: np.zeros((0, 2), dtype=np.int64),
+    )
+    monkeypatch.setattr(
+        main_simulate,
+        "get_nonsynonymous_codon_substitution_index",
+        lambda all_syn_cdn_index: np.zeros((0, 2), dtype=np.int64),
+    )
 
 
 def test_add_numerical_node_labels_assigns_unique_integers():
@@ -139,9 +153,208 @@ def test_plot_state_tree_writes_site_pdfs_with_matplotlib(tmp_path, monkeypatch)
     }
     monkeypatch.chdir(tmp_path)
     tree.plot_state_tree(state=state, orders=np.array(["K", "N"]), mode="aa", g=g)
-    out_files = sorted(tmp_path.glob("csubst_state_trait_aa_*.pdf"))
-    assert [p.name for p in out_files] == ["csubst_state_trait_aa_1.pdf", "csubst_state_trait_aa_2.pdf"]
-    assert all(p.stat().st_size > 0 for p in out_files)
+    out_file = tmp_path / "csubst_state_trait_aa_all.pdf"
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
+
+
+def test_plot_state_tree_supports_site_selection_formats(tmp_path, monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((len(labels), 3, 2), dtype=float)
+    state[:, :, 0] = 1.0
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"lineage_id": [1], "trait": ["B"]}),
+    }
+    monkeypatch.chdir(tmp_path)
+    tree.plot_state_tree(state=state, orders=np.array(["K", "N"]), mode="aa", g=g, plot_request="1,3")
+    pages_file = tmp_path / "csubst_state_trait_aa_1,3.pdf"
+    assert pages_file.exists()
+    assert pages_file.stat().st_size > 0
+    pages_file.unlink()
+    tree.plot_state_tree(state=state, orders=np.array(["K", "N"]), mode="aa", g=g, plot_request="1-3")
+    concat_file = tmp_path / "csubst_state_trait_aa_1-3.pdf"
+    assert concat_file.exists()
+    assert concat_file.stat().st_size > 0
+
+
+def test_plot_state_tree_hyphen_request_concatenates_site_labels(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((len(labels), 3, 3), dtype=float)
+    state[:, 0, 0] = 1.0
+    state[:, 1, 1] = 1.0
+    state[:, 2, 2] = 1.0
+    captured = {}
+
+    def fake_render(tree=None, trait_name=None, file_name=None, label='all', state_by_node=None,
+                    state_prob_by_node=None, state_orders=None, state_mode=None,
+                    pdf_pages=None, figure_title=None):
+        captured["file_name"] = str(file_name)
+        captured["figure_title"] = figure_title
+        captured["state_by_node"] = dict(state_by_node)
+
+    monkeypatch.setattr(tree, "_render_tree_matplotlib", fake_render)
+
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"lineage_id": [1], "trait": ["A"]}),
+    }
+    tree.plot_state_tree(
+        state=state,
+        orders=np.array(["AAC", "TCT", "GAC"], dtype=object),
+        mode="codon",
+        g=g,
+        plot_request="1-2-3",
+    )
+    assert captured["file_name"].endswith("csubst_state_trait_codon_1-2-3.pdf")
+    assert captured["figure_title"] == "Sites 1-2-3"
+    assert captured["state_by_node"][labels["A"]] == "AACTCTGAC"
+
+
+def test_plot_state_tree_hyphen_request_keeps_aa_seqlogo_probabilities(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((len(labels), 3, 3), dtype=float)
+    state[:, 0, :] = [0.7, 0.2, 0.1]
+    state[:, 1, :] = [0.1, 0.8, 0.1]
+    state[:, 2, :] = [0.2, 0.3, 0.5]
+    captured = {}
+
+    def fake_render(tree=None, trait_name=None, file_name=None, label='all', state_by_node=None,
+                    state_prob_by_node=None, state_orders=None, state_mode=None,
+                    pdf_pages=None, figure_title=None):
+        captured["state_mode"] = state_mode
+        captured["state_orders"] = tuple(np.asarray(state_orders, dtype=object).tolist()) if state_orders is not None else None
+        captured["state_prob_shape"] = np.asarray(state_prob_by_node[labels["A"]]).shape
+        captured["state_by_node"] = dict(state_by_node)
+
+    monkeypatch.setattr(tree, "_render_tree_matplotlib", fake_render)
+
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"lineage_id": [1], "trait": ["A"]}),
+    }
+    tree.plot_state_tree(
+        state=state,
+        orders=np.array(["A", "C", "D"], dtype=object),
+        mode="aa",
+        g=g,
+        plot_request="1-2-3",
+    )
+    assert captured["state_mode"] == "aa"
+    assert captured["state_orders"] == ("A", "C", "D")
+    assert captured["state_prob_shape"] == (3, 3)
+    assert captured["state_by_node"][labels["A"]] == "ACD"
+
+
+class _FakeTreeAxis:
+    def __init__(self):
+        self.text_calls = []
+
+    def plot(self, *args, **kwargs):
+        return None
+
+    def text(self, x, y, txt, **kwargs):
+        self.text_calls.append(str(txt))
+        return None
+
+    def set_xlim(self, *args, **kwargs):
+        return None
+
+    def set_ylim(self, *args, **kwargs):
+        return None
+
+    def axis(self, *args, **kwargs):
+        return None
+
+
+class _FakeTreeFigure:
+    def savefig(self, *args, **kwargs):
+        return None
+
+    def suptitle(self, *args, **kwargs):
+        return None
+
+
+class _FakeTreePyplot:
+    def __init__(self):
+        self.axis = _FakeTreeAxis()
+        self.figure = _FakeTreeFigure()
+
+    def subplots(self, *args, **kwargs):
+        return self.figure, self.axis
+
+    def close(self, *args, **kwargs):
+        return None
+
+
+def test_render_tree_matplotlib_hides_missing_root_state_for_codon(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
+
+    tree._render_tree_matplotlib(
+        tree=tr,
+        trait_name="trait",
+        file_name=str(tmp_path / "state_codon.pdf"),
+        state_by_node={
+            labels["R"]: "---",
+            labels["A"]: "AAA",
+            labels["B"]: "AAG",
+        },
+        state_mode="codon",
+    )
+
+    assert "---" not in fake_plt.axis.text_calls
+    assert "AAA|A" in fake_plt.axis.text_calls
+    assert "AAG|B" in fake_plt.axis.text_calls
+
+
+def test_render_tree_matplotlib_hides_missing_root_state_for_aa(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
+    monkeypatch.setattr(tree, "_get_logo_modules", lambda: (None, None, None, None))
+
+    tree._render_tree_matplotlib(
+        tree=tr,
+        trait_name="trait",
+        file_name=str(tmp_path / "state_aa.pdf"),
+        state_by_node={
+            labels["R"]: "-",
+            labels["A"]: "K",
+            labels["B"]: "N",
+        },
+        state_prob_by_node={
+            labels["R"]: None,
+            labels["A"]: None,
+            labels["B"]: None,
+        },
+        state_orders=np.array(["K", "N"], dtype=object),
+        state_mode="aa",
+    )
+
+    assert "-" not in fake_plt.axis.text_calls
+    assert "K" in fake_plt.axis.text_calls
+    assert "N" in fake_plt.axis.text_calls
+
+
+def test_normalize_state_plot_request_rejects_legacy_yes():
+    with pytest.raises(ValueError, match="no longer accepts yes/no"):
+        tree.normalize_state_plot_request("yes", param_name="--plot_state_aa")
 
 
 def test_get_num_adjusted_sites_does_not_mutate_parent_state_tensor():
@@ -726,17 +939,20 @@ def test_plot_state_tree_zero_sites_is_noop(tmp_path, monkeypatch):
 
 def test_main_simulate_plot_uses_foreground_annotation(monkeypatch):
     captured = {"colored": False}
+    _patch_simulation_index_helpers(monkeypatch)
 
-    def fake_read_treefile(local_g):
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+        force_notree_run=False,
+        ignore_tree_inconsistency=False,
+    ):
         tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
         local_g["tree"] = tr
         local_g["rooted_tree"] = tr
-        return local_g
-
-    def fake_passthrough(local_g, *args, **kwargs):
-        return local_g
-
-    def fake_read_input(local_g):
         local_g["num_input_site"] = 3
         return local_g
 
@@ -760,10 +976,7 @@ def test_main_simulate_plot_uses_foreground_annotation(monkeypatch):
         captured["colored"] = any(c != "black" for c in colors)
         raise RuntimeError("stop_after_plot")
 
-    monkeypatch.setattr(main_simulate.tree, "read_treefile", fake_read_treefile)
-    monkeypatch.setattr(main_simulate.parser_misc, "generate_intermediate_files", fake_passthrough)
-    monkeypatch.setattr(main_simulate.parser_misc, "annotate_tree", fake_passthrough)
-    monkeypatch.setattr(main_simulate.parser_misc, "read_input", fake_read_input)
+    monkeypatch.setattr(main_simulate, "_prepare_simulation_input_context", fake_prepare_input_context)
     monkeypatch.setattr(main_simulate.foreground, "get_foreground_branch", fake_get_foreground_branch)
     monkeypatch.setattr(main_simulate.tree, "plot_branch_category", fake_plot_branch_category)
 
@@ -787,17 +1000,20 @@ def test_main_simulate_plot_uses_foreground_annotation(monkeypatch):
 
 def test_main_simulate_assigns_simulation_seeds_when_requested(monkeypatch):
     captured = {"seed_conv": None, "seed_nonconv": None}
+    _patch_simulation_index_helpers(monkeypatch)
 
-    def fake_read_treefile(local_g):
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+        force_notree_run=False,
+        ignore_tree_inconsistency=False,
+    ):
         tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
         local_g["tree"] = tr
         local_g["rooted_tree"] = tr
-        return local_g
-
-    def fake_passthrough(local_g, *args, **kwargs):
-        return local_g
-
-    def fake_read_input(local_g):
         local_g["num_input_site"] = 5
         return local_g
 
@@ -815,10 +1031,7 @@ def test_main_simulate_assigns_simulation_seeds_when_requested(monkeypatch):
         captured["seed_nonconv"] = local_g.get("simulate_seed_nonconvergent", None)
         raise RuntimeError("stop_after_plot")
 
-    monkeypatch.setattr(main_simulate.tree, "read_treefile", fake_read_treefile)
-    monkeypatch.setattr(main_simulate.parser_misc, "generate_intermediate_files", fake_passthrough)
-    monkeypatch.setattr(main_simulate.parser_misc, "annotate_tree", fake_passthrough)
-    monkeypatch.setattr(main_simulate.parser_misc, "read_input", fake_read_input)
+    monkeypatch.setattr(main_simulate, "_prepare_simulation_input_context", fake_prepare_input_context)
     monkeypatch.setattr(main_simulate.foreground, "get_foreground_branch", fake_get_foreground_branch)
     monkeypatch.setattr(main_simulate.tree, "plot_branch_category", fake_plot_branch_category)
 
@@ -840,6 +1053,196 @@ def test_main_simulate_assigns_simulation_seeds_when_requested(monkeypatch):
         main_simulate.main_simulate(g)
     assert captured["seed_conv"] == 77
     assert captured["seed_nonconv"] == 78
+
+
+def test_main_simulate_routes_outputs_into_configured_namespace(tmp_path, monkeypatch):
+    captured = {"file_base": None}
+    _patch_simulation_index_helpers(monkeypatch)
+
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+        force_notree_run=False,
+        ignore_tree_inconsistency=False,
+    ):
+        tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+        local_g["tree"] = tr
+        local_g["rooted_tree"] = tr
+        local_g["num_input_site"] = 3
+        return local_g
+
+    def fake_get_foreground_branch(local_g, simulate=False):
+        local_g["fg_df"] = pd.DataFrame(columns=["name", "PLACEHOLDER"])
+        for node in local_g["tree"].traverse():
+            ete.set_prop(node, "is_fg_PLACEHOLDER", False)
+            ete.set_prop(node, "foreground_lineage_id_PLACEHOLDER", 0)
+            ete.set_prop(node, "color_PLACEHOLDER", "black")
+            ete.set_prop(node, "labelcolor_PLACEHOLDER", "black")
+        return local_g
+
+    def fake_plot_branch_category(local_g, file_base, label="all"):
+        captured["file_base"] = str(file_base)
+
+    def fake_get_pyvolve_tree(tree_obj, foreground_scaling_factor, trait_name):
+        return "pyvolve_tree"
+
+    def fake_resolve_background_omega(local_g):
+        return 0.2
+
+    def fake_resolve_eq_freq(local_g):
+        return np.ones(61, dtype=float) / 61.0
+
+    def fake_get_background_Q(local_g, method):
+        return np.zeros((61, 61), dtype=float)
+
+    def fake_resolve_site_rates(local_g):
+        return np.ones(int(local_g["num_simulated_site"]), dtype=float)
+
+    def fake_evolve_nonconvergent_partition(local_g):
+        path = runtime.temp_path("tmp.csubst.simulate_nonconvergent.fa")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(">A\nAAA\n>B\nAAA\n")
+
+    monkeypatch.setattr(main_simulate, "_prepare_simulation_input_context", fake_prepare_input_context)
+    monkeypatch.setattr(main_simulate.foreground, "get_foreground_branch", fake_get_foreground_branch)
+    monkeypatch.setattr(main_simulate.tree, "plot_branch_category", fake_plot_branch_category)
+    monkeypatch.setattr(main_simulate, "get_pyvolve_tree", fake_get_pyvolve_tree)
+    monkeypatch.setattr(main_simulate, "_resolve_simulation_background_omega", fake_resolve_background_omega)
+    monkeypatch.setattr(main_simulate, "_resolve_simulation_eq_freq", fake_resolve_eq_freq)
+    monkeypatch.setattr(main_simulate, "get_background_Q", fake_get_background_Q)
+    monkeypatch.setattr(main_simulate, "_resolve_simulation_site_rates", fake_resolve_site_rates)
+    monkeypatch.setattr(main_simulate, "evolve_nonconvergent_partition", fake_evolve_nonconvergent_partition)
+
+    outdir = tmp_path / "simulate_outputs"
+    g = {
+        "foreground": None,
+        "num_simulated_site": 1,
+        "percent_convergent_site": 0,
+        "percent_biased_sub": 90,
+        "optimized_branch_length": True,
+        "tree_scaling_factor": 1.0,
+        "foreground_scaling_factor": 1.0,
+        "export_true_asr": False,
+        "outdir": str(outdir),
+        "output_prefix": "run1",
+    }
+    main_simulate.main_simulate(g)
+
+    assert captured["file_base"] == str((outdir / "run1_branch_id").resolve())
+    assert (outdir / "run1.fa").exists()
+
+
+def test_main_simulate_infers_true_asr_prefix_from_output_namespace(tmp_path, monkeypatch):
+    captured = {"prefix": None}
+    _patch_simulation_index_helpers(monkeypatch)
+
+    def fake_prepare_input_context(
+        local_g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+        force_notree_run=False,
+        ignore_tree_inconsistency=False,
+    ):
+        tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+        local_g["tree"] = tr
+        local_g["rooted_tree"] = tr
+        local_g["num_input_site"] = 3
+        return local_g
+
+    def fake_get_foreground_branch(local_g, simulate=False):
+        local_g["fg_df"] = pd.DataFrame(columns=["name", "PLACEHOLDER"])
+        for node in local_g["tree"].traverse():
+            ete.set_prop(node, "is_fg_PLACEHOLDER", False)
+            ete.set_prop(node, "foreground_lineage_id_PLACEHOLDER", 0)
+            ete.set_prop(node, "color_PLACEHOLDER", "black")
+            ete.set_prop(node, "labelcolor_PLACEHOLDER", "black")
+        return local_g
+
+    def fake_get_pyvolve_tree(tree_obj, foreground_scaling_factor, trait_name):
+        return "pyvolve_tree"
+
+    def fake_resolve_background_omega(local_g):
+        return 0.2
+
+    def fake_resolve_eq_freq(local_g):
+        return np.ones(61, dtype=float) / 61.0
+
+    def fake_get_background_Q(local_g, method):
+        return np.zeros((61, 61), dtype=float)
+
+    def fake_resolve_site_rates(local_g):
+        return np.ones(int(local_g["num_simulated_site"]), dtype=float)
+
+    def fake_evolve_nonconvergent_partition(local_g):
+        path = runtime.temp_path("tmp.csubst.simulate_nonconvergent.fa")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(">A\nAAA\n>B\nAAA\n>R\nAAA\n")
+
+    def fake_split_tip_and_ancestor_alignment(in_fasta, tip_out, anc_out, tip_names):
+        with open(tip_out, "w", encoding="utf-8") as handle:
+            handle.write(">A\nAAA\n>B\nAAA\n")
+        with open(anc_out, "w", encoding="utf-8") as handle:
+            handle.write(">R\nAAA\n")
+        return 2, 1
+
+    def fake_write_true_asr_bundle(g, anc_fasta, prefix):
+        captured["prefix"] = str(prefix)
+        return {
+            "state": str(tmp_path / "state"),
+            "treefile": str(tmp_path / "treefile"),
+            "rate": str(tmp_path / "rate"),
+            "iqtree": str(tmp_path / "iqtree"),
+            "log": str(tmp_path / "log"),
+            "anc_fasta": str(tmp_path / "anc.fa"),
+        }
+
+    monkeypatch.setattr(main_simulate, "_prepare_simulation_input_context", fake_prepare_input_context)
+    monkeypatch.setattr(main_simulate.foreground, "get_foreground_branch", fake_get_foreground_branch)
+    monkeypatch.setattr(main_simulate.tree, "plot_branch_category", lambda local_g, file_base, label="all": None)
+    monkeypatch.setattr(main_simulate, "get_pyvolve_tree", fake_get_pyvolve_tree)
+    monkeypatch.setattr(main_simulate, "_resolve_simulation_background_omega", fake_resolve_background_omega)
+    monkeypatch.setattr(main_simulate, "_resolve_simulation_eq_freq", fake_resolve_eq_freq)
+    monkeypatch.setattr(main_simulate, "get_background_Q", fake_get_background_Q)
+    monkeypatch.setattr(main_simulate, "_resolve_simulation_site_rates", fake_resolve_site_rates)
+    monkeypatch.setattr(main_simulate, "evolve_nonconvergent_partition", fake_evolve_nonconvergent_partition)
+    monkeypatch.setattr(main_simulate, "split_tip_and_ancestor_alignment", fake_split_tip_and_ancestor_alignment)
+    monkeypatch.setattr(main_simulate, "write_true_asr_bundle", fake_write_true_asr_bundle)
+
+    outdir = tmp_path / "simulate_outputs"
+    g = {
+        "foreground": None,
+        "num_simulated_site": 1,
+        "percent_convergent_site": 0,
+        "percent_biased_sub": 90,
+        "optimized_branch_length": True,
+        "tree_scaling_factor": 1.0,
+        "foreground_scaling_factor": 1.0,
+        "export_true_asr": True,
+        "outdir": str(outdir),
+        "output_prefix": "run1",
+        "true_asr_prefix": "",
+    }
+    main_simulate.main_simulate(g)
+
+    assert captured["prefix"] == str((outdir / "run1_true_asr").resolve())
+
+
+def test_initialize_simulation_output_context_places_custom_frequency_file_in_namespace(tmp_path):
+    outdir = tmp_path / "simulate_outputs"
+    g = {
+        "outdir": str(outdir),
+        "output_prefix": "run1",
+        "true_asr_prefix": "",
+    }
+    out = main_simulate._initialize_simulation_output_context(g)
+    assert out["simulate_custom_frequency_file"] == str(
+        (outdir / "run1_custom_matrix_frequencies.txt").resolve()
+    )
 
 
 def test_require_pyvolve_prefers_vendored_backend(monkeypatch):

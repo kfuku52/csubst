@@ -7,8 +7,8 @@ import re
 from collections import OrderedDict
 
 from csubst import foreground
-from csubst import genetic_code
 from csubst import parser_misc
+from csubst import runtime
 from csubst import tree
 from csubst import ete
 
@@ -58,6 +58,19 @@ class suppress_stdout_stderr(object):
         # Close all file descriptors
         for fd in self.null_fds + self.save_fds:
             os.close(fd)
+
+
+def _make_pyvolve_custom_model(pyvolve, g, name, q_matrix):
+    kwargs = {
+        'model_type': 'custom',
+        'name': name,
+        'parameters': {'matrix': q_matrix},
+    }
+    save_path = str(g.get('simulate_custom_frequency_file', '')).strip()
+    if save_path != '':
+        kwargs['save_custom_frequencies'] = save_path
+    with suppress_stdout_stderr():
+        return pyvolve.Model(**kwargs)
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
@@ -410,8 +423,7 @@ def evolve_convergent_partitions(g):
                 q_matrix = _scale_rate_matrix(biased_Q, site_rate)
             else:
                 q_matrix = _scale_rate_matrix(g['background_Q'], site_rate)
-            with suppress_stdout_stderr():
-                model = pyvolve.Model(model_type='custom', name=model_name, parameters={'matrix':q_matrix})
+            model = _make_pyvolve_custom_model(pyvolve=pyvolve, g=g, name=model_name, q_matrix=q_matrix)
             models.append(model)
         partition = pyvolve.Partition(models=models, size=1,  root_model_name='root')
         convergent_partitions.append(partition)
@@ -428,9 +440,9 @@ def evolve_convergent_partitions(g):
     print(txt.format(mean_biased_substitution_fraction*100, g['num_convergent_site']))
     evolver = pyvolve.Evolver(partitions=convergent_partitions, tree=g['foreground_tree'])
     kwargs = dict(
-        ratefile='tmp.csubst.simulate_convergent_ratefile.txt',
-        infofile='tmp.csubst.simulate_convergent_infofile.txt',
-        seqfile='tmp.csubst.simulate_convergent.fa',
+        ratefile=runtime.temp_path('tmp.csubst.simulate_convergent_ratefile.txt'),
+        infofile=runtime.temp_path('tmp.csubst.simulate_convergent_infofile.txt'),
+        seqfile=runtime.temp_path('tmp.csubst.simulate_convergent.fa'),
         write_anc=bool(g.get('export_true_asr', True)),
     )
     if g.get('simulate_seed_convergent', None) is not None:
@@ -454,20 +466,18 @@ def evolve_nonconvergent_partition(g):
         partitions = list()
         for site_rate in site_rates:
             q_matrix = _scale_rate_matrix(g['background_Q'], site_rate)
-            with suppress_stdout_stderr():
-                model = pyvolve.Model(model_type='custom', name='root', parameters={'matrix':q_matrix})
+            model = _make_pyvolve_custom_model(pyvolve=pyvolve, g=g, name='root', q_matrix=q_matrix)
             partitions.append(pyvolve.Partition(models=model, size=1))
         evolver = pyvolve.Evolver(partitions=partitions, tree=g['background_tree'])
     else:
         q_matrix = _scale_rate_matrix(g['background_Q'], 1.0)
-        with suppress_stdout_stderr():
-            model = pyvolve.Model(model_type='custom', name='root', parameters={'matrix':q_matrix})
+        model = _make_pyvolve_custom_model(pyvolve=pyvolve, g=g, name='root', q_matrix=q_matrix)
         partition = pyvolve.Partition(models=model, size=num_nonconvergent_site)
         evolver = pyvolve.Evolver(partitions=partition, tree=g['background_tree'])
     kwargs = dict(
-        ratefile='tmp.csubst.simulate_nonconvergent_ratefile.txt',
-        infofile='tmp.csubst.simulate_nonconvergent_infofile.txt',
-        seqfile='tmp.csubst.simulate_nonconvergent.fa',
+        ratefile=runtime.temp_path('tmp.csubst.simulate_nonconvergent_ratefile.txt'),
+        infofile=runtime.temp_path('tmp.csubst.simulate_nonconvergent_infofile.txt'),
+        seqfile=runtime.temp_path('tmp.csubst.simulate_nonconvergent.fa'),
         write_anc=bool(g.get('export_true_asr', True)),
     )
     if g.get('simulate_seed_nonconvergent', None) is not None:
@@ -791,17 +801,85 @@ def write_true_asr_bundle(g, anc_fasta, prefix):
         'anc_fasta': os.path.abspath(anc_file),
     }
 
+
+def _prepare_simulation_input_context(g):
+    return parser_misc.prepare_input_context(
+        g,
+        include_foreground=False,
+        include_marginal=False,
+        resolve_state_subset=False,
+        prepare_state=False,
+        force_notree_run=True,
+        ignore_tree_inconsistency=True,
+    )
+
+
+def _initialize_simulation_output_context(g):
+    if str(g.get('output_prefix', '')).strip() == '':
+        g['output_prefix'] = 'simulate'
+    g = runtime.ensure_output_layout(g, create_dir=True)
+    g['simulate_alignment_file'] = runtime.output_path(g, 'fa', separator='.', create_dir=True)
+    g['simulate_branch_plot_base'] = runtime.output_path(g, 'branch_id', create_dir=True)
+    g['simulate_custom_frequency_file'] = runtime.output_path(
+        g,
+        'custom_matrix_frequencies.txt',
+        create_dir=True,
+    )
+    g['true_asr_prefix'] = runtime.resolve_user_output_prefix(
+        g,
+        g.get('true_asr_prefix', ''),
+        default_suffix='true_asr',
+        create_dir=True,
+    )
+    return g
+
+
+def _materialize_simulated_alignment(g, file_conv, file_noconv):
+    file_out = g['simulate_alignment_file']
+    file_all = runtime.temp_path('tmp.csubst.simulate_all.fa')
+    if (os.path.exists(file_conv)) and (not os.path.exists(file_noconv)):
+        os.rename(file_conv, file_out if (not g['export_true_asr']) else file_all)
+    elif (not os.path.exists(file_conv)) and (os.path.exists(file_noconv)):
+        os.rename(file_noconv, file_out if (not g['export_true_asr']) else file_all)
+    else:
+        concatenate_alignment(
+            in1=file_conv,
+            in2=file_noconv,
+            out=file_out if (not g['export_true_asr']) else file_all,
+        )
+    return file_out, file_all
+
+
+def _export_true_asr_bundle(g, file_all):
+    file_anc = runtime.temp_path('tmp.csubst.simulate_anc.fa')
+    tip_names = [leaf.name for leaf in ete.get_leaves(g['tree'])]
+    num_tip, num_anc = split_tip_and_ancestor_alignment(
+        in_fasta=file_all,
+        tip_out=g['simulate_alignment_file'],
+        anc_out=file_anc,
+        tip_names=tip_names,
+    )
+    txt = 'Split simulated sequences into tips ({}) and ancestors ({}) for true-ASR export.'
+    print(txt.format(num_tip, num_anc), flush=True)
+    true_asr_files = write_true_asr_bundle(
+        g=g,
+        anc_fasta=file_anc,
+        prefix=g['true_asr_prefix'],
+    )
+    print('True-ASR bundle prefix: {}'.format(os.path.abspath(g['true_asr_prefix'])), flush=True)
+    print('  state: {}'.format(true_asr_files['state']), flush=True)
+    print('  tree : {}'.format(true_asr_files['treefile']), flush=True)
+    print('  rate : {}'.format(true_asr_files['rate']), flush=True)
+    print('  iqtree: {}'.format(true_asr_files['iqtree']), flush=True)
+    print('  log  : {}'.format(true_asr_files['log']), flush=True)
+    print('  anc  : {}'.format(true_asr_files['anc_fasta']), flush=True)
+    return true_asr_files
+
 def main_simulate(g, Q_method='auto'):
-    g['codon_table'] = genetic_code.get_codon_table(ncbi_id=g['genetic_code'])
-    g = tree.read_treefile(g)
-    g = parser_misc.generate_intermediate_files(g, force_notree_run=True)
-    g = parser_misc.annotate_tree(g, ignore_tree_inconsistency=True)
-    g = parser_misc.read_input(g)
+    g = _initialize_simulation_output_context(g)
+    g = _prepare_simulation_input_context(g)
     g['simulate_asrv'] = str(g.get('simulate_asrv', 'no')).strip().lower()
     g['export_true_asr'] = bool(g.get('export_true_asr', True))
-    g['true_asr_prefix'] = str(g.get('true_asr_prefix', 'simulate_true_asr')).strip()
-    if g['export_true_asr'] and (g['true_asr_prefix'] == ''):
-        raise ValueError('--true_asr_prefix should be a non-empty path prefix.')
     g['trait_name'] = 'PLACEHOLDER'
     g['tree'] = ensure_internal_node_names(g['tree'])
     g['pyvolve_codon_orders'] = get_pyvolve_codon_order()
@@ -832,7 +910,7 @@ def main_simulate(g, Q_method='auto'):
     # lineage IDs in --foreground are reflected in simulate_branch_id.pdf and
     # pyvolve model tags.
     g = foreground.get_foreground_branch(g, simulate=True)
-    tree.plot_branch_category(g, file_base='simulate_branch_id', label='all')
+    tree.plot_branch_category(g, file_base=g['simulate_branch_plot_base'], label='all')
     g['background_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=1, trait_name=g['trait_name'])
     g['foreground_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=g['foreground_scaling_factor'], trait_name=g['trait_name'])
     g['background_omega'] = _resolve_simulation_background_omega(g)
@@ -861,43 +939,14 @@ def main_simulate(g, Q_method='auto'):
         evolve_convergent_partitions(g)
     if (g['num_no_convergent_site'] > 0):
         evolve_nonconvergent_partition(g)
-    file_conv = 'tmp.csubst.simulate_convergent.fa'
-    file_noconv = 'tmp.csubst.simulate_nonconvergent.fa'
-    file_out = 'simulate.fa'
-    file_all = 'tmp.csubst.simulate_all.fa'
-    file_anc = 'tmp.csubst.simulate_anc.fa'
-    if (os.path.exists(file_conv))&(not os.path.exists(file_noconv)):
-        os.rename(file_conv, file_out if (not g['export_true_asr']) else file_all)
-    elif (not os.path.exists(file_conv))&(os.path.exists(file_noconv)):
-        os.rename(file_noconv, file_out if (not g['export_true_asr']) else file_all)
-    else:
-        concatenate_alignment(
-            in1=file_conv,
-            in2=file_noconv,
-            out=file_out if (not g['export_true_asr']) else file_all,
-        )
+    file_conv = runtime.temp_path('tmp.csubst.simulate_convergent.fa')
+    file_noconv = runtime.temp_path('tmp.csubst.simulate_nonconvergent.fa')
+    file_out, file_all = _materialize_simulated_alignment(
+        g=g,
+        file_conv=file_conv,
+        file_noconv=file_noconv,
+    )
     if g['export_true_asr']:
-        tip_names = [leaf.name for leaf in ete.get_leaves(g['tree'])]
-        num_tip, num_anc = split_tip_and_ancestor_alignment(
-            in_fasta=file_all,
-            tip_out=file_out,
-            anc_out=file_anc,
-            tip_names=tip_names,
-        )
-        txt = 'Split simulated sequences into tips ({}) and ancestors ({}) for true-ASR export.'
-        print(txt.format(num_tip, num_anc), flush=True)
-        true_asr_files = write_true_asr_bundle(
-            g=g,
-            anc_fasta=file_anc,
-            prefix=g['true_asr_prefix'],
-        )
-        print('True-ASR bundle prefix: {}'.format(os.path.abspath(g['true_asr_prefix'])), flush=True)
-        print('  state: {}'.format(true_asr_files['state']), flush=True)
-        print('  tree : {}'.format(true_asr_files['treefile']), flush=True)
-        print('  rate : {}'.format(true_asr_files['rate']), flush=True)
-        print('  iqtree: {}'.format(true_asr_files['iqtree']), flush=True)
-        print('  log  : {}'.format(true_asr_files['log']), flush=True)
-        print('  anc  : {}'.format(true_asr_files['anc_fasta']), flush=True)
+        _export_true_asr_bundle(g=g, file_all=file_all)
 
-    tmp_files = [f for f in os.listdir() if f.startswith('tmp.csubst.')]
-    _ = [os.remove(ts) for ts in tmp_files]
+    runtime.cleanup_legacy_temp_artifacts()
