@@ -54,11 +54,11 @@ _OUTPUT_NAMESPACE_DEFAULTS = {
         'output_prefix': 'csubst',
     },
     'sites': {
-        'outdir': 'csubst_site',
+        'outdir': 'csubst_sites',
         'output_prefix': 'csubst',
     },
     'site': {
-        'outdir': 'csubst_site',
+        'outdir': 'csubst_sites',
         'output_prefix': 'csubst',
     },
 }
@@ -170,8 +170,8 @@ def command_sites(args):
     if str(getattr(args, 'log_file', '')).strip() == '':
         args.log_file = runtime.default_site_log_path(base_dir=os.getcwd(), create_dir=False)
     g = get_global_parameters_or_exit(args)
-    from csubst.main_site import main_site
-    main_site(g)
+    from csubst.main_sites import main_sites
+    main_sites(g)
     print('csubst {}: Time elapsed: {:,} sec'.format(command_label, int(time.time() - start)))
     print('csubst {} end:'.format(command_label), datetime.datetime.now(datetime.timezone.utc), flush=True)
     if (g['pdb'] is not None):
@@ -327,7 +327,7 @@ def _build_parser():
                              '(including sites with only one unambiguous tip codon). '
                              '"zero_sub_mass" drops only sites guaranteed to have zero observed substitution mass '
                              '(both N and S) across analyzed branches. '
-                             'In `inspect`, csubst_site_index_map.tsv is written to map retained internal '
+                             'In `inspect`, csubst_sites_index_map.tsv is written to map retained internal '
                              'site indices to original alignment positions.')
     psr_rc = argparse.ArgumentParser(add_help=False)
     psr_rc.add_argument('--nonsyn_recode', metavar='no|3di20|dayhoff6|sr6|kgb6|sr4|dayhoff9|dayhoff12|dayhoff15|dayhoff18|srchisq6|kgbauto6',
@@ -481,7 +481,7 @@ def _build_parser():
                       help='default=%(default)s: Generate a matplotlib-based tree + site summary plot.')
     site.add_argument('--site_state_plot', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Generate substitution-pattern summary outputs '
-                           '(csubst_site.state.pdf, csubst_site.state_N.tsv, csubst_site.state_S.tsv).')
+                           '(csubst_sites.state.pdf, csubst_sites.state_N.tsv, csubst_sites.state_S.tsv).')
     site.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
                       choices=['pdf', 'png', 'svg'],
                       help='default=%(default)s: Output format for --tree_site_plot.')
@@ -506,7 +506,7 @@ def _build_parser():
                            'all tip labels are parseable by --species_regex '
                            '(GENUS_SPECIES_GENEID labels satisfy the default regex).')
     site.add_argument('--site_output_manifest', metavar='yes|no', default='yes', required=False, type=strtobool,
-                      help='default=%(default)s: Write csubst_site.outputs.tsv with generated files, '
+                      help='default=%(default)s: Write csubst_sites.outputs.tsv with generated files, '
                            'sizes, branch IDs, and key plotting parameters.')
     site.add_argument('--cb_file', metavar='PATH', default='csubst_cb_2.tsv', required=False, type=str,
                       help='default=%(default)s: PATH to csubst_cb_*.tsv output of csubst search.')
@@ -563,7 +563,7 @@ def _build_parser():
                                'If the number of chains in the PDB file is larger than this value, '
                                '--pymol_img will be disabled.')
     site.add_argument('--uniprot_feature_types', metavar='all|TYPE1,TYPE2,...', default='all', required=False, type=str,
-                      help='default=%(default)s: UniProt feature types to append to csubst_site output. '
+                      help='default=%(default)s: UniProt feature types to append to csubst_sites output. '
                            'By default ("all"), all available UniProt features are considered. '
                            'Redundant annotations (including the uniprot_feature_types_* column) are excluded unless '
                            '--uniprot_include_redundant is "yes". '

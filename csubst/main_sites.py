@@ -107,7 +107,7 @@ def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, bra
     return manifest_rows
 
 def write_site_output_manifest(manifest_rows, g, branch_ids):
-    manifest_path = os.path.join(g['site_outdir'], 'csubst_site.outputs.tsv')
+    manifest_path = os.path.join(g['site_outdir'], 'csubst_sites.outputs.tsv')
     manifest_df = pd.DataFrame(manifest_rows)
     if manifest_df.shape[0] > 0:
         manifest_df = manifest_df.sort_values(by=['output_kind', 'output_file']).reset_index(drop=True)
@@ -562,7 +562,7 @@ def _draw_barchart_row(ax, df, sub_type, SN_colors, ylabel, g, NS_ymax, is_last_
 
 def _resolve_barchart_output_base(g):
     if g['pdb'] is None:
-        return os.path.join(g['site_outdir'], 'csubst_site')
+        return os.path.join(g['site_outdir'], 'csubst_sites')
     return g['pdb_outfile_base']
 
 
@@ -893,7 +893,7 @@ def _write_chimera_attribute_file(file_name, seq_sites, df, codon_site_col, head
 
 def _write_chimera_fasta_for_seq(seq_key, seq, g):
     translated_seq = translate(seq, g)
-    file_fasta = os.path.join(g['site_outdir'], 'csubst_site_' + seq_key + '.fasta')
+    file_fasta = os.path.join(g['site_outdir'], 'csubst_sites_' + seq_key + '.fasta')
     txt = "Writing amino acid fasta that may be used as a query for homology modeling " \
           "to obtain .pdb file (e.g., with SWISS-MODEL): {}"
     print(txt.format(file_fasta))
@@ -914,7 +914,7 @@ def export2chimera(df, g):
             raise ValueError(txt.format(seq_key, len(seq)))
         seq_num_site = len(seq) // 3
         seq_sites = np.arange(1, seq_num_site + 1)
-        file_name = os.path.join(g['site_outdir'], 'csubst_site_' + seq_key + '.chimera.txt')
+        file_name = os.path.join(g['site_outdir'], 'csubst_sites_' + seq_key + '.chimera.txt')
         txt = 'Writing a file that can be loaded to UCSF Chimera from ' \
               '"Tools -> Structure Analysis -> Define Attribute"'
         print(txt.format(file_name))
@@ -1127,7 +1127,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         return []
     fig,axes = plt.subplots(nrows=3, ncols=2, figsize=(7.2, 7.2), sharex=False)
     output_paths = list()
-    outfiles = ['csubst_site.state_N.tsv', 'csubst_site.state_S.tsv']
+    outfiles = ['csubst_sites.state_N.tsv', 'csubst_sites.state_S.tsv']
     colors = ['red','blue']
     ax_cols = [0,1]
     titles = ['Nonsynonymous substitution','Synonymous substitution']
@@ -1176,7 +1176,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         ax.set_xlabel('Max inter-branch distance of substitution category', fontsize=font_size)
         ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
     fig.tight_layout(h_pad=0.5, w_pad=1)
-    outbase = os.path.join(g['site_outdir'], 'csubst_site.state')
+    outbase = os.path.join(g['site_outdir'], 'csubst_sites.state')
     fig_path = outbase + ".pdf"
     fig.savefig(fig_path, format='pdf', transparent=True)
     plt.close(fig)
@@ -2575,7 +2575,7 @@ def plot_tree_site(df, g):
         fig.subplots_adjust(top=0.84, left=0.04, right=0.99, wspace=0.01)
 
     fmt = str(g.get('tree_site_plot_format', 'pdf')).lower()
-    fig_path = os.path.join(g['site_outdir'], 'csubst_site.tree_site.' + fmt)
+    fig_path = os.path.join(g['site_outdir'], 'csubst_sites.tree_site.' + fmt)
     fig.savefig(
         fig_path,
         format=fmt,
@@ -2599,7 +2599,7 @@ def plot_tree_site(df, g):
         tree_site_df.loc[is_site, 'plot_order'] = current_order
         current_order += 1
     tree_site_df = expand_site_table_to_alignment(df=tree_site_df, g=g)
-    table_path = os.path.join(g['site_outdir'], 'csubst_site.tree_site.tsv')
+    table_path = os.path.join(g['site_outdir'], 'csubst_sites.tree_site.tsv')
     tree_site_df.to_csv(table_path, sep='\t', index=False, float_format=g['float_format'], chunksize=10000)
     print('Writing tree + site category table: {}'.format(table_path), flush=True)
     return [fig_path, table_path]
@@ -3220,15 +3220,15 @@ def _parse_mode_and_expression(raw_mode):
 
 def _build_site_outdir(mode, branch_txt, lineage_input_branch_txt=None, mode_expression=None, set_stat_type=None):
     if mode == 'intersection':
-        return './csubst_site.branch_id' + branch_txt
+        return './csubst_sites.branch_id' + branch_txt
     if mode == 'lineage':
-        return './csubst_site.lineage.branch_id' + lineage_input_branch_txt
+        return './csubst_sites.lineage.branch_id' + lineage_input_branch_txt
     if mode == 'set':
         if set_stat_type is None:
             raise ValueError('Missing set substitution type for --mode set.')
         mode_expr_label = _get_set_expression_label(mode_expression)
-        return './csubst_site.set.' + str(set_stat_type) + '.expr' + mode_expr_label
-    return './csubst_site.mode' + mode + '.branch_id' + branch_txt
+        return './csubst_sites.set.' + str(set_stat_type) + '.expr' + mode_expr_label
+    return './csubst_sites.mode' + mode + '.branch_id' + branch_txt
 
 
 def _maybe_relocate_site_log_file(g):
@@ -3343,7 +3343,7 @@ def combinatorial2single_columns(df):
         return df
     return df.drop(labels=drop_cols, axis=1)
 
-def main_site(g):
+def main_sites(g):
     if g['pdb'] is not None:
         from csubst import parser_pymol
     print("Reading and parsing input files.", flush=True)
@@ -3403,7 +3403,7 @@ def main_site(g):
             id_base = os.path.basename(g['pdb'])
             id_base = re.sub('.pdb$', '', id_base)
             id_base = re.sub('.cif$', '', id_base)
-            g['pdb_outfile_base'] = os.path.join(g['site_outdir'], 'csubst_site.' + id_base)
+            g['pdb_outfile_base'] = os.path.join(g['site_outdir'], 'csubst_sites.' + id_base)
             parser_pymol.initialize_pymol(pdb_id=g['pdb'])
             num_chain = parser_pymol.get_num_chain()
             if num_chain >= g['pymol_max_num_chain']:
@@ -3432,7 +3432,7 @@ def main_site(g):
             )
             if g['pymol_img'] and should_save_pymol_views(g):
                 parser_pymol.save_six_views()
-                pymol_pdf_path = os.path.join(g['site_outdir'], f'csubst_site.{id_base}.pymol.pdf')
+                pymol_pdf_path = os.path.join(g['site_outdir'], f'csubst_sites.{id_base}.pymol.pdf')
                 parser_pymol.save_6view_pdf(pdf_filename=pymol_pdf_path)
                 add_site_output_manifest_row(
                     manifest_rows=manifest_rows,
@@ -3454,11 +3454,11 @@ def main_site(g):
             if len(state_paths):
                 for state_path in state_paths:
                     file_name = os.path.basename(state_path)
-                    if file_name == 'csubst_site.state.pdf':
+                    if file_name == 'csubst_sites.state.pdf':
                         output_kind = 'state_pattern_pdf'
-                    elif file_name == 'csubst_site.state_N.tsv':
+                    elif file_name == 'csubst_sites.state_N.tsv':
                         output_kind = 'state_pattern_nonsyn_tsv'
-                    elif file_name == 'csubst_site.state_S.tsv':
+                    elif file_name == 'csubst_sites.state_S.tsv':
                         output_kind = 'state_pattern_syn_tsv'
                     else:
                         output_kind = 'state_pattern_misc'
@@ -3472,7 +3472,7 @@ def main_site(g):
             else:
                 add_site_output_manifest_row(
                     manifest_rows=manifest_rows,
-                    output_path=os.path.join(g['site_outdir'], 'csubst_site.state.pdf'),
+                    output_path=os.path.join(g['site_outdir'], 'csubst_sites.state.pdf'),
                     output_kind='state_pattern_pdf',
                     g=g,
                     branch_ids=g['branch_ids'],
@@ -3480,7 +3480,7 @@ def main_site(g):
                 )
                 add_site_output_manifest_row(
                     manifest_rows=manifest_rows,
-                    output_path=os.path.join(g['site_outdir'], 'csubst_site.state_N.tsv'),
+                    output_path=os.path.join(g['site_outdir'], 'csubst_sites.state_N.tsv'),
                     output_kind='state_pattern_nonsyn_tsv',
                     g=g,
                     branch_ids=g['branch_ids'],
@@ -3488,7 +3488,7 @@ def main_site(g):
                 )
                 add_site_output_manifest_row(
                     manifest_rows=manifest_rows,
-                    output_path=os.path.join(g['site_outdir'], 'csubst_site.state_S.tsv'),
+                    output_path=os.path.join(g['site_outdir'], 'csubst_sites.state_S.tsv'),
                     output_kind='state_pattern_syn_tsv',
                     g=g,
                     branch_ids=g['branch_ids'],
@@ -3497,7 +3497,7 @@ def main_site(g):
         else:
             add_site_output_manifest_row(
                 manifest_rows=manifest_rows,
-                output_path=os.path.join(g['site_outdir'], 'csubst_site.state.pdf'),
+                output_path=os.path.join(g['site_outdir'], 'csubst_sites.state.pdf'),
                 output_kind='state_pattern_pdf',
                 g=g,
                 branch_ids=g['branch_ids'],
@@ -3505,7 +3505,7 @@ def main_site(g):
             )
             add_site_output_manifest_row(
                 manifest_rows=manifest_rows,
-                output_path=os.path.join(g['site_outdir'], 'csubst_site.state_N.tsv'),
+                output_path=os.path.join(g['site_outdir'], 'csubst_sites.state_N.tsv'),
                 output_kind='state_pattern_nonsyn_tsv',
                 g=g,
                 branch_ids=g['branch_ids'],
@@ -3513,7 +3513,7 @@ def main_site(g):
             )
             add_site_output_manifest_row(
                 manifest_rows=manifest_rows,
-                output_path=os.path.join(g['site_outdir'], 'csubst_site.state_S.tsv'),
+                output_path=os.path.join(g['site_outdir'], 'csubst_sites.state_S.tsv'),
                 output_kind='state_pattern_syn_tsv',
                 g=g,
                 branch_ids=g['branch_ids'],
@@ -3523,9 +3523,9 @@ def main_site(g):
         if len(tree_paths):
             for tree_path in tree_paths:
                 file_name = os.path.basename(tree_path)
-                if file_name.startswith('csubst_site.tree_site.') and file_name.endswith('.tsv'):
+                if file_name.startswith('csubst_sites.tree_site.') and file_name.endswith('.tsv'):
                     output_kind = 'tree_site_table_tsv'
-                elif file_name.startswith('csubst_site.tree_site.'):
+                elif file_name.startswith('csubst_sites.tree_site.'):
                     output_kind = 'tree_site_plot'
                 else:
                     output_kind = 'tree_site_misc'
@@ -3540,7 +3540,7 @@ def main_site(g):
             tree_format = str(g.get('tree_site_plot_format', 'pdf')).lower()
             add_site_output_manifest_row(
                 manifest_rows=manifest_rows,
-                output_path=os.path.join(g['site_outdir'], 'csubst_site.tree_site.' + tree_format),
+                output_path=os.path.join(g['site_outdir'], 'csubst_sites.tree_site.' + tree_format),
                 output_kind='tree_site_plot',
                 g=g,
                 branch_ids=g['branch_ids'],
@@ -3548,14 +3548,14 @@ def main_site(g):
             )
             add_site_output_manifest_row(
                 manifest_rows=manifest_rows,
-                output_path=os.path.join(g['site_outdir'], 'csubst_site.tree_site.tsv'),
+                output_path=os.path.join(g['site_outdir'], 'csubst_sites.tree_site.tsv'),
                 output_kind='tree_site_table_tsv',
                 g=g,
                 branch_ids=g['branch_ids'],
                 note='skipped_by_tree_site_plot',
             )
         if g['pdb'] is None:
-            outbase = os.path.join(g['site_outdir'], 'csubst_site')
+            outbase = os.path.join(g['site_outdir'], 'csubst_sites')
         else:
             outbase = g['pdb_outfile_base']
         if str(g.get('mode', '')).lower() == 'lineage':

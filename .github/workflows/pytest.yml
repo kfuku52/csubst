@@ -73,7 +73,7 @@ jobs:
 
       - name: Run parity and performance checks (PGK/PEPC)
         run: |
-          python .github/scripts/site_parity_check.py --output parity_metrics.tsv --workdir parity_runs
+          python .github/scripts/sites_parity_check.py --output parity_metrics.tsv --workdir parity_runs
           cat parity_metrics.tsv
 
       - name: Run omega p-value calibration regression (PGK)

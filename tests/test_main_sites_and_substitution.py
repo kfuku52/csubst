@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from pathlib import Path
 
-from csubst import main_site
+from csubst import main_sites
 from csubst import runtime
 from csubst import substitution
 from csubst import substitution_sparse
@@ -26,14 +26,14 @@ def tiny_tree():
 def test_get_state_rejects_missing_leaf_sequence():
     node = ete.PhyloNode("A;", format=1)
     with pytest.raises(AssertionError, match="Leaf sequence not found"):
-        main_site.get_state(node=node, g={})
+        main_sites.get_state(node=node, g={})
 
 
 def test_get_state_rejects_non_codon_length_sequence():
     node = ete.PhyloNode("A;", format=1)
     ete.set_prop(node, "sequence", "AT")
     with pytest.raises(AssertionError, match="multiple of 3"):
-        main_site.get_state(node=node, g={})
+        main_sites.get_state(node=node, g={})
 
 
 def test_get_gapsite_rate_matches_manual_count():
@@ -46,25 +46,25 @@ def test_get_gapsite_rate_matches_manual_count():
         dtype=float,
     )
     # site-wise gap rates: [0/3, 2/3, 1/3]
-    out = main_site.get_gapsite_rate(state_tensor)
+    out = main_sites.get_gapsite_rate(state_tensor)
     np.testing.assert_allclose(out, [0.0, 2.0 / 3.0, 1.0 / 3.0], atol=1e-12)
 
 
 def test_get_gapsite_rate_returns_zero_when_branch_axis_is_empty():
     state_tensor = np.zeros((0, 3, 2), dtype=float)
-    out = main_site.get_gapsite_rate(state_tensor)
+    out = main_sites.get_gapsite_rate(state_tensor)
     np.testing.assert_allclose(out, [0.0, 0.0, 0.0], atol=1e-12)
 
 
 def test_extend_site_index_edge_fills_missing_edges():
     sites = pd.Series([2, 3, 7], dtype=int)
-    out = main_site.extend_site_index_edge(sites, num_extend=2)
+    out = main_sites.extend_site_index_edge(sites, num_extend=2)
     # Gap between 3 and 7 is filled by 5 and 6.
     assert out.tolist() == [2, 3, 5, 6, 7]
 
 
 def test_initialize_site_df_columns_are_correct():
-    df = main_site.initialize_site_df(4)
+    df = main_sites.initialize_site_df(4)
     assert df["codon_site_alignment"].tolist() == [0, 1, 2, 3]
     assert df["nuc_site_alignment"].tolist() == [1, 4, 7, 10]
 
@@ -81,7 +81,7 @@ def test_remap_codon_site_columns_to_alignment_uses_site_index_mapping():
         "state_cdn": np.zeros((1, 2, 2), dtype=float),
         "site_index_alignment": np.array([5, 9], dtype=np.int64),
     }
-    out = main_site.remap_codon_site_columns_to_alignment(df=df, g=g)
+    out = main_sites.remap_codon_site_columns_to_alignment(df=df, g=g)
     assert out["codon_site_alignment"].tolist() == [5, 9]
     assert out["codon_site_geneA"].tolist() == [9, -1]
     assert out["other"].tolist() == [10, 20]
@@ -94,10 +94,10 @@ def test_get_leaf_state_letter_and_gap_checks_use_alignment_site_mapping():
         "amino_acid_orders": np.array(["A", "V"], dtype=object),
         "site_index_alignment": np.array([5, 9], dtype=np.int64),
     }
-    assert main_site.get_leaf_state_letter(g=g, leaf_id=0, codon_site_alignment=6) == "V"
-    assert main_site.get_leaf_state_letter(g=g, leaf_id=0, codon_site_alignment=10) == ""
-    assert main_site._is_branch_site_gap(g=g, branch_id=0, codon_site_alignment=6) is False
-    assert main_site._is_branch_site_gap(g=g, branch_id=0, codon_site_alignment=10) is True
+    assert main_sites.get_leaf_state_letter(g=g, leaf_id=0, codon_site_alignment=6) == "V"
+    assert main_sites.get_leaf_state_letter(g=g, leaf_id=0, codon_site_alignment=10) == ""
+    assert main_sites._is_branch_site_gap(g=g, branch_id=0, codon_site_alignment=6) is False
+    assert main_sites._is_branch_site_gap(g=g, branch_id=0, codon_site_alignment=10) is True
 
 
 def test_combinatorial2single_columns_removes_combination_columns():
@@ -109,15 +109,15 @@ def test_combinatorial2single_columns_removes_combination_columns():
             "kept": [4],
         }
     )
-    out = main_site.combinatorial2single_columns(df)
+    out = main_sites.combinatorial2single_columns(df)
     assert list(out.columns) == ["kept"]
 
 
 @pytest.mark.parametrize("mode_name,expected", [("intersection", True), ("lineage", False), ("set", False)])
 def test_mode_helpers_only_enable_optional_outputs_in_intersection(mode_name, expected):
     g = {"mode": mode_name}
-    assert main_site.should_plot_state(g) == expected
-    assert main_site.should_save_pymol_views(g) == expected
+    assert main_sites.should_plot_state(g) == expected
+    assert main_sites.should_save_pymol_views(g) == expected
 
 
 def test_get_yvalues_for_supported_modes():
@@ -133,11 +133,11 @@ def test_get_yvalues_for_supported_modes():
             "OCSany2spe": [0.1, 0.2],
         }
     )
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_sub", "S"), [0.0, 2.5], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_sub", "N"), [1.0, 2.0], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_sub_", "S"), [0.0, 1.0], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "any2spe", "S"), [0.3, 0.6], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "any2spe", "N"), [0.2, 0.4], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub", "S"), [0.0, 2.5], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub", "N"), [1.0, 2.0], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub_", "S"), [0.0, 1.0], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "any2spe", "S"), [0.3, 0.6], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "any2spe", "N"), [0.2, 0.4], atol=1e-12)
 
 
 def test_get_yvalues_for_lineage_branch_specific_rows():
@@ -149,15 +149,15 @@ def test_get_yvalues_for_lineage_branch_specific_rows():
             "N_sub_12": [0.4, 0.5],
         }
     )
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_sub_branch_13", "N"), [0.2, 0.3], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_sub_branch_13", "S"), [0.0, 0.9], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_sub_branch_12", "N"), [0.4, 0.5], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_sub_branch_12", "S"), [0.6, 0.0], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub_branch_13", "N"), [0.2, 0.3], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub_branch_13", "S"), [0.0, 0.9], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub_branch_12", "N"), [0.4, 0.5], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub_branch_12", "S"), [0.6, 0.0], atol=1e-12)
 
 
 def test_get_plot_sub_types_and_colors_lineage_has_n_plus_two_rows():
     g = {"mode": "lineage", "single_branch_mode": False, "branch_ids": np.array([13, 12, 2], dtype=np.int64)}
-    sub_types, sn_colors = main_site.get_plot_sub_types_and_colors(g)
+    sub_types, sn_colors = main_sites.get_plot_sub_types_and_colors(g)
     assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_13", "_sub_branch_12", "_sub_branch_2"]
     assert "entire tree" in sub_types["_sub"]
     assert sub_types["_sub_"] == "Branch-wise\nsubstitutions\nin the targets"
@@ -171,13 +171,13 @@ def test_get_plot_sub_types_and_colors_lineage_has_n_plus_two_rows():
 
 def test_get_set_expression_display_branch_ids_preserves_expression_order():
     g = {"mode_expression": "117|48", "branch_ids": np.array([48, 117], dtype=np.int64)}
-    out = main_site._get_set_expression_display_branch_ids(g)
+    out = main_sites._get_set_expression_display_branch_ids(g)
     assert out.tolist() == [117, 48]
 
 
 def test_get_set_expression_display_branch_ids_accepts_scalar_branch_id():
     g = {"mode_expression": "117|48", "branch_ids": np.int64(117)}
-    out = main_site._get_set_expression_display_branch_ids(g)
+    out = main_sites._get_set_expression_display_branch_ids(g)
     assert out.tolist() == [117]
 
 
@@ -189,7 +189,7 @@ def test_get_plot_sub_types_and_colors_set_has_branch_rows_and_expression_row():
         "mode_expression": "117|48",
         "branch_ids": np.array([48, 117], dtype=np.int64),
     }
-    sub_types, sn_colors = main_site.get_plot_sub_types_and_colors(g)
+    sub_types, sn_colors = main_sites.get_plot_sub_types_and_colors(g)
     assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_117", "_sub_branch_48", "_set_expr"]
     assert sub_types["_sub"] == "Branch-wise\nsubstitutions\nin the entire tree"
     assert sub_types["_sub_"] == "Branch-wise\nsubstitutions\nin the targets"
@@ -208,21 +208,21 @@ def test_get_plot_sub_types_and_colors_set_with_A_has_A_row():
         "mode_expression": "((117|48)-A)",
         "branch_ids": np.array([48, 117], dtype=np.int64),
     }
-    sub_types, _ = main_site.get_plot_sub_types_and_colors(g)
+    sub_types, _ = main_sites.get_plot_sub_types_and_colors(g)
     assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_117", "_sub_branch_48", "_set_other", "_set_expr"]
     assert sub_types["_set_other"] == "Substitutions in\nA"
 
 
 def test_get_yvalues_set_expression_prefers_probability_column():
     df = pd.DataFrame({"N_set_expr_prob": [0.0, 1.7, 2.0], "N_set_expr": [False, True, True]})
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_set_expr", "N"), [0.0, 1.7, 2.0], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_set_expr", "S"), [0.0, 0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_set_expr", "N"), [0.0, 1.7, 2.0], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_set_expr", "S"), [0.0, 0.0, 0.0], atol=1e-12)
 
 
 def test_get_yvalues_set_other_uses_other_prob_columns():
     df = pd.DataFrame({"N_set_other": [False, True], "N_set_other_prob": [0.2, 0.4], "S_set_other_prob": [0.1, 0.0]})
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_set_other", "N"), [0.0, 1.0], atol=1e-12)
-    np.testing.assert_allclose(main_site.get_yvalues(df, "_set_other", "S"), [0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_set_other", "N"), [0.0, 1.0], atol=1e-12)
+    np.testing.assert_allclose(main_sites.get_yvalues(df, "_set_other", "S"), [0.0, 0.0], atol=1e-12)
 
 
 @pytest.mark.parametrize(
@@ -233,7 +233,7 @@ def test_get_yvalues_set_other_uses_other_prob_columns():
     ],
 )
 def test_get_set_channel_label(set_stat_type, channel_index, aa_orders, expected):
-    assert main_site._get_set_channel_label(
+    assert main_sites._get_set_channel_label(
         set_stat_type=set_stat_type,
         channel_index=channel_index,
         amino_acid_orders=aa_orders,
@@ -249,7 +249,7 @@ def test_get_set_expression_channel_labels_spe():
         ],
         dtype=float,
     )
-    out = main_site.get_set_expression_channel_labels(
+    out = main_sites.get_set_expression_channel_labels(
         prob_matrix=prob,
         set_stat_type="spe",
         amino_acid_orders=np.array(["A", "V", "T"]),
@@ -266,7 +266,7 @@ def test_get_set_expression_channel_indices():
         ],
         dtype=float,
     )
-    out = main_site.get_set_expression_channel_indices(prob_matrix=prob)
+    out = main_sites.get_set_expression_channel_indices(prob_matrix=prob)
     assert out.tolist() == [1, 0, -1]
 
 
@@ -279,7 +279,7 @@ def test_get_set_heatmap_column_labels_uses_set_expr_channel_index():
     )
     display_meta = [{"site": 2}, {"site": None}, {"site": 3}, {"site": 4}]
     g = {"mode": "set", "set_stat_type": "spe", "amino_acid_orders": np.array(["A", "V"])}
-    out = main_site.get_set_heatmap_column_labels(df=df, display_meta=display_meta, g=g)
+    out = main_sites.get_set_heatmap_column_labels(df=df, display_meta=display_meta, g=g)
     assert out == {2: "X→A", 4: "X→V"}
 
 
@@ -308,8 +308,8 @@ def test_plot_barchart_set_has_n_plus_three_rows_for_two_branches(tmp_path):
         "pdb": None,
         "site_outdir": str(tmp_path),
     }
-    main_site.plot_barchart(df=df, g=g)
-    fig = main_site.plt.gcf()
+    main_sites.plot_barchart(df=df, g=g)
+    fig = main_sites.plt.gcf()
     axes = fig.axes
     assert len(axes) == 5
     assert axes[0].get_ylabel() == "Branch-wise\nsubstitutions\nin the entire tree"
@@ -317,7 +317,7 @@ def test_plot_barchart_set_has_n_plus_three_rows_for_two_branches(tmp_path):
     assert axes[2].get_ylabel() == "Substitutions in\nbranch_id 117"
     assert axes[3].get_ylabel() == "Substitutions in\nbranch_id 48"
     assert axes[4].get_ylabel() == "Substitutions in\n117|48"
-    main_site.plt.close(fig)
+    main_sites.plt.close(fig)
 
 
 def test_plot_barchart_set_with_A_has_extra_A_row(tmp_path):
@@ -347,8 +347,8 @@ def test_plot_barchart_set_with_A_has_extra_A_row(tmp_path):
         "pdb": None,
         "site_outdir": str(tmp_path),
     }
-    main_site.plot_barchart(df=df, g=g)
-    fig = main_site.plt.gcf()
+    main_sites.plot_barchart(df=df, g=g)
+    fig = main_sites.plt.gcf()
     axes = fig.axes
     assert len(axes) == 6
     assert axes[4].get_ylabel() == "Substitutions in\nA"
@@ -356,7 +356,7 @@ def test_plot_barchart_set_with_A_has_extra_A_row(tmp_path):
     ymin, ymax = axes[4].get_ylim()
     assert pytest.approx(ymin, abs=1e-12) == 0.0
     assert pytest.approx(ymax, abs=1e-12) == 1.0
-    main_site.plt.close(fig)
+    main_sites.plt.close(fig)
 
 
 def test_plot_barchart_lineage_branch_rows_use_fixed_unit_y_range(tmp_path):
@@ -382,8 +382,8 @@ def test_plot_barchart_lineage_branch_rows_use_fixed_unit_y_range(tmp_path):
         "pdb": None,
         "site_outdir": str(tmp_path),
     }
-    main_site.plot_barchart(df=df, g=g)
-    fig = main_site.plt.gcf()
+    main_sites.plot_barchart(df=df, g=g)
+    fig = main_sites.plt.gcf()
     axes = fig.axes
     # 5 data rows (N+2 for lineage) + 1 bottom colorbar axis
     assert len(axes) == 6
@@ -392,7 +392,7 @@ def test_plot_barchart_lineage_branch_rows_use_fixed_unit_y_range(tmp_path):
         assert pytest.approx(ymin, abs=1e-12) == 0.0
         assert pytest.approx(ymax, abs=1e-12) == 1.0
     assert "Branch distance from ancestor" in axes[5].get_xlabel()
-    main_site.plt.close(fig)
+    main_sites.plt.close(fig)
 
 
 def test_plot_barchart_lineage_colorbar_uses_actual_branch_length_ticks(tmp_path, tiny_tree):
@@ -420,8 +420,8 @@ def test_plot_barchart_lineage_colorbar_uses_actual_branch_length_ticks(tmp_path
         "pdb": None,
         "site_outdir": str(tmp_path),
     }
-    main_site.plot_barchart(df=df, g=g)
-    fig = main_site.plt.gcf()
+    main_sites.plot_barchart(df=df, g=g)
+    fig = main_sites.plt.gcf()
     axes = fig.axes
     # 4 data rows (N+2 where N=2) + 1 bottom colorbar axis
     assert len(axes) == 5
@@ -432,7 +432,7 @@ def test_plot_barchart_lineage_colorbar_uses_actual_branch_length_ticks(tmp_path
     # tiny_tree branch lengths are X=3 and C=2, so midpoint distances are 1.5 and 4.0.
     assert pytest.approx(min(tick_vals), abs=1e-6) == 1.5
     assert pytest.approx(max(tick_vals), abs=1e-6) == 4.0
-    main_site.plt.close(fig)
+    main_sites.plt.close(fig)
 
 
 def test_plot_lineage_tree_writes_pdf_and_applies_lineage_branch_colors(tmp_path, tiny_tree):
@@ -443,12 +443,12 @@ def test_plot_lineage_tree_writes_pdf_and_applies_lineage_branch_colors(tmp_path
         "tree": tiny_tree,
         "branch_ids": branch_ids,
     }
-    outbase = tmp_path / "csubst_site"
-    main_site.plot_lineage_tree(g=g, outbase=str(outbase))
-    outfile = tmp_path / "csubst_site.tree.pdf"
+    outbase = tmp_path / "csubst_sites"
+    main_sites.plot_lineage_tree(g=g, outbase=str(outbase))
+    outfile = tmp_path / "csubst_sites.tree.pdf"
     assert outfile.exists()
     assert outfile.stat().st_size > 0
-    lineage_rgb = main_site._get_lineage_rgb_by_branch(branch_ids=branch_ids.tolist(), g=g)
+    lineage_rgb = main_sites._get_lineage_rgb_by_branch(branch_ids=branch_ids.tolist(), g=g)
     for node in tiny_tree.traverse():
         bid = int(ete.get_prop(node, "numerical_label"))
         color = ete.get_prop(node, "color_PLACEHOLDER")
@@ -466,9 +466,9 @@ def test_plot_lineage_tree_accepts_scalar_branch_id(tmp_path, tiny_tree):
         "tree": tiny_tree,
         "branch_ids": target_id,
     }
-    outbase = tmp_path / "csubst_site_scalar"
-    main_site.plot_lineage_tree(g=g, outbase=str(outbase))
-    outfile = tmp_path / "csubst_site_scalar.tree.pdf"
+    outbase = tmp_path / "csubst_sites_scalar"
+    main_sites.plot_lineage_tree(g=g, outbase=str(outbase))
+    outfile = tmp_path / "csubst_sites_scalar.tree.pdf"
     assert outfile.exists()
     assert outfile.stat().st_size > 0
     assert ete.get_prop(next(node for node in tiny_tree.traverse() if int(ete.get_prop(node, "numerical_label")) == int(target_id)), "color_PLACEHOLDER") != "black"
@@ -476,33 +476,33 @@ def test_plot_lineage_tree_accepts_scalar_branch_id(tmp_path, tiny_tree):
 
 def test_translate_and_write_fasta(tmp_path):
     g = {"matrix_groups": {"K": ["AAA"], "N": ["AAC"]}}
-    assert main_site.translate("AAAAAC", g) == "KN"
+    assert main_sites.translate("AAAAAC", g) == "KN"
     out = tmp_path / "toy.fa"
-    main_site.write_fasta(str(out), "sample", "KN")
+    main_sites.write_fasta(str(out), "sample", "KN")
     assert out.read_text(encoding="utf-8") == ">sample\nKN\n"
 
 
 def test_translate_rejects_non_triplet_sequence_length():
     g = {"matrix_groups": {"K": ["AAA"]}}
     with pytest.raises(ValueError, match="multiple of 3"):
-        main_site.translate("AAAAA", g)
+        main_sites.translate("AAAAA", g)
 
 
 def test_translate_rejects_unknown_codon():
     g = {"matrix_groups": {"K": ["AAA"]}}
     with pytest.raises(ValueError, match='Unknown codon "AAT"'):
-        main_site.translate("AAT", g)
+        main_sites.translate("AAT", g)
 
 
 def test_resolve_chimera_line_for_site_handles_missing_any2dif_column():
     df = pd.DataFrame({"codon_site_seq1": [1], "OCNany2spe": [0.25]})
-    out = main_site._resolve_chimera_line_for_site(df=df, codon_site_col="codon_site_seq1", seq_site=1)
+    out = main_sites._resolve_chimera_line_for_site(df=df, codon_site_col="codon_site_seq1", seq_site=1)
     assert out == "\t:1\t0.2500\n"
 
 
 def test_resolve_chimera_line_for_site_handles_missing_any2spe_column():
     df = pd.DataFrame({"codon_site_seq1": [1], "OCNany2dif": [0.4]})
-    out = main_site._resolve_chimera_line_for_site(df=df, codon_site_col="codon_site_seq1", seq_site=1)
+    out = main_sites._resolve_chimera_line_for_site(df=df, codon_site_col="codon_site_seq1", seq_site=1)
     assert out == "\t:1\t-0.4000\n"
 
 
@@ -522,9 +522,9 @@ def test_export2chimera_rejects_non_triplet_sequence_before_writing(tmp_path):
         "matrix_groups": {"K": ["AAA"]},
     }
     with pytest.raises(ValueError, match='multiple of 3 for Chimera export'):
-        main_site.export2chimera(df=df, g=g)
-    assert not (tmp_path / "csubst_site_seq1.chimera.txt").exists()
-    assert not (tmp_path / "csubst_site_seq1.fasta").exists()
+        main_sites.export2chimera(df=df, g=g)
+    assert not (tmp_path / "csubst_sites_seq1.chimera.txt").exists()
+    assert not (tmp_path / "csubst_sites_seq1.fasta").exists()
 
 
 def test_get_parent_branch_ids(tiny_tree):
@@ -532,7 +532,7 @@ def test_get_parent_branch_ids(tiny_tree):
     for node in tiny_tree.traverse():
         if node.name in {"A", "C"}:
             bids.append(ete.get_prop(node, "numerical_label"))
-    out = main_site.get_parent_branch_ids(np.array(bids), {"tree": tiny_tree})
+    out = main_sites.get_parent_branch_ids(np.array(bids), {"tree": tiny_tree})
     assert len(out) == 2
     # Both A and C have internal node X as parent.
     x_id = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse() if n.name == "X"][0]
@@ -548,7 +548,7 @@ def test_build_aln_gene_match_for_leaf_rejects_non_triplet_untrimmed_cds():
         "codon_orders": np.array(["AAA"]),
     }
     with pytest.raises(ValueError, match='length for "A" should be multiple of 3'):
-        main_site._build_aln_gene_match_for_leaf(leaf=leaf_a, seq="AAAA", num_site=1, g=g)
+        main_sites._build_aln_gene_match_for_leaf(leaf=leaf_a, seq="AAAA", num_site=1, g=g)
 
 
 def test_add_states_handles_root_branch_without_parent_index_error(tiny_tree):
@@ -567,7 +567,7 @@ def test_add_states_handles_root_branch_without_parent_index_error(tiny_tree):
         "codon_orders": np.array(["AAA", "AAG"]),
         "amino_acid_orders": np.array(["K", "N"]),
     }
-    out = main_site.add_states(df=df, branch_ids=np.array([root_id], dtype=np.int64), g=g, add_hydrophobicity=False)
+    out = main_sites.add_states(df=df, branch_ids=np.array([root_id], dtype=np.int64), g=g, add_hydrophobicity=False)
     assert (out["cdn_{}_anc".format(root_id)] == "").all()
     assert (out["aa_{}_anc".format(root_id)] == "").all()
 
@@ -575,30 +575,30 @@ def test_add_states_handles_root_branch_without_parent_index_error(tiny_tree):
 def test_resolve_site_jobs_intersection_mode_preserves_branch_set_and_outdir_prefix(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "intersection", "branch_id": "{},{}".format(labels["A"], labels["C"])}
-    out = main_site.resolve_site_jobs(g)
+    out = main_sites.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
-    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.branch_id")
+    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_sites.branch_id")
 
 
 def test_resolve_site_jobs_rejects_duplicate_branch_ids(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "intersection", "branch_id": "{},{}".format(labels["A"], labels["A"])}
     with pytest.raises(ValueError, match="duplicate IDs"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 def test_maybe_relocate_site_log_file_moves_default_log_into_single_job_outdir(tmp_path, monkeypatch):
     default_log = Path(runtime.default_site_log_path(base_dir=tmp_path, create_dir=True))
     default_log.write_text("hello\n", encoding="utf-8")
-    site_outdir = tmp_path / "csubst_site.branch_id1,2"
+    site_outdir = tmp_path / "csubst_sites.branch_id1,2"
     g = {
         "log_file": str(default_log),
         "site_jobs": [{"site_outdir": str(site_outdir)}],
     }
 
     monkeypatch.chdir(tmp_path)
-    out = main_site._maybe_relocate_site_log_file(g)
+    out = main_sites._maybe_relocate_site_log_file(g)
 
     relocated_log = site_outdir / "csubst.log"
     assert out["log_file"] == str(relocated_log.resolve())
@@ -609,18 +609,18 @@ def test_maybe_relocate_site_log_file_moves_default_log_into_single_job_outdir(t
 
 def test_normalize_branch_ids_rejects_non_integer_like_values():
     with pytest.raises(ValueError, match="integer-like"):
-        main_site._normalize_branch_ids(np.array([1.5]))
+        main_sites._normalize_branch_ids(np.array([1.5]))
     with pytest.raises(ValueError, match="integer-like"):
-        main_site._normalize_branch_ids(np.array([True]))
+        main_sites._normalize_branch_ids(np.array([True]))
 
 
 def test_resolve_site_jobs_lineage_mode_returns_ancestor_to_descendant_path(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "lineage", "branch_id": "{},{}".format(labels["X"], labels["C"])}
-    out = main_site.resolve_site_jobs(g)
+    out = main_sites.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["X"], labels["C"]])
-    assert out["site_jobs"][0]["site_outdir"] == "./csubst_site.lineage.branch_id{},{}".format(labels["X"], labels["C"])
+    assert out["site_jobs"][0]["site_outdir"] == "./csubst_sites.lineage.branch_id{},{}".format(labels["X"], labels["C"])
     assert not out["site_jobs"][0]["single_branch_mode"]
 
 
@@ -628,7 +628,7 @@ def test_resolve_site_jobs_lineage_mode_rejects_non_ancestor_pairs(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "lineage", "branch_id": "{},{}".format(labels["B"], labels["C"])}
     with pytest.raises(ValueError, match="ancestor"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 @pytest.mark.parametrize("mode_name", ["total", "each", "all", "clade"])
@@ -640,20 +640,20 @@ def test_resolve_site_jobs_rejects_removed_modes(tiny_tree, mode_name):
         "branch_id": "{},{}".format(labels["A"], labels["C"]),
     }
     with pytest.raises(ValueError, match="intersection,lineage,set"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 def test_resolve_site_jobs_set_mode_extracts_expression_branch_ids(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     root_id = int(ete.get_prop(tiny_tree, "numerical_label"))
     g = {"tree": tiny_tree, "mode": "set,any,({}|{})-{}".format(labels["A"], labels["C"], root_id), "branch_id": "unused"}
-    out = main_site.resolve_site_jobs(g)
+    out = main_sites.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], sorted([labels["A"], labels["C"]]))
     assert out["mode"] == "set"
     assert out["set_stat_type"] == "any"
     assert out["mode_expression"] == "({}|{})-{}".format(labels["A"], labels["C"], root_id)
-    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.set.any.expr")
+    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_sites.set.any.expr")
     assert "_or_" in out["site_jobs"][0]["site_outdir"]
     assert "_minus_" in out["site_jobs"][0]["site_outdir"]
 
@@ -661,17 +661,17 @@ def test_resolve_site_jobs_set_mode_extracts_expression_branch_ids(tiny_tree):
 def test_resolve_site_jobs_set_mode_with_all_other_symbol_in_label(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "set,any,({}|{})-A".format(labels["A"], labels["C"]), "branch_id": "unused"}
-    out = main_site.resolve_site_jobs(g)
+    out = main_sites.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], sorted([labels["A"], labels["C"]]))
-    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_site.set.any.expr")
+    assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_sites.set.any.expr")
     assert "_all_other" in out["site_jobs"][0]["site_outdir"]
 
 
 def test_resolve_site_jobs_set_mode_without_branch_id(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "set,any,{}|{}".format(labels["A"], labels["B"])}
-    out = main_site.resolve_site_jobs(g)
+    out = main_sites.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], sorted([labels["A"], labels["B"]]))
 
@@ -679,28 +679,28 @@ def test_resolve_site_jobs_set_mode_without_branch_id(tiny_tree):
 def test_resolve_site_jobs_set_mode_rejects_unknown_branch_ids(tiny_tree):
     g = {"tree": tiny_tree, "mode": "set,any,999|1", "branch_id": "unused"}
     with pytest.raises(ValueError, match="unknown branch IDs"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 def test_resolve_site_jobs_set_mode_rejects_invalid_expression_syntax(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "set,any,({}|{}".format(labels["A"], labels["B"])}
     with pytest.raises(ValueError, match="Unbalanced parentheses"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 def test_resolve_site_jobs_set_mode_rejects_missing_stat_type(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "set,{}|{}".format(labels["A"], labels["B"])}
     with pytest.raises(ValueError, match="set,<substitution_type>,<expression>"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 def test_resolve_site_jobs_set_mode_rejects_invalid_stat_type(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "set,unknown,{}|{}".format(labels["A"], labels["B"])}
     with pytest.raises(ValueError, match="any,spe"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 @pytest.mark.parametrize("legacy_stat_type", ["any2any", "any2spe", "spe2any", "spe2spe"])
@@ -708,7 +708,7 @@ def test_resolve_site_jobs_set_mode_rejects_legacy_stat_types(tiny_tree, legacy_
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "set,{},{}|{}".format(legacy_stat_type, labels["A"], labels["B"])}
     with pytest.raises(ValueError, match="no longer supported|was removed"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 def test_set_expression_requires_parentheses_for_multiple_operators():
@@ -717,9 +717,9 @@ def test_set_expression_requires_parentheses_for_multiple_operators():
         2: np.array([True, False, True, False], dtype=bool),
         3: np.array([False, True, True, False], dtype=bool),
     }
-    tokens = main_site._tokenize_set_expression("1|2&3")
+    tokens = main_sites._tokenize_set_expression("1|2&3")
     with pytest.raises(ValueError, match="Ambiguous --mode set expression"):
-        main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+        main_sites._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
 
 
 def test_set_expression_accepts_same_operator_or_chain_without_parentheses():
@@ -728,8 +728,8 @@ def test_set_expression_accepts_same_operator_or_chain_without_parentheses():
         2: np.array([True, True, False], dtype=bool),
         3: np.array([True, False, True], dtype=bool),
     }
-    tokens = main_site._tokenize_set_expression("1|2|3")
-    out = main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    tokens = main_sites._tokenize_set_expression("1|2|3")
+    out = main_sites._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
     expected = branch_site_bool[1] | branch_site_bool[2] | branch_site_bool[3]
     np.testing.assert_array_equal(out, expected)
 
@@ -740,8 +740,8 @@ def test_set_expression_accepts_same_operator_and_chain_without_parentheses():
         2: np.array([True, True, False, False], dtype=bool),
         3: np.array([True, True, True, False], dtype=bool),
     }
-    tokens = main_site._tokenize_set_expression("1&2&3")
-    out = main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    tokens = main_sites._tokenize_set_expression("1&2&3")
+    out = main_sites._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
     expected = branch_site_bool[1] & branch_site_bool[2] & branch_site_bool[3]
     np.testing.assert_array_equal(out, expected)
 
@@ -753,9 +753,9 @@ def test_set_expression_rejects_same_operator_chain_for_xor_and_difference(mode_
         2: np.array([True, True, False], dtype=bool),
         3: np.array([True, False, True], dtype=bool),
     }
-    tokens = main_site._tokenize_set_expression(mode_expression)
+    tokens = main_sites._tokenize_set_expression(mode_expression)
     with pytest.raises(ValueError, match="Ambiguous --mode set expression"):
-        main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+        main_sites._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
 
 
 def test_set_expression_accepts_parenthesized_order():
@@ -764,8 +764,8 @@ def test_set_expression_accepts_parenthesized_order():
         2: np.array([True, False, True, False], dtype=bool),
         3: np.array([False, True, True, False], dtype=bool),
     }
-    tokens = main_site._tokenize_set_expression("1|(2&3)")
-    out = main_site._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
+    tokens = main_sites._tokenize_set_expression("1|(2&3)")
+    out = main_sites._evaluate_set_expression_boolean(tokens=tokens, branch_site_bool=branch_site_bool)
     expected = branch_site_bool[1] | (branch_site_bool[2] & branch_site_bool[3])
     np.testing.assert_array_equal(out, expected)
 
@@ -779,7 +779,7 @@ def test_add_set_mode_columns_evaluates_set_expression():
         }
     )
     g = {"mode": "set", "set_stat_type": "any", "mode_expression": "((1|5)-0)&25", "min_single_prob": 0.8}
-    out = main_site.add_set_mode_columns(df=df.copy(), g=g)
+    out = main_sites.add_set_mode_columns(df=df.copy(), g=g)
     # (1|5) => [T,T,T,T], minus root(0)=same, intersect 25 => [T,T,F,T]
     assert out["N_set_expr"].tolist() == [True, True, False, True]
     # PP is propagated by expression rules: OR=max, minus keeps LHS, AND=min.
@@ -795,7 +795,7 @@ def test_add_set_mode_columns_supports_xor_and_parentheses():
         }
     )
     g = {"mode": "set", "set_stat_type": "any", "mode_expression": "(1^5)&9", "min_single_prob": 0.8}
-    out = main_site.add_set_mode_columns(df=df.copy(), g=g)
+    out = main_sites.add_set_mode_columns(df=df.copy(), g=g)
     # 1^5 => [T,T,F,F], intersect 9 => [F,F,F,F]
     assert out["N_set_expr"].tolist() == [False, False, False, False]
     np.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [0.0, 0.0, 0.0, 0.0], atol=1e-12)
@@ -818,7 +818,7 @@ def test_add_set_mode_columns_operator_probability_rules(mode_expression, expect
         }
     )
     g = {"mode": "set", "set_stat_type": "any", "mode_expression": mode_expression, "min_single_prob": 0.8}
-    out = main_site.add_set_mode_columns(df=df.copy(), g=g)
+    out = main_sites.add_set_mode_columns(df=df.copy(), g=g)
     assert out["N_set_expr"].tolist() == expected_bool
     np.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), expected_prob, atol=1e-12)
 
@@ -854,7 +854,7 @@ def test_add_set_mode_columns_set_stat_type_changes_channelwise_aggregation(set_
         "mode_expression": "1|3",
         "min_single_prob": 0.5,
     }
-    out = main_site.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_tensor)
+    out = main_sites.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_tensor)
     assert out["N_set_expr"].tolist() == [True]
     np.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [expected_prob], atol=1e-12)
 
@@ -890,7 +890,7 @@ def test_add_set_mode_columns_supports_all_other_symbol(tiny_tree):
         "min_single_prob": 0.8,
         "tree": tiny_tree,
     }
-    out = main_site.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_tensor)
+    out = main_sites.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_tensor)
     assert out["N_set_expr"].tolist() == [True, False, True]
     np.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [0.9, 0.0, 0.9], atol=1e-12)
     assert out["N_set_other"].tolist() == [False, True, False]
@@ -917,7 +917,7 @@ def test_resolve_site_jobs_intersection_fg_reads_cb_file(tmp_path, tiny_tree):
         "branch_id": "fg",
         "cb_file": str(cb_path),
     }
-    out = main_site.resolve_site_jobs(g)
+    out = main_sites.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
 
@@ -939,7 +939,7 @@ def test_resolve_site_jobs_intersection_fg_accepts_truthy_fg_values(tmp_path, ti
         "branch_id": "fg",
         "cb_file": str(cb_path),
     }
-    out = main_site.resolve_site_jobs(g)
+    out = main_sites.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
 
@@ -961,25 +961,25 @@ def test_resolve_site_jobs_intersection_fg_rejects_non_integer_branch_ids(tmp_pa
         "cb_file": str(cb_path),
     }
     with pytest.raises(ValueError, match="integer-like"):
-        main_site.resolve_site_jobs(g)
+        main_sites.resolve_site_jobs(g)
 
 
 def test_get_state_orders():
     g = {"amino_acid_orders": np.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
-    orders_nsy, keys_nsy = main_site.get_state_orders(g, "nsy")
+    orders_nsy, keys_nsy = main_sites.get_state_orders(g, "nsy")
     assert keys_nsy == ["nsy"]
     assert list(orders_nsy["nsy"]) == ["A", "B"]
-    orders_syn, keys_syn = main_site.get_state_orders(g, "syn")
+    orders_syn, keys_syn = main_sites.get_state_orders(g, "syn")
     assert keys_syn == ["grp"]
     assert orders_syn["grp"] == ["AA", "AB"]
 
 
 def test_add_gapline_empty_df_is_noop():
     df = pd.DataFrame({"codon_site_alignment": [], "gap_rate_all": []})
-    fig, ax = main_site.plt.subplots()
-    main_site.add_gapline(df=df, gapcol="gap_rate_all", xcol="codon_site_alignment", yvalue=0.5, lw=1, ax=ax)
+    fig, ax = main_sites.plt.subplots()
+    main_sites.add_gapline(df=df, gapcol="gap_rate_all", xcol="codon_site_alignment", yvalue=0.5, lw=1, ax=ax)
     assert len(ax.collections) == 0
-    main_site.plt.close(fig)
+    main_sites.plt.close(fig)
 
 
 def test_classify_tree_site_categories_prefers_larger_signal():
@@ -995,7 +995,7 @@ def test_classify_tree_site_categories_prefers_larger_signal():
         "min_combinat_prob": 0.5,
         "min_single_prob": 0.8,
     }
-    out, min_prob = main_site.classify_tree_site_categories(df=df, g=g)
+    out, min_prob = main_sites.classify_tree_site_categories(df=df, g=g)
     assert pytest.approx(min_prob, abs=1e-12) == 0.5
     assert out["tree_site_category"].tolist() == ["convergent", "divergent", "blank", "divergent"]
 
@@ -1011,7 +1011,7 @@ def test_get_tree_site_display_sites_respects_max_sites_when_one_and_both_catego
     )
     g = {"tree_site_plot_max_sites": 1}
 
-    display_meta = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    display_meta = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
     site_rows = [row for row in display_meta if row["site"] is not None]
 
     assert len(site_rows) == 1
@@ -1031,7 +1031,7 @@ def test_get_tree_site_display_sites_refills_capacity_from_other_category():
     )
     g = {"tree_site_plot_max_sites": 4}
 
-    display_meta = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    display_meta = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
     site_rows = [row for row in display_meta if row["site"] is not None]
     conv_count = sum(row["category"] == "convergent" for row in site_rows)
     div_count = sum(row["category"] == "divergent" for row in site_rows)
@@ -1051,7 +1051,7 @@ def test_get_tree_site_display_sites_intersection_sorts_within_each_category():
         }
     )
     g = {"tree_site_plot_max_sites": 4}
-    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
     assert out == [
         {"site": 50, "category": "convergent"},
         {"site": 90, "category": "convergent"},
@@ -1071,7 +1071,7 @@ def test_get_tree_site_display_sites_respects_max_sites_when_one():
         }
     )
     g = {"tree_site_plot_max_sites": 1}
-    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
+    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
     plotted = [item for item in out if item["site"] is not None]
     assert len(plotted) == 1
     assert plotted[0]["site"] == 30
@@ -1102,7 +1102,7 @@ def test_get_tree_site_display_sites_lineage_includes_sites_above_min_prob():
         "tree_site_plot_max_sites": 10,
         "single_branch_mode": False,
     }
-    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
+    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     plotted = [item for item in out if item["site"] is not None]
     assert [item["site"] for item in plotted] == [3, 5]
     assert set(item["category"] for item in plotted) == {"lineage"}
@@ -1132,7 +1132,7 @@ def test_get_tree_site_display_sites_lineage_includes_sites_equal_to_min_prob():
         "tree_site_plot_max_sites": 10,
         "single_branch_mode": False,
     }
-    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
+    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     plotted = [item for item in out if item["site"] is not None]
     assert [item["site"] for item in plotted] == [1, 3]
     assert set(item["category"] for item in plotted) == {"lineage"}
@@ -1162,7 +1162,7 @@ def test_get_tree_site_display_sites_lineage_respects_max_sites_by_prob():
         "tree_site_plot_max_sites": 1,
         "single_branch_mode": False,
     }
-    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
+    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     plotted = [item for item in out if item["site"] is not None]
     assert [item["site"] for item in plotted] == [5]
     assert set(item["category"] for item in plotted) == {"lineage"}
@@ -1192,7 +1192,7 @@ def test_get_tree_site_display_sites_lineage_returns_empty_when_no_foreground_su
         "tree_site_plot_max_sites": 60,
         "single_branch_mode": False,
     }
-    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
+    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     assert out == []
 
 
@@ -1219,7 +1219,7 @@ def test_get_tree_site_display_sites_lineage_accepts_scalar_branch_id():
         "tree_site_plot_max_sites": 10,
         "single_branch_mode": False,
     }
-    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
+    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     plotted = [item for item in out if item["site"] is not None]
     assert [item["site"] for item in plotted] == [2]
     assert set(item["category"] for item in plotted) == {"lineage"}
@@ -1248,7 +1248,7 @@ def test_get_tree_site_display_sites_set_uses_set_expression_columns():
         "tree_site_plot_max_sites": 2,
         "single_branch_mode": False,
     }
-    out = main_site.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
+    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     plotted = [item for item in out if item["site"] is not None]
     # Top-2 by N_set_expr_prob: sites 2 (0.95) and 5 (0.91).
     assert [item["site"] for item in plotted] == [2, 5]
@@ -1279,12 +1279,12 @@ def test_get_tree_site_overflow_count_set_uses_set_expression_candidates():
         "single_branch_mode": False,
     }
     display_meta = [{"site": 2, "category": "set"}, {"site": 5, "category": "set"}]
-    overflow = main_site.get_tree_site_overflow_count(tree_site_df=tree_site_df, display_meta=display_meta, g=g, df=df)
+    overflow = main_sites.get_tree_site_overflow_count(tree_site_df=tree_site_df, display_meta=display_meta, g=g, df=df)
     assert overflow == 1
 
 
 def test_get_tree_site_overflow_label_y_is_half_row_below_alignment():
-    y = main_site.get_tree_site_overflow_label_y(
+    y = main_sites.get_tree_site_overflow_label_y(
         num_alignment_rows=3,
         has_structure_track=False,
         structure_row_y=None,
@@ -1294,7 +1294,7 @@ def test_get_tree_site_overflow_label_y_is_half_row_below_alignment():
 
 
 def test_get_tree_site_overflow_label_y_with_structure_is_below_structure_row():
-    y = main_site.get_tree_site_overflow_label_y(
+    y = main_sites.get_tree_site_overflow_label_y(
         num_alignment_rows=3,
         has_structure_track=True,
         structure_row_y=3.5,
@@ -1322,7 +1322,7 @@ def test_get_lineage_site_branch_ids_lists_all_nonzero_branches():
         "mode": "lineage",
         "branch_ids": np.array([10, 11], dtype=np.int64),
     }
-    out = main_site.get_lineage_site_branch_ids(
+    out = main_sites.get_lineage_site_branch_ids(
         df=df,
         display_meta=display_meta,
         g=g,
@@ -1350,7 +1350,7 @@ def test_get_lineage_site_branch_ids_includes_values_equal_to_min_prob():
         "mode": "lineage",
         "branch_ids": np.array([10, 11], dtype=np.int64),
     }
-    out = main_site.get_lineage_site_branch_ids(
+    out = main_sites.get_lineage_site_branch_ids(
         df=df,
         display_meta=display_meta,
         g=g,
@@ -1375,7 +1375,7 @@ def test_get_lineage_site_branch_ids_accepts_scalar_branch_id():
         "mode": "lineage",
         "branch_ids": np.int64(10),
     }
-    out = main_site.get_lineage_site_branch_ids(
+    out = main_sites.get_lineage_site_branch_ids(
         df=df,
         display_meta=display_meta,
         g=g,
@@ -1385,7 +1385,7 @@ def test_get_lineage_site_branch_ids_accepts_scalar_branch_id():
 
 
 def test_get_tree_plot_coordinates_returns_expected_root_and_leaf_positions(tiny_tree):
-    xcoord, ycoord, leaf_order = main_site.get_tree_plot_coordinates(tiny_tree)
+    xcoord, ycoord, leaf_order = main_sites.get_tree_plot_coordinates(tiny_tree)
     root = ete.get_tree_root(tiny_tree)
     root_id = ete.get_prop(root, "numerical_label")
     all_ids = [ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()]
@@ -1401,14 +1401,14 @@ def test_get_tree_plot_coordinates_returns_expected_root_and_leaf_positions(tiny
 def test_get_highlight_leaf_and_branch_ids_marks_descendant_leaves_for_internal_targets(tiny_tree):
     labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tiny_tree.traverse()}
 
-    leaf_ids, branch_ids = main_site.get_highlight_leaf_and_branch_ids(
+    leaf_ids, branch_ids = main_sites.get_highlight_leaf_and_branch_ids(
         tree=tiny_tree,
         branch_ids={labels["X"]},
     )
     assert branch_ids == {labels["X"]}
     assert leaf_ids == {labels["A"], labels["C"]}
 
-    leaf_ids, branch_ids = main_site.get_highlight_leaf_and_branch_ids(
+    leaf_ids, branch_ids = main_sites.get_highlight_leaf_and_branch_ids(
         tree=tiny_tree,
         branch_ids={labels["A"], labels["X"]},
     )
@@ -1423,7 +1423,7 @@ def test_get_species_overlap_node_types_classifies_speciation_and_duplication():
     )
     tr = tree.add_numerical_node_labels(tr)
     labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()}
-    out = main_site.get_species_overlap_node_types(
+    out = main_sites.get_species_overlap_node_types(
         tree=tr,
         species_regex=r"^([^_]+_[^_]+)_",
     )
@@ -1433,7 +1433,7 @@ def test_get_species_overlap_node_types_classifies_speciation_and_duplication():
 
 
 def test_get_species_overlap_node_types_returns_empty_without_regex(tiny_tree):
-    out = main_site.get_species_overlap_node_types(tree=tiny_tree, species_regex="")
+    out = main_sites.get_species_overlap_node_types(tree=tiny_tree, species_regex="")
     assert out == {}
 
 
@@ -1444,12 +1444,12 @@ def test_get_species_overlap_node_types_auto_requires_all_tip_labels():
     )
     tr = tree.add_numerical_node_labels(tr)
     labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()}
-    out_auto = main_site.get_species_overlap_node_types(
+    out_auto = main_sites.get_species_overlap_node_types(
         tree=tr,
         species_regex=r"^([^_]+_[^_]+)_",
         require_all_tip_labels=True,
     )
-    out_yes = main_site.get_species_overlap_node_types(
+    out_yes = main_sites.get_species_overlap_node_types(
         tree=tr,
         species_regex=r"^([^_]+_[^_]+)_",
         require_all_tip_labels=False,
@@ -1504,9 +1504,9 @@ def test_plot_tree_site_writes_figure_and_category_table(tmp_path, tiny_tree):
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    main_site.plot_tree_site(df=df, g=g)
-    fig_path = tmp_path / "csubst_site.tree_site.pdf"
-    table_path = tmp_path / "csubst_site.tree_site.tsv"
+    main_sites.plot_tree_site(df=df, g=g)
+    fig_path = tmp_path / "csubst_sites.tree_site.pdf"
+    table_path = tmp_path / "csubst_sites.tree_site.tsv"
     assert fig_path.exists()
     assert table_path.exists()
     out_df = pd.read_csv(table_path, sep="\t")
@@ -1550,9 +1550,9 @@ def test_plot_tree_site_svg_contains_expected_labels_and_no_legacy_title(tmp_pat
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    out_paths = main_site.plot_tree_site(df=df, g=g)
-    assert str(tmp_path / "csubst_site.tree_site.svg") in out_paths
-    svg_text = (tmp_path / "csubst_site.tree_site.svg").read_text(encoding="utf-8")
+    out_paths = main_sites.plot_tree_site(df=df, g=g)
+    assert str(tmp_path / "csubst_sites.tree_site.svg") in out_paths
+    svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8")
     assert ("Convergence & Divergence" in svg_text) or ("Convergence &amp; Divergence" in svg_text)
     assert re.search(r"N=\s*[0-9,]+(?:&|&amp;)[0-9,]+,\s*PP", svg_text) is not None
     assert ("PP ≥ 0.5" in svg_text) or ("PP &#8805; 0.5" in svg_text)
@@ -1604,8 +1604,8 @@ def test_plot_tree_site_svg_with_species_regex_adds_speciation_duplication_legen
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    _ = main_site.plot_tree_site(df=df, g=g)
-    svg_text = (tmp_path / "csubst_site.tree_site.svg").read_text(encoding="utf-8")
+    _ = main_sites.plot_tree_site(df=df, g=g)
+    svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8")
     assert "Speciation node" in svg_text
     assert "Duplication node" in svg_text
 
@@ -1655,8 +1655,8 @@ def test_plot_tree_site_svg_species_overlap_auto_hides_markers_when_tip_not_pars
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    _ = main_site.plot_tree_site(df=df, g=g)
-    svg_text = (tmp_path / "csubst_site.tree_site.svg").read_text(encoding="utf-8")
+    _ = main_sites.plot_tree_site(df=df, g=g)
+    svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8")
     assert "Speciation node" not in svg_text
     assert "Duplication node" not in svg_text
 
@@ -1700,8 +1700,8 @@ def test_plot_tree_site_svg_with_pdb_draws_structure_track_via_df_fallback(tmp_p
         "aa_identity_means": {},
         "species_overlap_node_plot": "no",
     }
-    _ = main_site.plot_tree_site(df=df, g=g)
-    svg_text = (tmp_path / "csubst_site.tree_site.svg").read_text(encoding="utf-8")
+    _ = main_sites.plot_tree_site(df=df, g=g)
+    svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8")
     assert "modelA" in svg_text
     assert "Structure position (aa)" in svg_text
 
@@ -1742,8 +1742,8 @@ def test_plot_tree_site_intersection_svg_includes_branch_heatmap_panel(tmp_path,
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    _ = main_site.plot_tree_site(df=df, g=g)
-    svg_text = (tmp_path / "csubst_site.tree_site.svg").read_text(encoding="utf-8").lower()
+    _ = main_sites.plot_tree_site(df=df, g=g)
+    svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8").lower()
     assert re.search(r'>0\.0</text>', svg_text) is not None
     assert re.search(r'>1\.0</text>', svg_text) is not None
     assert re.search(r'>branch id</text>', svg_text) is not None
@@ -1791,9 +1791,9 @@ def test_plot_tree_site_svg_with_pdb_adds_structure_row_and_axis_label(tmp_path,
         "pdb": "mock.pdb",
         "highest_identity_chain_name": "mock_A",
     }
-    out_paths = main_site.plot_tree_site(df=df, g=g)
-    assert str(tmp_path / "csubst_site.tree_site.svg") in out_paths
-    svg_text = (tmp_path / "csubst_site.tree_site.svg").read_text(encoding="utf-8")
+    out_paths = main_sites.plot_tree_site(df=df, g=g)
+    assert str(tmp_path / "csubst_sites.tree_site.svg") in out_paths
+    svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8")
     svg_text_lower = svg_text.lower()
     assert "Alignment position (aa)" in svg_text
     assert "Structure position (aa)" in svg_text
@@ -1848,8 +1848,8 @@ def test_plot_tree_site_svg_shows_overflow_site_count_label(tmp_path, tiny_tree)
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    _ = main_site.plot_tree_site(df=df, g=g)
-    svg_text = (tmp_path / "csubst_site.tree_site.svg").read_text(encoding="utf-8").lower()
+    _ = main_sites.plot_tree_site(df=df, g=g)
+    svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8").lower()
     assert re.search(r"\+3 sites with pp (≥|&#8805;|&ge;|>=|&gt;=) 0\.50", svg_text) is not None
 
 
@@ -1891,9 +1891,9 @@ def test_plot_tree_site_lineage_svg_uses_branch_palette_and_plots_all_threshold_
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    out_paths = main_site.plot_tree_site(df=df, g=g)
-    svg_path = tmp_path / "csubst_site.tree_site.svg"
-    table_path = tmp_path / "csubst_site.tree_site.tsv"
+    out_paths = main_sites.plot_tree_site(df=df, g=g)
+    svg_path = tmp_path / "csubst_sites.tree_site.svg"
+    table_path = tmp_path / "csubst_sites.tree_site.tsv"
     assert str(svg_path) in out_paths
     assert table_path.exists()
 
@@ -1901,9 +1901,9 @@ def test_plot_tree_site_lineage_svg_uses_branch_palette_and_plots_all_threshold_
     plotted_sites = plotted_df.loc[plotted_df["is_plotted"] == True, "codon_site_alignment"].astype(int).tolist()
     assert plotted_sites == [2, 3]
 
-    branch_rgb = main_site._get_lineage_rgb_by_branch(branch_ids=branch_ids, g=g)
-    x_hex = main_site.matplotlib.colors.to_hex(branch_rgb[labels["X"]]).lower()
-    c_hex = main_site.matplotlib.colors.to_hex(branch_rgb[labels["C"]]).lower()
+    branch_rgb = main_sites._get_lineage_rgb_by_branch(branch_ids=branch_ids, g=g)
+    x_hex = main_sites.matplotlib.colors.to_hex(branch_rgb[labels["X"]]).lower()
+    c_hex = main_sites.matplotlib.colors.to_hex(branch_rgb[labels["C"]]).lower()
     svg_text = svg_path.read_text(encoding="utf-8").lower()
     assert x_hex in svg_text
     assert c_hex in svg_text
@@ -1971,9 +1971,9 @@ def test_plot_tree_site_set_svg_includes_branch_heatmap_panel(tmp_path, tiny_tre
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    out_paths = main_site.plot_tree_site(df=df, g=g)
-    svg_path = tmp_path / "csubst_site.tree_site.svg"
-    table_path = tmp_path / "csubst_site.tree_site.tsv"
+    out_paths = main_sites.plot_tree_site(df=df, g=g)
+    svg_path = tmp_path / "csubst_sites.tree_site.svg"
+    table_path = tmp_path / "csubst_sites.tree_site.tsv"
     assert str(svg_path) in out_paths
     assert table_path.exists()
 
@@ -2041,8 +2041,8 @@ def test_plot_tree_site_set_any2spe_svg_includes_channel_labels(tmp_path, tiny_t
         "state_pep": state_pep,
         "amino_acid_orders": aa_orders,
     }
-    _ = main_site.plot_tree_site(df=df, g=g)
-    svg_path = tmp_path / "csubst_site.tree_site.svg"
+    _ = main_sites.plot_tree_site(df=df, g=g)
+    svg_path = tmp_path / "csubst_sites.tree_site.svg"
     svg_text = svg_path.read_text(encoding="utf-8").lower()
     assert re.search(r'heatmap metric:', svg_text) is None
     assert "x→v" in svg_text
@@ -2062,7 +2062,7 @@ def test_get_lineage_site_heatmap_values_set_prefers_set_branch_probability_colu
             "N_set_branch_11_prob": [0.9, 0.6],
         }
     )
-    heat_values, heat_branch_ids = main_site.get_lineage_site_heatmap_values(df=df, display_meta=display_meta, g=g)
+    heat_values, heat_branch_ids = main_sites.get_lineage_site_heatmap_values(df=df, display_meta=display_meta, g=g)
     assert heat_branch_ids == [10, 11]
     np.testing.assert_allclose(heat_values, np.array([[0.8, 0.7], [0.9, 0.6]], dtype=float), atol=1e-12)
 
@@ -2082,7 +2082,7 @@ def test_get_lineage_site_heatmap_values_uses_gap_mask_instead_of_zero():
             "N_sub_10": [0.25, 0.0],
         }
     )
-    heat_values, heat_branch_ids = main_site.get_lineage_site_heatmap_values(
+    heat_values, heat_branch_ids = main_sites.get_lineage_site_heatmap_values(
         df=df,
         display_meta=display_meta,
         g=g,
@@ -2111,11 +2111,11 @@ def test_plot_state_writes_outputs_when_enabled(tmp_path, tiny_tree):
         "matrix_groups": {"grp": ["AA", "AB"]},
         "site_state_plot": True,
     }
-    out_paths = main_site.plot_state(on, os, np.array([labels["A"], labels["C"]], dtype=int), g)
+    out_paths = main_sites.plot_state(on, os, np.array([labels["A"], labels["C"]], dtype=int), g)
     expected = {
-        str(tmp_path / "csubst_site.state.pdf"),
-        str(tmp_path / "csubst_site.state_N.tsv"),
-        str(tmp_path / "csubst_site.state_S.tsv"),
+        str(tmp_path / "csubst_sites.state.pdf"),
+        str(tmp_path / "csubst_sites.state_N.tsv"),
+        str(tmp_path / "csubst_sites.state_S.tsv"),
     }
     assert set(out_paths) == expected
     for path in expected:
@@ -2124,18 +2124,18 @@ def test_plot_state_writes_outputs_when_enabled(tmp_path, tiny_tree):
 
 def test_plot_state_skips_outputs_when_disabled(tmp_path):
     g = {"site_state_plot": False, "site_outdir": str(tmp_path)}
-    out_paths = main_site.plot_state(
+    out_paths = main_sites.plot_state(
         ON_tensor=np.zeros((1, 1, 1, 1, 1), dtype=float),
         OS_tensor=np.zeros((1, 1, 1, 1, 1), dtype=float),
         branch_ids=np.array([0], dtype=int),
         g=g,
     )
     assert out_paths == []
-    assert list(tmp_path.glob("csubst_site.state*")) == []
+    assert list(tmp_path.glob("csubst_sites.state*")) == []
 
 
 def test_write_site_output_manifest_records_files_and_parameters(tmp_path):
-    existing = tmp_path / "csubst_site.tsv"
+    existing = tmp_path / "csubst_sites.tsv"
     existing.write_text("x\n", encoding="utf-8")
     g = {
         "site_outdir": str(tmp_path),
@@ -2150,11 +2150,11 @@ def test_write_site_output_manifest_records_files_and_parameters(tmp_path):
     }
     rows = list()
     branch_ids = np.array([23, 51], dtype=int)
-    main_site.add_site_output_manifest_row(rows, str(existing), "site_table_tsv", g, branch_ids)
-    main_site.add_site_output_manifest_row(
-        rows, str(tmp_path / "csubst_site.state.pdf"), "state_pattern_pdf", g, branch_ids, note="skipped"
+    main_sites.add_site_output_manifest_row(rows, str(existing), "site_table_tsv", g, branch_ids)
+    main_sites.add_site_output_manifest_row(
+        rows, str(tmp_path / "csubst_sites.state.pdf"), "state_pattern_pdf", g, branch_ids, note="skipped"
     )
-    manifest_path = main_site.write_site_output_manifest(rows, g, branch_ids)
+    manifest_path = main_sites.write_site_output_manifest(rows, g, branch_ids)
     assert Path(manifest_path).exists()
     out_df = pd.read_csv(manifest_path, sep="\t")
     assert set(["output_kind", "output_file", "file_exists", "site_state_plot"]).issubset(set(out_df.columns))
@@ -2170,7 +2170,7 @@ def test_write_site_output_manifest_records_files_and_parameters(tmp_path):
 
 
 def test_write_site_output_manifest_accepts_scalar_branch_id(tmp_path):
-    existing = tmp_path / "csubst_site.tsv"
+    existing = tmp_path / "csubst_sites.tsv"
     existing.write_text("x\n", encoding="utf-8")
     g = {
         "site_outdir": str(tmp_path),
@@ -2184,8 +2184,8 @@ def test_write_site_output_manifest_accepts_scalar_branch_id(tmp_path):
         "pdb": None,
     }
     rows = list()
-    main_site.add_site_output_manifest_row(rows, str(existing), "site_table_tsv", g, np.int64(23))
-    manifest_path = main_site.write_site_output_manifest(rows, g, np.int64(23))
+    main_sites.add_site_output_manifest_row(rows, str(existing), "site_table_tsv", g, np.int64(23))
+    manifest_path = main_sites.write_site_output_manifest(rows, g, np.int64(23))
     out_df = pd.read_csv(manifest_path, sep="\t")
     site_row = out_df.loc[out_df.loc[:, "output_kind"] == "site_table_tsv", :].iloc[0]
     assert str(site_row["branch_ids"]) == "23"
@@ -2202,30 +2202,30 @@ def test_get_df_ad_add_site_stats_and_target_flag():
     sub_tensor[1, 0, 0, 1, 0] = 3.0
     sub_tensor[1, 1, 0, 1, 0] = 1.0
 
-    df_ad = main_site.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
+    df_ad = main_sites.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
     assert df_ad[["group", "state_from", "state_to"]].to_records(index=False).tolist() == [
         ("nsy", "A", "B"),
         ("nsy", "B", "A"),
     ]
     np.testing.assert_allclose(df_ad["value"].to_numpy(), [3.0, 4.0], atol=1e-12)
 
-    df_ad = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="tau")
-    df_ad = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="tsi")
-    df_ad = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="rank1")
-    df_ad = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="rank2")
+    df_ad = main_sites.add_site_stats(df_ad, sub_tensor, g, "nsy", method="tau")
+    df_ad = main_sites.add_site_stats(df_ad, sub_tensor, g, "nsy", method="tsi")
+    df_ad = main_sites.add_site_stats(df_ad, sub_tensor, g, "nsy", method="rank1")
+    df_ad = main_sites.add_site_stats(df_ad, sub_tensor, g, "nsy", method="rank2")
     np.testing.assert_allclose(df_ad["site_tau"].to_numpy(), [0.5, 2.0 / 3.0], atol=1e-12)
     np.testing.assert_allclose(df_ad["site_tsi"].to_numpy(), [2.0 / 3.0, 3.0 / 4.0], atol=1e-12)
     np.testing.assert_allclose(df_ad["site_rank1"].to_numpy(), [2.0, 3.0], atol=1e-12)
     np.testing.assert_allclose(df_ad["site_rank2"].to_numpy(), [1.0, 1.0], atol=1e-12)
 
-    flagged = main_site.add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, "nsy")
+    flagged = main_sites.add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, "nsy")
     assert flagged["has_target_high_combinat_prob_site"].tolist() == [True, True]
 
     scaled_sub_tensor = sub_tensor * 0.1
-    scaled_df_ad = main_site.get_df_ad(sub_tensor=scaled_sub_tensor, g=g, mode="nsy")
+    scaled_df_ad = main_sites.get_df_ad(sub_tensor=scaled_sub_tensor, g=g, mode="nsy")
     g_threshold = dict(g)
     g_threshold["min_combinat_prob"] = 0.25
-    scaled_flagged = main_site.add_has_target_high_combinat_prob_site(
+    scaled_flagged = main_sites.add_has_target_high_combinat_prob_site(
         scaled_df_ad,
         scaled_sub_tensor,
         g_threshold,
@@ -2249,10 +2249,10 @@ def test_site_summary_stats_support_sparse_substitution_tensors(monkeypatch):
         lambda self, axis=None: (_ for _ in ()).throw(AssertionError("dense fallback should not run")),
     )
 
-    df_ad = main_site.get_df_ad(sub_tensor=sparse_tensor, g=g, mode="nsy")
-    df_ad = main_site.add_site_stats(df_ad, sparse_tensor, g, "nsy", method="tau")
-    df_ad = main_site.add_site_stats(df_ad, sparse_tensor, g, "nsy", method="tsi")
-    flagged = main_site.add_has_target_high_combinat_prob_site(df_ad, sparse_tensor, g, "nsy")
+    df_ad = main_sites.get_df_ad(sub_tensor=sparse_tensor, g=g, mode="nsy")
+    df_ad = main_sites.add_site_stats(df_ad, sparse_tensor, g, "nsy", method="tau")
+    df_ad = main_sites.add_site_stats(df_ad, sparse_tensor, g, "nsy", method="tsi")
+    flagged = main_sites.add_has_target_high_combinat_prob_site(df_ad, sparse_tensor, g, "nsy")
 
     np.testing.assert_allclose(flagged["value"].to_numpy(), [3.0, 4.0], atol=1e-12)
     np.testing.assert_allclose(flagged["site_tau"].to_numpy(), [0.5, 2.0 / 3.0], atol=1e-12)
@@ -2265,8 +2265,8 @@ def test_add_site_stats_hg_ignores_zero_probabilities():
     sub_tensor = np.zeros((2, 2, 1, 2, 2), dtype=float)
     # A->B totals per site = [1, 0], so entropy should be 0, not NaN.
     sub_tensor[0, 0, 0, 0, 1] = 1.0
-    df_ad = main_site.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
-    out = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="hg")
+    df_ad = main_sites.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
+    out = main_sites.add_site_stats(df_ad, sub_tensor, g, "nsy", method="hg")
     assert pytest.approx(float(out["site_hg"].iloc[0]), abs=1e-12) == 0.0
     assert pd.isna(out["site_hg"].iloc[1])
 
@@ -2277,8 +2277,8 @@ def test_add_site_stats_tau_single_site_returns_zero_not_nan():
     # Single-site profile; tau denominator would otherwise be 0.
     sub_tensor[0, 0, 0, 0, 1] = 1.0
     sub_tensor[1, 0, 0, 0, 1] = 1.0
-    df_ad = main_site.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
-    out = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="tau")
+    df_ad = main_sites.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
+    out = main_sites.add_site_stats(df_ad, sub_tensor, g, "nsy", method="tau")
     assert pytest.approx(float(out["site_tau"].iloc[0]), abs=1e-12) == 0.0
     assert pd.isna(out["site_tau"].iloc[1])
 
@@ -2288,14 +2288,14 @@ def test_add_site_stats_rank_overflow_returns_zero_not_error():
     sub_tensor = np.zeros((2, 2, 1, 2, 2), dtype=float)
     sub_tensor[0, 0, 0, 0, 1] = 2.0
     sub_tensor[0, 1, 0, 0, 1] = 1.0
-    df_ad = main_site.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
-    out = main_site.add_site_stats(df_ad, sub_tensor, g, "nsy", method="rank5")
+    df_ad = main_sites.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
+    out = main_sites.add_site_stats(df_ad, sub_tensor, g, "nsy", method="rank5")
     np.testing.assert_allclose(out["site_rank5"].to_numpy(), [0.0, np.nan], atol=1e-12, equal_nan=True)
 
 
 def test_get_highest_identity_chain_name_handles_empty_identity_dict_without_pymol_import():
     g = {"aa_identity_means": {}}
-    out = main_site.get_highest_identity_chain_name(g)
+    out = main_sites.get_highest_identity_chain_name(g)
     assert out["highest_identity_chain_name"] is None
 
 
@@ -2309,7 +2309,7 @@ def test_get_df_dist_reports_max_distance_for_multi_branch_substitutions(tiny_tr
     sub_tensor[a_id, 0, 0, 0, 1] = 0.6
     sub_tensor[c_id, 0, 0, 0, 1] = 0.6
     sub_tensor[b_id, 0, 0, 1, 0] = 0.7
-    out = main_site.get_df_dist(sub_tensor=sub_tensor, g=g, mode="nsy")
+    out = main_sites.get_df_dist(sub_tensor=sub_tensor, g=g, mode="nsy")
     row_ab = out.loc[(out["state_from"] == "A") & (out["state_to"] == "B"), :]
     row_ba = out.loc[(out["state_from"] == "B") & (out["state_to"] == "A"), :]
     assert pytest.approx(float(row_ab["max_dist_bl"].iloc[0]), rel=0, abs=1e-12) == 1.0

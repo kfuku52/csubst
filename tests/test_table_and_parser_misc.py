@@ -1192,7 +1192,7 @@ def test_drop_invariant_tip_sites_drops_and_writes_site_map(tmp_path, monkeypatc
     assert out["state_nsy"].shape[1] == 1
     assert out["state_nuc"].shape[1] == 3
     np.testing.assert_allclose(out["iqtree_rate_values"], np.array([0.3], dtype=float), atol=1e-12)
-    map_path = tmp_path / "csubst_site_index_map.tsv"
+    map_path = tmp_path / "csubst_sites_index_map.tsv"
     assert map_path.exists()
     site_map = pd.read_csv(map_path, sep="\t")
     assert site_map["codon_site_alignment"].tolist() == [0, 1, 2]
@@ -1221,7 +1221,7 @@ def test_drop_invariant_tip_sites_skips_site_map_when_disabled(tmp_path, monkeyp
         "_precomputed_tip_invariant_site_mask": np.array([True, False, True], dtype=bool),
     }
     parser_misc.drop_invariant_tip_sites(g)
-    assert not (tmp_path / "csubst_site_index_map.tsv").exists()
+    assert not (tmp_path / "csubst_sites_index_map.tsv").exists()
 
 
 def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, monkeypatch):
@@ -1263,7 +1263,7 @@ def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, mon
     np.testing.assert_array_equal(out["site_index_alignment"], np.array([2], dtype=np.int64))
     assert out["num_dropped_tip_invariant_sites"] == 2
     np.testing.assert_array_equal(out["dropped_tip_invariant_site_alignment"], np.array([0, 1], dtype=np.int64))
-    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
+    site_map = pd.read_csv(tmp_path / "csubst_sites_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, -1, 0]
     assert site_map["is_retained"].tolist() == ["N", "N", "Y"]
 
@@ -1297,7 +1297,7 @@ def test_drop_invariant_tip_sites_uses_precomputed_mask_when_available(tmp_path,
     out = parser_misc.drop_invariant_tip_sites(g)
     np.testing.assert_array_equal(out["site_index_alignment"], np.array([1], dtype=np.int64))
     assert out["state_cdn"].shape[1] == 1
-    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
+    site_map = pd.read_csv(tmp_path / "csubst_sites_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, 0, -1]
     assert site_map["is_retained"].tolist() == ["N", "Y", "N"]
 
@@ -1350,5 +1350,5 @@ def test_drop_invariant_tip_sites_zero_sub_mass_mode_drops_only_zero_mass_sites(
     assert out["state_nsy"].shape[1] == 2
     assert out["state_nuc"].shape[1] == 6
     np.testing.assert_allclose(out["iqtree_rate_values"], np.array([0.2, 0.3], dtype=float), atol=1e-12)
-    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
+    site_map = pd.read_csv(tmp_path / "csubst_sites_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, 0, 1]

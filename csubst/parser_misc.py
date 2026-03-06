@@ -598,7 +598,7 @@ def map_internal_site_indices(site_indices, g, missing_value=-1, allow_invalid=F
     return out
 
 
-def write_site_index_map(g, output_path='csubst_site_index_map.tsv'):
+def write_site_index_map(g, output_path='csubst_sites_index_map.tsv'):
     site_index_alignment = get_site_index_alignment(g=g)
     if site_index_alignment.shape[0] == 0:
         return None

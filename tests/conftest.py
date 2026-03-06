@@ -25,7 +25,7 @@ sys.modules["csubst"] = module
 assert spec.loader is not None
 spec.loader.exec_module(module)
 
-# main_site imports matplotlib at module import time; ensure cache is writable.
+# main_sites imports matplotlib at module import time; ensure cache is writable.
 os.environ.setdefault("MPLCONFIGDIR", tempfile.mkdtemp(prefix="mplconfig-"))
 
 

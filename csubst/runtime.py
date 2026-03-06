@@ -12,7 +12,7 @@ _RUN_TMPDIR_PREFIX = ".csubst_tmp_"
 _DEFAULT_OUTPUT_DIR = "."
 _DEFAULT_OUTPUT_PREFIX = "csubst"
 _DEFAULT_IQTREE_OUTDIR = "csubst_iqtree"
-_DEFAULT_SITE_LOG_DIR = "csubst_site"
+_DEFAULT_SITE_LOG_DIR = "csubst_sites"
 _MISSING = object()
 
 

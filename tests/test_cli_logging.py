@@ -75,7 +75,7 @@ def test_simulate_help_uses_simulate_default_log_name(tmp_path):
 def test_sites_help_uses_site_default_log_name(tmp_path):
     result = _run_csubst(["sites", "-h"], cwd=tmp_path)
     assert result.returncode == 0
-    log_file = tmp_path / "csubst_site" / "csubst.log"
+    log_file = tmp_path / "csubst_sites" / "csubst.log"
     assert log_file.exists()
     assert not (tmp_path / "csubst.log").exists()
 
@@ -83,7 +83,7 @@ def test_sites_help_uses_site_default_log_name(tmp_path):
 def test_legacy_site_help_uses_site_default_log_name(tmp_path):
     result = _run_csubst(["site", "-h"], cwd=tmp_path)
     assert result.returncode == 0
-    log_file = tmp_path / "csubst_site" / "csubst.log"
+    log_file = tmp_path / "csubst_sites" / "csubst.log"
     assert log_file.exists()
     assert not (tmp_path / "csubst.log").exists()
 

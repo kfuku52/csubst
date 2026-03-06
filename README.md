@@ -11,7 +11,7 @@
 ## Overview
 **CSUBST** ([/si:sʌbst/](http://ipa-reader.xyz/?text=si:s%CA%8Cbst&voice=Salli)) is a tool for analyzing **C**ombinatorial **SUBST**itutions of codon sequences in phylogenetic trees.
 A combinatorial substitution is defined as recurrent substitutions that occur at the same protein site in multiple independent branches.
-If multiple substitutions result in the same amino acid, they are considered convergent amino acid substitutions.
+If independent substitutions result in the same amino acid, they are considered convergent amino acid substitutions.
 The main features of **CSUBST** include:
 
 - Error-corrected rate of protein convergence with null expectation obtained by:
@@ -62,7 +62,7 @@ csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --for
 CSUBST provides five main subcommands:
 
 - `csubst dataset`: generate bundled example datasets (e.g., `PGK`, `PEPC`).
-- `csubst search` (legacy alias: `csubst analyze`): run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`. Outputs are written to `csubst_search/` by default.
+- `csubst search` (legacy alias: `csubst analyze`): run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
 - `csubst inspect`: summarize branch mappings and inspect ancestral states.
 - `csubst sites` (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree + site summary plots, and optionally map sites to protein structures.
 - `csubst simulate`: simulate codon sequence evolution under user-defined convergent scenarios.
@@ -91,17 +91,6 @@ csubst sites \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
   --branch_id 23,51
-```
-
-Optional Bayesian shrinkage for sparse convergence counts:
-
-```bash
-csubst search \
-  --alignment_file alignment.fa \
-  --rooted_tree_file tree.nwk \
-  --pseudocount_alpha 0.5 \
-  --pseudocount_mode symmetric \
-  --pseudocount_target both
 ```
 
 For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
