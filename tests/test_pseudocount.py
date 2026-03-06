@@ -8,9 +8,9 @@ from csubst import pseudocount
 def test_validate_args_defaults_disable_smoothing():
     out = pseudocount.validate_args({})
     assert out["pseudocount_alpha"] == pytest.approx(0.0)
-    assert out["pseudocount_alpha_auto"] is True
+    assert out["pseudocount_alpha_auto"] is False
     assert out["pseudocount_mode"] == "none"
-    assert out["pseudocount_target"] == "expected"
+    assert out["pseudocount_target"] == "both"
     assert out["pseudocount_enabled"] is False
     assert out["pseudocount_add_output_columns"] is False
 
