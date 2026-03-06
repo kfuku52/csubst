@@ -36,6 +36,41 @@ def _default_sa_state_cache_file():
     return "csubst_3di_state_cache.npz"
 
 
+_OUTPUT_NAMESPACE_DEFAULTS = {
+    'simulate': {
+        'outdir': 'csubst_simulate',
+        'output_prefix': 'csubst',
+    },
+    'search': {
+        'outdir': 'csubst_analyze',
+        'output_prefix': 'csubst',
+    },
+    'analyze': {
+        'outdir': 'csubst_analyze',
+        'output_prefix': 'csubst',
+    },
+    'inspect': {
+        'outdir': 'csubst_inspect',
+        'output_prefix': 'csubst',
+    },
+    'sites': {
+        'outdir': 'csubst_site',
+        'output_prefix': 'csubst',
+    },
+    'site': {
+        'outdir': 'csubst_site',
+        'output_prefix': 'csubst',
+    },
+}
+
+
+def _get_subcommand_label(args, default_name):
+    subcommand = str(getattr(args, 'subcommand', '')).strip()
+    if subcommand == '':
+        return default_name
+    return subcommand
+
+
 def _resolve_output_namespace_defaults(argv):
     tokens_with_values = {'--outdir', '--output_prefix', '--log_file'}
     i = 0
@@ -50,26 +85,9 @@ def _resolve_output_namespace_defaults(argv):
         if token.startswith('-'):
             i += 1
             continue
-        if token == 'simulate':
-            return {
-                'outdir': 'csubst_simulate',
-                'output_prefix': 'csubst',
-            }
-        if token == 'analyze':
-            return {
-                'outdir': 'csubst_analyze',
-                'output_prefix': 'csubst',
-            }
-        if token == 'inspect':
-            return {
-                'outdir': 'csubst_inspect',
-                'output_prefix': 'csubst',
-            }
-        if token == 'site':
-            return {
-                'outdir': 'csubst_site',
-                'output_prefix': 'csubst',
-            }
+        defaults = _OUTPUT_NAMESPACE_DEFAULTS.get(token, None)
+        if defaults is not None:
+            return dict(defaults)
         break
     return {
         'outdir': '.',
@@ -145,29 +163,35 @@ def command_simulate(args):
     print('csubst simulate: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst simulate end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
-def command_site(args):
-    print('csubst site start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+def command_sites(args):
+    command_label = _get_subcommand_label(args, 'sites')
+    print('csubst {} start:'.format(command_label), datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
     if str(getattr(args, 'log_file', '')).strip() == '':
         args.log_file = runtime.default_site_log_path(base_dir=os.getcwd(), create_dir=False)
     g = get_global_parameters_or_exit(args)
     from csubst.main_site import main_site
     main_site(g)
-    print('csubst site: Time elapsed: {:,} sec'.format(int(time.time() - start)))
-    print('csubst site end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    print('csubst {}: Time elapsed: {:,} sec'.format(command_label, int(time.time() - start)))
+    print('csubst {} end:'.format(command_label), datetime.datetime.now(datetime.timezone.utc), flush=True)
     if (g['pdb'] is not None):
         # This should be executed at the very end, otherwise CSUBST's main process is killed.
         from csubst.parser_pymol import quit_pymol
         quit_pymol()
 
-def command_analyze(args):
-    print('csubst analyze start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+def command_search(args):
+    command_label = _get_subcommand_label(args, 'search')
+    print('csubst {} start:'.format(command_label), datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
     g = get_global_parameters_or_exit(args)
     from csubst.main_analyze import main_analyze
     main_analyze(g)
-    print('csubst analyze: Time elapsed: {:,} sec'.format(int(time.time() - start)))
-    print('csubst analyze end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    print('csubst {}: Time elapsed: {:,} sec'.format(command_label, int(time.time() - start)))
+    print('csubst {} end:'.format(command_label), datetime.datetime.now(datetime.timezone.utc), flush=True)
+
+
+command_site = command_sites
+command_analyze = command_search
 
 def command_inspect(args):
     print('csubst inspect start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
@@ -183,7 +207,7 @@ def _build_parser():
     parser = argparse.ArgumentParser(description='CSUBST - a toolkit for molecular convergence detection. For details, see https://github.com/kfuku52/csubst')
     parser.add_argument('--version', action='version', version='CSUBST version: {}'.format(__version__))
     _add_output_namespace_args(parser, include_outdir=False, include_output_prefix=False, include_log_file=True)
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(dest='subcommand')
 
     # shared: common
     psr_co = argparse.ArgumentParser(add_help=False)
@@ -430,19 +454,19 @@ def _build_parser():
                                '"alignment" always re-estimates from alignment.')
     simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
                           help='default=%(default)s: Export true ancestral-state bundle from simulation '
-                               '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for analyze-time evaluation.')
+                               '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for search-time evaluation.')
     simulate.add_argument('--true_asr_prefix', metavar='PATH_PREFIX', default='', type=str,
                           help='default=infer from --outdir/--output_prefix: Output path prefix for true-ASR bundle files.')
     simulate.set_defaults(handler=command_simulate)
 
 
-    # site
-    help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps it onto protein structure. '
-    help_txt += ' See `csubst site -h`'
-    site = subparsers.add_parser('site', help=help_txt, parents=[psr_co,psr_iq,psr_as,psr_rc])
+    # sites
+    help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps them onto protein structure. '
+    help_txt += 'See `csubst sites -h` (legacy alias: `csubst site -h`).'
+    site = subparsers.add_parser('sites', aliases=['site'], help=help_txt, parents=[psr_co,psr_iq,psr_as,psr_rc])
     site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default='', required=False, type=str,
                       help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
-                      'Run `csubst analyze` first and select branches of interest. '
+                      'Run `csubst search` first and select branches of interest. '
                       'If "fg", all foreground branch pairs will be analyzed (--mode intersection only). '
                       '--mode lineage expects ANC,DES, and --mode set ignores --branch_id.')
     site.add_argument('--mode', metavar='MODE', default='intersection', required=False, type=str,
@@ -485,7 +509,7 @@ def _build_parser():
                       help='default=%(default)s: Write csubst_site.outputs.tsv with generated files, '
                            'sizes, branch IDs, and key plotting parameters.')
     site.add_argument('--cb_file', metavar='PATH', default='csubst_cb_2.tsv', required=False, type=str,
-                      help='default=%(default)s: PATH to csubst_cb_*.tsv output of csubst analyze.')
+                      help='default=%(default)s: PATH to csubst_cb_*.tsv output of csubst search.')
     site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,
                       help='default=%(default)s: PATH to fasta file containing untrimmed CDS sequence(s). '
                            'Codon positions along the sequence(s) appear in the output tsv.')
@@ -551,13 +575,14 @@ def _build_parser():
                       help='default=%(default)s: Set "yes" to export files for the visualization of '
                            'convergence/divergence probabilities with UCSF Chimera. '
                            '--untrimmed_cds is required.')
-    site.set_defaults(handler=command_site)
+    site.set_defaults(handler=command_sites)
 
 
-    # analyze
-    help_txt = 'calculates convergence rates and other metrics on branch combinations.  See `csubst analyze -h`'
-    analyze = subparsers.add_parser('analyze', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_analyze])
-    analyze.set_defaults(handler=command_analyze)
+    # search
+    help_txt = 'calculates convergence rates and other metrics on branch combinations. '
+    help_txt += 'See `csubst search -h` (legacy alias: `csubst analyze -h`).'
+    analyze = subparsers.add_parser('search', aliases=['analyze'], help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_analyze])
+    analyze.set_defaults(handler=command_search)
     # branch combinations
     analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
                          help='default=%(default)s: The maximum combinatorial number of branches (K). '
@@ -708,9 +733,9 @@ def _build_parser():
                          help='default=%(default)s: Experimental feature. Candidate clip grid for --epistasis_joint_auto.')
     analyze.add_argument('--epistasis_degree_file', metavar='PATH', default='', type=str,
                          help='default=%(default)s: Experimental feature. Optional precomputed site-wise structure-degree table. '
-                              'If omitted, structure degree is computed during analyze when --epistasis_pdb is set.')
+                              'If omitted, structure degree is computed during search when --epistasis_pdb is set.')
     analyze.add_argument('--epistasis_pdb', metavar='PATH/PDB_CODE/besthit', default='', type=str,
-                         help='default=%(default)s: Experimental feature. Structure source for analyze-time epistasis degree generation. '
+                         help='default=%(default)s: Experimental feature. Structure source for search-time epistasis degree generation. '
                               'PATH: local structure file; PDB code: fetched from PDB; '
                               '"besthit": online sequence search + best-hit retrieval.')
     analyze.add_argument('--epistasis_database', metavar='DATABASE1,DATABASE2,...', default='pdb,alphafill,alphafold', type=str,
@@ -724,19 +749,19 @@ def _build_parser():
                          help='default=%(default)s: Experimental feature. Network timeout in seconds for --epistasis_pdb besthit retrieval.')
     analyze.add_argument('--epistasis_user_alignment', metavar='PATH', default='', type=str,
                          help='default=%(default)s: Experimental feature. Optional user-provided protein alignment for mapping structure residues '
-                              'to alignment sites in analyze-time epistasis degree generation.')
+                              'to alignment sites in search-time epistasis degree generation.')
     analyze.add_argument('--epistasis_contact_distance', metavar='FLOAT', default=8.0, type=float,
                          help='default=%(default)s: Experimental feature. CA-CA distance threshold (Angstrom) used to compute structure contact degree.')
     analyze.add_argument('--epistasis_mafft_exe', metavar='PATH', default='mafft', type=str,
-                         help='default=%(default)s: Experimental feature. PATH to mafft executable for analyze-time structure mapping.')
+                         help='default=%(default)s: Experimental feature. PATH to mafft executable for search-time structure mapping.')
     analyze.add_argument('--epistasis_mafft_op', metavar='FLOAT', default=-1, type=float,
-                         help='default=%(default)s: Experimental feature. mafft --op value for analyze-time structure mapping. -1 uses default.')
+                         help='default=%(default)s: Experimental feature. mafft --op value for search-time structure mapping. -1 uses default.')
     analyze.add_argument('--epistasis_mafft_ep', metavar='FLOAT', default=-1, type=float,
-                         help='default=%(default)s: Experimental feature. mafft --ep value for analyze-time structure mapping. -1 uses default.')
+                         help='default=%(default)s: Experimental feature. mafft --ep value for search-time structure mapping. -1 uses default.')
     analyze.add_argument('--epistasis_pymol_max_num_chain', metavar='INT', default=20, type=int,
                          help='default=%(default)s: Experimental feature. Maximum chain count threshold for candidate structures in --epistasis_pdb besthit.')
     analyze.add_argument('--epistasis_degree_outfile', metavar='PATH', default='csubst_epistasis_structure_degree.tsv', type=str,
-                         help='default=%(default)s: Experimental feature. Output TSV path for analyze-time structure degree table.')
+                         help='default=%(default)s: Experimental feature. Output TSV path for search-time structure degree table.')
     analyze.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='0.0', type=str,
                          help='default=%(default)s: Dirichlet pseudo-count alpha for convergence-statistic '
                               'shrinkage. Set 0 to disable smoothing. '

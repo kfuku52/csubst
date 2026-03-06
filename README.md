@@ -54,17 +54,17 @@ pip install git+https://github.com/kfuku52/csubst
 # Generate a test dataset
 csubst dataset --name PGK
 
-# Run csubst analyze
-csubst analyze --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --foreground foreground.txt
+# Run csubst search
+csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --foreground foreground.txt
 ```
 
 ## Usage
 CSUBST provides five main subcommands:
 
 - `csubst dataset`: generate bundled example datasets (e.g., `PGK`, `PEPC`).
-- `csubst analyze`: run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
+- `csubst search` (legacy alias: `csubst analyze`): run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
 - `csubst inspect`: summarize branch mappings and inspect ancestral states.
-- `csubst site`: compute site-wise combinatorial substitutions for selected branch combinations, generate tree + site summary plots, and optionally map sites to protein structures.
+- `csubst sites` (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree + site summary plots, and optionally map sites to protein structures.
 - `csubst simulate`: simulate codon sequence evolution under user-defined convergent scenarios.
 
 Get available commands and options:
@@ -81,13 +81,13 @@ Typical workflow:
 csubst dataset --name PGK
 
 # 2) Run convergence analysis
-csubst analyze \
+csubst search \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt
 
 # 3) Inspect site-wise convergence for a branch pair (example)
-csubst site \
+csubst sites \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
   --branch_id 23,51
@@ -96,7 +96,7 @@ csubst site \
 Optional Bayesian shrinkage for sparse convergence counts:
 
 ```bash
-csubst analyze \
+csubst search \
   --alignment_file alignment.fa \
   --rooted_tree_file tree.nwk \
   --pseudocount_alpha 0.5 \

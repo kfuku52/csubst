@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Benchmark csubst analyze across:
+# Benchmark csubst search across:
 #   1) no recoding
 #   2) 3di20 direct
 #   3) 3di20 translate
@@ -107,7 +107,7 @@ run_mode() {
   pushd "$work_dir" >/dev/null
 
   local args=(
-    analyze
+    search
     --alignment_file alignment.fa
     --rooted_tree_file tree.nwk
     --foreground foreground.txt

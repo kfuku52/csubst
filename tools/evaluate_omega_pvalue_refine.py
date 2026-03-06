@@ -235,7 +235,7 @@ def main():
     )
     parser.add_argument("--outdir", default=None, help="Output directory. Default: /tmp/csubst_omega_pvalue_refine_<timestamp>.")
     parser.add_argument("--reps", type=int, default=1, help="Number of replicate runs per configuration.")
-    parser.add_argument("--threads", type=int, default=1, help="--threads value for csubst analyze.")
+    parser.add_argument("--threads", type=int, default=1, help="--threads value for csubst search.")
     parser.add_argument("--output-stat", default="any2spe", help="Output statistic for p/q comparison (default: any2spe).")
     parser.add_argument("--omega-pvalue-niter", type=int, default=1000, help="--omega_pvalue_niter value.")
     parser.add_argument("--rounding", default="stochastic", help="--omega_pvalue_rounding value.")
@@ -294,7 +294,7 @@ def main():
                 if not dst.exists():
                     shutil.copy2(src, dst)
             cmd = python_cmd + [
-                "analyze",
+                "search",
                 "--alignment_file",
                 "PGK.alignment.fa",
                 "--rooted_tree_file",

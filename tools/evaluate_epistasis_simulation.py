@@ -361,7 +361,7 @@ def _analyze_command(paths, args, mode, degree_file):
     base = [
         str(args.python_exe),
         str(args.csubst_script),
-        "analyze",
+        "search",
         "--alignment_file",
         str(paths["simulate_alignment"]),
         "--rooted_tree_file",
@@ -644,7 +644,7 @@ def main():
                     {
                         "scenario": scenario,
                         "replicate": rep,
-                        "step": "analyze",
+                        "step": "search",
                         "mode": mode,
                         "workdir": str(mode_dir),
                         "command": analyze_cmd_txt,

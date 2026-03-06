@@ -15,10 +15,14 @@ def _resolve_log_path(repo_root, args):
     if len(args) > 0:
         if args[0] == "simulate":
             return repo_root / "csubst_simulate" / "csubst.log"
+        if args[0] == "search":
+            return repo_root / "csubst_analyze" / "csubst.log"
         if args[0] == "analyze":
             return repo_root / "csubst_analyze" / "csubst.log"
         if args[0] == "inspect":
             return repo_root / "csubst_inspect" / "csubst.log"
+        if args[0] == "sites":
+            return repo_root / "csubst_site" / "csubst.log"
         if args[0] == "site":
             return repo_root / "csubst_site" / "csubst.log"
     return repo_root / "csubst.log"
@@ -40,8 +44,8 @@ def _run_cli(*args):
     return proc, log_text
 
 
-def test_site_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects():
-    proc, log_text = _run_cli("site", "--branch_id", "0", "--tree_site_plot_max_sites", "0")
+def test_sites_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects():
+    proc, log_text = _run_cli("sites", "--branch_id", "0", "--tree_site_plot_max_sites", "0")
     assert proc.returncode == 2
     assert "--tree_site_plot_max_sites should be >= 1." in log_text
     assert "Traceback" not in log_text
@@ -62,42 +66,57 @@ def test_simulate_invalid_seed_fails_cleanly():
     assert "Traceback" not in log_text
 
 
-def test_site_deprecated_probability_options_are_rejected():
-    proc, log_text = _run_cli("site", "--branch_id", "0", "--tree_site_plot_min_prob", "0.5")
+def test_sites_deprecated_probability_options_are_rejected():
+    proc, log_text = _run_cli("sites", "--branch_id", "0", "--tree_site_plot_min_prob", "0.5")
     assert proc.returncode == 2
     assert "unrecognized arguments: --tree_site_plot_min_prob 0.5" in log_text
 
 
-def test_site_invalid_species_regex_fails_cleanly():
-    proc, log_text = _run_cli("site", "--branch_id", "0", "--species_regex", "(")
+def test_sites_invalid_species_regex_fails_cleanly():
+    proc, log_text = _run_cli("sites", "--branch_id", "0", "--species_regex", "(")
     assert proc.returncode == 2
     assert "--species_regex is not a valid regular expression" in log_text
     assert "Traceback" not in log_text
 
 
-def test_site_invalid_species_overlap_node_plot_fails_cleanly():
-    proc, log_text = _run_cli("site", "--branch_id", "0", "--species_overlap_node_plot", "maybe")
+def test_sites_invalid_species_overlap_node_plot_fails_cleanly():
+    proc, log_text = _run_cli("sites", "--branch_id", "0", "--species_overlap_node_plot", "maybe")
     assert proc.returncode == 2
     assert "--species_overlap_node_plot should be one of yes, no, auto." in log_text
     assert "Traceback" not in log_text
 
 
-def test_analyze_state_plot_options_are_rejected_after_move_to_inspect():
-    proc, log_text = _run_cli("analyze", "--plot_state_aa", "yes")
+def test_search_state_plot_options_are_rejected_after_move_to_inspect():
+    proc, log_text = _run_cli("search", "--plot_state_aa", "yes")
     assert proc.returncode == 2
     assert "unrecognized arguments: --plot_state_aa yes" in log_text
 
 
-def test_analyze_rejects_removed_prostt5_batch_size_option():
-    proc, log_text = _run_cli("analyze", "--prostt5_batch_size", "8")
+def test_search_rejects_removed_prostt5_batch_size_option():
+    proc, log_text = _run_cli("search", "--prostt5_batch_size", "8")
     assert proc.returncode == 2
     assert "unrecognized arguments: --prostt5_batch_size 8" in log_text
 
 
-def test_analyze_rejects_removed_pseudocount_strength_option():
-    proc, log_text = _run_cli("analyze", "--pseudocount_strength", "2.0")
+def test_search_rejects_removed_pseudocount_strength_option():
+    proc, log_text = _run_cli("search", "--pseudocount_strength", "2.0")
     assert proc.returncode == 2
     assert "unrecognized arguments: --pseudocount_strength 2.0" in log_text
+
+
+def test_cli_help_lists_primary_commands_and_legacy_aliases():
+    proc, log_text = _run_cli("--help")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "search (analyze)" in help_text
+    assert "sites (site)" in help_text
+
+
+def test_legacy_aliases_remain_available():
+    analyze_proc, _ = _run_cli("analyze", "-h")
+    assert analyze_proc.returncode == 0
+    site_proc, _ = _run_cli("site", "-h")
+    assert site_proc.returncode == 0
 
 
 def test_inspect_help_is_available():

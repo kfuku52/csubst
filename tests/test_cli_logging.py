@@ -29,6 +29,16 @@ def test_cli_writes_help_output_to_csubst_log(tmp_path):
 
 
 def test_cli_writes_stderr_output_to_csubst_log(tmp_path):
+    result = _run_csubst(["search", "--does_not_exist"], cwd=tmp_path)
+    assert result.returncode != 0
+    log_file = tmp_path / "csubst_analyze" / "csubst.log"
+    assert log_file.exists()
+    log_text = log_file.read_text(encoding="utf-8")
+    assert "error:" in log_text.lower()
+    assert "--does_not_exist" in log_text
+
+
+def test_legacy_analyze_alias_still_writes_to_csubst_analyze_log(tmp_path):
     result = _run_csubst(["analyze", "--does_not_exist"], cwd=tmp_path)
     assert result.returncode != 0
     log_file = tmp_path / "csubst_analyze" / "csubst.log"
@@ -62,7 +72,15 @@ def test_simulate_help_uses_simulate_default_log_name(tmp_path):
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_site_help_uses_site_default_log_name(tmp_path):
+def test_sites_help_uses_site_default_log_name(tmp_path):
+    result = _run_csubst(["sites", "-h"], cwd=tmp_path)
+    assert result.returncode == 0
+    log_file = tmp_path / "csubst_site" / "csubst.log"
+    assert log_file.exists()
+    assert not (tmp_path / "csubst.log").exists()
+
+
+def test_legacy_site_help_uses_site_default_log_name(tmp_path):
     result = _run_csubst(["site", "-h"], cwd=tmp_path)
     assert result.returncode == 0
     log_file = tmp_path / "csubst_site" / "csubst.log"
@@ -75,6 +93,10 @@ def test_subcommand_output_namespace_defaults_are_command_specific():
     script_path = repo_root / "csubst" / "csubst"
     ns = runpy.run_path(str(script_path), run_name="not_main")
     parser = ns["_build_parser"]()
+
+    search = parser.parse_args(["search"])
+    assert search.outdir == "csubst_analyze"
+    assert search.output_prefix == "csubst"
 
     analyze = parser.parse_args(["analyze"])
     assert analyze.outdir == "csubst_analyze"
