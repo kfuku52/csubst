@@ -42,11 +42,7 @@ conda install bioconda::csubst
 #### Option 2: Installation with `pip`
 ```
 # IQ-TREE should be installed separately: https://iqtree.github.io/
-pip install numpy cython # NumPy and Cython should be available upon csubst installation
 pip install git+https://github.com/kfuku52/csubst
-
-# `csubst simulate` works out-of-the-box: the pyvolve simulation backend is
-# bundled in the package.
 ```
 
 ## Test run
