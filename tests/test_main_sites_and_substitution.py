@@ -2659,6 +2659,20 @@ def test_get_selected_branch_set_rejects_non_integer_state_loaded_branch_ids():
         substitution._get_selected_branch_set({"state_loaded_branch_ids": np.array([1.5])})
 
 
+def test_collect_sub_tensor_branch_pairs_includes_root_child_branches_when_root_state_exists():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((len(labels), 1, 1), dtype=float)
+    state[labels["R"], 0, 0] = 1.0
+    g = {"tree": tr, "float_tol": 1e-12}
+    out = substitution._collect_sub_tensor_branch_pairs(
+        g=g,
+        state_tensor_anc=state,
+        selected_branch_set=None,
+    )
+    assert out == [(labels["A"], labels["R"]), (labels["B"], labels["R"])]
+
+
 def _toy_sub_tensor():
     # shape = [branch, site, group, from, to]
     sub = np.zeros((3, 2, 1, 2, 2), dtype=float)

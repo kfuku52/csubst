@@ -363,6 +363,24 @@ def test_get_state_tensor_reads_leaf_sequences_via_ete_compat(tmp_path):
     np.testing.assert_allclose(out[labels["B"], 1, :], [0.0, 0.0, 1.0], atol=1e-12)
 
 
+def test_get_state_tensor_reads_root_rows_from_state_file(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAAAAC\n",
+    )
+    state_file = tmp_path / "toy.state.tsv"
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "R\t1\tAAG\t0.0\t0.0\t1.0\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    out = parser_iqtree.get_state_tensor(g)
+    root_id = int(ete.get_prop(ete.get_tree_root(g["tree"]), "numerical_label"))
+    np.testing.assert_allclose(out[root_id, 0, :], [0.0, 0.0, 1.0], atol=1e-12)
+    np.testing.assert_allclose(out[root_id, 1, :], [0.0, 1.0, 0.0], atol=1e-12)
+
+
 def test_get_state_tensor_raises_when_leaf_sequence_missing(tmp_path):
     g = _make_state_tensor_g(
         tmp_path=tmp_path,
@@ -634,6 +652,46 @@ def test_get_state_tensor_selected_branch_ids_ignore_unknown_ids_in_ml_mode(tmp_
     assert selected.shape[0] == len(list(g["tree"].traverse()))
     assert selected[labels["A"], :, :].sum() > 0
     assert selected[labels["B"], :, :].sum() == 0
+
+
+def test_get_state_tensor_selected_internal_keeps_root_rows(tmp_path):
+    alignment_file = tmp_path / "toy_selected_root.fa"
+    state_file = tmp_path / "toy_selected_root.state.tsv"
+    alignment_file.write_text(
+        ">A\nAAAAAC\n"
+        ">B\nAAAAAC\n"
+        ">C\nAAGAAG\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "N1\t1\tAAC\t0.0\t1.0\t0.0\n"
+        "N1\t2\tAAG\t0.0\t0.0\t1.0\n"
+        "R\t1\tAAG\t0.0\t0.0\t1.0\n"
+        "R\t2\tAAA\t1.0\t0.0\t0.0\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
+        "ml_anc": False,
+    }
+    out = parser_iqtree.get_state_tensor(
+        g=g,
+        selected_branch_ids=np.array([labels["N1"]], dtype=np.int64),
+    )
+    np.testing.assert_allclose(out[labels["R"], 0, :], [0.0, 0.0, 1.0], atol=1e-12)
+    np.testing.assert_allclose(out[labels["R"], 1, :], [1.0, 0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(out[labels["N1"], 0, :], [0.0, 1.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(out[labels["N1"], 1, :], [0.0, 0.0, 1.0], atol=1e-12)
 
 
 def test_get_state_tensor_rejects_nucleotide_input(tmp_path):

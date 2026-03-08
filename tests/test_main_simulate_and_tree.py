@@ -1,4 +1,5 @@
 import builtins
+import sys
 import numpy as np
 import pandas as pd
 import pytest
@@ -213,6 +214,7 @@ def test_plot_state_tree_hyphen_request_concatenates_site_labels(monkeypatch):
     )
     assert captured["file_name"].endswith("csubst_state_trait_codon_1-2-3.pdf")
     assert captured["figure_title"] == "Sites 1-2-3"
+    assert captured["state_by_node"][labels["R"]] == "AACTCTGAC"
     assert captured["state_by_node"][labels["A"]] == "AACTCTGAC"
 
 
@@ -249,7 +251,54 @@ def test_plot_state_tree_hyphen_request_keeps_aa_seqlogo_probabilities(monkeypat
     assert captured["state_mode"] == "aa"
     assert captured["state_orders"] == ("A", "C", "D")
     assert captured["state_prob_shape"] == (3, 3)
+    assert captured["state_by_node"][labels["R"]] == "ACD"
     assert captured["state_by_node"][labels["A"]] == "ACD"
+
+
+def test_plot_state_tree_pages_request_preserves_root_state(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((len(labels), 1, 2), dtype=float)
+    state[labels["R"], 0, :] = [0.0, 1.0]
+    state[labels["A"], 0, :] = [1.0, 0.0]
+    state[labels["B"], 0, :] = [0.0, 1.0]
+    captured = {}
+
+    def fake_render(tree=None, trait_name=None, file_name=None, label='all', state_by_node=None,
+                    state_prob_by_node=None, state_orders=None, state_mode=None,
+                    pdf_pages=None, figure_title=None):
+        captured["state_by_node"] = dict(state_by_node)
+        captured["figure_title"] = figure_title
+
+    class _FakePdfPages:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def savefig(self, *args, **kwargs):
+            return None
+
+    monkeypatch.setattr(tree, "_render_tree_matplotlib", fake_render)
+    monkeypatch.setitem(sys.modules, "matplotlib.backends.backend_pdf", type("M", (), {"PdfPages": _FakePdfPages}))
+
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"lineage_id": [1], "trait": ["A"]}),
+    }
+    tree.plot_state_tree(
+        state=state,
+        orders=np.array(["AAA", "AAG"], dtype=object),
+        mode="codon",
+        g=g,
+        plot_request="1,1",
+    )
+    assert captured["figure_title"] == "Site 1"
+    assert captured["state_by_node"][labels["R"]] == "AAG"
 
 
 class _FakeTreeAxis:

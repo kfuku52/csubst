@@ -755,11 +755,6 @@ def _build_state_maps_for_site(tree, site_state, orders, mode, missing_state):
     state_prob_by_node = dict() if mode=='aa' else None
     for node in tree.traverse():
         nlabel = ete.get_prop(node, "numerical_label")
-        if ete.is_root(node):
-            state_by_node[nlabel] = missing_state
-            if state_prob_by_node is not None:
-                state_prob_by_node[nlabel] = None
-            continue
         node_state = site_state[nlabel, :]
         max_prob = float(node_state.max()) if node_state.size > 0 else 0.0
         if max_prob <= 0:
@@ -780,14 +775,8 @@ def _build_state_maps_for_site(tree, site_state, orders, mode, missing_state):
 def _build_state_maps_for_concatenated_sites(tree, state, site_indices, orders, missing_state):
     state_by_node = dict()
     state_prob_by_node = dict() if len(site_indices) > 0 else None
-    missing_repeat = missing_state * max(len(site_indices), 1)
     for node in tree.traverse():
         nlabel = ete.get_prop(node, "numerical_label")
-        if ete.is_root(node):
-            state_by_node[nlabel] = missing_repeat
-            if state_prob_by_node is not None:
-                state_prob_by_node[nlabel] = None
-            continue
         symbols = list()
         site_probabilities = list()
         for site_index in site_indices.tolist():

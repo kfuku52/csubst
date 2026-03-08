@@ -672,7 +672,7 @@ def get_state_tensor(g, selected_branch_ids=None):
     if selected_set is not None:
         target_internal_names = []
         for node in g['tree'].traverse():
-            if ete.is_root(node) or ete.is_leaf(node):
+            if ete.is_leaf(node):
                 continue
             nl = int(ete.get_prop(node, "numerical_label"))
             if nl in selected_set:
@@ -725,8 +725,6 @@ def get_state_tensor(g, selected_branch_ids=None):
         codon_lookup = _build_unambiguous_codon_lookup(g['codon_orders'])
         codon_state_lookup = sequence.build_state_index_lookup(g['codon_orders'])
     for node in g['tree'].traverse():
-        if ete.is_root(node):
-            continue
         nl = int(ete.get_prop(node, "numerical_label"))
         if (nl < 0) or (nl >= num_node):
             txt = 'Branch ID {} is out of bounds for state tensor axis {}.'
