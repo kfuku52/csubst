@@ -288,9 +288,21 @@ def run_dataset(repo_root, run_root, dataset_name):
         env=env,
     )
 
-    tree_site_path = run_dir / f"csubst_site.branch_id{branch_id_text}" / "csubst_site.tree_site.tsv"
-    if not tree_site_path.exists():
-        raise FileNotFoundError("Missing site output: {}".format(str(tree_site_path)))
+    tree_site_candidates = [
+        run_dir / f"csubst_sites.branch_id{branch_id_text}" / "csubst_sites.tree_site.tsv",
+        run_dir / f"csubst_site.branch_id{branch_id_text}" / "csubst_site.tree_site.tsv",
+    ]
+    tree_site_path = None
+    for candidate in tree_site_candidates:
+        if candidate.exists():
+            tree_site_path = candidate
+            break
+    if tree_site_path is None:
+        raise FileNotFoundError(
+            "Missing site output: {}".format(
+                ", ".join([str(path) for path in tree_site_candidates])
+            )
+        )
     tree_site = pandas.read_csv(tree_site_path, sep="\t")
     counts = tree_site["tree_site_category"].value_counts().to_dict()
     convergent = int(counts.get("convergent", 0))

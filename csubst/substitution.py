@@ -125,7 +125,10 @@ def _collect_sub_tensor_branch_pairs(g, state_tensor_anc, selected_branch_set):
         child = int(ete.get_prop(node, "numerical_label"))
         if (selected_branch_set is not None) and (child not in selected_branch_set):
             continue
-        if not ete.node_has_state(node, state_has_mass=state_has_mass):
+        # Leaves remain valid child branches even when state_tensor_anc only stores
+        # ancestral states. Skip only state-less internal branches, such as rerooted
+        # synthetic nodes that have no corresponding IQ-TREE .state row.
+        if (not ete.is_leaf(node)) and (not ete.node_has_state(node, state_has_mass=state_has_mass)):
             continue
         parent_node = ete.get_effective_state_parent(node, state_has_mass=state_has_mass)
         if parent_node is None:
