@@ -93,6 +93,16 @@ def test_inspect_help_includes_species_overlap_node_plot_option():
     assert "--species_overlap_node_plot" in help_text
 
 
+def test_inspect_help_includes_state_highlight_options():
+    proc, log_text = _run_cli("inspect", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "--plot_state_aa_highlight_pattern" in help_text
+    assert "--plot_state_aa_highlight_color" in help_text
+    assert "--tree_tip_label_spacing" in help_text
+    assert "--tree_fig_max_height" in help_text
+
+
 def test_search_state_plot_options_are_rejected_after_move_to_inspect():
     proc, log_text = _run_cli("search", "--plot_state_aa", "yes")
     assert proc.returncode == 2

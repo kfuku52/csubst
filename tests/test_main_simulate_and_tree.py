@@ -268,6 +268,56 @@ def test_plot_state_tree_hyphen_request_keeps_aa_seqlogo_probabilities(monkeypat
     assert captured["state_by_node"][labels["A"]] == "ACD"
 
 
+def test_plot_state_tree_highlight_pattern_passes_tip_and_branch_highlights(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    state = np.zeros((len(list(tr.traverse())), 2, 2), dtype=float)
+    state[labels["A"], 0, :] = [1.0, 0.0]
+    state[labels["A"], 1, :] = [0.0, 1.0]
+    state[labels["B"], 0, :] = [1.0, 0.0]
+    state[labels["B"], 1, :] = [0.0, 1.0]
+    state[labels["C"], 0, :] = [0.0, 1.0]
+    state[labels["C"], 1, :] = [1.0, 0.0]
+    state[labels["X"], 0, :] = [1.0, 0.0]
+    state[labels["X"], 1, :] = [0.0, 1.0]
+    state[labels["R"], :, 0] = 1.0
+    captured = {}
+
+    def fake_render(tree=None, trait_name=None, file_name=None, label='all', state_by_node=None,
+                    state_prob_by_node=None, state_orders=None, state_mode=None,
+                    pdf_pages=None, figure_title=None, node_type_by_id=None,
+                    tip_label_color_by_node_id=None, highlighted_node_ids=None, highlight_color=None):
+        captured["tip_label_color_by_node_id"] = dict(tip_label_color_by_node_id or {})
+        captured["highlighted_node_ids"] = set(highlighted_node_ids or set())
+        captured["highlight_color"] = highlight_color
+
+    monkeypatch.setattr(tree, "_render_tree_matplotlib", fake_render)
+
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"lineage_id": [1], "trait": ["A"]}),
+        "plot_state_aa_highlight_pattern": "KN",
+        "plot_state_aa_highlight_color": "orange",
+    }
+    tree.plot_state_tree(
+        state=state,
+        orders=np.array(["K", "N"], dtype=object),
+        mode="aa",
+        g=g,
+        plot_request="1-2",
+    )
+    assert captured["tip_label_color_by_node_id"] == {
+        labels["A"]: "orange",
+        labels["B"]: "orange",
+    }
+    assert captured["highlighted_node_ids"] == {
+        labels["A"],
+        labels["B"],
+        labels["X"],
+    }
+    assert captured["highlight_color"] == "orange"
+
+
 def test_plot_state_tree_pages_request_preserves_root_state(monkeypatch):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
@@ -323,8 +373,10 @@ class _FakeTreeAxis:
         self.patch_calls = []
         self.collection_calls = []
         self.xlim_calls = []
+        self.legend_calls = []
         self.transAxes = object()
         self.transData = object()
+        self.figure = None
 
     def plot(self, *args, **kwargs):
         self.plot_calls.append((args, kwargs))
@@ -362,12 +414,22 @@ class _FakeTreeAxis:
     def axis(self, *args, **kwargs):
         return None
 
+    def get_position(self):
+        return type("FakeAxisPosition", (), {"width": 1.0})()
+
+    def legend(self, *args, **kwargs):
+        self.legend_calls.append((args, kwargs))
+        return None
+
 
 class _FakeTreeFigure:
     def __init__(self):
         self.savefig_calls = []
         self.subplots_adjust_calls = []
         self.suptitle_calls = []
+        self.text_calls = []
+        self.text_items = []
+        self.transFigure = object()
 
     def savefig(self, *args, **kwargs):
         self.savefig_calls.append((args, kwargs))
@@ -381,11 +443,25 @@ class _FakeTreeFigure:
         self.subplots_adjust_calls.append((args, kwargs))
         return None
 
+    def text(self, x, y, txt, **kwargs):
+        self.text_calls.append(str(txt))
+        self.text_items.append({
+            "x": x,
+            "y": y,
+            "txt": str(txt),
+            "kwargs": dict(kwargs),
+        })
+        return None
+
+    def get_size_inches(self):
+        return (tree.TREE_FIG_WIDTH, 4.0)
+
 
 class _FakeTreePyplot:
     def __init__(self):
         self.axis = _FakeTreeAxis()
         self.figure = _FakeTreeFigure()
+        self.axis.figure = self.figure
 
     def subplots(self, *args, **kwargs):
         return self.figure, self.axis
@@ -498,6 +574,89 @@ def test_draw_aa_logo_centers_glyph_within_site_slot():
     assert pytest.approx(right_edge, rel=0, abs=1e-12) == 2.0 + (draw_width / 2.0)
 
 
+def test_draw_aa_logo_uses_half_width_for_I_glyph():
+    axis = _FakeTreeAxis()
+
+    class _FakeBBox:
+        x0 = 0.0
+        y0 = 0.0
+        width = 2.0
+        height = 1.0
+
+    class _FakeGlyph:
+        def get_extents(self):
+            return _FakeBBox()
+
+    class _FakeTextPathModule:
+        @staticmethod
+        def TextPath(*args, **kwargs):
+            return _FakeGlyph()
+
+    class _FakeTransform:
+        def __init__(self):
+            self.sx = None
+            self.sy = None
+            self.tx = None
+            self.ty = None
+
+        def scale(self, sx, sy):
+            self.sx = sx
+            self.sy = sy
+            return self
+
+        def translate(self, tx, ty):
+            self.tx = tx
+            self.ty = ty
+            return self
+
+        def __add__(self, other):
+            return self
+
+    class _FakeTransformsModule:
+        @staticmethod
+        def Affine2D():
+            return _FakeTransform()
+
+    class _FakePathPatch:
+        def __init__(self, glyph, transform=None, **kwargs):
+            self.glyph = glyph
+            self.transform = transform
+
+    class _FakePatchesModule:
+        PathPatch = _FakePathPatch
+
+    assert tree._draw_aa_logo(
+        ax=axis,
+        x=2.0,
+        y=3.0,
+        probabilities=np.array([1.0], dtype=float),
+        orders=np.array(['I'], dtype=object),
+        logo_width=0.5,
+        logo_height=1.0,
+        mpl_patches=_FakePatchesModule,
+        mpl_textpath=_FakeTextPathModule,
+        mpl_transforms=_FakeTransformsModule,
+        font_properties=None,
+    )
+
+    patch = axis.patch_calls[0]
+    draw_width = 0.5 * tree.AA_LOGO_SLOT_INNER_WIDTH_RATIO * tree.AA_LOGO_CHAR_WIDTH_RATIO['I']
+    left_edge = patch.transform.tx + (_FakeBBox.x0 * patch.transform.sx)
+    right_edge = patch.transform.tx + ((_FakeBBox.x0 + _FakeBBox.width) * patch.transform.sx)
+    assert pytest.approx(left_edge, rel=0, abs=1e-12) == 2.0 - (draw_width / 2.0)
+    assert pytest.approx(right_edge, rel=0, abs=1e-12) == 2.0 + (draw_width / 2.0)
+
+
+def test_expand_highlighted_leaf_ids_to_clade_node_ids_marks_fully_highlighted_clades():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    out = tree._expand_highlighted_leaf_ids_to_clade_node_ids(
+        tr,
+        highlighted_leaf_ids=[labels["A"], labels["B"]],
+    )
+    assert out == {labels["A"], labels["B"], labels["X"]}
+
+
 def test_get_logo_glyph_caches_by_character():
     class _FakeTextPathModule:
         call_count = 0
@@ -574,6 +733,7 @@ def test_fit_leaf_label_items_ellipsizes_when_tree_would_be_too_narrow():
 
 def test_fit_leaf_label_items_keeps_tps_sized_labels_unshortened():
     axis = _FakeTreeAxis()
+    axis.figure = _FakeTreeFigure()
     label = "Adiantum_capillus-veneris_CM043955.1_cds_KAI5070148.1_14541"
     assert len(label) <= tree.TREE_TIP_LABEL_NO_ELLIPSIS_UP_TO_CHARS
     leaf_items, x_right = tree._fit_leaf_label_items(
@@ -590,11 +750,11 @@ def test_fit_leaf_label_items_keeps_tps_sized_labels_unshortened():
             'va': 'center',
             'ha': 'left',
             'clip_on': False,
-            'fallback_char_ratio': 0.024,
+            'fallback_char_ratio': tree.TREE_FALLBACK_TEXT_CHAR_WIDTH_EM,
         }],
     )
     assert leaf_items[0]['text'] == label
-    assert x_right > 1.5
+    assert 1.1 < x_right < 1.6
 
 
 def test_should_use_exact_text_layout_disables_exact_path_for_large_trees():
@@ -723,6 +883,14 @@ def test_render_tree_matplotlib_draws_species_overlap_node_markers(monkeypatch, 
     assert scatter_kwargs["facecolor"] == tree.TREE_DUPLICATION_COLOR
     assert scatter_kwargs["s"] == tree.TREE_NODE_MARKER_AREA
     assert scatter_kwargs["zorder"] == tree.TREE_NODE_MARKER_ZORDER
+    assert len(fake_plt.axis.legend_calls) == 1
+    _, legend_kwargs = fake_plt.axis.legend_calls[0]
+    assert legend_kwargs["loc"] == "upper left"
+    assert legend_kwargs["bbox_to_anchor"] == (tree.TREE_NODE_LEGEND_X, tree.TREE_NODE_LEGEND_Y)
+    assert [handle.get_label() for handle in legend_kwargs["handles"]] == [
+        "Speciation node",
+        "Duplication node",
+    ]
 
 
 def test_render_tree_matplotlib_uses_projecting_caps_for_internal_segments(monkeypatch, tmp_path):
@@ -808,7 +976,7 @@ def test_render_tree_matplotlib_offsets_root_state_text_to_clear_root_marker(mon
     assert pytest.approx(root_item["x"], rel=0, abs=1e-12) == expected_x
 
 
-def test_render_tree_matplotlib_places_figure_title_in_axes_coordinates(monkeypatch, tmp_path):
+def test_render_tree_matplotlib_places_figure_title_in_figure_coordinates(monkeypatch, tmp_path):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     for node in tr.traverse():
         ete.set_prop(node, "color_trait", "black")
@@ -823,12 +991,12 @@ def test_render_tree_matplotlib_places_figure_title_in_axes_coordinates(monkeypa
         figure_title="Sites 1-2-3",
     )
 
-    title_item = [item for item in fake_plt.axis.text_items if item["txt"] == "Sites 1-2-3"][-1]
+    title_item = [item for item in fake_plt.figure.text_items if item["txt"] == "Sites 1-2-3"][-1]
     assert title_item["x"] == tree.TREE_FIG_TITLE_X
     assert title_item["y"] == tree.TREE_FIG_TITLE_Y
     assert title_item["kwargs"]["ha"] == "left"
     assert title_item["kwargs"]["va"] == "top"
-    assert title_item["kwargs"]["transform"] is fake_plt.axis.transAxes
+    assert "Sites 1-2-3" not in fake_plt.axis.text_calls
     assert fake_plt.figure.suptitle_calls == []
 
 
@@ -887,10 +1055,40 @@ def test_get_tree_figure_size_scales_with_leaf_count():
     assert pytest.approx(fig_width, rel=0, abs=1e-12) == tree.TREE_FIG_WIDTH
 
 
+def test_get_tree_figure_size_respects_tip_label_spacing_factor():
+    _,default_height = tree._get_tree_figure_size(num_leaves=10, max_label_len=12)
+    _,double_height = tree._get_tree_figure_size(num_leaves=10, max_label_len=12, tip_label_spacing_factor=2.0)
+    expected_double_height = max(
+        tree.TREE_FIG_MIN_HEIGHT,
+        tree.TREE_FIG_BASE_HEIGHT + (10 * tree.TREE_FIG_HEIGHT_PER_LEAF * 2.0),
+    )
+    assert pytest.approx(double_height, rel=0, abs=1e-12) == expected_double_height
+    assert double_height > default_height
+
+
+def test_get_tree_figure_size_respects_tree_fig_max_height_override():
+    _,fig_height = tree._get_tree_figure_size(
+        num_leaves=100000,
+        max_label_len=0,
+        tree_fig_max_height=500.0,
+    )
+    assert fig_height == 500.0
+
+
 def test_get_tree_figure_size_caps_pdf_height():
     fig_width,fig_height = tree._get_tree_figure_size(num_leaves=100000, max_label_len=0)
     assert fig_width == tree.TREE_FIG_WIDTH
     assert fig_height == tree.TREE_FIG_MAX_HEIGHT
+
+
+def test_resolve_tree_tip_label_spacing_factor_rejects_nonpositive_values():
+    with pytest.raises(ValueError, match="positive finite float"):
+        tree._resolve_tree_tip_label_spacing_factor(0)
+
+
+def test_resolve_tree_figure_max_height_rejects_nonpositive_values():
+    with pytest.raises(ValueError, match="positive finite float"):
+        tree._resolve_tree_figure_max_height(0)
 
 
 def test_normalize_state_plot_request_rejects_legacy_yes():
@@ -1860,6 +2058,37 @@ def test_foreground_stem_vertical_segment_is_not_colored():
     v_color_desc, h_color_desc = tree._get_branch_segment_colors(a_node, "t")
     assert v_color_desc == "red"
     assert h_color_desc == "red"
+
+
+def test_highlighted_clade_uses_foreground_stem_branch_coloring():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(B:1,(A:1,C:1)X:1)R;", format=1))
+    by_name = {n.name: n for n in tr.traverse() if n.name}
+    x_node = by_name["X"]
+    a_node = by_name["A"]
+
+    v_color_stem, h_color_stem = tree._get_branch_segment_colors(
+        x_node,
+        "t",
+        highlighted_node_ids={
+            int(ete.get_prop(x_node, "numerical_label")),
+            int(ete.get_prop(a_node, "numerical_label")),
+        },
+        highlight_color="orange",
+    )
+    assert v_color_stem == "black"
+    assert h_color_stem == "orange"
+
+    v_color_desc, h_color_desc = tree._get_branch_segment_colors(
+        a_node,
+        "t",
+        highlighted_node_ids={
+            int(ete.get_prop(x_node, "numerical_label")),
+            int(ete.get_prop(a_node, "numerical_label")),
+        },
+        highlight_color="orange",
+    )
+    assert v_color_desc == "orange"
+    assert h_color_desc == "orange"
 
 
 def test_rescale_branch_length_adjusted_site_keeps_ndist_when_only_nonsynonymous_substitutions(monkeypatch):

@@ -17,8 +17,12 @@ TREE_FIG_HEIGHT_PER_LEAF = 0.085
 TREE_FIG_MAX_HEIGHT = 180.0
 TREE_FIG_WIDTH = 7.12
 TREE_FIG_SAVE_PAD_INCHES = 0.0
-TREE_FIG_TITLE_X = 0.01
-TREE_FIG_TITLE_Y = 0.995
+TREE_TIP_LABEL_SPACING_FACTOR = 1.0
+TREE_FIG_TITLE_X = 0.0015
+TREE_FIG_TITLE_Y = 0.999
+TREE_FIG_TITLE_TOP_PADDING_ROWS = 1.1
+TREE_NODE_LEGEND_X = 0.0015
+TREE_NODE_LEGEND_Y = 0.988
 TREE_CONTENT_MIN_WIDTH_RATIO = 0.42
 TREE_TIP_LABEL_MIN_DISPLAY_CHARS = 22
 TREE_TIP_LABEL_NO_ELLIPSIS_UP_TO_CHARS = 128
@@ -40,6 +44,7 @@ TREE_STATE_TEXT_SIZE = 6
 TREE_TIP_LABEL_TEXT_SIZE = 5
 TREE_BRANCH_ID_TEXT_SIZE = TREE_TIP_LABEL_TEXT_SIZE * 0.5
 TREE_BRANCH_ID_MIN_GAP = 0.03
+TREE_FALLBACK_TEXT_CHAR_WIDTH_EM = 0.46
 TREE_SPECIATION_COLOR = (0.0, 0.0, 1.0)
 TREE_DUPLICATION_COLOR = (1.0, 0.0, 0.0)
 TREE_NODE_MARKER_AREA = 6.5
@@ -47,6 +52,8 @@ TREE_NODE_MARKER_EDGE_COLOR = 'white'
 TREE_NODE_MARKER_EDGE_WIDTH = 0.35
 TREE_NODE_MARKER_ZORDER = 2.0
 TREE_STATE_ARTIST_ZORDER = 4.0
+TREE_NODE_LEGEND_FONT_SIZE = max(TREE_TIP_LABEL_TEXT_SIZE - 1, 1)
+TREE_NODE_LEGEND_MARKER_SIZE_PT = 4.0
 AA_LOGO_MIN_PROB = 0.03
 AA_LOGO_MAX_RESIDUES = 6
 AA_LOGO_MIN_WIDTH = 0.012
@@ -64,6 +71,9 @@ AA_LOGO_MISSING_BAR_HEIGHT_RATIO = 0.08
 AA_LOGO_MISSING_CENTER_SHIFT_RATIO = 0.0
 AA_LOGO_LEFT_PADDING_RATIO = 0.0
 AA_LOGO_TEXT_WIDTH_RATIO = 0.9
+AA_LOGO_CHAR_WIDTH_RATIO = {
+    'I': 0.25,
+}
 AA_LOGO_COLORS = {
     'A': '#1b9e77',
     'C': '#66a61e',
@@ -358,6 +368,81 @@ def _select_logo_residues(probabilities, orders):
     return residues
 
 
+def _get_logo_char_width_ratio(char):
+    return float(AA_LOGO_CHAR_WIDTH_RATIO.get(str(char), 1.0))
+
+
+def _normalize_plot_state_tip_highlight_pattern(value):
+    if value is None:
+        return ''
+    return str(value).strip().upper()
+
+
+def _resolve_plot_state_tip_highlight_config(g, mode, plot_request_name, request_mode, num_selected_sites):
+    if mode not in ['aa', 'nsy']:
+        return None
+    pattern = _normalize_plot_state_tip_highlight_pattern(g.get('plot_state_aa_highlight_pattern', ''))
+    if pattern == '':
+        return None
+    if request_mode == 'all':
+        txt = '--plot_state_aa_highlight_pattern requires site-specific --plot_state_aa, not "all".'
+        raise ValueError(txt)
+    if len(pattern) != int(num_selected_sites):
+        txt = '--plot_state_aa_highlight_pattern length ({}) did not match the number of selected --plot_state_aa sites ({}).'
+        raise ValueError(txt.format(len(pattern), int(num_selected_sites)))
+    highlight_color = str(g.get('plot_state_aa_highlight_color', 'crimson')).strip()
+    if highlight_color == '':
+        highlight_color = 'crimson'
+    return {
+        'pattern': pattern,
+        'color': highlight_color,
+    }
+
+
+def _build_tip_label_color_by_state_pattern(tree, state_by_node, highlight_pattern, highlight_color):
+    out = dict()
+    pattern = _normalize_plot_state_tip_highlight_pattern(highlight_pattern)
+    if pattern == '':
+        return out
+    for leaf in ete.iter_leaves(tree):
+        node_id = int(ete.get_prop(leaf, "numerical_label"))
+        node_state = _normalize_plot_state_tip_highlight_pattern(state_by_node.get(node_id, ''))
+        if node_state == pattern:
+            out[node_id] = highlight_color
+    return out
+
+
+def _expand_highlighted_leaf_ids_to_clade_node_ids(tree, highlighted_leaf_ids):
+    highlighted_leaf_ids = set([int(v) for v in np.asarray(list(highlighted_leaf_ids), dtype=np.int64).tolist()])
+    out = set()
+
+    def visit(node):
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        if ete.is_leaf(node):
+            is_all_highlighted = (node_id in highlighted_leaf_ids)
+        else:
+            child_flags = [visit(child) for child in ete.get_children(node)]
+            is_all_highlighted = (len(child_flags) > 0) and all(child_flags)
+        if (not ete.is_root(node)) and is_all_highlighted:
+            out.add(node_id)
+        return is_all_highlighted
+
+    visit(ete.get_tree_root(tree))
+    return out
+
+
+def _get_leaf_label_color(node, trait_name, tip_label_color_by_node_id=None):
+    if tip_label_color_by_node_id is not None:
+        try:
+            node_id = int(ete.get_prop(node, "numerical_label"))
+            color = tip_label_color_by_node_id.get(node_id, None)
+            if color is not None:
+                return str(color)
+        except Exception:
+            pass
+    return ete.get_prop(node, "labelcolor_" + trait_name, "black")
+
+
 def _draw_aa_logo(ax, x, y, probabilities, orders, logo_width, logo_height,
                   mpl_patches, mpl_textpath, mpl_transforms, font_properties):
     residues = _select_logo_residues(probabilities=probabilities, orders=orders)
@@ -381,7 +466,8 @@ def _draw_aa_logo(ax, x, y, probabilities, orders, logo_width, logo_height,
         if (bbox.width <= 0) or (bbox.height <= 0):
             continue
         target_height = logo_height * prob
-        sx = draw_width / bbox.width
+        target_width = draw_width * _get_logo_char_width_ratio(char)
+        sx = target_width / bbox.width
         sy = target_height / bbox.height
         x_shift = (x - (draw_width / 2.0)) - (bbox.x0 * sx) + ((draw_width - (bbox.width * sx)) / 2.0)
         y_shift = y_cursor - (bbox.y0 * sy)
@@ -561,6 +647,25 @@ def _should_use_exact_text_layout(num_leaves, num_text_items):
 
 def _get_text_width_axes_ratio(ax, text, fontsize, fallback_char_ratio, measurement_context=None):
     fallback_ratio = max(len(str(text)), 1) * float(fallback_char_ratio)
+    try:
+        fig = getattr(ax, 'figure', None)
+        if (fig is not None) and hasattr(fig, 'get_size_inches'):
+            fig_size = fig.get_size_inches()
+            fig_width_in = float(fig_size[0])
+            if fig_width_in > 0:
+                axes_width_frac = 1.0
+                if hasattr(ax, 'get_position'):
+                    axes_width_frac = float(getattr(ax.get_position(), 'width', 1.0))
+                axes_width_in = fig_width_in * max(axes_width_frac, 1e-6)
+                fallback_ratio = (
+                    max(len(str(text)), 1)
+                    * float(fontsize)
+                    * float(fallback_char_ratio)
+                    / 72.0
+                    / axes_width_in
+                )
+    except Exception:
+        pass
     if measurement_context is None:
         return fallback_ratio
     try:
@@ -592,7 +697,7 @@ def _estimate_text_right_limit(ax, x_left, base_right, text_items, measurement_c
         anchor_x = float(item.get('x', 0.0))
         fontsize = float(item.get('fontsize', TREE_TIP_LABEL_TEXT_SIZE))
         ha = item.get('ha', 'left')
-        fallback_char_ratio = float(item.get('fallback_char_ratio', 0.024))
+        fallback_char_ratio = float(item.get('fallback_char_ratio', TREE_FALLBACK_TEXT_CHAR_WIDTH_EM))
         width_ratio = _get_text_width_axes_ratio(
             ax=ax,
             text=text,
@@ -810,11 +915,43 @@ def _format_tree_scale_label(scale_length):
     return '{:g} {}'.format(float(scale_length), TREE_SCALE_BAR_UNIT_LABEL)
 
 
-def _get_tree_figure_size(num_leaves, max_label_len):
+def _resolve_tree_tip_label_spacing_factor(value, param_name='--tree_tip_label_spacing'):
+    try:
+        spacing_factor = float(value)
+    except (TypeError, ValueError):
+        raise ValueError('{} should be a positive finite float.'.format(param_name))
+    if (not np.isfinite(spacing_factor)) or (spacing_factor <= 0):
+        raise ValueError('{} should be a positive finite float.'.format(param_name))
+    return spacing_factor
+
+
+def _resolve_tree_figure_max_height(value, param_name='--tree_fig_max_height'):
+    try:
+        max_height = float(value)
+    except (TypeError, ValueError):
+        raise ValueError('{} should be a positive finite float.'.format(param_name))
+    if (not np.isfinite(max_height)) or (max_height <= 0):
+        raise ValueError('{} should be a positive finite float.'.format(param_name))
+    return max_height
+
+
+def _get_tree_figure_size(num_leaves, max_label_len, tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
+                          tree_fig_max_height=TREE_FIG_MAX_HEIGHT):
     num_leaves = max(int(num_leaves), 1)
+    tip_label_spacing_factor = _resolve_tree_tip_label_spacing_factor(
+        value=tip_label_spacing_factor,
+        param_name='tip_label_spacing_factor',
+    )
+    tree_fig_max_height = _resolve_tree_figure_max_height(
+        value=tree_fig_max_height,
+        param_name='tree_fig_max_height',
+    )
     fig_height = min(
-        max(TREE_FIG_MIN_HEIGHT, TREE_FIG_BASE_HEIGHT + (num_leaves * TREE_FIG_HEIGHT_PER_LEAF)),
-        TREE_FIG_MAX_HEIGHT,
+        max(
+            TREE_FIG_MIN_HEIGHT,
+            TREE_FIG_BASE_HEIGHT + (num_leaves * TREE_FIG_HEIGHT_PER_LEAF * tip_label_spacing_factor),
+        ),
+        tree_fig_max_height,
     )
     fig_width = TREE_FIG_WIDTH
     return fig_width,fig_height
@@ -855,17 +992,26 @@ def _get_tree_xy(tree):
     return xcoord,ycoord,leaves
 
 
-def _is_foreground_stem_branch(node, trait_name):
+def _is_foreground_stem_branch(node, trait_name, highlighted_node_ids=None):
     if ete.is_root(node):
         return False
+    node_id = int(ete.get_prop(node, "numerical_label"))
+    parent_id = int(ete.get_prop(node.up, "numerical_label"))
     is_fg = bool(ete.get_prop(node, "is_fg_" + trait_name, False))
     is_parent_fg = bool(ete.get_prop(node.up, "is_fg_" + trait_name, False))
+    if highlighted_node_ids is not None:
+        is_fg = is_fg or (node_id in highlighted_node_ids)
+        is_parent_fg = is_parent_fg or (parent_id in highlighted_node_ids)
     return is_fg and (not is_parent_fg)
 
 
-def _get_branch_segment_colors(node, trait_name):
+def _get_branch_segment_colors(node, trait_name, highlighted_node_ids=None, highlight_color=None):
+    node_id = int(ete.get_prop(node, "numerical_label"))
     branch_color = ete.get_prop(node, "color_" + trait_name, "black")
-    if _is_foreground_stem_branch(node=node, trait_name=trait_name):
+    if (highlighted_node_ids is not None) and (node_id in highlighted_node_ids):
+        if highlight_color not in [None, '']:
+            branch_color = str(highlight_color)
+    if _is_foreground_stem_branch(node=node, trait_name=trait_name, highlighted_node_ids=highlighted_node_ids):
         vertical_color = "black"
     else:
         vertical_color = branch_color
@@ -875,7 +1021,10 @@ def _get_branch_segment_colors(node, trait_name):
 
 def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_node=None,
                             state_prob_by_node=None, state_orders=None, state_mode=None,
-                            pdf_pages=None, figure_title=None, node_type_by_id=None):
+                            pdf_pages=None, figure_title=None, node_type_by_id=None,
+                            tip_label_color_by_node_id=None, highlighted_node_ids=None,
+                            highlight_color=None, tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
+                            tree_fig_max_height=TREE_FIG_MAX_HEIGHT):
     plt = _get_pyplot()
     xcoord,ycoord,leaves = _get_tree_xy(tree)
     use_aa_logo = (state_mode=='aa') and (state_prob_by_node is not None) and (state_orders is not None)
@@ -915,11 +1064,17 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             labels.append((node, txt, font_size))
         max_label_len = max([len(lbl[1]) for lbl in labels], default=0)
     num_leaves = max(len(leaves), 1)
-    fig_width,fig_height = _get_tree_figure_size(num_leaves=num_leaves, max_label_len=max_label_len)
+    fig_width,fig_height = _get_tree_figure_size(
+        num_leaves=num_leaves,
+        max_label_len=max_label_len,
+        tip_label_spacing_factor=tip_label_spacing_factor,
+        tree_fig_max_height=tree_fig_max_height,
+    )
     fig,ax = plt.subplots(figsize=(fig_width, fig_height))
     if hasattr(fig, 'subplots_adjust'):
         fig.subplots_adjust(left=0.0, right=1.0, bottom=0.0, top=1.0)
-    ax.set_ylim(-0.5, num_leaves - 0.5)
+    y_top = num_leaves - 0.5 + (TREE_FIG_TITLE_TOP_PADDING_ROWS if figure_title else 0.0)
+    ax.set_ylim(-0.5, y_top)
     static_right_text_items = list()
     leaf_label_items = list()
     branch_nodes = [node for node in tree.traverse() if (not ete.is_root(node))]
@@ -940,7 +1095,12 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             y_parent = ycoord[id(parent)]
             x_node = xcoord[id(node)]
             y_node = ycoord[id(node)]
-            v_color,h_color = _get_branch_segment_colors(node=node, trait_name=trait_name)
+            v_color,h_color = _get_branch_segment_colors(
+                node=node,
+                trait_name=trait_name,
+                highlighted_node_ids=highlighted_node_ids,
+                highlight_color=highlight_color,
+            )
             v_segments_by_color.setdefault(v_color, list()).append([(x_parent, y_parent), (x_parent, y_node)])
             if ete.is_leaf(node):
                 h_terminal_segments_by_color.setdefault(h_color, list()).append([(x_parent, y_node), (x_node, y_node)])
@@ -974,12 +1134,18 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             y_parent = ycoord[id(parent)]
             x_node = xcoord[id(node)]
             y_node = ycoord[id(node)]
-            v_color,h_color = _get_branch_segment_colors(node=node, trait_name=trait_name)
+            v_color,h_color = _get_branch_segment_colors(
+                node=node,
+                trait_name=trait_name,
+                highlighted_node_ids=highlighted_node_ids,
+                highlight_color=highlight_color,
+            )
             ax.plot([x_parent, x_parent], [y_parent, y_node], color=v_color, linewidth=0.8, solid_capstyle=TREE_LINE_CAPSTYLE)
             horizontal_capstyle = TREE_LINE_TERMINAL_CAPSTYLE if ete.is_leaf(node) else TREE_LINE_CAPSTYLE
             ax.plot([x_parent, x_node], [y_node, y_node], color=h_color, linewidth=0.8, solid_capstyle=horizontal_capstyle)
     if node_type_by_id is None:
         node_type_by_id = {}
+    has_node_markers = False
     if len(node_type_by_id) > 0 and hasattr(ax, 'scatter'):
         node_marker_coords = {'duplication': (list(), list()), 'speciation': (list(), list())}
         for node in tree.traverse():
@@ -1007,6 +1173,47 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                 clip_on=False,
                 zorder=TREE_NODE_MARKER_ZORDER,
             )
+            has_node_markers = True
+    if has_node_markers and hasattr(ax, 'legend'):
+        try:
+            from matplotlib.lines import Line2D
+            legend_handles = [
+                Line2D(
+                    [0], [0],
+                    marker='o',
+                    linestyle='None',
+                    markerfacecolor=TREE_SPECIATION_COLOR,
+                    markeredgecolor=TREE_NODE_MARKER_EDGE_COLOR,
+                    markeredgewidth=TREE_NODE_MARKER_EDGE_WIDTH,
+                    markersize=TREE_NODE_LEGEND_MARKER_SIZE_PT,
+                    label='Speciation node',
+                ),
+                Line2D(
+                    [0], [0],
+                    marker='o',
+                    linestyle='None',
+                    markerfacecolor=TREE_DUPLICATION_COLOR,
+                    markeredgecolor=TREE_NODE_MARKER_EDGE_COLOR,
+                    markeredgewidth=TREE_NODE_MARKER_EDGE_WIDTH,
+                    markersize=TREE_NODE_LEGEND_MARKER_SIZE_PT,
+                    label='Duplication node',
+                ),
+            ]
+            legend_kwargs = {
+                'handles': legend_handles,
+                'loc': 'upper left',
+                'bbox_to_anchor': (TREE_NODE_LEGEND_X, TREE_NODE_LEGEND_Y),
+                'frameon': False,
+                'fontsize': TREE_NODE_LEGEND_FONT_SIZE,
+                'borderaxespad': 0.0,
+                'handletextpad': 0.3,
+                'labelspacing': 0.2,
+            }
+            if hasattr(fig, 'transFigure'):
+                legend_kwargs['bbox_transform'] = fig.transFigure
+            ax.legend(**legend_kwargs)
+        except Exception:
+            pass
     xmax = max(xcoord.values()) if len(xcoord)>0 else 0.0
     xspan = max(xmax, 1.0)
     x_left = -xspan * 0.02
@@ -1041,7 +1248,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                 'text': bid_txt,
                 'fontsize': TREE_BRANCH_ID_TEXT_SIZE,
                 'ha': 'center',
-                'fallback_char_ratio': 0.02,
+                'fallback_char_ratio': TREE_FALLBACK_TEXT_CHAR_WIDTH_EM,
             })
     label_text_offset = text_offset + branch_id_text_space
     content_right = xmax + label_text_offset
@@ -1120,9 +1327,14 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                         'text': fallback,
                         'fontsize': TREE_STATE_TEXT_SIZE,
                         'ha': 'left',
-                        'fallback_char_ratio': 0.02,
+                        'fallback_char_ratio': TREE_FALLBACK_TEXT_CHAR_WIDTH_EM,
                     })
             if ete.is_leaf(node) and (node.name is not None) and (len(node.name) > 0):
+                leaf_label_color = _get_leaf_label_color(
+                    node=node,
+                    trait_name=trait_name,
+                    tip_label_color_by_node_id=tip_label_color_by_node_id,
+                )
                 if is_logo_drawn:
                     label_x = node_logo_left + logo_total_width + leaf_label_gap
                 else:
@@ -1132,11 +1344,11 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     'y': node_y,
                     'text': node.name,
                     'fontsize': TREE_TIP_LABEL_TEXT_SIZE,
-                    'color': text_color,
+                    'color': leaf_label_color,
                     'va': 'center',
                     'ha': 'left',
                     'clip_on': False,
-                    'fallback_char_ratio': 0.024,
+                    'fallback_char_ratio': TREE_FALLBACK_TEXT_CHAR_WIDTH_EM,
                 })
     elif max_label_len>0:
         for node,txt,font_size in labels:
@@ -1144,6 +1356,11 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             root_label_extra_offset = xspan * TREE_ROOT_STATE_EXTRA_X_PADDING_RATIO if (state_by_node is not None and ete.is_root(node)) else 0.0
             label_x = xcoord[id(node)] + label_text_offset + root_label_extra_offset
             if (state_by_node is None) and ete.is_leaf(node):
+                text_color = _get_leaf_label_color(
+                    node=node,
+                    trait_name=trait_name,
+                    tip_label_color_by_node_id=tip_label_color_by_node_id,
+                )
                 leaf_label_items.append({
                     'x': label_x,
                     'y': ycoord[id(node)],
@@ -1153,7 +1370,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     'va': 'center',
                     'ha': 'left',
                     'clip_on': False,
-                    'fallback_char_ratio': 0.024,
+                    'fallback_char_ratio': TREE_FALLBACK_TEXT_CHAR_WIDTH_EM,
                 })
             else:
                 ax.text(
@@ -1172,7 +1389,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     'text': txt,
                     'fontsize': font_size,
                     'ha': 'left',
-                    'fallback_char_ratio': 0.024,
+                    'fallback_char_ratio': TREE_FALLBACK_TEXT_CHAR_WIDTH_EM,
                 })
     else:
         for node,txt,font_size in labels:
@@ -1180,6 +1397,11 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             root_label_extra_offset = xspan * TREE_ROOT_STATE_EXTRA_X_PADDING_RATIO if (state_by_node is not None and ete.is_root(node)) else 0.0
             label_x = xcoord[id(node)] + label_text_offset + root_label_extra_offset
             if (state_by_node is None) and ete.is_leaf(node):
+                text_color = _get_leaf_label_color(
+                    node=node,
+                    trait_name=trait_name,
+                    tip_label_color_by_node_id=tip_label_color_by_node_id,
+                )
                 leaf_label_items.append({
                     'x': label_x,
                     'y': ycoord[id(node)],
@@ -1189,7 +1411,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     'va': 'center',
                     'ha': 'left',
                     'clip_on': False,
-                    'fallback_char_ratio': 0.024,
+                    'fallback_char_ratio': TREE_FALLBACK_TEXT_CHAR_WIDTH_EM,
                 })
             else:
                 ax.text(
@@ -1208,7 +1430,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     'text': txt,
                     'fontsize': font_size,
                     'ha': 'left',
-                    'fallback_char_ratio': 0.024,
+                    'fallback_char_ratio': TREE_FALLBACK_TEXT_CHAR_WIDTH_EM,
                 })
     scale_length = _get_nice_scale_length(xmax)
     scale_x_start = xspan * TREE_SCALE_BAR_X_RATIO
@@ -1277,19 +1499,13 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     ax.set_xlim(x_left, x_right + (xspan * 0.004))
     ax.axis('off')
     if figure_title:
-        title_kwargs = {
-            'fontsize': TREE_STATE_TEXT_SIZE,
-            'ha': 'left',
-            'va': 'top',
-            'clip_on': False,
-        }
-        if hasattr(ax, 'transAxes'):
-            title_kwargs['transform'] = ax.transAxes
-        ax.text(
+        fig.text(
             TREE_FIG_TITLE_X,
             TREE_FIG_TITLE_Y,
             str(figure_title),
-            **title_kwargs,
+            fontsize=TREE_STATE_TEXT_SIZE,
+            ha='left',
+            va='top',
         )
     if pdf_pages is not None:
         pdf_pages.savefig(fig, transparent=True, pad_inches=TREE_FIG_SAVE_PAD_INCHES)
@@ -1298,7 +1514,8 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     plt.close(fig)
 
 
-def _render_tree_matplotlib_with_optional_node_types(node_type_by_id=None, **kwargs):
+def _render_tree_matplotlib_with_optional_node_types(node_type_by_id=None, tip_label_color_by_node_id=None,
+                                                     highlighted_node_ids=None, highlight_color=None, **kwargs):
     render_kwargs = dict(kwargs)
     if node_type_by_id is not None:
         try:
@@ -1307,6 +1524,21 @@ def _render_tree_matplotlib_with_optional_node_types(node_type_by_id=None, **kwa
             has_values = True
         if has_values:
             render_kwargs['node_type_by_id'] = node_type_by_id
+    if tip_label_color_by_node_id is not None:
+        try:
+            has_values = (len(tip_label_color_by_node_id) > 0)
+        except TypeError:
+            has_values = True
+        if has_values:
+            render_kwargs['tip_label_color_by_node_id'] = tip_label_color_by_node_id
+    if highlighted_node_ids is not None:
+        try:
+            has_values = (len(highlighted_node_ids) > 0)
+        except TypeError:
+            has_values = True
+        if has_values:
+            render_kwargs['highlighted_node_ids'] = highlighted_node_ids
+            render_kwargs['highlight_color'] = highlight_color
     return _render_tree_matplotlib(**render_kwargs)
     return None
 
@@ -1315,6 +1547,12 @@ def plot_branch_category(g, file_base, label='all'):
     if not is_ete_plottable():
         return None
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
+    tip_label_spacing_factor = _resolve_tree_tip_label_spacing_factor(
+        value=g.get('tree_tip_label_spacing', TREE_TIP_LABEL_SPACING_FACTOR),
+    )
+    tree_fig_max_height = _resolve_tree_figure_max_height(
+        value=g.get('tree_fig_max_height', TREE_FIG_MAX_HEIGHT),
+    )
     node_type_by_id = _resolve_species_overlap_node_types(
         tree=g['tree'],
         species_regex=g.get('species_regex', ''),
@@ -1330,6 +1568,8 @@ def plot_branch_category(g, file_base, label='all'):
             label=label,
             state_by_node=None,
             node_type_by_id=node_type_by_id,
+            tip_label_spacing_factor=tip_label_spacing_factor,
+            tree_fig_max_height=tree_fig_max_height,
         )
 
 
@@ -1473,7 +1713,10 @@ def _build_state_maps_for_concatenated_sites(tree, state, site_indices, orders, 
 
 
 def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, state_chunk, site_indices, ndigit,
-                             output_dir=None, node_type_by_id=None, site_number_labels=None):
+                             output_dir=None, node_type_by_id=None, site_number_labels=None,
+                             tip_label_color_by_node_id=None, highlighted_node_ids=None,
+                             highlight_color=None, tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
+                             tree_fig_max_height=TREE_FIG_MAX_HEIGHT):
     for local_idx,site_index in enumerate(site_indices):
         site_state = state_chunk[:, local_idx, :]
         state_by_node,state_prob_by_node = _build_state_maps_for_site(
@@ -1500,11 +1743,19 @@ def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, stat
             state_orders=orders if mode=='aa' else None,
             state_mode=mode,
             node_type_by_id=node_type_by_id,
+            tip_label_color_by_node_id=tip_label_color_by_node_id,
+            highlighted_node_ids=highlighted_node_ids,
+            highlight_color=highlight_color,
+            tip_label_spacing_factor=tip_label_spacing_factor,
+            tree_fig_max_height=tree_fig_max_height,
         )
 
 
 def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, state, site_indices, output_token,
-                              output_dir=None, node_type_by_id=None, site_number_labels=None):
+                              output_dir=None, node_type_by_id=None, site_number_labels=None,
+                              tip_label_color_by_node_id=None, highlighted_node_ids=None,
+                              highlight_color=None, tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
+                              tree_fig_max_height=TREE_FIG_MAX_HEIGHT):
     from matplotlib.backends.backend_pdf import PdfPages
 
     file_name = 'csubst_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
@@ -1536,12 +1787,20 @@ def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, sta
                 pdf_pages=pdf_pages,
                 figure_title='Site {}'.format(site_number),
                 node_type_by_id=node_type_by_id,
+                tip_label_color_by_node_id=tip_label_color_by_node_id,
+                highlighted_node_ids=highlighted_node_ids,
+                highlight_color=highlight_color,
+                tip_label_spacing_factor=tip_label_spacing_factor,
+                tree_fig_max_height=tree_fig_max_height,
             )
     return file_name
 
 
 def _render_state_tree_concatenated(tree, trait_name, mode, orders, missing_state, state, site_indices, output_token,
-                                    output_dir=None, node_type_by_id=None):
+                                    output_dir=None, node_type_by_id=None, tip_label_color_by_node_id=None,
+                                    highlighted_node_ids=None, highlight_color=None,
+                                    tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
+                                    tree_fig_max_height=TREE_FIG_MAX_HEIGHT):
     file_name = 'csubst_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
     file_name = file_name.replace('_PLACEHOLDER', '')
     if output_dir is not None:
@@ -1564,6 +1823,11 @@ def _render_state_tree_concatenated(tree, trait_name, mode, orders, missing_stat
         state_mode=mode,
         figure_title='Sites {}'.format(str(output_token)),
         node_type_by_id=node_type_by_id,
+        tip_label_color_by_node_id=tip_label_color_by_node_id,
+        highlighted_node_ids=highlighted_node_ids,
+        highlight_color=highlight_color,
+        tip_label_spacing_factor=tip_label_spacing_factor,
+        tree_fig_max_height=tree_fig_max_height,
     )
     return file_name
 
@@ -1593,11 +1857,52 @@ def plot_state_tree(state, orders, mode, g, output_dir=None, plot_request='all',
     else:
         missing_state = '-'
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
+    tip_label_spacing_factor = _resolve_tree_tip_label_spacing_factor(
+        value=g.get('tree_tip_label_spacing', TREE_TIP_LABEL_SPACING_FACTOR),
+    )
+    tree_fig_max_height = _resolve_tree_figure_max_height(
+        value=g.get('tree_fig_max_height', TREE_FIG_MAX_HEIGHT),
+    )
     node_type_by_id = _resolve_species_overlap_node_types(
         tree=g['tree'],
         species_regex=g.get('species_regex', ''),
         species_overlap_node_plot=g.get('species_overlap_node_plot', 'auto'),
     )
+    highlight_config = _resolve_plot_state_tip_highlight_config(
+        g=g,
+        mode=mode,
+        plot_request_name=plot_request_name,
+        request_mode=request['mode'],
+        num_selected_sites=site_indices.shape[0],
+    )
+    tip_label_color_by_node_id = None
+    highlighted_node_ids = None
+    highlight_color = None
+    if highlight_config is not None:
+        state_by_node_all,_ = _build_state_maps_for_concatenated_sites(
+            tree=g['tree'],
+            state=state,
+            site_indices=site_indices,
+            orders=orders,
+            missing_state=missing_state,
+        )
+        tip_label_color_by_node_id = _build_tip_label_color_by_state_pattern(
+            tree=g['tree'],
+            state_by_node=state_by_node_all,
+            highlight_pattern=highlight_config['pattern'],
+            highlight_color=highlight_config['color'],
+        )
+        highlighted_node_ids = _expand_highlighted_leaf_ids_to_clade_node_ids(
+            tree=g['tree'],
+            highlighted_leaf_ids=tip_label_color_by_node_id.keys(),
+        )
+        highlight_color = highlight_config['color']
+        print(
+            'Highlighting {:,} tip label(s) and {:,} branch/clade node(s) matching plotted amino-acid pattern "{}".'.format(
+                len(tip_label_color_by_node_id), len(highlighted_node_ids), highlight_config['pattern']
+            ),
+            flush=True,
+        )
     out_files = list()
     for trait_name in trait_names:
         if request['mode'] in ['all', 'pages']:
@@ -1613,6 +1918,11 @@ def plot_state_tree(state, orders, mode, g, output_dir=None, plot_request='all',
                     output_token=request['token'],
                     output_dir=output_dir,
                     node_type_by_id=node_type_by_id,
+                    tip_label_color_by_node_id=tip_label_color_by_node_id,
+                    highlighted_node_ids=highlighted_node_ids,
+                    highlight_color=highlight_color,
+                    tip_label_spacing_factor=tip_label_spacing_factor,
+                    tree_fig_max_height=tree_fig_max_height,
                 )
             )
             continue
@@ -1628,6 +1938,11 @@ def plot_state_tree(state, orders, mode, g, output_dir=None, plot_request='all',
                 output_token=request['token'],
                 output_dir=output_dir,
                 node_type_by_id=node_type_by_id,
+                tip_label_color_by_node_id=tip_label_color_by_node_id,
+                highlighted_node_ids=highlighted_node_ids,
+                highlight_color=highlight_color,
+                tip_label_spacing_factor=tip_label_spacing_factor,
+                tree_fig_max_height=tree_fig_max_height,
             )
         )
     return out_files
@@ -1680,11 +1995,52 @@ def plot_state_tree_selected_sites(state, orders, mode, g, site_numbers, output_
         os.makedirs(output_dir, exist_ok=True)
     missing_state = '---' if mode == 'codon' else '-'
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
+    tip_label_spacing_factor = _resolve_tree_tip_label_spacing_factor(
+        value=g.get('tree_tip_label_spacing', TREE_TIP_LABEL_SPACING_FACTOR),
+    )
+    tree_fig_max_height = _resolve_tree_figure_max_height(
+        value=g.get('tree_fig_max_height', TREE_FIG_MAX_HEIGHT),
+    )
     node_type_by_id = _resolve_species_overlap_node_types(
         tree=g['tree'],
         species_regex=g.get('species_regex', ''),
         species_overlap_node_plot=g.get('species_overlap_node_plot', 'auto'),
     )
+    highlight_config = _resolve_plot_state_tip_highlight_config(
+        g=g,
+        mode=mode,
+        plot_request_name=plot_request_name,
+        request_mode=request['mode'],
+        num_selected_sites=local_indices.shape[0],
+    )
+    tip_label_color_by_node_id = None
+    highlighted_node_ids = None
+    highlight_color = None
+    if highlight_config is not None:
+        state_by_node_all,_ = _build_state_maps_for_concatenated_sites(
+            tree=g['tree'],
+            state=state,
+            site_indices=local_indices,
+            orders=orders,
+            missing_state=missing_state,
+        )
+        tip_label_color_by_node_id = _build_tip_label_color_by_state_pattern(
+            tree=g['tree'],
+            state_by_node=state_by_node_all,
+            highlight_pattern=highlight_config['pattern'],
+            highlight_color=highlight_config['color'],
+        )
+        highlighted_node_ids = _expand_highlighted_leaf_ids_to_clade_node_ids(
+            tree=g['tree'],
+            highlighted_leaf_ids=tip_label_color_by_node_id.keys(),
+        )
+        highlight_color = highlight_config['color']
+        print(
+            'Highlighting {:,} tip label(s) and {:,} branch/clade node(s) matching plotted amino-acid pattern "{}".'.format(
+                len(tip_label_color_by_node_id), len(highlighted_node_ids), highlight_config['pattern']
+            ),
+            flush=True,
+        )
     out_files = list()
     for trait_name in trait_names:
         if request['mode'] in ['all', 'pages']:
@@ -1701,6 +2057,11 @@ def plot_state_tree_selected_sites(state, orders, mode, g, site_numbers, output_
                     output_dir=output_dir,
                     node_type_by_id=node_type_by_id,
                     site_number_labels=site_number_labels,
+                    tip_label_color_by_node_id=tip_label_color_by_node_id,
+                    highlighted_node_ids=highlighted_node_ids,
+                    highlight_color=highlight_color,
+                    tip_label_spacing_factor=tip_label_spacing_factor,
+                    tree_fig_max_height=tree_fig_max_height,
                 )
             )
             continue
@@ -1716,6 +2077,11 @@ def plot_state_tree_selected_sites(state, orders, mode, g, site_numbers, output_
                 output_token=request['token'],
                 output_dir=output_dir,
                 node_type_by_id=node_type_by_id,
+                tip_label_color_by_node_id=tip_label_color_by_node_id,
+                highlighted_node_ids=highlighted_node_ids,
+                highlight_color=highlight_color,
+                tip_label_spacing_factor=tip_label_spacing_factor,
+                tree_fig_max_height=tree_fig_max_height,
             )
         )
     return out_files

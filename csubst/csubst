@@ -803,6 +803,18 @@ def _build_parser():
                          help='default=%(default)s: Show speciation/duplication node markers in inspect tree plots. '
                               '"yes" always tries to plot, "no" disables them, and "auto" enables them only when '
                               'all tip labels are parseable by --species_regex.')
+    inspect.add_argument('--plot_state_aa_highlight_pattern', metavar='AASEQ', default='', type=str,
+                         help='default=%(default)s: When --plot_state_aa requests specific site(s), '
+                              'highlight tip labels whose concatenated amino-acid states exactly match this pattern. '
+                              'If all descendant leaves of a clade match, branch/clade coloring is also highlighted.')
+    inspect.add_argument('--plot_state_aa_highlight_color', metavar='COLOR', default='crimson', type=str,
+                         help='default=%(default)s: Matplotlib color for --plot_state_aa_highlight_pattern matches.')
+    inspect.add_argument('--tree_tip_label_spacing', metavar='FLOAT', default=1.0, type=float,
+                         help='default=%(default)s: Vertical spacing multiplier for inspect tree tip labels. '
+                              '1.0 keeps the current layout; 2.0 doubles the spacing by increasing figure height per leaf.')
+    inspect.add_argument('--tree_fig_max_height', metavar='FLOAT', default=180.0, type=float,
+                         help='default=%(default)s: Maximum PDF page height in inches for inspect tree plots. '
+                              'Increase this together with --tree_tip_label_spacing for very large trees.')
     inspect.add_argument('--plot_nonsyn_recode_pca', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Write csubst_nonsyn_recoding_pca.png from input alignment.')
     inspect.add_argument('--plot_nonsyn_recode_pca_3di20', metavar='yes|no', default='no', type=strtobool,
