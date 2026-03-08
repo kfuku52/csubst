@@ -18,18 +18,24 @@ TREE_FIG_MAX_HEIGHT = 180.0
 TREE_FIG_WIDTH = 7.12
 TREE_FIG_SAVE_PAD_INCHES = 0.0
 TREE_FIG_TITLE_X = 0.01
-TREE_FIG_TITLE_Y = 1.002
+TREE_FIG_TITLE_Y = 0.995
 TREE_CONTENT_MIN_WIDTH_RATIO = 0.42
 TREE_TIP_LABEL_MIN_DISPLAY_CHARS = 22
+TREE_TIP_LABEL_NO_ELLIPSIS_UP_TO_CHARS = 128
+TREE_EXACT_TEXT_LAYOUT_MAX_ITEMS = 256
+TREE_EXACT_TEXT_LAYOUT_MAX_LEAVES = 192
 TREE_LABEL_X_PADDING_RATIO = 0.015
 TREE_STATE_X_PADDING_RATIO = 0.002
+TREE_ROOT_STATE_EXTRA_X_PADDING_RATIO = 0.006
 TREE_STATE_LEAF_LABEL_GAP_RATIO = 0.006
 TREE_SCALE_BAR_X_RATIO = 0.03
 TREE_SCALE_BAR_Y = -0.28
 TREE_SCALE_BAR_TICK_HALF_HEIGHT = 0.07
-TREE_SCALE_BAR_LABEL_Y = -0.42
+TREE_SCALE_BAR_LABEL_GAP = 0.03
 TREE_SCALE_BAR_UNIT_LABEL = 'subs/codon site'
-TREE_LINE_CAPSTYLE = 'round'
+TREE_LINE_CAPSTYLE = 'projecting'
+TREE_LINE_TERMINAL_CAPSTYLE = 'butt'
+TREE_LINE_JOINSTYLE = 'miter'
 TREE_STATE_TEXT_SIZE = 6
 TREE_TIP_LABEL_TEXT_SIZE = 5
 TREE_BRANCH_ID_TEXT_SIZE = TREE_TIP_LABEL_TEXT_SIZE * 0.5
@@ -39,6 +45,8 @@ TREE_DUPLICATION_COLOR = (1.0, 0.0, 0.0)
 TREE_NODE_MARKER_AREA = 6.5
 TREE_NODE_MARKER_EDGE_COLOR = 'white'
 TREE_NODE_MARKER_EDGE_WIDTH = 0.35
+TREE_NODE_MARKER_ZORDER = 2.0
+TREE_STATE_ARTIST_ZORDER = 4.0
 AA_LOGO_MIN_PROB = 0.03
 AA_LOGO_MAX_RESIDUES = 6
 AA_LOGO_MIN_WIDTH = 0.012
@@ -78,6 +86,9 @@ AA_LOGO_COLORS = {
     'W': '#7570b3',
     'Y': '#7570b3',
 }
+
+_LOGO_MODULES = None
+_AA_LOGO_GLYPH_CACHE = dict()
 
 
 def _format_branch_id_label(branch_id):
@@ -146,7 +157,23 @@ def transfer_root(tree_to, tree_from, verbose=False):
         tree_to.name = original_root_name
     elif not tree_to.name:
         tree_to.name = 'Root'
+    tree_to = _clear_duplicate_internal_node_names(tree_to)
     return tree_to
+
+
+def _clear_duplicate_internal_node_names(tree):
+    seen = set()
+    for node in tree.traverse():
+        if ete.is_leaf(node):
+            continue
+        node_name = '' if (node.name is None) else str(node.name)
+        if node_name == '':
+            continue
+        if node_name in seen:
+            node.name = ''
+            continue
+        seen.add(node_name)
+    return tree
 
 def transfer_internal_node_names(tree_to, tree_from):
     rf_dist = tree_to.robinson_foulds(tree_from, expand_polytomies=True)[0]
@@ -282,12 +309,24 @@ def _get_pyplot():
 
 
 def _get_logo_modules():
-    import matplotlib.font_manager
-    import matplotlib.patches
-    import matplotlib.textpath
-    import matplotlib.transforms
-    font_properties = matplotlib.font_manager.FontProperties(weight='bold')
-    return matplotlib.patches,matplotlib.textpath,matplotlib.transforms,font_properties
+    global _LOGO_MODULES
+    if _LOGO_MODULES is None:
+        import matplotlib.font_manager
+        import matplotlib.patches
+        import matplotlib.textpath
+        import matplotlib.transforms
+        font_properties = matplotlib.font_manager.FontProperties(weight='bold')
+        _LOGO_MODULES = (matplotlib.patches, matplotlib.textpath, matplotlib.transforms, font_properties)
+    return _LOGO_MODULES
+
+
+def _get_logo_glyph(mpl_textpath, font_properties, char):
+    cache_key = (id(mpl_textpath), str(char))
+    glyph = _AA_LOGO_GLYPH_CACHE.get(cache_key, None)
+    if glyph is None:
+        glyph = mpl_textpath.TextPath((0, 0), char, size=1.0, prop=font_properties)
+        _AA_LOGO_GLYPH_CACHE[cache_key] = glyph
+    return glyph
 
 
 def _normalize_state_probabilities(probabilities):
@@ -333,7 +372,11 @@ def _draw_aa_logo(ax, x, y, probabilities, orders, logo_width, logo_height,
         if prob <= 0:
             continue
         char = aa[0] if len(aa) else '-'
-        glyph = mpl_textpath.TextPath((0, 0), char, size=1.0, prop=font_properties)
+        glyph = _get_logo_glyph(
+            mpl_textpath=mpl_textpath,
+            font_properties=font_properties,
+            char=char,
+        )
         bbox = glyph.get_extents()
         if (bbox.width <= 0) or (bbox.height <= 0):
             continue
@@ -349,6 +392,7 @@ def _draw_aa_logo(ax, x, y, probabilities, orders, logo_width, logo_height,
             lw=0,
             facecolor=AA_LOGO_COLORS.get(char, 'black'),
             edgecolor='none',
+            zorder=TREE_STATE_ARTIST_ZORDER,
         )
         ax.add_patch(patch)
         y_cursor += target_height
@@ -375,7 +419,7 @@ def _draw_logo_placeholder(ax, x, y, text, color, logo_width, logo_height):
             edgecolor=AA_LOGO_MISSING_BOX_EDGE_COLOR,
             linewidth=0.5,
             clip_on=False,
-            zorder=3.0,
+            zorder=TREE_STATE_ARTIST_ZORDER,
         )
         ax.add_patch(rect)
         if symbol == '-':
@@ -388,7 +432,7 @@ def _draw_logo_placeholder(ax, x, y, text, color, logo_width, logo_height):
                 facecolor=AA_LOGO_MISSING_BAR_FILL_COLOR,
                 edgecolor='none',
                 clip_on=False,
-                zorder=4.0,
+                zorder=TREE_STATE_ARTIST_ZORDER + 0.1,
             )
             ax.add_patch(bar)
         else:
@@ -401,7 +445,7 @@ def _draw_logo_placeholder(ax, x, y, text, color, logo_width, logo_height):
                 va='center',
                 ha='center',
                 clip_on=False,
-                zorder=4.0,
+                zorder=TREE_STATE_ARTIST_ZORDER + 0.1,
             )
     else:
         ax.text(
@@ -413,7 +457,7 @@ def _draw_logo_placeholder(ax, x, y, text, color, logo_width, logo_height):
             va='center',
             ha='center',
             clip_on=False,
-            zorder=4.0,
+            zorder=TREE_STATE_ARTIST_ZORDER + 0.1,
         )
     return True
 
@@ -480,36 +524,66 @@ def _get_text_height_in_data_units(ax, fontsize, fallback_height=AA_LOGO_HEIGHT_
         return float(fallback_height)
 
 
-def _get_text_width_axes_ratio(ax, text, fontsize, fallback_char_ratio):
-    fallback_ratio = max(len(str(text)), 1) * float(fallback_char_ratio)
+def _get_text_width_measurement_context(ax, enable_exact=True):
+    if not enable_exact:
+        return None
     fig = getattr(ax, 'figure', None)
     if fig is None:
-        return fallback_ratio
+        return None
     try:
         canvas = getattr(fig, 'canvas', None)
         if (canvas is None) or (not hasattr(canvas, 'draw')) or (not hasattr(canvas, 'get_renderer')):
-            return fallback_ratio
+            return None
         if not hasattr(ax, 'get_window_extent'):
-            return fallback_ratio
+            return None
         canvas.draw()
         renderer = canvas.get_renderer()
         axes_bbox = ax.get_window_extent(renderer=renderer)
         axes_width_px = float(getattr(axes_bbox, 'width', 0.0))
         if axes_width_px <= 0:
-            return fallback_ratio
+            return None
+        return {
+            'fig': fig,
+            'renderer': renderer,
+            'axes_width_px': axes_width_px,
+            'cache': dict(),
+        }
+    except Exception:
+        return None
+
+
+def _should_use_exact_text_layout(num_leaves, num_text_items):
+    return (
+        int(num_leaves) <= TREE_EXACT_TEXT_LAYOUT_MAX_LEAVES
+        and int(num_text_items) <= TREE_EXACT_TEXT_LAYOUT_MAX_ITEMS
+    )
+
+
+def _get_text_width_axes_ratio(ax, text, fontsize, fallback_char_ratio, measurement_context=None):
+    fallback_ratio = max(len(str(text)), 1) * float(fallback_char_ratio)
+    if measurement_context is None:
+        return fallback_ratio
+    try:
+        cache_key = (str(text), float(fontsize))
+        cache = measurement_context.get('cache', {})
+        if cache_key in cache:
+            return cache[cache_key]
         from matplotlib.text import Text as mpl_text
         text_artist = mpl_text(x=0.0, y=0.0, text=str(text), fontsize=fontsize)
-        text_artist.set_figure(fig)
-        text_bbox = text_artist.get_window_extent(renderer=renderer)
+        text_artist.set_figure(measurement_context['fig'])
+        text_bbox = text_artist.get_window_extent(renderer=measurement_context['renderer'])
         text_width_px = float(getattr(text_bbox, 'width', 0.0))
         if text_width_px <= 0:
             return fallback_ratio
-        return text_width_px / axes_width_px
+        width_ratio = text_width_px / measurement_context['axes_width_px']
+        cache[cache_key] = width_ratio
+        measurement_context['cache'] = cache
+        return width_ratio
     except Exception:
         return fallback_ratio
 
 
-def _estimate_text_right_limit(ax, x_left, base_right, text_items):
+def _estimate_text_right_limit(ax, x_left, base_right, text_items, measurement_context=None):
     x_right = float(base_right)
     for item in text_items:
         text = str(item.get('text', ''))
@@ -524,6 +598,7 @@ def _estimate_text_right_limit(ax, x_left, base_right, text_items):
             text=text,
             fontsize=fontsize,
             fallback_char_ratio=fallback_char_ratio,
+            measurement_context=measurement_context,
         )
         width_ratio = min(max(width_ratio, 0.0), 0.95)
         if ha == 'center':
@@ -556,13 +631,14 @@ def _ellipsize_middle(text, max_chars):
     return text[:left] + '...' + text[-right:]
 
 
-def _fit_leaf_label_items(ax, x_left, content_right, static_text_items, leaf_label_items):
+def _fit_leaf_label_items(ax, x_left, content_right, static_text_items, leaf_label_items, measurement_context=None):
     if len(leaf_label_items) == 0:
         x_right = _estimate_text_right_limit(
             ax=ax,
             x_left=x_left,
             base_right=content_right,
             text_items=static_text_items,
+            measurement_context=measurement_context,
         )
         return list(), x_right
 
@@ -572,11 +648,14 @@ def _fit_leaf_label_items(ax, x_left, content_right, static_text_items, leaf_lab
         x_left=x_left,
         base_right=content_right,
         text_items=static_text_items + full_items,
+        measurement_context=measurement_context,
     )
     if _get_content_width_ratio(x_left, content_right, full_x_right) >= TREE_CONTENT_MIN_WIDTH_RATIO:
         return full_items, full_x_right
 
     max_label_len = max([len(str(item.get('text', ''))) for item in leaf_label_items], default=0)
+    if max_label_len <= TREE_TIP_LABEL_NO_ELLIPSIS_UP_TO_CHARS:
+        return full_items, full_x_right
     min_chars = min(max_label_len, TREE_TIP_LABEL_MIN_DISPLAY_CHARS)
     best_items = None
     best_x_right = None
@@ -593,6 +672,7 @@ def _fit_leaf_label_items(ax, x_left, content_right, static_text_items, leaf_lab
             x_left=x_left,
             base_right=content_right,
             text_items=static_text_items + trial_items,
+            measurement_context=measurement_context,
         )
         if _get_content_width_ratio(x_left, content_right, trial_x_right) >= TREE_CONTENT_MIN_WIDTH_RATIO:
             best_items = trial_items
@@ -610,6 +690,7 @@ def _fit_leaf_label_items(ax, x_left, content_right, static_text_items, leaf_lab
             x_left=x_left,
             base_right=content_right,
             text_items=static_text_items + best_items,
+            measurement_context=measurement_context,
         )
     return best_items, best_x_right
 
@@ -841,20 +922,66 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     ax.set_ylim(-0.5, num_leaves - 0.5)
     static_right_text_items = list()
     leaf_label_items = list()
-    for node in tree.traverse():
-        if ete.is_root(node):
-            continue
-        parent = node.up
-        x_parent = xcoord[id(parent)]
-        y_parent = ycoord[id(parent)]
-        x_node = xcoord[id(node)]
-        y_node = ycoord[id(node)]
-        v_color,h_color = _get_branch_segment_colors(node=node, trait_name=trait_name)
-        ax.plot([x_parent, x_parent], [y_parent, y_node], color=v_color, linewidth=0.8, solid_capstyle=TREE_LINE_CAPSTYLE)
-        ax.plot([x_parent, x_node], [y_node, y_node], color=h_color, linewidth=0.8, solid_capstyle=TREE_LINE_CAPSTYLE)
+    branch_nodes = [node for node in tree.traverse() if (not ete.is_root(node))]
+    if hasattr(ax, 'add_collection'):
+        try:
+            from matplotlib.collections import LineCollection
+        except Exception:
+            LineCollection = None
+    else:
+        LineCollection = None
+    if LineCollection is not None:
+        v_segments_by_color = dict()
+        h_internal_segments_by_color = dict()
+        h_terminal_segments_by_color = dict()
+        for node in branch_nodes:
+            parent = node.up
+            x_parent = xcoord[id(parent)]
+            y_parent = ycoord[id(parent)]
+            x_node = xcoord[id(node)]
+            y_node = ycoord[id(node)]
+            v_color,h_color = _get_branch_segment_colors(node=node, trait_name=trait_name)
+            v_segments_by_color.setdefault(v_color, list()).append([(x_parent, y_parent), (x_parent, y_node)])
+            if ete.is_leaf(node):
+                h_terminal_segments_by_color.setdefault(h_color, list()).append([(x_parent, y_node), (x_node, y_node)])
+            else:
+                h_internal_segments_by_color.setdefault(h_color, list()).append([(x_parent, y_node), (x_node, y_node)])
+        for color, segments in v_segments_by_color.items():
+            collection = LineCollection(segments, colors=color, linewidths=0.8)
+            if hasattr(collection, 'set_capstyle'):
+                collection.set_capstyle(TREE_LINE_CAPSTYLE)
+            if hasattr(collection, 'set_joinstyle'):
+                collection.set_joinstyle(TREE_LINE_JOINSTYLE)
+            ax.add_collection(collection)
+        for color, segments in h_internal_segments_by_color.items():
+            collection = LineCollection(segments, colors=color, linewidths=0.8)
+            if hasattr(collection, 'set_capstyle'):
+                collection.set_capstyle(TREE_LINE_CAPSTYLE)
+            if hasattr(collection, 'set_joinstyle'):
+                collection.set_joinstyle(TREE_LINE_JOINSTYLE)
+            ax.add_collection(collection)
+        for color, segments in h_terminal_segments_by_color.items():
+            collection = LineCollection(segments, colors=color, linewidths=0.8)
+            if hasattr(collection, 'set_capstyle'):
+                collection.set_capstyle(TREE_LINE_TERMINAL_CAPSTYLE)
+            if hasattr(collection, 'set_joinstyle'):
+                collection.set_joinstyle(TREE_LINE_JOINSTYLE)
+            ax.add_collection(collection)
+    else:
+        for node in branch_nodes:
+            parent = node.up
+            x_parent = xcoord[id(parent)]
+            y_parent = ycoord[id(parent)]
+            x_node = xcoord[id(node)]
+            y_node = ycoord[id(node)]
+            v_color,h_color = _get_branch_segment_colors(node=node, trait_name=trait_name)
+            ax.plot([x_parent, x_parent], [y_parent, y_node], color=v_color, linewidth=0.8, solid_capstyle=TREE_LINE_CAPSTYLE)
+            horizontal_capstyle = TREE_LINE_TERMINAL_CAPSTYLE if ete.is_leaf(node) else TREE_LINE_CAPSTYLE
+            ax.plot([x_parent, x_node], [y_node, y_node], color=h_color, linewidth=0.8, solid_capstyle=horizontal_capstyle)
     if node_type_by_id is None:
         node_type_by_id = {}
     if len(node_type_by_id) > 0 and hasattr(ax, 'scatter'):
+        node_marker_coords = {'duplication': (list(), list()), 'speciation': (list(), list())}
         for node in tree.traverse():
             if ete.is_leaf(node):
                 continue
@@ -862,17 +989,23 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             node_type = node_type_by_id.get(node_id, None)
             if node_type is None:
                 continue
+            xs,ys = node_marker_coords.setdefault(node_type, (list(), list()))
+            xs.append(xcoord[id(node)])
+            ys.append(ycoord[id(node)])
+        for node_type,(xs,ys) in node_marker_coords.items():
+            if len(xs) == 0:
+                continue
             marker_color = TREE_DUPLICATION_COLOR if (node_type == 'duplication') else TREE_SPECIATION_COLOR
             ax.scatter(
-                [xcoord[id(node)]],
-                [ycoord[id(node)]],
+                xs,
+                ys,
                 s=TREE_NODE_MARKER_AREA,
                 marker='o',
                 facecolor=marker_color,
                 edgecolor=TREE_NODE_MARKER_EDGE_COLOR,
                 linewidth=TREE_NODE_MARKER_EDGE_WIDTH,
                 clip_on=False,
-                zorder=2.5,
+                zorder=TREE_NODE_MARKER_ZORDER,
             )
     xmax = max(xcoord.values()) if len(xcoord)>0 else 0.0
     xspan = max(xmax, 1.0)
@@ -931,7 +1064,13 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
         fallback_leaf_name_offset = xspan * 0.018
         leaf_label_gap = max(logo_width * 0.22, xspan * TREE_STATE_LEAF_LABEL_GAP_RATIO)
         for node in tree.traverse():
-            node_logo_left = xcoord[id(node)] + label_text_offset + logo_left_padding
+            root_logo_extra_offset = 0.0
+            if ete.is_root(node):
+                root_logo_extra_offset = max(
+                    logo_width * 0.35,
+                    xspan * TREE_ROOT_STATE_EXTRA_X_PADDING_RATIO,
+                )
+            node_logo_left = xcoord[id(node)] + label_text_offset + logo_left_padding + root_logo_extra_offset
             node_y = ycoord[id(node)]
             text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
             nl = ete.get_prop(node, "numerical_label")
@@ -974,6 +1113,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                         va='center',
                         ha='left',
                         clip_on=False,
+                        zorder=TREE_STATE_ARTIST_ZORDER + 0.1,
                     )
                     static_right_text_items.append({
                         'x': node_logo_left,
@@ -1001,7 +1141,8 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     elif max_label_len>0:
         for node,txt,font_size in labels:
             text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
-            label_x = xcoord[id(node)] + label_text_offset
+            root_label_extra_offset = xspan * TREE_ROOT_STATE_EXTRA_X_PADDING_RATIO if (state_by_node is not None and ete.is_root(node)) else 0.0
+            label_x = xcoord[id(node)] + label_text_offset + root_label_extra_offset
             if (state_by_node is None) and ete.is_leaf(node):
                 leaf_label_items.append({
                     'x': label_x,
@@ -1024,6 +1165,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     va='center',
                     ha='left',
                     clip_on=False,
+                    zorder=TREE_STATE_ARTIST_ZORDER + 0.1,
                 )
                 static_right_text_items.append({
                     'x': label_x,
@@ -1035,7 +1177,8 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     else:
         for node,txt,font_size in labels:
             text_color = ete.get_prop(node, "labelcolor_" + trait_name, "black")
-            label_x = xcoord[id(node)] + label_text_offset
+            root_label_extra_offset = xspan * TREE_ROOT_STATE_EXTRA_X_PADDING_RATIO if (state_by_node is not None and ete.is_root(node)) else 0.0
+            label_x = xcoord[id(node)] + label_text_offset + root_label_extra_offset
             if (state_by_node is None) and ete.is_leaf(node):
                 leaf_label_items.append({
                     'x': label_x,
@@ -1058,6 +1201,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
                     va='center',
                     ha='left',
                     clip_on=False,
+                    zorder=TREE_STATE_ARTIST_ZORDER + 0.1,
                 )
                 static_right_text_items.append({
                     'x': label_x,
@@ -1073,6 +1217,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
         scale_length = _get_nice_scale_length(xmax * 0.5)
         scale_x_end = scale_x_start + scale_length
     if scale_length > 0:
+        scale_label_y = TREE_SCALE_BAR_Y + TREE_SCALE_BAR_TICK_HALF_HEIGHT + TREE_SCALE_BAR_LABEL_GAP
         ax.plot(
             [scale_x_start, scale_x_end],
             [TREE_SCALE_BAR_Y, TREE_SCALE_BAR_Y],
@@ -1096,11 +1241,11 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
         )
         ax.text(
             (scale_x_start + scale_x_end) / 2.0,
-            TREE_SCALE_BAR_LABEL_Y,
+            scale_label_y,
             _format_tree_scale_label(scale_length),
             fontsize=TREE_TIP_LABEL_TEXT_SIZE,
             color='black',
-            va='top',
+            va='bottom',
             ha='center',
             clip_on=False,
         )
@@ -1110,6 +1255,13 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
         content_right=content_right,
         static_text_items=static_right_text_items,
         leaf_label_items=leaf_label_items,
+        measurement_context=_get_text_width_measurement_context(
+            ax=ax,
+            enable_exact=_should_use_exact_text_layout(
+                num_leaves=num_leaves,
+                num_text_items=len(static_right_text_items) + len(leaf_label_items),
+            ),
+        ),
     )
     for item in fitted_leaf_items:
         ax.text(
@@ -1128,7 +1280,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
         title_kwargs = {
             'fontsize': TREE_STATE_TEXT_SIZE,
             'ha': 'left',
-            'va': 'bottom',
+            'va': 'top',
             'clip_on': False,
         }
         if hasattr(ax, 'transAxes'):
@@ -1140,10 +1292,22 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
             **title_kwargs,
         )
     if pdf_pages is not None:
-        pdf_pages.savefig(fig, transparent=True, bbox_inches='tight', pad_inches=TREE_FIG_SAVE_PAD_INCHES)
+        pdf_pages.savefig(fig, transparent=True, pad_inches=TREE_FIG_SAVE_PAD_INCHES)
     else:
-        fig.savefig(file_name, format='pdf', transparent=True, bbox_inches='tight', pad_inches=TREE_FIG_SAVE_PAD_INCHES)
+        fig.savefig(file_name, format='pdf', transparent=True, pad_inches=TREE_FIG_SAVE_PAD_INCHES)
     plt.close(fig)
+
+
+def _render_tree_matplotlib_with_optional_node_types(node_type_by_id=None, **kwargs):
+    render_kwargs = dict(kwargs)
+    if node_type_by_id is not None:
+        try:
+            has_values = (len(node_type_by_id) > 0)
+        except TypeError:
+            has_values = True
+        if has_values:
+            render_kwargs['node_type_by_id'] = node_type_by_id
+    return _render_tree_matplotlib(**render_kwargs)
     return None
 
 
@@ -1159,7 +1323,7 @@ def plot_branch_category(g, file_base, label='all'):
     for trait_name in trait_names:
         file_name = file_base+'_'+trait_name+'.pdf'
         file_name = file_name.replace('_PLACEHOLDER', '')
-        _render_tree_matplotlib(
+        _render_tree_matplotlib_with_optional_node_types(
             tree=g['tree'],
             trait_name=trait_name,
             file_name=file_name,
@@ -1309,7 +1473,7 @@ def _build_state_maps_for_concatenated_sites(tree, state, site_indices, orders, 
 
 
 def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, state_chunk, site_indices, ndigit,
-                             output_dir=None, node_type_by_id=None):
+                             output_dir=None, node_type_by_id=None, site_number_labels=None):
     for local_idx,site_index in enumerate(site_indices):
         site_state = state_chunk[:, local_idx, :]
         state_by_node,state_prob_by_node = _build_state_maps_for_site(
@@ -1319,11 +1483,14 @@ def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, stat
             mode=mode,
             missing_state=missing_state,
         )
-        file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(int(site_index)+1).zfill(ndigit)+'.pdf'
+        site_number = int(site_index) + 1
+        if site_number_labels is not None:
+            site_number = int(site_number_labels[local_idx])
+        file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(site_number).zfill(ndigit)+'.pdf'
         file_name = file_name.replace('_PLACEHOLDER', '')
         if output_dir is not None:
             file_name = os.path.join(output_dir, file_name)
-        _render_tree_matplotlib(
+        _render_tree_matplotlib_with_optional_node_types(
             tree=tree,
             trait_name=trait_name,
             file_name=file_name,
@@ -1337,7 +1504,7 @@ def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, stat
 
 
 def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, state, site_indices, output_token,
-                              output_dir=None, node_type_by_id=None):
+                              output_dir=None, node_type_by_id=None, site_number_labels=None):
     from matplotlib.backends.backend_pdf import PdfPages
 
     file_name = 'csubst_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
@@ -1345,7 +1512,7 @@ def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, sta
     if output_dir is not None:
         file_name = os.path.join(output_dir, file_name)
     with PdfPages(file_name) as pdf_pages:
-        for site_index in site_indices.tolist():
+        for local_idx, site_index in enumerate(site_indices.tolist()):
             site_state = state[:, int(site_index), :]
             state_by_node,state_prob_by_node = _build_state_maps_for_site(
                 tree=tree,
@@ -1354,7 +1521,10 @@ def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, sta
                 mode=mode,
                 missing_state=missing_state,
             )
-            _render_tree_matplotlib(
+            site_number = int(site_index) + 1
+            if site_number_labels is not None:
+                site_number = int(site_number_labels[local_idx])
+            _render_tree_matplotlib_with_optional_node_types(
                 tree=tree,
                 trait_name=trait_name,
                 file_name=file_name,
@@ -1364,7 +1534,7 @@ def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, sta
                 state_orders=orders if mode=='aa' else None,
                 state_mode=mode,
                 pdf_pages=pdf_pages,
-                figure_title='Site {}'.format(int(site_index) + 1),
+                figure_title='Site {}'.format(site_number),
                 node_type_by_id=node_type_by_id,
             )
     return file_name
@@ -1383,7 +1553,7 @@ def _render_state_tree_concatenated(tree, trait_name, mode, orders, missing_stat
         orders=orders,
         missing_state=missing_state,
     )
-    _render_tree_matplotlib(
+    _render_tree_matplotlib_with_optional_node_types(
         tree=tree,
         trait_name=trait_name,
         file_name=file_name,
@@ -1462,9 +1632,101 @@ def plot_state_tree(state, orders, mode, g, output_dir=None, plot_request='all',
         )
     return out_files
 
+
+def plot_state_tree_selected_sites(state, orders, mode, g, site_numbers, output_dir=None, plot_request='all', plot_request_name=None):
+    if not is_ete_plottable():
+        return None
+    site_numbers = np.asarray(site_numbers, dtype=np.int64).reshape(-1)
+    if site_numbers.size == 0:
+        print('No sites available for ancestral state tree plotting. Skipping.', flush=True)
+        return None
+    if state.shape[1] != site_numbers.shape[0]:
+        txt = 'state site axis ({}) did not match provided site_numbers length ({}).'
+        raise ValueError(txt.format(state.shape[1], site_numbers.shape[0]))
+    if plot_request_name is None:
+        plot_request_name = '--plot_state_{}'.format('aa' if mode == 'aa' else mode)
+    request = normalize_state_plot_request(value=plot_request, param_name=plot_request_name)
+    if request['mode'] == 'none':
+        print('No sites selected for ancestral state tree plotting. Skipping.', flush=True)
+        return None
+    if request['mode'] == 'all':
+        requested_site_indices = (site_numbers - 1).astype(np.int64, copy=False)
+    else:
+        _, requested_site_indices = _resolve_state_plot_site_indices(
+            num_site=int(g.get('num_input_site', int(site_numbers.max()) if site_numbers.size else 0)),
+            plot_request=plot_request,
+            param_name=plot_request_name,
+        )
+    local_index_by_global = {
+        int(global_index): int(local_index)
+        for local_index, global_index in enumerate((site_numbers - 1).tolist())
+    }
+    local_indices = list()
+    site_number_labels = list()
+    for global_index in requested_site_indices.tolist():
+        local_index = local_index_by_global.get(int(global_index), None)
+        if local_index is None:
+            txt = '{} requested site {} which was not loaded into the selected-site state tensor.'
+            raise ValueError(txt.format(plot_request_name, int(global_index) + 1))
+        local_indices.append(int(local_index))
+        site_number_labels.append(int(global_index) + 1)
+    if len(local_indices) == 0:
+        print('No sites selected for ancestral state tree plotting. Skipping.', flush=True)
+        return None
+    local_indices = np.asarray(local_indices, dtype=np.int64)
+    site_number_labels = np.asarray(site_number_labels, dtype=np.int64)
+    print('Writing ancestral state trees: mode = {}, number of pdf files = 1'.format(mode), flush=True)
+    if output_dir is not None:
+        os.makedirs(output_dir, exist_ok=True)
+    missing_state = '---' if mode == 'codon' else '-'
+    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
+    node_type_by_id = _resolve_species_overlap_node_types(
+        tree=g['tree'],
+        species_regex=g.get('species_regex', ''),
+        species_overlap_node_plot=g.get('species_overlap_node_plot', 'auto'),
+    )
+    out_files = list()
+    for trait_name in trait_names:
+        if request['mode'] in ['all', 'pages']:
+            out_files.append(
+                _render_state_tree_bundle(
+                    tree=g['tree'],
+                    trait_name=trait_name,
+                    mode=mode,
+                    orders=orders,
+                    missing_state=missing_state,
+                    state=state,
+                    site_indices=local_indices,
+                    output_token=request['token'],
+                    output_dir=output_dir,
+                    node_type_by_id=node_type_by_id,
+                    site_number_labels=site_number_labels,
+                )
+            )
+            continue
+        out_files.append(
+            _render_state_tree_concatenated(
+                tree=g['tree'],
+                trait_name=trait_name,
+                mode=mode,
+                orders=orders,
+                missing_state=missing_state,
+                state=state,
+                site_indices=local_indices,
+                output_token=request['token'],
+                output_dir=output_dir,
+                node_type_by_id=node_type_by_id,
+            )
+        )
+    return out_files
+
 def get_num_adjusted_sites(g, node):
     nl = ete.get_prop(node, "numerical_label")
-    parent = ete.get_prop(node.up, "numerical_label")
+    state_has_mass = (g['state_cdn'].sum(axis=(1, 2)) > float(g.get('float_tol', 0)))
+    parent_node = ete.get_effective_state_parent(node, state_has_mass=state_has_mass)
+    if parent_node is None:
+        return 0, 0
+    parent = ete.get_prop(parent_node, "numerical_label")
     child_states = g['state_cdn'][nl,:,:]
     parent_states = g['state_cdn'][parent,:,:].copy()
     is_child_present = np.expand_dims(child_states.sum(axis=1)!=0, axis=1)
@@ -1499,6 +1761,7 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
     ))
     OS_branch_sub = substitution.get_branch_sub_counts(OS_tensor)
     ON_branch_sub = substitution.get_branch_sub_counts(ON_tensor)
+    state_has_mass = (g['state_cdn'].sum(axis=(1, 2)) > float(g.get('float_tol', 0)))
     for node in g['tree'].traverse():
         if ete.is_root(node):
             ete.set_prop(node, "Sdist", 0)
@@ -1506,7 +1769,17 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
             ete.set_prop(node, "SNdist", 0)
             continue
         nl = ete.get_prop(node, "numerical_label")
-        parent = ete.get_prop(node.up, "numerical_label")
+        parent_node, branch_length_to_parent = ete.get_effective_state_parent(
+            node,
+            state_has_mass=state_has_mass,
+            accumulate_distance=True,
+        )
+        if parent_node is None:
+            ete.set_prop(node, "Sdist", 0)
+            ete.set_prop(node, "Ndist", 0)
+            ete.set_prop(node, "SNdist", 0)
+            continue
+        parent = ete.get_prop(parent_node, "numerical_label")
         num_nonmissing_codon = (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum()
         if num_nonmissing_codon==0:
             ete.set_prop(node, "Sdist", 0)
@@ -1547,12 +1820,12 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
                 if num_S_sub<g['float_tol']:
                     sdist = 0
                 else:
-                    sdist = node.dist * prop_S
+                    sdist = branch_length_to_parent * prop_S
                     #node.Sdist = adjusted_site_S / prop_S
                 if num_N_sub<g['float_tol']:
                     ndist = 0
                 else:
-                    ndist = node.dist * prop_N
+                    ndist = branch_length_to_parent * prop_N
                     #node.Ndist = adjusted_site_N / prop_N
             ete.set_prop(node, "Sdist", sdist)
             ete.set_prop(node, "Ndist", ndist)

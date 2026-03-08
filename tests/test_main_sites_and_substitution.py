@@ -23,6 +23,12 @@ def tiny_tree():
     return tree.add_numerical_node_labels(tr)
 
 
+def _rerooted_tree_with_state_less_synthetic_internal():
+    iqtree_like = ete.PhyloNode("(A:1,B:1,(C:1,D:1)Y:1)R;", format=1)
+    rooted = ete.PhyloNode("(A:1,(B:1,(C:1,D:1)Y:1):1)RR;", format=1)
+    return tree.add_numerical_node_labels(tree.transfer_root(tree_to=iqtree_like, tree_from=rooted))
+
+
 def test_get_state_rejects_missing_leaf_sequence():
     node = ete.PhyloNode("A;", format=1)
     with pytest.raises(AssertionError, match="Leaf sequence not found"):
@@ -2443,6 +2449,46 @@ def test_get_b_sitewise_uses_nonsyn_state_orders_when_available(tiny_tree):
         sitewise=True,
     )
     assert out.loc[out["branch_id"] == a_id, "N_sitewise"].iloc[0] == "grpX1grpY"
+
+
+def test_get_substitution_tensor_collapses_state_less_synthetic_parent():
+    tr = _rerooted_tree_with_state_less_synthetic_internal()
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    synthetic_id = [int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if (not ete.is_leaf(n)) and (not ete.is_root(n)) and (n.name == "")][0]
+    num_node = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    state = np.zeros((num_node, 1, 2), dtype=float)
+    state[labels["R"], 0, :] = [1.0, 0.0]
+    state[labels["Y"], 0, :] = [1.0, 0.0]
+    state[labels["A"], 0, :] = [1.0, 0.0]
+    state[labels["B"], 0, :] = [0.0, 1.0]
+    state[labels["C"], 0, :] = [1.0, 0.0]
+    state[labels["D"], 0, :] = [1.0, 0.0]
+    g = {"tree": tr, "ml_anc": False, "float_tol": 1e-12, "sub_tensor_backend": "dense"}
+    pairs = substitution._collect_sub_tensor_branch_pairs(g=g, state_tensor_anc=state, selected_branch_set=None)
+    assert (labels["B"], labels["R"]) in pairs
+    assert all(child != synthetic_id for child, _parent in pairs)
+
+    out = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g, mmap_attr="synthetic_parent")
+    assert pytest.approx(float(np.nansum(out[labels["B"]])), abs=1e-12) == 1.0
+
+
+def test_get_parent_branch_ids_skips_state_less_synthetic_parent():
+    tr = _rerooted_tree_with_state_less_synthetic_internal()
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    num_node = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    state_cdn = np.zeros((num_node, 1, 2), dtype=float)
+    state_cdn[labels["R"], 0, :] = [1.0, 0.0]
+    state_cdn[labels["Y"], 0, :] = [1.0, 0.0]
+    state_cdn[labels["A"], 0, :] = [1.0, 0.0]
+    state_cdn[labels["B"], 0, :] = [0.0, 1.0]
+    state_cdn[labels["C"], 0, :] = [1.0, 0.0]
+    state_cdn[labels["D"], 0, :] = [1.0, 0.0]
+    out = main_sites.get_parent_branch_ids(
+        branch_ids=[labels["B"], labels["Y"]],
+        g={"tree": tr, "state_cdn": state_cdn, "float_tol": 1e-12},
+    )
+    assert out[labels["B"]] == labels["R"]
+    assert out[labels["Y"]] == labels["R"]
 
 
 def test_get_sub_sites_handles_noncontiguous_branch_ids():

@@ -1,12 +1,13 @@
-import numpy as np
-import pandas as pd
-
+import gzip
 import os
 import re
 import subprocess
 import sys
 from collections import OrderedDict
 from itertools import zip_longest
+
+import numpy as np
+import pandas as pd
 
 from csubst import genetic_code
 from csubst import runtime
@@ -219,6 +220,89 @@ def _estimate_empirical_codon_frequency_from_alignment(alignment_file, codon_ord
     counts /= total
     return counts
 
+
+def _get_state_file_path(g):
+    state_path = str(g.get('iqtree_state', '')).strip()
+    if state_path != '':
+        return state_path
+    return str(g.get('path_iqtree_state', '')).strip()
+
+
+def _populate_state_metadata_from_columns(g, state_columns):
+    state_columns = pd.Index(state_columns)
+    g['state_probability_columns'] = state_columns.tolist()
+    g['num_input_state'] = int(state_columns.shape[0])
+    g['input_state'] = state_columns.str.replace('p_', '', regex=False).tolist()
+    if g['num_input_state'] == 4:
+        raise NotImplementedError(
+            'Nucleotide ancestral-state input is obsolete and no longer supported. '
+            'Use codon input instead.'
+        )
+    elif g['num_input_state'] == 20:
+        raise NotImplementedError(
+            'Protein ancestral-state input is obsolete and no longer supported. '
+            'Use codon input instead.'
+        )
+    elif g['num_input_state'] > 20:
+        g['input_data_type'] = 'cdn'
+        g['codon_orders'] = state_columns.str.replace('p_', '', regex=False).to_numpy(dtype=object)
+        codon_orders_list = [str(c) for c in g['codon_orders'].tolist()]
+        if len(codon_orders_list) != len(set(codon_orders_list)):
+            duplicate_codons = sorted(list(set([c for c in codon_orders_list if codon_orders_list.count(c) > 1])))
+            duplicate_txt = ','.join(duplicate_codons[:10])
+            if len(duplicate_codons) > 10:
+                duplicate_txt += ',...'
+            raise ValueError('Duplicate codon state columns were found in .state file: {}'.format(duplicate_txt))
+    else:
+        msg = 'Unsupported number of input states: {}. Only codon input (>20 states) is supported.'
+        raise AssertionError(msg.format(g['num_input_state']))
+    if g['input_data_type'] == 'cdn':
+        g['amino_acid_orders'] = sorted(list(set([c[0] for c in g['codon_table'] if c[0] != '*'])))
+        matrix_groups = OrderedDict()
+        for aa in g['amino_acid_orders']:
+            matrix_groups[aa] = [c[1] for c in g['codon_table'] if c[0] == aa]
+        g['matrix_groups'] = matrix_groups
+        synonymous_indices = dict()
+        for aa in matrix_groups.keys():
+            synonymous_indices[aa] = []
+        for i, c in enumerate(g['codon_orders']):
+            for aa in matrix_groups.keys():
+                if c in matrix_groups[aa]:
+                    synonymous_indices[aa].append(i)
+                    break
+        g['synonymous_indices'] = synonymous_indices
+        g['max_synonymous_size'] = max([len(si) for si in synonymous_indices.values()])
+    return g
+
+
+def _infer_num_input_site_from_alignment_file(alignment_file):
+    path_txt = str(alignment_file).strip()
+    if path_txt == '':
+        raise ValueError('alignment_file is required to infer the number of input sites.')
+    open_fn = gzip.open if path_txt.lower().endswith('.gz') else open
+    seq_name = None
+    seq_len = 0
+    with open_fn(path_txt, mode='rt', encoding='utf-8') as f:
+        for line in f:
+            line = line.rstrip('\n')
+            if line.startswith('>'):
+                if seq_name is not None:
+                    break
+                seq_name = line[1:].strip()
+                continue
+            if seq_name is None:
+                if line.strip() == '':
+                    continue
+                raise ValueError('Invalid FASTA format in alignment file: sequence line appeared before header.')
+            if line.strip() == '':
+                continue
+            seq_len += len(line.strip())
+    if seq_name is None:
+        raise ValueError('Alignment file is empty: {}'.format(alignment_file))
+    if (seq_len % 3) != 0:
+        raise AssertionError('Sequence length is not multiple of 3 in alignment file.')
+    return int(seq_len // 3)
+
 def check_iqtree_dependency(g):
     try:
         test_iqtree = subprocess.run([g['iqtree_exe'], '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -302,50 +386,21 @@ def run_iqtree_ancestral(g, force_notree_run=False):
     return None
 
 def read_state(g):
-    print('Reading the state file:', g['iqtree_state'])
-    state_table = pd.read_csv(g['iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
+    state_path = _get_state_file_path(g)
+    print('Reading the state file:', state_path)
+    state_table = pd.read_csv(state_path, sep="\t", index_col=False, header=0, comment='#')
     g['num_input_site'] = state_table['Site'].unique().shape[0]
-    g['num_input_state'] = state_table.shape[1] - 3
-    g['input_state'] = state_table.columns[3:].str.replace('p_','').tolist()
-    if g['num_input_state']==4:
-        raise NotImplementedError(
-            'Nucleotide ancestral-state input is obsolete and no longer supported. '
-            'Use codon input instead.'
-        )
-    elif g['num_input_state']==20:
-        raise NotImplementedError(
-            'Protein ancestral-state input is obsolete and no longer supported. '
-            'Use codon input instead.'
-        )
-    elif g['num_input_state'] > 20:
-        g['input_data_type'] = 'cdn'
-        g['codon_orders'] = state_table.columns[3:].str.replace('p_','').to_numpy(dtype=object)
-        codon_orders_list = [str(c) for c in g['codon_orders'].tolist()]
-        if len(codon_orders_list) != len(set(codon_orders_list)):
-            duplicate_codons = sorted(list(set([c for c in codon_orders_list if codon_orders_list.count(c) > 1])))
-            duplicate_txt = ','.join(duplicate_codons[:10])
-            if len(duplicate_codons) > 10:
-                duplicate_txt += ',...'
-            raise ValueError('Duplicate codon state columns were found in .state file: {}'.format(duplicate_txt))
-    else:
-        msg = 'Unsupported number of input states: {}. Only codon input (>20 states) is supported.'
-        raise AssertionError(msg.format(g['num_input_state']))
-    if (g['input_data_type']=='cdn'):
-        g['amino_acid_orders'] = sorted(list(set([ c[0] for c in g['codon_table'] if c[0]!='*' ])))
-        matrix_groups = OrderedDict()
-        for aa in g['amino_acid_orders']:
-            matrix_groups[aa] = [ c[1] for c in g['codon_table'] if c[0]==aa ]
-        g['matrix_groups'] = matrix_groups
-        synonymous_indices = dict()
-        for aa in matrix_groups.keys():
-            synonymous_indices[aa] = []
-        for i,c in enumerate(g['codon_orders']):
-            for aa in matrix_groups.keys():
-                if c in matrix_groups[aa]:
-                    synonymous_indices[aa].append(i)
-                    break
-        g['synonymous_indices'] = synonymous_indices
-        g['max_synonymous_size'] = max([ len(si) for si in synonymous_indices.values() ])
+    g = _populate_state_metadata_from_columns(g=g, state_columns=state_table.columns[3:])
+    print('')
+    return g
+
+
+def read_state_header(g):
+    state_path = _get_state_file_path(g)
+    print('Reading the state file header:', state_path)
+    state_header = pd.read_csv(state_path, sep='\t', index_col=False, header=0, comment='#', nrows=0)
+    g['num_input_site'] = _infer_num_input_site_from_alignment_file(g['alignment_file'])
+    g = _populate_state_metadata_from_columns(g=g, state_columns=state_header.columns[3:])
     print('')
     return g
 
@@ -560,7 +615,22 @@ def _get_leaf_nonmissing_sites(g, required_leaf_ids):
 
 
 def mask_missing_sites(state_tensor, tree, selected_internal_ids=None, leaf_nonmissing_sites=None):
+    nonzero_masks = get_internal_site_nonzero_masks(
+        tree=tree,
+        state_tensor=state_tensor,
+        selected_internal_ids=selected_internal_ids,
+        leaf_nonmissing_sites=leaf_nonmissing_sites,
+    )
+    for nl, is_nonzero in nonzero_masks.items():
+        state_tensor[nl,:,:] = np.einsum('ij,i->ij', state_tensor[nl,:,:], is_nonzero)
+    return state_tensor
+
+
+def get_internal_site_nonzero_masks(tree, state_tensor=None, selected_internal_ids=None, leaf_nonmissing_sites=None):
+    if (state_tensor is None) and (leaf_nonmissing_sites is None):
+        raise ValueError('Either state_tensor or leaf_nonmissing_sites is required.')
     selected_set = None if selected_internal_ids is None else set([int(v) for v in selected_internal_ids])
+    nonzero_masks = dict()
     for node in tree.traverse():
         if (ete.is_root(node)) | (ete.is_leaf(node)):
             continue
@@ -585,9 +655,8 @@ def mask_missing_sites(state_tensor, tree, selected_internal_ids=None, leaf_nonm
         if len(group_nonzero) < 2:
             continue
         group_nonzero = np.stack(group_nonzero, axis=0)
-        is_nonzero = (group_nonzero.sum(axis=0) >= 2)
-        state_tensor[nl,:,:] = np.einsum('ij,i->ij', state_tensor[nl,:,:], is_nonzero)
-    return state_tensor
+        nonzero_masks[nl] = (group_nonzero.sum(axis=0) >= 2)
+    return nonzero_masks
 
 
 def _validate_state_table_node_site_rows(state_table, expected_num_site):

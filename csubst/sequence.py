@@ -250,6 +250,41 @@ def write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
             f.write('\n'.join(aln_out) + '\n')
 
 
+def write_alignment_from_symbol_indices(outfile, symbol_index_matrix, orders, missing_state, g, leaf_only=False, branch_ids=None):
+    orders = np.asarray(orders, dtype=object).reshape(-1)
+    symbol_index_matrix = np.asarray(symbol_index_matrix)
+    if symbol_index_matrix.ndim != 2:
+        raise ValueError('symbol_index_matrix should be a 2D array.')
+    aln_out = list()
+    branch_id_set = None
+    if branch_ids is not None:
+        branch_id_set = set(int(bid) for bid in _normalize_branch_ids(branch_ids))
+    if leaf_only:
+        nodes = ete.iter_leaves(g['tree'])
+    else:
+        nodes = g['tree'].traverse()
+    for node in nodes:
+        if ete.is_root(node):
+            continue
+        nlabel = int(ete.get_prop(node, "numerical_label"))
+        if (branch_id_set is not None) and (nlabel not in branch_id_set):
+            continue
+        if (nlabel < 0) or (nlabel >= symbol_index_matrix.shape[0]):
+            raise ValueError('Branch ID {} is out of bounds for symbol_index_matrix.'.format(nlabel))
+        symbol_index = np.asarray(symbol_index_matrix[nlabel, :]).reshape(-1)
+        symbol_text = np.full(shape=(symbol_index.shape[0],), fill_value=missing_state, dtype=object)
+        is_valid = (symbol_index >= 0) & (symbol_index < orders.shape[0])
+        if is_valid.any():
+            symbol_text[is_valid] = orders[symbol_index[is_valid].astype(np.int64, copy=False)]
+        node_name = '' if (node.name is None) else str(node.name)
+        aln_out.append('>' + node_name)
+        aln_out.append(''.join(symbol_text.tolist()))
+    with open(outfile, 'w') as f:
+        print('Writing sequence alignment:', outfile, flush=True)
+        if len(aln_out) != 0:
+            f.write('\n'.join(aln_out) + '\n')
+
+
 def build_state_index_lookup(input_state):
     input_states = np.asarray(input_state, dtype=object).reshape(-1)
     lookup = dict()

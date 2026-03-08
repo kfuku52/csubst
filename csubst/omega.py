@@ -1797,7 +1797,7 @@ def _calc_hypergeom_count_matrix(
     return dfq
 
 
-def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol):
+def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol, state_has_mass=None):
     jobs = list()
     if mode == 'cdn':
         dist_prop = 'SNdist'
@@ -1808,11 +1808,17 @@ def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol):
     for node in tree.traverse():
         if ete.is_root(node):
             continue
-        branch_length = max(float(ete.get_prop(node, dist_prop, 0)), 0.0)
-        if branch_length < float_tol:
-            continue
         nl = int(ete.get_prop(node, "numerical_label"))
-        parent_nl = int(ete.get_prop(node.up, "numerical_label"))
+        if (not ete.is_leaf(node)) and (not ete.node_has_state(node, state_has_mass=state_has_mass)):
+            continue
+        branch_length = max(float(ete.get_prop(node, dist_prop, 0)), 0.0)
+        parent_node = node.up
+        while (parent_node is not None) and (not ete.node_has_state(parent_node, state_has_mass=state_has_mass)):
+            branch_length += max(float(ete.get_prop(parent_node, dist_prop, 0)), 0.0)
+            parent_node = parent_node.up
+        if (parent_node is None) or (branch_length < float_tol):
+            continue
+        parent_nl = int(ete.get_prop(parent_node, "numerical_label"))
         if (parent_nl < 0) or (parent_nl >= num_node):
             continue
         if (nl < 0) or (nl >= num_node):
@@ -2222,11 +2228,13 @@ def get_exp_state(g, mode):
         rate_values = rate_values.reshape(-1)
     unique_site_rates, inverse_rate_indices = np.unique(rate_values, return_inverse=True)
     rate_site_indices = [np.where(inverse_rate_indices == i)[0] for i in range(unique_site_rates.shape[0])]
+    state_has_mass = (state.sum(axis=(1, 2)) >= float(g['float_tol']))
     branch_jobs = _collect_expected_state_branch_jobs(
         tree=g['tree'],
         mode=mode,
         num_node=stateE.shape[0],
         float_tol=float(g['float_tol']),
+        state_has_mass=state_has_mass,
     )
     n_jobs, estimated_work = _resolve_expected_state_n_jobs(
         num_branch_jobs=len(branch_jobs),

@@ -94,6 +94,19 @@ def test_transfer_root_rejects_non_bifurcating_source_root():
         tree.transfer_root(tree_to=tree_to, tree_from=tree_from)
 
 
+def test_clear_duplicate_internal_node_names_preserves_first_name():
+    tr = ete.PhyloNode("((A:1,B:1)X:1,(C:1,D:1)Y:1)Root;", format=1)
+    duplicate_node = [n for n in tr.traverse() if (not ete.is_leaf(n)) and (not ete.is_root(n)) and n.name == "X"][0]
+    duplicate_node.name = "Root"
+
+    out = tree._clear_duplicate_internal_node_names(tr)
+
+    internal_names = [n.name for n in out.traverse() if not ete.is_leaf(n)]
+    assert internal_names.count("Root") == 1
+    assert ete.get_tree_root(out).name == "Root"
+    assert duplicate_node.name == ""
+
+
 def test_read_treefile_rejects_unrooted_tree(tmp_path):
     tree_file = tmp_path / "unrooted.nwk"
     tree_file.write_text("(A:1,B:1,C:1);", encoding="utf-8")
@@ -308,6 +321,7 @@ class _FakeTreeAxis:
         self.text_calls = []
         self.text_items = []
         self.patch_calls = []
+        self.collection_calls = []
         self.xlim_calls = []
         self.transAxes = object()
         self.transData = object()
@@ -333,6 +347,10 @@ class _FakeTreeAxis:
     def add_patch(self, patch):
         self.patch_calls.append(patch)
         return patch
+
+    def add_collection(self, collection):
+        self.collection_calls.append(collection)
+        return collection
 
     def set_xlim(self, *args, **kwargs):
         self.xlim_calls.append((args, kwargs))
@@ -480,6 +498,24 @@ def test_draw_aa_logo_centers_glyph_within_site_slot():
     assert pytest.approx(right_edge, rel=0, abs=1e-12) == 2.0 + (draw_width / 2.0)
 
 
+def test_get_logo_glyph_caches_by_character():
+    class _FakeTextPathModule:
+        call_count = 0
+
+        @classmethod
+        def TextPath(cls, *args, **kwargs):
+            cls.call_count += 1
+            return object()
+
+    glyph1 = tree._get_logo_glyph(_FakeTextPathModule, None, 'Q')
+    glyph2 = tree._get_logo_glyph(_FakeTextPathModule, None, 'Q')
+    glyph3 = tree._get_logo_glyph(_FakeTextPathModule, None, 'R')
+
+    assert glyph1 is glyph2
+    assert glyph1 is not glyph3
+    assert _FakeTextPathModule.call_count == 2
+
+
 def test_format_tree_scale_label_includes_units():
     assert tree._format_tree_scale_label(0.2) == "0.2 subs/codon site"
 
@@ -510,6 +546,11 @@ def test_ellipsize_middle_preserves_prefix_and_suffix():
 
 def test_fit_leaf_label_items_ellipsizes_when_tree_would_be_too_narrow():
     axis = _FakeTreeAxis()
+    long_label = (
+        "Homo_sapiens_GENEBLAH_ISOFORMBLAH1_EXTRA_LONG_SUFFIX_0123456789_ABCD_"
+        "MORE_TEXT_TO_FORCE_MIDDLE_ELLIPSIS_BEYOND_128_CHARACTERS_AND_KEEP_GOING"
+    )
+    assert len(long_label) > tree.TREE_TIP_LABEL_NO_ELLIPSIS_UP_TO_CHARS
     leaf_items, x_right = tree._fit_leaf_label_items(
         ax=axis,
         x_left=-0.1,
@@ -518,7 +559,7 @@ def test_fit_leaf_label_items_ellipsizes_when_tree_would_be_too_narrow():
         leaf_label_items=[{
             'x': 0.9,
             'y': 0.0,
-            'text': 'Homo_sapiens_GENEBLAH_ISOFORMBLAH1',
+            'text': long_label,
             'fontsize': tree.TREE_TIP_LABEL_TEXT_SIZE,
             'color': 'black',
             'va': 'center',
@@ -527,8 +568,45 @@ def test_fit_leaf_label_items_ellipsizes_when_tree_would_be_too_narrow():
             'fallback_char_ratio': 0.024,
         }],
     )
-    assert leaf_items[0]['text'] == "Homo_sapie...FORMBLAH1"
+    assert "..." in leaf_items[0]['text']
     assert tree._get_content_width_ratio(-0.1, 0.8, x_right) >= tree.TREE_CONTENT_MIN_WIDTH_RATIO
+
+
+def test_fit_leaf_label_items_keeps_tps_sized_labels_unshortened():
+    axis = _FakeTreeAxis()
+    label = "Adiantum_capillus-veneris_CM043955.1_cds_KAI5070148.1_14541"
+    assert len(label) <= tree.TREE_TIP_LABEL_NO_ELLIPSIS_UP_TO_CHARS
+    leaf_items, x_right = tree._fit_leaf_label_items(
+        ax=axis,
+        x_left=-0.1,
+        content_right=0.8,
+        static_text_items=[],
+        leaf_label_items=[{
+            'x': 0.9,
+            'y': 0.0,
+            'text': label,
+            'fontsize': tree.TREE_TIP_LABEL_TEXT_SIZE,
+            'color': 'black',
+            'va': 'center',
+            'ha': 'left',
+            'clip_on': False,
+            'fallback_char_ratio': 0.024,
+        }],
+    )
+    assert leaf_items[0]['text'] == label
+    assert x_right > 1.5
+
+
+def test_should_use_exact_text_layout_disables_exact_path_for_large_trees():
+    assert tree._should_use_exact_text_layout(num_leaves=50, num_text_items=100)
+    assert not tree._should_use_exact_text_layout(
+        num_leaves=tree.TREE_EXACT_TEXT_LAYOUT_MAX_LEAVES + 1,
+        num_text_items=100,
+    )
+    assert not tree._should_use_exact_text_layout(
+        num_leaves=50,
+        num_text_items=tree.TREE_EXACT_TEXT_LAYOUT_MAX_ITEMS + 1,
+    )
 
 
 def test_render_tree_matplotlib_hides_missing_root_state_for_codon(monkeypatch, tmp_path):
@@ -563,6 +641,10 @@ def test_render_tree_matplotlib_hides_missing_root_state_for_codon(monkeypatch, 
         "top": 1.0,
     }
     assert fake_plt.figure.savefig_calls[-1][1]["pad_inches"] == tree.TREE_FIG_SAVE_PAD_INCHES
+    scale_label_item = next(item for item in fake_plt.axis.text_items if item["txt"].endswith("subs/codon site"))
+    expected_scale_label_y = tree.TREE_SCALE_BAR_Y + tree.TREE_SCALE_BAR_TICK_HALF_HEIGHT + tree.TREE_SCALE_BAR_LABEL_GAP
+    assert pytest.approx(scale_label_item["y"], rel=0, abs=1e-12) == expected_scale_label_y
+    assert scale_label_item["kwargs"]["va"] == "bottom"
 
 
 def test_render_tree_matplotlib_places_branch_ids_below_branch_midpoints(monkeypatch, tmp_path):
@@ -640,6 +722,28 @@ def test_render_tree_matplotlib_draws_species_overlap_node_markers(monkeypatch, 
     scatter_args, scatter_kwargs = fake_plt.axis.scatter_calls[0]
     assert scatter_kwargs["facecolor"] == tree.TREE_DUPLICATION_COLOR
     assert scatter_kwargs["s"] == tree.TREE_NODE_MARKER_AREA
+    assert scatter_kwargs["zorder"] == tree.TREE_NODE_MARKER_ZORDER
+
+
+def test_render_tree_matplotlib_uses_projecting_caps_for_internal_segments(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
+
+    tree._render_tree_matplotlib(
+        tree=tr,
+        trait_name="trait",
+        file_name=str(tmp_path / "caps.pdf"),
+        label="all",
+    )
+
+    capstyles = [collection.get_capstyle() for collection in fake_plt.axis.collection_calls]
+    assert tree.TREE_LINE_CAPSTYLE in capstyles
+    assert tree.TREE_LINE_TERMINAL_CAPSTYLE in capstyles
+    assert all(collection.get_joinstyle() == tree.TREE_LINE_JOINSTYLE for collection in fake_plt.axis.collection_calls)
 
 
 def test_render_tree_matplotlib_hides_missing_root_state_for_aa(monkeypatch, tmp_path):
@@ -675,6 +779,35 @@ def test_render_tree_matplotlib_hides_missing_root_state_for_aa(monkeypatch, tmp
     assert "N" in fake_plt.axis.text_calls
 
 
+def test_render_tree_matplotlib_offsets_root_state_text_to_clear_root_marker(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
+
+    tree._render_tree_matplotlib(
+        tree=tr,
+        trait_name="trait",
+        file_name=str(tmp_path / "state_root_offset.pdf"),
+        state_by_node={
+            labels["R"]: "AAA",
+            labels["A"]: "AAC",
+            labels["B"]: "AAG",
+        },
+        state_mode="codon",
+        node_type_by_id={labels["R"]: "duplication"},
+    )
+
+    xcoord,_,_ = tree._get_tree_xy(tr)
+    xspan = max(xcoord.values())
+    root_item = next(item for item in fake_plt.axis.text_items if item["txt"] == "AAA")
+    expected_x = xcoord[id(tr)] + (xspan * (tree.TREE_STATE_X_PADDING_RATIO + tree.TREE_ROOT_STATE_EXTRA_X_PADDING_RATIO))
+    assert pytest.approx(root_item["x"], rel=0, abs=1e-12) == expected_x
+
+
 def test_render_tree_matplotlib_places_figure_title_in_axes_coordinates(monkeypatch, tmp_path):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     for node in tr.traverse():
@@ -694,7 +827,7 @@ def test_render_tree_matplotlib_places_figure_title_in_axes_coordinates(monkeypa
     assert title_item["x"] == tree.TREE_FIG_TITLE_X
     assert title_item["y"] == tree.TREE_FIG_TITLE_Y
     assert title_item["kwargs"]["ha"] == "left"
-    assert title_item["kwargs"]["va"] == "bottom"
+    assert title_item["kwargs"]["va"] == "top"
     assert title_item["kwargs"]["transform"] is fake_plt.axis.transAxes
     assert fake_plt.figure.suptitle_calls == []
 
@@ -782,6 +915,32 @@ def test_get_num_adjusted_sites_does_not_mutate_parent_state_tensor():
     parent_before = g["state_cdn"][nodes["R"], :, :].copy()
     tree.get_num_adjusted_sites(g=g, node=a_node)
     np.testing.assert_allclose(g["state_cdn"][nodes["R"], :, :], parent_before, atol=1e-12)
+
+
+def test_get_num_adjusted_sites_uses_nearest_stateful_parent_after_reroot():
+    iqtree_like = ete.PhyloNode("(A:1,B:1,(C:1,D:1)Y:1)R;", format=1)
+    rooted = ete.PhyloNode("(A:1,(B:1,(C:1,D:1)Y:1):1)RR;", format=1)
+    tr = tree.add_numerical_node_labels(tree.transfer_root(tree_to=iqtree_like, tree_from=rooted))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    b_node = [n for n in tr.traverse() if n.name == "B"][0]
+    num_node = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    state_cdn = np.zeros((num_node, 1, 2), dtype=float)
+    state_cdn[labels["R"], 0, :] = [1.0, 0.0]
+    state_cdn[labels["Y"], 0, :] = [1.0, 0.0]
+    state_cdn[labels["A"], 0, :] = [1.0, 0.0]
+    state_cdn[labels["B"], 0, :] = [0.0, 1.0]
+    state_cdn[labels["C"], 0, :] = [1.0, 0.0]
+    state_cdn[labels["D"], 0, :] = [1.0, 0.0]
+    g = {
+        "state_cdn": state_cdn,
+        "codon_orders": np.array(["AAA", "AAG"]),
+        "codon_table": [["K", "AAA"], ["K", "AAG"]],
+        "instantaneous_codon_rate_matrix": np.array([[0.0, 1.0], [1.0, 0.0]], dtype=float),
+        "float_tol": 1e-12,
+    }
+    adjusted_s, adjusted_n = tree.get_num_adjusted_sites(g=g, node=b_node)
+    assert adjusted_s > 0.0
+    assert pytest.approx(adjusted_n, abs=1e-12) == 0.0
 
 
 def test_get_nice_scale_length_returns_expected_steps():
@@ -1772,3 +1931,44 @@ def test_rescale_branch_length_adjusted_site_keeps_nonzero_component_when_other_
     assert ete.get_prop(a_node, "Sdist") == pytest.approx(0.0, abs=1e-12)
     assert ete.get_prop(a_node, "Ndist") == pytest.approx(a_node.dist, abs=1e-12)
     assert ete.get_prop(a_node, "SNdist") == pytest.approx(a_node.dist, abs=1e-12)
+
+
+def test_rescale_branch_length_adjusted_site_accumulates_distance_across_state_less_synthetic_parent(monkeypatch):
+    iqtree_like = ete.PhyloNode("(A:1,B:1,(C:1,D:1)Y:1)R;", format=1)
+    rooted = ete.PhyloNode("(A:1,(B:1,(C:1,D:1)Y:1):1)RR;", format=1)
+    tr = tree.add_numerical_node_labels(tree.transfer_root(tree_to=iqtree_like, tree_from=rooted))
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse() if node.name}
+    b_node = next(node for node in tr.traverse() if node.name == "B")
+    synthetic_parent = b_node.up
+    assert synthetic_parent is not None
+    assert synthetic_parent.name in ("", None)
+    num_node = max(int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()) + 1
+    state_cdn = np.zeros((num_node, 1, 1), dtype=float)
+    for name in ["R", "Y", "A", "B", "C", "D"]:
+        state_cdn[labels[name], 0, 0] = 1.0
+    g = {
+        "tree": tr,
+        "state_cdn": state_cdn,
+        "float_tol": 1e-12,
+    }
+    os_counts = np.zeros(num_node, dtype=float)
+    on_counts = np.zeros(num_node, dtype=float)
+    on_counts[labels["B"]] = 2.0
+    os_tensor = object()
+    on_tensor = object()
+
+    def fake_get_branch_sub_counts(tensor):
+        if tensor is os_tensor:
+            return os_counts
+        if tensor is on_tensor:
+            return on_counts
+        raise AssertionError("Unexpected tensor object")
+
+    monkeypatch.setattr(tree.substitution, "get_branch_sub_counts", fake_get_branch_sub_counts)
+    monkeypatch.setattr(tree, "get_num_adjusted_sites", lambda local_g, node: (0.0, 1.0))
+
+    tree.rescale_branch_length(g, os_tensor, on_tensor, denominator="adjusted_site")
+    expected_dist = float(b_node.dist or 0.0) + float(synthetic_parent.dist or 0.0)
+    assert ete.get_prop(b_node, "Sdist") == pytest.approx(0.0, abs=1e-12)
+    assert ete.get_prop(b_node, "Ndist") == pytest.approx(expected_dist, abs=1e-12)
+    assert ete.get_prop(b_node, "SNdist") == pytest.approx(expected_dist, abs=1e-12)

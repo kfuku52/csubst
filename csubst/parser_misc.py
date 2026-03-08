@@ -56,12 +56,13 @@ def prepare_input_context(
     prepare_state=False,
     force_notree_run=False,
     ignore_tree_inconsistency=False,
+    state_metadata_only=False,
 ):
     g["codon_table"] = genetic_code.get_codon_table(ncbi_id=g["genetic_code"])
     g = tree.read_treefile(g)
     g = generate_intermediate_files(g, force_notree_run=force_notree_run)
     g = annotate_tree(g, ignore_tree_inconsistency=ignore_tree_inconsistency)
-    g = read_input(g)
+    g = read_input(g, state_metadata_only=state_metadata_only)
     if include_foreground:
         g = foreground.get_foreground_branch(g)
         if include_marginal:
@@ -250,9 +251,15 @@ def generate_intermediate_files(g, force_notree_run=False):
         raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     return g
 
-def read_input(g):
+def read_input(g, state_metadata_only=False):
     if g['infile_type'] == 'iqtree':
-        g = parser_iqtree.get_input_information(g)
+        if state_metadata_only:
+            g = parser_iqtree.read_state_header(g)
+            g = parser_iqtree.read_iqtree(g)
+            g = parser_iqtree.read_log(g)
+            g['iqtree_rate_values'] = parser_iqtree.read_rate(g)
+        else:
+            g = parser_iqtree.get_input_information(g)
     else:
         raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     expectation_method = _resolve_expectation_method(g)
@@ -526,7 +533,13 @@ def _get_required_state_branch_ids(g):
         node = node_by_id.get(branch_id, None)
         if (node is None) or ete.is_root(node):
             continue
-        required.add(int(ete.get_prop(node.up, "numerical_label")))
+        parent = getattr(node, 'up', None)
+        while parent is not None:
+            required.add(int(ete.get_prop(parent, "numerical_label")))
+            parent_name = '' if (parent.name is None) else str(parent.name)
+            if ete.is_root(parent) or (parent_name != ''):
+                break
+            parent = getattr(parent, 'up', None)
     required_ids = np.array(sorted(required), dtype=np.int64)
     return required_ids
 
@@ -771,6 +784,14 @@ def _get_drop_site_branch_pairs(g):
     selected_branch_set = None
     if selected_branch_ids is not None:
         selected_branch_set = set(int(v) for v in _normalize_branch_ids(selected_branch_ids).tolist())
+    state_cdn = g.get('state_cdn', None)
+    state_nsy = g.get('state_nsy', None)
+    if state_cdn is not None:
+        state_has_mass = (state_cdn.sum(axis=(1, 2)) > float(g.get('float_tol', 0)))
+    elif state_nsy is not None:
+        state_has_mass = (state_nsy.sum(axis=(1, 2)) > float(g.get('float_tol', 0)))
+    else:
+        state_has_mass = None
     branch_pairs = list()
     for node in g['tree'].traverse():
         if ete.is_root(node):
@@ -778,7 +799,12 @@ def _get_drop_site_branch_pairs(g):
         child = int(ete.get_prop(node, "numerical_label"))
         if (selected_branch_set is not None) and (child not in selected_branch_set):
             continue
-        parent = int(ete.get_prop(node.up, "numerical_label"))
+        if not ete.node_has_state(node, state_has_mass=state_has_mass):
+            continue
+        parent_node = ete.get_effective_state_parent(node, state_has_mass=state_has_mass)
+        if parent_node is None:
+            continue
+        parent = int(ete.get_prop(parent_node, "numerical_label"))
         branch_pairs.append((child, parent))
     return branch_pairs
 
@@ -841,10 +867,13 @@ def _slice_site_axis_in_state_tensor(state_tensor, keep_mask):
 
 def drop_invariant_tip_sites(g):
     state_cdn = g.get('state_cdn', None)
-    if state_cdn is None:
-        return g
-    site_index_alignment = get_site_index_alignment(g=g, expected_num_site=state_cdn.shape[1])
     mode = str(g.get('drop_invariant_tip_sites_mode', 'tip_invariant')).strip().lower()
+    expected_num_site = None
+    if state_cdn is not None:
+        expected_num_site = state_cdn.shape[1]
+    elif g.get('num_input_site', None) is not None:
+        expected_num_site = int(g['num_input_site'])
+    site_index_alignment = get_site_index_alignment(g=g, expected_num_site=expected_num_site)
     if mode == 'tip_invariant':
         precomputed = g.get('_precomputed_tip_invariant_site_mask', None)
         if precomputed is not None:
@@ -858,6 +887,8 @@ def drop_invariant_tip_sites(g):
             is_drop_site = _get_tip_invariant_site_mask(g=g, site_index_alignment=site_index_alignment)
         mode_label = 'tip-invariant'
     elif mode == 'zero_sub_mass':
+        if state_cdn is None:
+            raise ValueError('state_cdn and state_nsy are required for zero_sub_mass site filtering.')
         is_drop_site = _get_zero_substitution_mass_site_mask(g=g)
         mode_label = 'zero-sub-mass'
     else:
@@ -875,10 +906,11 @@ def drop_invariant_tip_sites(g):
     if keep_mask.sum() == 0:
         txt = 'All codon sites were classified as drop candidates and would be dropped (mode={}).'
         raise ValueError(txt.format(mode))
-    g['state_nuc'] = _slice_site_axis_in_state_tensor(g.get('state_nuc', None), keep_mask)
-    g['state_cdn'] = _slice_site_axis_in_state_tensor(g.get('state_cdn', None), keep_mask)
-    g['state_pep'] = _slice_site_axis_in_state_tensor(g.get('state_pep', None), keep_mask)
-    g['state_nsy'] = _slice_site_axis_in_state_tensor(g.get('state_nsy', None), keep_mask)
+    if state_cdn is not None:
+        g['state_nuc'] = _slice_site_axis_in_state_tensor(g.get('state_nuc', None), keep_mask)
+        g['state_cdn'] = _slice_site_axis_in_state_tensor(g.get('state_cdn', None), keep_mask)
+        g['state_pep'] = _slice_site_axis_in_state_tensor(g.get('state_pep', None), keep_mask)
+        g['state_nsy'] = _slice_site_axis_in_state_tensor(g.get('state_nsy', None), keep_mask)
     g['site_index_alignment'] = site_index_alignment[keep_mask]
     dropped_alignment_sites = site_index_alignment[is_drop_site]
     g['drop_invariant_tip_sites_mode_applied'] = mode

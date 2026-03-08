@@ -122,6 +122,36 @@ def get_tree_root(tree):
     return tree.get_tree_root()
 
 
+def node_has_state(node, state_has_mass=None):
+    if state_has_mass is None:
+        return True
+    nl = get_prop(node, "numerical_label", None)
+    try:
+        nl = int(nl)
+    except (TypeError, ValueError):
+        return False
+    if (nl < 0) or (nl >= len(state_has_mass)):
+        return False
+    return bool(state_has_mass[nl])
+
+
+def get_effective_state_parent(node, state_has_mass=None, accumulate_distance=False):
+    parent = getattr(node, "up", None)
+    if accumulate_distance:
+        distance = max(float(getattr(node, "dist", 0.0) or 0.0), 0.0)
+    while parent is not None:
+        if node_has_state(parent, state_has_mass=state_has_mass):
+            if accumulate_distance:
+                return parent, distance
+            return parent
+        if accumulate_distance:
+            distance += max(float(getattr(parent, "dist", 0.0) or 0.0), 0.0)
+        parent = getattr(parent, "up", None)
+    if accumulate_distance:
+        return None, distance
+    return None
+
+
 def add_features(node, **kwargs):
     if hasattr(node, "add_props"):
         node.add_props(**kwargs)

@@ -117,7 +117,7 @@ def _get_selected_branch_set(g):
 
 
 def _collect_sub_tensor_branch_pairs(g, state_tensor_anc, selected_branch_set):
-    parent_state_mass = state_tensor_anc.sum(axis=(1, 2))
+    state_has_mass = (state_tensor_anc.sum(axis=(1, 2)) >= g['float_tol'])
     branch_pairs = []
     for node in g['tree'].traverse():
         if ete.is_root(node):
@@ -125,9 +125,12 @@ def _collect_sub_tensor_branch_pairs(g, state_tensor_anc, selected_branch_set):
         child = int(ete.get_prop(node, "numerical_label"))
         if (selected_branch_set is not None) and (child not in selected_branch_set):
             continue
-        parent = int(ete.get_prop(node.up, "numerical_label"))
-        if parent_state_mass[parent] < g['float_tol']:
+        if not ete.node_has_state(node, state_has_mass=state_has_mass):
             continue
+        parent_node = ete.get_effective_state_parent(node, state_has_mass=state_has_mass)
+        if parent_node is None:
+            continue
+        parent = int(ete.get_prop(parent_node, "numerical_label"))
         branch_pairs.append((child, parent))
     return branch_pairs
 

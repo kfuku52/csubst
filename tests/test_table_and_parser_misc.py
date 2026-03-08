@@ -614,6 +614,27 @@ def test_get_required_state_branch_ids_ignores_none_target_ids():
     np.testing.assert_array_equal(out, np.array(sorted([labels["R"], labels["N1"]]), dtype=np.int64))
 
 
+def test_get_required_state_branch_ids_climbs_past_unnamed_internal_parent():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,(B:1,C:1):1)X:1,D:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    target_node = next(n for n in tr.traverse() if n.name == "B")
+    unnamed_parent = target_node.up
+    assert unnamed_parent is not None
+    assert unnamed_parent.name in ("", None)
+    g = {
+        "tree": tr,
+        "target_ids": {"trait1": np.array([labels["B"]], dtype=np.int64)},
+    }
+    out = parser_misc._get_required_state_branch_ids(g)
+    np.testing.assert_array_equal(
+        out,
+        np.array(
+            sorted([labels["R"], labels["X"], labels["B"], int(ete.get_prop(unnamed_parent, "numerical_label"))]),
+            dtype=np.int64,
+        ),
+    )
+
+
 def test_get_required_state_branch_ids_rejects_non_integer_target_ids():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     g = {
@@ -1192,7 +1213,7 @@ def test_drop_invariant_tip_sites_drops_and_writes_site_map(tmp_path, monkeypatc
     assert out["state_nsy"].shape[1] == 1
     assert out["state_nuc"].shape[1] == 3
     np.testing.assert_allclose(out["iqtree_rate_values"], np.array([0.3], dtype=float), atol=1e-12)
-    map_path = tmp_path / "csubst_sites_index_map.tsv"
+    map_path = tmp_path / "csubst_site_index_map.tsv"
     assert map_path.exists()
     site_map = pd.read_csv(map_path, sep="\t")
     assert site_map["codon_site_alignment"].tolist() == [0, 1, 2]
@@ -1221,7 +1242,7 @@ def test_drop_invariant_tip_sites_skips_site_map_when_disabled(tmp_path, monkeyp
         "_precomputed_tip_invariant_site_mask": np.array([True, False, True], dtype=bool),
     }
     parser_misc.drop_invariant_tip_sites(g)
-    assert not (tmp_path / "csubst_sites_index_map.tsv").exists()
+    assert not (tmp_path / "csubst_site_index_map.tsv").exists()
 
 
 def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, monkeypatch):
@@ -1263,7 +1284,7 @@ def test_drop_invariant_tip_sites_drops_single_nonmissing_tip_site(tmp_path, mon
     np.testing.assert_array_equal(out["site_index_alignment"], np.array([2], dtype=np.int64))
     assert out["num_dropped_tip_invariant_sites"] == 2
     np.testing.assert_array_equal(out["dropped_tip_invariant_site_alignment"], np.array([0, 1], dtype=np.int64))
-    site_map = pd.read_csv(tmp_path / "csubst_sites_index_map.tsv", sep="\t")
+    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, -1, 0]
     assert site_map["is_retained"].tolist() == ["N", "N", "Y"]
 
@@ -1297,7 +1318,7 @@ def test_drop_invariant_tip_sites_uses_precomputed_mask_when_available(tmp_path,
     out = parser_misc.drop_invariant_tip_sites(g)
     np.testing.assert_array_equal(out["site_index_alignment"], np.array([1], dtype=np.int64))
     assert out["state_cdn"].shape[1] == 1
-    site_map = pd.read_csv(tmp_path / "csubst_sites_index_map.tsv", sep="\t")
+    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, 0, -1]
     assert site_map["is_retained"].tolist() == ["N", "Y", "N"]
 
@@ -1350,5 +1371,59 @@ def test_drop_invariant_tip_sites_zero_sub_mass_mode_drops_only_zero_mass_sites(
     assert out["state_nsy"].shape[1] == 2
     assert out["state_nuc"].shape[1] == 6
     np.testing.assert_allclose(out["iqtree_rate_values"], np.array([0.2, 0.3], dtype=float), atol=1e-12)
-    site_map = pd.read_csv(tmp_path / "csubst_sites_index_map.tsv", sep="\t")
+    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, 0, 1]
+
+
+def test_zero_sub_mass_ignores_state_less_synthetic_parent_after_reroot():
+    iqtree_like = ete.PhyloNode("(A:1,B:1,(C:1,D:1)Y:1)R;", format=1)
+    rooted = ete.PhyloNode("(A:1,(B:1,(C:1,D:1)Y:1):1)RR;", format=1)
+    tr = tree.add_numerical_node_labels(tree.transfer_root(tree_to=iqtree_like, tree_from=rooted))
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse() if node.name}
+    num_node = max(int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()) + 1
+    state_cdn = np.zeros((num_node, 1, 3), dtype=float)
+    state_cdn[labels["R"], 0, 0] = 1.0
+    state_cdn[labels["Y"], 0, 0] = 1.0
+    state_cdn[labels["A"], 0, 0] = 1.0
+    state_cdn[labels["B"], 0, 1] = 1.0
+    state_cdn[labels["C"], 0, 0] = 1.0
+    state_cdn[labels["D"], 0, 0] = 1.0
+    state_nsy = np.zeros((num_node, 1, 2), dtype=float)
+    state_nsy[:, 0, 0] = state_cdn[:, 0, 0] + state_cdn[:, 0, 1]
+    state_nsy[:, 0, 1] = state_cdn[:, 0, 2]
+    g = {
+        "tree": tr,
+        "state_cdn": state_cdn,
+        "state_nsy": state_nsy,
+        "float_tol": 1e-12,
+        "amino_acid_orders": np.array(["K", "N"], dtype=object),
+        "synonymous_indices": {"K": [0, 1], "N": [2]},
+    }
+    out = parser_misc._get_zero_substitution_mass_site_mask(g)
+    np.testing.assert_array_equal(out, np.array([False], dtype=bool))
+
+
+def test_drop_invariant_tip_sites_works_without_state_tensors_for_tip_invariant_mode(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    seq_by_leaf = {
+        "A": "AAAAAAAAG",
+        "B": "AAAAAAAAG",
+        "C": "AAAAAAAAA",
+    }
+    for leaf in ete.iter_leaves(tr):
+        ete.set_prop(leaf, "sequence", seq_by_leaf[leaf.name])
+    g = {
+        "tree": tr,
+        "num_input_site": 3,
+        "write_site_index_map": True,
+        "codon_orders": np.array(["AAA", "AAG"], dtype=object),
+        "iqtree_rate_values": np.array([0.1, 0.2, 0.3], dtype=float),
+    }
+    out = parser_misc.drop_invariant_tip_sites(g)
+    np.testing.assert_array_equal(out["site_index_alignment"], np.array([2], dtype=np.int64))
+    assert "state_cdn" not in out
+    np.testing.assert_allclose(out["iqtree_rate_values"], np.array([0.3], dtype=float), atol=1e-12)
+    site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
+    assert site_map["site"].tolist() == [-1, -1, 0]
+    assert site_map["is_retained"].tolist() == ["N", "N", "Y"]

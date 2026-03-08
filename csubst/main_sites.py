@@ -928,10 +928,18 @@ def export2chimera(df, g):
         _write_chimera_fasta_for_seq(seq_key=seq_key, seq=seq, g=g)
 
 def get_parent_branch_ids(branch_ids, g):
+    state_ref = g.get('state_cdn', g.get('state_pep', g.get('state_nsy', None)))
+    if state_ref is None:
+        state_has_mass = None
+    else:
+        state_has_mass = (state_ref.sum(axis=(1, 2)) > float(g.get('float_tol', 0)))
     parent_branch_ids = dict()
     for node in g['tree'].traverse():
         if ete.get_prop(node, "numerical_label") in branch_ids:
-            parent_branch_ids[ete.get_prop(node, "numerical_label")] = ete.get_prop(node.up, "numerical_label")
+            parent_node = ete.get_effective_state_parent(node, state_has_mass=state_has_mass)
+            if parent_node is None:
+                continue
+            parent_branch_ids[ete.get_prop(node, "numerical_label")] = ete.get_prop(parent_node, "numerical_label")
     return parent_branch_ids
 
 def add_states(df, branch_ids, g, add_hydrophobicity=True):

@@ -461,3 +461,173 @@ def test_main_inspect_applies_3di_smoke_branch_limit(tmp_path, monkeypatch):
     main_inspect.main_inspect(g)
     np.testing.assert_array_equal(observed["sa_ids"], expected_with_root)
     np.testing.assert_array_equal(observed["nsy_branch_ids"], expected_nonroot)
+
+
+def test_main_inspect_uses_fast_bypass_for_site_specific_state_plots(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    calls = []
+
+    def fake_fast(local_g):
+        calls.append("fast")
+        return local_g
+
+    monkeypatch.setattr(main_inspect, "_run_fast_unfiltered_outputs", fake_fast)
+    monkeypatch.setattr(
+        main_inspect,
+        "_run_standard_unfiltered_outputs",
+        lambda _g: (_ for _ in ()).throw(AssertionError("standard path should not run for site-specific requests")),
+    )
+    monkeypatch.setattr(main_inspect, "_finalize_inspect_outputs", lambda local_g: local_g)
+
+    g = {
+        "genetic_code": 1,
+        "plot_state_aa": "2-3",
+        "plot_state_codon": "no",
+    }
+    main_inspect.main_inspect(g)
+    assert calls == ["fast"]
+
+
+def test_main_inspect_uses_standard_path_for_all_state_plots(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    calls = []
+
+    def fake_standard(local_g):
+        calls.append("standard")
+        return local_g
+
+    monkeypatch.setattr(
+        main_inspect,
+        "_run_fast_unfiltered_outputs",
+        lambda _g: (_ for _ in ()).throw(AssertionError("fast path should not run for all-site requests")),
+    )
+    monkeypatch.setattr(main_inspect, "_run_standard_unfiltered_outputs", fake_standard)
+    monkeypatch.setattr(main_inspect, "_finalize_inspect_outputs", lambda local_g: local_g)
+
+    g = {
+        "genetic_code": 1,
+        "plot_state_aa": "all",
+        "plot_state_codon": "no",
+    }
+    main_inspect.main_inspect(g)
+    assert calls == ["standard"]
+
+
+def test_run_fast_unfiltered_outputs_streams_selected_sites_and_writes_alignments(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
+    alignment_file = tmp_path / "alignment.fa"
+    alignment_file.write_text(
+        ">A\nAAAAAGAAA\n>B\nAAAAAGAAA\n>C\nAAGAAAAAG\n",
+        encoding="utf-8",
+    )
+    state_file = tmp_path / "test.state"
+    state_file.write_text(
+        "\n".join(
+            [
+                "Node\tSite\tState\tp_AAA\tp_AAG",
+                "R\t1\tAAA\t1.0\t0.0",
+                "R\t2\tAAG\t0.0\t1.0",
+                "R\t3\tAAA\t1.0\t0.0",
+                "N1\t1\tAAA\t1.0\t0.0",
+                "N1\t2\t?\t0.0\t0.0",
+                "N1\t3\tAAG\t0.0\t1.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    def fake_prepare(local_g):
+        local_g["tree"] = tr
+        local_g["num_node"] = len(list(tr.traverse()))
+        local_g["num_input_site"] = 3
+        local_g["num_input_state"] = 2
+        local_g["input_state"] = ["AAA", "AAG"]
+        local_g["state_probability_columns"] = ["p_AAA", "p_AAG"]
+        local_g["codon_orders"] = np.array(["AAA", "AAG"], dtype=object)
+        local_g["amino_acid_orders"] = np.array(["K"], dtype=object)
+        local_g["matrix_groups"] = {"K": ["AAA", "AAG"]}
+        local_g["synonymous_indices"] = {"K": [0, 1]}
+        local_g["max_synonymous_size"] = 2
+        local_g["nonsyn_recode"] = "no"
+        local_g["fg_df"] = pd.DataFrame(columns=["name"])
+        local_g["target_ids"] = {}
+        local_g["float_type"] = np.float64
+        local_g["float_tol"] = 1e-12
+        local_g["alignment_file"] = str(alignment_file)
+        local_g["iqtree_state"] = str(state_file)
+        local_g["state_loaded_branch_ids"] = None
+        local_g["outdir"] = str(tmp_path)
+        return local_g
+
+    plot_calls = []
+
+    def fake_plot_state_tree_selected_sites(state, orders, mode, g, site_numbers, output_dir=None, plot_request="all", plot_request_name=None):
+        plot_calls.append((str(mode), tuple(site_numbers.tolist()), tuple(state.shape), tuple(np.asarray(orders, dtype=object).tolist())))
+        return []
+
+    monkeypatch.setattr(main_inspect, "_prepare_fast_inspect_context", fake_prepare)
+    monkeypatch.setattr(main_inspect.tree, "plot_state_tree_selected_sites", fake_plot_state_tree_selected_sites)
+
+    g = {
+        "genetic_code": 1,
+        "plot_state_aa": "2-3",
+        "plot_state_codon": "2-3",
+    }
+    main_inspect._run_fast_unfiltered_outputs(g)
+
+    codon_alignment = (tmp_path / "csubst_alignment_codon.fa").read_text(encoding="utf-8")
+    aa_alignment = (tmp_path / "csubst_alignment_aa.fa").read_text(encoding="utf-8")
+    assert ">N1\nAAA---AAG\n" in codon_alignment
+    assert ">A\nAAAAAGAAA\n" in codon_alignment
+    assert ">N1\nK-K\n" in aa_alignment
+    assert ("aa", (2, 3), (5, 2, 1), ("K",)) in plot_calls
+    assert ("codon", (2, 3), (5, 2, 2), ("AAA", "AAG")) in plot_calls
+
+
+def test_stream_internal_states_for_fast_inspect_allows_unnamed_internal_node(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)Root;", format=1))
+    duplicate_node = [n for n in tr.traverse() if (not ete.is_leaf(n)) and (not ete.is_root(n)) and n.name == "X"][0]
+    duplicate_node.name = "Root"
+    tr = tree._clear_duplicate_internal_node_names(tr)
+    root = ete.get_tree_root(tr)
+    root_id = int(ete.get_prop(root, "numerical_label"))
+    unnamed_id = int(ete.get_prop(duplicate_node, "numerical_label"))
+    state_file = tmp_path / "unnamed_internal.state"
+    state_file.write_text(
+        "\n".join(
+            [
+                "Node\tSite\tState\tp_AAA\tp_AAG",
+                "Root\t1\tAAA\t1.0\t0.0",
+                "Root\t2\tAAG\t0.0\t1.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    g = {
+        "tree": tr,
+        "num_node": len(list(tr.traverse())),
+        "num_input_site": 2,
+        "num_input_state": 2,
+        "state_probability_columns": ["p_AAA", "p_AAG"],
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+        "iqtree_state": str(state_file),
+        "ml_anc": False,
+    }
+    aa_config = {
+        "group_matrix": np.eye(2, dtype=np.float64),
+    }
+
+    codon_symbol_index, aa_symbol_index, state_cdn_subset = main_inspect._stream_internal_states_for_fast_inspect(
+        g=g,
+        selected_site_indices=np.array([0, 1], dtype=np.int64),
+        aa_config=aa_config,
+    )
+
+    np.testing.assert_allclose(state_cdn_subset[root_id, :, :], [[1.0, 0.0], [0.0, 1.0]], atol=1e-12)
+    np.testing.assert_allclose(state_cdn_subset[unnamed_id, :, :], 0.0, atol=1e-12)
+    np.testing.assert_array_equal(codon_symbol_index[root_id, :], [0, 1])

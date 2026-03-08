@@ -132,6 +132,35 @@ def test_get_exp_state_uses_branch_distance_props():
     np.testing.assert_allclose(cdn[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
 
 
+def test_collect_expected_state_branch_jobs_collapses_state_less_synthetic_parent():
+    iqtree_like = ete.PhyloNode("(A:1,B:1,(C:1,D:1)Y:1)R;", format=1)
+    rooted = ete.PhyloNode("(A:1,(B:1,(C:1,D:1)Y:1):1)RR;", format=1)
+    tr = tree.add_numerical_node_labels(tree.transfer_root(tree_to=iqtree_like, tree_from=rooted))
+    for node in tr.traverse():
+        ete.set_prop(node, "Ndist", float(node.dist or 0.0))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
+    synthetic_node = [n for n in tr.traverse() if (not ete.is_leaf(n)) and (not ete.is_root(n)) and (n.name == "")][0]
+    num_node = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    state_has_mass = np.zeros((num_node,), dtype=bool)
+    state_has_mass[labels["R"]] = True
+    state_has_mass[labels["Y"]] = True
+    state_has_mass[labels["A"]] = True
+    state_has_mass[labels["B"]] = True
+    state_has_mass[labels["C"]] = True
+    state_has_mass[labels["D"]] = True
+    jobs = omega._collect_expected_state_branch_jobs(
+        tree=tr,
+        mode="pep",
+        num_node=num_node,
+        float_tol=1e-12,
+        state_has_mass=state_has_mass,
+    )
+    job_by_child = {child: (parent, branch_length) for child, parent, branch_length in jobs}
+    expected_length = float([n for n in tr.traverse() if n.name == "B"][0].dist or 0.0) + float(synthetic_node.dist or 0.0)
+    assert job_by_child[labels["B"]][0] == labels["R"]
+    assert pytest.approx(job_by_child[labels["B"]][1], abs=1e-12) == expected_length
+
+
 def test_get_exp_state_nsy_uses_nonsynonymous_rate_matrix():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
