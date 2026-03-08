@@ -86,6 +86,13 @@ def test_sites_invalid_species_overlap_node_plot_fails_cleanly():
     assert "Traceback" not in log_text
 
 
+def test_inspect_help_includes_species_overlap_node_plot_option():
+    proc, log_text = _run_cli("inspect", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "--species_overlap_node_plot" in help_text
+
+
 def test_search_state_plot_options_are_rejected_after_move_to_inspect():
     proc, log_text = _run_cli("search", "--plot_state_aa", "yes")
     assert proc.returncode == 2

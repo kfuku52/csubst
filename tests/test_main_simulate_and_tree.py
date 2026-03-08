@@ -303,16 +303,39 @@ def test_plot_state_tree_pages_request_preserves_root_state(monkeypatch):
 
 class _FakeTreeAxis:
     def __init__(self):
+        self.plot_calls = []
+        self.scatter_calls = []
         self.text_calls = []
+        self.text_items = []
+        self.patch_calls = []
+        self.xlim_calls = []
+        self.transAxes = object()
+        self.transData = object()
 
     def plot(self, *args, **kwargs):
+        self.plot_calls.append((args, kwargs))
+        return None
+
+    def scatter(self, *args, **kwargs):
+        self.scatter_calls.append((args, kwargs))
         return None
 
     def text(self, x, y, txt, **kwargs):
         self.text_calls.append(str(txt))
+        self.text_items.append({
+            "x": x,
+            "y": y,
+            "txt": str(txt),
+            "kwargs": dict(kwargs),
+        })
         return None
 
+    def add_patch(self, patch):
+        self.patch_calls.append(patch)
+        return patch
+
     def set_xlim(self, *args, **kwargs):
+        self.xlim_calls.append((args, kwargs))
         return None
 
     def set_ylim(self, *args, **kwargs):
@@ -323,10 +346,21 @@ class _FakeTreeAxis:
 
 
 class _FakeTreeFigure:
+    def __init__(self):
+        self.savefig_calls = []
+        self.subplots_adjust_calls = []
+        self.suptitle_calls = []
+
     def savefig(self, *args, **kwargs):
+        self.savefig_calls.append((args, kwargs))
         return None
 
     def suptitle(self, *args, **kwargs):
+        self.suptitle_calls.append((args, kwargs))
+        return None
+
+    def subplots_adjust(self, *args, **kwargs):
+        self.subplots_adjust_calls.append((args, kwargs))
         return None
 
 
@@ -340,6 +374,161 @@ class _FakeTreePyplot:
 
     def close(self, *args, **kwargs):
         return None
+
+
+def test_draw_logo_placeholder_uses_centered_inset_slot_dimensions():
+    axis = _FakeTreeAxis()
+
+    tree._draw_logo_placeholder(
+        ax=axis,
+        x=2.0,
+        y=3.0,
+        text='-',
+        color='black',
+        logo_width=0.25,
+        logo_height=0.78,
+    )
+
+    assert axis.text_calls == []
+    assert len(axis.patch_calls) == 2
+    rect = axis.patch_calls[0]
+    expected_center_x = 2.0 + (0.25 * tree.AA_LOGO_MISSING_CENTER_SHIFT_RATIO)
+    expected_width = (0.25 * tree.AA_LOGO_SLOT_INNER_WIDTH_RATIO) * tree.AA_LOGO_MISSING_BOX_WIDTH_RATIO
+    assert pytest.approx(rect.get_x(), rel=0, abs=1e-12) == expected_center_x - (expected_width / 2.0)
+    assert pytest.approx(rect.get_y(), rel=0, abs=1e-12) == 3.0 - (0.78 / 2.0)
+    assert pytest.approx(rect.get_width(), rel=0, abs=1e-12) == expected_width
+    assert pytest.approx(rect.get_height(), rel=0, abs=1e-12) == 0.78
+    bar = axis.patch_calls[1]
+    expected_bar_width = expected_width * tree.AA_LOGO_MISSING_BAR_WIDTH_RATIO
+    expected_bar_height = 0.78 * tree.AA_LOGO_MISSING_BAR_HEIGHT_RATIO
+    assert pytest.approx(bar.get_x(), rel=0, abs=1e-12) == expected_center_x - (expected_bar_width / 2.0)
+    assert pytest.approx(bar.get_y(), rel=0, abs=1e-12) == 3.0 - (expected_bar_height / 2.0)
+    assert pytest.approx(bar.get_width(), rel=0, abs=1e-12) == expected_bar_width
+    assert pytest.approx(bar.get_height(), rel=0, abs=1e-12) == expected_bar_height
+
+
+def test_draw_aa_logo_centers_glyph_within_site_slot():
+    axis = _FakeTreeAxis()
+
+    class _FakeBBox:
+        x0 = 0.0
+        y0 = 0.0
+        width = 2.0
+        height = 1.0
+
+    class _FakeGlyph:
+        def get_extents(self):
+            return _FakeBBox()
+
+    class _FakeTextPathModule:
+        @staticmethod
+        def TextPath(*args, **kwargs):
+            return _FakeGlyph()
+
+    class _FakeTransform:
+        def __init__(self):
+            self.sx = None
+            self.sy = None
+            self.tx = None
+            self.ty = None
+
+        def scale(self, sx, sy):
+            self.sx = sx
+            self.sy = sy
+            return self
+
+        def translate(self, tx, ty):
+            self.tx = tx
+            self.ty = ty
+            return self
+
+        def __add__(self, other):
+            return self
+
+    class _FakeTransformsModule:
+        @staticmethod
+        def Affine2D():
+            return _FakeTransform()
+
+    class _FakePathPatch:
+        def __init__(self, glyph, transform=None, **kwargs):
+            self.glyph = glyph
+            self.transform = transform
+
+    class _FakePatchesModule:
+        PathPatch = _FakePathPatch
+
+    assert tree._draw_aa_logo(
+        ax=axis,
+        x=2.0,
+        y=3.0,
+        probabilities=np.array([1.0], dtype=float),
+        orders=np.array(['Q'], dtype=object),
+        logo_width=0.5,
+        logo_height=1.0,
+        mpl_patches=_FakePatchesModule,
+        mpl_textpath=_FakeTextPathModule,
+        mpl_transforms=_FakeTransformsModule,
+        font_properties=None,
+    )
+
+    patch = axis.patch_calls[0]
+    draw_width = 0.5 * tree.AA_LOGO_SLOT_INNER_WIDTH_RATIO
+    left_edge = patch.transform.tx + (_FakeBBox.x0 * patch.transform.sx)
+    right_edge = patch.transform.tx + ((_FakeBBox.x0 + _FakeBBox.width) * patch.transform.sx)
+    assert pytest.approx(left_edge, rel=0, abs=1e-12) == 2.0 - (draw_width / 2.0)
+    assert pytest.approx(right_edge, rel=0, abs=1e-12) == 2.0 + (draw_width / 2.0)
+
+
+def test_format_tree_scale_label_includes_units():
+    assert tree._format_tree_scale_label(0.2) == "0.2 subs/codon site"
+
+
+def test_estimate_text_right_limit_uses_fallback_text_width_ratio():
+    axis = _FakeTreeAxis()
+    x_right = tree._estimate_text_right_limit(
+        ax=axis,
+        x_left=-0.1,
+        base_right=1.0,
+        text_items=[{
+            'x': 1.0,
+            'text': 'ABCDEFGHIJ',
+            'fontsize': tree.TREE_TIP_LABEL_TEXT_SIZE,
+            'ha': 'left',
+            'fallback_char_ratio': 0.02,
+        }],
+    )
+    expected_ratio = 10 * 0.02
+    expected_right = (1.0 - (expected_ratio * -0.1)) / (1.0 - expected_ratio)
+    assert pytest.approx(x_right, rel=0, abs=1e-12) == expected_right
+
+
+def test_ellipsize_middle_preserves_prefix_and_suffix():
+    text = "Homo_sapiens_GENEBLAH_ISOFORMBLAH1"
+    assert tree._ellipsize_middle(text, 23) == "Homo_sapie...OFORMBLAH1"
+
+
+def test_fit_leaf_label_items_ellipsizes_when_tree_would_be_too_narrow():
+    axis = _FakeTreeAxis()
+    leaf_items, x_right = tree._fit_leaf_label_items(
+        ax=axis,
+        x_left=-0.1,
+        content_right=0.8,
+        static_text_items=[],
+        leaf_label_items=[{
+            'x': 0.9,
+            'y': 0.0,
+            'text': 'Homo_sapiens_GENEBLAH_ISOFORMBLAH1',
+            'fontsize': tree.TREE_TIP_LABEL_TEXT_SIZE,
+            'color': 'black',
+            'va': 'center',
+            'ha': 'left',
+            'clip_on': False,
+            'fallback_char_ratio': 0.024,
+        }],
+    )
+    assert leaf_items[0]['text'] == "Homo_sapie...FORMBLAH1"
+    assert tree._get_content_width_ratio(-0.1, 0.8, x_right) >= tree.TREE_CONTENT_MIN_WIDTH_RATIO
 
 
 def test_render_tree_matplotlib_hides_missing_root_state_for_codon(monkeypatch, tmp_path):
@@ -366,6 +555,91 @@ def test_render_tree_matplotlib_hides_missing_root_state_for_codon(monkeypatch, 
     assert "---" not in fake_plt.axis.text_calls
     assert "AAA|A" in fake_plt.axis.text_calls
     assert "AAG|B" in fake_plt.axis.text_calls
+    assert any(txt.endswith("subs/codon site") for txt in fake_plt.axis.text_calls)
+    assert fake_plt.figure.subplots_adjust_calls[-1][1] == {
+        "left": 0.0,
+        "right": 1.0,
+        "bottom": 0.0,
+        "top": 1.0,
+    }
+    assert fake_plt.figure.savefig_calls[-1][1]["pad_inches"] == tree.TREE_FIG_SAVE_PAD_INCHES
+
+
+def test_render_tree_matplotlib_places_branch_ids_below_branch_midpoints(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:2,B:4)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    xcoord,ycoord,_ = tree._get_tree_xy(tr)
+    expected_gap = max(
+        tree._get_text_height_in_data_units(
+            ax=_FakeTreeAxis(),
+            fontsize=tree.TREE_BRANCH_ID_TEXT_SIZE,
+            fallback_height=tree.AA_LOGO_HEIGHT_FALLBACK * 0.5,
+        ) * 0.2,
+        tree.TREE_BRANCH_ID_MIN_GAP,
+    )
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
+
+    tree._render_tree_matplotlib(
+        tree=tr,
+        trait_name="trait",
+        file_name=str(tmp_path / "branch_id.pdf"),
+        label="all",
+    )
+
+    items_by_text = {item["txt"]: item for item in fake_plt.axis.text_items}
+    for node in tr.traverse():
+        if ete.is_root(node):
+            continue
+        branch_id_text = tree._format_branch_id_label(ete.get_prop(node, "numerical_label"))
+        text_item = items_by_text[branch_id_text]
+        expected_x = (xcoord[id(node.up)] + xcoord[id(node)]) / 2.0
+        expected_y = ycoord[id(node)] - expected_gap
+        assert pytest.approx(text_item["x"], rel=0, abs=1e-12) == expected_x
+        assert pytest.approx(text_item["y"], rel=0, abs=1e-12) == expected_y
+        assert text_item["kwargs"]["fontsize"] == tree.TREE_BRANCH_ID_TEXT_SIZE
+        assert text_item["kwargs"]["va"] == "top"
+        assert text_item["kwargs"]["ha"] == "center"
+
+
+def test_resolve_species_overlap_node_types_auto_detects_duplication_and_speciation():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode(
+        "((Homo_sapiens_gene1:1,Homo_sapiens_gene2:1)Dup:1,(Mus_musculus_gene1:1,Rattus_norvegicus_gene1:1)Spec:1)Root;",
+        format=1,
+    ))
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()}
+    node_types = tree._resolve_species_overlap_node_types(
+        tree=tr,
+        species_regex='^([^_]+_[^_]+)_',
+        species_overlap_node_plot='auto',
+    )
+    assert node_types[labels["Dup"]] == "duplication"
+    assert node_types[labels["Spec"]] == "speciation"
+
+
+def test_render_tree_matplotlib_draws_species_overlap_node_markers(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    root_id = int(ete.get_prop(tr, "numerical_label"))
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
+
+    tree._render_tree_matplotlib(
+        tree=tr,
+        trait_name="trait",
+        file_name=str(tmp_path / "marker.pdf"),
+        state_by_node=None,
+        node_type_by_id={root_id: "duplication"},
+    )
+
+    assert len(fake_plt.axis.scatter_calls) == 1
+    scatter_args, scatter_kwargs = fake_plt.axis.scatter_calls[0]
+    assert scatter_kwargs["facecolor"] == tree.TREE_DUPLICATION_COLOR
+    assert scatter_kwargs["s"] == tree.TREE_NODE_MARKER_AREA
 
 
 def test_render_tree_matplotlib_hides_missing_root_state_for_aa(monkeypatch, tmp_path):
@@ -399,6 +673,91 @@ def test_render_tree_matplotlib_hides_missing_root_state_for_aa(monkeypatch, tmp
     assert "-" not in fake_plt.axis.text_calls
     assert "K" in fake_plt.axis.text_calls
     assert "N" in fake_plt.axis.text_calls
+
+
+def test_render_tree_matplotlib_places_figure_title_in_axes_coordinates(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
+
+    tree._render_tree_matplotlib(
+        tree=tr,
+        trait_name="trait",
+        file_name=str(tmp_path / "state_title.pdf"),
+        figure_title="Sites 1-2-3",
+    )
+
+    title_item = [item for item in fake_plt.axis.text_items if item["txt"] == "Sites 1-2-3"][-1]
+    assert title_item["x"] == tree.TREE_FIG_TITLE_X
+    assert title_item["y"] == tree.TREE_FIG_TITLE_Y
+    assert title_item["kwargs"]["ha"] == "left"
+    assert title_item["kwargs"]["va"] == "bottom"
+    assert title_item["kwargs"]["transform"] is fake_plt.axis.transAxes
+    assert fake_plt.figure.suptitle_calls == []
+
+
+def test_render_tree_matplotlib_draws_placeholder_for_missing_aa_logo_sites(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, "color_trait", "black")
+        ete.set_prop(node, "labelcolor_trait", "black")
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
+    monkeypatch.setattr(tree, "_get_logo_modules", lambda: (None, None, None, None))
+
+    def fake_draw_logo(ax, x, y, probabilities, orders, logo_width, logo_height,
+                       mpl_patches, mpl_textpath, mpl_transforms, font_properties):
+        return bool(np.asarray(probabilities, dtype=float).sum() > 0)
+
+    monkeypatch.setattr(tree, "_draw_aa_logo", fake_draw_logo)
+
+    tree._render_tree_matplotlib(
+        tree=tr,
+        trait_name="trait",
+        file_name=str(tmp_path / "state_missing_logo.pdf"),
+        state_by_node={
+            labels["R"]: "----",
+            labels["A"]: "A-CC",
+            labels["B"]: "CCCC",
+        },
+        state_prob_by_node={
+            labels["R"]: None,
+            labels["A"]: np.array([
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [0.0, 1.0],
+                [0.0, 1.0],
+            ], dtype=float),
+            labels["B"]: np.ones((4, 2), dtype=float),
+        },
+        state_orders=np.array(["A", "C"], dtype=object),
+        state_mode="aa",
+    )
+
+    assert len(fake_plt.axis.patch_calls) == 2
+    assert all(type(patch).__name__ == "Rectangle" for patch in fake_plt.axis.patch_calls)
+    assert "A" in fake_plt.axis.text_calls
+    assert "B" in fake_plt.axis.text_calls
+
+
+def test_get_tree_figure_size_scales_with_leaf_count():
+    fig_width,fig_height = tree._get_tree_figure_size(num_leaves=10, max_label_len=12)
+    expected_height = max(
+        tree.TREE_FIG_MIN_HEIGHT,
+        tree.TREE_FIG_BASE_HEIGHT + (10 * tree.TREE_FIG_HEIGHT_PER_LEAF),
+    )
+    assert pytest.approx(fig_height, rel=0, abs=1e-12) == expected_height
+    assert pytest.approx(fig_width, rel=0, abs=1e-12) == tree.TREE_FIG_WIDTH
+
+
+def test_get_tree_figure_size_caps_pdf_height():
+    fig_width,fig_height = tree._get_tree_figure_size(num_leaves=100000, max_label_len=0)
+    assert fig_width == tree.TREE_FIG_WIDTH
+    assert fig_height == tree.TREE_FIG_MAX_HEIGHT
 
 
 def test_normalize_state_plot_request_rejects_legacy_yes():

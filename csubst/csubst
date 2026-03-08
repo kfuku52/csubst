@@ -794,6 +794,15 @@ def _build_parser():
                               'Use "all" for one multi-page PDF with every site, '
                               '"2,5,10" for one multi-page PDF with one site per page, '
                               'or "2-5-10" for one single-page PDF with concatenated site labels.')
+    inspect.add_argument('--species_regex', metavar='REGEX', default='^([^_]+_[^_]+)_', required=False, type=str,
+                         help='default=%(default)s: Regular expression for extracting species IDs from leaf labels '
+                              'for species-overlap node annotation in inspect tree plots. '
+                              'If the regex contains capture groups, the first non-empty captured group is used; '
+                              'otherwise, the full regex match is used.')
+    inspect.add_argument('--species_overlap_node_plot', metavar='yes|no|auto', default='auto', required=False, type=str,
+                         help='default=%(default)s: Show speciation/duplication node markers in inspect tree plots. '
+                              '"yes" always tries to plot, "no" disables them, and "auto" enables them only when '
+                              'all tip labels are parseable by --species_regex.')
     inspect.add_argument('--plot_nonsyn_recode_pca', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Write csubst_nonsyn_recoding_pca.png from input alignment.')
     inspect.add_argument('--plot_nonsyn_recode_pca_3di20', metavar='yes|no', default='no', type=strtobool,
