@@ -645,6 +645,7 @@ def _parse_bool_like(value):
 
 
 def set_substitution_colors(df, g, object_names, N_sub_cols):
+    single_branch_mode = bool(g.get('single_branch_mode', False))
     for object_name in object_names:
         if object_name.endswith('_pol_conts'):
             continue
@@ -732,8 +733,8 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             color_sites['OCNany2spe'] = []
             color_sites['OCNany2dif'] = []
             color_sites['single_sub'] = []
-            has_any2spe = ('OCNany2spe' in df.columns)
-            has_any2dif = ('OCNany2dif' in df.columns)
+            has_any2spe = ('OCNany2spe' in df.columns) and (not single_branch_mode)
+            has_any2dif = ('OCNany2dif' in df.columns) and (not single_branch_mode)
             min_combinat_prob = float(g.get('min_combinat_prob', 0.5))
             min_single_prob = float(g.get('min_single_prob', 0.8))
             for i in df.index:
@@ -754,7 +755,7 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                     color_sites['OCNany2dif'].append(codon_site)
                 elif (prob_single_sub>=min_single_prob):
                     color_sites['single_sub'].append(codon_site)
-            if g['single_branch_mode']:
+            if single_branch_mode:
                 color_sites['single_branch_N'] = copy.deepcopy(color_sites['single_sub'])
                 del color_sites['OCNany2spe']
                 del color_sites['OCNany2dif']

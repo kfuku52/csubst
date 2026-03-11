@@ -400,6 +400,33 @@ def test_set_substitution_colors_handles_missing_any2dif_column(monkeypatch):
     assert any("resi 5" in cmd for cmd in commands)
 
 
+def test_set_substitution_colors_single_branch_prefers_branch_prob_over_ocn_columns(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": [8],
+            "OCNany2spe": [0.95],
+            "OCNany2dif": [0.0],
+            "N_sub_1": [0.95],
+        }
+    )
+    g = {
+        "mode": "intersection",
+        "min_combinat_prob": 0.5,
+        "min_single_prob": 0.8,
+        "single_branch_mode": True,
+    }
+    n_sub_cols = df.columns[df.columns.str.startswith("N_sub_")]
+    parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=n_sub_cols)
+    assert any(("0x800080" in cmd) and ("resi 8" in cmd) for cmd in commands)
+
+
 def test_set_substitution_colors_set_mode_parses_string_booleans_safely(monkeypatch):
     commands = []
     parser_pymol = _import_parser_pymol_with_fake_pymol(
