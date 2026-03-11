@@ -420,14 +420,14 @@ def get_global_parameters(args):
         g['epistasis_pdb'] = ''
     g['epistasis_pdb'] = str(g['epistasis_pdb']).strip()
     if 'epistasis_database' not in g.keys():
-        g['epistasis_database'] = 'pdb,alphafill,alphafold'
+        g['epistasis_database'] = 'swissmodel,pdb,alphafold,alphafill'
     g['epistasis_database'] = str(g['epistasis_database']).strip().lower()
     if g['epistasis_database'] == '':
-        g['epistasis_database'] = 'pdb,alphafill,alphafold'
+        g['epistasis_database'] = 'swissmodel,pdb,alphafold,alphafill'
     epistasis_database_names = [db.strip().lower() for db in g['epistasis_database'].split(',') if db.strip() != '']
     if len(epistasis_database_names) == 0:
-        raise ValueError('--epistasis_database should include one or more of pdb,alphafill,alphafold.')
-    epistasis_allowed_database_names = {'pdb', 'alphafill', 'alphafold'}
+        raise ValueError('--epistasis_database should include one or more of swissmodel,pdb,alphafold,alphafill.')
+    epistasis_allowed_database_names = {'swissmodel', 'pdb', 'alphafill', 'alphafold'}
     epistasis_unknown_database_names = sorted(set(epistasis_database_names).difference(epistasis_allowed_database_names))
     if len(epistasis_unknown_database_names):
         txt = '--epistasis_database includes unknown values: {}. Supported: {}.'

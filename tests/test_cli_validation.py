@@ -102,6 +102,14 @@ def test_sites_help_shows_output_manifest_and_hides_legacy_site_output_manifest(
     assert "--site_output_manifest" not in help_text
 
 
+def test_sites_help_shows_swissmodel_first_in_database_default():
+    proc, log_text = _run_cli("sites", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "default=swissmodel,pdb,alphafold,alphafill" in help_text
+    assert "swissmodel: Run online QBLAST search" in help_text
+
+
 def test_inspect_help_includes_state_highlight_options():
     proc, log_text = _run_cli("inspect", "-h")
     assert proc.returncode == 0
@@ -128,6 +136,15 @@ def test_search_rejects_removed_pseudocount_strength_option():
     proc, log_text = _run_cli("search", "--pseudocount_strength", "2.0")
     assert proc.returncode == 2
     assert "unrecognized arguments: --pseudocount_strength 2.0" in log_text
+
+
+def test_search_help_shows_swissmodel_first_in_epistasis_database_default():
+    proc, log_text = _run_cli("search", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "default=swissmodel,pdb,alphafold,alphafill" in help_text
+    assert "Supported:" in help_text
+    assert "swissmodel" in help_text
 
 
 def test_cli_help_lists_primary_commands_and_legacy_aliases():

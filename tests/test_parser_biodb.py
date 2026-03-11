@@ -1,4 +1,6 @@
 import importlib
+import io
+import json
 import sys
 import types
 import urllib
@@ -425,3 +427,156 @@ def test_pdb_sequence_search_alphafold_download_uses_context_manager(monkeypatch
     assert out["pdb"] == "AF-P12345-F1-model_v2.pdb"
     assert state["closed"] is True
     assert state["timeout"] == 9.0
+
+
+def test_get_swissmodel_download_info_selects_best_provider_model(monkeypatch):
+    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
+    payload = {
+        "result": {
+            "structures": [
+                {
+                    "provider": "PDB",
+                    "coordinates": "https://example.com/pdb.pdb",
+                    "gmqe": 0.99,
+                    "identity": 99.0,
+                    "from": 1,
+                    "to": 200,
+                },
+                {
+                    "provider": "SWISSMODEL",
+                    "coordinates": "https://example.com/low_model.pdb",
+                    "gmqe": 0.70,
+                    "identity": 88.0,
+                    "from": 1,
+                    "to": 200,
+                    "template": "1abc.1.A",
+                },
+                {
+                    "provider": "SWISSMODEL",
+                    "coordinates": "https://example.com/high_model.pdb",
+                    "gmqe": 0.91,
+                    "identity": 55.0,
+                    "from": 5,
+                    "to": 190,
+                    "template": "2xyz.1.A",
+                },
+            ],
+        },
+    }
+
+    class _Resp(io.StringIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def _urlopen(_url, timeout=None):
+        return _Resp(json.dumps(payload))
+
+    monkeypatch.setattr(parser_biodb.urllib.request, "urlopen", _urlopen)
+    download_url, download_info = parser_biodb.get_swissmodel_download_info("P12345", timeout=11)
+    assert download_url == "https://example.com/high_model.pdb"
+    assert download_info["template"] == "2xyz.1.A"
+    assert download_info["gmqe"] == 0.91
+    assert download_info["identity"] == 55.0
+    assert download_info["from"] == 5
+    assert download_info["to"] == 190
+
+
+def test_pdb_sequence_search_swissmodel_download_uses_context_manager(monkeypatch, tmp_path):
+    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    a_node = [n for n in tr.traverse() if n.name == "A"][0]
+    a_bid = int(ete.get_prop(a_node, "numerical_label"))
+    monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda nlabel, mode, g: "AAAA")
+    monkeypatch.setattr(parser_biodb, "run_qblast", lambda aa_query, num_display=10, evalue_cutoff=10: ["P12345"])
+    monkeypatch.setattr(
+        parser_biodb,
+        "get_swissmodel_download_info",
+        lambda top_hit_id, timeout=30: (
+            "https://example.com/P12345_model.pdb",
+            {"template": "1abc.1.A", "gmqe": 0.88, "identity": 72.0, "from": 2, "to": 180},
+        ),
+    )
+    monkeypatch.setattr(parser_biodb, "is_url_valid", lambda url, timeout=30: True)
+    monkeypatch.chdir(tmp_path)
+    state = {"closed": False, "timeout": None}
+
+    class _Inner:
+        def read(self):
+            return b"MODEL"
+
+    class _UrlOpenResult:
+        def __enter__(self):
+            return _Inner()
+
+        def __exit__(self, exc_type, exc, tb):
+            state["closed"] = True
+            return False
+
+    def _urlopen(_url, timeout=None):
+        state["timeout"] = timeout
+        return _UrlOpenResult()
+
+    monkeypatch.setattr(parser_biodb.urllib.request, "urlopen", _urlopen)
+    g = {
+        "branch_ids": [a_bid],
+        "tree": tr,
+        "database": "swissmodel",
+        "database_timeout": 9,
+        "database_evalue_cutoff": 10,
+        "database_minimum_identity": 0.0,
+        "pymol_max_num_chain": 999,
+    }
+    out = parser_biodb.pdb_sequence_search(g)
+    assert out["selected_database"] == "swissmodel"
+    assert out["pdb"] == "P12345.swissmodel.pdb"
+    assert state["closed"] is True
+    assert state["timeout"] == 9.0
+
+
+def test_pdb_sequence_search_swissmodel_tries_next_hit_when_first_has_no_model(monkeypatch, tmp_path):
+    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    a_node = [n for n in tr.traverse() if n.name == "A"][0]
+    a_bid = int(ete.get_prop(a_node, "numerical_label"))
+    monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda nlabel, mode, g: "AAAA")
+    monkeypatch.setattr(parser_biodb, "run_qblast", lambda aa_query, num_display=10, evalue_cutoff=10: ["P11111", "P22222"])
+    state = {"lookups": []}
+
+    def _get_swissmodel_download_info(top_hit_id, timeout=30):
+        state["lookups"].append(top_hit_id)
+        if top_hit_id == "P11111":
+            return None, None
+        return "https://example.com/P22222_model.pdb", {"template": "9xyz.1.A", "gmqe": 0.80, "identity": 61.0, "from": 1, "to": 150}
+
+    monkeypatch.setattr(parser_biodb, "get_swissmodel_download_info", _get_swissmodel_download_info)
+    monkeypatch.setattr(parser_biodb, "is_url_valid", lambda url, timeout=30: True)
+    monkeypatch.chdir(tmp_path)
+
+    class _Inner:
+        def read(self):
+            return b"MODEL"
+
+    class _UrlOpenResult:
+        def __enter__(self):
+            return _Inner()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(parser_biodb.urllib.request, "urlopen", lambda _url, timeout=None: _UrlOpenResult())
+    g = {
+        "branch_ids": [a_bid],
+        "tree": tr,
+        "database": "swissmodel",
+        "database_timeout": 9,
+        "database_evalue_cutoff": 10,
+        "database_minimum_identity": 0.0,
+        "pymol_max_num_chain": 999,
+    }
+    out = parser_biodb.pdb_sequence_search(g)
+    assert state["lookups"] == ["P11111", "P22222"]
+    assert out["selected_database"] == "swissmodel"
+    assert out["pdb"] == "P22222.swissmodel.pdb"

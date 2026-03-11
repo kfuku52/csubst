@@ -128,6 +128,61 @@ def _normalize_branch_ids(branch_ids):
     return normalized
 
 
+def _get_numeric_sort_key(value, default=float('-inf')):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _get_swissmodel_coverage_length(structure_dict):
+    try:
+        start = int(structure_dict.get('from'))
+        end = int(structure_dict.get('to'))
+    except (TypeError, ValueError):
+        return 0
+    return max(end - start + 1, 0)
+
+
+def _select_best_swissmodel_structure(structures):
+    swissmodel_structures = [
+        structure_dict for structure_dict in structures
+        if str(structure_dict.get('provider', '')).strip().upper() == 'SWISSMODEL'
+    ]
+    if len(swissmodel_structures) == 0:
+        return None
+    return max(
+        swissmodel_structures,
+        key=lambda structure_dict: (
+            _get_numeric_sort_key(structure_dict.get('gmqe')),
+            _get_numeric_sort_key(structure_dict.get('qmean', {}).get('avg_local_score')),
+            _get_swissmodel_coverage_length(structure_dict),
+            _get_numeric_sort_key(structure_dict.get('identity')),
+        ),
+    )
+
+
+def get_swissmodel_download_info(top_hit_id, timeout=30):
+    metadata_url = 'https://swissmodel.expasy.org/repository/uniprot/{}.json'.format(top_hit_id)
+    with urllib.request.urlopen(metadata_url, timeout=timeout) as response:
+        swissmodel_metadata = json.load(response)
+    structures = swissmodel_metadata.get('result', {}).get('structures', [])
+    best_structure = _select_best_swissmodel_structure(structures)
+    if best_structure is None:
+        return None, None
+    download_url = str(best_structure.get('coordinates', '')).strip()
+    if download_url == '':
+        download_url = 'https://swissmodel.expasy.org/repository/uniprot/{}.pdb?provider=swissmodel'.format(top_hit_id)
+    download_info = {
+        'template': str(best_structure.get('template', '')).strip(),
+        'gmqe': best_structure.get('gmqe', None),
+        'identity': best_structure.get('identity', None),
+        'from': best_structure.get('from', None),
+        'to': best_structure.get('to', None),
+    }
+    return download_url, download_info
+
+
 def pdb_sequence_search(g):
     print('')
     branch_ids = _normalize_branch_ids(g.get('branch_ids', []))
@@ -149,9 +204,9 @@ def pdb_sequence_search(g):
     pdb_id = None
     top_hit_ids = []
     database_names = [db.strip().lower() for db in g['database'].split(',') if db.strip()]
-    allowed_database_names = {'pdb', 'alphafill', 'alphafold'}
+    allowed_database_names = {'pdb', 'swissmodel', 'alphafill', 'alphafold'}
     if len(database_names) == 0:
-        raise ValueError('No database was specified. Use --database with one or more of pdb,alphafill,alphafold.')
+        raise ValueError('No database was specified. Use --database with one or more of swissmodel,pdb,alphafold,alphafill.')
     unknown_database_names = [db for db in database_names if db not in allowed_database_names]
     if len(unknown_database_names) > 0:
         txt = 'Unknown database name(s) in --database: {}. Supported values: {}.'
@@ -214,7 +269,7 @@ def pdb_sequence_search(g):
                 print(e)
                 print('MMseqs2 search against PDB was unsuccessful.')
                 pdb_id = None
-        elif database_name in ['alphafill', 'alphafold']:
+        elif database_name in ['swissmodel', 'alphafill', 'alphafold']:
             if len(top_hit_ids)==0:
                 try:
                     top_hit_ids = run_qblast(aa_query, num_display=10, evalue_cutoff=g['database_evalue_cutoff'])
@@ -228,22 +283,47 @@ def pdb_sequence_search(g):
             else:
                 for i in range(len(top_hit_ids)):
                     print('Retrieving protein structure: {}'.format(top_hit_ids[i]), flush=True)
-                    if (database_name=='alphafill'):
+                    download_info = None
+                    if (database_name == 'swissmodel'):
+                        try:
+                            download_url, download_info = get_swissmodel_download_info(
+                                top_hit_id=top_hit_ids[i],
+                                timeout=network_timeout,
+                            )
+                        except Exception as exc:
+                            print('SWISS-MODEL lookup failed for {} ({})'.format(top_hit_ids[i], exc), flush=True)
+                            download_url = None
+                        if download_url is None:
+                            print('No SWISS-MODEL homology model found for: {}'.format(top_hit_ids[i]), flush=True)
+                            pdb_id = None
+                            continue
+                    elif (database_name=='alphafill'):
                         download_url = 'https://alphafill.eu/v1/aff/'+top_hit_ids[i]
                     elif (database_name=='alphafold'):
                         download_url = 'https://alphafold.ebi.ac.uk/files/AF-' + top_hit_ids[i] + '-F1-model_v2.pdb'
                     if is_url_valid(url=download_url, timeout=network_timeout):
                         try:
                             with urllib.request.urlopen(download_url, timeout=network_timeout) as response:
-                                alphafold_pdb = response.read()
-                            if (database_name == 'alphafill'):
-                                alphafold_pdb_path = os.path.basename(download_url)+'.cif'
+                                structure_bytes = response.read()
+                            if (database_name == 'swissmodel'):
+                                structure_path = top_hit_ids[i] + '.swissmodel.pdb'
+                            elif (database_name == 'alphafill'):
+                                structure_path = os.path.basename(download_url)+'.cif'
                             elif (database_name=='alphafold'):
-                                alphafold_pdb_path = os.path.basename(download_url)
-                            with open(alphafold_pdb_path, mode='wb') as f:
-                                f.write(alphafold_pdb)
+                                structure_path = os.path.basename(download_url)
+                            with open(structure_path, mode='wb') as f:
+                                f.write(structure_bytes)
                             print('Download succeeded at: {}'.format(download_url), flush=True)
-                            pdb_id = alphafold_pdb_path
+                            if (database_name == 'swissmodel') and (download_info is not None):
+                                txt = 'SWISS-MODEL best hit: template={} GMQE={} identity={} range={}-{}'
+                                print(txt.format(
+                                    download_info.get('template', ''),
+                                    download_info.get('gmqe', ''),
+                                    download_info.get('identity', ''),
+                                    download_info.get('from', ''),
+                                    download_info.get('to', ''),
+                                ), flush=True)
+                            pdb_id = structure_path
                             g['selected_database'] = database_name
                             break
                         except Exception as exc:

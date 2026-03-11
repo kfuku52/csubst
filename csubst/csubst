@@ -525,13 +525,14 @@ def _build_parser():
                            'The PDB protein sequence will be aligned with mafft, '
                            'and a pymol session will be generated. '
                            'besthit: Run online sequence search and fetch the best-hit model. See --database.')
-    site.add_argument('--database', metavar='DATABASE1,DATABASE2,...', default='pdb,alphafill,alphafold', required=False, type=str,
+    site.add_argument('--database', metavar='DATABASE1,DATABASE2,...', default='swissmodel,pdb,alphafold,alphafill', required=False, type=str,
                       help='default=%(default)s: '
                            'Comma-delimited names of protein structure databases to search. '
                            'The top priority is given to the first. '
+                           'swissmodel: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best SWISS-MODEL homology model (https://swissmodel.expasy.org/). '
                            'pdb: Run online MMseqs2 search against the RCSB PDB database (https://www.rcsb.org/) and fetch the best-hit PDB model. '
-                           'alphafill: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFill model (https://alphafill.eu/). '
-                           'alphafold: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFold model (https://alphafold.ebi.ac.uk/).')
+                           'alphafold: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFold model (https://alphafold.ebi.ac.uk/). '
+                           'alphafill: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFill model (https://alphafill.eu/).')
     site.add_argument('--database_evalue_cutoff', metavar='FLOAT', default=1.0, required=False, type=float,
                       help='default=%(default)s: E-value cutoff in the database searches. Applied to MMseqs2 and QBLAST.')
     site.add_argument('--database_minimum_identity', metavar='FLOAT', default=0.25, required=False, type=float,
@@ -742,9 +743,9 @@ def _build_parser():
                          help='default=%(default)s: Experimental feature. Structure source for search-time epistasis degree generation. '
                               'PATH: local structure file; PDB code: fetched from PDB; '
                               '"besthit": online sequence search + best-hit retrieval.')
-    analyze.add_argument('--epistasis_database', metavar='DATABASE1,DATABASE2,...', default='pdb,alphafill,alphafold', type=str,
+    analyze.add_argument('--epistasis_database', metavar='DATABASE1,DATABASE2,...', default='swissmodel,pdb,alphafold,alphafill', type=str,
                          help='default=%(default)s: Experimental feature. Comma-delimited database priority for --epistasis_pdb besthit. '
-                              'Supported: pdb, alphafill, alphafold.')
+                              'Supported: swissmodel, pdb, alphafold, alphafill.')
     analyze.add_argument('--epistasis_database_evalue_cutoff', metavar='FLOAT', default=1.0, type=float,
                          help='default=%(default)s: Experimental feature. E-value cutoff for --epistasis_pdb besthit searches.')
     analyze.add_argument('--epistasis_database_minimum_identity', metavar='FLOAT', default=0.25, type=float,
