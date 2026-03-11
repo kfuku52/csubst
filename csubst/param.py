@@ -863,6 +863,8 @@ def get_global_parameters(args):
         )
         if (g['pymol_transparency'] < 0) or (g['pymol_transparency'] > 1):
             raise ValueError('--pymol_transparency should satisfy 0 <= value <= 1.')
+    if 'pymol_surface_quality' in g.keys():
+        g['pymol_surface_quality'] = int(g['pymol_surface_quality'])
     if 'pymol_max_num_chain' in g.keys():
         g['pymol_max_num_chain'] = int(g['pymol_max_num_chain'])
         if g['pymol_max_num_chain'] < 1:

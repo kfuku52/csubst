@@ -561,6 +561,8 @@ def _build_parser():
                       help='default=%(default)s: Gray value for no-substitution sites. 0=black, 100=white')
     site.add_argument('--pymol_transparency', metavar='FLOAT', default=0.65, required=False, type=float,
                       help='default=%(default)s: Surface transparency. 0=non-transparent, 1=completely transparent')
+    site.add_argument('--pymol_surface_quality', metavar='INT', default=-1, required=False, type=int,
+                      help='default=%(default)s: PyMOL surface quality setting. Lower values speed up surface generation at the cost of smoothness.')
     site.add_argument('--pymol_img', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to generate a rendered 6-view image file of protein structure.')
     site.add_argument('--pymol_max_num_chain', metavar='INT', default=20, required=False, type=int,

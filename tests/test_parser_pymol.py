@@ -740,14 +740,18 @@ def test_write_pymol_session_skips_ligand_preset_without_organic_atoms(tmp_path,
         "remove_ligand": "",
         "pymol_transparency": 0.1,
         "pymol_gray": 80,
+        "pymol_surface_quality": -1,
         "mask_subunit": False,
         "session_file_path": str(tmp_path / "out.pse"),
     }
     parser_pymol.write_pymol_session(df=df, g=g)
     assert not any("preset.ligand_sites_trans_hq" in cmd for cmd in commands)
     assert not any("util.cbag organic" in cmd for cmd in commands)
+    surface_quality_index = next(i for i, cmd in enumerate(commands) if "set surface_quality" in cmd)
     set_index = next(i for i, cmd in enumerate(commands) if "set transparency" in cmd)
     show_surface_index = next(i for i, cmd in enumerate(commands) if cmd == "show surface")
+    assert "set surface_quality, -1" in commands[surface_quality_index]
+    assert surface_quality_index < show_surface_index
     assert set_index < show_surface_index
 
 
@@ -770,9 +774,11 @@ def test_write_pymol_session_keeps_ligand_preset_with_organic_atoms(tmp_path, mo
         "remove_ligand": "",
         "pymol_transparency": 0.1,
         "pymol_gray": 80,
+        "pymol_surface_quality": 0,
         "mask_subunit": False,
         "session_file_path": str(tmp_path / "out.pse"),
     }
     parser_pymol.write_pymol_session(df=df, g=g)
     assert any("preset.ligand_sites_trans_hq" in cmd for cmd in commands)
     assert any("util.cbag organic" in cmd for cmd in commands)
+    assert any("set surface_quality, 0" in cmd for cmd in commands)

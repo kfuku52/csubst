@@ -905,6 +905,7 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
 def write_pymol_session(df, g):
     df = df.reset_index(drop=True)
     _cmd_set('seq_view', 1)
+    _cmd_set('surface_quality', int(g.get('pymol_surface_quality', -1)))
     if g['remove_solvent']:
         _cmd_remove('solvent')
     if g['remove_ligand']:

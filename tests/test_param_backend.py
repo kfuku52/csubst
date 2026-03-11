@@ -823,6 +823,7 @@ def test_get_global_parameters_validates_site_database_and_pymol_ranges():
             mafft_ep=0.2,
             pymol_gray=80,
             pymol_transparency=0.65,
+            pymol_surface_quality=-1,
             pymol_max_num_chain=20,
         )
     )
@@ -832,6 +833,7 @@ def test_get_global_parameters_validates_site_database_and_pymol_ranges():
     assert g["mafft_ep"] == pytest.approx(0.2)
     assert g["pymol_gray"] == 80
     assert g["pymol_transparency"] == pytest.approx(0.65)
+    assert g["pymol_surface_quality"] == -1
     assert g["pymol_max_num_chain"] == 20
 
     with pytest.raises(ValueError, match="database_evalue_cutoff"):
