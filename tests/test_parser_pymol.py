@@ -260,6 +260,21 @@ def test_mask_subunit_skips_when_no_pdb_prefixed_sequences(tmp_path, monkeypatch
     assert g["aa_identity_means"] == {}
 
 
+def test_mask_subunit_skips_identity_scan_for_single_protein_chain(monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    parser_pymol.pymol.cmd.get_chains = lambda selection=None, *_args, **_kwargs: ["A"] if selection == "polymer.protein" else []
+    monkeypatch.setattr(
+        parser_pymol,
+        "calc_aa_identity",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("calc_aa_identity should not run")),
+    )
+    out = parser_pymol.mask_subunit({"mafft_add_fasta": "unused.fa", "pdb": "1abc.pdb"})
+    assert out is None
+
+
 def test_add_pdb_residue_numbering_skips_pol_conts_objects(monkeypatch):
     parser_pymol = _import_parser_pymol_with_fake_pymol(
         monkeypatch=monkeypatch,
@@ -731,6 +746,9 @@ def test_write_pymol_session_skips_ligand_preset_without_organic_atoms(tmp_path,
     parser_pymol.write_pymol_session(df=df, g=g)
     assert not any("preset.ligand_sites_trans_hq" in cmd for cmd in commands)
     assert not any("util.cbag organic" in cmd for cmd in commands)
+    set_index = next(i for i, cmd in enumerate(commands) if "set transparency" in cmd)
+    show_surface_index = next(i for i, cmd in enumerate(commands) if cmd == "show surface")
+    assert set_index < show_surface_index
 
 
 def test_write_pymol_session_keeps_ligand_preset_with_organic_atoms(tmp_path, monkeypatch):

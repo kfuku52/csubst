@@ -518,21 +518,22 @@ def calc_aa_identity(g):
     return g
 
 def mask_subunit(g):
+    protein_chains = pymol.cmd.get_chains('polymer.protein')
+    nucleic_chains = pymol.cmd.get_chains('polymer.nucleic')
+    colors = ['wheat','slate','salmon','brightorange','violet','olive',
+              'firebrick','pink','marine','density','cyan','chocolate','teal',]
+    num_chains = len(protein_chains) + len(nucleic_chains)
+    if num_chains > len(colors):
+        colors *= int(num_chains/len(colors)) + 1 # for supercomplex
+    for nucleotide in ['DG','DT','DA','DC']: # DNA
+        _cmd_color('pink', 'resn ' + nucleotide)
+    if len(protein_chains) == 1:
+        return None
     g = calc_aa_identity(g)
     pdb_seqnames = list(g['aa_identity_means'].keys())
     if len(pdb_seqnames) == 0:
         txt = 'No sequence with PDB basename prefix was found in {}. Skipping subunit masking.'
         print(txt.format(g['mafft_add_fasta']), flush=True)
-        return None
-    nucleic_chains = pymol.cmd.get_chains('polymer.nucleic')
-    colors = ['wheat','slate','salmon','brightorange','violet','olive',
-              'firebrick','pink','marine','density','cyan','chocolate','teal',]
-    num_chains = len(pdb_seqnames) + len(nucleic_chains)
-    if num_chains > len(colors):
-        colors *= int(num_chains/len(colors)) + 1 # for supercomplex
-    for nucleotide in ['DG','DT','DA','DC']: # DNA
-        _cmd_color('pink', 'resn ' + nucleotide)
-    if len(pdb_seqnames)==1:
         return None
     finite_identity_items = [item for item in g['aa_identity_means'].items() if np.isfinite(item[1])]
     if len(finite_identity_items) > 0:
@@ -748,20 +749,32 @@ def _parse_bool_like(value):
 
 def set_substitution_colors(df, g, object_names, N_sub_cols):
     single_branch_mode = bool(g.get('single_branch_mode', False))
-    if len(N_sub_cols) == 0:
-        single_prob_values = np.zeros(df.shape[0], dtype=np.float64)
-        total_prob_values = np.zeros(df.shape[0], dtype=np.float64)
+    mode = str(g.get('mode', 'intersection')).lower()
+    need_single_prob = (mode not in ['set', 'lineage', 'total'])
+    need_total_prob = (mode == 'total')
+    need_any2 = (mode not in ['set', 'lineage', 'total']) and (not single_branch_mode)
+    single_prob_values = np.zeros(df.shape[0], dtype=np.float64)
+    total_prob_values = np.zeros(df.shape[0], dtype=np.float64)
+    if len(N_sub_cols) != 0:
+        n_sub_frame = df.loc[:, N_sub_cols]
+        if need_single_prob:
+            single_prob_values = pd.to_numeric(
+                n_sub_frame.max(axis=1),
+                errors='coerce',
+            ).fillna(0.0).to_numpy(dtype=np.float64, copy=False)
+        if need_total_prob:
+            total_prob_values = pd.to_numeric(
+                n_sub_frame.sum(axis=1),
+                errors='coerce',
+            ).fillna(0.0).to_numpy(dtype=np.float64, copy=False)
+    if need_any2 and ('OCNany2spe' in df.columns):
+        any2spe_values = pd.to_numeric(df['OCNany2spe'], errors='coerce').fillna(0.0).to_numpy(dtype=np.float64, copy=False)
     else:
-        single_prob_values = pd.to_numeric(
-            df.loc[:, N_sub_cols].max(axis=1),
-            errors='coerce',
-        ).fillna(0.0).to_numpy(dtype=np.float64, copy=False)
-        total_prob_values = pd.to_numeric(
-            df.loc[:, N_sub_cols].sum(axis=1),
-            errors='coerce',
-        ).fillna(0.0).to_numpy(dtype=np.float64, copy=False)
-    any2spe_values = pd.to_numeric(df.get('OCNany2spe', 0.0), errors='coerce').fillna(0.0).to_numpy(dtype=np.float64, copy=False) if 'OCNany2spe' in df.columns else np.zeros(df.shape[0], dtype=np.float64)
-    any2dif_values = pd.to_numeric(df.get('OCNany2dif', 0.0), errors='coerce').fillna(0.0).to_numpy(dtype=np.float64, copy=False) if 'OCNany2dif' in df.columns else np.zeros(df.shape[0], dtype=np.float64)
+        any2spe_values = np.zeros(df.shape[0], dtype=np.float64)
+    if need_any2 and ('OCNany2dif' in df.columns):
+        any2dif_values = pd.to_numeric(df['OCNany2dif'], errors='coerce').fillna(0.0).to_numpy(dtype=np.float64, copy=False)
+    else:
+        any2dif_values = np.zeros(df.shape[0], dtype=np.float64)
     for object_name in object_names:
         if object_name.endswith('_pol_conts'):
             continue
@@ -770,7 +783,6 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             if not codon_site_col in df.columns:
                 continue
             site_values, valid_site_mask = _extract_positive_site_array(df.loc[:, codon_site_col])
-            mode = str(g.get('mode', 'intersection')).lower()
             if mode=='set':
                 if 'N_set_expr' not in df.columns:
                     print('Skipping site painting. N_set_expr column was not found for --mode set.', flush=True)
@@ -905,8 +917,8 @@ def write_pymol_session(df, g):
     _cmd_hide('wire')
     _cmd_hide('ribbon')
     _cmd_show('cartoon')
-    _cmd_show('surface')
     _cmd_set('transparency', g['pymol_transparency'], 'polymer.protein')
+    _cmd_show('surface')
     object_names = pymol.cmd.get_names()
     #residue_numberings = get_residue_numberings()
     #set_color_gray(object_names, residue_numberings, gray_value=g['pymol_gray'])
