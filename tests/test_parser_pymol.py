@@ -7,11 +7,15 @@ import pandas as pd
 import pytest
 
 
-def _import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta, chains=None, commands=None):
+def _import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta, chains=None, commands=None, names=None, count_atoms=None):
     if chains is None:
         chains = []
     if commands is None:
         commands = []
+    if names is None:
+        names = []
+    if count_atoms is None:
+        count_atoms = {}
 
     def _record_do(command):
         commands.append(command)
@@ -19,7 +23,8 @@ def _import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta, chains=None, co
     fake_cmd = types.SimpleNamespace(
         get_fastastr=lambda **kwargs: pdb_fasta,
         get_chains=lambda *args, **kwargs: list(chains),
-        get_names=lambda *args, **kwargs: [],
+        get_names=lambda *args, **kwargs: list(names),
+        count_atoms=lambda selection: count_atoms.get(selection, 0),
         do=_record_do,
     )
     fake_pymol = types.SimpleNamespace(cmd=fake_cmd)
@@ -699,3 +704,57 @@ def test_set_substitution_colors_lineage_maps_sites_to_first_qualifying_listed_b
     parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=n_sub_cols)
     # Site should be painted with branch-3 color (red), not branch-2 color (blue).
     assert any(("0xFF0000" in cmd) and ("resi 11" in cmd) for cmd in commands)
+
+
+def test_write_pymol_session_skips_ligand_preset_without_organic_atoms(tmp_path, monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">obj_A\nAAAA\n",
+        chains=["A"],
+        names=["obj"],
+        count_atoms={"organic": 0},
+        commands=commands,
+    )
+    monkeypatch.setattr(parser_pymol, "set_substitution_colors", lambda *args, **kwargs: None)
+    parser_pymol.pymol.cmd.deselect = lambda: None
+    parser_pymol.pymol.cmd.save = lambda *_args, **_kwargs: None
+    df = pd.DataFrame({"codon_site_pdb_obj_A": [1], "N_sub_1": [0.9]})
+    g = {
+        "remove_solvent": False,
+        "remove_ligand": "",
+        "pymol_transparency": 0.1,
+        "pymol_gray": 80,
+        "mask_subunit": False,
+        "session_file_path": str(tmp_path / "out.pse"),
+    }
+    parser_pymol.write_pymol_session(df=df, g=g)
+    assert not any("preset.ligand_sites_trans_hq" in cmd for cmd in commands)
+    assert not any("util.cbag organic" in cmd for cmd in commands)
+
+
+def test_write_pymol_session_keeps_ligand_preset_with_organic_atoms(tmp_path, monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">obj_A\nAAAA\n",
+        chains=["A"],
+        names=["obj"],
+        count_atoms={"organic": 3},
+        commands=commands,
+    )
+    monkeypatch.setattr(parser_pymol, "set_substitution_colors", lambda *args, **kwargs: None)
+    parser_pymol.pymol.cmd.deselect = lambda: None
+    parser_pymol.pymol.cmd.save = lambda *_args, **_kwargs: None
+    df = pd.DataFrame({"codon_site_pdb_obj_A": [1], "N_sub_1": [0.9]})
+    g = {
+        "remove_solvent": False,
+        "remove_ligand": "",
+        "pymol_transparency": 0.1,
+        "pymol_gray": 80,
+        "mask_subunit": False,
+        "session_file_path": str(tmp_path / "out.pse"),
+    }
+    parser_pymol.write_pymol_session(df=df, g=g)
+    assert any("preset.ligand_sites_trans_hq" in cmd for cmd in commands)
+    assert any("util.cbag organic" in cmd for cmd in commands)

@@ -69,6 +69,13 @@ def _cmd_color(color_name, selection):
     return pymol.cmd.do('color {}, {}'.format(color_name, selection))
 
 
+def _cmd_count_atoms(selection):
+    count_atoms = getattr(pymol.cmd, 'count_atoms', None)
+    if callable(count_atoms):
+        return int(count_atoms(selection))
+    return 0
+
+
 def _cmd_zoom(selection='all'):
     zoom = getattr(pymol.cmd, 'zoom', None)
     if callable(zoom):
@@ -90,6 +97,10 @@ def _cmd_color_organic():
     if callable(cbag):
         return cbag('organic')
     return pymol.cmd.do('util.cbag organic')
+
+
+def _has_organic_ligand():
+    return (_cmd_count_atoms('organic') > 0)
 
 
 def _extract_positive_site_array(series):
@@ -520,7 +531,7 @@ def mask_subunit(g):
     if num_chains > len(colors):
         colors *= int(num_chains/len(colors)) + 1 # for supercomplex
     for nucleotide in ['DG','DT','DA','DC']: # DNA
-        pymol.cmd.do('color pink, resn '+nucleotide)
+        _cmd_color('pink', 'resn ' + nucleotide)
     if len(pdb_seqnames)==1:
         return None
     finite_identity_items = [item for item in g['aa_identity_means'].items() if np.isfinite(item[1])]
@@ -542,11 +553,11 @@ def mask_subunit(g):
         print('Masking chain {}'.format(chain), flush=True)
         if spans[1]==0: # End position = 0 if no protein in the chain
             continue
-        pymol.cmd.do('color {}, chain {} and polymer.protein'.format(colors[i], chain))
+        _cmd_color(colors[i], 'chain {} and polymer.protein'.format(chain))
         i += 1
     for chain in nucleic_chains:
         print('Masking chain {}'.format(chain), flush=True)
-        pymol.cmd.do('color {}, chain {} and polymer.nucleic'.format(colors[i], chain))
+        _cmd_color(colors[i], 'chain {} and polymer.nucleic'.format(chain))
         i += 1
 
 def set_color_gray(object_names, residue_numberings, gray_value):
@@ -565,8 +576,10 @@ def set_color_gray(object_names, residue_numberings, gray_value):
             residue_end = codon_site_pdb.loc[is_nonzero].max()
             if pd.isna(residue_start) or pd.isna(residue_end):
                 continue
-            cmd_color = "color gray{}, {} and chain {} and resi {:}-{:}"
-            pymol.cmd.do(cmd_color.format(gray_value, object_name, ch, int(residue_start), int(residue_end)))
+            _cmd_color(
+                'gray{}'.format(gray_value),
+                '{} and chain {} and resi {:}-{:}'.format(object_name, ch, int(residue_start), int(residue_end)),
+            )
 
 
 def _paint_sites_with_hex(object_name, chain_id, sites, hex_value, label):
@@ -886,7 +899,9 @@ def write_pymol_session(df, g):
         molecule_codes = g['remove_ligand'].split(',')
         for molecule_code in molecule_codes:
             _cmd_remove('resn '+molecule_code)
-    _cmd_preset_ligand_sites_trans_hq(selection='all')
+    has_organic_ligand = _has_organic_ligand()
+    if has_organic_ligand:
+        _cmd_preset_ligand_sites_trans_hq(selection='all')
     _cmd_hide('wire')
     _cmd_hide('ribbon')
     _cmd_show('cartoon')
@@ -896,7 +911,8 @@ def write_pymol_session(df, g):
     #residue_numberings = get_residue_numberings()
     #set_color_gray(object_names, residue_numberings, gray_value=g['pymol_gray'])
     _cmd_color('gray{}'.format(g['pymol_gray']), 'polymer.protein')
-    _cmd_color_organic()
+    if has_organic_ligand:
+        _cmd_color_organic()
     N_sub_cols = df.columns[df.columns.str.startswith('N_sub_')]
     set_substitution_colors(df, g, object_names, N_sub_cols)
     if g['mask_subunit']:
