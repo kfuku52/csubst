@@ -91,6 +91,15 @@ def test_inspect_help_includes_species_overlap_node_plot_option():
     assert proc.returncode == 0
     help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
     assert "--species_overlap_node_plot" in help_text
+    assert "--output_manifest" in help_text
+
+
+def test_sites_help_shows_output_manifest_and_hides_legacy_site_output_manifest():
+    proc, log_text = _run_cli("sites", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "--output_manifest" in help_text
+    assert "--site_output_manifest" not in help_text
 
 
 def test_inspect_help_includes_state_highlight_options():

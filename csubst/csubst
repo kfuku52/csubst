@@ -365,6 +365,22 @@ def _build_parser():
     psr_rc.add_argument('--sa_iqtree_model', metavar='STR', default='GTR', type=str,
                         help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20 '
                              '(used with --seqtype MORPH).')
+    psr_treeplot = argparse.ArgumentParser(add_help=False)
+    psr_treeplot.add_argument('--species_regex', metavar='REGEX', default='^([^_]+_[^_]+)_', required=False, type=str,
+                              help='default=%(default)s: Regular expression for extracting species IDs from leaf labels '
+                                   'for species-overlap node annotation in tree plots. '
+                                   'If the regex contains capture groups, the first non-empty captured group is used; '
+                                   'otherwise, the full regex match is used. '
+                                   'For GENUS_SPECIES_GENEID labels, the default works as-is.')
+    psr_treeplot.add_argument('--species_overlap_node_plot', metavar='yes|no|auto', default='auto', required=False, type=str,
+                              help='default=%(default)s: Show speciation/duplication node markers in tree plots. '
+                                   '"yes" always tries to plot, "no" disables them, and "auto" enables them only when '
+                                   'all tip labels are parseable by --species_regex '
+                                   '(GENUS_SPECIES_GENEID labels satisfy the default regex).')
+    psr_output_manifest = argparse.ArgumentParser(add_help=False)
+    psr_output_manifest.add_argument('--output_manifest', metavar='yes|no', default='yes', required=False, type=strtobool,
+                                     help='default=%(default)s: Write an outputs manifest TSV with generated files, '
+                                          'sizes, and key command parameters.')
 
     # shared: foreground
     psr_fg = argparse.ArgumentParser(add_help=False)
@@ -463,7 +479,7 @@ def _build_parser():
     # sites
     help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps them onto protein structure. '
     help_txt += 'See `csubst sites -h` (legacy alias: `csubst site -h`).'
-    site = subparsers.add_parser('sites', aliases=['site'], help=help_txt, parents=[psr_co,psr_iq,psr_as,psr_rc])
+    site = subparsers.add_parser('sites', aliases=['site'], help=help_txt, parents=[psr_co,psr_iq,psr_as,psr_rc,psr_treeplot,psr_output_manifest])
     site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default='', required=False, type=str,
                       help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
                       'Run `csubst search` first and select branches of interest. '
@@ -494,20 +510,8 @@ def _build_parser():
     site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=30, required=False, type=int,
                       help='default=%(default)s: Maximum number of plotted sites in the tree + site summary '
                            '(convergent and divergent columns are balanced when both are available).')
-    site.add_argument('--species_regex', metavar='REGEX', default='^([^_]+_[^_]+)_', required=False, type=str,
-                      help='default=%(default)s: Regular expression for extracting species IDs from leaf labels '
-                           'for species-overlap node annotation in tree plots. '
-                           'If the regex contains capture groups, the first non-empty captured group is used; '
-                           'otherwise, the full regex match is used. '
-                           'For GENUS_SPECIES_GENEID labels, the default works as-is.')
-    site.add_argument('--species_overlap_node_plot', metavar='yes|no|auto', default='auto', required=False, type=str,
-                      help='default=%(default)s: Show speciation/duplication node markers in tree plots. '
-                           '"yes" always tries to plot, "no" disables them, and "auto" enables them only when '
-                           'all tip labels are parseable by --species_regex '
-                           '(GENUS_SPECIES_GENEID labels satisfy the default regex).')
-    site.add_argument('--site_output_manifest', metavar='yes|no', default='yes', required=False, type=strtobool,
-                      help='default=%(default)s: Write csubst_sites.outputs.tsv with generated files, '
-                           'sizes, branch IDs, and key plotting parameters.')
+    site.add_argument('--site_output_manifest', metavar='yes|no', dest='output_manifest', default='yes', required=False, type=strtobool,
+                      help=argparse.SUPPRESS)
     site.add_argument('--cb_file', metavar='PATH', default='csubst_cb_2.tsv', required=False, type=str,
                       help='default=%(default)s: PATH to csubst_cb_*.tsv output of csubst search.')
     site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,
@@ -783,7 +787,7 @@ def _build_parser():
 
     # inspect
     help_txt = 'writes branch/tree/state inspection outputs without running convergence statistics. See `csubst inspect -h`'
-    inspect = subparsers.add_parser('inspect', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_inspect])
+    inspect = subparsers.add_parser('inspect', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_treeplot,psr_output_manifest,psr_out_inspect])
     inspect.add_argument('--plot_state_aa', metavar='no|all|SITE_SPEC', default='no', type=str,
                          help='default=%(default)s: Write ancestral amino-acid state trees from unfiltered sites. '
                               'Use "all" for one multi-page PDF with every site, '
@@ -794,15 +798,6 @@ def _build_parser():
                               'Use "all" for one multi-page PDF with every site, '
                               '"2,5,10" for one multi-page PDF with one site per page, '
                               'or "2-5-10" for one single-page PDF with concatenated site labels.')
-    inspect.add_argument('--species_regex', metavar='REGEX', default='^([^_]+_[^_]+)_', required=False, type=str,
-                         help='default=%(default)s: Regular expression for extracting species IDs from leaf labels '
-                              'for species-overlap node annotation in inspect tree plots. '
-                              'If the regex contains capture groups, the first non-empty captured group is used; '
-                              'otherwise, the full regex match is used.')
-    inspect.add_argument('--species_overlap_node_plot', metavar='yes|no|auto', default='auto', required=False, type=str,
-                         help='default=%(default)s: Show speciation/duplication node markers in inspect tree plots. '
-                              '"yes" always tries to plot, "no" disables them, and "auto" enables them only when '
-                              'all tip labels are parseable by --species_regex.')
     inspect.add_argument('--plot_state_aa_highlight_pattern', metavar='AASEQ', default='', type=str,
                          help='default=%(default)s: When --plot_state_aa requests specific site(s), '
                               'highlight tip labels whose concatenated amino-acid states exactly match this pattern. '

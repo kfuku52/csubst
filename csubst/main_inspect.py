@@ -7,6 +7,7 @@ import pandas as pd
 
 from csubst import ete
 from csubst import genetic_code
+from csubst import output_manifest
 from csubst import parser_iqtree
 from csubst import parser_misc
 from csubst import runtime
@@ -27,7 +28,7 @@ def _plot_state_tree_in_directory(output_dir, state, orders, mode, g, plot_reque
         if os.path.isfile(path):
             os.remove(path)
     os.makedirs(output_dir, exist_ok=True)
-    tree.plot_state_tree(
+    return tree.plot_state_tree(
         state=state,
         orders=orders,
         mode=mode,
@@ -73,6 +74,87 @@ def _get_trait_names(g):
     return fg_df.columns[1:].tolist()
 
 
+def _get_inspect_manifest_rows(g):
+    rows = g.get("_inspect_output_manifest_rows", None)
+    if rows is None:
+        rows = list()
+        g["_inspect_output_manifest_rows"] = rows
+    return rows
+
+
+def _get_inspect_output_manifest_metadata(g):
+    plot_state_aa = tree.normalize_state_plot_request(
+        g.get("plot_state_aa", "no"),
+        param_name="--plot_state_aa",
+    )
+    plot_state_codon = tree.normalize_state_plot_request(
+        g.get("plot_state_codon", "no"),
+        param_name="--plot_state_codon",
+    )
+    return {
+        "plot_state_aa": str(plot_state_aa.get("token", "no")),
+        "plot_state_codon": str(plot_state_codon.get("token", "no")),
+        "nonsyn_recode": str(g.get("nonsyn_recode", "no")).strip().lower(),
+        "drop_invariant_tip_sites": _normalize_drop_invariant_mode(g),
+        "species_overlap_node_plot": str(g.get("species_overlap_node_plot", "auto")).strip().lower(),
+        "tree_tip_label_spacing": float(g.get("tree_tip_label_spacing", 1.0)),
+        "tree_fig_max_height": float(g.get("tree_fig_max_height", 180.0)),
+    }
+
+
+def _add_inspect_output_manifest_row(manifest_rows, output_path, output_kind, g, note=''):
+    return output_manifest.add_output_manifest_row(
+        manifest_rows=manifest_rows,
+        output_path=output_path,
+        output_kind=output_kind,
+        note=note,
+        base_dir=g["outdir"],
+        extra_fields=_get_inspect_output_manifest_metadata(g),
+    )
+
+
+def _record_inspect_output_paths(g, output_paths, output_kind, note=''):
+    if output_paths is None:
+        return g
+    if isinstance(output_paths, (str, os.PathLike)):
+        normalized_paths = [str(output_paths)]
+    else:
+        normalized_paths = [str(path) for path in list(output_paths)]
+    if len(normalized_paths) == 0:
+        return g
+    manifest_rows = _get_inspect_manifest_rows(g)
+    for output_path in normalized_paths:
+        _add_inspect_output_manifest_row(
+            manifest_rows=manifest_rows,
+            output_path=output_path,
+            output_kind=output_kind,
+            g=g,
+            note=note,
+        )
+    return g
+
+
+def _record_inspect_foreground_branch_files(g):
+    for trait_name in _get_trait_names(g):
+        output_path = runtime.output_path(g, "foreground_branch_" + str(trait_name) + ".txt")
+        if os.path.exists(output_path):
+            _record_inspect_output_paths(g=g, output_paths=output_path, output_kind="foreground_branch_txt")
+    return g
+
+
+def _write_inspect_output_manifest(g):
+    manifest_path = runtime.output_path(g, "outputs.tsv")
+    manifest_path = output_manifest.write_output_manifest(
+        manifest_rows=_get_inspect_manifest_rows(g),
+        manifest_path=manifest_path,
+        note="manifest_self_row",
+        base_dir=g["outdir"],
+        extra_fields=_get_inspect_output_manifest_metadata(g),
+    )
+    print("Writing inspect output manifest: {}".format(manifest_path), flush=True)
+    return manifest_path
+
+
 def _strip_placeholder_suffix(text):
     suffix = "_PLACEHOLDER"
     text = str(text)
@@ -92,6 +174,7 @@ def _write_branch_maps(g):
     base_df = pd.DataFrame(base_rows).sort_values(by=["branch_id"]).reset_index(drop=True)
     trait_names = _get_trait_names(g)
     combined_df = base_df.copy(deep=True)
+    output_paths = list()
     trait_specific_frames = {}
     for trait_name in trait_names:
         target_ids = g.get("target_ids", {}).get(trait_name, np.array([], dtype=np.int64))
@@ -118,17 +201,21 @@ def _write_branch_maps(g):
         combined_df.loc[:, "foreground_lineage_id_" + trait_name] = trait_df.loc[:, "foreground_lineage_id"].values
         combined_df.loc[:, "branch_color_" + trait_name] = trait_df.loc[:, "branch_color"].values
         combined_df.loc[:, "label_color_" + trait_name] = trait_df.loc[:, "label_color"].values
+    combined_path = runtime.output_path(g, "branch_map.tsv")
     _sanitize_placeholder_columns(combined_df).to_csv(
-        runtime.output_path(g, "branch_map.tsv"),
+        combined_path,
         sep="\t",
         index=False,
     )
+    output_paths.append(combined_path)
     for trait_name in trait_names:
         out_file = runtime.output_path(g, "branch_map_" + str(trait_name) + ".tsv")
         out_file = out_file.replace("_PLACEHOLDER", "")
-        if out_file == runtime.output_path(g, "branch_map.tsv"):
+        if out_file == combined_path:
             continue
         _sanitize_placeholder_columns(trait_specific_frames[trait_name]).to_csv(out_file, sep="\t", index=False)
+        output_paths.append(out_file)
+    return output_paths
 
 
 def _get_aa_state_view_for_inspect(g):
@@ -456,22 +543,26 @@ def _remove_legacy_state_plot_dir(g, output_name):
 
 def _write_fast_unfiltered_alignments(g, codon_symbol_index, aa_symbol_index, aa_config):
     loaded_branch_ids = g.get("state_loaded_branch_ids", None)
+    codon_path = runtime.output_path(g, "alignment_codon.fa")
     sequence.write_alignment_from_symbol_indices(
-        runtime.output_path(g, "alignment_codon.fa"),
+        codon_path,
         symbol_index_matrix=codon_symbol_index,
         orders=g["codon_orders"],
         missing_state="---",
         g=g,
         branch_ids=loaded_branch_ids,
     )
+    _record_inspect_output_paths(g=g, output_paths=codon_path, output_kind="alignment_codon_fa")
+    aa_path = runtime.output_path(g, "alignment_aa.fa")
     sequence.write_alignment_from_symbol_indices(
-        runtime.output_path(g, "alignment_aa.fa"),
+        aa_path,
         symbol_index_matrix=aa_symbol_index,
         orders=aa_config["alignment_orders"],
         missing_state="-",
         g=g,
         branch_ids=loaded_branch_ids,
     )
+    _record_inspect_output_paths(g=g, output_paths=aa_path, output_kind="alignment_aa_fa")
 
 
 def _plot_fast_unfiltered_state_trees(g, selected_site_indices, state_cdn_subset, aa_config):
@@ -482,7 +573,7 @@ def _plot_fast_unfiltered_state_trees(g, selected_site_indices, state_cdn_subset
             aa_state_subset = sequence.cdn2nsy_state(state_cdn=state_cdn_subset, g=g)
         else:
             aa_state_subset = sequence.cdn2pep_state(state_cdn=state_cdn_subset, g=g)
-        tree.plot_state_tree_selected_sites(
+        aa_out_files = tree.plot_state_tree_selected_sites(
             state=aa_state_subset,
             orders=aa_config["plot_orders"],
             mode=aa_config["mode"],
@@ -492,9 +583,10 @@ def _plot_fast_unfiltered_state_trees(g, selected_site_indices, state_cdn_subset
             plot_request=g["plot_state_aa"],
             plot_request_name="--plot_state_aa",
         )
+        _record_inspect_output_paths(g=g, output_paths=aa_out_files, output_kind="state_tree_aa_pdf")
     if tree.has_state_plot_request(g.get("plot_state_codon", "no")):
         _remove_legacy_state_plot_dir(g, "plot_state_codon")
-        tree.plot_state_tree_selected_sites(
+        codon_out_files = tree.plot_state_tree_selected_sites(
             state=state_cdn_subset,
             orders=g["codon_orders"],
             mode="codon",
@@ -504,11 +596,13 @@ def _plot_fast_unfiltered_state_trees(g, selected_site_indices, state_cdn_subset
             plot_request=g["plot_state_codon"],
             plot_request_name="--plot_state_codon",
         )
+        _record_inspect_output_paths(g=g, output_paths=codon_out_files, output_kind="state_tree_codon_pdf")
 
 
 def _run_fast_unfiltered_outputs(g):
     print('Fast inspect state-plot bypass enabled: streaming selected-site outputs without full state tensors.', flush=True)
     g = _prepare_fast_inspect_context(g)
+    g = _record_inspect_foreground_branch_files(g)
     g = _configure_3di_smoke_mode(g)
     g = _ensure_tree_alignment_for_fast_inspect(g)
     selected_site_indices = _get_selected_plot_site_indices(g)
@@ -556,36 +650,43 @@ def _run_standard_unfiltered_outputs(g):
         resolve_state_subset=True,
         prepare_state=False,
     )
+    g = _record_inspect_foreground_branch_files(g)
     g = _configure_3di_smoke_mode(g)
     g = parser_misc.prep_state(g, apply_site_filtering=False)
     loaded_branch_ids = g.get("state_loaded_branch_ids", None)
     aa_state_unfiltered, aa_orders_unfiltered, aa_mode_unfiltered = _get_aa_state_view_for_inspect(g)
     codon_state_unfiltered = g["state_cdn"]
+    codon_path = runtime.output_path(g, "alignment_codon.fa")
     sequence.write_alignment(
-        runtime.output_path(g, "alignment_codon.fa"),
+        codon_path,
         mode="codon",
         g=g,
         branch_ids=loaded_branch_ids,
     )
+    _record_inspect_output_paths(g=g, output_paths=codon_path, output_kind="alignment_codon_fa")
+    aa_path = runtime.output_path(g, "alignment_aa.fa")
     sequence.write_alignment(
-        runtime.output_path(g, "alignment_aa.fa"),
+        aa_path,
         mode=aa_mode_unfiltered,
         g=g,
         branch_ids=loaded_branch_ids,
     )
+    _record_inspect_output_paths(g=g, output_paths=aa_path, output_kind="alignment_aa_fa")
     if str(g.get("nonsyn_recode", "no")).strip().lower() == "3di20":
         nsy_branch_ids = g.get("sa_smoke_inferred_nonroot_branch_ids", None)
         if nsy_branch_ids is None:
             nsy_branch_ids = loaded_branch_ids
+        alignment_3di_path = runtime.output_path(g, "alignment_3di.fa")
         sequence.write_alignment(
-            runtime.output_path(g, "alignment_3di.fa"),
+            alignment_3di_path,
             mode="nsy",
             g=g,
             branch_ids=nsy_branch_ids,
         )
+        _record_inspect_output_paths(g=g, output_paths=alignment_3di_path, output_kind="alignment_3di_fa")
     if tree.has_state_plot_request(g.get("plot_state_aa", "no")):
         _remove_legacy_state_plot_dir(g, "plot_state_aa")
-        _plot_state_tree_in_directory(
+        aa_out_files = _plot_state_tree_in_directory(
             output_dir=g["outdir"],
             state=aa_state_unfiltered,
             orders=aa_orders_unfiltered,
@@ -594,9 +695,10 @@ def _run_standard_unfiltered_outputs(g):
             plot_request=g["plot_state_aa"],
             plot_request_name="--plot_state_aa",
         )
+        _record_inspect_output_paths(g=g, output_paths=aa_out_files, output_kind="state_tree_aa_pdf")
     if tree.has_state_plot_request(g.get("plot_state_codon", "no")):
         _remove_legacy_state_plot_dir(g, "plot_state_codon")
-        _plot_state_tree_in_directory(
+        codon_out_files = _plot_state_tree_in_directory(
             output_dir=g["outdir"],
             state=codon_state_unfiltered,
             orders=g["codon_orders"],
@@ -605,22 +707,33 @@ def _run_standard_unfiltered_outputs(g):
             plot_request=g["plot_state_codon"],
             plot_request_name="--plot_state_codon",
         )
+        _record_inspect_output_paths(g=g, output_paths=codon_out_files, output_kind="state_tree_codon_pdf")
     return g
 
 
 def _finalize_inspect_outputs(g):
     g = parser_misc.apply_site_filters(g)
-    tree.write_tree(g["tree"], outfile=runtime.output_path(g, "tree.nwk"))
-    tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id"), label="all")
-    tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id_leaf"), label="leaf")
-    tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id_nolabel"), label="no")
-    _write_branch_maps(g)
+    site_index_map_path = runtime.output_path(g, "site_index_map.tsv")
+    if os.path.exists(site_index_map_path):
+        _record_inspect_output_paths(g=g, output_paths=site_index_map_path, output_kind="site_index_map_tsv")
+    tree_path = runtime.output_path(g, "tree.nwk")
+    tree.write_tree(g["tree"], outfile=tree_path)
+    _record_inspect_output_paths(g=g, output_paths=tree_path, output_kind="tree_newick")
+    branch_all_paths = tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id"), label="all")
+    _record_inspect_output_paths(g=g, output_paths=branch_all_paths, output_kind="branch_category_all_pdf")
+    branch_leaf_paths = tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id_leaf"), label="leaf")
+    _record_inspect_output_paths(g=g, output_paths=branch_leaf_paths, output_kind="branch_category_leaf_pdf")
+    branch_nolabel_paths = tree.plot_branch_category(g, file_base=runtime.output_path(g, "branch_id_nolabel"), label="no")
+    _record_inspect_output_paths(g=g, output_paths=branch_nolabel_paths, output_kind="branch_category_nolabel_pdf")
+    branch_map_paths = _write_branch_maps(g)
+    _record_inspect_output_paths(g=g, output_paths=branch_map_paths, output_kind="branch_map_tsv")
     return g
 
 
 def main_inspect(g):
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
+    g["_inspect_output_manifest_rows"] = list()
     g["plot_state_aa"] = tree.normalize_state_plot_request(
         g.get("plot_state_aa", "no"),
         param_name="--plot_state_aa",
@@ -643,10 +756,15 @@ def main_inspect(g):
         except _FastStatePlotBypassUnavailable as exc:
             txt = 'Fast inspect state-plot bypass was disabled after validation: {}. Falling back to standard state loading.'
             print(txt.format(str(exc)), flush=True)
+            g["_inspect_output_manifest_rows"] = list()
             g = _run_standard_unfiltered_outputs(g)
     else:
         g = _run_standard_unfiltered_outputs(g)
     g = _finalize_inspect_outputs(g)
+    if bool(g.get("output_manifest", True)):
+        _write_inspect_output_manifest(g)
+    else:
+        print('Skipping inspect output manifest (--output_manifest no).', flush=True)
 
     elapsed_time = int(time.time() - start)
     print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)

@@ -10,6 +10,7 @@ import re
 import sys
 
 from csubst import genetic_code
+from csubst import output_manifest
 from csubst import parser_misc
 from csubst import runtime
 from csubst import sequence
@@ -72,27 +73,11 @@ def _normalize_branch_ids(branch_ids):
 def _format_branch_id_label(branch_id):
     return 'b{}'.format(int(branch_id))
 
-def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, branch_ids, note=''):
-    site_outdir = os.path.abspath(g['site_outdir'])
-    output_path_abs = os.path.abspath(output_path)
-    exists = os.path.exists(output_path_abs)
-    size_bytes = os.path.getsize(output_path_abs) if exists else -1
-    normalized_branch_ids = _normalize_branch_ids(branch_ids)
-    if output_path_abs.startswith(site_outdir + os.sep):
-        output_file = os.path.relpath(output_path_abs, start=site_outdir)
-    else:
-        output_file = output_path_abs
+
+def _get_site_output_manifest_metadata(g):
     effective_min_prob = float(get_tree_site_min_prob(g))
-    row = {
-        'generated_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        'branch_ids': ','.join([str(int(bid)) for bid in normalized_branch_ids.tolist()]),
-        'branch_count': int(normalized_branch_ids.shape[0]),
+    return {
         'single_branch_mode': bool2yn(g.get('single_branch_mode', False)),
-        'output_kind': str(output_kind),
-        'output_file': str(output_file),
-        'output_path': output_path_abs,
-        'file_exists': bool2yn(exists),
-        'file_size_bytes': int(size_bytes),
         'tree_site_plot': bool2yn(g.get('tree_site_plot', True)),
         'site_state_plot': bool2yn(g.get('site_state_plot', True)),
         'tree_site_plot_format': str(g.get('tree_site_plot_format', 'pdf')).lower(),
@@ -101,28 +86,30 @@ def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, bra
         'tree_site_plot_min_prob_effective': effective_min_prob,
         'tree_site_plot_max_sites': int(get_tree_site_plot_max_sites(g)),
         'pdb_mode': bool2yn(g.get('pdb', None) is not None),
-        'note': str(note),
     }
-    manifest_rows.append(row)
-    return manifest_rows
+
+
+def add_site_output_manifest_row(manifest_rows, output_path, output_kind, g, branch_ids, note=''):
+    return output_manifest.add_output_manifest_row(
+        manifest_rows=manifest_rows,
+        output_path=output_path,
+        output_kind=output_kind,
+        note=note,
+        base_dir=g['site_outdir'],
+        branch_ids=branch_ids,
+        extra_fields=_get_site_output_manifest_metadata(g),
+    )
 
 def write_site_output_manifest(manifest_rows, g, branch_ids):
     manifest_path = os.path.join(g['site_outdir'], 'csubst_sites.outputs.tsv')
-    manifest_df = pd.DataFrame(manifest_rows)
-    if manifest_df.shape[0] > 0:
-        manifest_df = manifest_df.sort_values(by=['output_kind', 'output_file']).reset_index(drop=True)
-    manifest_df.to_csv(manifest_path, sep='\t', index=False, chunksize=10000)
-    add_site_output_manifest_row(
+    manifest_path = output_manifest.write_output_manifest(
         manifest_rows=manifest_rows,
-        output_path=manifest_path,
-        output_kind='output_manifest',
-        g=g,
-        branch_ids=branch_ids,
+        manifest_path=manifest_path,
         note='manifest_self_row',
+        base_dir=g['site_outdir'],
+        branch_ids=branch_ids,
+        extra_fields=_get_site_output_manifest_metadata(g),
     )
-    manifest_df = pd.DataFrame(manifest_rows)
-    manifest_df = manifest_df.sort_values(by=['output_kind', 'output_file']).reset_index(drop=True)
-    manifest_df.to_csv(manifest_path, sep='\t', index=False, chunksize=10000)
     print('Writing site output manifest: {}'.format(manifest_path), flush=True)
     return manifest_path
 
@@ -3580,10 +3567,10 @@ def main_sites(g):
             g=g,
             branch_ids=g['branch_ids'],
         )
-        if bool(g.get('site_output_manifest', True)):
+        if bool(g.get('output_manifest', True)):
             write_site_output_manifest(manifest_rows=manifest_rows, g=g, branch_ids=g['branch_ids'])
         else:
-            print('Skipping site output manifest (--site_output_manifest no).', flush=True)
+            print('Skipping site output manifest (--output_manifest no).', flush=True)
     print('To visualize the convergence probability on protein structure, please see: https://github.com/kfuku52/csubst/wiki')
     print('')
     runtime.cleanup_legacy_temp_artifacts()

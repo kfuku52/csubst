@@ -153,6 +153,7 @@ def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
         "csubst_branch_id_nolabel_traitA.pdf",
         "csubst_state_traitA_aa_all.pdf",
         "csubst_state_traitA_codon_all.pdf",
+        "csubst_outputs.tsv",
         "csubst_tree.nwk",
         "csubst_foreground_branch_traitA.txt",
         "csubst_branch_map.tsv",
@@ -236,6 +237,7 @@ def test_main_inspect_routes_outputs_into_configured_namespace(tmp_path, monkeyp
         outdir / "inspect_run_alignment_codon.fa",
         outdir / "inspect_run_alignment_aa.fa",
         outdir / "inspect_run_tree.nwk",
+        outdir / "inspect_run_outputs.tsv",
         outdir / "inspect_run_branch_id_traitA.pdf",
         outdir / "csubst_state_traitA_aa_all.pdf",
         outdir / "inspect_run_branch_map.tsv",
@@ -243,6 +245,10 @@ def test_main_inspect_routes_outputs_into_configured_namespace(tmp_path, monkeyp
     ]
     for path in expected_paths:
         assert path.exists(), path
+    manifest_df = pd.read_csv(outdir / "inspect_run_outputs.tsv", sep="\t")
+    assert (manifest_df.loc[:, "output_kind"] == "output_manifest").any()
+    assert (manifest_df.loc[:, "output_kind"] == "branch_map_tsv").any()
+    assert (manifest_df.loc[:, "output_kind"] == "foreground_branch_txt").any()
 
 
 def test_main_inspect_uses_recoded_state_for_state_aa_outputs(tmp_path, monkeypatch):

@@ -1545,7 +1545,7 @@ def _render_tree_matplotlib_with_optional_node_types(node_type_by_id=None, tip_l
 
 def plot_branch_category(g, file_base, label='all'):
     if not is_ete_plottable():
-        return None
+        return []
     trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)]
     tip_label_spacing_factor = _resolve_tree_tip_label_spacing_factor(
         value=g.get('tree_tip_label_spacing', TREE_TIP_LABEL_SPACING_FACTOR),
@@ -1558,6 +1558,7 @@ def plot_branch_category(g, file_base, label='all'):
         species_regex=g.get('species_regex', ''),
         species_overlap_node_plot=g.get('species_overlap_node_plot', 'auto'),
     )
+    out_files = list()
     for trait_name in trait_names:
         file_name = file_base+'_'+trait_name+'.pdf'
         file_name = file_name.replace('_PLACEHOLDER', '')
@@ -1571,6 +1572,8 @@ def plot_branch_category(g, file_base, label='all'):
             tip_label_spacing_factor=tip_label_spacing_factor,
             tree_fig_max_height=tree_fig_max_height,
         )
+        out_files.append(file_name)
+    return out_files
 
 
 def normalize_state_plot_request(value, param_name='state plot selector'):
