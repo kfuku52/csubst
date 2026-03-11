@@ -18,15 +18,105 @@ from csubst import runtime
 from csubst import utility
 from csubst import ete
 
+def _cmd_delete_all():
+    delete = getattr(pymol.cmd, 'delete', None)
+    if callable(delete):
+        return delete('all')
+    return pymol.cmd.do('delete all')
+
+
+def _cmd_fetch(pdb_id):
+    fetch = getattr(pymol.cmd, 'fetch', None)
+    if callable(fetch):
+        return fetch(pdb_id)
+    return pymol.cmd.do('fetch {}'.format(pdb_id))
+
+
+def _cmd_remove(selection):
+    remove = getattr(pymol.cmd, 'remove', None)
+    if callable(remove):
+        return remove(selection)
+    return pymol.cmd.do('remove {}'.format(selection))
+
+
+def _cmd_hide(representation, selection='all'):
+    hide = getattr(pymol.cmd, 'hide', None)
+    if callable(hide):
+        return hide(representation, selection)
+    return pymol.cmd.do('hide {}'.format(representation))
+
+
+def _cmd_show(representation, selection='all'):
+    show = getattr(pymol.cmd, 'show', None)
+    if callable(show):
+        return show(representation, selection)
+    return pymol.cmd.do('show {}'.format(representation))
+
+
+def _cmd_set(setting_name, value, selection=''):
+    set_cmd = getattr(pymol.cmd, 'set', None)
+    if callable(set_cmd):
+        return set_cmd(setting_name, value, selection)
+    if selection != '':
+        return pymol.cmd.do('set {}, {}, {}'.format(setting_name, value, selection))
+    return pymol.cmd.do('set {}, {}'.format(setting_name, value))
+
+
+def _cmd_color(color_name, selection):
+    color = getattr(pymol.cmd, 'color', None)
+    if callable(color):
+        return color(color_name, selection)
+    return pymol.cmd.do('color {}, {}'.format(color_name, selection))
+
+
+def _cmd_zoom(selection='all'):
+    zoom = getattr(pymol.cmd, 'zoom', None)
+    if callable(zoom):
+        return zoom(selection)
+    return pymol.cmd.do('zoom')
+
+
+def _cmd_preset_ligand_sites_trans_hq(selection='all'):
+    preset_module = getattr(pymol, 'preset', None)
+    preset_func = getattr(preset_module, 'ligand_sites_trans_hq', None)
+    if callable(preset_func):
+        return preset_func(selection=selection)
+    return pymol.cmd.do("preset.ligand_sites_trans_hq(selection='{}')".format(selection))
+
+
+def _cmd_color_organic():
+    util_module = getattr(pymol, 'util', None)
+    cbag = getattr(util_module, 'cbag', None)
+    if callable(cbag):
+        return cbag('organic')
+    return pymol.cmd.do('util.cbag organic')
+
+
+def _extract_positive_site_array(series):
+    values = pd.to_numeric(series, errors='coerce').to_numpy(dtype=np.float64, copy=True)
+    valid_mask = np.isfinite(values)
+    if valid_mask.any():
+        valid_mask &= np.isclose(values, np.rint(values))
+    site_values = np.zeros(values.shape[0], dtype=np.int64)
+    if valid_mask.any():
+        rounded = np.rint(values[valid_mask]).astype(np.int64, copy=False)
+        positive_mask = rounded > 0
+        valid_positions = np.flatnonzero(valid_mask)
+        invalid_positions = valid_positions[~positive_mask]
+        valid_mask[invalid_positions] = False
+        site_values[valid_positions[positive_mask]] = rounded[positive_mask]
+    return site_values, valid_mask
+
+
 def initialize_pymol(pdb_id):
     #pymol.pymol_argv = ['pymol','-qc']
     #pymol.finish_launching()
-    pymol.cmd.do('delete all')
+    _cmd_delete_all()
     is_old_pdb_code = bool(re.fullmatch('[0-9][A-Za-z0-9]{3}', pdb_id))
     is_new_pdb_code = bool(re.fullmatch('pdb_[0-9]{5}[A-Za-z0-9]{3}', pdb_id))
     if is_old_pdb_code|is_new_pdb_code:
         print('Fetching PDB code {}. Internet connection is needed.'.format(pdb_id), flush=True)
-        pymol.cmd.do('fetch {}'.format(pdb_id))
+        _cmd_fetch(pdb_id)
     else:
         print('Loading PDB file: {}'.format(pdb_id), flush=True)
         pymol.cmd.load(pdb_id)
@@ -486,8 +576,7 @@ def _paint_sites_with_hex(object_name, chain_id, sites, hex_value, label):
     sites = sorted(list(set([int(site) for site in sites])))
     print('Amino acid sites with {} will be painted with {}.'.format(label, hex_value), flush=True)
     txt_resi = '+'.join([str(site) for site in sites])
-    cmd_color = "color {}, {} and chain {} and resi {}"
-    pymol.cmd.do(cmd_color.format(hex_value, object_name, chain_id, txt_resi))
+    _cmd_color(hex_value, '{} and chain {} and resi {}'.format(object_name, chain_id, txt_resi))
     return None
 
 
@@ -646,6 +735,20 @@ def _parse_bool_like(value):
 
 def set_substitution_colors(df, g, object_names, N_sub_cols):
     single_branch_mode = bool(g.get('single_branch_mode', False))
+    if len(N_sub_cols) == 0:
+        single_prob_values = np.zeros(df.shape[0], dtype=np.float64)
+        total_prob_values = np.zeros(df.shape[0], dtype=np.float64)
+    else:
+        single_prob_values = pd.to_numeric(
+            df.loc[:, N_sub_cols].max(axis=1),
+            errors='coerce',
+        ).fillna(0.0).to_numpy(dtype=np.float64, copy=False)
+        total_prob_values = pd.to_numeric(
+            df.loc[:, N_sub_cols].sum(axis=1),
+            errors='coerce',
+        ).fillna(0.0).to_numpy(dtype=np.float64, copy=False)
+    any2spe_values = pd.to_numeric(df.get('OCNany2spe', 0.0), errors='coerce').fillna(0.0).to_numpy(dtype=np.float64, copy=False) if 'OCNany2spe' in df.columns else np.zeros(df.shape[0], dtype=np.float64)
+    any2dif_values = pd.to_numeric(df.get('OCNany2dif', 0.0), errors='coerce').fillna(0.0).to_numpy(dtype=np.float64, copy=False) if 'OCNany2dif' in df.columns else np.zeros(df.shape[0], dtype=np.float64)
     for object_name in object_names:
         if object_name.endswith('_pol_conts'):
             continue
@@ -653,6 +756,7 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             codon_site_col = 'codon_site_pdb_'+object_name+'_'+ch
             if not codon_site_col in df.columns:
                 continue
+            site_values, valid_site_mask = _extract_positive_site_array(df.loc[:, codon_site_col])
             mode = str(g.get('mode', 'intersection')).lower()
             if mode=='set':
                 if 'N_set_expr' not in df.columns:
@@ -675,14 +779,9 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 continue
             if mode=='total':
                 site_values = dict()
-                for i in df.index:
-                    codon_site = _parse_positive_site(df.at[i, codon_site_col])
-                    if codon_site is None:
-                        continue
-                    total_sub = float(df.loc[i,N_sub_cols].sum())
-                    if total_sub < float(g.get('min_single_prob', 0.8)):
-                        continue
-                    site_values[codon_site] = max(site_values.get(codon_site, 0.0), total_sub)
+                qualifying_mask = valid_site_mask & (total_prob_values >= float(g.get('min_single_prob', 0.8)))
+                for codon_site, total_sub in zip(site_values[qualifying_mask], total_prob_values[qualifying_mask]):
+                    site_values[int(codon_site)] = max(site_values.get(int(codon_site), 0.0), float(total_sub))
                 _paint_intensity_sites(
                     object_name=object_name,
                     chain_id=ch,
@@ -737,24 +836,20 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             has_any2dif = ('OCNany2dif' in df.columns) and (not single_branch_mode)
             min_combinat_prob = float(g.get('min_combinat_prob', 0.5))
             min_single_prob = float(g.get('min_single_prob', 0.8))
-            for i in df.index:
-                codon_site = _parse_positive_site(df.at[i, codon_site_col])
-                prob_Nany2spe = float(df.at[i,'OCNany2spe']) if has_any2spe else 0.0
-                prob_Nany2dif = float(df.at[i,'OCNany2dif']) if has_any2dif else 0.0
-                if len(N_sub_cols) == 0:
-                    prob_single_sub = 0.0
-                else:
-                    prob_single_sub = float(df.loc[i,N_sub_cols].max())
-                    if not np.isfinite(prob_single_sub):
-                        prob_single_sub = 0.0
-                if codon_site is None:
-                    continue
-                elif (prob_Nany2spe>=min_combinat_prob)&(prob_Nany2dif<=prob_Nany2spe):
-                    color_sites['OCNany2spe'].append(codon_site)
-                elif (prob_Nany2dif>=min_combinat_prob)&(prob_Nany2dif>prob_Nany2spe):
-                    color_sites['OCNany2dif'].append(codon_site)
-                elif (prob_single_sub>=min_single_prob):
-                    color_sites['single_sub'].append(codon_site)
+            selected_site_values = site_values[valid_site_mask]
+            if has_any2spe:
+                spe_mask = valid_site_mask & (any2spe_values >= min_combinat_prob) & (any2dif_values <= any2spe_values)
+                color_sites['OCNany2spe'] = selected_site_values[np.flatnonzero(spe_mask[valid_site_mask])].tolist()
+            if has_any2dif:
+                dif_mask = valid_site_mask & (any2dif_values >= min_combinat_prob) & (any2dif_values > any2spe_values)
+                color_sites['OCNany2dif'] = selected_site_values[np.flatnonzero(dif_mask[valid_site_mask])].tolist()
+            occupied_mask = np.zeros(df.shape[0], dtype=bool)
+            if has_any2spe:
+                occupied_mask |= spe_mask
+            if has_any2dif:
+                occupied_mask |= dif_mask
+            single_mask = valid_site_mask & (~occupied_mask) & (single_prob_values >= min_single_prob)
+            color_sites['single_sub'] = selected_site_values[np.flatnonzero(single_mask[valid_site_mask])].tolist()
             if single_branch_mode:
                 color_sites['single_branch_N'] = copy.deepcopy(color_sites['single_sub'])
                 del color_sites['OCNany2spe']
@@ -780,34 +875,33 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 )
                 if key in ['OCNany2spe','OCNany2dif'] and len(color_sites[key])>0:
                     txt_resi = '+'.join([str(site) for site in sorted(list(set(color_sites[key])))])
-                    cmd_tp = "set transparency, 0.3, {} and chain {} and resi {:}"
-                    pymol.cmd.do(cmd_tp.format(object_name, ch, txt_resi))
+                    _cmd_set('transparency', 0.3, '{} and chain {} and resi {}'.format(object_name, ch, txt_resi))
 
 def write_pymol_session(df, g):
     df = df.reset_index(drop=True)
-    pymol.cmd.do('set seq_view, 1')
+    _cmd_set('seq_view', 1)
     if g['remove_solvent']:
-        pymol.cmd.do("remove solvent")
+        _cmd_remove('solvent')
     if g['remove_ligand']:
         molecule_codes = g['remove_ligand'].split(',')
         for molecule_code in molecule_codes:
-            pymol.cmd.do("remove resn "+molecule_code)
-    pymol.cmd.do("preset.ligand_sites_trans_hq(selection='all')")
-    pymol.cmd.do("hide wire")
-    pymol.cmd.do("hide ribbon")
-    pymol.cmd.do("show cartoon")
-    pymol.cmd.do("show surface")
-    pymol.cmd.do("set transparency, {}, polymer.protein".format(g['pymol_transparency']))
+            _cmd_remove('resn '+molecule_code)
+    _cmd_preset_ligand_sites_trans_hq(selection='all')
+    _cmd_hide('wire')
+    _cmd_hide('ribbon')
+    _cmd_show('cartoon')
+    _cmd_show('surface')
+    _cmd_set('transparency', g['pymol_transparency'], 'polymer.protein')
     object_names = pymol.cmd.get_names()
     #residue_numberings = get_residue_numberings()
     #set_color_gray(object_names, residue_numberings, gray_value=g['pymol_gray'])
-    pymol.cmd.do("color gray{}, polymer.protein".format(g['pymol_gray']))
-    pymol.cmd.do('util.cbag organic')
+    _cmd_color('gray{}'.format(g['pymol_gray']), 'polymer.protein')
+    _cmd_color_organic()
     N_sub_cols = df.columns[df.columns.str.startswith('N_sub_')]
     set_substitution_colors(df, g, object_names, N_sub_cols)
     if g['mask_subunit']:
         mask_subunit(g)
-    pymol.cmd.do('zoom')
+    _cmd_zoom()
     pymol.cmd.deselect()
     pymol.cmd.save(g['session_file_path'])
 
