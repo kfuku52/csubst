@@ -207,7 +207,7 @@ def test_plot_state_tree_hyphen_request_concatenates_site_labels(monkeypatch):
 
     def fake_render(tree=None, trait_name=None, file_name=None, label='all', state_by_node=None,
                     state_prob_by_node=None, state_orders=None, state_mode=None,
-                    pdf_pages=None, figure_title=None):
+                    pdf_pages=None, figure_title=None, **kwargs):
         captured["file_name"] = str(file_name)
         captured["figure_title"] = figure_title
         captured["state_by_node"] = dict(state_by_node)
@@ -242,7 +242,7 @@ def test_plot_state_tree_hyphen_request_keeps_aa_seqlogo_probabilities(monkeypat
 
     def fake_render(tree=None, trait_name=None, file_name=None, label='all', state_by_node=None,
                     state_prob_by_node=None, state_orders=None, state_mode=None,
-                    pdf_pages=None, figure_title=None):
+                    pdf_pages=None, figure_title=None, **kwargs):
         captured["state_mode"] = state_mode
         captured["state_orders"] = tuple(np.asarray(state_orders, dtype=object).tolist()) if state_orders is not None else None
         captured["state_prob_shape"] = np.asarray(state_prob_by_node[labels["A"]]).shape
@@ -286,7 +286,7 @@ def test_plot_state_tree_highlight_pattern_passes_tip_and_branch_highlights(monk
     def fake_render(tree=None, trait_name=None, file_name=None, label='all', state_by_node=None,
                     state_prob_by_node=None, state_orders=None, state_mode=None,
                     pdf_pages=None, figure_title=None, node_type_by_id=None,
-                    tip_label_color_by_node_id=None, highlighted_node_ids=None, highlight_color=None):
+                    tip_label_color_by_node_id=None, highlighted_node_ids=None, highlight_color=None, **kwargs):
         captured["tip_label_color_by_node_id"] = dict(tip_label_color_by_node_id or {})
         captured["highlighted_node_ids"] = set(highlighted_node_ids or set())
         captured["highlight_color"] = highlight_color
@@ -329,7 +329,7 @@ def test_plot_state_tree_pages_request_preserves_root_state(monkeypatch):
 
     def fake_render(tree=None, trait_name=None, file_name=None, label='all', state_by_node=None,
                     state_prob_by_node=None, state_orders=None, state_mode=None,
-                    pdf_pages=None, figure_title=None):
+                    pdf_pages=None, figure_title=None, **kwargs):
         captured["state_by_node"] = dict(state_by_node)
         captured["figure_title"] = figure_title
 
