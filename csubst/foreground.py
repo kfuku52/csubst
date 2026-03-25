@@ -23,6 +23,33 @@ def _get_trait_names(g):
     return g['fg_df'].columns[1:len(g['fg_df'].columns)]
 
 
+def _is_background_trait_value(value):
+    if value is None:
+        return True
+    if pd.isna(value):
+        return True
+    if isinstance(value, (bool, np.bool_)):
+        return not bool(value)
+    if isinstance(value, (int, np.integer)):
+        return int(value) == 0
+    if isinstance(value, (float, np.floating)):
+        return np.isfinite(value) and (float(value) == 0.0)
+    value_txt = str(value).strip()
+    if value_txt == '':
+        return True
+    if bool(re.fullmatch(r'[+-]?0+(?:\.0+)?', value_txt)):
+        return True
+    return False
+
+
+def _get_non_background_lineages(series):
+    values = np.asarray(series.unique(), dtype=object)
+    if values.size == 0:
+        return values
+    out = [value for value in values.tolist() if not _is_background_trait_value(value)]
+    return np.asarray(out, dtype=object)
+
+
 def _invalidate_clade_permutation_cache(g):
     for key in [
         '_node_by_branch_id_cache',
@@ -693,8 +720,7 @@ def get_foreground_ids(g, write=True):
     g['target_ids'] = dict()
     g['fg_ids'] = dict()
     for trait_name in _get_trait_names(g):
-        lineages = g['fg_df'].loc[:,trait_name].unique()
-        lineages = lineages[lineages!=0]
+        lineages = _get_non_background_lineages(g['fg_df'].loc[:, trait_name])
         g['fg_leaf_names'][trait_name] = get_fg_leaf_names(lineages, trait_name, g)
         g['tree'] = annotate_lineage_foreground(lineages, trait_name, g)
         g['target_ids'][trait_name] = get_target_ids(lineages, trait_name, g)

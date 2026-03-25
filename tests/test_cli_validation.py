@@ -13,6 +13,12 @@ def _resolve_log_path(repo_root, args):
         if token.startswith("--log_file="):
             return Path(token.split("=", 1)[1])
     if len(args) > 0:
+        if args[0] == "benchmark":
+            return repo_root / "csubst_benchmark" / "csubst.log"
+        if args[0] == "benchmark-plot":
+            return repo_root / "csubst_benchmark_plot" / "csubst.log"
+        if args[0] == "doctor":
+            return repo_root / "csubst_doctor" / "csubst.log"
         if args[0] == "simulate":
             return repo_root / "csubst_simulate" / "csubst.log"
         if args[0] == "search":
@@ -151,6 +157,9 @@ def test_cli_help_lists_primary_commands_and_legacy_aliases():
     proc, log_text = _run_cli("--help")
     assert proc.returncode == 0
     help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "benchmark" in help_text
+    assert "benchmark-plot" in help_text
+    assert "doctor" in help_text
     assert "search (analyze)" in help_text
     assert "sites (site)" in help_text
 
@@ -165,6 +174,47 @@ def test_legacy_aliases_remain_available():
 def test_inspect_help_is_available():
     proc, _ = _run_cli("inspect", "-h")
     assert proc.returncode == 0
+
+
+def test_benchmark_help_is_available():
+    proc, log_text = _run_cli("benchmark", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "--benchmark_expectation_methods" in help_text
+    assert "--benchmark_keep_going" in help_text
+    assert "--output_manifest" in help_text
+
+
+def test_benchmark_plot_help_is_available():
+    proc, log_text = _run_cli("benchmark-plot", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "--benchmark_dir" in help_text
+    assert "--benchmark_plot_metrics" in help_text
+    assert "--benchmark_plot_format" in help_text
+    assert "--output_manifest" in help_text
+
+
+def test_benchmark_plot_missing_directory_fails_cleanly():
+    proc, log_text = _run_cli(
+        "benchmark-plot",
+        "--benchmark_dir",
+        str(Path(__file__).resolve().parents[1] / "definitely_missing_benchmark_dir"),
+        "--benchmark_plot_recursive",
+        "no",
+    )
+    assert proc.returncode == 2
+    assert "--benchmark_dir was not found or is not a directory" in log_text
+    assert "Traceback" not in log_text
+
+
+def test_doctor_help_is_available():
+    proc, log_text = _run_cli("doctor", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "--check_iqtree_exe" in help_text
+    assert "--doctor_fail_level" in help_text
+    assert "--output_manifest" in help_text
 
 
 def test_inspect_help_includes_nonsyn_recode_pca_option():

@@ -37,6 +37,18 @@ def _default_sa_state_cache_file():
 
 
 _OUTPUT_NAMESPACE_DEFAULTS = {
+    'benchmark': {
+        'outdir': 'csubst_benchmark',
+        'output_prefix': 'csubst',
+    },
+    'benchmark-plot': {
+        'outdir': 'csubst_benchmark_plot',
+        'output_prefix': 'csubst',
+    },
+    'doctor': {
+        'outdir': 'csubst_doctor',
+        'output_prefix': 'csubst',
+    },
     'simulate': {
         'outdir': 'csubst_simulate',
         'output_prefix': 'csubst',
@@ -190,6 +202,36 @@ def command_search(args):
     print('csubst {} end:'.format(command_label), datetime.datetime.now(datetime.timezone.utc), flush=True)
 
 
+def command_benchmark(args):
+    print('csubst benchmark start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    g = get_global_parameters_or_exit(args)
+    from csubst.main_benchmark import main_benchmark
+    main_benchmark(g)
+    print('csubst benchmark: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst benchmark end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
+
+def command_benchmark_plot(args):
+    print('csubst benchmark-plot start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    g = get_global_parameters_or_exit(args)
+    from csubst.main_benchmark_plot import main_benchmark_plot
+    main_benchmark_plot(g)
+    print('csubst benchmark-plot: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst benchmark-plot end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
+
+def command_doctor(args):
+    print('csubst doctor start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    g = get_global_parameters_or_exit(args)
+    from csubst.main_doctor import main_doctor
+    main_doctor(g)
+    print('csubst doctor: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst doctor end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
+
 command_site = command_sites
 command_analyze = command_search
 
@@ -201,6 +243,206 @@ def command_inspect(args):
     main_inspect(g)
     print('csubst inspect: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst inspect end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
+
+def _add_search_subcommand_args(parser):
+    # branch combinations
+    parser.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
+                        help='default=%(default)s: The maximum combinatorial number of branches (K). '
+                             'Set 2 for branch pairs. 3 or larger for higher-order combinations.')
+    parser.add_argument('--exhaustive_until', metavar='INTEGER', default=2, type=int,
+                        help='default=%(default)s: Analyze all independent branch combinations until specified arity (K). '
+                             'Be careful of combinatorial explosion if set to 3 or higher. '
+                             'Set to 1 for foreground-only analysis.')
+    parser.add_argument('--max_combination', metavar='INTEGER', default=10000, type=int,
+                        help='default=%(default)s: Maximum number of branch combinations to generate at K+1. '
+                             'If possible branch combinations at K+1 are more than this number, '
+                             'top N convergent combinatinons are selected with the thresholds specified by --cutoff_stat. '
+                             'The first stat in --cutoff_stat is most prioritized.')
+    parser.add_argument('--exclude_sister_pair', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Set to "yes" for excluding sister branches in branch combination analysis.')
+    parser.add_argument('--cutoff_stat', metavar='[STAT1,VALUE1|STAT2,VALUE2|...]',
+                        default='OCNany2spe,2.0|omegaCany2spe,5.0', type=str,
+                        help='default=%(default)s: Cutoff statistics for searching higher-order branch combinations. '
+                             'STAT is a column in csubst_cb_N.tsv. Regular expressions are supported. '
+                             'e.g., "N_sub_[0-9]+" to specify the number of branch-wise nonsynonymous substitutions '
+                             'in all branches. VALUE is the minimum value, '
+                             'and branch combinations with smaller values will be excluded.')
+    parser.add_argument('--output_stat', metavar='STAT1,STAT2,...',
+                        default='any2any,any2dif,any2spe', type=str,
+                        help='default=%(default)s: Comma-delimited combinatorial-substitution statistics '
+                             'to compute and report. Choose from '
+                             'any2any, any2spe, any2dif, dif2any, dif2spe, dif2dif, '
+                             'spe2any, spe2spe, spe2dif.')
+    parser.add_argument('--branch_dist', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Set "yes" to calculate inter-branch distance.')
+    # Substitution outputs
+    parser.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Branch output. Set "yes" to generate the output tsv.')
+    parser.add_argument('--s', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Site output. Set "yes" to generate the output tsv.')
+    parser.add_argument('--cs', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Combinatorial-site output. Set "yes" to generate the output tsv.')
+    parser.add_argument('--cb', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Combinatorial-branch output. Set "yes" to generate the output tsv.')
+    parser.add_argument('--bs', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Branch-site output. Set "yes" to generate the output tsv.')
+    parser.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output tsv.')
+    # Omega_C calculation
+    parser.add_argument('--expectation_method', metavar='codon_model|urn', default=None, type=str,
+                        choices=['codon_model', 'urn'],
+                        help='default=codon_model: Method to calculate omega_C expected values. '
+                             '"codon_model" utilizes a codon substitution model in ancestral-state reconstruction. '
+                             'In addition to base substitution models, codon frequencies and among-site rate '
+                             'heterogeneity are taken into account. '
+                             'Described in Fukushima and Pollock (2023, https://doi.org/10.1038/s41559-022-01932-7). '
+                             '"urn" uses among-site randomization (weighted urn sampling).')
+    parser.add_argument('--urn_model', metavar='wallenius|fisher|factorized_approx', default=None, type=str,
+                        choices=['wallenius', 'fisher', 'factorized_approx'],
+                        help='default=wallenius: Urn expectation model used when --expectation_method urn. '
+                             '"wallenius" uses Wallenius-type inclusion probabilities; '
+                             '"fisher" uses Fisher-type inclusion probabilities; '
+                             '"factorized_approx" uses the legacy factorized approximation.')
+    parser.add_argument('--omegaC_method', metavar='[submodel|modelfree]', default=None, type=str,
+                        choices=['modelfree','submodel'],
+                        help='Deprecated alias for --expectation_method. '
+                             '"submodel" maps to --expectation_method codon_model. '
+                             '"modelfree" maps to --expectation_method urn.')
+    parser.add_argument('--calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
+                             'P values of omega_C by substitution randomization (--expectation_method urn only). '
+                             'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib".')
+    parser.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full|nbinom', default='hypergeom', type=str,
+                        choices=['hypergeom', 'poisson', 'poisson_full', 'nbinom'],
+                        help='default=%(default)s: Experimental feature. Null count generator for --calc_omega_pvalue. '
+                             '"hypergeom" uses legacy site-subset randomization with integer draw sizes. '
+                             '"poisson" uses factorized branch/site continuous-rate nulls (Poisson sampling from expected counts). '
+                             '"poisson_full" uses branch-specific site masses without branch-site factorization; '
+                             '"nbinom" adds Gamma-Poisson overdispersion on factorized mean counts. '
+                             'Both Poisson-based models reduce sensitivity to --min_sub_pp.')
+    parser.add_argument('--omega_pvalue_nbinom_alpha', metavar='auto|FLOAT', default='auto', type=str,
+                        help='default=%(default)s: Experimental feature. Overdispersion coefficient for '
+                             '--omega_pvalue_null_model nbinom. Variance is mean + alpha*mean^2. '
+                             '"auto" estimates alpha from observed-vs-expected count dispersion.')
+    parser.add_argument('--omega_pvalue_niter_schedule', metavar='0|N1,N2,...', default='0', type=str,
+                        help='default=%(default)s: Experimental feature. Iteration schedule for staged '
+                             '--calc_omega_pvalue refinement under all --omega_pvalue_null_model modes '
+                             '(upper-tail edge focused). '
+                             'Set 0 (auto) to use adaptive stages (100,1000). '
+                             'Custom values should be comma-delimited strictly increasing integers '
+                             '(e.g., 200,2000,10000).')
+    parser.add_argument('--omega_pvalue_refine_upper_edge_bins', metavar='INTEGER', default=2, type=int,
+                        help='default=%(default)s: Experimental feature. Number of upper-tail p-value edge bins '
+                             'used to select rows for the next refinement stage. '
+                             'Rows with exceedance rank <= this value are refined; set 0 to disable.')
+    parser.add_argument('--omega_pvalue_rounding', metavar='round|stochastic|floor|ceil', default='stochastic', type=str,
+                        choices=['round', 'stochastic', 'floor', 'ceil'],
+                        help='default=%(default)s: Experimental feature. How fractional branch-wise substitution masses are converted to '
+                             'integer draw sizes in randomization for --calc_omega_pvalue. '
+                             '"round" reproduces legacy behavior; "stochastic" applies per-iteration '
+                             'stochastic rounding; "floor"/"ceil" provide deterministic lower/upper bounds.')
+    parser.add_argument('--asrv', metavar='no|pool|sn|each|file|file_each', default='each', type=str,
+                        choices=['no', 'pool', 'sn', 'each', 'file', 'file_each'],
+                        help='default=%(default)s: Experimental. Correct among-site rate variation in omega calculation. '
+                             'This option is used with --expectation_method urn but not with --expectation_method codon_model. '
+                             '"no", No ASRV, meaning a uniform rate among sites. '
+                             '"pool", All categories of substitutions are pooled to calculate a single set of ASRV. '
+                             '"sn", Synonymous and nonsynonymous substitutions are processed individually '
+                             'to calculate their respective ASRVs (2 sets). '
+                             '"each", Each of 61x60 patterns of substitutions are processed individually '
+                             'to calculate their respective ASRVs. '
+                             '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
+                             '"file_each", Hybrid of site-rate and category-specific empirical site mass. ')
+    parser.add_argument('--asrv_dirichlet_alpha', metavar='FLOAT', default=1.0, type=float,
+                        help='default=%(default)s: Dirichlet pseudo-count alpha for branch-wise ASRV normalization '
+                             'in --asrv sn/each/file_each. Set >0 to smooth sparse site-mass profiles.')
+    parser.add_argument('--epistasis_apply_to', metavar='N|S|NS', default='N', type=str,
+                        help='default=%(default)s: Experimental feature. Expected-count channels to apply structure-aware epistasis correction. '
+                             '"N" adjusts nonsynonymous expectations (ECN), '
+                             '"S" adjusts synonymous expectations (ECS; useful as a negative-control check), '
+                             '"NS" adjusts both.')
+    parser.add_argument('--epistasis_site_metric', metavar='off|auto|degree|proximity|hybrid', default='off', type=str,
+                        help='default=%(default)s: Experimental feature. Site-level structure feature for epistasis weighting. '
+                             '"off" keeps epistasis-site-feature selection disabled by default '
+                             '(auto-enabled when --epistasis_beta is active), '
+                             '"degree" uses contact degree, '
+                             '"proximity" uses distance-weighted local proximity, '
+                             '"hybrid" averages degree/proximity z-scores, '
+                             '"auto" selects hybrid when both are available (otherwise falls back).')
+    parser.add_argument('--epistasis_beta', metavar='off|auto|FLOAT', default='off', type=str,
+                        help='default=%(default)s: Experimental feature. Strength of structure-aware epistasis correction. '
+                             'Set "off"/0 to disable, a non-negative float for fixed strength, '
+                             'or "auto" for branch-level CV tuning.')
+    parser.add_argument('--epistasis_beta_partition', metavar='global|branch_depth', default='global', type=str,
+                        help='default=%(default)s: Experimental feature. Scope of epistasis beta estimation. '
+                             '"global" fits one beta per channel; '
+                             '"branch_depth" fits beta per branch-depth bin to reduce over-shrinkage from global averaging.')
+    parser.add_argument('--epistasis_branch_depth_bins', metavar='INT', default=3, type=int,
+                        help='default=%(default)s: Experimental feature. Number of branch-depth bins for --epistasis_beta_partition branch_depth.')
+    parser.add_argument('--epistasis_feature_mode', metavar='single|paired', default='single', type=str,
+                        help='default=%(default)s: Experimental feature. Site-feature dimensionality for epistasis weighting. '
+                             '"single" uses resolved --epistasis_site_metric only; '
+                             '"paired" uses both degree and proximity when both are available.')
+    parser.add_argument('--epistasis_clip', metavar='auto|FLOAT', default='3.0', type=str,
+                        help='default=%(default)s: Experimental feature. Absolute clipping bound for the internal epistasis score '
+                             'before exponentiation. Set a positive float or "auto".')
+    parser.add_argument('--epistasis_joint_auto', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Experimental feature. Jointly optimize epistasis alpha/clip with beta CV. '
+                             'When enabled with --epistasis_beta auto, the best (alpha, clip, beta) tuple is selected by CV score.')
+    parser.add_argument('--epistasis_joint_alpha_grid', metavar='FLOAT,FLOAT,...', default='0,0.5,1,2', type=str,
+                        help='default=%(default)s: Experimental feature. Candidate ASRV Dirichlet alpha grid for --epistasis_joint_auto.')
+    parser.add_argument('--epistasis_joint_clip_grid', metavar='FLOAT,FLOAT,...', default='1.5,2,2.5,3,4,5', type=str,
+                        help='default=%(default)s: Experimental feature. Candidate clip grid for --epistasis_joint_auto.')
+    parser.add_argument('--epistasis_degree_file', metavar='PATH', default='', type=str,
+                        help='default=%(default)s: Experimental feature. Optional precomputed site-wise structure-degree table. '
+                             'If omitted, structure degree is computed during search when --epistasis_pdb is set.')
+    parser.add_argument('--epistasis_pdb', metavar='PATH/PDB_CODE/besthit', default='', type=str,
+                        help='default=%(default)s: Experimental feature. Structure source for search-time epistasis degree generation. '
+                             'PATH: local structure file; PDB code: fetched from PDB; '
+                             '"besthit": online sequence search + best-hit retrieval.')
+    parser.add_argument('--epistasis_database', metavar='DATABASE1,DATABASE2,...', default='swissmodel,pdb,alphafold,alphafill', type=str,
+                        help='default=%(default)s: Experimental feature. Comma-delimited database priority for --epistasis_pdb besthit. '
+                             'Supported: swissmodel, pdb, alphafold, alphafill.')
+    parser.add_argument('--epistasis_database_evalue_cutoff', metavar='FLOAT', default=1.0, type=float,
+                        help='default=%(default)s: Experimental feature. E-value cutoff for --epistasis_pdb besthit searches.')
+    parser.add_argument('--epistasis_database_minimum_identity', metavar='FLOAT', default=0.25, type=float,
+                        help='default=%(default)s: Experimental feature. Minimum sequence identity for MMseqs2 PDB search in --epistasis_pdb besthit.')
+    parser.add_argument('--epistasis_database_timeout', metavar='FLOAT', default=30.0, type=float,
+                        help='default=%(default)s: Experimental feature. Network timeout in seconds for --epistasis_pdb besthit retrieval.')
+    parser.add_argument('--epistasis_user_alignment', metavar='PATH', default='', type=str,
+                        help='default=%(default)s: Experimental feature. Optional user-provided protein alignment for mapping structure residues '
+                             'to alignment sites in search-time epistasis degree generation.')
+    parser.add_argument('--epistasis_contact_distance', metavar='FLOAT', default=8.0, type=float,
+                        help='default=%(default)s: Experimental feature. CA-CA distance threshold (Angstrom) used to compute structure contact degree.')
+    parser.add_argument('--epistasis_mafft_exe', metavar='PATH', default='mafft', type=str,
+                        help='default=%(default)s: Experimental feature. PATH to mafft executable for search-time structure mapping.')
+    parser.add_argument('--epistasis_mafft_op', metavar='FLOAT', default=-1, type=float,
+                        help='default=%(default)s: Experimental feature. mafft --op value for search-time structure mapping. -1 uses default.')
+    parser.add_argument('--epistasis_mafft_ep', metavar='FLOAT', default=-1, type=float,
+                        help='default=%(default)s: Experimental feature. mafft --ep value for search-time structure mapping. -1 uses default.')
+    parser.add_argument('--epistasis_pymol_max_num_chain', metavar='INT', default=20, type=int,
+                        help='default=%(default)s: Experimental feature. Maximum chain count threshold for candidate structures in --epistasis_pdb besthit.')
+    parser.add_argument('--epistasis_degree_outfile', metavar='PATH', default='csubst_epistasis_structure_degree.tsv', type=str,
+                        help='default=%(default)s: Experimental feature. Output TSV path for search-time structure degree table.')
+    parser.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='0.0', type=str,
+                        help='default=%(default)s: Dirichlet pseudo-count alpha for convergence-statistic '
+                             'shrinkage. Set 0 to disable smoothing. '
+                             'Use "auto" for Empirical-Bayes alpha estimation.')
+    parser.add_argument('--pseudocount_mode', metavar='none|symmetric|empirical', default='none', type=str,
+                        choices=['none', 'symmetric', 'empirical'],
+                        help='default=%(default)s: Pseudocount mode. '
+                             '"none" keeps legacy behavior; '
+                             '"symmetric" applies equal pseudo-counts; '
+                             '"empirical" shrinks toward global substitution-category frequencies.')
+    parser.add_argument('--pseudocount_target', metavar='observed|expected|both', default='both', type=str,
+                        choices=['observed', 'expected', 'both'],
+                        help='default=%(default)s: Apply pseudo-counts to observed counts, expected counts, or both.')
+    parser.add_argument('--pseudocount_report', action='store_true',
+                        help='Write pseudocount configuration and pre-smoothing sparsity diagnostics to logs and outputs.')
+    parser.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
+                             'by quantile-based transformation.')
 
 def _build_parser():
     # Main parser
@@ -280,6 +522,9 @@ def _build_parser():
                         help='default=%(default)s: Write csubst instantaneous codon rate matrix TSV.')
 
     psr_out_analyze = _make_output_parent_parser(default_outdir='csubst_search', default_prefix='csubst')
+    psr_out_benchmark = _make_output_parent_parser(default_outdir='csubst_benchmark', default_prefix='csubst')
+    psr_out_benchmark_plot = _make_output_parent_parser(default_outdir='csubst_benchmark_plot', default_prefix='csubst')
+    psr_out_doctor = _make_output_parent_parser(default_outdir='csubst_doctor', default_prefix='csubst')
     psr_out_inspect = _make_output_parent_parser(default_outdir='csubst_inspect', default_prefix='csubst')
     psr_out_simulate = _make_output_parent_parser(default_outdir='csubst_simulate', default_prefix='csubst')
 
@@ -475,6 +720,56 @@ def _build_parser():
                           help='default=infer from --outdir/--output_prefix: Output path prefix for true-ASR bundle files.')
     simulate.set_defaults(handler=command_simulate)
 
+    # benchmark
+    help_txt = 'benchmarks `csubst search` across parameter grids on the same input data and summarizes runtime/output metrics. See `csubst benchmark -h`'
+    benchmark = subparsers.add_parser('benchmark', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_output_manifest,psr_out_benchmark])
+    _add_search_subcommand_args(benchmark)
+    benchmark.add_argument('--benchmark_expectation_methods', metavar='LIST', default='', type=str,
+                           help='default=current --expectation_method: Comma-delimited expectation methods to compare.')
+    benchmark.add_argument('--benchmark_asrv_modes', metavar='LIST', default='', type=str,
+                           help='default=current --asrv: Comma-delimited ASRV modes to compare.')
+    benchmark.add_argument('--benchmark_nonsyn_recode_modes', metavar='LIST', default='', type=str,
+                           help='default=current --nonsyn_recode: Comma-delimited nonsynonymous recoding modes to compare.')
+    benchmark.add_argument('--benchmark_sa_asr_modes', metavar='LIST', default='', type=str,
+                           help='default=current --sa_asr_mode: Comma-delimited 3Di ASR modes to compare when --nonsyn_recode is 3di20.')
+    benchmark.add_argument('--benchmark_pseudocount_modes', metavar='LIST', default='', type=str,
+                           help='default=current --pseudocount_mode: Comma-delimited pseudocount modes to compare.')
+    benchmark.add_argument('--benchmark_keep_going', metavar='yes|no', default='yes', type=strtobool,
+                           help='default=%(default)s: Continue remaining benchmark runs after a failed configuration.')
+    benchmark.add_argument('--benchmark_score_column', metavar='COLUMN', default='omegaCany2spe', type=str,
+                           help='default=%(default)s: Score column to summarize from csubst_cb_2.tsv.')
+    benchmark.add_argument('--benchmark_ocn_column', metavar='COLUMN', default='OCNany2spe', type=str,
+                           help='default=%(default)s: Count column paired with --benchmark_score_column.')
+    benchmark.add_argument('--benchmark_min_score', metavar='FLOAT', default=5.0, type=float,
+                           help='default=%(default)s: Threshold for counting high-score hits in benchmark summaries.')
+    benchmark.add_argument('--benchmark_min_ocn', metavar='FLOAT', default=2.0, type=float,
+                           help='default=%(default)s: Threshold for counting high-score hits in benchmark summaries.')
+    benchmark.set_defaults(handler=command_benchmark)
+
+    # benchmark-plot
+    help_txt = 'collects existing benchmark outputs, compares parameter-wise performance, and writes an overview plot. See `csubst benchmark-plot -h`'
+    benchmark_plot = subparsers.add_parser('benchmark-plot', help=help_txt, parents=[psr_output_manifest,psr_out_benchmark_plot])
+    benchmark_plot.add_argument('--benchmark_dir', metavar='PATH', default='.', type=str,
+                                help='default=%(default)s: Root directory to scan for benchmark outputs.')
+    benchmark_plot.add_argument('--benchmark_plot_recursive', metavar='yes|no', default='yes', type=strtobool,
+                                help='default=%(default)s: Recursively scan --benchmark_dir for benchmark outputs.')
+    benchmark_plot.add_argument('--benchmark_plot_metrics', metavar='LIST', default='elapsed_sec,hit_rows,score_max', type=str,
+                                help='default=%(default)s: Comma-delimited numeric columns to compare in the overview plot.')
+    benchmark_plot.add_argument('--benchmark_plot_format', metavar='pdf|png|svg', default='pdf', type=str,
+                                choices=['pdf', 'png', 'svg'],
+                                help='default=%(default)s: Output format for the overview figure.')
+    benchmark_plot.set_defaults(handler=command_benchmark_plot)
+
+    # doctor
+    help_txt = 'checks input files, inferred IQ-TREE paths, and optional foreground/3Di settings before running heavier workflows. See `csubst doctor -h`'
+    doctor = subparsers.add_parser('doctor', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_rc,psr_output_manifest,psr_out_doctor])
+    doctor.add_argument('--check_iqtree_exe', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Check that --iqtree_exe is callable with --version.')
+    doctor.add_argument('--doctor_fail_level', metavar='error|warning|never', default='error', type=str,
+                        choices=['error', 'warning', 'never'],
+                        help='default=%(default)s: Exit non-zero when checks at or above this level are found.')
+    doctor.set_defaults(handler=command_doctor)
+
 
     # sites
     help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps them onto protein structure. '
@@ -590,203 +885,7 @@ def _build_parser():
     help_txt += 'See `csubst search -h` (legacy alias: `csubst analyze -h`).'
     analyze = subparsers.add_parser('search', aliases=['analyze'], help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_analyze])
     analyze.set_defaults(handler=command_search)
-    # branch combinations
-    analyze.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
-                         help='default=%(default)s: The maximum combinatorial number of branches (K). '
-                              'Set 2 for branch pairs. 3 or larger for higher-order combinations.')
-    analyze.add_argument('--exhaustive_until', metavar='INTEGER', default=2, type=int,
-                         help='default=%(default)s: Analyze all independent branch combinations until specified arity (K). '
-                              'Be careful of combinatorial explosion if set to 3 or higher. '
-                              'Set to 1 for foreground-only analysis.')
-    analyze.add_argument('--max_combination', metavar='INTEGER', default=10000, type=int,
-                         help='default=%(default)s: Maximum number of branch combinations to generate at K+1. '
-                              'If possible branch combinations at K+1 are more than this number, '
-                              'top N convergent combinatinons are selected with the thresholds specified by --cutoff_stat. '
-                              'The first stat in --cutoff_stat is most prioritized.')
-    analyze.add_argument('--exclude_sister_pair', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Set to "yes" for excluding sister branches in branch combination analysis.')
-    analyze.add_argument('--cutoff_stat', metavar='[STAT1,VALUE1|STAT2,VALUE2|...]',
-                         default='OCNany2spe,2.0|omegaCany2spe,5.0', type=str,
-                         help='default=%(default)s: Cutoff statistics for searching higher-order branch combinations. '
-                              'STAT is a column in csubst_cb_N.tsv. Regular expressions are supported. '
-                              'e.g., "N_sub_[0-9]+" to specify the number of branch-wise nonsynonymous substitutions '
-                              'in all branches. VALUE is the minimum value, '
-                              'and branch combinations with smaller values will be excluded.')
-    analyze.add_argument('--output_stat', metavar='STAT1,STAT2,...',
-                         default='any2any,any2dif,any2spe', type=str,
-                         help='default=%(default)s: Comma-delimited combinatorial-substitution statistics '
-                              'to compute and report. Choose from '
-                              'any2any, any2spe, any2dif, dif2any, dif2spe, dif2dif, '
-                              'spe2any, spe2spe, spe2dif.')
-    analyze.add_argument('--branch_dist', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Set "yes" to calculate inter-branch distance.')
-    # Substitution outputs
-    analyze.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Branch output. Set "yes" to generate the output tsv.')
-    analyze.add_argument('--s', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Site output. Set "yes" to generate the output tsv.')
-    analyze.add_argument('--cs', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Combinatorial-site output. Set "yes" to generate the output tsv.')
-    analyze.add_argument('--cb', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Combinatorial-branch output. Set "yes" to generate the output tsv.')
-    analyze.add_argument('--bs', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Branch-site output. Set "yes" to generate the output tsv.')
-    analyze.add_argument('--cbs', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Combinatorial-branch-site output. Set "yes" to generate the output tsv.')
-    # Omega_C calculation
-    analyze.add_argument('--expectation_method', metavar='codon_model|urn', default=None, type=str,
-                         choices=['codon_model', 'urn'],
-                         help='default=codon_model: Method to calculate omega_C expected values. '
-                              '"codon_model" utilizes a codon substitution model in ancestral-state reconstruction. '
-                              'In addition to base substitution models, codon frequencies and among-site rate '
-                              'heterogeneity are taken into account. '
-                              'Described in Fukushima and Pollock (2023, https://doi.org/10.1038/s41559-022-01932-7). '
-                              '"urn" uses among-site randomization (weighted urn sampling).')
-    analyze.add_argument('--urn_model', metavar='wallenius|fisher|factorized_approx', default=None, type=str,
-                         choices=['wallenius', 'fisher', 'factorized_approx'],
-                         help='default=wallenius: Urn expectation model used when --expectation_method urn. '
-                              '"wallenius" uses Wallenius-type inclusion probabilities; '
-                              '"fisher" uses Fisher-type inclusion probabilities; '
-                              '"factorized_approx" uses the legacy factorized approximation.')
-    analyze.add_argument('--omegaC_method', metavar='[submodel|modelfree]', default=None, type=str,
-                         choices=['modelfree','submodel'],
-                         help='Deprecated alias for --expectation_method. '
-                              '"submodel" maps to --expectation_method codon_model. '
-                              '"modelfree" maps to --expectation_method urn.')
-    analyze.add_argument('--calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
-                              'P values of omega_C by substitution randomization (--expectation_method urn only). '
-                              'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib".')
-    analyze.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full|nbinom', default='hypergeom', type=str,
-                         choices=['hypergeom', 'poisson', 'poisson_full', 'nbinom'],
-                         help='default=%(default)s: Experimental feature. Null count generator for --calc_omega_pvalue. '
-                              '"hypergeom" uses legacy site-subset randomization with integer draw sizes. '
-                              '"poisson" uses factorized branch/site continuous-rate nulls (Poisson sampling from expected counts). '
-                              '"poisson_full" uses branch-specific site masses without branch-site factorization; '
-                              '"nbinom" adds Gamma-Poisson overdispersion on factorized mean counts. '
-                              'Both Poisson-based models reduce sensitivity to --min_sub_pp.')
-    analyze.add_argument('--omega_pvalue_nbinom_alpha', metavar='auto|FLOAT', default='auto', type=str,
-                         help='default=%(default)s: Experimental feature. Overdispersion coefficient for '
-                              '--omega_pvalue_null_model nbinom. Variance is mean + alpha*mean^2. '
-                              '"auto" estimates alpha from observed-vs-expected count dispersion.')
-    analyze.add_argument('--omega_pvalue_niter_schedule', metavar='0|N1,N2,...', default='0', type=str,
-                         help='default=%(default)s: Experimental feature. Iteration schedule for staged '
-                              '--calc_omega_pvalue refinement under all --omega_pvalue_null_model modes '
-                              '(upper-tail edge focused). '
-                              'Set 0 (auto) to use adaptive stages (100,1000). '
-                              'Custom values should be comma-delimited strictly increasing integers '
-                              '(e.g., 200,2000,10000).')
-    analyze.add_argument('--omega_pvalue_refine_upper_edge_bins', metavar='INTEGER', default=2, type=int,
-                         help='default=%(default)s: Experimental feature. Number of upper-tail p-value edge bins '
-                              'used to select rows for the next refinement stage. '
-                              'Rows with exceedance rank <= this value are refined; set 0 to disable.')
-    analyze.add_argument('--omega_pvalue_rounding', metavar='round|stochastic|floor|ceil', default='stochastic', type=str,
-                         choices=['round', 'stochastic', 'floor', 'ceil'],
-                         help='default=%(default)s: Experimental feature. How fractional branch-wise substitution masses are converted to '
-                              'integer draw sizes in randomization for --calc_omega_pvalue. '
-                              '"round" reproduces legacy behavior; "stochastic" applies per-iteration '
-                              'stochastic rounding; "floor"/"ceil" provide deterministic lower/upper bounds.')
-    analyze.add_argument('--asrv', metavar='no|pool|sn|each|file|file_each', default='each', type=str,
-                         choices=['no', 'pool', 'sn', 'each', 'file', 'file_each'],
-                         help='default=%(default)s: Experimental. Correct among-site rate variation in omega calculation. '
-                              'This option is used with --expectation_method urn but not with --expectation_method codon_model. '
-                              '"no", No ASRV, meaning a uniform rate among sites. '
-                              '"pool", All categories of substitutions are pooled to calculate a single set of ASRV. '
-                              '"sn", Synonymous and nonsynonymous substitutions are processed individually '
-                              'to calculate their respective ASRVs (2 sets). '
-                              '"each", Each of 61x60 patterns of substitutions are processed individually '
-                              'to calculate their respective ASRVs. '
-                              '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
-                              '"file_each", Hybrid of site-rate and category-specific empirical site mass. ')
-    analyze.add_argument('--asrv_dirichlet_alpha', metavar='FLOAT', default=1.0, type=float,
-                         help='default=%(default)s: Dirichlet pseudo-count alpha for branch-wise ASRV normalization '
-                              'in --asrv sn/each/file_each. Set >0 to smooth sparse site-mass profiles.')
-    analyze.add_argument('--epistasis_apply_to', metavar='N|S|NS', default='N', type=str,
-                         help='default=%(default)s: Experimental feature. Expected-count channels to apply structure-aware epistasis correction. '
-                              '"N" adjusts nonsynonymous expectations (ECN), '
-                              '"S" adjusts synonymous expectations (ECS; useful as a negative-control check), '
-                              '"NS" adjusts both.')
-    analyze.add_argument('--epistasis_site_metric', metavar='off|auto|degree|proximity|hybrid', default='off', type=str,
-                         help='default=%(default)s: Experimental feature. Site-level structure feature for epistasis weighting. '
-                              '"off" keeps epistasis-site-feature selection disabled by default '
-                              '(auto-enabled when --epistasis_beta is active), '
-                              '"degree" uses contact degree, '
-                              '"proximity" uses distance-weighted local proximity, '
-                              '"hybrid" averages degree/proximity z-scores, '
-                              '"auto" selects hybrid when both are available (otherwise falls back).')
-    analyze.add_argument('--epistasis_beta', metavar='off|auto|FLOAT', default='off', type=str,
-                         help='default=%(default)s: Experimental feature. Strength of structure-aware epistasis correction. '
-                              'Set "off"/0 to disable, a non-negative float for fixed strength, '
-                              'or "auto" for branch-level CV tuning.')
-    analyze.add_argument('--epistasis_beta_partition', metavar='global|branch_depth', default='global', type=str,
-                         help='default=%(default)s: Experimental feature. Scope of epistasis beta estimation. '
-                              '"global" fits one beta per channel; '
-                              '"branch_depth" fits beta per branch-depth bin to reduce over-shrinkage from global averaging.')
-    analyze.add_argument('--epistasis_branch_depth_bins', metavar='INT', default=3, type=int,
-                         help='default=%(default)s: Experimental feature. Number of branch-depth bins for --epistasis_beta_partition branch_depth.')
-    analyze.add_argument('--epistasis_feature_mode', metavar='single|paired', default='single', type=str,
-                         help='default=%(default)s: Experimental feature. Site-feature dimensionality for epistasis weighting. '
-                              '"single" uses resolved --epistasis_site_metric only; '
-                              '"paired" uses both degree and proximity when both are available.')
-    analyze.add_argument('--epistasis_clip', metavar='auto|FLOAT', default='3.0', type=str,
-                         help='default=%(default)s: Experimental feature. Absolute clipping bound for the internal epistasis score '
-                              'before exponentiation. Set a positive float or "auto".')
-    analyze.add_argument('--epistasis_joint_auto', metavar='yes|no', default='no', type=strtobool,
-                         help='default=%(default)s: Experimental feature. Jointly optimize epistasis alpha/clip with beta CV. '
-                              'When enabled with --epistasis_beta auto, the best (alpha, clip, beta) tuple is selected by CV score.')
-    analyze.add_argument('--epistasis_joint_alpha_grid', metavar='FLOAT,FLOAT,...', default='0,0.5,1,2', type=str,
-                         help='default=%(default)s: Experimental feature. Candidate ASRV Dirichlet alpha grid for --epistasis_joint_auto.')
-    analyze.add_argument('--epistasis_joint_clip_grid', metavar='FLOAT,FLOAT,...', default='1.5,2,2.5,3,4,5', type=str,
-                         help='default=%(default)s: Experimental feature. Candidate clip grid for --epistasis_joint_auto.')
-    analyze.add_argument('--epistasis_degree_file', metavar='PATH', default='', type=str,
-                         help='default=%(default)s: Experimental feature. Optional precomputed site-wise structure-degree table. '
-                              'If omitted, structure degree is computed during search when --epistasis_pdb is set.')
-    analyze.add_argument('--epistasis_pdb', metavar='PATH/PDB_CODE/besthit', default='', type=str,
-                         help='default=%(default)s: Experimental feature. Structure source for search-time epistasis degree generation. '
-                              'PATH: local structure file; PDB code: fetched from PDB; '
-                              '"besthit": online sequence search + best-hit retrieval.')
-    analyze.add_argument('--epistasis_database', metavar='DATABASE1,DATABASE2,...', default='swissmodel,pdb,alphafold,alphafill', type=str,
-                         help='default=%(default)s: Experimental feature. Comma-delimited database priority for --epistasis_pdb besthit. '
-                              'Supported: swissmodel, pdb, alphafold, alphafill.')
-    analyze.add_argument('--epistasis_database_evalue_cutoff', metavar='FLOAT', default=1.0, type=float,
-                         help='default=%(default)s: Experimental feature. E-value cutoff for --epistasis_pdb besthit searches.')
-    analyze.add_argument('--epistasis_database_minimum_identity', metavar='FLOAT', default=0.25, type=float,
-                         help='default=%(default)s: Experimental feature. Minimum sequence identity for MMseqs2 PDB search in --epistasis_pdb besthit.')
-    analyze.add_argument('--epistasis_database_timeout', metavar='FLOAT', default=30.0, type=float,
-                         help='default=%(default)s: Experimental feature. Network timeout in seconds for --epistasis_pdb besthit retrieval.')
-    analyze.add_argument('--epistasis_user_alignment', metavar='PATH', default='', type=str,
-                         help='default=%(default)s: Experimental feature. Optional user-provided protein alignment for mapping structure residues '
-                              'to alignment sites in search-time epistasis degree generation.')
-    analyze.add_argument('--epistasis_contact_distance', metavar='FLOAT', default=8.0, type=float,
-                         help='default=%(default)s: Experimental feature. CA-CA distance threshold (Angstrom) used to compute structure contact degree.')
-    analyze.add_argument('--epistasis_mafft_exe', metavar='PATH', default='mafft', type=str,
-                         help='default=%(default)s: Experimental feature. PATH to mafft executable for search-time structure mapping.')
-    analyze.add_argument('--epistasis_mafft_op', metavar='FLOAT', default=-1, type=float,
-                         help='default=%(default)s: Experimental feature. mafft --op value for search-time structure mapping. -1 uses default.')
-    analyze.add_argument('--epistasis_mafft_ep', metavar='FLOAT', default=-1, type=float,
-                         help='default=%(default)s: Experimental feature. mafft --ep value for search-time structure mapping. -1 uses default.')
-    analyze.add_argument('--epistasis_pymol_max_num_chain', metavar='INT', default=20, type=int,
-                         help='default=%(default)s: Experimental feature. Maximum chain count threshold for candidate structures in --epistasis_pdb besthit.')
-    analyze.add_argument('--epistasis_degree_outfile', metavar='PATH', default='csubst_epistasis_structure_degree.tsv', type=str,
-                         help='default=%(default)s: Experimental feature. Output TSV path for search-time structure degree table.')
-    analyze.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='0.0', type=str,
-                         help='default=%(default)s: Dirichlet pseudo-count alpha for convergence-statistic '
-                              'shrinkage. Set 0 to disable smoothing. '
-                              'Use "auto" for Empirical-Bayes alpha estimation.')
-    analyze.add_argument('--pseudocount_mode', metavar='none|symmetric|empirical', default='none', type=str,
-                         choices=['none', 'symmetric', 'empirical'],
-                         help='default=%(default)s: Pseudocount mode. '
-                              '"none" keeps legacy behavior; '
-                              '"symmetric" applies equal pseudo-counts; '
-                              '"empirical" shrinks toward global substitution-category frequencies.')
-    analyze.add_argument('--pseudocount_target', metavar='observed|expected|both', default='both', type=str,
-                         choices=['observed', 'expected', 'both'],
-                         help='default=%(default)s: Apply pseudo-counts to observed counts, expected counts, or both.')
-    analyze.add_argument('--pseudocount_report', action='store_true',
-                         help='Write pseudocount configuration and pre-smoothing sparsity diagnostics to logs and outputs.')
-    analyze.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
-                         help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
-                              'by quantile-based transformation.')
+    _add_search_subcommand_args(analyze)
 
     # inspect
     help_txt = 'writes branch/tree/state inspection outputs without running convergence statistics. See `csubst inspect -h`'

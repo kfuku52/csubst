@@ -72,6 +72,30 @@ def test_simulate_help_uses_simulate_default_log_name(tmp_path):
     assert not (tmp_path / "csubst.log").exists()
 
 
+def test_benchmark_help_uses_benchmark_default_log_name(tmp_path):
+    result = _run_csubst(["benchmark", "-h"], cwd=tmp_path)
+    assert result.returncode == 0
+    log_file = tmp_path / "csubst_benchmark" / "csubst.log"
+    assert log_file.exists()
+    assert not (tmp_path / "csubst.log").exists()
+
+
+def test_benchmark_plot_help_uses_benchmark_plot_default_log_name(tmp_path):
+    result = _run_csubst(["benchmark-plot", "-h"], cwd=tmp_path)
+    assert result.returncode == 0
+    log_file = tmp_path / "csubst_benchmark_plot" / "csubst.log"
+    assert log_file.exists()
+    assert not (tmp_path / "csubst.log").exists()
+
+
+def test_doctor_help_uses_doctor_default_log_name(tmp_path):
+    result = _run_csubst(["doctor", "-h"], cwd=tmp_path)
+    assert result.returncode == 0
+    log_file = tmp_path / "csubst_doctor" / "csubst.log"
+    assert log_file.exists()
+    assert not (tmp_path / "csubst.log").exists()
+
+
 def test_sites_help_uses_site_default_log_name(tmp_path):
     result = _run_csubst(["sites", "-h"], cwd=tmp_path)
     assert result.returncode == 0
@@ -105,6 +129,18 @@ def test_subcommand_output_namespace_defaults_are_command_specific():
     inspect = parser.parse_args(["inspect"])
     assert inspect.outdir == "csubst_inspect"
     assert inspect.output_prefix == "csubst"
+
+    benchmark = parser.parse_args(["benchmark"])
+    assert benchmark.outdir == "csubst_benchmark"
+    assert benchmark.output_prefix == "csubst"
+
+    benchmark_plot = parser.parse_args(["benchmark-plot"])
+    assert benchmark_plot.outdir == "csubst_benchmark_plot"
+    assert benchmark_plot.output_prefix == "csubst"
+
+    doctor = parser.parse_args(["doctor"])
+    assert doctor.outdir == "csubst_doctor"
+    assert doctor.output_prefix == "csubst"
 
     simulate = parser.parse_args(["simulate"])
     assert simulate.outdir == "csubst_simulate"

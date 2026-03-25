@@ -55,9 +55,12 @@ csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --for
 ```
 
 ## Usage
-CSUBST provides five main subcommands:
+CSUBST provides eight main subcommands:
 
 - `csubst dataset`: generate bundled example datasets (e.g., `PGK`, `PEPC`).
+- `csubst doctor`: validate input files, inferred IQ-TREE paths, and optional 3Di settings before heavier runs.
+- `csubst benchmark`: run `csubst search` across parameter grids on the same input data and summarize runtime/output metrics.
+- `csubst benchmark-plot`: collect existing benchmark outputs, compare parameter-wise performance, and write an overview figure.
 - `csubst search` (legacy alias: `csubst analyze`): run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
 - `csubst inspect`: summarize branch mappings and inspect ancestral states.
 - `csubst sites` (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree + site summary plots, and optionally map sites to protein structures.
@@ -76,18 +79,48 @@ Typical workflow:
 # 1) Prepare a toy dataset
 csubst dataset --name PGK
 
-# 2) Run convergence analysis
+# 2) Validate inputs and inferred IQ-TREE paths
+csubst doctor \
+  --alignment_file alignment.fa.gz \
+  --rooted_tree_file tree.nwk \
+  --foreground foreground.txt
+
+# 3) Run convergence analysis
 csubst search \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt
 
-# 3) Inspect site-wise convergence for a branch pair (example)
+# 4) Inspect site-wise convergence for a branch pair (example)
 csubst sites \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
   --branch_id 23,51
 ```
+
+Benchmark multiple search settings on the same input:
+
+```bash
+csubst benchmark \
+  --alignment_file alignment.fa.gz \
+  --rooted_tree_file tree.nwk \
+  --foreground foreground.txt \
+  --benchmark_expectation_methods codon_model,urn \
+  --benchmark_asrv_modes each,file \
+  --benchmark_pseudocount_modes none,empirical
+```
+
+This writes `csubst_benchmark_summary.tsv`, `csubst_benchmark_summary.json`, and per-run logs under `csubst_benchmark/`.
+
+Plot and compare existing benchmark outputs:
+
+```bash
+csubst benchmark-plot \
+  --benchmark_dir . \
+  --benchmark_plot_format pdf
+```
+
+This writes `csubst_benchmark_plot_summary.tsv`, `csubst_benchmark_plot_summary.json`, and `csubst_benchmark_plot_overview.pdf` under `csubst_benchmark_plot/`.
 
 For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 

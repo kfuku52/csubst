@@ -369,6 +369,23 @@ def test_get_foreground_ids_writes_target_file_under_output_namespace(tmp_path):
     assert target_ids == out["target_ids"]["traitA"].tolist()
 
 
+def test_get_foreground_ids_ignores_string_zero_background_rows():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame({"name": ["A", "B"], "traitA": ["FG1", "0"]}),
+        "fg_stem_only": True,
+    }
+
+    out = foreground.get_foreground_ids(g, write=False)
+
+    assert out["fg_leaf_names"]["traitA"] == [["A"]]
+    assert len(out["fg_ids"]["traitA"].tolist()) == 1
+    node_by_name = {n.name: n for n in out["tree"].traverse() if n.name}
+    assert int(ete.get_prop(node_by_name["A"], "foreground_lineage_id_traitA")) == 1
+    assert int(ete.get_prop(node_by_name["B"], "foreground_lineage_id_traitA")) == 0
+
+
 def test_randomize_foreground_flags_without_sample_original_preserves_target_count():
     np.random.seed(1)
     before = np.array([True, False, False, True, False], dtype=bool)
