@@ -5,11 +5,28 @@ import os
 import re
 import sys
 import time
+from importlib import import_module
 
 from csubst import sequence
 from csubst import parallel
-from csubst import substitution
 from csubst import ete
+
+
+class _LazyModuleProxy(object):
+    def __init__(self, module_name):
+        self._module_name = str(module_name)
+        self._module = None
+
+    def _load(self):
+        if self._module is None:
+            self._module = import_module('csubst.' + self._module_name)
+        return self._module
+
+    def __getattr__(self, name):
+        return getattr(self._load(), name)
+
+
+substitution = _LazyModuleProxy('substitution')
 
 TREE_FIG_MIN_HEIGHT = 1.8
 TREE_FIG_BASE_HEIGHT = 0.45

@@ -13,7 +13,10 @@ from collections import defaultdict
 from csubst import table
 from csubst import parallel
 from csubst import runtime
-from csubst import substitution_cy
+try:
+    from csubst import substitution_cy
+except Exception:  # pragma: no cover - Cython extension is optional
+    substitution_cy = None
 from csubst import substitution_sparse
 try:
     from csubst import substitution_sparse_cy

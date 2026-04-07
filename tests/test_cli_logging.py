@@ -24,6 +24,8 @@ def test_cli_writes_help_output_to_csubst_log(tmp_path):
     log_file = tmp_path / "csubst.log"
     assert log_file.exists()
     log_text = log_file.read_text(encoding="utf-8")
+    assert "CSUBST start:" in result.stdout
+    assert "usage:" in result.stdout.lower()
     assert "CSUBST start:" in log_text
     assert "usage:" in log_text.lower()
 
@@ -34,6 +36,8 @@ def test_cli_writes_stderr_output_to_csubst_log(tmp_path):
     log_file = tmp_path / "csubst_search" / "csubst.log"
     assert log_file.exists()
     log_text = log_file.read_text(encoding="utf-8")
+    assert "error:" in result.stderr.lower()
+    assert "--does_not_exist" in result.stderr
     assert "error:" in log_text.lower()
     assert "--does_not_exist" in log_text
 
@@ -44,6 +48,8 @@ def test_legacy_analyze_alias_still_writes_to_csubst_search_log(tmp_path):
     log_file = tmp_path / "csubst_search" / "csubst.log"
     assert log_file.exists()
     log_text = log_file.read_text(encoding="utf-8")
+    assert "error:" in result.stderr.lower()
+    assert "--does_not_exist" in result.stderr
     assert "error:" in log_text.lower()
     assert "--does_not_exist" in log_text
 

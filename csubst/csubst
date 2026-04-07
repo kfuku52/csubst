@@ -17,6 +17,32 @@ from csubst import param
 from csubst import runtime
 
 
+class _TeeTextStream(object):
+    def __init__(self, primary, secondary):
+        self.primary = primary
+        self.secondary = secondary
+        self.encoding = getattr(primary, 'encoding', None)
+        self.errors = getattr(primary, 'errors', None)
+
+    def write(self, text):
+        self.primary.write(text)
+        return self.secondary.write(text)
+
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
+    def flush(self):
+        self.primary.flush()
+        self.secondary.flush()
+
+    def isatty(self):
+        return bool(getattr(self.primary, 'isatty', lambda: False)())
+
+    def fileno(self):
+        return self.primary.fileno()
+
+
 def strtobool(value):
     if isinstance(value, bool):
         return value
@@ -953,5 +979,7 @@ def _main():
 if __name__ == "__main__":
     log_path = _resolve_log_file_from_argv(sys.argv[1:])
     with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
-        with contextlib.redirect_stdout(log_file), contextlib.redirect_stderr(log_file):
+        stdout_tee = _TeeTextStream(sys.stdout, log_file)
+        stderr_tee = _TeeTextStream(sys.stderr, log_file)
+        with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):
             _main()
