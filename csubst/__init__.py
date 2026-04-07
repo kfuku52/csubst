@@ -1,4 +1,4 @@
-__version__ = '1.11.9'
+__version__ = '1.11.10'
 
 from importlib import import_module
 
