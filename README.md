@@ -9,39 +9,38 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
-**CSUBST** ([/si:sʌbst/](http://ipa-reader.xyz/?text=si:s%CA%8Cbst&voice=Salli)) is a tool for analyzing **C**ombinatorial **SUBST**itutions of codon sequences in phylogenetic trees.
-A combinatorial substitution is defined as recurrent substitutions that occur at the same protein site in multiple independent branches.
-If independent substitutions result in the same amino acid, they are considered convergent amino acid substitutions.
-The main features of **CSUBST** include:
+**CSUBST** ([/si:sʌbst/](http://ipa-reader.xyz/?text=si:s%CA%8Cbst&voice=Salli)) is a tool for analyzing **C**ombinatorial **SUBST**itutions in codon sequences on phylogenetic trees.
+A combinatorial substitution is a recurrent substitution at the same protein site on multiple independent branches.
+When independent substitutions lead to the same amino acid, they are interpreted as convergent amino acid substitutions.
+The main features of **CSUBST** are:
 
-- Error-corrected rate of protein convergence with null expectation obtained by:
-    - Empirical or mechanistic codon substitution model
+- Error-corrected rates of protein convergence, with null expectations based on:
+    - Empirical or mechanistic codon substitution models
     - Urn sampling from site-wise substitution frequencies (**experimental**)
-- Flexible specification of "foreground" lineages and its comparison with neighboring branches
+- Flexible specification of "foreground" lineages and comparisons with neighboring branches
 - Heuristic detection of higher-order convergence involving more than two branches
-- Simulated sequence evolution under specified scenarios of convergent evolution
-- Convergent substitution mapping to protein structure
+- Sequence simulation under user-defined scenarios of convergent evolution
+- Mapping convergent substitutions onto protein structures
 
 ![](logo/method.png)
 
 ## Input files
-**CSUBST** takes as inputs: 
-- [Newick](https://en.wikipedia.org/wiki/Newick_format) file for the rooted tree
-- [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file for the multiple sequence alignment of in-frame coding sequences
+**CSUBST** requires the following input files:
+
+- A [Newick](https://en.wikipedia.org/wiki/Newick_format) file containing the rooted tree
+- A [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file containing a multiple sequence alignment of in-frame coding sequences
 
 ## Installation
-**CSUBST** runs on python 3. Installation via [bioconda](https://anaconda.org/bioconda/csubst) is recommended for ease of use, as it handles all dependencies automatically. `pip` installation is also supported, but in this case [IQ-TREE](https://iqtree.github.io/) and a few python packages must be installed separately.
+**CSUBST** runs on Python 3. Installation via [Bioconda](https://anaconda.org/bioconda/csubst) is recommended because it installs the required dependencies automatically. `pip` installation is also supported, but [IQ-TREE](https://iqtree.github.io/) and several Python packages must then be installed separately.
 
-IQ-TREE compatibility: CSUBST supports IQ-TREE 2.x and 3.x outputs. For some IQ-TREE 3 codon runs where `.iqtree` does not print codon `pi(...)` entries, CSUBST estimates empirical codon frequencies from the input alignment by normalized codon counts (matching IQ-TREE's `State frequencies: (empirical counts from alignment)` convention) [[Minh et al., 2020](https://doi.org/10.1093/molbev/msaa015)]. Ambiguous IUPAC nucleotide symbols are expanded over compatible codons with equal weights [[Cornish-Bowden, 1985](https://doi.org/10.1093/nar/13.9.3021)].
-
-#### Option 1: Installation with `conda`
+#### Option 1: Install with `conda`
 ```
 conda install bioconda::csubst
 ```
 
-#### Option 2: Installation with `pip`
+#### Option 2: Install with `pip`
 ```
-# IQ-TREE should be installed separately: https://iqtree.github.io/
+# Install IQ-TREE separately: https://iqtree.github.io/
 pip install git+https://github.com/kfuku52/csubst
 ```
 
@@ -57,16 +56,16 @@ csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --for
 ## Usage
 CSUBST provides eight main subcommands:
 
-- `csubst dataset`: generate bundled example datasets (e.g., `PGK`, `PEPC`).
-- `csubst doctor`: validate input files, inferred IQ-TREE paths, and optional 3Di settings before heavier runs.
-- `csubst benchmark`: run `csubst search` across parameter grids on the same input data and summarize runtime/output metrics.
-- `csubst benchmark-plot`: collect existing benchmark outputs, compare parameter-wise performance, and write an overview figure.
-- `csubst search` (legacy alias: `csubst analyze`): run convergence analysis and output metrics such as `omegaC`, `dNC`, and `dSC`.
-- `csubst inspect`: summarize branch mappings and inspect ancestral states.
-- `csubst sites` (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree + site summary plots, and optionally map sites to protein structures.
-- `csubst simulate`: simulate codon sequence evolution under user-defined convergent scenarios.
+- [`csubst dataset`](https://github.com/kfuku52/csubst/wiki/csubst-dataset): generate built-in example datasets such as `PGK` and `PEPC`.
+- [`csubst doctor`](https://github.com/kfuku52/csubst/wiki/csubst-doctor): validate input files, inferred IQ-TREE paths, and optional 3Di settings before longer runs.
+- [`csubst search`](https://github.com/kfuku52/csubst/wiki/csubst-search) (legacy alias: `csubst analyze`): run convergence analysis and report metrics such as `omegaC`, `dNC`, and `dSC`.
+- [`csubst inspect`](https://github.com/kfuku52/csubst/wiki/csubst-inspect): summarize branch mappings and inspect ancestral states.
+- [`csubst sites`](https://github.com/kfuku52/csubst/wiki/csubst-sites) (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree and site-summary plots, and optionally map sites to protein structures.
+- [`csubst simulate`](https://github.com/kfuku52/csubst/wiki/csubst-simulate): simulate codon sequence evolution under user-defined convergence scenarios.
+- [`csubst benchmark`](https://github.com/kfuku52/csubst/wiki/csubst-benchmark): run `csubst search` over parameter grids on the same input data and summarize runtime and output metrics.
+- [`csubst benchmark-plot`](https://github.com/kfuku52/csubst/wiki/csubst-benchmark-plot): collect existing benchmark outputs, compare performance across parameter settings, and write an overview figure.
 
-Get available commands and options:
+Display available commands and options:
 
 ```bash
 csubst -h
@@ -91,38 +90,14 @@ csubst search \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt
 
-# 4) Inspect site-wise convergence for a branch pair (example)
+# 4) Inspect site-wise convergence for a branch pair
 csubst sites \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
   --branch_id 23,51
 ```
 
-Benchmark multiple search settings on the same input:
-
-```bash
-csubst benchmark \
-  --alignment_file alignment.fa.gz \
-  --rooted_tree_file tree.nwk \
-  --foreground foreground.txt \
-  --benchmark_expectation_methods codon_model,urn \
-  --benchmark_asrv_modes each,file \
-  --benchmark_pseudocount_modes none,empirical
-```
-
-This writes `csubst_benchmark_summary.tsv`, `csubst_benchmark_summary.json`, and per-run logs under `csubst_benchmark/`.
-
-Plot and compare existing benchmark outputs:
-
-```bash
-csubst benchmark-plot \
-  --benchmark_dir . \
-  --benchmark_plot_format pdf
-```
-
-This writes `csubst_benchmark_plot_summary.tsv`, `csubst_benchmark_plot_summary.json`, and `csubst_benchmark_plot_overview.pdf` under `csubst_benchmark_plot/`.
-
-For advanced settings (foreground formats, higher-order search, structure mapping, simulation parameters), see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
+For advanced settings, including foreground formats, higher-order search, structure mapping, and simulation parameters, see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 
 ## Citation
 Fukushima K, Pollock DD. 2023. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. Nature Ecology & Evolution 7: 155–170. [DOI: 10.1038/s41559-022-01932-7](https://doi.org/10.1038/s41559-022-01932-7)
