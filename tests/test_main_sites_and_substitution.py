@@ -865,6 +865,37 @@ def test_add_set_mode_columns_set_stat_type_changes_channelwise_aggregation(set_
     np.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [expected_prob], atol=1e-12)
 
 
+def test_add_set_mode_columns_accepts_sparse_branch_tensors_for_spe():
+    dense = np.zeros((4, 2, 1, 2, 2), dtype=float)
+    dense[1, 0, 0, 0, 1] = 0.9
+    dense[3, 0, 0, 0, 1] = 0.2
+    dense[1, 1, 0, 1, 0] = 0.3
+    dense[3, 1, 0, 1, 0] = 0.8
+    sparse = substitution_sparse.SparseSubstitutionTensor.from_dense(dense)
+    df = pd.DataFrame({"codon_site_alignment": [0, 1]})
+    g = {
+        "mode": "set",
+        "set_stat_type": "spe",
+        "mode_expression": "1|3",
+        "min_single_prob": 0.5,
+        "amino_acid_orders": np.array(["A", "B"], dtype=object),
+    }
+
+    dense_out = main_sites.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=dense)
+    sparse_out = main_sites.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=sparse)
+
+    assert sparse_out["N_set_expr"].tolist() == dense_out["N_set_expr"].tolist()
+    np.testing.assert_allclose(
+        sparse_out["N_set_expr_prob"].to_numpy(),
+        dense_out["N_set_expr_prob"].to_numpy(),
+        atol=1e-12,
+    )
+    np.testing.assert_array_equal(
+        sparse_out["N_set_expr_channel_index"].to_numpy(),
+        dense_out["N_set_expr_channel_index"].to_numpy(),
+    )
+
+
 def test_add_set_mode_columns_supports_all_other_symbol(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     a_id = labels["A"]
@@ -905,6 +936,50 @@ def test_add_set_mode_columns_supports_all_other_symbol(tiny_tree):
     assert out["N_set_A"].tolist() == [False, True, False]
     np.testing.assert_allclose(out["N_set_A_prob"].to_numpy(), [0.1, 0.9, 0.1], atol=1e-12)
     np.testing.assert_allclose(out["S_set_A_prob"].to_numpy(), [0.0, 0.0, 0.0], atol=1e-12)
+
+
+def test_add_set_mode_columns_all_other_accepts_sparse_tensors(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    a_id = labels["A"]
+    c_id = labels["C"]
+    b_id = labels["B"]
+    x_id = labels["X"]
+    n_site = 3
+    max_id = max([int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()])
+    on_dense = np.zeros((max_id + 1, n_site, 1, 1, 1), dtype=float)
+    os_dense = np.zeros((max_id + 1, n_site, 1, 1, 1), dtype=float)
+    on_dense[a_id, 0, 0, 0, 0] = 0.9
+    on_dense[a_id, 1, 0, 0, 0] = 0.9
+    on_dense[b_id, 1, 0, 0, 0] = 0.9
+    on_dense[c_id, 2, 0, 0, 0] = 0.9
+    on_dense[x_id, :, 0, 0, 0] = 0.1
+    os_dense[b_id, 1, 0, 0, 0] = 0.4
+    on_sparse = substitution_sparse.SparseSubstitutionTensor.from_dense(on_dense)
+    os_sparse = substitution_sparse.SparseSubstitutionTensor.from_dense(os_dense)
+    df = pd.DataFrame(
+        {
+            "N_sub_{}".format(a_id): [0.9, 0.9, 0.0],
+            "N_sub_{}".format(c_id): [0.0, 0.0, 0.9],
+        }
+    )
+    g = {
+        "mode": "set",
+        "set_stat_type": "any",
+        "mode_expression": "({}|{})-A".format(a_id, c_id),
+        "min_single_prob": 0.8,
+        "tree": tiny_tree,
+    }
+
+    dense_out = main_sites.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_dense, OS_tensor=os_dense)
+    sparse_out = main_sites.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_sparse, OS_tensor=os_sparse)
+
+    assert sparse_out["N_set_expr"].tolist() == dense_out["N_set_expr"].tolist()
+    assert sparse_out["N_set_other"].tolist() == dense_out["N_set_other"].tolist()
+    np.testing.assert_allclose(
+        sparse_out[["N_set_expr_prob", "N_set_other_prob", "S_set_other_prob"]].to_numpy(dtype=float),
+        dense_out[["N_set_expr_prob", "N_set_other_prob", "S_set_other_prob"]].to_numpy(dtype=float),
+        atol=1e-12,
+    )
 
 
 def test_resolve_site_jobs_intersection_fg_reads_cb_file(tmp_path, tiny_tree):
@@ -2128,6 +2203,38 @@ def test_plot_state_writes_outputs_when_enabled(tmp_path, tiny_tree):
         assert Path(path).exists()
 
 
+def test_plot_state_accepts_sparse_substitution_tensors(tmp_path, tiny_tree):
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()}
+    num_node = max(labels.values()) + 1
+    on = np.zeros((num_node, 5, 1, 2, 2), dtype=float)
+    os = np.zeros((num_node, 5, 1, 2, 2), dtype=float)
+    for site in range(5):
+        on[labels["A"], site, 0, 0, 1] = 0.8 - 0.1 * site
+        on[labels["C"], site, 0, 0, 1] = 0.7 - 0.1 * site
+        os[labels["A"], site, 0, 0, 1] = 0.6 - 0.05 * site
+        os[labels["C"], site, 0, 0, 1] = 0.9 - 0.05 * site
+    g = {
+        "tree": tiny_tree,
+        "site_outdir": str(tmp_path),
+        "float_format": "%.4f",
+        "amino_acid_orders": np.array(["A", "B"]),
+        "matrix_groups": {"grp": ["AA", "AB"]},
+        "site_state_plot": True,
+    }
+    sparse_on = substitution_sparse.SparseSubstitutionTensor.from_dense(on)
+    sparse_os = substitution_sparse.SparseSubstitutionTensor.from_dense(os)
+
+    out_paths = main_sites.plot_state(sparse_on, sparse_os, np.array([labels["A"], labels["C"]], dtype=int), g)
+
+    assert set(out_paths) == {
+        str(tmp_path / "csubst_sites.state.pdf"),
+        str(tmp_path / "csubst_sites.state_N.tsv"),
+        str(tmp_path / "csubst_sites.state_S.tsv"),
+    }
+    for path in out_paths:
+        assert Path(path).exists()
+
+
 def test_plot_state_skips_outputs_when_disabled(tmp_path):
     g = {"site_state_plot": False, "site_outdir": str(tmp_path)}
     out_paths = main_sites.plot_state(
@@ -2264,6 +2371,26 @@ def test_site_summary_stats_support_sparse_substitution_tensors(monkeypatch):
     np.testing.assert_allclose(flagged["site_tau"].to_numpy(), [0.5, 2.0 / 3.0], atol=1e-12)
     np.testing.assert_allclose(flagged["site_tsi"].to_numpy(), [2.0 / 3.0, 3.0 / 4.0], atol=1e-12)
     assert flagged["has_target_high_combinat_prob_site"].tolist() == [True, True]
+
+
+def test_add_branch_sub_prob_accepts_sparse_substitution_tensors():
+    dense = np.zeros((3, 3, 1, 2, 2), dtype=float)
+    dense[1, 0, 0, 0, 1] = 0.2
+    dense[1, 0, 0, 1, 0] = 0.3
+    dense[1, 2, 0, 0, 1] = 0.4
+    dense[2, 1, 0, 1, 0] = 0.8
+    sparse = substitution_sparse.SparseSubstitutionTensor.from_dense(dense)
+    branch_ids = np.array([1, 2], dtype=np.int64)
+    df = main_sites.initialize_site_df(num_site=3)
+
+    dense_out = main_sites.add_branch_sub_prob(df=df.copy(), branch_ids=branch_ids, sub_tensor=dense, attr="N")
+    sparse_out = main_sites.add_branch_sub_prob(df=df.copy(), branch_ids=branch_ids, sub_tensor=sparse, attr="N")
+
+    np.testing.assert_allclose(
+        sparse_out[["N_sub_1", "N_sub_2"]].to_numpy(dtype=float),
+        dense_out[["N_sub_1", "N_sub_2"]].to_numpy(dtype=float),
+        atol=1e-12,
+    )
 
 
 def test_add_site_stats_hg_ignores_zero_probabilities():

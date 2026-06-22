@@ -1128,7 +1128,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     titles = ['Nonsynonymous substitution','Synonymous substitution']
     iter_items = zip(ax_cols,['nsy','syn'],[ON_tensor,OS_tensor],outfiles,colors,titles)
     for ax_col,mode,sub_tensor,outfile,color,title in iter_items:
-        sub_target = sub_tensor[branch_ids,:,:,:,:]
+        sub_target = substitution.get_branches_sub_tensor(sub_tensor=sub_tensor, branch_ids=branch_ids)
         sub_target_combinat = np.expand_dims(sub_target.prod(axis=0), axis=0)
         df_ad = get_df_ad(sub_tensor=sub_tensor, g=g, mode=mode)
         df_ad_target = get_df_ad(sub_tensor=sub_target, g=g, mode=mode)
@@ -2660,7 +2660,7 @@ def add_site_info(df, sub_tensor, attr):
 
 def add_branch_sub_prob(df, branch_ids, sub_tensor, attr):
     for branch_id in branch_ids:
-        sub_probs = sub_tensor[branch_id,:,:,:,:].sum(axis=(1,2,3))
+        sub_probs = substitution.get_branch_site_sub_counts(sub_tensor=sub_tensor, branch_id=branch_id)
         df.loc[:,attr+'_sub_'+str(branch_id)] = sub_probs
     return df
 
@@ -3060,7 +3060,7 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
         if ON_tensor is not None:
             bid = int(branch_id)
             if 0 <= bid < ON_tensor.shape[0]:
-                branch_tensor = ON_tensor[bid, :, :, :, :]
+                branch_tensor = substitution.get_branch_sub_tensor(sub_tensor=ON_tensor, branch_id=bid)
                 n_sub_prob = _get_set_stat_channels_from_branch_tensor(
                     branch_tensor=branch_tensor,
                     set_stat_type=set_stat_type,
@@ -3097,7 +3097,7 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
             if len(other_branch_ids) > 0:
                 other_prob_rows = []
                 for other_bid in other_branch_ids:
-                    other_tensor = ON_tensor[int(other_bid), :, :, :, :]
+                    other_tensor = substitution.get_branch_sub_tensor(sub_tensor=ON_tensor, branch_id=other_bid)
                     other_prob_rows.append(
                         _get_set_stat_channels_from_branch_tensor(
                             branch_tensor=other_tensor,

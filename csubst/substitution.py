@@ -784,6 +784,33 @@ def _get_sparse_branch_tensor(sub_tensor, branch_id):
     return out
 
 
+def get_branch_sub_tensor(sub_tensor, branch_id):
+    branch_id = int(branch_id)
+    num_branch = int(sub_tensor.shape[0])
+    if (branch_id < 0) or (branch_id >= num_branch):
+        txt = 'branch_id {} is out of bounds for substitution tensor with {} branch(es).'
+        raise IndexError(txt.format(branch_id, num_branch))
+    if _is_sparse_sub_tensor(sub_tensor):
+        return _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=branch_id)
+    return sub_tensor[branch_id, :, :, :, :]
+
+
+def get_branches_sub_tensor(sub_tensor, branch_ids):
+    branch_ids = _normalize_branch_ids(branch_ids)
+    num_branch = int(sub_tensor.shape[0])
+    is_invalid = (branch_ids < 0) | (branch_ids >= num_branch)
+    if is_invalid.any():
+        invalid_ids = ','.join([str(int(v)) for v in branch_ids[is_invalid].tolist()])
+        txt = 'branch_id(s) {} are out of bounds for substitution tensor with {} branch(es).'
+        raise IndexError(txt.format(invalid_ids, num_branch))
+    if _is_sparse_sub_tensor(sub_tensor):
+        out = np.zeros(shape=(branch_ids.shape[0],) + tuple(sub_tensor.shape[1:]), dtype=sub_tensor.dtype)
+        for i, branch_id in enumerate(branch_ids.tolist()):
+            out[i, :, :, :, :] = _get_sparse_branch_tensor(sub_tensor=sub_tensor, branch_id=int(branch_id))
+        return out
+    return sub_tensor[branch_ids, :, :, :, :]
+
+
 def _get_sorted_sparse_block_items(sub_tensor):
     cache = getattr(sub_tensor, '_sorted_block_items', None)
     if cache is None:
