@@ -6,6 +6,30 @@ except Exception:  # pragma: no cover - Cython extension is optional
     substitution_sparse_cy = None
 
 
+def _sum_result_dtype(dtype):
+    return np.asarray(np.zeros(shape=(0,), dtype=dtype).sum()).dtype
+
+
+def _normalize_sum_axes(axis, ndim):
+    if axis is None:
+        return None
+    if isinstance(axis, tuple):
+        axes = axis
+    else:
+        axes = (axis,)
+    normalized = []
+    for ax in axes:
+        ax = int(ax)
+        if ax < 0:
+            ax += ndim
+        if (ax < 0) or (ax >= ndim):
+            raise ValueError('axis {} is out of bounds for sparse substitution tensor with {} dimensions'.format(ax, ndim))
+        normalized.append(ax)
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("duplicate value in 'axis'")
+    return tuple(normalized)
+
+
 class SparseSubstitutionTensor:
     def __init__(self, shape, dtype, blocks):
         if len(shape) != 5:
@@ -55,8 +79,43 @@ class SparseSubstitutionTensor:
         return out
 
     def sum(self, axis=None):
-        # Keep numpy-like behavior for legacy call sites that aggregate dense tensors.
-        return self.to_dense().sum(axis=axis)
+        axes = _normalize_sum_axes(axis=axis, ndim=len(self.shape))
+        out_dtype = _sum_result_dtype(self.dtype)
+        if axes is None:
+            total = np.zeros(shape=(), dtype=out_dtype)
+            for mat in self.blocks.values():
+                if mat.nnz == 0:
+                    continue
+                total[...] = total + np.asarray(mat.data, dtype=out_dtype).sum(dtype=out_dtype)
+            return total[()]
+        if len(axes) == 0:
+            raise ValueError('axis=() would require a dense 5D tensor; use to_dense() explicitly.')
+
+        remaining_axes = tuple(ax for ax in range(len(self.shape)) if ax not in axes)
+        out_shape = tuple(self.shape[ax] for ax in remaining_axes)
+        out = np.zeros(shape=out_shape, dtype=out_dtype)
+        for (sg, a, d), mat in self.blocks.items():
+            if mat.nnz == 0:
+                continue
+            coo = mat.tocoo()
+            data = np.asarray(coo.data, dtype=out_dtype)
+            if len(remaining_axes) == 0:
+                out[...] = out + data.sum(dtype=out_dtype)
+                continue
+            coords_by_axis = {
+                0: coo.row,
+                1: coo.col,
+                2: int(sg),
+                3: int(a),
+                4: int(d),
+            }
+            indices = tuple(coords_by_axis[ax] for ax in remaining_axes)
+            has_branch_or_site_axis = (0 in remaining_axes) or (1 in remaining_axes)
+            if has_branch_or_site_axis:
+                np.add.at(out, indices, data)
+            else:
+                out[indices] = out[indices] + data.sum(dtype=out_dtype)
+        return out
 
     def get_block(self, sg, a, d):
         key = (int(sg), int(a), int(d))

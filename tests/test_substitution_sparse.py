@@ -60,6 +60,47 @@ def test_dense_to_sparse_preserves_nan_values_with_tolerance():
     assert restored[1, 1, 0, 0, 0] == 0
 
 
+def test_sparse_sum_matches_dense_without_materializing_full_tensor(monkeypatch):
+    dense = _toy_dense_tensor()
+    dense[2, 2, 0, 1, 2] = np.nan
+    sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(dense, tol=0)
+    monkeypatch.setattr(
+        substitution_sparse.SparseSubstitutionTensor,
+        "to_dense",
+        lambda self: (_ for _ in ()).throw(AssertionError("sum should not call to_dense")),
+    )
+
+    axes_to_check = [
+        None,
+        0,
+        1,
+        2,
+        3,
+        4,
+        -1,
+        (0, 1),
+        (0, 2, 4),
+        (1, 3, 4),
+        (2, 3, 4),
+        (0, 1, 2, 3, 4),
+    ]
+    for axis in axes_to_check:
+        observed = sparse_tensor.sum(axis=axis)
+        expected = dense.sum(axis=axis)
+        np.testing.assert_allclose(observed, expected, atol=1e-12, equal_nan=True)
+
+
+def test_sparse_sum_bool_tensor_matches_numpy_count_dtype():
+    dense = _toy_dense_tensor() > 0
+    sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(dense, tol=0)
+
+    observed = sparse_tensor.sum(axis=(0, 1))
+    expected = dense.sum(axis=(0, 1))
+
+    assert observed.dtype == expected.dtype
+    np.testing.assert_array_equal(observed, expected)
+
+
 def test_dense_to_sparse_cython_path_matches_python_fallback(monkeypatch):
     if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "dense_block_to_csr_arrays_double")):
         pytest.skip("Cython substitution_sparse fast path is unavailable")
