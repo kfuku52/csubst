@@ -59,6 +59,57 @@ def test_calc_E_stat_mean_sparse_matches_dense_for_all_modes():
         np.testing.assert_allclose(out_sparse, out_dense, atol=1e-12)
 
 
+def test_resolve_E_stat_n_jobs_keeps_pepc_like_workload_single_thread():
+    n_jobs, estimated_work = omega._resolve_E_stat_n_jobs(
+        num_cb_rows=8446,
+        num_site=956,
+        num_categories=59,
+        g={"threads": 3},
+    )
+
+    assert estimated_work == 8446 * 956 * 59
+    assert n_jobs == 1
+
+
+def test_resolve_E_stat_n_jobs_parallelizes_large_category_workload():
+    n_jobs, estimated_work = omega._resolve_E_stat_n_jobs(
+        num_cb_rows=50000,
+        num_site=2000,
+        num_categories=512,
+        g={"threads": 4},
+    )
+
+    assert estimated_work == 50000 * 2000 * 512
+    assert n_jobs == 4
+
+
+def test_calc_E_stat_parallel_chunks_match_single_thread(monkeypatch):
+    dense = _toy_sub_tensor()
+    cb = _toy_cb()
+    g_single = _toy_g(dense)
+    g_parallel = _toy_g(dense)
+    g_parallel.update(
+        {
+            "threads": 2,
+            "parallel_min_items_e_stat": 1,
+            "parallel_min_categories_per_job_e_stat": 1,
+        }
+    )
+    invoked = {"parallel": False}
+    orig_run_starmap = parallel.run_starmap
+
+    def _wrapped_run_starmap(*args, **kwargs):
+        invoked["parallel"] = True
+        return orig_run_starmap(*args, **kwargs)
+
+    monkeypatch.setattr(parallel, "run_starmap", _wrapped_run_starmap)
+    out_parallel = omega.calc_E_stat(cb=cb, sub_tensor=dense, mode="any2spe", stat="mean", SN="N", g=g_parallel)
+    out_single = omega.calc_E_stat(cb=cb, sub_tensor=dense, mode="any2spe", stat="mean", SN="N", g=g_single)
+
+    assert invoked["parallel"] is True
+    np.testing.assert_allclose(out_parallel, out_single, atol=1e-12)
+
+
 def test_calc_E_stat_requires_g():
     with pytest.raises(ValueError, match="g is required"):
         omega.calc_E_stat(
@@ -430,6 +481,18 @@ def test_get_exp_state_respects_parallel_threshold(monkeypatch):
     out = omega.get_exp_state(g=g, mode="pep")
     assert invoked["parallel"] is False
     assert np.isfinite(out).all()
+
+
+def test_resolve_expected_state_n_jobs_uses_param_default_thresholds():
+    n_jobs, estimated_work = omega._resolve_expected_state_n_jobs(
+        num_branch_jobs=139,
+        num_site=956,
+        num_state=20,
+        g={"threads": 3},
+    )
+
+    assert estimated_work == 139 * 956 * 20 * 20
+    assert n_jobs == 3
 
 
 def test_calibrate_dsc_skips_substitution_class_without_finite_pairs():

@@ -9,13 +9,11 @@ import scipy.stats as stats
 from scipy.linalg import expm
 
 import itertools
-import os
 import re
 import sys
 import time
 
 from csubst import parallel
-from csubst import runtime
 from csubst import substitution
 from csubst import substitution_sparse
 from csubst import table
@@ -35,6 +33,8 @@ _EPI_BETA_GRID = np.unique(np.concatenate([
     np.arange(-2.0, 2.001, 0.01, dtype=np.float64),
     np.array([-3.0, -2.5, 2.5, 3.0], dtype=np.float64),
 ]))
+_DEFAULT_E_STAT_MIN_ITEMS_FOR_PARALLEL = 1000000000
+_DEFAULT_E_STAT_MIN_CATEGORIES_PER_JOB = 64
 _EPI_AUTO_CLIP_QUANTILE = 0.995
 _EPI_AUTO_CLIP_MIN = 1.5
 _EPI_AUTO_CLIP_MAX = 5.0
@@ -1835,8 +1835,8 @@ def _resolve_expected_state_n_jobs(num_branch_jobs, num_site, num_state, g):
     n_jobs = parallel.resolve_adaptive_n_jobs(
         num_items=estimated_work,
         threads=threads,
-        min_items_for_parallel=int(g.get('parallel_min_items_expected_state', 5000000000)),
-        min_items_per_job=int(g.get('parallel_min_items_per_job_expected_state', 1000000000)),
+        min_items_for_parallel=int(g.get('parallel_min_items_expected_state', 50000000)),
+        min_items_per_job=int(g.get('parallel_min_items_per_job_expected_state', 10000000)),
     )
     max_jobs_by_branch = parallel.resolve_n_jobs(num_items=num_branch_jobs, threads=threads)
     return min(n_jobs, max_jobs_by_branch), estimated_work
@@ -1932,6 +1932,35 @@ def joblib_calc_E_mean(
     print(txt.format(obs_col, i_start, i, num_gad_combinat, int(time.time()-iter_start)), flush=True)
 
 
+def _calc_E_mean_chunk_local(
+    mode,
+    cb_ids,
+    sub_sg,
+    sub_bg,
+    obs_col,
+    num_gad_combinat,
+    igad_chunk,
+    g,
+    static_sub_sites,
+    cb_site_overlap,
+):
+    E_b = np.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
+    joblib_calc_E_mean(
+        mode,
+        cb_ids,
+        sub_sg,
+        sub_bg,
+        E_b,
+        obs_col,
+        num_gad_combinat,
+        igad_chunk,
+        g,
+        static_sub_sites=static_sub_sites,
+        cb_site_overlap=cb_site_overlap,
+    )
+    return E_b
+
+
 def joblib_calc_hypergeom(
     mode,
     cb_ids,
@@ -1970,37 +1999,6 @@ def joblib_calc_hypergeom(
         dfq[:, :] += _get_permutations_fast(cb_ids, sub_branches, p, niter)
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
-
-def _calc_E_mean_chunk_to_mmap(
-    mode,
-    cb_ids,
-    sub_sg,
-    sub_bg,
-    mmap_out,
-    dtype,
-    shape,
-    obs_col,
-    num_gad_combinat,
-    igad_chunk,
-    g,
-    static_sub_sites,
-    cb_site_overlap,
-):
-    dfEb = np.memmap(filename=mmap_out, dtype=dtype, shape=shape, mode='r+')
-    joblib_calc_E_mean(
-        mode,
-        cb_ids,
-        sub_sg,
-        sub_bg,
-        dfEb,
-        obs_col,
-        num_gad_combinat,
-        igad_chunk,
-        g,
-        static_sub_sites=static_sub_sites,
-        cb_site_overlap=cb_site_overlap,
-    )
-    dfEb.flush()
 
 def _calc_hypergeom_chunk_local(
     mode,
@@ -2063,6 +2061,31 @@ def _prepare_substitution_permutation_components(sub_tensor, mode, SN, g):
     return sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat
 
 
+def _resolve_E_stat_n_jobs(num_cb_rows, num_site, num_categories, g):
+    threads = int(g.get('threads', 1))
+    num_cb_rows = int(num_cb_rows)
+    num_site = int(num_site)
+    num_categories = int(num_categories)
+    estimated_work = num_cb_rows * num_site * num_categories
+    if (threads <= 1) or (num_cb_rows <= 0) or (num_site <= 0) or (num_categories <= 1):
+        return 1, estimated_work
+    min_items = int(g.get('parallel_min_items_e_stat', _DEFAULT_E_STAT_MIN_ITEMS_FOR_PARALLEL))
+    min_categories_per_job = int(
+        g.get('parallel_min_categories_per_job_e_stat', _DEFAULT_E_STAT_MIN_CATEGORIES_PER_JOB)
+    )
+    if min_items < 0:
+        raise ValueError('parallel_min_items_e_stat should be >= 0.')
+    if min_categories_per_job < 1:
+        raise ValueError('parallel_min_categories_per_job_e_stat should be >= 1.')
+    if estimated_work < min_items:
+        return 1, estimated_work
+    max_jobs_by_category = num_categories // min_categories_per_job
+    if max_jobs_by_category <= 1:
+        return 1, estimated_work
+    requested_n_jobs = parallel.resolve_n_jobs(num_items=num_categories, threads=threads)
+    return min(requested_n_jobs, max_jobs_by_category), estimated_work
+
+
 def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
     if g is None:
         raise ValueError('g is required.')
@@ -2079,9 +2102,27 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
     cb_ids = _get_cb_ids(cb)
     static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
     cb_site_overlap = None
-    requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
+    n_jobs, estimated_work = _resolve_E_stat_n_jobs(
+        num_cb_rows=cb_ids.shape[0],
+        num_site=sub_sg.shape[0],
+        num_categories=len(list_igad),
+        g=g,
+    )
+    txt = 'E{}{} scheduler: cb_rows={}, sites={}, categories={}, estimated_work={}, workers={} (threads={})'
+    print(
+        txt.format(
+            SN,
+            mode,
+            cb_ids.shape[0],
+            sub_sg.shape[0],
+            len(list_igad),
+            estimated_work,
+            n_jobs,
+            int(g.get('threads', 1)),
+        ),
+        flush=True,
+    )
     chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
-    n_jobs = requested_n_jobs
     igad_chunks = None
     if stat == 'mean':
         igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(
@@ -2102,21 +2143,12 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
             cb_site_overlap=cb_site_overlap,
         )
     else:
-        my_dtype = sub_tensor.dtype
-        if 'bool' in str(my_dtype): my_dtype = g['float_type']
-        mmap_out = runtime.temp_path('tmp.csubst.dfEb.mmap')
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
-        axis = (cb.shape[0],)
-        dfEb = np.memmap(filename=mmap_out, dtype=my_dtype, shape=axis, mode='w+')
         tasks = [
             (
                 mode,
                 cb_ids,
                 sub_sg,
                 sub_bg,
-                mmap_out,
-                my_dtype,
-                axis,
                 obs_col,
                 num_gad_combinat,
                 igad_chunk,
@@ -2126,16 +2158,15 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
             )
             for igad_chunk in igad_chunks
         ]
-        parallel.run_starmap(
-            func=_calc_E_mean_chunk_to_mmap,
+        chunk_E = parallel.run_starmap(
+            func=_calc_E_mean_chunk_local,
             args_iterable=tasks,
             n_jobs=n_jobs,
             backend='threading',
         )
-        dfEb.flush()
-        E_b = dfEb
-        del dfEb
-        if os.path.exists(mmap_out): os.unlink(mmap_out)
+        E_b = np.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
+        for item in chunk_E:
+            E_b += item
     return E_b
 
 def subroot_E2nan(cb, tree):

@@ -998,7 +998,6 @@ def initialize_df_cb_stats(g):
 
 def set_num_thread_variables(num_thread=1):
     # https://stackoverflow.com/questions/30791550/limit-number-of-threads-in-numpy
-    # TODO Not sure yet if this really accelerate the computation.
     os.environ["OMP_NUM_THREADS"] = str(num_thread)
     os.environ["OPENBLAS_NUM_THREADS"] = str(num_thread)
     os.environ["MKL_NUM_THREADS"] = str(num_thread)
