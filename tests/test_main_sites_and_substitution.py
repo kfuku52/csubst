@@ -232,17 +232,17 @@ def test_get_yvalues_set_other_uses_other_prob_columns():
 
 
 @pytest.mark.parametrize(
-    ("set_stat_type", "channel_index", "aa_orders", "expected"),
+    ("set_stat_type", "channel_index", "state_orders", "expected"),
     [
         ("any", 0, np.array(["A", "V"]), ""),
         ("spe", 1, np.array(["A", "V"]), "X→V"),
     ],
 )
-def test_get_set_channel_label(set_stat_type, channel_index, aa_orders, expected):
+def test_get_set_channel_label(set_stat_type, channel_index, state_orders, expected):
     assert main_sites._get_set_channel_label(
         set_stat_type=set_stat_type,
         channel_index=channel_index,
-        amino_acid_orders=aa_orders,
+        state_orders=state_orders,
     ) == expected
 
 
@@ -258,7 +258,7 @@ def test_get_set_expression_channel_labels_spe():
     out = main_sites.get_set_expression_channel_labels(
         prob_matrix=prob,
         set_stat_type="spe",
-        amino_acid_orders=np.array(["A", "V", "T"]),
+        state_orders=np.array(["A", "V", "T"]),
     )
     assert out.tolist() == ["X→V", "X→A", ""]
 
@@ -863,6 +863,24 @@ def test_add_set_mode_columns_set_stat_type_changes_channelwise_aggregation(set_
     out = main_sites.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_tensor)
     assert out["N_set_expr"].tolist() == [True]
     np.testing.assert_allclose(out["N_set_expr_prob"].to_numpy(), [expected_prob], atol=1e-12)
+
+
+def test_add_set_mode_columns_spe_labels_use_nonsyn_state_orders():
+    on_tensor = np.zeros((2, 1, 1, 2, 2), dtype=float)
+    on_tensor[1, 0, 0, 0, 1] = 0.9
+    df = pd.DataFrame({"N_sub_1": [0.9]})
+    g = {
+        "mode": "set",
+        "set_stat_type": "spe",
+        "mode_expression": "1",
+        "min_single_prob": 0.5,
+        "amino_acid_orders": np.array(["A", "V", "T", "I"], dtype=object),
+        "nonsyn_state_orders": np.array(["AGPST", "C"], dtype=object),
+    }
+
+    out = main_sites.add_set_mode_columns(df=df.copy(), g=g, ON_tensor=on_tensor)
+
+    assert out["N_set_expr_channel_label"].tolist() == ["X→C"]
 
 
 def test_add_set_mode_columns_accepts_sparse_branch_tensors_for_spe():
@@ -2201,6 +2219,57 @@ def test_plot_state_writes_outputs_when_enabled(tmp_path, tiny_tree):
     assert set(out_paths) == expected
     for path in expected:
         assert Path(path).exists()
+
+
+def test_get_df_ad_uses_nonsyn_state_orders_for_recoded_tensor():
+    g = {
+        "amino_acid_orders": np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object),
+        "nonsyn_state_orders": np.array(["AGPST", "DENQ", "HKR", "ILMV", "FWY", "C"], dtype=object),
+        "matrix_groups": {"grp": ["AAA", "AAT"]},
+        "min_combinat_prob": 0.5,
+    }
+    sub_tensor = np.zeros((2, 2, 1, 6, 6), dtype=float)
+    sub_tensor[0, 0, 0, 0, 5] = 0.75
+    sub_tensor[1, 1, 0, 5, 0] = 0.25
+
+    df_ad = main_sites.get_df_ad(sub_tensor=sub_tensor, g=g, mode="nsy")
+    df_ad = main_sites.add_site_stats(df_ad, sub_tensor, g, "nsy", method="rank1")
+    df_ad = main_sites.add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, "nsy")
+
+    row = df_ad.loc[(df_ad["state_from"] == "AGPST") & (df_ad["state_to"] == "C"), :]
+    assert row.shape[0] == 1
+    assert float(row["value"].iloc[0]) == pytest.approx(0.75, abs=1e-12)
+    assert bool(row["has_target_high_combinat_prob_site"].iloc[0]) is True
+    assert "A" not in set(df_ad["state_from"])
+    assert "DENQ" in set(df_ad["state_from"])
+
+
+def test_plot_state_accepts_recoded_nonsyn_state_axis(tmp_path, tiny_tree):
+    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()}
+    num_node = max(labels.values()) + 1
+    on = np.zeros((num_node, 3, 1, 6, 6), dtype=float)
+    os = np.zeros((num_node, 3, 1, 2, 2), dtype=float)
+    for site in range(3):
+        on[labels["A"], site, 0, 0, 5] = 0.8 - 0.1 * site
+        on[labels["C"], site, 0, 5, 0] = 0.7 - 0.1 * site
+        os[labels["A"], site, 0, 0, 1] = 0.6 - 0.05 * site
+        os[labels["C"], site, 0, 1, 0] = 0.9 - 0.05 * site
+    g = {
+        "tree": tiny_tree,
+        "site_outdir": str(tmp_path),
+        "float_format": "%.4f",
+        "amino_acid_orders": np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object),
+        "nonsyn_state_orders": np.array(["AGPST", "DENQ", "HKR", "ILMV", "FWY", "C"], dtype=object),
+        "matrix_groups": {"grp": ["AAA", "AAT"]},
+        "site_state_plot": True,
+    }
+
+    out_paths = main_sites.plot_state(on, os, np.array([labels["A"], labels["C"]], dtype=int), g)
+
+    assert str(tmp_path / "csubst_sites.state_N.tsv") in out_paths
+    state_n = pd.read_csv(tmp_path / "csubst_sites.state_N.tsv", sep="\t")
+    assert "AGPST" in set(state_n["state_from"])
+    assert "C" in set(state_n["state_to"])
 
 
 def test_plot_state_accepts_sparse_substitution_tensors(tmp_path, tiny_tree):

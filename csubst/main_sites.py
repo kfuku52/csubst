@@ -980,14 +980,35 @@ def add_states(df, branch_ids, g, add_hydrophobicity=True):
 
 def get_state_orders(g, mode):
     if mode=='nsy':
-        state_orders = {'nsy':g['amino_acid_orders']}
+        state_orders = {'nsy':sequence.get_nonsyn_state_orders(g)}
     elif mode=='syn':
         state_orders = g['matrix_groups']
+    else:
+        raise ValueError('Unsupported state order mode: {}'.format(mode))
     state_keys = list(state_orders.keys())
     return state_orders,state_keys
 
+
+def validate_state_orders_against_sub_tensor(state_orders, state_keys, sub_tensor, mode):
+    group_axis = int(sub_tensor.shape[2])
+    state_axis = int(sub_tensor.shape[3])
+    if len(state_keys) != group_axis:
+        txt = 'State-order group count for mode "{}" ({}) does not match substitution tensor group axis ({}).'
+        raise ValueError(txt.format(mode, len(state_keys), group_axis))
+    for state_key in state_keys:
+        num_state = len(state_orders[state_key])
+        if num_state > state_axis:
+            txt = 'State-order size for mode "{}" group "{}" ({}) exceeds substitution tensor state axis ({}).'
+            raise ValueError(txt.format(mode, state_key, num_state, state_axis))
+        if (mode == 'nsy') and (num_state != state_axis):
+            txt = 'Nonsynonymous state-order size ({}) does not match substitution tensor state axis ({}).'
+            raise ValueError(txt.format(num_state, state_axis))
+    return None
+
+
 def get_df_ad(sub_tensor, g, mode):
     state_orders,state_keys = get_state_orders(g, mode)
+    validate_state_orders_against_sub_tensor(state_orders, state_keys, sub_tensor, mode)
     gad, _, _ = substitution.get_group_state_totals(sub_tensor=sub_tensor)
     cols = ['group','state_from','state_to','value']
     nrow = sum([ len(v)**2-len(v) for v in state_orders.values() ])
@@ -1015,6 +1036,7 @@ def add_site_stats(df_ad, sub_tensor, g, mode, method='tau'):
     # method = {'tau', 'hg', 'tsi'}
     # https://academic.oup.com/bib/article/18/2/205/2562739
     state_orders,state_keys = get_state_orders(g, mode)
+    validate_state_orders_against_sub_tensor(state_orders, state_keys, sub_tensor, mode)
     outcol = 'site_'+method
     df_ad.loc[:,outcol] = np.nan
     sgad = substitution.get_site_group_state_totals(sub_tensor=sub_tensor)
@@ -1059,6 +1081,7 @@ def add_site_stats(df_ad, sub_tensor, g, mode, method='tau'):
 
 def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
     state_orders,state_keys = get_state_orders(g, mode)
+    validate_state_orders_against_sub_tensor(state_orders, state_keys, sub_tensor, mode)
     outcol = 'has_target_high_combinat_prob_site'
     df_ad.loc[:,outcol] = False
     sgad = substitution.get_site_group_state_totals(sub_tensor=sub_tensor)
@@ -1081,6 +1104,7 @@ def get_df_dist(sub_tensor, g, mode):
     for node in g['tree'].traverse():
         tree_dict[ete.get_prop(node, "numerical_label")] = node
     state_orders, state_keys = get_state_orders(g, mode)
+    validate_state_orders_against_sub_tensor(state_orders, state_keys, sub_tensor, mode)
     cols = ['group','state_from','state_to','max_dist_bl']
     inds = np.arange(np.array(sub_tensor.shape[2:]).prod()-sub_tensor.shape[4])
     df_dist = pd.DataFrame(columns=cols, index=inds)
@@ -1574,22 +1598,22 @@ def get_lineage_site_heatmap_values(df, display_meta, g):
     return values, branch_ids
 
 
-def _get_set_channel_label(set_stat_type, channel_index, amino_acid_orders):
+def _get_set_channel_label(set_stat_type, channel_index, state_orders):
     set_stat_type = str(set_stat_type).strip().lower()
     if set_stat_type == 'any':
         return ''
-    aa_orders = np.asarray(amino_acid_orders, dtype=object).reshape(-1)
-    if aa_orders.shape[0] == 0:
+    state_orders = np.asarray(state_orders, dtype=object).reshape(-1)
+    if state_orders.shape[0] == 0:
         return str(int(channel_index))
 
-    def _aa_label(index):
-        if aa_orders.shape[0] == 0:
+    def _state_label(index):
+        if state_orders.shape[0] == 0:
             return str(int(index))
-        idx = int(index) % int(aa_orders.shape[0])
-        return str(aa_orders[idx])
+        idx = int(index) % int(state_orders.shape[0])
+        return str(state_orders[idx])
 
     if set_stat_type == 'spe':
-        return 'X→{}'.format(_aa_label(channel_index))
+        return 'X→{}'.format(_state_label(channel_index))
     return ''
 
 
@@ -1610,7 +1634,7 @@ def get_set_expression_channel_indices(prob_matrix):
     return indices
 
 
-def get_set_expression_channel_labels(prob_matrix, set_stat_type, amino_acid_orders):
+def get_set_expression_channel_labels(prob_matrix, set_stat_type, state_orders):
     channel_indices = get_set_expression_channel_indices(prob_matrix=prob_matrix)
     labels = np.array([''] * channel_indices.shape[0], dtype=object)
     for i,channel_index in enumerate(channel_indices.tolist()):
@@ -1619,7 +1643,7 @@ def get_set_expression_channel_labels(prob_matrix, set_stat_type, amino_acid_ord
         labels[i] = _get_set_channel_label(
             set_stat_type=set_stat_type,
             channel_index=int(channel_index),
-            amino_acid_orders=amino_acid_orders,
+            state_orders=state_orders,
         )
     return labels
 
@@ -1633,7 +1657,7 @@ def get_set_heatmap_column_labels(df, display_meta, g):
         int(site): i for i,site in enumerate(df.loc[:, 'codon_site_alignment'].astype(int).tolist())
     }
     set_stat_type = str(g.get('set_stat_type', 'any')).strip().lower()
-    amino_acid_orders = g.get('amino_acid_orders', [])
+    state_orders = sequence.get_nonsyn_state_orders(g)
     out = {}
     for item in display_meta:
         site = item.get('site', None)
@@ -1652,7 +1676,7 @@ def get_set_heatmap_column_labels(df, display_meta, g):
         label = _get_set_channel_label(
             set_stat_type=set_stat_type,
             channel_index=channel_index,
-            amino_acid_orders=amino_acid_orders,
+            state_orders=state_orders,
         )
         if label == '':
             continue
@@ -3176,7 +3200,7 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
     df.loc[:, 'N_set_expr_channel_label'] = get_set_expression_channel_labels(
         prob_matrix=selected_prob_matrix,
         set_stat_type=set_stat_type,
-        amino_acid_orders=g.get('amino_acid_orders', []),
+        state_orders=sequence.get_nonsyn_state_orders(g),
     )
     return df
 

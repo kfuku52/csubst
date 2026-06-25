@@ -24,6 +24,7 @@ except Exception:  # pragma: no cover - Cython extension is optional
     substitution_sparse_cy = None
 from csubst import ete
 from csubst import output_stat
+from csubst import sequence
 
 _CB_BASE_SUBSTITUTIONS = ("any2any", "spe2any", "any2spe", "spe2spe")
 _SUB_TENSOR_BACKENDS = ('auto', 'dense', 'sparse')
@@ -1206,11 +1207,11 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
                     branch_id=branch_id,
                     min_sitewise_pp=min_sitewise_pp,
                 )
-                state_order = g['amino_acid_orders']
+                state_order = sequence.get_nonsyn_state_orders(g)
                 sub_list = list()
                 for s, anc, der in zip(site_ids.tolist(), anc_ids.tolist(), der_ids.tolist()):
-                    ancestral_state = state_order[int(anc)]
-                    derived_state = state_order[int(der)]
+                    ancestral_state = str(state_order[int(anc)])
+                    derived_state = str(state_order[int(der)])
                     sub_string = ancestral_state + str(_site_label(s)) + derived_state
                     sub_list.append(sub_string)
                 df.at[i, attr + '_sitewise'] = ','.join(sub_list)
@@ -1223,7 +1224,7 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
         if sitewise:
             sub_list = list()
             if attr=='N':
-                state_order = g.get('nonsyn_state_orders', g.get('amino_acid_orders', []))
+                state_order = sequence.get_nonsyn_state_orders(g)
             elif attr=='S':
                 raise ValueError('This function is not supported for synonymous substitutions.')
             if _can_use_cython_sitewise_max_scan(branch_tensor=branch_tensor):
@@ -1232,8 +1233,8 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
                     min_sitewise_pp=float(min_sitewise_pp),
                 )
                 for s, anc, der in zip(site_ids.tolist(), anc_ids.tolist(), der_ids.tolist()):
-                    ancestral_state = state_order[int(anc)]
-                    derived_state = state_order[int(der)]
+                    ancestral_state = str(state_order[int(anc)])
+                    derived_state = str(state_order[int(der)])
                     sub_string = ancestral_state + str(_site_label(s)) + derived_state
                     sub_list.append(sub_string)
             else:
@@ -1247,8 +1248,8 @@ def get_b(g, sub_tensor, attr, sitewise, min_sitewise_pp=0.5):
                     max_idx = np.where(site_values == max_value)
                     if (max_idx[1].shape[0] == 0) or (max_idx[2].shape[0] == 0):
                         continue
-                    ancestral_state = state_order[max_idx[1][0]]
-                    derived_state = state_order[max_idx[2][0]]
+                    ancestral_state = str(state_order[max_idx[1][0]])
+                    derived_state = str(state_order[max_idx[2][0]])
                     sub_string = ancestral_state + str(_site_label(s)) + derived_state
                     sub_list.append(sub_string)
             df.at[i, attr + '_sitewise'] = ','.join(sub_list)

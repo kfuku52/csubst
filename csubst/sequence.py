@@ -12,6 +12,13 @@ _NSY_ALIGNMENT_SYMBOLS = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl
 _GROUP_SUM_MATRIX_CACHE = dict()
 
 
+def get_nonsyn_state_orders(g):
+    orders = g.get('nonsyn_state_orders', None)
+    if orders is None:
+        orders = g.get('amino_acid_orders', [])
+    return np.asarray(orders, dtype=object).reshape(-1)
+
+
 def calc_omega_state(state_nuc, g):  # implement exclude stop codon freq
     num_node = state_nuc.shape[0]
     num_nuc_site = state_nuc.shape[1]
@@ -156,7 +163,7 @@ def _build_nsy_alignment_symbols(orders):
 
 
 def _get_nsy_alignment_symbols(g):
-    orders = tuple(np.asarray(g['nonsyn_state_orders'], dtype=object).reshape(-1).tolist())
+    orders = tuple(get_nonsyn_state_orders(g).tolist())
     cache = g.get('_nsy_alignment_symbols_cache', None)
     if isinstance(cache, dict):
         if cache.get('orders', None) == orders:

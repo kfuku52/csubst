@@ -406,6 +406,25 @@ def test_get_b_sitewise_sparse_path_matches_dense_reference():
     )
 
 
+def test_get_b_sitewise_sparse_path_uses_nonsyn_state_orders():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name != ""}
+    num_node = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
+    dense = np.zeros((num_node, 1, 1, 2, 2), dtype=np.float64)
+    dense[labels["A"], 0, 0, 0, 1] = 0.9
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0.0)
+    g = {
+        "tree": tr,
+        "num_node": num_node,
+        "amino_acid_orders": np.array(["A", "V", "T", "I"], dtype=object),
+        "nonsyn_state_orders": np.array(["AGPST", "C"], dtype=object),
+    }
+
+    out = substitution.get_b(g=g, sub_tensor=sparse_tensor, attr="N", sitewise=True, min_sitewise_pp=0.5)
+
+    assert out.loc[out["branch_id"] == labels["A"], "N_sitewise"].iloc[0] == "AGPST1C"
+
+
 def test_sparse_branch_sitewise_max_indices_cython_row_update_matches_python_fallback(monkeypatch):
     if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "update_sitewise_max_from_csr_row_double")):
         pytest.skip("Cython sitewise CSR row-update kernel is unavailable")
