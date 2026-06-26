@@ -21,6 +21,8 @@ def _resolve_log_path(repo_root, args):
             return repo_root / "csubst_doctor" / "csubst.log"
         if args[0] == "simulate":
             return repo_root / "csubst_simulate" / "csubst.log"
+        if args[0] == "scan":
+            return repo_root / "csubst_scan" / "csubst.log"
         if args[0] == "search":
             return repo_root / "csubst_search" / "csubst.log"
         if args[0] == "analyze":
@@ -160,6 +162,7 @@ def test_cli_help_lists_primary_commands_and_legacy_aliases():
     assert "benchmark" in help_text
     assert "benchmark-plot" in help_text
     assert "doctor" in help_text
+    assert "scan" in help_text
     assert "search (analyze)" in help_text
     assert "sites (site)" in help_text
 
@@ -183,6 +186,35 @@ def test_benchmark_help_is_available():
     assert "--benchmark_expectation_methods" in help_text
     assert "--benchmark_keep_going" in help_text
     assert "--output_manifest" in help_text
+
+
+def test_scan_help_is_available():
+    proc, log_text = _run_cli("scan", "-h")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    assert "--scan_match" in help_text
+    assert "any2any" in help_text
+    assert "--scan_unit" not in help_text
+    assert "--scan_rate_exposure" in help_text
+    assert "q_weighted" in help_text
+    assert "default=q_weighted" in help_text
+    assert "--scan_rate_event_mode" in help_text
+    assert "--scan_other_scope" in help_text
+    assert "all|sister" in help_text
+    assert "--scan_sister_stem_only" in help_text
+    assert "--scan_pvalue_calibration" in help_text
+    assert "full_scan" in help_text
+    assert "--scan_n_permutations" in help_text
+    assert "--scan_permutation_mode" not in help_text
+    assert "--scan_rate_length" in help_text
+    assert "default=n_rescaled" in help_text
+    assert "--nonsyn_recode" in help_text
+    assert "--scan_report_targets" not in help_text
+    assert "--scan_candidate_target" not in help_text
+    assert "--fg_clade_permutation" not in help_text
+    assert "--fg_exclude_wg" not in help_text
+    assert "--mg_parent" not in help_text
+    assert "--mg_sister" not in help_text
 
 
 def test_benchmark_plot_help_is_available():

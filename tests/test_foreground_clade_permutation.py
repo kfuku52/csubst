@@ -631,6 +631,64 @@ def test_clade_permutation_retries_with_sample_original_foreground(monkeypatch):
     assert "_sampleorig_" in out["df_cb_stats_main"].loc[0, "mode"]
 
 
+def test_clade_permutation_parallelizes_candidates_over_threads(monkeypatch):
+    observed = pd.DataFrame(
+        {
+            "arity": [2],
+            "mode": ["foreground"],
+            "median_omegaCany2spe_fg_traitA": [0.4],
+            "total_OCNany2spe_fg_traitA": [2.5],
+        }
+    )
+    g = {
+        "fg_df": pd.DataFrame({"name": ["tip1"], "traitA": [1]}),
+        "df_cb_stats": observed.copy(deep=True),
+        "df_cb_stats_main": pd.DataFrame(),
+        "fg_clade_permutation": 2,
+        "current_arity": 2,
+        "cutoff_stat": "dummy,0",
+        "threads": 2,
+        "parallel_backend": "auto",
+    }
+    cb = pd.DataFrame({"branch_id_1": [1], "branch_id_2": [2], "dummy": [1.0]})
+    random_calls = []
+    parallel_calls = []
+
+    def fake_set_random_foreground_branch(local_g, trait_name, num_trial=100, sample_original_foreground=False):
+        random_calls.append(sample_original_foreground)
+        offset = len(random_calls) * 10
+        local_g["r_fg_ids"] = {trait_name: np.array([offset + 1, offset + 2], dtype=np.int64)}
+        return local_g, np.array([[1, 2]], dtype=np.int64)
+
+    def fake_add_median_cb_stats(local_g, rcb, current_arity, start, verbose=False):
+        assert (rcb.loc[:, "is_fg_traitA"] == "Y").all()
+        local_g["df_cb_stats"].loc[:, "arity"] = current_arity
+        local_g["df_cb_stats"].loc[:, "median_omegaCany2spe_fg_traitA"] = 0.9
+        local_g["df_cb_stats"].loc[:, "total_OCNany2spe_fg_traitA"] = 3.0
+        return local_g
+
+    def fake_run_starmap(func, args_iterable, n_jobs, backend="multiprocessing", chunksize=None):
+        args = list(args_iterable)
+        parallel_calls.append((len(args), n_jobs, backend, chunksize))
+        return [func(*arg) for arg in args]
+
+    monkeypatch.setattr(foreground, "set_random_foreground_branch", fake_set_random_foreground_branch)
+    monkeypatch.setattr(foreground, "add_median_cb_stats", fake_add_median_cb_stats)
+    monkeypatch.setattr(foreground.parallel, "run_starmap", fake_run_starmap)
+
+    out = foreground.clade_permutation(cb=cb, g=g)
+
+    assert random_calls == [False, False]
+    assert parallel_calls == [(2, 2, "threading", None)]
+    assert out["df_cb_stats_main"].shape[0] == 2
+    assert out["df_cb_stats_main"].loc[:, "clade_permutation_backend"].tolist() == ["threading", "threading"]
+    assert out["df_cb_stats_main"].loc[:, "clade_permutation_n_jobs"].tolist() == [2, 2]
+    assert out["df_cb_stats_main"].loc[:, "mode"].tolist() == [
+        "randomization_traitA_iter1_bid11,12",
+        "randomization_traitA_iter2_bid21,22",
+    ]
+
+
 def test_clade_permutation_recomputes_missing_randomized_combinations(monkeypatch, capsys):
     observed = pd.DataFrame(
         {

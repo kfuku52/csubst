@@ -10,6 +10,7 @@ import warnings
 
 from csubst import combination
 from csubst import omega
+from csubst import parallel
 from csubst import table
 from csubst import param
 from csubst import ete
@@ -2279,6 +2280,208 @@ def _finalize_clade_permutation_iteration(
     return g, cb_cache, advance_iter, break_trait
 
 
+def _resolve_clade_permutation_n_jobs(g):
+    return parallel.resolve_n_jobs(
+        num_items=int(g.get('fg_clade_permutation', 0)),
+        threads=int(g.get('threads', 1)),
+    )
+
+
+def _resolve_clade_permutation_backend(g):
+    backend = str(g.get('parallel_backend', 'auto')).strip().lower()
+    if backend not in ['auto', 'multiprocessing', 'threading']:
+        raise ValueError('--parallel_backend should be one of auto, multiprocessing, threading.')
+    # The workers share large cb/tensor objects and only return one compact stats row.
+    return 'threading'
+
+
+def _make_clade_permutation_worker_g(g):
+    local_g = copy.copy(g)
+    if '_clade_permutation_cb_stats_template' in g:
+        local_g['_clade_permutation_cb_stats_template'] = g['_clade_permutation_cb_stats_template'].copy(deep=True)
+        local_g['df_cb_stats'] = g['_clade_permutation_cb_stats_template'].copy(deep=True)
+    else:
+        local_g['df_cb_stats'] = g.get('df_cb_stats', pd.DataFrame()).copy(deep=True)
+    if '_clade_permutation_cb_stats_columns' in g:
+        local_g['_clade_permutation_cb_stats_columns'] = list(g['_clade_permutation_cb_stats_columns'])
+    if '_clade_permutation_cb_stats_row_defaults' in g:
+        local_g['_clade_permutation_cb_stats_row_defaults'] = dict(g['_clade_permutation_cb_stats_row_defaults'])
+    local_g['_clade_permutation_rows_buffer'] = []
+    local_g['_clade_permutation_current_stat_row'] = None
+    for cache_key in [
+        '_permutation_cb_pair_lookup_cache',
+        '_clade_permutation_fast_stats_plan_cache',
+        '_clade_permutation_selected_rows_plan_cache',
+    ]:
+        if cache_key in g:
+            local_g[cache_key] = copy.copy(g[cache_key])
+    return local_g
+
+
+def _evaluate_clade_permutation_candidate(
+    cb,
+    g,
+    trait_name,
+    rid_combinations,
+    OS_tensor_reducer=None,
+    ON_tensor_reducer=None,
+):
+    start = time.time()
+    local_g = _make_clade_permutation_worker_g(g=g)
+    cb_cache = pd.DataFrame()
+    rcb, cb_cache, local_g, requested_rows, _dropped_before_recompute, dropped_after_recompute, selected_rows = _get_permutation_cb_rows(
+        rid_combinations=rid_combinations,
+        cb=cb,
+        cb_cache=cb_cache,
+        g=local_g,
+        OS_tensor_reducer=OS_tensor_reducer,
+        ON_tensor_reducer=ON_tensor_reducer,
+    )
+    if (selected_rows is not None) and _is_default_add_median_cb_stats_impl():
+        local_g = _set_clade_permutation_stat_row_from_selected_rows(
+            g=local_g,
+            cb=cb,
+            selected_rows=selected_rows,
+            trait_name=trait_name,
+            current_arity=local_g['current_arity'],
+            start=start,
+        )
+    else:
+        rcb = _set_randomized_trait_flags(rcb=rcb, trait_name=trait_name)
+        local_g = add_median_cb_stats(local_g, rcb, local_g['current_arity'], start, verbose=False)
+    row = _get_current_clade_permutation_stat_row(g=local_g)
+    is_valid = _is_valid_clade_permutation_stat_row(
+        g=local_g,
+        trait_name=trait_name,
+        rid_combinations=rid_combinations,
+    )
+    kept_rows = selected_rows.shape[0] if selected_rows is not None else rcb.shape[0]
+    return {
+        'is_valid': bool(is_valid),
+        'row': dict(row) if row is not None else None,
+        'requested_rows': int(requested_rows),
+        'kept_rows': int(kept_rows),
+        'dropped_after_recompute': int(dropped_after_recompute),
+    }
+
+
+def _build_clade_permutation_candidate_request(g, trait_name, trial_no, sample_original_foreground):
+    try:
+        g, rid_combinations = set_random_foreground_branch(
+            g,
+            trait_name,
+            sample_original_foreground=sample_original_foreground,
+        )
+        return {
+            'kind': 'candidate',
+            'g': g,
+            'sample_original_foreground': sample_original_foreground,
+            'request': {
+                'trait_name': trait_name,
+                'trial_no': int(trial_no),
+                'sample_original_foreground': bool(sample_original_foreground),
+                'rid_combinations': np.asarray(rid_combinations, dtype=np.int64).copy(),
+                'randomized_bids': _normalize_branch_ids(g['r_fg_ids'][trait_name]).copy(),
+            },
+        }
+    except Exception as exc:
+        if not sample_original_foreground:
+            txt = 'Clade permutation retry for trait "{}": allowing sampling from original foreground clades after trial {:,} failure ({})\n'
+            sys.stderr.write(txt.format(trait_name, trial_no + 1, str(exc)))
+            return {
+                'kind': 'retry',
+                'g': g,
+                'sample_original_foreground': True,
+                'request': None,
+            }
+        return {
+            'kind': 'failure',
+            'g': g,
+            'sample_original_foreground': sample_original_foreground,
+            'request': None,
+            'reason': str(exc),
+        }
+
+
+def _collect_clade_permutation_candidate_batch(g, trait_name, trial_no, max_trials, sample_original_foreground, batch_size):
+    requests = []
+    break_trait = False
+    while (trial_no < max_trials) and (len(requests) < int(batch_size)):
+        out = _build_clade_permutation_candidate_request(
+            g=g,
+            trait_name=trait_name,
+            trial_no=trial_no,
+            sample_original_foreground=sample_original_foreground,
+        )
+        g = out['g']
+        sample_original_foreground = out['sample_original_foreground']
+        if out['kind'] == 'candidate':
+            requests.append(out['request'])
+            trial_no += 1
+            continue
+        if out['kind'] == 'retry':
+            trial_no += 1
+            continue
+        g = _append_clade_permutation_failure_row(g, trait_name, trial_no + 1, out.get('reason', ''))
+        txt = 'Clade permutation failed for trait "{}" at trial {:,}: {}\n'
+        sys.stderr.write(txt.format(trait_name, trial_no + 1, out.get('reason', '')))
+        trial_no += 1
+        break_trait = True
+        break
+    return g, requests, sample_original_foreground, trial_no, break_trait
+
+
+def _run_clade_permutation_candidate_batch(
+    cb,
+    g,
+    trait_name,
+    requests,
+    n_jobs,
+    backend,
+    OS_tensor_reducer=None,
+    ON_tensor_reducer=None,
+):
+    tasks = [
+        (
+            cb,
+            g,
+            trait_name,
+            request['rid_combinations'],
+            OS_tensor_reducer,
+            ON_tensor_reducer,
+        )
+        for request in requests
+    ]
+    return parallel.run_starmap(
+        _evaluate_clade_permutation_candidate,
+        tasks,
+        n_jobs=n_jobs,
+        backend=backend,
+    )
+
+
+def _append_parallel_clade_permutation_row(g, trait_name, iteration, request, result, n_jobs, backend):
+    _report_dropped_permutation_rows(
+        dropped_after_recompute=result['dropped_after_recompute'],
+        requested_rows=result['requested_rows'],
+        kept_rows=result['kept_rows'],
+    )
+    if not result['is_valid']:
+        return g, False, None
+    row = dict(result['row'])
+    row['mode'] = _build_clade_permutation_mode(
+        trait_name=trait_name,
+        iteration=iteration,
+        randomized_bids=request['randomized_bids'],
+        sample_original_foreground=request['sample_original_foreground'],
+    )
+    row['clade_permutation_backend'] = backend
+    row['clade_permutation_n_jobs'] = int(n_jobs)
+    row['clade_permutation_trial_no'] = int(request['trial_no'] + 1)
+    g['_clade_permutation_current_stat_row'] = row
+    return g, True, dict(row)
+
+
 def _run_clade_permutation_iteration(
     cb,
     cb_cache,
@@ -2356,6 +2559,79 @@ def _run_clade_permutation_for_trait(
     return g, cb_cache
 
 
+def _run_clade_permutation_for_trait_parallel(
+    cb,
+    g,
+    trait_name,
+    max_trials,
+    n_jobs,
+    backend,
+    OS_tensor_reducer=None,
+    ON_tensor_reducer=None,
+):
+    iteration = 1
+    trial_no = 0
+    sample_original_foreground = False
+    accepted_rows = []
+    while (trial_no < max_trials) and (iteration <= int(g['fg_clade_permutation'])):
+        remaining = int(g['fg_clade_permutation']) - iteration + 1
+        batch_size = max(1, min(int(n_jobs), remaining))
+        g, requests, sample_original_foreground, trial_no, break_trait = _collect_clade_permutation_candidate_batch(
+            g=g,
+            trait_name=trait_name,
+            trial_no=trial_no,
+            max_trials=max_trials,
+            sample_original_foreground=sample_original_foreground,
+            batch_size=batch_size,
+        )
+        if len(requests) == 0:
+            if break_trait:
+                break
+            continue
+        for request in requests:
+            txt = 'Queued foreground clade permutation candidate after trial {:,} for trait "{}"'
+            print(txt.format(request['trial_no'] + 1, trait_name), flush=True)
+        results = _run_clade_permutation_candidate_batch(
+            cb=cb,
+            g=g,
+            trait_name=trait_name,
+            requests=requests,
+            n_jobs=min(int(n_jobs), len(requests)),
+            backend=backend,
+            OS_tensor_reducer=OS_tensor_reducer,
+            ON_tensor_reducer=ON_tensor_reducer,
+        )
+        for request, result in zip(requests, results):
+            g, accepted, row = _append_parallel_clade_permutation_row(
+                g=g,
+                trait_name=trait_name,
+                iteration=iteration,
+                request=request,
+                result=result,
+                n_jobs=min(int(n_jobs), len(requests)),
+                backend=backend,
+            )
+            if accepted:
+                accepted_rows.append(row)
+                iteration += 1
+                print('')
+            if iteration > int(g['fg_clade_permutation']):
+                break
+        if break_trait:
+            break
+    if iteration > int(g['fg_clade_permutation']):
+        txt = 'Clade permutation successfully found {:,} new branch combinations for trait "{}" after {:,} trials.'
+        print(txt.format(g['fg_clade_permutation'], trait_name, trial_no))
+    elif trial_no >= max_trials:
+        txt = 'Clade permutation could not find enough number of new branch combinations for trait "{}" even after {:,} trials.\n'
+        sys.stderr.write(txt.format(trait_name, max_trials))
+    existing_rows = list(g.get('_clade_permutation_rows_buffer', []))
+    g['_clade_permutation_rows_buffer'] = existing_rows + accepted_rows
+    g = _flush_clade_permutation_rows_buffer(g=g)
+    _report_clade_permutation_stats(g, trait_name)
+    return g
+
+
 def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
     print('Starting foreground clade permutation.')
     trait_names = _get_trait_names(g)
@@ -2370,16 +2646,41 @@ def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
     g['_clade_permutation_current_stat_row'] = None
     max_trials = g['fg_clade_permutation'] * 10
     cb_cache = pd.DataFrame()
-    for trait_name in trait_names:
-        g, cb_cache = _run_clade_permutation_for_trait(
-            cb=cb,
-            cb_cache=cb_cache,
+    n_jobs = _resolve_clade_permutation_n_jobs(g=g)
+    backend = _resolve_clade_permutation_backend(g=g)
+    if n_jobs > 1:
+        target_col_prefixes = ['is_fg', 'is_mg', 'is_mf', 'is_all']
+        _get_clade_permutation_selected_rows_plan(
             g=g,
-            trait_name=trait_name,
-            max_trials=max_trials,
-            OS_tensor_reducer=OS_tensor_reducer,
-            ON_tensor_reducer=ON_tensor_reducer,
+            cb=cb,
+            trait_names=trait_names,
+            target_col_prefixes=target_col_prefixes,
         )
+        bid_columns = ['branch_id_' + str(k + 1) for k in np.arange(int(g.get('current_arity', 2)))]
+        if (int(g.get('current_arity', 2)) == 2) and all(col in cb.columns for col in bid_columns):
+            _get_permutation_cb_pair_lookup(cb=cb, bid_columns=bid_columns, g=g)
+    for trait_name in trait_names:
+        if n_jobs > 1:
+            g = _run_clade_permutation_for_trait_parallel(
+                cb=cb,
+                g=g,
+                trait_name=trait_name,
+                max_trials=max_trials,
+                n_jobs=n_jobs,
+                backend=backend,
+                OS_tensor_reducer=OS_tensor_reducer,
+                ON_tensor_reducer=ON_tensor_reducer,
+            )
+        else:
+            g, cb_cache = _run_clade_permutation_for_trait(
+                cb=cb,
+                cb_cache=cb_cache,
+                g=g,
+                trait_name=trait_name,
+                max_trials=max_trials,
+                OS_tensor_reducer=OS_tensor_reducer,
+                ON_tensor_reducer=ON_tensor_reducer,
+            )
     g['df_cb_stats_main'] = _move_duplicate_columns_to_end(g['df_cb_stats_main'])
     g['df_cb_stats'] = g['df_cb_stats_observed'].copy()
     if '_clade_permutation_cb_stats_template' in g:

@@ -79,6 +79,10 @@ _OUTPUT_NAMESPACE_DEFAULTS = {
         'outdir': 'csubst_simulate',
         'output_prefix': 'csubst',
     },
+    'scan': {
+        'outdir': 'csubst_scan',
+        'output_prefix': 'csubst',
+    },
     'search': {
         'outdir': 'csubst_search',
         'output_prefix': 'csubst',
@@ -226,6 +230,16 @@ def command_search(args):
     main_analyze(g)
     print('csubst {}: Time elapsed: {:,} sec'.format(command_label, int(time.time() - start)))
     print('csubst {} end:'.format(command_label), datetime.datetime.now(datetime.timezone.utc), flush=True)
+
+
+def command_scan(args):
+    print('csubst scan start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    g = get_global_parameters_or_exit(args)
+    from csubst.main_scan import main_scan
+    main_scan(g)
+    print('csubst scan: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst scan end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
 
 def command_benchmark(args):
@@ -470,6 +484,53 @@ def _add_search_subcommand_args(parser):
                         help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
                              'by quantile-based transformation.')
 
+
+def _add_scan_subcommand_args(parser):
+    parser.add_argument('--scan_match', metavar='MATCH1,MATCH2,...', default='any2spe', type=str,
+                        help='default=%(default)s: Comma-delimited recurrent substitution pattern classes to scan. '
+                             'Choose from any2any, any2spe, any2dif, spe2any, spe2spe, spe2dif, '
+                             'dif2any, dif2spe, dif2dif, or "all".')
+    parser.add_argument('--scan_min_event_pp', metavar='FLOAT', default=0.5, type=float,
+                        help='default=%(default)s: Minimum posterior probability for candidate discovery and lineage-support calls. '
+                             'With --scan_rate_event_mode posterior_sum, this threshold does not filter the event mass used for rate P values.')
+    parser.add_argument('--scan_min_support', metavar='FRACTION|INTEGER', default='2', type=str,
+                        help='default=%(default)s: Minimum foreground-lineage support for a scanned candidate. '
+                             'Values <=1 are treated as a fraction of foreground units; integer values are counts.')
+    parser.add_argument('--scan_rate_exposure', metavar='q_weighted|state_aware|raw_branch_length', default='q_weighted', type=str,
+                        choices=['state_aware', 'raw_branch_length', 'q_weighted'],
+                        help='default=%(default)s: Exposure model for scan rate P values. '
+                             '"state_aware" counts only branch length whose parent state can produce the candidate substitution; '
+                             '"q_weighted" further weights each possible parent-to-derived transition by its nonsynonymous instantaneous rate.')
+    parser.add_argument('--scan_rate_event_mode', metavar='called|posterior_sum', default='posterior_sum', type=str,
+                        choices=['called', 'posterior_sum'],
+                        help='default=%(default)s: Event mass used for scan rate P values. '
+                             '"called" uses events passing --scan_min_event_pp; '
+                             '"posterior_sum" keeps candidate discovery/support thresholded but sums all matching posterior event mass.')
+    parser.add_argument('--scan_other_scope', metavar='all|sister', default='all', type=str,
+                        choices=['all', 'sister'],
+                        help='default=%(default)s: Non-target branch set used as the control in scan rate P values. '
+                             '"all" uses all non-foreground branches; "sister" uses sister branches for foreground rows.')
+    parser.add_argument('--scan_rate_length', metavar='raw|sn_rescaled|n_rescaled', default='n_rescaled', type=str,
+                        choices=['raw', 'sn_rescaled', 'n_rescaled'],
+                        help='default=%(default)s: Branch-length scale used for scan rate P values. '
+                             '"n_rescaled" uses CSUBST nonsynonymous-substitution branch lengths; '
+                             '"raw" uses IQ-TREE/tree branch lengths; "sn_rescaled" uses CSUBST S+N branch lengths.')
+    parser.add_argument('--scan_pvalue_calibration', metavar='none|candidate_fixed|full_scan', default='full_scan', type=str,
+                        choices=['none', 'candidate_fixed', 'full_scan'],
+                        help='default=%(default)s: Empirical calibration for scan rate P values. '
+                             '"candidate_fixed" permutes foreground clades and retests observed candidates; '
+                             '"full_scan" reruns candidate discovery for each permutation and reports maxT-style empirical P values.')
+    parser.add_argument('--scan_n_permutations', metavar='INT', default=1000, type=int,
+                        help='default=%(default)s: Number of foreground clade permutations for scan P-value calibration. '
+                             'Permutation iterations are parallelized over --threads using --parallel_backend.')
+    parser.add_argument('--scan_permutation_seed', metavar='INT', default=1, type=int,
+                        help='default=%(default)s: Random seed for scan foreground clade permutations.')
+    parser.add_argument('--scan_permutation_sample_original', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Allow original foreground clades to be sampled as permutation targets.')
+    parser.add_argument('--scan_permutation_retry_sample_original', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Retry a failed scan permutation while allowing original foreground clades.')
+
+
 def _build_parser():
     # Main parser
     parser = argparse.ArgumentParser(description='CSUBST - a toolkit for molecular convergence detection. For details, see https://github.com/kfuku52/csubst')
@@ -553,6 +614,7 @@ def _build_parser():
     psr_out_doctor = _make_output_parent_parser(default_outdir='csubst_doctor', default_prefix='csubst')
     psr_out_inspect = _make_output_parent_parser(default_outdir='csubst_inspect', default_prefix='csubst')
     psr_out_simulate = _make_output_parent_parser(default_outdir='csubst_simulate', default_prefix='csubst')
+    psr_out_scan = _make_output_parent_parser(default_outdir='csubst_scan', default_prefix='csubst')
 
     # shared: IQ-TREE inputs
     psr_iq = argparse.ArgumentParser(add_help=False)
@@ -678,9 +740,28 @@ def _build_parser():
     psr_fg.add_argument('--fg_clade_permutation', metavar='INT', default=0, type=int,
                     help='default=%(default)s: Experimental. Randomly select the same/similar number and size of clades as foreground '
                          'and run analysis N times to obtain a permutation-based P value of convergence. '
+                         'Permutation candidate statistics are parallelized over --threads using a thread backend. '
                          'At least 1000 is recommended.')
     psr_fg.add_argument('--min_clade_bin_count', metavar='INT', default=10, type=int,
                     help='default=%(default)s: Experimental. Minimum number of branches per bin for foreground clade permutation. ')
+
+    psr_fg_scan = argparse.ArgumentParser(add_help=False)
+    psr_fg_scan.add_argument('--foreground', metavar='PATH', default=None, type=str, required=False,
+                    help='default=%(default)s: A text file to specify the foreground lineages. '
+                         'The file should contain two columns separated by a tab: '
+                         '1st column for lineage IDs and 2nd for regex-compatible leaf names. '
+                         'See https://github.com/kfuku52/csubst/wiki/Foreground-specification')
+    psr_fg_scan.add_argument('--fg_format', metavar='1|2', default=1, type=int, choices=[1,2],
+                    help='default=%(default)s: Table format of --foreground.')
+    psr_fg_scan.add_argument('--fg_stem_only', metavar='yes|no', default='yes', type=strtobool,
+                    help='default=%(default)s: Set "yes" to scan only foreground stem branches. '
+                         'Set "no" to include foreground clade-internal branches in candidate discovery/support.')
+    psr_fg_scan.add_argument('--scan_sister_stem_only', dest='scan_sister_stem_only',
+                    metavar='yes|no', default='no', type=strtobool,
+                    help='default=%(default)s: With --scan_other_scope sister, include sister clade-internal branches. '
+                         'Set "yes" to use only sister stem branches.')
+    psr_fg_scan.add_argument('--min_clade_bin_count', metavar='INT', default=10, type=int,
+                    help='default=%(default)s: Minimum number of branches per bin for scan foreground-clade permutations.')
 
     # dataset
     help_txt = 'generates out-of-the-box test datasets. See `csubst dataset -h`'
@@ -745,6 +826,12 @@ def _build_parser():
     simulate.add_argument('--true_asr_prefix', metavar='PATH_PREFIX', default='', type=str,
                           help='default=infer from --outdir/--output_prefix: Output path prefix for true-ASR bundle files.')
     simulate.set_defaults(handler=command_simulate)
+
+    # scan
+    help_txt = 'scans foreground recurrent nonsynonymous-state substitutions without omega_C branch-combination search. See `csubst scan -h`'
+    scan = subparsers.add_parser('scan', help=help_txt, parents=[psr_co,psr_iq,psr_fg_scan,psr_as,psr_rc,psr_out_scan])
+    scan.set_defaults(handler=command_scan)
+    _add_scan_subcommand_args(scan)
 
     # benchmark
     help_txt = 'benchmarks `csubst search` across parameter grids on the same input data and summarizes runtime/output metrics. See `csubst benchmark -h`'
