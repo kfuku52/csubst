@@ -1,6 +1,6 @@
 # Method review for `csubst scan`
 
-Date: 2026-06-25
+Date: 2026-06-26
 
 This report reviews the theoretical status of the current `csubst scan` implementation and compares it with methods that address similar questions: explicit convergent amino-acid substitution counting, PCOC/profile-shift methods, CSUBST omegaC-style convergence-rate tests, and ESL-PSC-style predictive approaches.
 
@@ -18,7 +18,7 @@ The current implementation does the following:
    - foreground exposure: branch length multiplied by opportunity
    - other exposure: same for the configured control branch set
 6. Under the default `--scan_rate_event_mode posterior_sum`, candidate discovery/support remain thresholded, but rate P values use all matching posterior event mass. `called` is available for the previous thresholded-count behavior.
-7. Under the default `--scan_rate_exposure q_weighted`, opportunity is posterior parent-state mass in candidate ancestral states multiplied by the nonsynonymous instantaneous rate toward the candidate derived state. This excludes post-hit descendant branch length when the parent state has already reached the candidate derived state. `state_aware` is available as the same state filter without Q weighting.
+7. Under the default `--scan_rate_exposure q_weighted`, opportunity is posterior parent-state mass in candidate ancestral states multiplied by the candidate nonsynonymous transition weight. With the default `--scan_rate_length n_rescaled`, this weight is the conditional probability of the candidate transition among all nonsynonymous outgoing transitions from the parent state; with raw/S+N lengths, it is the nonsynonymous instantaneous rate toward the candidate derived state. This excludes post-hit descendant branch length when the parent state has already reached the candidate derived state. `state_aware` is available as the same state filter without Q weighting.
 8. A one-sided Poisson LRT compares target rate vs other rate.
 9. By default, `--scan_pvalue_calibration full_scan` reruns candidate discovery on foreground-clade permutations and reports a maxT-style empirical P value.
 
@@ -26,7 +26,7 @@ In formula form, for a fixed candidate pattern:
 
 ```text
 event_b = sum posterior mass of substitutions matching the candidate on branch b
-exposure_b = selected_branch_length_b * Pr(parent state can produce candidate | data) * Q(candidate transition)
+exposure_b = selected_branch_length_b * Pr(parent state can produce candidate | data) * candidate_transition_weight
 
 target_event = sum_{b in target} event_b
 target_exposure = sum_{b in target} exposure_b
@@ -217,7 +217,7 @@ Potential fixes:
 
 Severity: medium.
 
-`q_weighted` exposure first applies the state-aware filter, so branches whose parent state cannot produce the candidate substitution contribute little or nothing. It then weights each possible parent-to-derived transition by the fitted nonsynonymous instantaneous rate matrix. This is the most model-aware fast denominator currently implemented.
+`q_weighted` exposure first applies the state-aware filter, so branches whose parent state cannot produce the candidate substitution contribute little or nothing. It then weights each possible parent-to-derived transition by the fitted nonsynonymous instantaneous rate matrix. When the selected length is `n_rescaled`, the weight is normalized by the total nonsynonymous outgoing rate from that parent state, because the branch length has already been rescaled to nonsynonymous substitutions. This is the most model-aware fast denominator currently implemented.
 
 This handles the user's stem-completion concern in a fair way and avoids the origin-weight correction problem discussed separately. It includes candidate-specific exchangeability, codon mutational accessibility, codon degeneracy, and nonsynonymous recoding through the fitted Q matrix. It still does not include:
 
@@ -227,7 +227,7 @@ This handles the user's stem-completion concern in a fair way and avoids the ori
 
 Implemented / remaining fixes:
 
-- Implemented: `q_weighted` exposure, defined as parent posterior mass times model rate from ancestral state to derived state.
+- Implemented: `q_weighted` exposure, defined as parent posterior mass times candidate transition weight; the weight is conditional on nonsynonymous outgoing rate under `n_rescaled` branch length.
 - Remaining: parametric simulation or model-expected candidate counts for confirmatory calibration.
 - Remaining: optional site-rate-stratified empirical nulls.
 

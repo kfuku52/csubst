@@ -2291,8 +2291,7 @@ def _resolve_clade_permutation_backend(g):
     backend = str(g.get('parallel_backend', 'auto')).strip().lower()
     if backend not in ['auto', 'multiprocessing', 'threading']:
         raise ValueError('--parallel_backend should be one of auto, multiprocessing, threading.')
-    # The workers share large cb/tensor objects and only return one compact stats row.
-    return 'threading'
+    return parallel.resolve_parallel_backend(g=g, task='general')
 
 
 def _make_clade_permutation_worker_g(g):

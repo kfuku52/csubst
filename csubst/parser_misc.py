@@ -1022,15 +1022,14 @@ def prep_state(g, apply_site_filtering=True):
 
     if g['infile_type'] == 'iqtree':
         from csubst import parser_iqtree
-        if g['input_data_type'] == 'nuc': # obsoleted
-            state_nuc = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
-            state_cdn = calc_omega_state(state_nuc=state_nuc, g=g)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
-        elif g['input_data_type'] == 'cdn':
-            state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
-            state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
+        if g['input_data_type'] != 'cdn':
+            raise NotImplementedError(
+                'Non-codon input is obsolete and no longer supported. '
+                'Run ancestral reconstruction with a codon model.'
+            )
+        state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
+        state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
+        state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
     else:
         raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     g['state_nuc'] = state_nuc

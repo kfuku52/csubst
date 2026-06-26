@@ -62,6 +62,7 @@ SCAN_OUTPUT_COLUMNS = (
     "scan_permutation_n_jobs",
     "scan_permutation_success_count",
     "scan_permutation_failure_count",
+    "scan_permutation_failure_reasons",
     "codon_site_alignment",
     "site_rate",
     "site_rate_quantile",
@@ -433,34 +434,6 @@ def _lineage_sister_branch_ids(g, trait_name, lineage_index, fg_branch_ids, node
     return np.array(sorted(sister_ids), dtype=np.int64)
 
 
-def _lineage_marginal_branch_ids(g, trait_name, lineage_index, fg_branch_ids, node_by_id):
-    fg_set = set(int(v) for v in np.asarray(fg_branch_ids, dtype=np.int64).reshape(-1).tolist())
-    mg_ids = set()
-    if bool(g.get("mg_parent", False)):
-        for bid in fg_set:
-            node = node_by_id.get(int(bid), None)
-            parent = getattr(node, "up", None) if node is not None else None
-            if parent is None or ete.is_root(parent):
-                continue
-            parent_id = int(ete.get_prop(parent, "numerical_label"))
-            if parent_id not in fg_set:
-                mg_ids.add(parent_id)
-    if bool(g.get("mg_sister", False)):
-        sister_ids = _lineage_sister_branch_ids(
-            g=g,
-            trait_name=trait_name,
-            lineage_index=lineage_index,
-            fg_branch_ids=fg_branch_ids,
-            node_by_id=node_by_id,
-        )
-        mg_ids.update(int(v) for v in sister_ids.tolist())
-    if trait_name in g.get("mg_ids", {}):
-        allowed = set(int(v) for v in np.asarray(g["mg_ids"][trait_name], dtype=np.int64).reshape(-1).tolist())
-        mg_ids = mg_ids.intersection(allowed)
-    mg_ids = mg_ids.difference(fg_set)
-    return np.array(sorted(mg_ids), dtype=np.int64)
-
-
 def build_scan_units(g, branch_meta):
     rows = []
     valid_branches = set(branch_meta["branch_id"].astype(int).tolist())
@@ -474,14 +447,6 @@ def build_scan_units(g, branch_meta):
                 g=g,
             )
             fg_ids = np.array([int(v) for v in fg_ids.tolist() if int(v) in valid_branches], dtype=np.int64)
-            mg_ids = _lineage_marginal_branch_ids(
-                g=g,
-                trait_name=trait_name,
-                lineage_index=i,
-                fg_branch_ids=fg_ids,
-                node_by_id=node_by_id,
-            )
-            mg_ids = np.array([int(v) for v in mg_ids.tolist() if int(v) in valid_branches], dtype=np.int64)
             sister_ids = _lineage_sister_branch_ids(
                 g=g,
                 trait_name=trait_name,
@@ -500,7 +465,6 @@ def build_scan_units(g, branch_meta):
                     "lineage_value": lineage_value,
                     "fg_leaf_names": ",".join(leaf_names),
                     "fg_branch_ids": ",".join(str(v) for v in fg_ids.tolist()),
-                    "mg_branch_ids": ",".join(str(v) for v in mg_ids.tolist()),
                     "sister_branch_ids": ",".join(str(v) for v in sister_ids.tolist()),
                 }
             )
@@ -533,24 +497,6 @@ def _unit_sister_branch_ids(g, fg_branch_ids, all_fg_branch_ids, node_by_id):
                     if desc_id not in all_fg_set:
                         sister_ids.add(desc_id)
     return np.array(sorted(sister_ids.difference(fg_set)), dtype=np.int64)
-
-
-def _unit_marginal_branch_ids(g, fg_branch_ids, all_fg_branch_ids, sister_branch_ids, node_by_id):
-    fg_set = set(int(v) for v in np.asarray(fg_branch_ids, dtype=np.int64).reshape(-1).tolist())
-    all_fg_set = set(int(v) for v in np.asarray(all_fg_branch_ids, dtype=np.int64).reshape(-1).tolist())
-    mg_ids = set()
-    if bool(g.get("mg_parent", False)):
-        for bid in fg_set:
-            node = node_by_id.get(int(bid), None)
-            parent = getattr(node, "up", None) if node is not None else None
-            if parent is None or ete.is_root(parent):
-                continue
-            parent_id = int(ete.get_prop(parent, "numerical_label"))
-            if parent_id not in all_fg_set:
-                mg_ids.add(parent_id)
-    if bool(g.get("mg_sister", False)):
-        mg_ids.update(int(v) for v in np.asarray(sister_branch_ids, dtype=np.int64).reshape(-1).tolist())
-    return np.array(sorted(mg_ids.difference(all_fg_set)), dtype=np.int64)
 
 
 def _selected_stem_fg_branch_ids(g, trait_cache, stem_index):
@@ -588,14 +534,12 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
         fg_leaf_names.append(sorted([str(v) for v in trait_cache["leaf_names_by_index"][int(stem_index)]]))
     if len(unit_fg_arrays) == 0:
         return {
-            "units": pd.DataFrame(columns=["trait", "unit_id", "lineage_value", "fg_leaf_names", "fg_branch_ids", "mg_branch_ids", "sister_branch_ids"]),
+            "units": pd.DataFrame(columns=["trait", "unit_id", "lineage_value", "fg_leaf_names", "fg_branch_ids", "sister_branch_ids"]),
             "fg_ids": np.array([], dtype=np.int64),
-            "mg_ids": np.array([], dtype=np.int64),
             "fg_leaf_names": [],
         }
     all_fg_ids = np.unique(np.concatenate(unit_fg_arrays).astype(np.int64, copy=False))
     rows = []
-    all_mg_ids = []
     for i, fg_ids in enumerate(unit_fg_arrays):
         sister_ids = _unit_sister_branch_ids(
             g=g,
@@ -604,15 +548,6 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
             node_by_id=node_by_id,
         )
         sister_ids = np.array([int(v) for v in sister_ids.tolist() if int(v) in valid_set], dtype=np.int64)
-        mg_ids = _unit_marginal_branch_ids(
-            g=g,
-            fg_branch_ids=fg_ids,
-            all_fg_branch_ids=all_fg_ids,
-            sister_branch_ids=sister_ids,
-            node_by_id=node_by_id,
-        )
-        mg_ids = np.array([int(v) for v in mg_ids.tolist() if int(v) in valid_set], dtype=np.int64)
-        all_mg_ids.append(mg_ids)
         rows.append(
             {
                 "trait": trait_name,
@@ -620,18 +555,12 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
                 "lineage_value": i + 1,
                 "fg_leaf_names": ",".join(fg_leaf_names[i]),
                 "fg_branch_ids": ",".join(str(v) for v in fg_ids.tolist()),
-                "mg_branch_ids": ",".join(str(v) for v in mg_ids.tolist()),
                 "sister_branch_ids": ",".join(str(v) for v in sister_ids.tolist()),
             }
         )
-    if len(all_mg_ids) > 0:
-        mg_union = np.unique(np.concatenate(all_mg_ids).astype(np.int64, copy=False))
-    else:
-        mg_union = np.array([], dtype=np.int64)
     return {
         "units": pd.DataFrame(rows),
         "fg_ids": all_fg_ids,
-        "mg_ids": mg_union,
         "fg_leaf_names": fg_leaf_names,
     }
 
@@ -639,7 +568,6 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
 def _build_permuted_scan_context(g, trait_names, valid_branch_ids, sample_original_foreground):
     units = []
     fg_ids = {}
-    mg_ids = {}
     fg_leaf_names = {}
     for trait_name in trait_names:
         trait_context = _build_permuted_trait_context(
@@ -650,13 +578,11 @@ def _build_permuted_scan_context(g, trait_names, valid_branch_ids, sample_origin
         )
         units.append(trait_context["units"])
         fg_ids[trait_name] = trait_context["fg_ids"]
-        mg_ids[trait_name] = trait_context["mg_ids"]
         fg_leaf_names[trait_name] = trait_context["fg_leaf_names"]
     units_df = pd.concat(units, ignore_index=True) if len(units) > 0 else pd.DataFrame()
     return {
         "units": units_df,
         "fg_ids": fg_ids,
-        "mg_ids": mg_ids,
         "fg_leaf_names": fg_leaf_names,
         "trait_names": list(trait_names),
     }
@@ -822,7 +748,7 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
     }
 
 
-def _target_branch_ids_from_maps(fg_ids_map, mg_ids_map, trait_name, target_class, valid_branch_ids):
+def _target_branch_ids_from_maps(fg_ids_map, trait_name, target_class, valid_branch_ids):
     if str(target_class) != "fg":
         raise ValueError("Only foreground target class is supported in scan.")
     valid = set(int(v) for v in valid_branch_ids)
@@ -833,7 +759,6 @@ def _target_branch_ids_from_maps(fg_ids_map, mg_ids_map, trait_name, target_clas
 def _target_branch_ids(g, trait_name, target_class, valid_branch_ids):
     return _target_branch_ids_from_maps(
         fg_ids_map=g.get("fg_ids", {}),
-        mg_ids_map=g.get("mg_ids", {}),
         trait_name=trait_name,
         target_class=target_class,
         valid_branch_ids=valid_branch_ids,
@@ -851,7 +776,6 @@ def _union_unit_branch_ids(units_df, column):
 
 def _other_branch_ids_from_maps(
     fg_ids_map,
-    mg_ids_map,
     trait_name,
     target_class,
     valid_branch_ids,
@@ -865,7 +789,6 @@ def _other_branch_ids_from_maps(
         int(v)
         for v in _target_branch_ids_from_maps(
             fg_ids_map=fg_ids_map,
-            mg_ids_map=mg_ids_map,
             trait_name=trait_name,
             target_class=target_class,
             valid_branch_ids=valid_branch_ids,
@@ -885,7 +808,6 @@ def _other_branch_ids_from_maps(
 def _other_branch_ids(g, trait_name, target_class, valid_branch_ids, scan_other_scope, units_df):
     return _other_branch_ids_from_maps(
         fg_ids_map=g.get("fg_ids", {}),
-        mg_ids_map=g.get("mg_ids", {}),
         trait_name=trait_name,
         target_class=target_class,
         valid_branch_ids=valid_branch_ids,
@@ -975,7 +897,7 @@ def _assign_grouped_qvalues(scan_df, out_col, group_cols):
     return scan_df
 
 
-def _q_weighted_opportunity(branch_meta, state_nsy, site, from_ids, to_ids, q_matrix):
+def _q_weighted_opportunity(branch_meta, state_nsy, site, from_ids, to_ids, q_matrix, rate_length):
     if q_matrix is None:
         raise ValueError("--scan_rate_exposure q_weighted requires instantaneous_nsy_rate_matrix.")
     state_nsy = np.asarray(state_nsy, dtype=np.float64)
@@ -996,7 +918,15 @@ def _q_weighted_opportunity(branch_meta, state_nsy, site, from_ids, to_ids, q_ma
         allowed_to = [int(der) for der in to_ids.tolist() if (int(der) != anc) and (0 <= int(der) < num_state)]
         if len(allowed_to) == 0:
             continue
-        weights[anc] = float(q_positive[anc, allowed_to].sum())
+        row_rates = q_positive[anc, :].copy()
+        row_rates[anc] = 0.0
+        candidate_rate = float(row_rates[allowed_to].sum())
+        if str(rate_length) == "n_rescaled":
+            total_rate = float(row_rates.sum())
+            if total_rate > 0.0:
+                weights[anc] = candidate_rate / total_rate
+        else:
+            weights[anc] = candidate_rate
     parent_ids = branch_meta["parent_id"].astype(int).to_numpy(copy=False)
     return state_nsy[parent_ids, int(site), :].dot(weights)
 
@@ -1047,6 +977,7 @@ def _rate_summary(
             from_ids=from_ids,
             to_ids=to_ids,
             q_matrix=q_matrix,
+            rate_length=rate_length,
         )
     else:
         txt = "--scan_rate_exposure should be one of {}."
@@ -1225,13 +1156,11 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
     if scan_context is None:
         units = build_scan_units(g=g, branch_meta=branch_meta)
         fg_ids_map = g.get("fg_ids", {})
-        mg_ids_map = g.get("mg_ids", {})
         fg_leaf_names_map = g.get("fg_leaf_names", {})
         trait_names = g["fg_df"].columns[1:].tolist()
     else:
         units = scan_context["units"].copy()
         fg_ids_map = scan_context["fg_ids"]
-        mg_ids_map = scan_context["mg_ids"]
         fg_leaf_names_map = scan_context["fg_leaf_names"]
         trait_names = list(scan_context["trait_names"])
     if units.shape[0] == 0:
@@ -1242,7 +1171,6 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
         units_trait = units.loc[units["trait"] == trait_name, :].reset_index(drop=True)
         candidate_branch_ids = _target_branch_ids_from_maps(
             fg_ids_map=fg_ids_map,
-            mg_ids_map=mg_ids_map,
             trait_name=trait_name,
             target_class="fg",
             valid_branch_ids=valid_branch_ids,
@@ -1317,14 +1245,12 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
             for target_class in scan_targets:
                 target_branch_ids = _target_branch_ids_from_maps(
                     fg_ids_map=fg_ids_map,
-                    mg_ids_map=mg_ids_map,
                     trait_name=trait_name,
                     target_class=target_class,
                     valid_branch_ids=valid_branch_ids,
                 )
                 other_branch_ids = _other_branch_ids_from_maps(
                     fg_ids_map=fg_ids_map,
-                    mg_ids_map=mg_ids_map,
                     trait_name=trait_name,
                     target_class=target_class,
                     valid_branch_ids=valid_branch_ids,
@@ -1380,6 +1306,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     "scan_permutation_n_jobs": int(permutation_n_jobs),
                     "scan_permutation_success_count": 0,
                     "scan_permutation_failure_count": 0,
+                    "scan_permutation_failure_reasons": "",
                     "p_rate_enrichment_empirical": np.nan,
                     "p_rate_enrichment_empirical_maxT": np.nan,
                 }
@@ -1526,7 +1453,6 @@ def _candidate_fixed_permutation_pvalues(
             )
         target_branch_ids = _target_branch_ids_from_maps(
             fg_ids_map=scan_context["fg_ids"],
-            mg_ids_map=scan_context["mg_ids"],
             trait_name=trait_name,
             target_class=target_class,
             valid_branch_ids=valid_branch_ids,
@@ -1534,7 +1460,6 @@ def _candidate_fixed_permutation_pvalues(
         units_trait = scan_context["units"].loc[scan_context["units"]["trait"] == trait_name, :].reset_index(drop=True)
         other_branch_ids = _other_branch_ids_from_maps(
             fg_ids_map=scan_context["fg_ids"],
-            mg_ids_map=scan_context["mg_ids"],
             trait_name=trait_name,
             target_class=target_class,
             valid_branch_ids=valid_branch_ids,
@@ -1613,12 +1538,14 @@ def _run_scan_permutation(
             "success": True,
             "min_p": min_p,
             "row_key_to_p": row_key_to_p,
+            "failure_reason": "",
         }
-    except Exception:
+    except Exception as exc:
         return {
             "success": False,
             "min_p": np.nan,
             "row_key_to_p": {},
+            "failure_reason": "{}: {}".format(type(exc).__name__, str(exc)),
         }
 
 
@@ -1664,6 +1591,7 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor):
     row_key_to_perm_p = {_scan_row_key(row): [] for _, row in observed_df.iterrows()}
     observed_keys = set(row_key_to_perm_p.keys())
     min_perm_p = []
+    failure_reasons = []
     n_jobs = _resolve_scan_permutation_n_jobs(g=g, n_permutations=n_permutations)
     backend = _resolve_scan_permutation_backend(g=g)
     permutation_indices = np.arange(1, n_permutations + 1, dtype=np.int64)
@@ -1700,6 +1628,9 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor):
     for result in results:
         if not result.get("success", False):
             failure_count += 1
+            failure_reason = str(result.get("failure_reason", "")).strip()
+            if failure_reason != "":
+                failure_reasons.append(failure_reason)
             continue
         success_count += 1
         if calibration == "full_scan":
@@ -1713,6 +1644,20 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor):
     observed_df.loc[:, "scan_permutation_n_jobs"] = int(n_jobs)
     observed_df.loc[:, "scan_permutation_success_count"] = int(success_count)
     observed_df.loc[:, "scan_permutation_failure_count"] = int(failure_count)
+    unique_failure_reasons = list(dict.fromkeys(failure_reasons))
+    observed_df.loc[:, "scan_permutation_failure_reasons"] = "; ".join(unique_failure_reasons[:5])
+    if failure_count > 0:
+        reason_txt = observed_df["scan_permutation_failure_reasons"].iloc[0]
+        if reason_txt == "":
+            reason_txt = "unknown"
+        print(
+            "Scan warning: {} of {} permutations failed: {}".format(
+                int(failure_count),
+                int(n_permutations),
+                reason_txt,
+            ),
+            flush=True,
+        )
     if success_count == 0:
         return observed_df
     empirical = []

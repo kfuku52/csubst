@@ -821,11 +821,6 @@ def get_state_tensor(g, selected_branch_ids=None):
                     codon_lookup=codon_lookup,
                     codon_state_lookup=codon_state_lookup,
                 )
-            elif g['input_data_type']=='nuc':
-                for s in np.arange(len(seq)):
-                    nuc_index = sequence.get_state_index(seq[s], g['input_state'], genetic_code.ambiguous_table)
-                    for ni in nuc_index:
-                        state_matrix[s, ni] = 1/len(nuc_index)
             state_tensor[nl,:,:] = state_matrix
         else: # Internal nodes
             state_matrix = state_table_by_node.get(node.name, None)

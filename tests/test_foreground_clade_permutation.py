@@ -631,7 +631,7 @@ def test_clade_permutation_retries_with_sample_original_foreground(monkeypatch):
     assert "_sampleorig_" in out["df_cb_stats_main"].loc[0, "mode"]
 
 
-def test_clade_permutation_parallelizes_candidates_over_threads(monkeypatch):
+def test_clade_permutation_parallelizes_candidates_over_resolved_backend(monkeypatch):
     observed = pd.DataFrame(
         {
             "arity": [2],
@@ -679,9 +679,9 @@ def test_clade_permutation_parallelizes_candidates_over_threads(monkeypatch):
     out = foreground.clade_permutation(cb=cb, g=g)
 
     assert random_calls == [False, False]
-    assert parallel_calls == [(2, 2, "threading", None)]
+    assert parallel_calls == [(2, 2, "multiprocessing", None)]
     assert out["df_cb_stats_main"].shape[0] == 2
-    assert out["df_cb_stats_main"].loc[:, "clade_permutation_backend"].tolist() == ["threading", "threading"]
+    assert out["df_cb_stats_main"].loc[:, "clade_permutation_backend"].tolist() == ["multiprocessing", "multiprocessing"]
     assert out["df_cb_stats_main"].loc[:, "clade_permutation_n_jobs"].tolist() == [2, 2]
     assert out["df_cb_stats_main"].loc[:, "mode"].tolist() == [
         "randomization_traitA_iter1_bid11,12",

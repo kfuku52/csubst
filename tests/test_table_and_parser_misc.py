@@ -849,6 +849,24 @@ def test_prep_state_3di20_translate_uses_translate_builder(monkeypatch):
     assert "_3di_alignment_by_branch_id" in out
 
 
+def test_prep_state_rejects_nucleotide_input_before_iqtree_loader(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+
+    def _unexpected_loader(g, selected_branch_ids=None):
+        raise AssertionError("unexpected nucleotide loader")
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "get_state_tensor", _unexpected_loader)
+    g = {
+        "tree": tr,
+        "infile_type": "iqtree",
+        "input_data_type": "nuc",
+        "nonsyn_recode": "no",
+    }
+
+    with pytest.raises(NotImplementedError, match="Non-codon input is obsolete"):
+        parser_misc.prep_state(g)
+
+
 def test_prep_state_3di20_direct_uses_direct_builder(monkeypatch):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))

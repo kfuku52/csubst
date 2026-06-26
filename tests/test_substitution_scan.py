@@ -50,7 +50,7 @@ def test_build_candidates_supports_scan_match_specific_grouping():
     assert set(spe_to_spe["state_change"].tolist()) == {"A1K", "A1N", "C1K"}
 
 
-def test_unit_support_counts_foreground_lineages_once_and_rejects_marginal_targets():
+def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground_targets():
     candidate_events = pd.DataFrame(
         {
             "branch_id": [1, 3, 4],
@@ -64,7 +64,6 @@ def test_unit_support_counts_foreground_lineages_once_and_rejects_marginal_targe
         {
             "unit_id": [1, 2],
             "fg_branch_ids": ["1", "2"],
-            "mg_branch_ids": ["3", "4"],
         }
     )
 
@@ -202,6 +201,56 @@ def test_rate_summary_q_weighted_exposure_uses_instantaneous_nsy_rates():
     assert out["other_exposure_branch_length"] == pytest.approx(2.0)
 
 
+def test_rate_summary_q_weighted_normalizes_rates_for_n_rescaled_lengths():
+    branch_meta = pd.DataFrame(
+        {
+            "branch_id": [1, 2],
+            "parent_id": [0, 1],
+            "raw_length": [6.0, 6.0],
+            "sn_rescaled_length": [6.0, 6.0],
+            "n_rescaled_length": [6.0, 6.0],
+        }
+    )
+    state_nsy = np.zeros((3, 1, 3), dtype=float)
+    state_nsy[0, 0, :] = [1.0, 0.0, 0.0]
+    state_nsy[1, 0, :] = [1.0, 0.0, 0.0]
+    state_nsy[2, 0, :] = [0.0, 1.0, 0.0]
+    q_matrix = np.array(
+        [
+            [-3.0, 1.0, 2.0],
+            [4.0, -5.0, 1.0],
+            [1.0, 1.0, -2.0],
+        ],
+        dtype=float,
+    )
+    candidate_events = pd.DataFrame(
+        {
+            "branch_id": [1, 2],
+            "site": [0, 0],
+            "from_state_id": [0, 0],
+            "to_state_id": [1, 1],
+            "event_pp": [1.0, 1.0],
+        }
+    )
+
+    out = substitution_scan._rate_summary(
+        candidate_events=candidate_events,
+        branch_meta=branch_meta,
+        state_nsy=state_nsy,
+        site=0,
+        from_ids=np.array([0], dtype=np.int64),
+        to_ids=np.array([1], dtype=np.int64),
+        target_branch_ids=np.array([1], dtype=np.int64),
+        other_branch_ids=np.array([2], dtype=np.int64),
+        rate_length="n_rescaled",
+        rate_exposure="q_weighted",
+        q_matrix=q_matrix,
+    )
+
+    assert out["target_exposure_branch_length"] == pytest.approx(2.0)
+    assert out["other_exposure_branch_length"] == pytest.approx(2.0)
+
+
 def _set_state(state, branch_id, site, state_id):
     state[int(branch_id), int(site), :] = 0.0
     state[int(branch_id), int(site), int(state_id)] = 1.0
@@ -244,10 +293,7 @@ def _toy_scan_context():
         "fg_df": pd.DataFrame({"name": ["A", "C"], "trait": [1, 2]}),
         "fg_leaf_names": fg_leaf_names,
         "fg_ids": {"trait": np.array([labels["A"], labels["C"]], dtype=np.int64)},
-        "mg_ids": {"trait": np.array([labels["B"], labels["D"]], dtype=np.int64)},
         "fg_stem_only": True,
-        "mg_parent": False,
-        "mg_sister": True,
         "scan_sister_stem_only": True,
         "state_nsy": state_nsy,
         "state_pep": state_pep,
@@ -341,7 +387,6 @@ def test_scan_substitutions_handles_multiple_traits_and_stratified_qvalues():
     g["fg_df"]["trait2"] = [1, 2]
     g["fg_leaf_names"]["trait2"] = [["A"], ["C"]]
     g["fg_ids"]["trait2"] = np.array([labels["A"], labels["C"]], dtype=np.int64)
-    g["mg_ids"]["trait2"] = np.array([labels["B"], labels["D"]], dtype=np.int64)
     for i, names in enumerate(g["fg_leaf_names"]["trait2"], start=1):
         name_set = set(names)
         for node in g["tree"].traverse():
@@ -384,6 +429,7 @@ def test_scan_full_scan_permutation_adds_empirical_maxt_pvalues():
     assert row["scan_pvalue_calibration"] == "full_scan"
     assert row["scan_permutation_success_count"] == 4
     assert row["scan_permutation_failure_count"] == 0
+    assert row["scan_permutation_failure_reasons"] == ""
     assert np.isfinite(float(row["p_rate_enrichment_empirical_maxT"]))
     assert 0 < float(row["p_rate_enrichment_empirical_maxT"]) <= 1
 
@@ -401,6 +447,32 @@ def test_scan_candidate_fixed_permutation_adds_empirical_pvalues():
     assert row["scan_permutation_success_count"] == 4
     assert np.isfinite(float(row["p_rate_enrichment_empirical"]))
     assert np.isnan(float(row["p_rate_enrichment_empirical_maxT"]))
+
+
+def test_scan_permutation_failures_report_reasons(monkeypatch, capsys):
+    g, on_tensor = _toy_scan_context()
+    g["scan_pvalue_calibration"] = "candidate_fixed"
+    g["scan_n_permutations"] = 2
+    g["scan_permutation_seed"] = 3
+
+    def fail_permutation_context(*args, **kwargs):
+        raise RuntimeError("permutation context boom")
+
+    monkeypatch.setattr(
+        substitution_scan,
+        "_build_permuted_context_with_seed",
+        fail_permutation_context,
+    )
+
+    scan_df, _ = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
+
+    captured = capsys.readouterr()
+    row = scan_df.iloc[0]
+    assert row["scan_permutation_success_count"] == 0
+    assert row["scan_permutation_failure_count"] == 2
+    assert "RuntimeError: permutation context boom" in row["scan_permutation_failure_reasons"]
+    assert "2 of 2 permutations failed" in captured.out
+    assert np.isnan(float(row["p_rate_enrichment_empirical"]))
 
 
 def test_scan_permutations_use_parallel_backend_and_chunks(monkeypatch):
