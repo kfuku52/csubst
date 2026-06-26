@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from csubst import ete
+from csubst import main_scan
 from csubst import substitution_sparse
 from csubst import substitution_scan
 from csubst import tree
@@ -334,6 +335,53 @@ def test_scan_substitutions_outputs_foreground_rows():
     assert fg_row["target_event_count"] == pytest.approx(1.7)
     assert fg_row["target_exposure_branch_length"] == pytest.approx(2.0)
     assert fg_row["site_rate"] == pytest.approx(0.25)
+
+
+def test_build_scan_site_plot_table_uses_supporting_branch_event_pp():
+    g, on_tensor = _toy_scan_context()
+    scan_df, _ = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in g["tree"].traverse()}
+
+    site_df, branch_ids = substitution_scan.build_scan_site_plot_table(
+        scan_df=scan_df,
+        g=g,
+        ON_tensor=on_tensor,
+    )
+
+    assert branch_ids.tolist() == [labels["A"], labels["C"]]
+    assert site_df["codon_site_alignment"].tolist() == [1]
+    assert site_df["OCNany2spe"].iloc[0] == pytest.approx(0.9)
+    assert site_df["N_sub_{}".format(labels["A"])].iloc[0] == pytest.approx(0.9)
+    assert site_df["N_sub_{}".format(labels["C"])].iloc[0] == pytest.approx(0.8)
+
+
+def test_write_scan_site_plot_reuses_sites_plotter(monkeypatch, tmp_path):
+    g, on_tensor = _toy_scan_context()
+    g["outdir"] = str(tmp_path)
+    g["tree_site_plot_format"] = "svg"
+    scan_df, _ = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in g["tree"].traverse()}
+    g["fg_ids"] = {"trait": np.array([labels["X"], labels["A"], labels["C"]], dtype=np.int64)}
+    calls = []
+
+    def fake_plot_tree_site(df, g):
+        calls.append((df.copy(deep=True), dict(g)))
+        return [str(tmp_path / "csubst_scan.tree_site.svg")]
+
+    monkeypatch.setattr(main_scan.main_sites, "plot_tree_site", fake_plot_tree_site)
+
+    out_paths = main_scan._write_scan_site_plot(g=g, scan_df=scan_df, ON_tensor=on_tensor)
+
+    assert out_paths == [str(tmp_path / "csubst_scan.tree_site.svg")]
+    assert len(calls) == 1
+    plot_df, plot_g = calls[0]
+    assert plot_g["mode"] == "lineage"
+    assert plot_g["site_outdir"] == str(tmp_path)
+    assert plot_g["tree_site_plot_prefix"] == "csubst_scan"
+    assert plot_g["tree_site_plot_format"] == "svg"
+    assert plot_g["tree_site_branch_color_mode"] == "single"
+    assert plot_g["tree_site_highlight_branch_ids"].tolist() == sorted([labels["X"], labels["A"], labels["C"]])
+    assert plot_df["codon_site_alignment"].tolist() == [1]
 
 
 def test_scan_state_change_uses_alignment_site_coordinate():

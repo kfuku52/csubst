@@ -205,6 +205,11 @@ def test_scan_help_is_available():
     assert "--scan_pvalue_calibration" in help_text
     assert "full_scan" in help_text
     assert "--scan_n_permutations" in help_text
+    assert "--scan_site_plot" in help_text
+    assert "--tree_site_plot_format" in help_text
+    assert "--tree_site_plot_max_sites" in help_text
+    assert "--tree_site_tip_label_spacing" in help_text
+    assert "--tree_site_fig_max_height" in help_text
     assert "--scan_permutation_mode" not in help_text
     assert "--scan_rate_length" in help_text
     assert "default=n_rescaled" in help_text

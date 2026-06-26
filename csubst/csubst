@@ -530,6 +530,17 @@ def _add_scan_subcommand_args(parser):
                         help='default=%(default)s: Allow original foreground clades to be sampled as permutation targets.')
     parser.add_argument('--scan_permutation_retry_sample_original', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Retry a failed scan permutation while allowing original foreground clades.')
+    parser.add_argument('--scan_site_plot', metavar='yes|no', default='yes', type=strtobool,
+                        help='default=%(default)s: Generate a tree + detected-site summary plot using the csubst sites plotter.')
+    parser.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
+                        choices=['pdf', 'png', 'svg'],
+                        help='default=%(default)s: Output format for --scan_site_plot.')
+    parser.add_argument('--tree_site_plot_max_sites', metavar='INT', default=30, required=False, type=int,
+                        help='default=%(default)s: Maximum number of detected sites plotted in the scan tree + site summary.')
+    parser.add_argument('--tree_site_tip_label_spacing', metavar='FLOAT', default=1.35, required=False, type=float,
+                        help='default=%(default)s: Vertical spacing multiplier for tip labels in the scan tree + site summary.')
+    parser.add_argument('--tree_site_fig_max_height', metavar='FLOAT', default=24.0, required=False, type=float,
+                        help='default=%(default)s: Maximum figure height in inches for the scan tree + site summary.')
 
 
 def _build_parser():
@@ -830,7 +841,7 @@ def _build_parser():
 
     # scan
     help_txt = 'scans foreground recurrent nonsynonymous-state substitutions without omega_C branch-combination search. See `csubst scan -h`'
-    scan = subparsers.add_parser('scan', help=help_txt, parents=[psr_co,psr_iq,psr_fg_scan,psr_as,psr_rc,psr_out_scan])
+    scan = subparsers.add_parser('scan', help=help_txt, parents=[psr_co,psr_iq,psr_fg_scan,psr_as,psr_rc,psr_treeplot,psr_out_scan])
     scan.set_defaults(handler=command_scan)
     _add_scan_subcommand_args(scan)
 
@@ -919,6 +930,10 @@ def _build_parser():
     site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=30, required=False, type=int,
                       help='default=%(default)s: Maximum number of plotted sites in the tree + site summary '
                            '(convergent and divergent columns are balanced when both are available).')
+    site.add_argument('--tree_site_tip_label_spacing', metavar='FLOAT', default=1.35, required=False, type=float,
+                      help='default=%(default)s: Vertical spacing multiplier for tip labels in the tree + site summary.')
+    site.add_argument('--tree_site_fig_max_height', metavar='FLOAT', default=24.0, required=False, type=float,
+                      help='default=%(default)s: Maximum figure height in inches for the tree + site summary.')
     site.add_argument('--site_output_manifest', metavar='yes|no', dest='output_manifest', default='yes', required=False, type=strtobool,
                       help=argparse.SUPPRESS)
     site.add_argument('--cb_file', metavar='PATH', default='csubst_cb_2.tsv', required=False, type=str,

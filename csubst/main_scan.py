@@ -1,16 +1,66 @@
 import time
 
+import numpy as np
+
 from csubst import parser_misc
 from csubst import runtime
 from csubst import substitution
 from csubst import substitution_scan
 from csubst import tree
+from csubst import main_sites
 
 
 def _require_foreground(g):
     if g.get("foreground", None) is None:
         raise ValueError("csubst scan requires --foreground.")
     return None
+
+
+def _scan_foreground_branch_ids(g):
+    fg_ids = []
+    for values in g.get("fg_ids", {}).values():
+        arr = np.asarray(values, dtype=np.int64).reshape(-1)
+        fg_ids.extend(int(v) for v in arr.tolist())
+    if len(fg_ids) == 0:
+        return np.array([], dtype=np.int64)
+    return np.array(sorted(set(fg_ids)), dtype=np.int64)
+
+
+def _write_scan_site_plot(g, scan_df, ON_tensor):
+    if not bool(g.get("scan_site_plot", True)):
+        print("Skipping scan site visualization (--scan_site_plot no).", flush=True)
+        return []
+    if scan_df.shape[0] == 0:
+        print("Skipping scan site visualization because no candidates passed.", flush=True)
+        return []
+    site_df, branch_ids = substitution_scan.build_scan_site_plot_table(
+        scan_df=scan_df,
+        g=g,
+        ON_tensor=ON_tensor,
+    )
+    if (site_df.shape[0] == 0) or (branch_ids.shape[0] == 0):
+        print("Skipping scan site visualization because no supporting branches were available.", flush=True)
+        return []
+    foreground_branch_ids = _scan_foreground_branch_ids(g)
+    if foreground_branch_ids.shape[0] == 0:
+        foreground_branch_ids = branch_ids
+    plot_g = dict(g)
+    plot_g.update(
+        {
+            "branch_ids": branch_ids,
+            "tree_site_highlight_branch_ids": foreground_branch_ids,
+            "tree_site_branch_color_mode": "single",
+            "mode": "lineage",
+            "single_branch_mode": False,
+            "site_outdir": g["outdir"],
+            "tree_site_plot": True,
+            "tree_site_plot_prefix": "csubst_scan",
+            "min_single_prob": float(g.get("scan_min_event_pp", 0.5)),
+            "min_combinat_prob": float(g.get("scan_min_event_pp", 0.5)),
+        }
+    )
+    print("Writing scan site visualization from detected candidates.", flush=True)
+    return main_sites.plot_tree_site(df=site_df, g=plot_g)
 
 
 def main_scan(g):
@@ -76,6 +126,7 @@ def main_scan(g):
     )
     print("Writing {}".format(scan_path), flush=True)
     print("Writing {}".format(units_path), flush=True)
+    _write_scan_site_plot(g=g, scan_df=scan_df, ON_tensor=ON_tensor_called)
     print(
         "Scan candidates: {:,} rows, {:,} foreground units.".format(
             int(scan_df.shape[0]),

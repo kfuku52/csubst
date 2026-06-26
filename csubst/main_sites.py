@@ -311,6 +311,18 @@ def _get_lineage_rgb_by_branch(branch_ids, g):
     return out
 
 
+def get_tree_site_branch_color_by_id(branch_ids, g, default_color='firebrick'):
+    branch_ids = _normalize_branch_ids(branch_ids).tolist()
+    color_mode = str(g.get('tree_site_branch_color_mode', 'lineage')).strip().lower()
+    single_color_modes = {'single', 'uniform', 'one', 'same'}
+    if color_mode in single_color_modes:
+        color = str(g.get('tree_site_branch_color', default_color)).strip()
+        if color == '':
+            color = default_color
+        return {int(bid): color for bid in branch_ids}
+    return _get_lineage_rgb_by_branch(branch_ids=branch_ids, g=g)
+
+
 def _add_lineage_distance_colorbar(fig, g):
     branch_ids = _normalize_branch_ids(g.get('branch_ids', [])).tolist()
     if len(branch_ids)==0:
@@ -1290,6 +1302,22 @@ def get_tree_site_plot_max_sites(g):
         max_sites = 1
     return max_sites
 
+
+def get_tree_site_tip_label_spacing(g):
+    value = g.get('tree_site_tip_label_spacing', 1.35)
+    return tree._resolve_tree_tip_label_spacing_factor(
+        value=value,
+        param_name='--tree_site_tip_label_spacing',
+    )
+
+
+def get_tree_site_fig_max_height(g):
+    value = g.get('tree_site_fig_max_height', 24.0)
+    return tree._resolve_tree_figure_max_height(
+        value=value,
+        param_name='--tree_site_fig_max_height',
+    )
+
 def get_lineage_display_sites(df, g, min_prob, return_total=False):
     branch_ids = _normalize_branch_ids(g.get('branch_ids', [])).tolist()
     col_pairs = []
@@ -2110,13 +2138,17 @@ def plot_tree_site(df, g):
     ))
     xcoord,ycoord,leaf_order = get_tree_plot_coordinates(tree=g['tree'])
     branch_ids_in_order = _normalize_branch_ids(g['branch_ids']).tolist()
-    branch_ids = set(branch_ids_in_order)
+    highlight_branch_ids_in_order = _normalize_branch_ids(
+        g.get('tree_site_highlight_branch_ids', branch_ids_in_order)
+    ).tolist()
+    branch_ids = set(highlight_branch_ids_in_order)
     mode = str(g.get('mode', '')).lower()
     show_branch_heatmap = mode in ('lineage', 'set', 'intersection')
     if mode == 'lineage':
-        branch_color_by_id = _get_lineage_rgb_by_branch(branch_ids=branch_ids_in_order, g=g)
+        color_ids_in_order = list(dict.fromkeys(branch_ids_in_order + highlight_branch_ids_in_order))
+        branch_color_by_id = get_tree_site_branch_color_by_id(branch_ids=color_ids_in_order, g=g, default_color='firebrick')
     else:
-        branch_color_by_id = {int(bid): 'firebrick' for bid in branch_ids_in_order}
+        branch_color_by_id = {int(bid): 'firebrick' for bid in highlight_branch_ids_in_order}
     highlight_leaf_ids,highlight_branch_ids = get_highlight_leaf_and_branch_ids(tree=g['tree'], branch_ids=branch_ids)
     x_values = np.array(list(xcoord.values()), dtype=float)
     x_max = x_values.max() if x_values.shape[0] else 1.0
@@ -2144,7 +2176,9 @@ def plot_tree_site(df, g):
     site_column_width_in = 0.112
     site_panel_width = max(site_column_width_in, num_display_site * site_column_width_in)
     fig_width = tree_panel_width + site_panel_width
-    fig_height = min(max(2.5, num_leaf * 0.13 + 0.55), 8.5)
+    tip_label_spacing = get_tree_site_tip_label_spacing(g)
+    tree_site_fig_max_height = get_tree_site_fig_max_height(g)
+    fig_height = min(max(2.5, num_leaf * 0.13 * tip_label_spacing + 0.55), tree_site_fig_max_height)
     # Keep one heatmap row (one branch) aligned to one alignment row height.
     alignment_row_height_in = (fig_height - 0.55) / max(num_leaf, 1.0)
     fg_color = 'firebrick'
@@ -2593,8 +2627,11 @@ def plot_tree_site(df, g):
     else:
         fig.subplots_adjust(top=0.84, left=0.04, right=0.99, wspace=0.01)
 
+    output_prefix = str(g.get('tree_site_plot_prefix', 'csubst_sites')).strip()
+    if output_prefix == '':
+        output_prefix = 'csubst_sites'
     fmt = str(g.get('tree_site_plot_format', 'pdf')).lower()
-    fig_path = os.path.join(g['site_outdir'], 'csubst_sites.tree_site.' + fmt)
+    fig_path = os.path.join(g['site_outdir'], output_prefix + '.tree_site.' + fmt)
     fig.savefig(
         fig_path,
         format=fmt,
@@ -2618,7 +2655,7 @@ def plot_tree_site(df, g):
         tree_site_df.loc[is_site, 'plot_order'] = current_order
         current_order += 1
     tree_site_df = expand_site_table_to_alignment(df=tree_site_df, g=g)
-    table_path = os.path.join(g['site_outdir'], 'csubst_sites.tree_site.tsv')
+    table_path = os.path.join(g['site_outdir'], output_prefix + '.tree_site.tsv')
     tree_site_df.to_csv(table_path, sep='\t', index=False, float_format=g['float_format'], chunksize=10000)
     print('Writing tree + site category table: {}'.format(table_path), flush=True)
     return [fig_path, table_path]

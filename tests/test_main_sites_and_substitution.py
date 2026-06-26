@@ -1612,6 +1612,87 @@ def test_plot_tree_site_writes_figure_and_category_table(tmp_path, tiny_tree):
     assert out_df["tree_site_category"].tolist() == ["convergent", "divergent", "blank", "convergent"]
 
 
+def test_plot_tree_site_honors_output_prefix(tmp_path, tiny_tree):
+    labels = {node.name: ete.get_prop(node, "numerical_label") for node in tiny_tree.traverse()}
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
+    aa_orders = np.array(["A", "V"])
+    state_pep = np.zeros((num_node, 1, aa_orders.shape[0]), dtype=float)
+    for leaf_name in ("A", "B", "C"):
+        state_pep[labels[leaf_name], 0, 0] = 1.0
+    df = pd.DataFrame(
+        {
+            "codon_site_alignment": [1],
+            "OCNany2spe": [0.7],
+            "OCNany2dif": [0.0],
+        }
+    )
+    g = {
+        "tree": tiny_tree,
+        "branch_ids": np.array([labels["A"]], dtype=int),
+        "single_branch_mode": False,
+        "tree_site_plot": True,
+        "tree_site_plot_format": "pdf",
+        "tree_site_plot_prefix": "csubst_scan",
+        "min_combinat_prob": 0.5,
+        "min_single_prob": 0.5,
+        "tree_site_plot_max_sites": 30,
+        "site_outdir": str(tmp_path),
+        "float_format": "%.4f",
+        "state_pep": state_pep,
+        "amino_acid_orders": aa_orders,
+    }
+
+    out_paths = main_sites.plot_tree_site(df=df, g=g)
+
+    assert str(tmp_path / "csubst_scan.tree_site.pdf") in out_paths
+    assert str(tmp_path / "csubst_scan.tree_site.tsv") in out_paths
+    assert not (tmp_path / "csubst_sites.tree_site.pdf").exists()
+
+
+def test_plot_tree_site_supports_separate_highlight_branches_and_single_color(tmp_path, tiny_tree):
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tiny_tree.traverse()}
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
+    aa_orders = np.array(["A", "V"])
+    state_pep = np.zeros((num_node, 1, aa_orders.shape[0]), dtype=float)
+    for leaf_name in ("A", "B", "C"):
+        state_pep[labels[leaf_name], 0, 0] = 1.0
+    df = pd.DataFrame(
+        {
+            "codon_site_alignment": [1],
+            "OCNany2spe": [0.0],
+            "OCNany2dif": [0.0],
+            "N_sub_{}".format(labels["A"]): [0.9],
+            "N_sub_{}".format(labels["C"]): [0.8],
+        }
+    )
+    g = {
+        "tree": tiny_tree,
+        "branch_ids": np.array([labels["A"], labels["C"]], dtype=int),
+        "tree_site_highlight_branch_ids": np.array([labels["X"]], dtype=int),
+        "tree_site_branch_color_mode": "single",
+        "tree_site_branch_color": "#123456",
+        "mode": "lineage",
+        "single_branch_mode": False,
+        "tree_site_plot": True,
+        "tree_site_plot_format": "svg",
+        "min_combinat_prob": 0.5,
+        "min_single_prob": 0.5,
+        "tree_site_plot_max_sites": 30,
+        "site_outdir": str(tmp_path),
+        "float_format": "%.4f",
+        "state_pep": state_pep,
+        "amino_acid_orders": aa_orders,
+    }
+
+    main_sites.plot_tree_site(df=df, g=g)
+
+    svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8").lower()
+    assert "#123456" in svg_text
+    branch_rgb = main_sites._get_lineage_rgb_by_branch(branch_ids=[labels["A"], labels["C"]], g=g)
+    for color in branch_rgb.values():
+        assert main_sites.matplotlib.colors.to_hex(color).lower() not in svg_text
+
+
 def test_plot_tree_site_svg_contains_expected_labels_and_no_legacy_title(tmp_path, tiny_tree):
     branch_ids = []
     labels = {}

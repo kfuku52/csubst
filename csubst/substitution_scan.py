@@ -1122,6 +1122,68 @@ def build_site_annotations(g, trait_name, fg_leaf_names_map=None):
     return out
 
 
+def build_scan_site_plot_table(scan_df, g, ON_tensor):
+    if scan_df.shape[0] == 0:
+        return pd.DataFrame(), np.array([], dtype=np.int64)
+    plot_rows = scan_df.loc[scan_df["target_class"].astype(str) == "fg", :].copy()
+    if plot_rows.shape[0] == 0:
+        return pd.DataFrame(), np.array([], dtype=np.int64)
+    branch_ids = set()
+    for value in plot_rows.get("support_branch_ids", pd.Series(dtype=object)).tolist():
+        branch_ids.update(int(v) for v in _parse_id_list(value).tolist())
+    if len(branch_ids) == 0:
+        return pd.DataFrame(), np.array([], dtype=np.int64)
+    branch_ids = np.array(sorted(branch_ids), dtype=np.int64)
+    site_numbers = np.array(
+        sorted(set(plot_rows["codon_site_alignment"].astype(int).tolist())),
+        dtype=np.int64,
+    )
+    out = pd.DataFrame({"codon_site_alignment": site_numbers})
+    out.loc[:, "OCNany2spe"] = 0.0
+    out.loc[:, "OCNany2dif"] = 0.0
+    for branch_id in branch_ids.tolist():
+        out.loc[:, "N_sub_{}".format(int(branch_id))] = 0.0
+    site_to_row = {int(site): int(i) for i, site in enumerate(site_numbers.tolist())}
+    for _, row in plot_rows.iterrows():
+        alignment_site = int(row["codon_site_alignment"])
+        row_index = site_to_row.get(alignment_site, None)
+        if row_index is None:
+            continue
+        support_ids = set(int(v) for v in _parse_id_list(row.get("support_branch_ids", "")).tolist())
+        if len(support_ids) == 0:
+            continue
+        from_ids = _parse_id_list(row.get("from_state_ids", ""))
+        to_ids = _parse_id_list(row.get("to_state_ids", ""))
+        candidate_events = extract_candidate_posterior_events(
+            sub_tensor=ON_tensor,
+            site=int(row["site"]),
+            from_ids=from_ids,
+            to_ids=to_ids,
+            float_tol=float(g.get("float_tol", 1e-12)),
+        )
+        if candidate_events.shape[0] == 0:
+            continue
+        candidate_events = candidate_events.loc[
+            candidate_events["branch_id"].astype(int).isin(support_ids),
+            :,
+        ]
+        if candidate_events.shape[0] == 0:
+            continue
+        max_event = 0.0
+        for _, event in candidate_events.iterrows():
+            branch_id = int(event["branch_id"])
+            col = "N_sub_{}".format(branch_id)
+            if col not in out.columns:
+                continue
+            value = float(event["event_pp"])
+            if not np.isfinite(value):
+                continue
+            out.at[row_index, col] = max(float(out.at[row_index, col]), value)
+            max_event = max(max_event, value)
+        out.at[row_index, "OCNany2spe"] = max(float(out.at[row_index, "OCNany2spe"]), max_event)
+    return out, branch_ids
+
+
 def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=None):
     scan_matches = normalize_scan_matches(g.get("scan_match", "any2spe"))
     scan_targets = ["fg"]
