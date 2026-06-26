@@ -1649,6 +1649,45 @@ def test_plot_tree_site_honors_output_prefix(tmp_path, tiny_tree):
     assert not (tmp_path / "csubst_sites.tree_site.pdf").exists()
 
 
+def test_plot_tree_site_can_skip_category_table(tmp_path, tiny_tree):
+    labels = {node.name: ete.get_prop(node, "numerical_label") for node in tiny_tree.traverse()}
+    num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
+    aa_orders = np.array(["A", "V"])
+    state_pep = np.zeros((num_node, 1, aa_orders.shape[0]), dtype=float)
+    for leaf_name in ("A", "B", "C"):
+        state_pep[labels[leaf_name], 0, 0] = 1.0
+    stale_table = tmp_path / "csubst_scan.tree_site.tsv"
+    stale_table.write_text("stale\n", encoding="utf-8")
+    df = pd.DataFrame(
+        {
+            "codon_site_alignment": [1],
+            "OCNany2spe": [0.7],
+            "OCNany2dif": [0.0],
+        }
+    )
+    g = {
+        "tree": tiny_tree,
+        "branch_ids": np.array([labels["A"]], dtype=int),
+        "single_branch_mode": False,
+        "tree_site_plot": True,
+        "tree_site_plot_format": "pdf",
+        "tree_site_plot_prefix": "csubst_scan",
+        "tree_site_output_table": False,
+        "min_combinat_prob": 0.5,
+        "min_single_prob": 0.5,
+        "tree_site_plot_max_sites": 30,
+        "site_outdir": str(tmp_path),
+        "float_format": "%.4f",
+        "state_pep": state_pep,
+        "amino_acid_orders": aa_orders,
+    }
+
+    out_paths = main_sites.plot_tree_site(df=df, g=g)
+
+    assert out_paths == [str(tmp_path / "csubst_scan.tree_site.pdf")]
+    assert not stale_table.exists()
+
+
 def test_plot_tree_site_supports_separate_highlight_branches_and_single_color(tmp_path, tiny_tree):
     labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tiny_tree.traverse()}
     num_node = max(ete.get_prop(n, "numerical_label") for n in tiny_tree.traverse()) + 1
@@ -1688,6 +1727,7 @@ def test_plot_tree_site_supports_separate_highlight_branches_and_single_color(tm
 
     svg_text = (tmp_path / "csubst_sites.tree_site.svg").read_text(encoding="utf-8").lower()
     assert "#123456" in svg_text
+    assert re.search(r'fill:\s*#123456[^>]*>a</text>', svg_text) is not None
     branch_rgb = main_sites._get_lineage_rgb_by_branch(branch_ids=[labels["A"], labels["C"]], g=g)
     for color in branch_rgb.values():
         assert main_sites.matplotlib.colors.to_hex(color).lower() not in svg_text
@@ -2087,10 +2127,8 @@ def test_plot_tree_site_lineage_svg_uses_branch_palette_and_plots_all_threshold_
     svg_text = svg_path.read_text(encoding="utf-8").lower()
     assert x_hex in svg_text
     assert c_hex in svg_text
-    # In lineage mode, tip labels stay in the default label color.
-    assert '#b22222' not in svg_text
-    assert re.search(r'fill:\s*#5f6f7f[^>]*>a</text>', svg_text) is not None
-    assert re.search(r'fill:\s*#5f6f7f[^>]*>c</text>', svg_text) is not None
+    assert re.search(r'fill:\s*{}[^>]*>a</text>'.format(re.escape(x_hex)), svg_text) is not None
+    assert re.search(r'fill:\s*{}[^>]*>c</text>'.format(re.escape(c_hex)), svg_text) is not None
     assert re.search(r'>a\|0</text>', svg_text) is None
     assert re.search(r'>c\|2</text>', svg_text) is None
     # Terminal branch IDs are rendered near the tree, not appended to tip labels.

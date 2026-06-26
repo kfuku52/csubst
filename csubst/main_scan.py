@@ -55,6 +55,7 @@ def _write_scan_site_plot(g, scan_df, ON_tensor):
             "site_outdir": g["outdir"],
             "tree_site_plot": True,
             "tree_site_plot_prefix": "csubst_scan",
+            "tree_site_output_table": False,
             "min_single_prob": float(g.get("scan_min_event_pp", 0.5)),
             "min_combinat_prob": float(g.get("scan_min_event_pp", 0.5)),
         }

@@ -1506,6 +1506,18 @@ def get_highlight_leaf_and_branch_ids(tree, branch_ids):
             highlight_leaf_ids.add(leaf_id)
     return highlight_leaf_ids,highlight_branch_ids
 
+
+def get_tree_site_leaf_label_color(leaf, highlight_branch_ids, branch_color_by_id, default_color):
+    node = leaf
+    while node is not None:
+        node_id = int(ete.get_prop(node, "numerical_label"))
+        if node_id in highlight_branch_ids:
+            return branch_color_by_id.get(node_id, default_color)
+        if ete.is_root(node):
+            break
+        node = node.up
+    return default_color
+
 def get_lineage_site_branch_ids(df, display_meta, g, min_prob):
     if str(g.get('mode', '')).lower() != 'lineage':
         return {}
@@ -2349,7 +2361,15 @@ def plot_tree_site(df, g):
         node_id = int(ete.get_prop(leaf, "numerical_label"))
         label = (leaf.name or '')
         if mode == 'lineage':
-            label_color = bg_label_color
+            if node_id in highlight_leaf_ids:
+                label_color = get_tree_site_leaf_label_color(
+                    leaf=leaf,
+                    highlight_branch_ids=highlight_branch_ids,
+                    branch_color_by_id=branch_color_by_id,
+                    default_color=fg_color,
+                )
+            else:
+                label_color = bg_label_color
         else:
             is_target_leaf = node_id in highlight_leaf_ids
             label_color = fg_color if is_target_leaf else bg_label_color
@@ -2643,6 +2663,14 @@ def plot_tree_site(df, g):
     plt.close(fig)
     print('Writing tree + site plot: {}'.format(fig_path), flush=True)
 
+    table_path = os.path.join(g['site_outdir'], output_prefix + '.tree_site.tsv')
+    if not bool(g.get('tree_site_output_table', True)):
+        if os.path.exists(table_path):
+            os.remove(table_path)
+            print('Removing stale tree + site category table: {}'.format(table_path), flush=True)
+        print('Skipping tree + site category table.', flush=True)
+        return [fig_path]
+
     tree_site_df.loc[:, 'is_plotted'] = False
     tree_site_df.loc[:, 'plot_order'] = np.nan
     current_order = 1
@@ -2655,7 +2683,6 @@ def plot_tree_site(df, g):
         tree_site_df.loc[is_site, 'plot_order'] = current_order
         current_order += 1
     tree_site_df = expand_site_table_to_alignment(df=tree_site_df, g=g)
-    table_path = os.path.join(g['site_outdir'], output_prefix + '.tree_site.tsv')
     tree_site_df.to_csv(table_path, sep='\t', index=False, float_format=g['float_format'], chunksize=10000)
     print('Writing tree + site category table: {}'.format(table_path), flush=True)
     return [fig_path, table_path]

@@ -379,6 +379,7 @@ def test_write_scan_site_plot_reuses_sites_plotter(monkeypatch, tmp_path):
     assert plot_g["site_outdir"] == str(tmp_path)
     assert plot_g["tree_site_plot_prefix"] == "csubst_scan"
     assert plot_g["tree_site_plot_format"] == "svg"
+    assert plot_g["tree_site_output_table"] is False
     assert plot_g["tree_site_branch_color_mode"] == "single"
     assert plot_g["tree_site_highlight_branch_ids"].tolist() == sorted([labels["X"], labels["A"], labels["C"]])
     assert plot_df["codon_site_alignment"].tolist() == [1]
