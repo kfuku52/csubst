@@ -1,6 +1,6 @@
 # csubst scan PEPC report
 
-Date: 2026-06-25
+Date: 2026-06-26
 
 This report records a smoke/example analysis for the new `csubst scan` command on the bundled PEPC dataset, and compares the intended scope of `csubst scan` with PCOC and ESL-PSC Toolkit.
 
@@ -97,16 +97,16 @@ Top foreground rows from `independent_any2spe`, sorted by support count, slow-si
 
 | Change | Alignment codon site | FG units | FG fraction | FG events | FG exposure | Other events | Other exposure | P | q | Site-rate quantile | Background AA conservation | Supporting units |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 778S | 778 | 7 | 0.5833 | 6.6758 | 0.1593 | 2.3145 | 1.1254 | 9.79e-06 | 0.000842 | 0.8075 | 1.0000 | 1,2,4,5,6,7,11 |
-| 625I | 625 | 5 | 0.4167 | 4.9857 | 0.4273 | 1.0228 | 2.1717 | 0.000165 | 0.004200 | 0.6538 | 1.0000 | 1,4,5,6,7 |
-| 663N | 663 | 5 | 0.4167 | 5.0912 | 0.0361 | 7.9369 | 0.1996 | 0.0190 | 0.0583 | 0.6914 | 0.6792 | 1,4,5,6,7 |
-| 759A | 759 | 5 | 0.4167 | 5.2137 | 0.3488 | 2.0083 | 2.1481 | 0.000194 | 0.004200 | 0.7887 | 0.9828 | 1,2,4,6,11 |
-| 538T | 538 | 4 | 0.3333 | 3.9687 | 0.0572 | 0.0311 | 0.2739 | 0.000114 | 0.004200 | 0.5649 | 0.9811 | 4,5,6,7 |
-| 571N | 571 | 4 | 0.3333 | 3.9619 | 0.0508 | 0.0383 | 0.0978 | 0.002200 | 0.0190 | 0.5994 | 0.6792 | 1,3,4,6 |
-| 577T | 577 | 4 | 0.3333 | 3.9798 | 0.0596 | 2.3767 | 0.4927 | 0.000844 | 0.008100 | 0.6056 | 0.6604 | 4,5,6,7 |
-| 628K | 628 | 4 | 0.3333 | 3.9944 | 0.2154 | 4.1110 | 0.8918 | 0.0285 | 0.0717 | 0.6569 | 0.3019 | 4,6,9,11 |
-| 8V | 8 | 3 | 0.2500 | 3.1785 | 0.0674 | 3.6621 | 0.3132 | 0.0420 | 0.0840 | 0.0408 | 0.4828 | 1,2,7 |
-| 115L | 115 | 3 | 0.2500 | 2.9452 | 0.1989 | 0.0614 | 1.1536 | 0.000533 | 0.007100 | 0.1485 | 0.9091 | 2,8,9 |
+| 778S | 778 | 7 | 0.5833 | 6.6758 | 0.0940 | 2.3145 | 0.6643 | 9.79e-06 | 0.000842 | 0.8075 | 1.0000 | 1,2,4,5,6,7,11 |
+| 625I | 625 | 5 | 0.4167 | 4.9857 | 0.2365 | 1.0228 | 1.2022 | 0.000165 | 0.004200 | 0.6538 | 1.0000 | 1,4,5,6,7 |
+| 663N | 663 | 5 | 0.4167 | 5.0912 | 0.0415 | 7.9369 | 0.2304 | 0.0187 | 0.0596 | 0.6914 | 0.6792 | 1,4,5,6,7 |
+| 759A | 759 | 5 | 0.4167 | 5.2137 | 0.1130 | 2.0083 | 0.6960 | 0.000194 | 0.004200 | 0.7887 | 0.9828 | 1,2,4,6,11 |
+| 538T | 538 | 4 | 0.3333 | 3.9687 | 0.0566 | 0.0311 | 0.2710 | 0.000114 | 0.004200 | 0.5649 | 0.9811 | 4,5,6,7 |
+| 571N | 571 | 4 | 0.3333 | 3.9619 | 0.0189 | 0.0383 | 0.0539 | 0.000671 | 0.006400 | 0.5994 | 0.6792 | 1,3,4,6 |
+| 577T | 577 | 4 | 0.3333 | 3.9798 | 0.0394 | 2.3767 | 0.2901 | 0.001300 | 0.010900 | 0.6056 | 0.6604 | 4,5,6,7 |
+| 628K | 628 | 4 | 0.3333 | 3.9944 | 0.1360 | 4.1110 | 0.5554 | 0.0297 | 0.0724 | 0.6569 | 0.3019 | 4,6,9,11 |
+| 8V | 8 | 3 | 0.2500 | 3.1785 | 0.0378 | 3.6621 | 0.1820 | 0.0385 | 0.0828 | 0.0408 | 0.4828 | 1,2,7 |
+| 115L | 115 | 3 | 0.2500 | 2.9452 | 0.1432 | 0.0614 | 0.8568 | 0.000489 | 0.006400 | 0.1485 | 0.9091 | 2,8,9 |
 
 The very slow-site candidates in this table are especially interesting under the working hypothesis that convergent substitutions at slowly evolving/conserved sites are more likely to be phenotype-relevant than substitutions at fast sites. For example, 8V and 115L have much lower site-rate quantiles than 778S, but lower foreground support.
 
@@ -114,16 +114,16 @@ Top foreground rows from `independent_all` show how relaxed pattern classes clus
 
 | Change | Alignment codon site | Match | FG units | P | q | Site-rate quantile | Background AA conservation |
 | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
-| 571:any2dif | 571 | `any2dif` | 7 | 0.002300 | 0.034800 | 0.5994 | 0.6792 |
-| 571:dif2dif | 571 | `dif2dif` | 7 | 0.002700 | 0.034800 | 0.5994 | 0.6792 |
-| 571:dif2any | 571 | `dif2any` | 7 | 0.080600 | 0.161900 | 0.5994 | 0.6792 |
-| 571:any2any | 571 | `any2any` | 7 | 0.100300 | 0.180100 | 0.5994 | 0.6792 |
+| 571:any2dif | 571 | `any2dif` | 7 | 0.001500 | 0.026900 | 0.5994 | 0.6792 |
+| 571:dif2dif | 571 | `dif2dif` | 7 | 0.001900 | 0.033200 | 0.5994 | 0.6792 |
+| 571:dif2any | 571 | `dif2any` | 7 | 0.041600 | 0.108300 | 0.5994 | 0.6792 |
+| 571:any2any | 571 | `any2any` | 7 | 0.047900 | 0.112800 | 0.5994 | 0.6792 |
 | A778S | 778 | `spe2spe` | 7 | 9.77e-06 | 0.001400 | 0.8075 | 1.0000 |
 | 778S | 778 | `any2spe` | 7 | 9.79e-06 | 0.001400 | 0.8075 | 1.0000 |
 | A778 | 778 | `spe2any` | 7 | 9.80e-06 | 0.001400 | 0.8075 | 1.0000 |
-| 778:any2any | 778 | `any2any` | 7 | 0.000466 | 0.014800 | 0.8075 | 1.0000 |
-| 582:any2dif | 582 | `any2dif` | 6 | 2.35e-06 | 0.000842 | 0.6109 | 0.7925 |
-| 582:dif2dif | 582 | `dif2dif` | 6 | 2.35e-06 | 0.000842 | 0.6109 | 0.7925 |
+| 778:any2any | 778 | `any2any` | 7 | 0.000151 | 0.007700 | 0.8075 | 1.0000 |
+| 582:any2dif | 582 | `any2dif` | 6 | 2.12e-06 | 0.000758 | 0.6109 | 0.7925 |
+| 582:dif2dif | 582 | `dif2dif` | 6 | 2.12e-06 | 0.000758 | 0.6109 | 0.7925 |
 
 ## Comparison With Existing Methods
 
@@ -171,13 +171,14 @@ ESL-PSC uses paired species contrast and sparse predictive modeling to identify 
 - Added `csubst scan` as an independent subcommand.
 - Added all nine `--scan_match` classes: `any2any`, `any2spe`, `any2dif`, `spe2any`, `spe2spe`, `spe2dif`, `dif2any`, `dif2spe`, `dif2dif`.
 - Foreground candidate rows are reported directly; marginal/combined target rows were intentionally removed because the scan is clade-centered.
-- Added `--scan_rate_exposure q_weighted` as the default; it applies state-aware opportunity and weights each allowed parent-to-derived transition by the nonsynonymous instantaneous rate matrix.
+- Added `--scan_rate_exposure q_weighted` as the default; it applies state-aware opportunity and weights each allowed parent-to-derived transition by the nonsynonymous instantaneous rate matrix. With `--scan_rate_length n_rescaled`, the Q weight is normalized to the conditional nonsynonymous transition probability so nonsynonymous branch length is not double-weighted by total outgoing rate.
 - Added `--scan_rate_event_mode called|posterior_sum`; default `posterior_sum` keeps candidate discovery/support thresholded but uses all matching posterior event mass for rate P values.
 - Added `--scan_other_scope all|sister` so the control branch set can be made explicit for foreground-vs-control comparisons.
 - `state_aware` remains available when a model-rate-weighted exposure is not desired.
 - Added stratified q-value columns: `q_rate_enrichment_by_trait` and `q_rate_enrichment_by_trait_match`.
 - Added `--scan_pvalue_calibration none|candidate_fixed|full_scan`; `full_scan` is the default and reports maxT-style empirical P values from foreground-clade permutations.
 - Added `--scan_n_permutations`, `--scan_permutation_seed`, `--scan_permutation_sample_original`, and `--scan_permutation_retry_sample_original`.
+- Added `scan_permutation_failure_reasons` so failed empirical-calibration iterations are no longer silent.
 - Added `--scan_rate_length raw|sn_rescaled|n_rescaled`; default is `n_rescaled`, matching the nonsynonymous-state focus of `csubst scan`.
 - Added IQ-TREE site rates, site-rate quantiles, amino-acid conservation, and nonsyn-state conservation.
 - Added empty-output headers so a no-candidate scan still writes a machine-readable `csubst_scan.tsv`.
