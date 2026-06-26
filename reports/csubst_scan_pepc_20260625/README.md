@@ -27,7 +27,7 @@ python csubst/csubst scan \
   --outdir reports/csubst_scan_pepc_20260625/default
 ```
 
-For recurrent substitutions among the 12 C4 leaves, I used `PEPC.foreground.independent.txt`, which assigns each C4 leaf to its own foreground unit:
+For recurrent substitutions among the C4 lineages, I used `PEPC.foreground.independent.txt`, which keeps most C4 leaves as independent foreground units but groups the Setaria/Zea/Sorghum PEPC clade as one foreground unit so its stem branch is analyzed as the foreground branch:
 
 ```bash
 python csubst/csubst scan \
@@ -43,6 +43,7 @@ python csubst/csubst scan \
   --scan_min_event_pp 0.5 \
   --scan_min_support 2 \
   --scan_pvalue_calibration none \
+  --scan_site_plot no \
   --float_digit 8 \
   --threads 1 \
   --outdir reports/csubst_scan_pepc_20260625/independent_any2spe
@@ -64,6 +65,7 @@ python csubst/csubst scan \
   --scan_min_event_pp 0.5 \
   --scan_min_support 2 \
   --scan_pvalue_calibration none \
+  --scan_site_plot no \
   --float_digit 8 \
   --threads 1 \
   --outdir reports/csubst_scan_pepc_20260625/independent_all
@@ -74,22 +76,22 @@ python csubst/csubst scan \
 | Run | Foreground units | `--scan_match` | Output rows | Candidate `scan_id`s | Notes |
 | --- | ---: | --- | ---: | ---: | --- |
 | `default` | 1 | `any2spe` | 0 | 0 | Bundled foreground has one lineage value, so support >= 2 is impossible. |
-| `independent_any2spe` | 12 | `any2spe` | 86 | 86 | One foreground row per candidate. |
-| `independent_all` | 12 | all 9 classes | 716 | 716 | One foreground row per candidate. |
+| `independent_any2spe` | 10 | `any2spe` | 78 | 78 | One foreground row per candidate. |
+| `independent_all` | 10 | all 9 classes | 526 | 526 | One foreground row per candidate. |
 
 `independent_all` candidate rows by match class:
 
 | Match | Rows |
 | --- | ---: |
-| `any2any` | 137 |
-| `spe2any` | 120 |
-| `any2dif` | 103 |
-| `any2spe` | 86 |
-| `spe2spe` | 82 |
-| `dif2any` | 61 |
-| `spe2dif` | 61 |
-| `dif2dif` | 56 |
-| `dif2spe` | 10 |
+| `any2any` | 104 |
+| `spe2any` | 96 |
+| `any2spe` | 78 |
+| `spe2spe` | 77 |
+| `any2dif` | 63 |
+| `spe2dif` | 40 |
+| `dif2any` | 33 |
+| `dif2dif` | 29 |
+| `dif2spe` | 6 |
 
 ## Top PEPC Candidates
 
@@ -97,33 +99,33 @@ Top foreground rows from `independent_any2spe`, sorted by support count, slow-si
 
 | Change | Alignment codon site | FG units | FG fraction | FG events | FG exposure | Other events | Other exposure | P | q | Site-rate quantile | Background AA conservation | Supporting units |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 778S | 778 | 7 | 0.5833 | 6.6758 | 0.0940 | 2.3145 | 0.6643 | 9.79e-06 | 0.000842 | 0.8075 | 1.0000 | 1,2,4,5,6,7,11 |
-| 625I | 625 | 5 | 0.4167 | 4.9857 | 0.2365 | 1.0228 | 1.2022 | 0.000165 | 0.004200 | 0.6538 | 1.0000 | 1,4,5,6,7 |
-| 663N | 663 | 5 | 0.4167 | 5.0912 | 0.0415 | 7.9369 | 0.2304 | 0.0187 | 0.0596 | 0.6914 | 0.6792 | 1,4,5,6,7 |
-| 759A | 759 | 5 | 0.4167 | 5.2137 | 0.1130 | 2.0083 | 0.6960 | 0.000194 | 0.004200 | 0.7887 | 0.9828 | 1,2,4,6,11 |
-| 538T | 538 | 4 | 0.3333 | 3.9687 | 0.0566 | 0.0311 | 0.2710 | 0.000114 | 0.004200 | 0.5649 | 0.9811 | 4,5,6,7 |
-| 571N | 571 | 4 | 0.3333 | 3.9619 | 0.0189 | 0.0383 | 0.0539 | 0.000671 | 0.006400 | 0.5994 | 0.6792 | 1,3,4,6 |
-| 577T | 577 | 4 | 0.3333 | 3.9798 | 0.0394 | 2.3767 | 0.2901 | 0.001300 | 0.010900 | 0.6056 | 0.6604 | 4,5,6,7 |
-| 628K | 628 | 4 | 0.3333 | 3.9944 | 0.1360 | 4.1110 | 0.5554 | 0.0297 | 0.0724 | 0.6569 | 0.3019 | 4,6,9,11 |
-| 8V | 8 | 3 | 0.2500 | 3.1785 | 0.0378 | 3.6621 | 0.1820 | 0.0385 | 0.0828 | 0.0408 | 0.4828 | 1,2,7 |
-| 115L | 115 | 3 | 0.2500 | 2.9452 | 0.1432 | 0.0614 | 0.8568 | 0.000489 | 0.006400 | 0.1485 | 0.9091 | 2,8,9 |
+| 778S | 778 | 8 | 0.8000 | 7.2397 | 0.0979 | 1.7506 | 0.6605 | 2e-06 | 0.0001558 | 0.8075 | 1.0000 | 1,2,4,5,6,7,8,10 |
+| 663N | 663 | 6 | 0.6000 | 6.0573 | 0.0443 | 6.9709 | 0.2276 | 0.00551 | 0.02287 | 0.6914 | 0.6792 | 1,4,5,6,7,8 |
+| 759A | 759 | 6 | 0.6000 | 5.7717 | 0.1166 | 1.4503 | 0.6924 | 3.98e-05 | 0.0009985 | 0.7887 | 0.9828 | 1,2,4,6,8,10 |
+| 625I | 625 | 5 | 0.5000 | 4.9857 | 0.1881 | 1.0228 | 1.2507 | 5.12e-05 | 0.0009985 | 0.6538 | 1.0000 | 1,4,5,6,7 |
+| 538T | 538 | 4 | 0.4000 | 3.9687 | 0.0457 | 0.0311 | 0.2819 | 4.62e-05 | 0.0009985 | 0.5649 | 0.9811 | 4,5,6,7 |
+| 570Q | 570 | 4 | 0.4000 | 3.9384 | 0.0991 | 3.1536 | 0.5064 | 0.00878 | 0.03112 | 0.5983 | 0.7736 | 2,4,6,8 |
+| 571N | 571 | 4 | 0.4000 | 3.9619 | 0.0141 | 0.0383 | 0.0587 | 0.000192 | 0.002988 | 0.5994 | 0.6792 | 1,3,4,6 |
+| 577T | 577 | 4 | 0.4000 | 3.9798 | 0.0343 | 2.3767 | 0.2952 | 0.000727 | 0.007088 | 0.6056 | 0.6604 | 4,5,6,7 |
+| 729V | 729 | 4 | 0.4000 | 4.0215 | 0.1643 | 5.2512 | 1.2026 | 0.00851 | 0.03112 | 0.7573 | 0.8475 | 4,6,7,8 |
+| 8V | 8 | 3 | 0.3000 | 2.9928 | 0.0336 | 3.8479 | 0.1862 | 0.0382 | 0.07087 | 0.0408 | 0.4828 | 1,2,7 |
 
-The very slow-site candidates in this table are especially interesting under the working hypothesis that convergent substitutions at slowly evolving/conserved sites are more likely to be phenotype-relevant than substitutions at fast sites. For example, 8V and 115L have much lower site-rate quantiles than 778S, but lower foreground support.
+The very slow-site candidates in this table are especially interesting under the working hypothesis that convergent substitutions at slowly evolving/conserved sites are more likely to be phenotype-relevant than substitutions at fast sites. For example, 8V has a much lower site-rate quantile than 778S, but lower foreground support.
 
 Top foreground rows from `independent_all` show how relaxed pattern classes cluster around the same positions:
 
 | Change | Alignment codon site | Match | FG units | P | q | Site-rate quantile | Background AA conservation |
 | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
-| 571:any2dif | 571 | `any2dif` | 7 | 0.001500 | 0.026900 | 0.5994 | 0.6792 |
-| 571:dif2dif | 571 | `dif2dif` | 7 | 0.001900 | 0.033200 | 0.5994 | 0.6792 |
-| 571:dif2any | 571 | `dif2any` | 7 | 0.041600 | 0.108300 | 0.5994 | 0.6792 |
-| 571:any2any | 571 | `any2any` | 7 | 0.047900 | 0.112800 | 0.5994 | 0.6792 |
-| A778S | 778 | `spe2spe` | 7 | 9.77e-06 | 0.001400 | 0.8075 | 1.0000 |
-| 778S | 778 | `any2spe` | 7 | 9.79e-06 | 0.001400 | 0.8075 | 1.0000 |
-| A778 | 778 | `spe2any` | 7 | 9.80e-06 | 0.001400 | 0.8075 | 1.0000 |
-| 778:any2any | 778 | `any2any` | 7 | 0.000151 | 0.007700 | 0.8075 | 1.0000 |
-| 582:any2dif | 582 | `any2dif` | 6 | 2.12e-06 | 0.000758 | 0.6109 | 0.7925 |
-| 582:dif2dif | 582 | `dif2dif` | 6 | 2.12e-06 | 0.000758 | 0.6109 | 0.7925 |
+| 778S | 778 | `any2spe` | 8 | 2e-06 | 0.0003527 | 0.8075 | 1.0000 |
+| A778S | 778 | `spe2spe` | 8 | 2e-06 | 0.0003527 | 0.8075 | 1.0000 |
+| A778 | 778 | `spe2any` | 8 | 2.01e-06 | 0.0003527 | 0.8075 | 1.0000 |
+| 778:any2any | 778 | `any2any` | 8 | 6.9e-06 | 0.0009068 | 0.8075 | 1.0000 |
+| 663:any2dif | 663 | `any2dif` | 7 | 0.000717 | 0.01199 | 0.6914 | 0.6792 |
+| 663:dif2dif | 663 | `dif2dif` | 7 | 0.000742 | 0.01199 | 0.6914 | 0.6792 |
+| 663:any2any | 663 | `any2any` | 7 | 0.00202 | 0.02091 | 0.6914 | 0.6792 |
+| 663:dif2any | 663 | `dif2any` | 7 | 0.00206 | 0.02091 | 0.6914 | 0.6792 |
+| 570:any2any | 570 | `any2any` | 6 | 0.00059 | 0.01111 | 0.5983 | 0.7736 |
+| 570:any2dif | 570 | `any2dif` | 6 | 0.000752 | 0.01199 | 0.5983 | 0.7736 |
 
 ## Comparison With Existing Methods
 
