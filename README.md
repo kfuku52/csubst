@@ -54,11 +54,12 @@ csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --for
 ```
 
 ## Usage
-CSUBST provides eight main subcommands:
+CSUBST provides nine main subcommands:
 
 - [`csubst dataset`](https://github.com/kfuku52/csubst/wiki/csubst-dataset): generate built-in example datasets such as `PGK` and `PEPC`.
 - [`csubst doctor`](https://github.com/kfuku52/csubst/wiki/csubst-doctor): validate input files, inferred IQ-TREE paths, and optional 3Di settings before longer runs.
 - [`csubst search`](https://github.com/kfuku52/csubst/wiki/csubst-search) (legacy alias: `csubst analyze`): run convergence analysis and report metrics such as `omegaC`, `dNC`, and `dSC`.
+- `csubst scan`: list recurrent nonsynonymous-state substitutions shared by foreground clades without the omegaC branch-combination search. The output includes lineage-level support, configurable foreground-vs-control rate-enrichment statistics, posterior-sum or called-event rate counts, site evolutionary rates, and amino-acid/state conservation.
 - [`csubst inspect`](https://github.com/kfuku52/csubst/wiki/csubst-inspect): summarize branch mappings and inspect ancestral states.
 - [`csubst sites`](https://github.com/kfuku52/csubst/wiki/csubst-sites) (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree and site-summary plots, and optionally map sites to protein structures.
 - [`csubst simulate`](https://github.com/kfuku52/csubst/wiki/csubst-simulate): simulate codon sequence evolution under user-defined convergence scenarios.
@@ -90,7 +91,19 @@ csubst search \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt
 
-# 4) Inspect site-wise convergence for a branch pair
+# 4) Scan foreground recurrent substitutions directly
+csubst scan \
+  --alignment_file alignment.fa.gz \
+  --rooted_tree_file tree.nwk \
+  --foreground foreground.txt \
+  --scan_other_scope all \
+  --scan_rate_event_mode posterior_sum \
+  --scan_rate_exposure q_weighted \
+  --scan_pvalue_calibration full_scan \
+  --scan_n_permutations 1000 \
+  --threads 8
+
+# 5) Inspect site-wise convergence for a branch pair
 csubst sites \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \

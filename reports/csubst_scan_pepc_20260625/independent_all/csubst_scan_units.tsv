@@ -1,0 +1,13 @@
+trait	unit_id	lineage_value	fg_leaf_names	fg_branch_ids	mg_branch_ids	sister_branch_ids
+PLACEHOLDER	1	1	Alternanthera_pungens_AY950665	1		0
+PLACEHOLDER	2	2	Amaranthus_hypochondriacus_Z68125	5		0,2,3,4
+PLACEHOLDER	3	3	Bienertia_sinuspersici_DQ538352	12		
+PLACEHOLDER	4	4	Cyperus_sanguinolentus_FM208046	26		19,20,21
+PLACEHOLDER	5	5	Eleocharis_vivipara_AB085948	33		34,36
+PLACEHOLDER	6	6	Fimbristylis_littoralis_FM208037	35		34
+PLACEHOLDER	7	7	Flaveria_australasica_Z25853	40		41,43,44
+PLACEHOLDER	8	8	Setaria_italica_AF495586	90		123
+PLACEHOLDER	9	9	Sorghum_bicolor_X17379	95		
+PLACEHOLDER	10	10	Suaeda_aralocaspica_DQ538353	101		
+PLACEHOLDER	11	11	Suaeda_eltonica_DQ538354	103		102,104,105
+PLACEHOLDER	12	12	Zea_mays_X15239	122		
