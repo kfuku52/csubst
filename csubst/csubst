@@ -495,13 +495,14 @@ def _add_scan_subcommand_args(parser):
                              'With --scan_rate_event_mode posterior_sum, this threshold does not filter the event mass used for rate P values.')
     parser.add_argument('--scan_min_support', metavar='FRACTION|INTEGER', default='2', type=str,
                         help='default=%(default)s: Minimum foreground-lineage support for a scanned candidate. '
-                             'Values <=1 are treated as a fraction of foreground units; integer values are counts.')
+                             'Integer tokens (including "1") are counts; decimal/scientific values <=1 are fractions.')
     parser.add_argument('--scan_rate_exposure', metavar='q_weighted|state_aware|raw_branch_length', default='q_weighted', type=str,
                         choices=['state_aware', 'raw_branch_length', 'q_weighted'],
                         help='default=%(default)s: Exposure model for scan rate P values. '
                              '"state_aware" counts only branch length whose parent state can produce the candidate substitution; '
-                             '"q_weighted" further weights each possible parent-to-derived transition by its nonsynonymous instantaneous rate '
-                             'or, with --scan_rate_length n_rescaled, by its conditional nonsynonymous transition probability.')
+                             '"q_weighted" integrates candidate codon-transition rates over the parent codon posterior '
+                             'or, with --scan_rate_length n_rescaled, uses their conditional probability among outgoing nonsynonymous transitions. '
+                             'For --nonsyn_recode 3di20, q_weighted resolves to state_aware because a codon-model Q is not a 3Di Q.')
     parser.add_argument('--scan_rate_event_mode', metavar='called|posterior_sum', default='posterior_sum', type=str,
                         choices=['called', 'posterior_sum'],
                         help='default=%(default)s: Event mass used for scan rate P values. '
@@ -520,7 +521,8 @@ def _add_scan_subcommand_args(parser):
                         choices=['none', 'candidate_fixed', 'full_scan'],
                         help='default=%(default)s: Empirical calibration for scan rate P values. '
                              '"candidate_fixed" permutes foreground clades and retests observed candidates; '
-                             '"full_scan" reruns candidate discovery for each permutation and reports maxT-style empirical P values.')
+                             '"full_scan" reruns candidate discovery for each size-binned, non-overlapping clade permutation '
+                             'and reports maxT-style empirical P values.')
     parser.add_argument('--scan_n_permutations', metavar='INT', default=1000, type=int,
                         help='default=%(default)s: Number of foreground clade permutations for scan P-value calibration. '
                              'Permutation iterations are parallelized over --threads using --parallel_backend.')
@@ -531,7 +533,8 @@ def _add_scan_subcommand_args(parser):
     parser.add_argument('--scan_permutation_retry_sample_original', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Retry a failed scan permutation while allowing original foreground clades.')
     parser.add_argument('--scan_site_plot', metavar='yes|no', default='yes', type=strtobool,
-                        help='default=%(default)s: Generate a tree + detected-site summary plot using the csubst sites plotter.')
+                        help='default=%(default)s: Generate a tree + detected-site summary plot using the csubst sites plotter. '
+                             'When multiple candidates share a site, the best-supported candidate represents that site.')
     parser.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
                         choices=['pdf', 'png', 'svg'],
                         help='default=%(default)s: Output format for --scan_site_plot.')

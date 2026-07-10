@@ -1377,6 +1377,7 @@ def test_drop_invariant_tip_sites_zero_sub_mass_mode_drops_only_zero_mass_sites(
         "state_nuc": state_nuc,
         "state_cdn": state_cdn,
         "iqtree_rate_values": np.array([0.1, 0.2, 0.3], dtype=float),
+        "iqtree_categorized_rate_values": np.array([1.0, 2.0, 3.0], dtype=float),
     }
     g["state_pep"] = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
     g["state_nsy"] = sequence.cdn2nsy_state(state_cdn=state_cdn, g=g)
@@ -1389,6 +1390,9 @@ def test_drop_invariant_tip_sites_zero_sub_mass_mode_drops_only_zero_mass_sites(
     assert out["state_nsy"].shape[1] == 2
     assert out["state_nuc"].shape[1] == 6
     np.testing.assert_allclose(out["iqtree_rate_values"], np.array([0.2, 0.3], dtype=float), atol=1e-12)
+    np.testing.assert_allclose(
+        out["iqtree_categorized_rate_values"], np.array([2.0, 3.0], dtype=float), atol=1e-12
+    )
     site_map = pd.read_csv(tmp_path / "csubst_site_index_map.tsv", sep="\t")
     assert site_map["site"].tolist() == [-1, 0, 1]
 

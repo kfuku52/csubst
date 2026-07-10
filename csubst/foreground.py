@@ -508,28 +508,42 @@ def _get_clade_permutation_randomization_plan(g, trait_name, sample_original_for
 
 
 def _randomize_foreground_stem_flags_from_plan(trait_cache, randomization_plan, sample_original_foreground):
-    is_fg_stem_randomized = trait_cache['is_fg_stem'].copy()
-    is_blocked = np.zeros(shape=(is_fg_stem_randomized.shape[0],), dtype=bool)
+    is_fg_stem = np.asarray(trait_cache['is_fg_stem'], dtype=bool).reshape(-1)
     descendant_indices_by_index = trait_cache['descendant_indices_by_index']
-    for bin_no in randomization_plan['fg_bins'].tolist():
-        indices = randomization_plan['bin_indices'].get(int(bin_no), None)
-        if (indices is None) or (indices.shape[0] == 0):
-            continue
-        eligible_indices = indices[~is_blocked[indices]]
-        if eligible_indices.shape[0] == 0:
-            continue
-        before_randomization = is_fg_stem_randomized[eligible_indices]
-        after_randomization = _randomize_foreground_flags(
-            before_randomization=before_randomization,
-            sample_original_foreground=sample_original_foreground,
-        )
-        is_fg_stem_randomized[eligible_indices] = after_randomization
-        new_fg_indices = eligible_indices[after_randomization]
-        for idx in new_fg_indices.tolist():
-            descendant_indices = descendant_indices_by_index[int(idx)]
-            if descendant_indices.shape[0] > 0:
-                is_blocked[descendant_indices] = True
-    return is_fg_stem_randomized
+    last_error = None
+    for _attempt in range(100):
+        is_fg_stem_randomized = np.zeros(shape=is_fg_stem.shape, dtype=bool)
+        is_blocked = np.zeros(shape=is_fg_stem.shape, dtype=bool)
+        try:
+            for bin_no in sorted(randomization_plan['fg_bins'].tolist(), reverse=True):
+                indices = randomization_plan['bin_indices'].get(int(bin_no), None)
+                if (indices is None) or (indices.shape[0] == 0):
+                    continue
+                num_bin_fg = int(is_fg_stem[indices].sum())
+                for _ in range(num_bin_fg):
+                    eligible_indices = indices[~is_blocked[indices] & ~is_fg_stem_randomized[indices]]
+                    if not sample_original_foreground:
+                        eligible_indices = eligible_indices[~is_fg_stem[eligible_indices]]
+                    is_ancestor_of_selected = np.array(
+                        [
+                            bool(is_fg_stem_randomized[descendant_indices_by_index[int(idx)]].any())
+                            for idx in eligible_indices.tolist()
+                        ],
+                        dtype=bool,
+                    )
+                    eligible_indices = eligible_indices[~is_ancestor_of_selected]
+                    if eligible_indices.shape[0] == 0:
+                        txt = 'Not enough non-overlapping clades for permutation in bin {}.'
+                        raise ValueError(txt.format(int(bin_no)))
+                    new_fg_index = int(np.random.choice(eligible_indices))
+                    is_fg_stem_randomized[new_fg_index] = True
+                    descendant_indices = descendant_indices_by_index[new_fg_index]
+                    descendant_indices = descendant_indices[descendant_indices != new_fg_index]
+                    is_blocked[descendant_indices] = True
+            return is_fg_stem_randomized
+        except ValueError as exc:
+            last_error = exc
+    raise last_error
 
 
 def _resolve_randomized_target_ids(trait_cache, randomized_stem_indices, fg_stem_only):

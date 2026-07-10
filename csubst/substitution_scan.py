@@ -1,14 +1,19 @@
 import math
+import os
+import re
+import tempfile
 import threading
+from decimal import Decimal, InvalidOperation, ROUND_CEILING
 
 import numpy as np
 import pandas as pd
-from scipy.stats import chi2
+from scipy.stats import chi2, rankdata
 
 from csubst import ete
 from csubst import foreground
 from csubst import parallel
 from csubst import parser_misc
+from csubst import runtime
 from csubst import sequence
 from csubst import substitution
 
@@ -30,6 +35,10 @@ SCAN_RATE_EXPOSURES = ("q_weighted", "state_aware", "raw_branch_length")
 SCAN_OTHER_SCOPES = ("all", "sister")
 SCAN_PVALUE_CALIBRATIONS = ("none", "candidate_fixed", "full_scan")
 _SCAN_PERMUTATION_RANDOM_LOCK = threading.Lock()
+
+
+class _RetryableScanPermutationError(RuntimeError):
+    pass
 
 
 SCAN_OUTPUT_COLUMNS = (
@@ -65,6 +74,7 @@ SCAN_OUTPUT_COLUMNS = (
     "scan_permutation_failure_reasons",
     "codon_site_alignment",
     "site_rate",
+    "site_rate_categorized",
     "site_rate_quantile",
     "state_all_conservation",
     "state_all_entropy",
@@ -106,6 +116,9 @@ SCAN_OUTPUT_COLUMNS = (
     "rate_ratio",
     "p_rate_enrichment",
     "p_rate_enrichment_empirical",
+    "q_rate_enrichment_empirical",
+    "q_rate_enrichment_empirical_by_trait",
+    "q_rate_enrichment_empirical_by_trait_match",
     "p_rate_enrichment_empirical_maxT",
     "q_rate_enrichment",
     "q_rate_enrichment_by_trait",
@@ -156,6 +169,20 @@ def normalize_scan_rate_exposure(value):
     return value_txt
 
 
+def resolve_scan_rate_exposure(g):
+    requested = normalize_scan_rate_exposure(g.get("scan_rate_exposure", "q_weighted"))
+    if (requested == "q_weighted") and (str(g.get("nonsyn_recode", "no")).strip().lower() == "3di20"):
+        if not bool(g.get("_scan_3di_exposure_warning_emitted", False)):
+            print(
+                "Scan warning: q_weighted exposure is unavailable for 3Di states because the fitted codon Q "
+                "does not define 3Di-state transition rates; using state_aware exposure.",
+                flush=True,
+            )
+            g["_scan_3di_exposure_warning_emitted"] = True
+        return "state_aware"
+    return requested
+
+
 def normalize_scan_other_scope(value):
     value_txt = "all" if value is None else str(value).strip().lower()
     if value_txt not in SCAN_OTHER_SCOPES:
@@ -201,16 +228,23 @@ def parse_scan_support_threshold(value, total_units, param_name="--scan_min_supp
     value_txt = str(value).strip().lower()
     if value_txt == "":
         raise ValueError("{} should be non-empty.".format(param_name))
-    numeric = float(value_txt)
-    if not np.isfinite(numeric):
+    try:
+        numeric_decimal = Decimal(value_txt)
+    except InvalidOperation as exc:
+        raise ValueError("{} should be numeric.".format(param_name)) from exc
+    numeric = float(numeric_decimal)
+    if (not numeric_decimal.is_finite()) or (not np.isfinite(numeric)):
         raise ValueError("{} should be finite.".format(param_name))
     if numeric < 0:
         raise ValueError("{} should be >= 0.".format(param_name))
-    if numeric <= 1.0:
-        return int(math.ceil(numeric * total_units))
-    if not float(numeric).is_integer():
+    if bool(re.fullmatch(r"[+]?[0-9]+", value_txt)):
+        return int(numeric_decimal)
+    if numeric_decimal <= Decimal("1"):
+        count = (numeric_decimal * Decimal(total_units)).to_integral_value(rounding=ROUND_CEILING)
+        return int(count)
+    if numeric_decimal != numeric_decimal.to_integral_value():
         raise ValueError("{} should be a fraction <= 1 or an integer count.".format(param_name))
-    return int(numeric)
+    return int(numeric_decimal)
 
 
 def _state_set_label(indices, state_orders, any_label="any", dif_label="dif"):
@@ -237,6 +271,99 @@ def _state_distribution_label(events, col, state_orders):
 
 def _is_sparse_sub_tensor(sub_tensor):
     return substitution._is_sparse_sub_tensor(sub_tensor)
+
+
+def _pack_scan_tensor_for_worker(sub_tensor):
+    if isinstance(sub_tensor, np.memmap):
+        filename = getattr(sub_tensor, "filename", None)
+        if filename is not None:
+            sub_tensor.flush()
+            return {
+                "__scan_memmap__": True,
+                "filename": os.path.abspath(os.fspath(filename)),
+                "dtype": np.dtype(sub_tensor.dtype).str,
+                "shape": tuple(int(v) for v in sub_tensor.shape),
+                "offset": int(getattr(sub_tensor, "offset", 0)),
+            }
+    return sub_tensor
+
+
+def _unpack_scan_tensor_for_worker(value):
+    if not (isinstance(value, dict) and bool(value.get("__scan_memmap__", False))):
+        return value
+    return np.memmap(
+        value["filename"],
+        dtype=np.dtype(value["dtype"]),
+        mode="r",
+        shape=tuple(value["shape"]),
+        offset=int(value.get("offset", 0)),
+    )
+
+
+def _pack_scan_array_for_worker(value, name, owned_paths, min_copy_bytes=1024 * 1024):
+    packed = _pack_scan_tensor_for_worker(value)
+    if packed is not value:
+        return packed
+    if (not isinstance(value, np.ndarray)) or (int(value.nbytes) < int(min_copy_bytes)):
+        return value
+    run_tmpdir = runtime.get_run_tempdir(create=False)
+    fd, path = tempfile.mkstemp(
+        prefix="tmp.csubst.scan_worker_{}._".format(str(name)),
+        suffix=".mmap",
+        dir=run_tmpdir,
+    )
+    os.close(fd)
+    worker_memmap = np.memmap(path, dtype=value.dtype, mode="w+", shape=value.shape)
+    np.copyto(worker_memmap, value)
+    worker_memmap.flush()
+    descriptor = _pack_scan_tensor_for_worker(worker_memmap)
+    del worker_memmap
+    owned_paths.append(path)
+    return descriptor
+
+
+def _pack_scan_worker_context(g, scan_static):
+    owned_paths = []
+    worker_g = dict(g)
+    worker_g["state_nsy"] = _pack_scan_array_for_worker(
+        g.get("state_nsy", None),
+        name="state_nsy",
+        owned_paths=owned_paths,
+    )
+    q_context = dict(scan_static["q_context"])
+    state_cdn = q_context.get("state_cdn", None)
+    if state_cdn is None:
+        worker_g["state_cdn"] = None
+    else:
+        packed_state_cdn = _pack_scan_array_for_worker(
+            state_cdn,
+            name="state_cdn",
+            owned_paths=owned_paths,
+        )
+        worker_g["state_cdn"] = packed_state_cdn
+        q_context["state_cdn"] = packed_state_cdn
+    for unused_key in ["state_nuc", "state_pep", "_3di_alignment_by_branch_id", "_3di_tip_alignment_by_leaf"]:
+        worker_g.pop(unused_key, None)
+    worker_static = dict(scan_static)
+    worker_static["q_context"] = q_context
+    worker_static["observed_site_annotations"] = {}
+    return worker_g, worker_static, owned_paths
+
+
+def _unpack_scan_worker_context(g, scan_static):
+    worker_g = dict(g)
+    worker_g["state_nsy"] = _unpack_scan_tensor_for_worker(worker_g.get("state_nsy", None))
+    worker_static = dict(scan_static)
+    q_context = dict(worker_static["q_context"])
+    packed_state_cdn = q_context.get("state_cdn", None)
+    if packed_state_cdn is None:
+        worker_g["state_cdn"] = None
+    else:
+        state_cdn = _unpack_scan_tensor_for_worker(packed_state_cdn)
+        worker_g["state_cdn"] = state_cdn
+        q_context["state_cdn"] = state_cdn
+    worker_static["q_context"] = q_context
+    return worker_g, worker_static
 
 
 def extract_atomic_events(sub_tensor, min_event_pp=0.5, float_tol=1e-12):
@@ -447,6 +574,17 @@ def build_scan_units(g, branch_meta):
                 g=g,
             )
             fg_ids = np.array([int(v) for v in fg_ids.tolist() if int(v) in valid_branches], dtype=np.int64)
+            fg_clade_ids = set()
+            for branch_id in fg_ids.tolist():
+                node = node_by_id.get(int(branch_id), None)
+                if node is None:
+                    continue
+                fg_clade_ids.update(
+                    int(ete.get_prop(desc, "numerical_label"))
+                    for desc in node.traverse()
+                    if int(ete.get_prop(desc, "numerical_label")) in valid_branches
+                )
+            fg_clade_ids = np.array(sorted(fg_clade_ids), dtype=np.int64)
             sister_ids = _lineage_sister_branch_ids(
                 g=g,
                 trait_name=trait_name,
@@ -466,6 +604,7 @@ def build_scan_units(g, branch_meta):
                     "fg_leaf_names": ",".join(leaf_names),
                     "fg_branch_ids": ",".join(str(v) for v in fg_ids.tolist()),
                     "sister_branch_ids": ",".join(str(v) for v in sister_ids.tolist()),
+                    "fg_clade_branch_ids": ",".join(str(v) for v in fg_clade_ids.tolist()),
                 }
             )
     return pd.DataFrame(rows)
@@ -524,6 +663,7 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
     valid_set = set(int(v) for v in np.asarray(valid_branch_ids, dtype=np.int64).reshape(-1).tolist())
     node_by_id = _node_by_branch_id(g)
     unit_fg_arrays = []
+    unit_fg_clade_arrays = []
     fg_leaf_names = []
     for stem_index in stem_indices.tolist():
         fg_ids = _selected_stem_fg_branch_ids(g=g, trait_cache=trait_cache, stem_index=stem_index)
@@ -531,14 +671,42 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
         if fg_ids.shape[0] == 0:
             continue
         unit_fg_arrays.append(fg_ids)
+        fg_clade_ids = np.array(
+            [
+                int(v)
+                for v in trait_cache["descendant_branch_ids_by_index"][int(stem_index)].tolist()
+                if int(v) in valid_set
+            ],
+            dtype=np.int64,
+        )
+        unit_fg_clade_arrays.append(fg_clade_ids)
         fg_leaf_names.append(sorted([str(v) for v in trait_cache["leaf_names_by_index"][int(stem_index)]]))
+    expected_unit_count = len(_lineage_values(g=g, trait_name=trait_name))
+    if len(unit_fg_arrays) != expected_unit_count:
+        txt = (
+            "A scan permutation retained {} of {} foreground units for trait {} after filtering "
+            "branches without analyzable states."
+        )
+        raise _RetryableScanPermutationError(
+            txt.format(len(unit_fg_arrays), expected_unit_count, trait_name)
+        )
+    occupied_clade_ids = set()
+    for clade_ids in unit_fg_clade_arrays:
+        clade_id_set = set(int(v) for v in clade_ids.tolist())
+        if len(occupied_clade_ids.intersection(clade_id_set)) > 0:
+            raise _RetryableScanPermutationError(
+                "A scan permutation produced overlapping foreground clades for trait {}.".format(trait_name)
+            )
+        occupied_clade_ids.update(clade_id_set)
     if len(unit_fg_arrays) == 0:
         return {
-            "units": pd.DataFrame(columns=["trait", "unit_id", "lineage_value", "fg_leaf_names", "fg_branch_ids", "sister_branch_ids"]),
+            "units": pd.DataFrame(columns=["trait", "unit_id", "lineage_value", "fg_leaf_names", "fg_branch_ids", "sister_branch_ids", "fg_clade_branch_ids"]),
             "fg_ids": np.array([], dtype=np.int64),
+            "rate_fg_ids": np.array([], dtype=np.int64),
             "fg_leaf_names": [],
         }
     all_fg_ids = np.unique(np.concatenate(unit_fg_arrays).astype(np.int64, copy=False))
+    all_rate_fg_ids = np.unique(np.concatenate(unit_fg_clade_arrays).astype(np.int64, copy=False))
     rows = []
     for i, fg_ids in enumerate(unit_fg_arrays):
         sister_ids = _unit_sister_branch_ids(
@@ -556,11 +724,13 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
                 "fg_leaf_names": ",".join(fg_leaf_names[i]),
                 "fg_branch_ids": ",".join(str(v) for v in fg_ids.tolist()),
                 "sister_branch_ids": ",".join(str(v) for v in sister_ids.tolist()),
+                "fg_clade_branch_ids": ",".join(str(v) for v in unit_fg_clade_arrays[i].tolist()),
             }
         )
     return {
         "units": pd.DataFrame(rows),
         "fg_ids": all_fg_ids,
+        "rate_fg_ids": all_rate_fg_ids,
         "fg_leaf_names": fg_leaf_names,
     }
 
@@ -568,6 +738,7 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
 def _build_permuted_scan_context(g, trait_names, valid_branch_ids, sample_original_foreground):
     units = []
     fg_ids = {}
+    rate_fg_ids = {}
     fg_leaf_names = {}
     for trait_name in trait_names:
         trait_context = _build_permuted_trait_context(
@@ -578,11 +749,13 @@ def _build_permuted_scan_context(g, trait_names, valid_branch_ids, sample_origin
         )
         units.append(trait_context["units"])
         fg_ids[trait_name] = trait_context["fg_ids"]
+        rate_fg_ids[trait_name] = trait_context["rate_fg_ids"]
         fg_leaf_names[trait_name] = trait_context["fg_leaf_names"]
     units_df = pd.concat(units, ignore_index=True) if len(units) > 0 else pd.DataFrame()
     return {
         "units": units_df,
         "fg_ids": fg_ids,
+        "rate_fg_ids": rate_fg_ids,
         "fg_leaf_names": fg_leaf_names,
         "trait_names": list(trait_names),
     }
@@ -774,6 +947,20 @@ def _union_unit_branch_ids(units_df, column):
     return out
 
 
+def _rate_fg_ids_map_from_units(units, fg_ids_map, trait_names):
+    out = {}
+    for trait_name in trait_names:
+        units_trait = units.loc[units["trait"] == trait_name, :]
+        clade_ids = _union_unit_branch_ids(units_df=units_trait, column="fg_clade_branch_ids")
+        if len(clade_ids) == 0:
+            clade_ids = set(
+                int(v)
+                for v in np.asarray(fg_ids_map.get(trait_name, []), dtype=np.int64).reshape(-1).tolist()
+            )
+        out[trait_name] = np.array(sorted(clade_ids), dtype=np.int64)
+    return out
+
+
 def _other_branch_ids_from_maps(
     fg_ids_map,
     trait_name,
@@ -824,6 +1011,58 @@ def _opportunity_states(from_ids, to_ids):
         if any(der != anc for der in to_set):
             out.append(anc)
     return np.array(sorted(set(out)), dtype=np.int64)
+
+
+def _build_codon_state_ids(g):
+    codon_q = g.get("instantaneous_codon_rate_matrix", None)
+    group_indices = g.get("nonsynonymous_indices", None)
+    if codon_q is None or not isinstance(group_indices, dict):
+        return None
+    num_codon = int(np.asarray(codon_q).shape[0])
+    codon_state_ids = np.full(shape=(num_codon,), fill_value=-1, dtype=np.int64)
+    state_orders = sequence.get_nonsyn_state_orders(g)
+    for state_id, state_label in enumerate(state_orders.tolist()):
+        indices = group_indices.get(str(state_label), [])
+        for codon_id in np.asarray(indices, dtype=np.int64).reshape(-1).tolist():
+            if (int(codon_id) < 0) or (int(codon_id) >= num_codon):
+                raise ValueError("nonsynonymous_indices contained an out-of-range codon index.")
+            if codon_state_ids[int(codon_id)] >= 0:
+                raise ValueError("A codon was assigned to multiple nonsynonymous states.")
+            codon_state_ids[int(codon_id)] = int(state_id)
+    if (codon_state_ids < 0).any():
+        raise ValueError("Some codons were not assigned to a nonsynonymous state.")
+    return codon_state_ids
+
+
+def _build_scan_q_context(g, rate_exposure):
+    if rate_exposure != "q_weighted":
+        return {
+            "q_matrix": None,
+            "state_cdn": None,
+            "codon_q_matrix": None,
+            "codon_state_ids": None,
+        }
+    codon_q = g.get("instantaneous_codon_rate_matrix", None)
+    state_cdn = g.get("state_cdn", None)
+    codon_state_ids = _build_codon_state_ids(g)
+    q_matrix = g.get("instantaneous_nsy_rate_matrix", None)
+    if (codon_q is None) or (state_cdn is None) or (codon_state_ids is None):
+        if q_matrix is None:
+            raise ValueError(
+                "--scan_rate_exposure q_weighted requires codon posterior states and an instantaneous codon Q matrix."
+            )
+        return {
+            "q_matrix": q_matrix,
+            "state_cdn": None,
+            "codon_q_matrix": None,
+            "codon_state_ids": None,
+        }
+    return {
+        "q_matrix": q_matrix,
+        "state_cdn": state_cdn,
+        "codon_q_matrix": codon_q,
+        "codon_state_ids": codon_state_ids,
+    }
 
 
 def _length_column(rate_length):
@@ -887,19 +1126,63 @@ def _bh_qvalues(pvalues):
     return qvalues
 
 
-def _assign_grouped_qvalues(scan_df, out_col, group_cols):
+def _assign_grouped_qvalues(scan_df, out_col, group_cols, p_col="p_rate_enrichment"):
     scan_df[out_col] = np.nan
     if scan_df.shape[0] == 0:
         return scan_df
     for _, index_values in scan_df.groupby(group_cols, sort=False, dropna=False).groups.items():
-        pvalues = scan_df.loc[index_values, "p_rate_enrichment"].to_numpy(dtype=np.float64)
+        pvalues = scan_df.loc[index_values, p_col].to_numpy(dtype=np.float64)
         scan_df.loc[index_values, out_col] = _bh_qvalues(pvalues)
     return scan_df
 
 
-def _q_weighted_opportunity(branch_meta, state_nsy, site, from_ids, to_ids, q_matrix, rate_length):
+def _q_weighted_opportunity(
+    branch_meta,
+    state_nsy,
+    site,
+    from_ids,
+    to_ids,
+    q_matrix,
+    rate_length,
+    state_cdn=None,
+    codon_q_matrix=None,
+    codon_state_ids=None,
+):
+    if (state_cdn is not None) and (codon_q_matrix is not None) and (codon_state_ids is not None):
+        state_cdn = np.asarray(state_cdn, dtype=np.float64)
+        codon_q = np.asarray(codon_q_matrix, dtype=np.float64)
+        codon_state_ids = np.asarray(codon_state_ids, dtype=np.int64).reshape(-1)
+        if codon_q.ndim != 2 or codon_q.shape[0] != codon_q.shape[1]:
+            raise ValueError("instantaneous_codon_rate_matrix should be a square matrix.")
+        if state_cdn.shape[2] != codon_q.shape[0] or codon_state_ids.shape[0] != codon_q.shape[0]:
+            raise ValueError("Codon Q/state dimensions did not match for q_weighted scan exposure.")
+        q_positive = np.where(np.isfinite(codon_q) & (codon_q > 0), codon_q, 0.0)
+        from_set = set(int(v) for v in np.asarray(from_ids, dtype=np.int64).reshape(-1).tolist())
+        to_set = set(int(v) for v in np.asarray(to_ids, dtype=np.int64).reshape(-1).tolist())
+        codon_weights = np.zeros(shape=(codon_q.shape[0],), dtype=np.float64)
+        for anc_codon, anc_state in enumerate(codon_state_ids.tolist()):
+            anc_state = int(anc_state)
+            if anc_state not in from_set:
+                continue
+            candidate_mask = np.array(
+                [(int(state_id) in to_set) and (int(state_id) != anc_state) for state_id in codon_state_ids],
+                dtype=bool,
+            )
+            candidate_rate = float(q_positive[anc_codon, candidate_mask].sum())
+            if str(rate_length) == "n_rescaled":
+                nonsyn_mask = (codon_state_ids >= 0) & (codon_state_ids != anc_state)
+                total_rate = float(q_positive[anc_codon, nonsyn_mask].sum())
+                if total_rate > 0.0:
+                    codon_weights[anc_codon] = candidate_rate / total_rate
+            else:
+                codon_weights[anc_codon] = candidate_rate
+        parent_ids = branch_meta["parent_id"].astype(int).to_numpy(copy=False)
+        return state_cdn[parent_ids, int(site), :].dot(codon_weights)
     if q_matrix is None:
-        raise ValueError("--scan_rate_exposure q_weighted requires instantaneous_nsy_rate_matrix.")
+        raise ValueError(
+            "--scan_rate_exposure q_weighted requires codon-state posterior/Q context or "
+            "instantaneous_nsy_rate_matrix."
+        )
     state_nsy = np.asarray(state_nsy, dtype=np.float64)
     q = np.asarray(q_matrix, dtype=np.float64)
     if q.ndim != 2 or q.shape[0] != q.shape[1]:
@@ -943,6 +1226,9 @@ def _rate_summary(
     rate_exposure,
     other_branch_ids=None,
     q_matrix=None,
+    state_cdn=None,
+    codon_q_matrix=None,
+    codon_state_ids=None,
 ):
     target_set = set(int(v) for v in np.asarray(target_branch_ids, dtype=np.int64).reshape(-1).tolist())
     branch_ids = branch_meta["branch_id"].astype(int).to_numpy(copy=False)
@@ -978,6 +1264,9 @@ def _rate_summary(
             to_ids=to_ids,
             q_matrix=q_matrix,
             rate_length=rate_length,
+            state_cdn=state_cdn,
+            codon_q_matrix=codon_q_matrix,
+            codon_state_ids=codon_state_ids,
         )
     else:
         txt = "--scan_rate_exposure should be one of {}."
@@ -1029,9 +1318,7 @@ def _rank_quantiles(values):
     if not finite.any():
         return out
     finite_values = values[finite]
-    order = np.argsort(finite_values, kind="mergesort")
-    ranks = np.empty(shape=finite_values.shape[0], dtype=np.float64)
-    ranks[order] = np.arange(1, finite_values.shape[0] + 1, dtype=np.float64)
+    ranks = rankdata(finite_values, method="average").astype(np.float64, copy=False)
     out[finite] = ranks / finite_values.shape[0]
     return out
 
@@ -1090,6 +1377,15 @@ def build_site_annotations(g, trait_name, fg_leaf_names_map=None):
             raise ValueError(txt.format(rate_values.shape[0], num_site))
         out["site_rate"] = rate_values
         out["site_rate_quantile"] = _rank_quantiles(rate_values)
+    categorized_rate_values = g.get("iqtree_categorized_rate_values", None)
+    if categorized_rate_values is None:
+        out["site_rate_categorized"] = np.nan
+    else:
+        categorized_rate_values = np.asarray(categorized_rate_values, dtype=np.float64).reshape(-1)
+        if categorized_rate_values.shape[0] != num_site:
+            txt = "iqtree_categorized_rate_values length ({}) did not match scan site axis ({})."
+            raise ValueError(txt.format(categorized_rate_values.shape[0], num_site))
+        out["site_rate_categorized"] = categorized_rate_values
     tip_ids = []
     fg_tip_names = set()
     if fg_leaf_names_map is None:
@@ -1122,10 +1418,47 @@ def build_site_annotations(g, trait_name, fg_leaf_names_map=None):
     return out
 
 
+def _select_scan_plot_rows(scan_df):
+    if scan_df.shape[0] == 0:
+        return scan_df.copy()
+    plot_rows = scan_df.loc[scan_df["target_class"].astype(str) == "fg", :].copy()
+    if plot_rows.shape[0] == 0:
+        return plot_rows
+    for col, default in [
+        ("support_unit_count", 0),
+        ("support_pp_sum", 0.0),
+        ("candidate_event_pp_sum", 0.0),
+        ("p_rate_enrichment_empirical_maxT", np.inf),
+        ("p_rate_enrichment", np.inf),
+    ]:
+        if col not in plot_rows.columns:
+            plot_rows[col] = default
+    plot_rows["__plot_empirical_p__"] = pd.to_numeric(
+        plot_rows["p_rate_enrichment_empirical_maxT"], errors="coerce"
+    ).fillna(np.inf)
+    plot_rows["__plot_analytical_p__"] = pd.to_numeric(
+        plot_rows["p_rate_enrichment"], errors="coerce"
+    ).fillna(np.inf)
+    plot_rows = plot_rows.sort_values(
+        by=[
+            "codon_site_alignment",
+            "support_unit_count",
+            "support_pp_sum",
+            "candidate_event_pp_sum",
+            "__plot_empirical_p__",
+            "__plot_analytical_p__",
+        ],
+        ascending=[True, False, False, False, True, True],
+        kind="mergesort",
+    )
+    plot_rows = plot_rows.drop_duplicates(subset=["codon_site_alignment"], keep="first")
+    return plot_rows.drop(columns=["__plot_empirical_p__", "__plot_analytical_p__"]).reset_index(drop=True)
+
+
 def build_scan_site_plot_table(scan_df, g, ON_tensor):
     if scan_df.shape[0] == 0:
         return pd.DataFrame(), np.array([], dtype=np.int64)
-    plot_rows = scan_df.loc[scan_df["target_class"].astype(str) == "fg", :].copy()
+    plot_rows = _select_scan_plot_rows(scan_df)
     if plot_rows.shape[0] == 0:
         return pd.DataFrame(), np.array([], dtype=np.int64)
     branch_ids = set()
@@ -1184,12 +1517,46 @@ def build_scan_site_plot_table(scan_df, g, ON_tensor):
     return out, branch_ids
 
 
-def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=None):
+def _build_scan_static_context(g, ON_tensor):
+    min_event_pp = float(g.get("scan_min_event_pp", 0.5))
+    events = extract_atomic_events(
+        sub_tensor=ON_tensor,
+        min_event_pp=min_event_pp,
+        float_tol=float(g.get("float_tol", 1e-12)),
+    )
+    branch_meta = build_branch_metadata(g)
+    trait_names = g["fg_df"].columns[1:].tolist()
+    observed_site_annotations = {
+        trait_name: build_site_annotations(g=g, trait_name=trait_name)
+        for trait_name in trait_names
+    }
+    permutation_site_annotations = None
+    if len(trait_names) > 0:
+        permutation_site_annotations = build_site_annotations(
+            g=g,
+            trait_name=trait_names[0],
+            fg_leaf_names_map={},
+        )
+    rate_exposure = resolve_scan_rate_exposure(g)
+    return {
+        "events": events,
+        "branch_meta": branch_meta,
+        "valid_branch_ids": branch_meta["branch_id"].astype(int).to_numpy(copy=False),
+        "rate_exposure": rate_exposure,
+        "q_context": _build_scan_q_context(g=g, rate_exposure=rate_exposure),
+        "observed_site_annotations": observed_site_annotations,
+        "permutation_site_annotations": permutation_site_annotations,
+    }
+
+
+def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=None, scan_static=None):
     scan_matches = normalize_scan_matches(g.get("scan_match", "any2spe"))
     scan_targets = ["fg"]
     rate_length = str(g.get("scan_rate_length", "n_rescaled")).strip().lower()
     _length_column(rate_length)
-    rate_exposure = normalize_scan_rate_exposure(g.get("scan_rate_exposure", "q_weighted"))
+    if scan_static is None:
+        scan_static = _build_scan_static_context(g=g, ON_tensor=ON_tensor)
+    rate_exposure = scan_static["rate_exposure"]
     rate_event_mode = normalize_scan_rate_event_mode(g.get("scan_rate_event_mode", "posterior_sum"))
     scan_other_scope = normalize_scan_other_scope(g.get("scan_other_scope", "all"))
     pvalue_calibration = normalize_scan_pvalue_calibration(g.get("scan_pvalue_calibration", "full_scan"))
@@ -1203,27 +1570,23 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
     state_orders = sequence.get_nonsyn_state_orders(g)
     if rate_ON_tensor is None:
         rate_ON_tensor = ON_tensor
-    q_matrix = None
-    if rate_exposure == "q_weighted":
-        q_matrix = g.get("instantaneous_nsy_rate_matrix", None)
-        if q_matrix is None:
-            raise ValueError("--scan_rate_exposure q_weighted requires instantaneous_nsy_rate_matrix.")
-    events = extract_atomic_events(
-        sub_tensor=ON_tensor,
-        min_event_pp=min_event_pp,
-        float_tol=float(g.get("float_tol", 1e-12)),
-    )
-    branch_meta = build_branch_metadata(g)
-    valid_branch_ids = branch_meta["branch_id"].astype(int).to_numpy(copy=False)
+    q_context = scan_static["q_context"]
+    events = scan_static["events"]
+    branch_meta = scan_static["branch_meta"]
+    valid_branch_ids = scan_static["valid_branch_ids"]
     if scan_context is None:
         units = build_scan_units(g=g, branch_meta=branch_meta)
         fg_ids_map = g.get("fg_ids", {})
-        fg_leaf_names_map = g.get("fg_leaf_names", {})
         trait_names = g["fg_df"].columns[1:].tolist()
+        rate_fg_ids_map = _rate_fg_ids_map_from_units(
+            units=units,
+            fg_ids_map=fg_ids_map,
+            trait_names=trait_names,
+        )
     else:
         units = scan_context["units"].copy()
         fg_ids_map = scan_context["fg_ids"]
-        fg_leaf_names_map = scan_context["fg_leaf_names"]
+        rate_fg_ids_map = scan_context.get("rate_fg_ids", scan_context["fg_ids"])
         trait_names = list(scan_context["trait_names"])
     if units.shape[0] == 0:
         raise ValueError("No foreground units were available for scan. Use --foreground.")
@@ -1257,11 +1620,10 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                 )
                 print(txt.format(int(min_support_count), trait_name, int(units_trait.shape[0])), flush=True)
             continue
-        site_annotations = build_site_annotations(
-            g=g,
-            trait_name=trait_name,
-            fg_leaf_names_map=fg_leaf_names_map,
-        )
+        if scan_context is None:
+            site_annotations = scan_static["observed_site_annotations"][trait_name]
+        else:
+            site_annotations = scan_static["permutation_site_annotations"]
         site_annotation_by_site = site_annotations.set_index("site", drop=False)
         for _, cand in candidates.iterrows():
             site = int(cand["site"])
@@ -1306,13 +1668,13 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
             )
             for target_class in scan_targets:
                 target_branch_ids = _target_branch_ids_from_maps(
-                    fg_ids_map=fg_ids_map,
+                    fg_ids_map=rate_fg_ids_map,
                     trait_name=trait_name,
                     target_class=target_class,
                     valid_branch_ids=valid_branch_ids,
                 )
                 other_branch_ids = _other_branch_ids_from_maps(
-                    fg_ids_map=fg_ids_map,
+                    fg_ids_map=rate_fg_ids_map,
                     trait_name=trait_name,
                     target_class=target_class,
                     valid_branch_ids=valid_branch_ids,
@@ -1336,7 +1698,10 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     rate_length=rate_length,
                     rate_exposure=rate_exposure,
                     other_branch_ids=other_branch_ids,
-                    q_matrix=q_matrix,
+                    q_matrix=q_context["q_matrix"],
+                    state_cdn=q_context["state_cdn"],
+                    codon_q_matrix=q_context["codon_q_matrix"],
+                    codon_state_ids=q_context["codon_state_ids"],
                 )
                 row = {
                     "scan_id": int(scan_id),
@@ -1446,22 +1811,26 @@ def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutat
         random_state = np.random.get_state()
         np.random.seed(_scan_permutation_seed(base_seed=base_seed, permutation_index=permutation_index))
         try:
+            def build_with_retry(sample_original_foreground):
+                last_error = None
+                for _ in range(100):
+                    try:
+                        return _build_permuted_scan_context(
+                            g=g,
+                            trait_names=trait_names,
+                            valid_branch_ids=valid_branch_ids,
+                            sample_original_foreground=sample_original_foreground,
+                        )
+                    except _RetryableScanPermutationError as exc:
+                        last_error = exc
+                raise last_error
+
             try:
-                return _build_permuted_scan_context(
-                    g=g,
-                    trait_names=trait_names,
-                    valid_branch_ids=valid_branch_ids,
-                    sample_original_foreground=sample_original,
-                )
+                return build_with_retry(sample_original_foreground=sample_original)
             except Exception:
                 if sample_original or (not retry_with_original):
                     raise
-                return _build_permuted_scan_context(
-                    g=g,
-                    trait_names=trait_names,
-                    valid_branch_ids=valid_branch_ids,
-                    sample_original_foreground=True,
-                )
+                return build_with_retry(sample_original_foreground=True)
         finally:
             np.random.set_state(random_state)
 
@@ -1474,22 +1843,27 @@ def _candidate_fixed_permutation_pvalues(
     valid_branch_ids,
     ON_tensor,
     rate_ON_tensor,
+    scan_static=None,
 ):
     rate_length = str(g.get("scan_rate_length", "n_rescaled")).strip().lower()
-    rate_exposure = normalize_scan_rate_exposure(g.get("scan_rate_exposure", "q_weighted"))
+    rate_exposure = scan_static["rate_exposure"] if scan_static is not None else resolve_scan_rate_exposure(g)
     rate_event_mode = normalize_scan_rate_event_mode(g.get("scan_rate_event_mode", "posterior_sum"))
     scan_other_scope = normalize_scan_other_scope(g.get("scan_other_scope", "all"))
     min_event_pp = float(g.get("scan_min_event_pp", 0.5))
     called_events = None
     if rate_event_mode == "called":
-        called_events = extract_atomic_events(
-            sub_tensor=ON_tensor,
-            min_event_pp=min_event_pp,
-            float_tol=float(g.get("float_tol", 1e-12)),
-        )
-    q_matrix = None
-    if rate_exposure == "q_weighted":
-        q_matrix = g.get("instantaneous_nsy_rate_matrix", None)
+        if scan_static is not None:
+            called_events = scan_static["events"]
+        else:
+            called_events = extract_atomic_events(
+                sub_tensor=ON_tensor,
+                min_event_pp=min_event_pp,
+                float_tol=float(g.get("float_tol", 1e-12)),
+            )
+    q_context = scan_static["q_context"] if scan_static is not None else _build_scan_q_context(
+        g=g,
+        rate_exposure=rate_exposure,
+    )
     out = {}
     for _, row in observed_df.iterrows():
         trait_name = str(row["trait"])
@@ -1514,14 +1888,14 @@ def _candidate_fixed_permutation_pvalues(
                 float_tol=float(g.get("float_tol", 1e-12)),
             )
         target_branch_ids = _target_branch_ids_from_maps(
-            fg_ids_map=scan_context["fg_ids"],
+            fg_ids_map=scan_context.get("rate_fg_ids", scan_context["fg_ids"]),
             trait_name=trait_name,
             target_class=target_class,
             valid_branch_ids=valid_branch_ids,
         )
         units_trait = scan_context["units"].loc[scan_context["units"]["trait"] == trait_name, :].reset_index(drop=True)
         other_branch_ids = _other_branch_ids_from_maps(
-            fg_ids_map=scan_context["fg_ids"],
+            fg_ids_map=scan_context.get("rate_fg_ids", scan_context["fg_ids"]),
             trait_name=trait_name,
             target_class=target_class,
             valid_branch_ids=valid_branch_ids,
@@ -1539,7 +1913,10 @@ def _candidate_fixed_permutation_pvalues(
             rate_length=rate_length,
             rate_exposure=rate_exposure,
             other_branch_ids=other_branch_ids,
-            q_matrix=q_matrix,
+            q_matrix=q_context["q_matrix"],
+            state_cdn=q_context["state_cdn"],
+            codon_q_matrix=q_context["codon_q_matrix"],
+            codon_state_ids=q_context["codon_state_ids"],
         )
         out[_scan_row_key(row)] = float(rate["p_rate_enrichment"])
     return out
@@ -1556,6 +1933,7 @@ def _run_scan_permutation(
     valid_branch_ids,
     ON_tensor,
     rate_ON_tensor,
+    scan_static,
 ):
     try:
         scan_context = _build_permuted_context_with_seed(
@@ -1575,6 +1953,7 @@ def _run_scan_permutation(
                 valid_branch_ids=valid_branch_ids,
                 ON_tensor=ON_tensor,
                 rate_ON_tensor=rate_ON_tensor,
+                scan_static=scan_static,
             )
             for key, pvalue in perm_by_key.items():
                 if key in observed_keys:
@@ -1585,6 +1964,7 @@ def _run_scan_permutation(
                 ON_tensor=ON_tensor,
                 rate_ON_tensor=rate_ON_tensor,
                 scan_context=scan_context,
+                scan_static=scan_static,
             )
             if perm_df.shape[0] == 0:
                 min_p = 1.0
@@ -1622,7 +2002,11 @@ def _run_scan_permutation_chunk(
     valid_branch_ids,
     ON_tensor,
     rate_ON_tensor,
+    scan_static,
 ):
+    g, scan_static = _unpack_scan_worker_context(g=g, scan_static=scan_static)
+    ON_tensor = _unpack_scan_tensor_for_worker(ON_tensor)
+    rate_ON_tensor = _unpack_scan_tensor_for_worker(rate_ON_tensor)
     return [
         _run_scan_permutation(
             permutation_index=int(permutation_index),
@@ -1635,20 +2019,21 @@ def _run_scan_permutation_chunk(
             valid_branch_ids=valid_branch_ids,
             ON_tensor=ON_tensor,
             rate_ON_tensor=rate_ON_tensor,
+            scan_static=scan_static,
         )
         for permutation_index in np.asarray(permutation_indices, dtype=np.int64).reshape(-1).tolist()
     ]
 
 
-def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor):
+def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_static):
     calibration = normalize_scan_pvalue_calibration(g.get("scan_pvalue_calibration", "full_scan"))
     if calibration == "none":
         return observed_df
     n_permutations = normalize_scan_n_permutations(g.get("scan_n_permutations", 1000))
     if n_permutations == 0 or observed_df.shape[0] == 0:
         return observed_df
-    branch_meta = build_branch_metadata(g)
-    valid_branch_ids = branch_meta["branch_id"].astype(int).to_numpy(copy=False)
+    branch_meta = scan_static["branch_meta"]
+    valid_branch_ids = scan_static["valid_branch_ids"]
     trait_names = g["fg_df"].columns[1:].tolist()
     row_key_to_perm_p = {_scan_row_key(row): [] for _, row in observed_df.iterrows()}
     observed_keys = set(row_key_to_perm_p.keys())
@@ -1663,27 +2048,61 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor):
         threads=n_jobs,
         chunk_factor=chunk_factor,
     )
+    owned_worker_paths = []
+    if (backend == "multiprocessing") and (n_jobs > 1):
+        worker_g, worker_scan_static, owned_worker_paths = _pack_scan_worker_context(
+            g=g,
+            scan_static=scan_static,
+        )
+        worker_ON_tensor = _pack_scan_array_for_worker(
+            ON_tensor,
+            name="ON_tensor",
+            owned_paths=owned_worker_paths,
+            min_copy_bytes=0,
+        )
+        if rate_ON_tensor is ON_tensor:
+            worker_rate_ON_tensor = worker_ON_tensor
+        else:
+            worker_rate_ON_tensor = _pack_scan_array_for_worker(
+                rate_ON_tensor,
+                name="rate_ON_tensor",
+                owned_paths=owned_worker_paths,
+                min_copy_bytes=0,
+            )
+    else:
+        worker_g = g
+        worker_scan_static = scan_static
+        worker_ON_tensor = ON_tensor
+        worker_rate_ON_tensor = rate_ON_tensor
     permutation_args = [
         (
             permutation_chunk,
-            g,
+            worker_g,
             observed_df,
             observed_keys,
             calibration,
             trait_names,
             branch_meta,
             valid_branch_ids,
-            ON_tensor,
-            rate_ON_tensor,
+            worker_ON_tensor,
+            worker_rate_ON_tensor,
+            worker_scan_static,
         )
         for permutation_chunk in permutation_chunks
     ]
-    chunk_results = parallel.run_starmap(
-        _run_scan_permutation_chunk,
-        permutation_args,
-        n_jobs=n_jobs,
-        backend=backend,
-    )
+    try:
+        chunk_results = parallel.run_starmap(
+            _run_scan_permutation_chunk,
+            permutation_args,
+            n_jobs=n_jobs,
+            backend=backend,
+        )
+    finally:
+        for path in owned_worker_paths:
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
     results = [result for chunk_result in chunk_results for result in chunk_result]
     success_count = 0
     failure_count = 0
@@ -1750,13 +2169,34 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor):
 
 
 def scan_substitutions(g, ON_tensor, rate_ON_tensor=None):
-    scan_df, units = _scan_substitutions_core(g=g, ON_tensor=ON_tensor, rate_ON_tensor=rate_ON_tensor)
+    scan_static = _build_scan_static_context(g=g, ON_tensor=ON_tensor)
+    scan_df, units = _scan_substitutions_core(
+        g=g,
+        ON_tensor=ON_tensor,
+        rate_ON_tensor=rate_ON_tensor,
+        scan_static=scan_static,
+    )
     scan_df = _calibrate_scan_pvalues(
         g=g,
         observed_df=scan_df,
         ON_tensor=ON_tensor,
         rate_ON_tensor=rate_ON_tensor if rate_ON_tensor is not None else ON_tensor,
+        scan_static=scan_static,
     )
     if scan_df.shape[0] > 0:
+        empirical_p = scan_df["p_rate_enrichment_empirical"].to_numpy(dtype=np.float64)
+        scan_df["q_rate_enrichment_empirical"] = _bh_qvalues(empirical_p)
+        scan_df = _assign_grouped_qvalues(
+            scan_df=scan_df,
+            out_col="q_rate_enrichment_empirical_by_trait",
+            group_cols=["trait"],
+            p_col="p_rate_enrichment_empirical",
+        )
+        scan_df = _assign_grouped_qvalues(
+            scan_df=scan_df,
+            out_col="q_rate_enrichment_empirical_by_trait_match",
+            group_cols=["trait", "scan_match"],
+            p_col="p_rate_enrichment_empirical",
+        )
         scan_df = scan_df.loc[:, [col for col in SCAN_OUTPUT_COLUMNS if col in scan_df.columns]]
     return scan_df, units

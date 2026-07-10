@@ -918,16 +918,18 @@ def drop_invariant_tip_sites(g):
     g['dropped_site_alignment'] = dropped_alignment_sites
     g['num_dropped_tip_invariant_sites'] = num_drop
     g['dropped_tip_invariant_site_alignment'] = dropped_alignment_sites
-    if 'iqtree_rate_values' in g and (g['iqtree_rate_values'] is not None):
-        rate_values = np.asarray(g['iqtree_rate_values'])
+    for rate_key in ['iqtree_rate_values', 'iqtree_categorized_rate_values']:
+        if (rate_key not in g) or (g[rate_key] is None):
+            continue
+        rate_values = np.asarray(g[rate_key])
         num_input_site = int(g.get('num_input_site', rate_values.shape[0]))
         if rate_values.shape[0] == num_input_site:
-            g['iqtree_rate_values'] = rate_values[g['site_index_alignment']]
+            g[rate_key] = rate_values[g['site_index_alignment']]
         elif rate_values.shape[0] == keep_mask.shape[0]:
-            g['iqtree_rate_values'] = rate_values[keep_mask]
+            g[rate_key] = rate_values[keep_mask]
         else:
-            txt = 'iqtree_rate_values length ({}) did not match num_input_site ({}) or current site axis ({}).'
-            raise ValueError(txt.format(rate_values.shape[0], num_input_site, keep_mask.shape[0]))
+            txt = '{} length ({}) did not match num_input_site ({}) or current site axis ({}).'
+            raise ValueError(txt.format(rate_key, rate_values.shape[0], num_input_site, keep_mask.shape[0]))
     map_path = None
     if bool(g.get('write_site_index_map', False)):
         map_path = write_site_index_map(

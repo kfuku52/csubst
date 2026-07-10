@@ -1,6 +1,6 @@
 # Method review for `csubst scan`
 
-Date: 2026-06-26
+Date: 2026-06-26 (updated 2026-07-10)
 
 This report reviews the theoretical status of the current `csubst scan` implementation and compares it with methods that address similar questions: explicit convergent amino-acid substitution counting, PCOC/profile-shift methods, CSUBST omegaC-style convergence-rate tests, and ESL-PSC-style predictive approaches.
 
@@ -10,17 +10,18 @@ The current implementation does the following:
 
 1. Infer nonsynonymous-state substitutions from ancestral-state posterior tensors.
 2. Keep branch-site-state events whose posterior event probability is at least `--scan_min_event_pp`.
-3. Build candidate substitution patterns from foreground branches.
+3. Build candidate substitution patterns from foreground discovery branches (stem branches by default).
 4. Keep candidates whose lineage-level support is at least `--scan_min_support`.
 5. For each retained candidate, compute:
-   - foreground event count: sum of matching event mass in foreground branches
+   - foreground event count: sum of matching event mass in the whole foreground clades
    - other event count: sum of matching event mass in the configured control branch set
    - foreground exposure: branch length multiplied by opportunity
    - other exposure: same for the configured control branch set
 6. Under the default `--scan_rate_event_mode posterior_sum`, candidate discovery/support remain thresholded, but rate P values use all matching posterior event mass. `called` is available for the previous thresholded-count behavior.
-7. Under the default `--scan_rate_exposure q_weighted`, opportunity is posterior parent-state mass in candidate ancestral states multiplied by the candidate nonsynonymous transition weight. With the default `--scan_rate_length n_rescaled`, this weight is the conditional probability of the candidate transition among all nonsynonymous outgoing transitions from the parent state; with raw/S+N lengths, it is the nonsynonymous instantaneous rate toward the candidate derived state. This excludes post-hit descendant branch length when the parent state has already reached the candidate derived state. `state_aware` is available as the same state filter without Q weighting.
+7. Candidate/support branches and rate branches are separate: stem-only discovery still assigns descendant foreground-clade branches to the foreground rate set. Under the default `--scan_rate_exposure q_weighted`, opportunity is computed from the parent codon posterior and codon Q matrix. With the default `--scan_rate_length n_rescaled`, each parent codon's candidate rate is divided by its total outgoing rate to other nonsynonymous states; with raw/S+N lengths, the unnormalized candidate codon rate is used. This excludes post-hit descendant branch length when the parent state has already reached the candidate derived state, while allowing opportunity to return after a reversion. `state_aware` is available as the same state filter without Q weighting. For `3di20`, `q_weighted` resolves to `state_aware` because the fitted codon Q does not define 3Di-state transition rates.
 8. A one-sided Poisson LRT compares target rate vs other rate.
-9. By default, `--scan_pvalue_calibration full_scan` reruns candidate discovery on foreground-clade permutations and reports a maxT-style empirical P value.
+9. By default, `--scan_pvalue_calibration full_scan` reruns candidate discovery on size-binned, non-overlapping foreground-clade permutations and reports a maxT-style empirical P value.
+10. Parallel permutation workers reuse static candidate data and reopen large substitution/posterior-state arrays from read-only memmaps instead of serializing one dense copy per worker.
 
 In formula form, for a fixed candidate pattern:
 
@@ -165,7 +166,7 @@ p_rate_enrichment is a post-selection screening statistic for called candidate s
 
 Implemented / remaining fixes:
 
-- foreground-clade permutation matched by clade size, with `full_scan` as the default calibration
+- non-overlapping foreground-clade permutation matched by clade-size bin, with `full_scan` as the default calibration
 - split-sample or split-branch discovery/testing
 - simulation under fitted null models
 - report empirical P values alongside the current analytic P value
@@ -217,9 +218,9 @@ Potential fixes:
 
 Severity: medium.
 
-`q_weighted` exposure first applies the state-aware filter, so branches whose parent state cannot produce the candidate substitution contribute little or nothing. It then weights each possible parent-to-derived transition by the fitted nonsynonymous instantaneous rate matrix. When the selected length is `n_rescaled`, the weight is normalized by the total nonsynonymous outgoing rate from that parent state, because the branch length has already been rescaled to nonsynonymous substitutions. This is the most model-aware fast denominator currently implemented.
+`q_weighted` exposure first applies the state-aware filter, so branches whose parent state cannot produce the candidate substitution contribute little or nothing. It then integrates each possible transition over the site- and branch-specific parent codon posterior using the fitted codon Q matrix. When the selected length is `n_rescaled`, each codon's weight is normalized by its total outgoing rate to other nonsynonymous states, because the branch length has already been rescaled to nonsynonymous-state substitutions. This is the most model-aware fast denominator currently implemented for amino-acid and codon-defined recoded states.
 
-This handles the user's stem-completion concern in a fair way and avoids the origin-weight correction problem discussed separately. It includes candidate-specific exchangeability, codon mutational accessibility, codon degeneracy, and nonsynonymous recoding through the fitted Q matrix. It still does not include:
+This handles the user's stem-completion concern in a fair way and avoids the origin-weight correction problem discussed separately. Candidate discovery can remain stem-only while rate accounting includes all foreground-clade descendants. It includes candidate-specific exchangeability, codon mutational accessibility, codon usage through the parent posterior, codon degeneracy, and codon-defined nonsynonymous recoding. It still does not include:
 
 - site-specific amino-acid preference,
 - uncertainty in the fitted substitution model,
@@ -227,7 +228,8 @@ This handles the user's stem-completion concern in a fair way and avoids the ori
 
 Implemented / remaining fixes:
 
-- Implemented: `q_weighted` exposure, defined as parent posterior mass times candidate transition weight; the weight is conditional on nonsynonymous outgoing rate under `n_rescaled` branch length.
+- Implemented: `q_weighted` exposure from parent codon posterior and codon Q; the weight is conditional on outgoing rates to other nonsynonymous states under `n_rescaled` branch length.
+- Implemented: safe `state_aware` fallback for 3Di states until a genuine 3Di Q model is available.
 - Remaining: parametric simulation or model-expected candidate counts for confirmatory calibration.
 - Remaining: optional site-rate-stratified empirical nulls.
 
@@ -253,17 +255,17 @@ BH q-values are useful for ranking, but the tested rows are highly dependent:
 - match classes overlap, especially `any2any`, `any2spe`, and `spe2spe`.
 - candidates are selected before testing.
 
-Potential fixes:
+Implemented / remaining fixes:
 
-- Add q-values stratified by `trait` and `scan_match`.
+- Implemented: analytic and candidate-wise empirical q-values globally, by `trait`, and by `trait` + `scan_match`.
 - Add candidate-level q-values, using one row per `scan_id` per hypothesis family.
-- Prefer empirical null calibration for final significance claims.
+- Prefer the full-scan maxT empirical P value for scan-wide significance claims; it is already family-wise calibrated and does not need BH correction.
 
 ### Issue 7: Site Rate and Conservation Are Annotations, Not Null-Model Terms
 
 Severity: low.
 
-Including site rate and conservation in the output is theoretically clean as prioritization metadata. They are not currently used in the P value, so they do not create circularity in the test. However, if users select hits after looking at these annotations, the final biological claim becomes a post hoc prioritization.
+Including site rate and conservation in the output is theoretically clean as prioritization metadata. `site_rate` uses IQ-TREE's posterior-mean `Rate`, `site_rate_categorized` retains the category representative, and tied mean rates receive the same average quantile. They are not currently used in the P value, so they do not create circularity in the test. However, if users select hits after looking at these annotations, the final biological claim becomes a post hoc prioritization.
 
 Potential fixes:
 

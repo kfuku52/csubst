@@ -408,13 +408,14 @@ def read_rate(g):
     rate_table = pd.read_csv(g['path_iqtree_rate'], sep='\t', header=0, comment='#')
     rate_table.columns = [str(col).strip() for col in rate_table.columns]
     if rate_table.shape[0] == 0:
+        g['iqtree_categorized_rate_values'] = np.ones(g['num_input_site'])
         return np.ones(g['num_input_site'])
     column_by_lower = {str(col).lower(): str(col) for col in rate_table.columns}
-    if 'c_rate' in column_by_lower:
-        rate_col = column_by_lower['c_rate']
-    elif 'rate' in column_by_lower:
+    if 'rate' in column_by_lower:
         rate_col = column_by_lower['rate']
-        txt = 'Using "Rate" column from IQ-TREE rate file because "C_Rate" was not found.'
+    elif 'c_rate' in column_by_lower:
+        rate_col = column_by_lower['c_rate']
+        txt = 'Using categorized "C_Rate" because posterior-mean "Rate" was not found in the IQ-TREE rate file.'
         print(txt, flush=True)
     else:
         available_cols = ','.join([str(c) for c in rate_table.columns.tolist()])
@@ -428,6 +429,15 @@ def read_rate(g):
     if rate_sites.shape[0] != expected_sites:
         txt = 'The number of site-rate rows in {} ({}) did not match num_input_site ({}).'
         raise ValueError(txt.format(g['path_iqtree_rate'], rate_sites.shape[0], expected_sites))
+    if 'c_rate' in column_by_lower:
+        categorized = pd.to_numeric(
+            rate_table.loc[:, column_by_lower['c_rate']], errors='coerce'
+        ).to_numpy(dtype=float)
+        if (categorized.shape[0] != expected_sites) or (not np.isfinite(categorized).all()):
+            raise ValueError('Invalid categorized site-rate values were found in {}.'.format(g['path_iqtree_rate']))
+        g['iqtree_categorized_rate_values'] = categorized
+    else:
+        g['iqtree_categorized_rate_values'] = None
     return rate_sites
 
 def read_iqtree(g, eq=True):

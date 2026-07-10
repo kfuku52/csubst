@@ -1,6 +1,7 @@
 import time
 
 import numpy as np
+import pandas as pd
 
 from csubst import parser_misc
 from csubst import runtime
@@ -24,6 +25,18 @@ def _scan_foreground_branch_ids(g):
     if len(fg_ids) == 0:
         return np.array([], dtype=np.int64)
     return np.array(sorted(set(fg_ids)), dtype=np.int64)
+
+
+def _prepare_scan_output_table(scan_df):
+    out = scan_df.copy()
+    stat_columns = [
+        col for col in out.columns
+        if str(col).startswith("p_") or str(col).startswith("q_")
+    ]
+    for col in stat_columns:
+        values = np.asarray(pd.to_numeric(out[col], errors="coerce"), dtype=np.float64)
+        out[col] = ["{:.6e}".format(value) if np.isfinite(value) else "" for value in values]
+    return out
 
 
 def _write_scan_site_plot(g, scan_df, ON_tensor):
@@ -90,7 +103,14 @@ def main_scan(g):
     ON_tensor_called = ON_tensor_rate
     if float(g.get("min_sub_pp", 0)) != 0:
         if (rate_event_mode == "posterior_sum") and (not substitution._is_sparse_sub_tensor(ON_tensor_rate)):
-            ON_tensor_called = ON_tensor_rate.copy()
+            called_path = runtime.temp_path("tmp.csubst.sub_tensor.scan_N_called.mmap")
+            ON_tensor_called = np.memmap(
+                called_path,
+                dtype=ON_tensor_rate.dtype,
+                mode="w+",
+                shape=ON_tensor_rate.shape,
+            )
+            np.copyto(ON_tensor_called, ON_tensor_rate)
         ON_tensor_called = substitution.apply_min_sub_pp(g, ON_tensor_called)
     print("Generating synonymous substitution tensor for branch-length context.", flush=True)
     OS_tensor = substitution.get_substitution_tensor(
@@ -101,6 +121,7 @@ def main_scan(g):
     )
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
     g = tree.rescale_branch_length(g, OS_tensor, ON_tensor_called)
+    del OS_tensor
     print("Scanning recurrent foreground substitution patterns.", flush=True)
     rate_ON_tensor = ON_tensor_rate if rate_event_mode == "posterior_sum" else ON_tensor_called
     scan_df, units_df = substitution_scan.scan_substitutions(
@@ -112,7 +133,8 @@ def main_scan(g):
     units_path = runtime.output_path(g, "scan_units.tsv")
     if scan_df.shape[0] == 0:
         print("No scan candidates passed the configured thresholds.", flush=True)
-    scan_df.to_csv(
+    scan_output_df = _prepare_scan_output_table(scan_df)
+    scan_output_df.to_csv(
         scan_path,
         sep="\t",
         index=False,

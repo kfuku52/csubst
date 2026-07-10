@@ -238,6 +238,22 @@ def test_read_rate_falls_back_to_rate_column_when_c_rate_is_missing(tmp_path):
     np.testing.assert_allclose(out, [0.5, 1.5], atol=1e-12)
 
 
+def test_read_rate_prefers_posterior_mean_rate_and_retains_categorized_rate(tmp_path):
+    rate_file = tmp_path / "toy.rate"
+    rate_file.write_text(
+        "Site\tRate\tC_Rate\n"
+        "1\t0.25\t0.10\n"
+        "2\t1.75\t2.00\n",
+        encoding="utf-8",
+    )
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 2}
+
+    out = parser_iqtree.read_rate(g)
+
+    np.testing.assert_allclose(out, [0.25, 1.75], atol=1e-12)
+    np.testing.assert_allclose(g["iqtree_categorized_rate_values"], [0.10, 2.00], atol=1e-12)
+
+
 def test_read_rate_accepts_whitespace_padded_column_name(tmp_path):
     rate_file = tmp_path / "toy.rate"
     rate_file.write_text(
