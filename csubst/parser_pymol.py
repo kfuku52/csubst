@@ -10,7 +10,6 @@ import copy
 import os
 import re
 import subprocess
-import sys
 import time
 
 from csubst import sequence
@@ -780,7 +779,7 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
             continue
         for ch in pymol.cmd.get_chains(object_name):
             codon_site_col = 'codon_site_pdb_'+object_name+'_'+ch
-            if not codon_site_col in df.columns:
+            if codon_site_col not in df.columns:
                 continue
             site_values, valid_site_mask = _extract_positive_site_array(df.loc[:, codon_site_col])
             if mode=='set':

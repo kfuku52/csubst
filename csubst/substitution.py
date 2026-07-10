@@ -977,7 +977,8 @@ def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None)
         num_state = g['max_synonymous_size']
     axis = (num_branch,num_site,num_syngroup,num_state,num_state) # axis = [branch,site,matrix_group,state_from,state_to]
     mmap_tensor = runtime.temp_path('tmp.csubst.sub_tensor.'+mmap_attr+'.mmap')
-    if os.path.exists(mmap_tensor): os.unlink(mmap_tensor)
+    if os.path.exists(mmap_tensor):
+        os.unlink(mmap_tensor)
     txt = 'Generating memory map: dtype={}, axis={}, path={}'
     print(txt.format(state_tensor.dtype, axis, mmap_tensor), flush=True)
     sub_tensor = np.memmap(mmap_tensor, dtype=dtype, shape=axis, mode='w+')

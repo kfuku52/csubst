@@ -2118,7 +2118,7 @@ def test_plot_tree_site_lineage_svg_uses_branch_palette_and_plots_all_threshold_
     assert table_path.exists()
 
     plotted_df = pd.read_csv(table_path, sep="\t")
-    plotted_sites = plotted_df.loc[plotted_df["is_plotted"] == True, "codon_site_alignment"].astype(int).tolist()
+    plotted_sites = plotted_df.loc[plotted_df["is_plotted"], "codon_site_alignment"].astype(int).tolist()
     assert plotted_sites == [2, 3]
 
     branch_rgb = main_sites._get_lineage_rgb_by_branch(branch_ids=branch_ids, g=g)
@@ -2196,7 +2196,7 @@ def test_plot_tree_site_set_svg_includes_branch_heatmap_panel(tmp_path, tiny_tre
     assert table_path.exists()
 
     plotted_df = pd.read_csv(table_path, sep="\t")
-    plotted_sites = plotted_df.loc[plotted_df["is_plotted"] == True, "codon_site_alignment"].astype(int).tolist()
+    plotted_sites = plotted_df.loc[plotted_df["is_plotted"], "codon_site_alignment"].astype(int).tolist()
     assert plotted_sites == [2, 3]
 
     svg_text = svg_path.read_text(encoding="utf-8").lower()
@@ -2462,6 +2462,7 @@ def test_write_site_output_manifest_records_files_and_parameters(tmp_path):
     assert (out_df.loc[:, "output_kind"] == "output_manifest").any()
     manifest_row = out_df.loc[out_df.loc[:, "output_kind"] == "output_manifest", :].iloc[0]
     assert manifest_row["file_exists"] == "Y"
+    assert int(manifest_row["file_size_bytes"]) == Path(manifest_path).stat().st_size
     site_row = out_df.loc[out_df.loc[:, "output_kind"] == "site_table_tsv", :].iloc[0]
     assert site_row["file_exists"] == "Y"
     assert int(site_row["file_size_bytes"]) > 0

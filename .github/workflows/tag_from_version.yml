@@ -3,8 +3,11 @@ name: Create GitHub Tag from __version__
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   create_tag:
@@ -12,27 +15,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Detect version using AST
         id: get_version
         run: |
-          echo "🔍 Searching for __init__.py..."
+          INIT_PATH=csubst/__init__.py
+          echo "Reading version from: $INIT_PATH"
 
-          INIT_PATH=$(find . -type f -name '__init__.py' | head -n1)
-          echo "Found: $INIT_PATH"
-
-          echo 'import ast' > get_version.py
-          echo 'with open("'"$INIT_PATH"'") as f:' >> get_version.py
-          echo '    tree = ast.parse(f.read())' >> get_version.py
-          echo 'for node in ast.walk(tree):' >> get_version.py
-          echo '    if isinstance(node, ast.Assign):' >> get_version.py
-          echo '        if getattr(node.targets[0], "id", None) == "__version__":' >> get_version.py
-          echo '            print(node.value.s)' >> get_version.py
-          echo '            break' >> get_version.py
-
-          VERSION=$(python3 get_version.py)
-          PACKAGE=$(basename $(dirname "$INIT_PATH"))
+          VERSION=$(python3 -c 'import ast, pathlib; tree=ast.parse(pathlib.Path("csubst/__init__.py").read_text()); values=[ast.literal_eval(node.value) for node in ast.walk(tree) if isinstance(node, ast.Assign) and any(getattr(target, "id", None) == "__version__" for target in node.targets)]; print(values[0] if len(values) == 1 else "")')
+          PACKAGE=csubst
 
           if [ -z "$VERSION" ]; then
             echo "❌ __version__ not found in $INIT_PATH"
@@ -48,7 +40,7 @@ jobs:
       - name: Create tag if not exists
         run: |
           git fetch --tags
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+          if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
             echo "✅ Tag v$VERSION already exists. Skipping."
           else
             echo "🏷 Creating new tag v$VERSION"

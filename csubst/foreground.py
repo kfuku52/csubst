@@ -6,11 +6,11 @@ import itertools
 import re
 import sys
 import time
-import warnings
 
 from csubst import combination
 from csubst import omega
 from csubst import parallel
+from csubst import randomness
 from csubst import table
 from csubst import param
 from csubst import ete
@@ -371,15 +371,18 @@ def _build_clade_permutation_bins(df_clade_size, trait_name, min_clade_bin_count
     return bins, counts, size_array
 
 
-def _randomize_foreground_flags(before_randomization, sample_original_foreground):
+def _randomize_foreground_flags(before_randomization, sample_original_foreground, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
     if sample_original_foreground:
-        return np.random.permutation(before_randomization)
-    ind_fg = np.where(before_randomization == True)[0]
-    ind_nonfg = np.where(before_randomization == False)[0]
+        return rng.permutation(before_randomization)
+    before_randomization = np.asarray(before_randomization, dtype=bool)
+    ind_fg = np.where(before_randomization)[0]
+    ind_nonfg = np.where(~before_randomization)[0]
     if ind_nonfg.shape[0] < ind_fg.shape[0]:
         txt = 'Not enough non-foreground clades for permutation (required {}, available {}).'
         raise ValueError(txt.format(ind_fg.shape[0], ind_nonfg.shape[0]))
-    ind_rfg = np.random.choice(ind_nonfg, ind_fg.shape[0], replace=False)
+    ind_rfg = rng.choice(ind_nonfg, ind_fg.shape[0], replace=False)
     after_randomization = np.zeros_like(before_randomization, dtype=bool)
     after_randomization[ind_rfg] = True
     return after_randomization
@@ -387,7 +390,8 @@ def _randomize_foreground_flags(before_randomization, sample_original_foreground
 
 def _block_randomized_foreground_descendants(df_clade_size, is_bin, node_by_id):
     is_blocked = df_clade_size.loc[:, 'is_blocked'].values
-    is_new_fg = is_bin & ~is_blocked & (df_clade_size.loc[:, 'is_fg_stem_randomized'] == True)
+    is_randomized = df_clade_size.loc[:, 'is_fg_stem_randomized'].to_numpy(dtype=bool, copy=False)
+    is_new_fg = is_bin & ~is_blocked & is_randomized
     new_fg_bids = df_clade_size.loc[is_new_fg, 'branch_id'].values
     for new_fg_bid in new_fg_bids:
         node = node_by_id.get(int(new_fg_bid), None)
@@ -418,6 +422,12 @@ def foreground_clade_randomization(df_clade_size, g, trait_name, sample_original
     branch_id_to_index = trait_cache['branch_id_to_index']
     descendant_indices_by_bid = trait_cache.get('descendant_indices_by_bid', None)
     node_by_id = None
+    rng = randomness.next_generator(
+        g,
+        'foreground_clade_legacy',
+        str(trait_name),
+        bool(sample_original_foreground),
+    )
     if descendant_indices_by_bid is None:
         node_by_id = _get_node_by_branch_id(g)
     for bin_no in fg_bins:
@@ -427,6 +437,7 @@ def foreground_clade_randomization(df_clade_size, g, trait_name, sample_original
         after_randomization = _randomize_foreground_flags(
             before_randomization=before_randomization,
             sample_original_foreground=sample_original_foreground,
+            rng=rng,
         )
         is_fg_stem_randomized[is_eligible] = after_randomization
         is_new_fg = is_eligible & is_fg_stem_randomized
@@ -507,7 +518,14 @@ def _get_clade_permutation_randomization_plan(g, trait_name, sample_original_for
     return cache[cache_key]
 
 
-def _randomize_foreground_stem_flags_from_plan(trait_cache, randomization_plan, sample_original_foreground):
+def _randomize_foreground_stem_flags_from_plan(
+    trait_cache,
+    randomization_plan,
+    sample_original_foreground,
+    rng=None,
+):
+    if rng is None:
+        rng = np.random.default_rng()
     is_fg_stem = np.asarray(trait_cache['is_fg_stem'], dtype=bool).reshape(-1)
     descendant_indices_by_index = trait_cache['descendant_indices_by_index']
     last_error = None
@@ -535,7 +553,7 @@ def _randomize_foreground_stem_flags_from_plan(trait_cache, randomization_plan, 
                     if eligible_indices.shape[0] == 0:
                         txt = 'Not enough non-overlapping clades for permutation in bin {}.'
                         raise ValueError(txt.format(int(bin_no)))
-                    new_fg_index = int(np.random.choice(eligible_indices))
+                    new_fg_index = int(rng.choice(eligible_indices))
                     is_fg_stem_randomized[new_fg_index] = True
                     descendant_indices = descendant_indices_by_index[new_fg_index]
                     descendant_indices = descendant_indices[descendant_indices != new_fg_index]
@@ -579,7 +597,7 @@ def _infer_trait_name_from_clade_size(df_clade_size):
 
 
 def get_new_foreground_ids(df_clade_size, g, trait_name=None):
-    is_new_fg = (df_clade_size.loc[:,'is_fg_stem_randomized']==True)
+    is_new_fg = df_clade_size.loc[:, 'is_fg_stem_randomized'].to_numpy(dtype=bool, copy=False)
     fg_stem_bids = df_clade_size.loc[is_new_fg,'branch_id'].to_numpy(dtype=np.int64, copy=False)
     if fg_stem_bids.shape[0] == 0:
         return np.array([], dtype=np.int64)
@@ -673,7 +691,7 @@ def _get_lineage_target_ids(lineage_index, trait_name, g):
         else:
             is_lineage_fg = ete.get_prop(node, lineage_flag_key, False)
             is_parent_lineage_fg = ete.get_prop(node.up, lineage_flag_key, False)
-            if (is_lineage_fg == True) & (is_parent_lineage_fg == False):
+            if bool(is_lineage_fg) and (not bool(is_parent_lineage_fg)):
                 lineage_fg_ids.append(ete.get_prop(node, "numerical_label"))
     dif = 1
     while dif:
@@ -723,7 +741,7 @@ def annotate_foreground(lineages, trait_name, g):
                     ete.add_features(node, **{'labelcolor_' + trait_name: lineage_color})
             else:
                 is_lineage_fg = ete.get_prop(node, lineage_prop, False)
-                if is_lineage_fg == True:
+                if bool(is_lineage_fg):
                     ete.add_features(node, **{'is_fg_' + trait_name: True})
                     ete.add_features(node, **{'foreground_lineage_id_' + trait_name: int(i + 1)})
                     ete.add_features(node, **{'color_' + trait_name: lineage_color})
@@ -832,10 +850,17 @@ def randomize_foreground_branch(g, trait_name, sample_original_foreground=False)
         trait_name=trait_name,
         sample_original_foreground=sample_original_foreground,
     )
+    rng = randomness.next_generator(
+        g,
+        'foreground_clade_permutation',
+        str(trait_name),
+        bool(sample_original_foreground),
+    )
     is_fg_stem_randomized = _randomize_foreground_stem_flags_from_plan(
         trait_cache=trait_cache,
         randomization_plan=randomization_plan,
         sample_original_foreground=sample_original_foreground,
+        rng=rng,
     )
     randomized_stem_indices = np.where(is_fg_stem_randomized)[0].astype(np.int64, copy=False)
     count_cache = g.get('_clade_permutation_combination_count_cache', None)
@@ -868,23 +893,23 @@ def get_marginal_branch(g):
             if ete.is_root(node):
                 continue
             is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
-            if (is_fg==False):
+            if not bool(is_fg):
                 continue
             if (g['mg_parent']):
                 is_parent_fg = ete.get_prop(node.up, 'is_fg_' + trait_name, False)
-                if (is_parent_fg==False):
+                if not bool(is_parent_fg):
                     g['mg_ids'][trait_name].append(ete.get_prop(node.up, "numerical_label"))
             if (g['mg_sister']):
                 sisters = ete.get_sisters(node)
                 for sister in sisters:
                     if (g['mg_sister_stem_only']):
                         is_sister_fg = ete.get_prop(sister, 'is_fg_' + trait_name, False)
-                        if is_sister_fg==False:
+                        if not bool(is_sister_fg):
                             g['mg_ids'][trait_name].append(ete.get_prop(sister, "numerical_label"))
                     else:
                         for sister_des in sister.traverse():
                             is_sister_des_fg = ete.get_prop(sister_des, 'is_fg_' + trait_name, False)
-                            if is_sister_des_fg==False:
+                            if not bool(is_sister_des_fg):
                                 g['mg_ids'][trait_name].append(ete.get_prop(sister_des, "numerical_label"))
         concat_ids = list(set(g['mg_ids'][trait_name]) - set(target_ids.tolist()))
         g['mg_ids'][trait_name] = np.array(concat_ids, dtype=np.int64)
@@ -955,7 +980,7 @@ def get_foreground_branch_num(cb, g):
         txt = txt.format(arity, g['cutoff_stat'], trait_name, percent_fg_enough, num_fg_enough, num_enough,
                          num_all, enrichment_factor)
         print(txt, flush=True)
-        if not 'fg_enrichment_factor_'+trait_name in g['df_cb_stats'].columns:
+        if 'fg_enrichment_factor_' + trait_name not in g['df_cb_stats'].columns:
             g['df_cb_stats']['fg_enrichment_factor_'+trait_name] = np.nan
         g['df_cb_stats'].at[0,'fg_enrichment_factor_'+trait_name] = enrichment_factor
     txt = 'Time elapsed for obtaining foreground branch numbers in the cb table: {:,} sec'

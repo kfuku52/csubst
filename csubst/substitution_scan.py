@@ -2,7 +2,6 @@ import math
 import os
 import re
 import tempfile
-import threading
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
 
 import numpy as np
@@ -13,6 +12,7 @@ from csubst import ete
 from csubst import foreground
 from csubst import parallel
 from csubst import parser_misc
+from csubst import randomness
 from csubst import runtime
 from csubst import sequence
 from csubst import substitution
@@ -34,7 +34,6 @@ SCAN_RATE_EVENT_MODES = ("called", "posterior_sum")
 SCAN_RATE_EXPOSURES = ("q_weighted", "state_aware", "raw_branch_length")
 SCAN_OTHER_SCOPES = ("all", "sister")
 SCAN_PVALUE_CALIBRATIONS = ("none", "candidate_fixed", "full_scan")
-_SCAN_PERMUTATION_RANDOM_LOCK = threading.Lock()
 
 
 class _RetryableScanPermutationError(RuntimeError):
@@ -645,7 +644,15 @@ def _selected_stem_fg_branch_ids(g, trait_cache, stem_index):
     return np.array(trait_cache["descendant_branch_ids_by_index"][stem_index], dtype=np.int64)
 
 
-def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_original_foreground):
+def _build_permuted_trait_context(
+    g,
+    trait_name,
+    valid_branch_ids,
+    sample_original_foreground,
+    rng=None,
+):
+    if rng is None:
+        rng = randomness.next_generator(g, 'scan_permutation_direct', str(trait_name))
     if "min_clade_bin_count" not in g:
         g["min_clade_bin_count"] = int(g.get("scan_permutation_min_clade_bin_count", 10))
     trait_cache = foreground._get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
@@ -658,6 +665,7 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
         trait_cache=trait_cache,
         randomization_plan=randomization_plan,
         sample_original_foreground=sample_original_foreground,
+        rng=rng,
     )
     stem_indices = np.where(stem_flags)[0].astype(np.int64, copy=False)
     valid_set = set(int(v) for v in np.asarray(valid_branch_ids, dtype=np.int64).reshape(-1).tolist())
@@ -735,7 +743,15 @@ def _build_permuted_trait_context(g, trait_name, valid_branch_ids, sample_origin
     }
 
 
-def _build_permuted_scan_context(g, trait_names, valid_branch_ids, sample_original_foreground):
+def _build_permuted_scan_context(
+    g,
+    trait_names,
+    valid_branch_ids,
+    sample_original_foreground,
+    rng=None,
+):
+    if rng is None:
+        rng = randomness.next_generator(g, 'scan_permutation_context')
     units = []
     fg_ids = {}
     rate_fg_ids = {}
@@ -746,6 +762,7 @@ def _build_permuted_scan_context(g, trait_names, valid_branch_ids, sample_origin
             trait_name=trait_name,
             valid_branch_ids=valid_branch_ids,
             sample_original_foreground=sample_original_foreground,
+            rng=rng,
         )
         units.append(trait_context["units"])
         fg_ids[trait_name] = trait_context["fg_ids"]
@@ -873,7 +890,7 @@ def _support_for_unit(branch_event, branch_ids, min_event_pp):
     supporting = []
     for bid in branch_ids.tolist():
         value = float(branch_event.get(int(bid), 0.0))
-        if value >= float(min_event_pp):
+        if (value > 0.0) and (value >= float(min_event_pp)):
             values.append(value)
             supporting.append(int(bid))
     if len(values) == 0:
@@ -901,7 +918,7 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
     for _, row in units_df.iterrows():
         fg_ids = _parse_id_list(row.get("fg_branch_ids", ""))
         fg_pp, fg_support_branches = _support_for_unit(branch_event, fg_ids, min_event_pp)
-        is_support = fg_pp >= float(min_event_pp)
+        is_support = len(fg_support_branches) > 0
         pp = fg_pp
         branches = fg_support_branches
         if is_support:
@@ -1807,32 +1824,31 @@ def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutat
     base_seed = int(g.get("scan_permutation_seed", 1))
     sample_original = bool(g.get("scan_permutation_sample_original", False))
     retry_with_original = bool(g.get("scan_permutation_retry_sample_original", True))
-    with _SCAN_PERMUTATION_RANDOM_LOCK:
-        random_state = np.random.get_state()
-        np.random.seed(_scan_permutation_seed(base_seed=base_seed, permutation_index=permutation_index))
-        try:
-            def build_with_retry(sample_original_foreground):
-                last_error = None
-                for _ in range(100):
-                    try:
-                        return _build_permuted_scan_context(
-                            g=g,
-                            trait_names=trait_names,
-                            valid_branch_ids=valid_branch_ids,
-                            sample_original_foreground=sample_original_foreground,
-                        )
-                    except _RetryableScanPermutationError as exc:
-                        last_error = exc
-                raise last_error
+    rng = np.random.default_rng(
+        _scan_permutation_seed(base_seed=base_seed, permutation_index=permutation_index)
+    )
 
+    def build_with_retry(sample_original_foreground):
+        last_error = None
+        for _ in range(100):
             try:
-                return build_with_retry(sample_original_foreground=sample_original)
-            except Exception:
-                if sample_original or (not retry_with_original):
-                    raise
-                return build_with_retry(sample_original_foreground=True)
-        finally:
-            np.random.set_state(random_state)
+                return _build_permuted_scan_context(
+                    g=g,
+                    trait_names=trait_names,
+                    valid_branch_ids=valid_branch_ids,
+                    sample_original_foreground=sample_original_foreground,
+                    rng=rng,
+                )
+            except _RetryableScanPermutationError as exc:
+                last_error = exc
+        raise last_error
+
+    try:
+        return build_with_retry(sample_original_foreground=sample_original)
+    except Exception:
+        if sample_original or (not retry_with_original):
+            raise
+        return build_with_retry(sample_original_foreground=True)
 
 
 def _candidate_fixed_permutation_pvalues(

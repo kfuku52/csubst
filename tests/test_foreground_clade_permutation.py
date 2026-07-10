@@ -387,9 +387,12 @@ def test_get_foreground_ids_ignores_string_zero_background_rows():
 
 
 def test_randomize_foreground_flags_without_sample_original_preserves_target_count():
-    np.random.seed(1)
     before = np.array([True, False, False, True, False], dtype=bool)
-    out = foreground._randomize_foreground_flags(before_randomization=before, sample_original_foreground=False)
+    out = foreground._randomize_foreground_flags(
+        before_randomization=before,
+        sample_original_foreground=False,
+        rng=np.random.default_rng(0),
+    )
     assert int(out.sum()) == int(before.sum())
     assert not out[np.where(before)[0]].any()
 
@@ -423,6 +426,7 @@ def test_randomize_foreground_stems_preserves_bin_counts_without_nested_clades()
         trait_cache=trait_cache,
         randomization_plan=randomization_plan,
         sample_original_foreground=False,
+        rng=np.random.default_rng(0),
     )
 
     assert np.where(randomized)[0].tolist() == [0, 3]
@@ -452,11 +456,11 @@ def test_randomize_foreground_stems_avoids_nested_candidates_within_one_bin():
     }
 
     for seed in range(20):
-        np.random.seed(seed)
         randomized = foreground._randomize_foreground_stem_flags_from_plan(
             trait_cache=trait_cache,
             randomization_plan=randomization_plan,
             sample_original_foreground=False,
+            rng=np.random.default_rng(seed),
         )
         selected = set(np.where(randomized)[0].tolist())
         assert len(selected) == 2

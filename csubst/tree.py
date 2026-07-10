@@ -1045,11 +1045,6 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     plt = _get_pyplot()
     xcoord,ycoord,leaves = _get_tree_xy(tree)
     use_aa_logo = (state_mode=='aa') and (state_prob_by_node is not None) and (state_orders is not None)
-    max_logo_sites = 1
-    if use_aa_logo:
-        counts = [_get_logo_site_count(prob) for prob in state_prob_by_node.values() if prob is not None]
-        if len(counts) > 0:
-            max_logo_sites = max(counts)
     labels = []
     show_branch_id_labels = (state_by_node is None)
     branch_id_labels = []
@@ -2242,7 +2237,7 @@ def read_treefile(g):
     return g
 
 def is_consistent_tree_and_aln(g):
-    leaf_names = [l.name for l in ete.get_leaves(g['rooted_tree'])]
+    leaf_names = [leaf.name for leaf in ete.get_leaves(g['rooted_tree'])]
     fasta_dict = sequence.read_fasta(path=g['alignment_file'])
     seq_names = list(fasta_dict.keys())
     is_consistent = set(leaf_names) == set(seq_names)

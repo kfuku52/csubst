@@ -654,7 +654,10 @@ def get_internal_site_nonzero_masks(tree, state_tensor=None, selected_internal_i
             continue
         group_nonzero = list()
         for grp in groups:
-            leaf_nls = np.array([int(ete.get_prop(l, "numerical_label")) for l in ete.get_leaves(grp)], dtype=int)
+            leaf_nls = np.array(
+                [int(ete.get_prop(leaf, "numerical_label")) for leaf in ete.get_leaves(grp)],
+                dtype=int,
+            )
             if leaf_nls.shape[0] == 0:
                 continue
             if leaf_nonmissing_sites is None:

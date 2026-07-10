@@ -3,7 +3,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 
-import datetime
 import itertools
 import os
 import re
@@ -1180,7 +1179,6 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank4')
         df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
         df_dist = get_df_dist(sub_tensor=sub_tensor, g=g, mode=mode)
-        df_dist_target = get_df_dist(sub_tensor=sub_target, g=g, mode=mode)
         df_ad = pd.merge(df_ad, df_dist, on=['group','state_from','state_to'])
         out_path = os.path.join(g['site_outdir'], outfile)
         df_ad.to_csv(out_path, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)

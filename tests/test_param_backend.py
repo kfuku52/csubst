@@ -21,6 +21,7 @@ def _args(**kwargs):
 
 def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     g = param.get_global_parameters(_args())
+    assert g["random_seed"] == 1
     assert g["sub_tensor_backend"] == "auto"
     assert g["sub_tensor_sparse_density_cutoff"] == pytest.approx(0.15)
     assert g["sub_tensor_auto_sparse_min_elements"] == 100000000
@@ -52,6 +53,12 @@ def test_get_global_parameters_builds_run_context_and_output_namespace(tmp_path,
 def test_get_global_parameters_rejects_unsupported_float_type():
     with pytest.raises(ValueError, match="float_type"):
         param.get_global_parameters(_args(float_type=128))
+
+
+@pytest.mark.parametrize("seed", [-2, 1.5, "1.5", True])
+def test_get_global_parameters_rejects_invalid_random_seed(seed):
+    with pytest.raises(ValueError, match="random_seed"):
+        param.get_global_parameters(_args(random_seed=seed))
 
 
 def test_get_global_parameters_rejects_output_prefix_paths():

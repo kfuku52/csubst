@@ -74,6 +74,13 @@ def test_simulate_invalid_seed_fails_cleanly():
     assert "Traceback" not in log_text
 
 
+def test_invalid_common_random_seed_fails_cleanly():
+    proc, log_text = _run_cli("scan", "--random_seed", "-2")
+    assert proc.returncode == 2
+    assert "--random_seed should be -1 or >= 0." in log_text
+    assert "Traceback" not in log_text
+
+
 def test_sites_deprecated_probability_options_are_rejected():
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--tree_site_plot_min_prob", "0.5")
     assert proc.returncode == 2
@@ -193,6 +200,7 @@ def test_scan_help_is_available():
     assert proc.returncode == 0
     help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
     assert "--scan_match" in help_text
+    assert "--random_seed" in help_text
     assert "any2any" in help_text
     assert "--scan_unit" not in help_text
     assert "--scan_rate_exposure" in help_text

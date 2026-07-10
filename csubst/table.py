@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 
 import re
-import sys
 import time
 
 from scipy.stats import chi2_contingency

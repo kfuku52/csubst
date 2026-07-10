@@ -656,16 +656,36 @@ def test_node_combination_subsamples_rifle_tolerates_initial_duplicate_trials(mo
     }
     picks = iter([1, 2, 1, 2, 1, 2, 1, 3])
 
-    def _fake_choice(a, size, replace=False):
-        picked = int(next(picks))
-        if picked not in set([int(v) for v in list(a)]):
-            raise AssertionError("picked unavailable branch id")
-        return np.array([picked], dtype=np.int64)
+    class FakeRng:
+        def choice(self, a, size=None, replace=False):
+            picked = int(next(picks))
+            if picked not in set([int(v) for v in list(a)]):
+                raise AssertionError("picked unavailable branch id")
+            if size is None:
+                return np.int64(picked)
+            return np.array([picked], dtype=np.int64)
 
-    monkeypatch.setattr(combination.np.random, "choice", _fake_choice)
+    monkeypatch.setattr(combination.randomness, "next_generator", lambda *args, **kwargs: FakeRng())
     out = combination.node_combination_subsamples_rifle(g=g, arity=2, rep=2)
     assert out.shape == (2, 2)
     assert {tuple(sorted(row.tolist())) for row in out} == {(1, 2), (1, 3)}
+
+
+def test_node_combination_subsamples_rifle_is_reproducible_from_configured_seed():
+    base_g = {
+        "sub_branches": [1, 2, 3, 4, 5, 6],
+        "dep_ids": [np.array([bid], dtype=np.int64) for bid in range(1, 7)],
+        "random_seed": 17,
+    }
+
+    first = combination.node_combination_subsamples_rifle(g=dict(base_g), arity=3, rep=8)
+    second = combination.node_combination_subsamples_rifle(g=dict(base_g), arity=3, rep=8)
+    different = combination.node_combination_subsamples_rifle(
+        g=dict(base_g, random_seed=18), arity=3, rep=8
+    )
+
+    np.testing.assert_array_equal(first, second)
+    assert not np.array_equal(first, different)
 
 
 def test_node_combination_subsamples_shotgun_returns_2d_empty_when_no_independent_combo():

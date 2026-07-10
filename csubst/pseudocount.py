@@ -162,13 +162,13 @@ def _safe_divide(numerator, denominator):
     return out
 
 
-def smooth_ratio(O, E, alpha_obs, alpha_exp):
+def smooth_ratio(O, E, alpha_obs, alpha_exp):  # noqa: E741 - domain-standard observed/expected notation
     numerator = smooth_counts(O, alpha_obs)
     denominator = smooth_counts(E, alpha_exp)
     return _safe_divide(numerator=numerator, denominator=denominator)
 
 
-def smooth_log_ratio(O, E, alpha_obs, alpha_exp):
+def smooth_log_ratio(O, E, alpha_obs, alpha_exp):  # noqa: E741 - domain-standard observed/expected notation
     numerator = smooth_counts(O, alpha_obs)
     denominator = smooth_counts(E, alpha_exp)
     with np.errstate(divide="ignore", invalid="ignore"):

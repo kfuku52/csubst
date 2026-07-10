@@ -270,7 +270,7 @@ def test_run_single_config_refreshes_search_log_on_rerun(tmp_path, monkeypatch):
         print("RUN2")
 
     monkeypatch.setattr(main_benchmark.main_analyze, "main_analyze", _fake_first)
-    first = main_benchmark._run_single_config(g, config, run_dir)
+    main_benchmark._run_single_config(g, config, run_dir)
     monkeypatch.setattr(main_benchmark.main_analyze, "main_analyze", _fake_second)
     second = main_benchmark._run_single_config(g, config, run_dir)
 

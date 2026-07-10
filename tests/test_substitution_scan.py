@@ -496,6 +496,29 @@ def test_scan_substitutions_outputs_foreground_rows():
     assert fg_row["site_rate"] == pytest.approx(0.25)
 
 
+def test_scan_zero_event_probability_does_not_count_as_support_at_zero_threshold():
+    event_pp, branches = substitution_scan._support_for_unit(
+        branch_event={},
+        branch_ids=np.array([2, 3], dtype=np.int64),
+        min_event_pp=0.0,
+    )
+
+    assert event_pp == 0.0
+    assert branches == []
+
+
+def test_scan_zero_threshold_still_requires_an_observed_event_in_each_support_unit():
+    g, on_tensor = _toy_scan_context()
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in g["tree"].traverse()}
+    on_tensor[labels["C"], 0, 0, 0, 1] = 0.0
+    g["scan_min_event_pp"] = 0.0
+
+    scan_df, units = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
+
+    assert units.shape[0] == 2
+    assert scan_df.empty
+
+
 def test_scan_3di_q_weighted_fallback_completes_without_codon_q_context(capsys):
     g, on_tensor = _toy_scan_context()
     g["nonsyn_recode"] = "3di20"

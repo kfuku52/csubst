@@ -67,7 +67,7 @@ def get_representative_leaf(node, size='median'):
     leaves = ete.get_leaves(node)
     if len(leaves) == 0:
         raise ValueError('No leaves were found to select a representative sequence.')
-    leaf_seqlens = [ len(ete.get_prop(l, 'sequence', '').replace('-', '')) for l in leaves ]
+    leaf_seqlens = [len(ete.get_prop(leaf, 'sequence', '').replace('-', '')) for leaf in leaves]
     if size == 'median':
         ind = np.argsort(leaf_seqlens)[len(leaf_seqlens) // 2]
     else:

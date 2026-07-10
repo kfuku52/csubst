@@ -63,16 +63,16 @@ def test_validate_args_rejects_removed_strength_parameter():
 
 
 def test_smooth_ratio_alpha_zero_matches_raw_ratio():
-    O = np.array([0.0, 1.0, 2.0, 3.0], dtype=np.float64)
-    E = np.array([1.0, 2.0, 4.0, 6.0], dtype=np.float64)
-    out = pseudocount.smooth_ratio(O=O, E=E, alpha_obs=0.0, alpha_exp=0.0)
-    np.testing.assert_allclose(out, O / E, atol=1e-12)
+    observed = np.array([0.0, 1.0, 2.0, 3.0], dtype=np.float64)
+    expected = np.array([1.0, 2.0, 4.0, 6.0], dtype=np.float64)
+    out = pseudocount.smooth_ratio(O=observed, E=expected, alpha_obs=0.0, alpha_exp=0.0)
+    np.testing.assert_allclose(out, observed / expected, atol=1e-12)
 
 
 def test_smooth_ratio_alpha_zero_maps_zero_over_zero_to_zero_only():
-    O = np.array([0.0, 1.0], dtype=np.float64)
-    E = np.array([0.0, 0.0], dtype=np.float64)
-    out = pseudocount.smooth_ratio(O=O, E=E, alpha_obs=0.0, alpha_exp=0.0)
+    observed = np.array([0.0, 1.0], dtype=np.float64)
+    expected = np.array([0.0, 0.0], dtype=np.float64)
+    out = pseudocount.smooth_ratio(O=observed, E=expected, alpha_obs=0.0, alpha_exp=0.0)
     assert out[0] == pytest.approx(0.0)
     assert np.isinf(out[1])
 
@@ -105,10 +105,10 @@ def test_empirical_alpha_vector_and_smoothed_probabilities_are_normalized():
 
 def test_smoothed_ratios_are_finite_and_monotonic_toward_one():
     rng = np.random.default_rng(7)
-    O = rng.poisson(lam=0.3, size=512).astype(np.float64)
-    E = rng.poisson(lam=0.3, size=512).astype(np.float64)
-    r_small = pseudocount.smooth_ratio(O=O, E=E, alpha_obs=0.1, alpha_exp=0.1)
-    r_large = pseudocount.smooth_ratio(O=O, E=E, alpha_obs=1.0, alpha_exp=1.0)
+    observed = rng.poisson(lam=0.3, size=512).astype(np.float64)
+    expected = rng.poisson(lam=0.3, size=512).astype(np.float64)
+    r_small = pseudocount.smooth_ratio(O=observed, E=expected, alpha_obs=0.1, alpha_exp=0.1)
+    r_large = pseudocount.smooth_ratio(O=observed, E=expected, alpha_obs=1.0, alpha_exp=1.0)
     assert np.isfinite(r_small).all()
     assert np.isfinite(r_large).all()
     assert (np.abs(r_large - 1.0) <= (np.abs(r_small - 1.0) + 1e-12)).all()

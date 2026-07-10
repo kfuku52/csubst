@@ -14,6 +14,7 @@ import sys
 import time
 
 from csubst import parallel
+from csubst import randomness
 from csubst import substitution
 from csubst import substitution_sparse
 from csubst import table
@@ -1001,7 +1002,9 @@ def _pack_sampled_site_indices_to_uint8(sampled_site_indices, num_site):
     return packed
 
 
-def _weighted_sample_without_replacement_packed(p, size, niter):
+def _weighted_sample_without_replacement_packed(p, size, niter, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
     p = np.asarray(p, dtype=np.float64)
     if p.ndim != 1:
         raise ValueError('p should be a 1D array.')
@@ -1029,7 +1032,7 @@ def _weighted_sample_without_replacement_packed(p, size, niter):
         return packed
     # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
     positive_weights = p[positive_sites].astype(np.float32, copy=False)
-    keys = np.random.random((niter, num_positive_sites)).astype(np.float32, copy=False)
+    keys = rng.random((niter, num_positive_sites)).astype(np.float32, copy=False)
     np.log(keys, out=keys)
     keys /= positive_weights
     kth = num_positive_sites - size
@@ -1165,7 +1168,9 @@ def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type, cb_site_overlap
     return tmp_E.sum(axis=1) * branch_factor
 
 
-def _weighted_sample_without_replacement_masks(p, size, niter):
+def _weighted_sample_without_replacement_masks(p, size, niter, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
     p = np.asarray(p, dtype=np.float64)
     if p.ndim != 1:
         raise ValueError('p should be a 1D array.')
@@ -1184,7 +1189,7 @@ def _weighted_sample_without_replacement_masks(p, size, niter):
         return masks
     # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
     positive_weights = p[positive_sites].astype(np.float32, copy=False)
-    keys = np.random.random((niter, num_positive_sites)).astype(np.float32, copy=False)
+    keys = rng.random((niter, num_positive_sites)).astype(np.float32, copy=False)
     np.log(keys, out=keys)
     keys /= positive_weights
     kth = num_positive_sites - size
@@ -1231,7 +1236,7 @@ def _resolve_urn_model(g):
     raise ValueError('urn_model should be one of wallenius, fisher, factorized_approx.')
 
 
-def _prepare_permutation_branch_sizes(sub_branches, niter, g):
+def _prepare_permutation_branch_sizes(sub_branches, niter, g, rng=None):
     sub_branches = np.asarray(sub_branches)
     if sub_branches.ndim != 1:
         raise ValueError('sub_branches should be a 1D array.')
@@ -1246,13 +1251,15 @@ def _prepare_permutation_branch_sizes(sub_branches, niter, g):
     sub_branches = np.clip(sub_branches, a_min=0.0, a_max=None)
     rounding_mode = _resolve_omega_pvalue_rounding_mode(g=g)
     if rounding_mode == 'stochastic':
+        if rng is None:
+            rng = np.random.default_rng()
         niter = int(niter)
         if niter <= 0:
             raise ValueError('niter should be a positive integer.')
         base = np.floor(sub_branches).astype(np.int64, copy=False)
         frac = sub_branches - base
         if (frac > 0).any():
-            rand = np.random.random((sub_branches.shape[0], niter))
+            rand = rng.random((sub_branches.shape[0], niter))
             inc = (rand < frac[:, None]).astype(np.int64, copy=False)
             return base[:, None] + inc
         return np.repeat(base[:, None], repeats=niter, axis=1)
@@ -1504,7 +1511,9 @@ def _calc_urn_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
     raise ValueError('Unsupported urn_model: {}'.format(urn_model))
 
 
-def _fill_packed_masks_for_sizes(packed_masks_branch, site_p, size_values):
+def _fill_packed_masks_for_sizes(packed_masks_branch, site_p, size_values, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
     size_values = np.asarray(size_values, dtype=np.int64).reshape(-1)
     if packed_masks_branch.shape[0] != size_values.shape[0]:
         txt = 'packed_masks_branch iterations ({}) and size_values ({}) should match.'
@@ -1529,11 +1538,14 @@ def _fill_packed_masks_for_sizes(packed_masks_branch, site_p, size_values):
             p=site_p,
             size=capped_size,
             niter=iter_indices.shape[0],
+            rng=rng,
         )
     return None
 
 
-def _get_permutations_fast(cb_ids, sub_branches, p, niter):
+def _get_permutations_fast(cb_ids, sub_branches, p, niter, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
     niter = int(niter)
     if niter < 0:
         raise ValueError('niter should be >= 0.')
@@ -1592,6 +1604,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                     packed_masks_branch=packed_masks[branch_id, :, :],
                     site_p=shared_site_p,
                     size_values=size_values,
+                    rng=rng,
                 )
         else:
             active_site_p = branch_site_p[active_branch_ids, :]
@@ -1609,6 +1622,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                         packed_masks_branch=packed_masks[branch_id, :, :],
                         site_p=first_site_p,
                         size_values=size_values,
+                        rng=rng,
                     )
             else:
                 for branch_id in range(num_branch):
@@ -1619,6 +1633,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                         packed_masks_branch=packed_masks[branch_id, :, :],
                         site_p=active_site_p[branch_id, :],
                         size_values=size_values,
+                        rng=rng,
                     )
         return _calc_shared_counts_from_packed_masks(
             packed_masks=packed_masks,
@@ -1652,13 +1667,14 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                 size = num_positive_sites
             if size in previous_branch_id_by_size:
                 prev_branch_id = previous_branch_id_by_size[size]
-                packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
+                packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, rng.permutation(niter), :]
                 continue
             previous_branch_id_by_size[size] = branch_id
             packed_masks[branch_id, :, :] = _weighted_sample_without_replacement_packed(
                 p=shared_site_p,
                 size=size,
                 niter=niter,
+                rng=rng,
             )
     else:
         active_site_p = branch_site_p[active_branch_ids, :]
@@ -1677,13 +1693,14 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                     size = num_positive_sites
                 if size in previous_branch_id_by_size:
                     prev_branch_id = previous_branch_id_by_size[size]
-                    packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, np.random.permutation(niter), :]
+                    packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, rng.permutation(niter), :]
                     continue
                 previous_branch_id_by_size[size] = branch_id
                 packed_masks[branch_id, :, :] = _weighted_sample_without_replacement_packed(
                     p=first_site_p,
                     size=size,
                     niter=niter,
+                    rng=rng,
                 )
         else:
             for branch_id in range(num_branch):
@@ -1700,6 +1717,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter):
                     p=site_p,
                     size=size,
                     niter=niter,
+                    rng=rng,
                 )
 
     active_out = _calc_shared_counts_from_packed_masks(
@@ -1744,6 +1762,11 @@ def _calc_hypergeom_count_matrix(
         raise ValueError('niter should be a positive integer.')
     if cb_ids.shape[0] == 0:
         return np.zeros(shape=(0, niter), dtype=np.int32)
+    operation_seed = g.get('_omega_operation_seed', None)
+    if operation_seed is None:
+        operation_seed = randomness.next_seed(g, 'omega_hypergeom_direct', str(obs_col), int(niter))
+    local_g = dict(g)
+    local_g['_omega_operation_seed'] = int(operation_seed)
     requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
     chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
     n_jobs, chunk_factor = _resolve_hypergeom_parallel_plan(
@@ -1767,7 +1790,7 @@ def _calc_hypergeom_count_matrix(
             obs_col,
             num_gad_combinat,
             list_igad,
-            g,
+            local_g,
             static_sub_sites=static_sub_sites,
         )
         return dfq
@@ -1781,7 +1804,7 @@ def _calc_hypergeom_count_matrix(
             obs_col,
             num_gad_combinat,
             igad_chunk,
-            g,
+            local_g,
             static_sub_sites,
         )
         for igad_chunk in igad_chunks
@@ -1974,6 +1997,9 @@ def joblib_calc_hypergeom(
     g,
     static_sub_sites=None,
 ):
+    operation_seed = g.get('_omega_operation_seed', None)
+    if operation_seed is None:
+        operation_seed = randomness.next_seed(g, 'omega_hypergeom_direct', str(obs_col), int(niter))
     for i,sg,a,d in igad_chunk:
         if (a==d):
             continue
@@ -1991,12 +2017,28 @@ def joblib_calc_hypergeom(
             if (p.sum(axis=1) > 0).sum() == 0:
                 continue
         pm_start = time.time()
+        category_rng = randomness.generator(
+            operation_seed,
+            'category',
+            str(obs_col),
+            int(i),
+            int(sg),
+            str(a),
+            str(d),
+        )
         sub_branches = _prepare_permutation_branch_sizes(
             sub_branches=sub_branches,
             niter=niter,
             g=g,
+            rng=category_rng,
         )
-        dfq[:, :] += _get_permutations_fast(cb_ids, sub_branches, p, niter)
+        dfq[:, :] += _get_permutations_fast(
+            cb_ids,
+            sub_branches,
+            p,
+            niter,
+            rng=category_rng,
+        )
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
 
@@ -2770,6 +2812,9 @@ def _calc_poisson_count_matrix(
     out = np.zeros(shape=(cb_ids.shape[0], niter), dtype=np.float64)
     if cb_ids.shape[0] == 0:
         return out
+    operation_seed = g.get('_omega_operation_seed', None)
+    if operation_seed is None:
+        operation_seed = randomness.next_seed(g, 'omega_poisson_direct', str(obs_col), int(niter))
     for i, sg, a, d in list_igad:
         if a == d:
             continue
@@ -2793,7 +2838,16 @@ def _calc_poisson_count_matrix(
         if (mean_count > 0).sum() == 0:
             continue
         pm_start = time.time()
-        out += np.random.poisson(
+        category_rng = randomness.generator(
+            operation_seed,
+            'category',
+            str(obs_col),
+            int(i),
+            int(sg),
+            str(a),
+            str(d),
+        )
+        out += category_rng.poisson(
             lam=mean_count[:, None],
             size=(mean_count.shape[0], niter),
         ).astype(np.float64, copy=False)
@@ -2842,7 +2896,9 @@ def _resolve_nbinom_alpha(g, obs_count, mean_count):
     return float(alpha), 'fixed'
 
 
-def _sample_nbinom_count_matrix(mean_count, niter, alpha):
+def _sample_nbinom_count_matrix(mean_count, niter, alpha, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
     mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
     if mean_count.ndim != 1:
         raise ValueError('mean_count should be a 1D array.')
@@ -2852,18 +2908,18 @@ def _sample_nbinom_count_matrix(mean_count, niter, alpha):
     if mean_count.shape[0] == 0:
         return np.zeros(shape=(0, int(niter)), dtype=np.float64)
     if alpha <= 0:
-        return np.random.poisson(
+        return rng.poisson(
             lam=mean_count[:, None],
             size=(mean_count.shape[0], int(niter)),
         ).astype(np.float64, copy=False)
     gamma_shape = 1.0 / float(alpha)
     gamma_scale = float(alpha) * mean_count[:, None]
-    lam = np.random.gamma(
+    lam = rng.gamma(
         shape=gamma_shape,
         scale=gamma_scale,
         size=(mean_count.shape[0], int(niter)),
     )
-    return np.random.poisson(lam=lam).astype(np.float64, copy=False)
+    return rng.poisson(lam=lam).astype(np.float64, copy=False)
 
 
 def _calc_nbinom_count_matrix(
@@ -2920,10 +2976,14 @@ def _calc_nbinom_count_matrix(
         mean_count=mean_total,
     )
     pm_start = time.time()
+    operation_seed = g.get('_omega_operation_seed', None)
+    if operation_seed is None:
+        operation_seed = randomness.next_seed(g, 'omega_nbinom_direct', str(obs_col), int(niter))
     out = _sample_nbinom_count_matrix(
         mean_count=mean_total,
         niter=niter,
         alpha=alpha,
+        rng=randomness.generator(operation_seed, 'nbinom', str(obs_col)),
     )
     txt = '{} (nbinom): categories={}, alpha={:.6g} (source={}), niter={}, elapsed={} sec'
     print(
@@ -2978,6 +3038,9 @@ def _calc_poisson_full_count_matrix(
     out = np.zeros(shape=(cb_ids.shape[0], niter), dtype=np.float64)
     if cb_ids.shape[0] == 0:
         return out
+    operation_seed = g.get('_omega_operation_seed', None)
+    if operation_seed is None:
+        operation_seed = randomness.next_seed(g, 'omega_poisson_full_direct', str(obs_col), int(niter))
     for i, sg, a, d in list_igad:
         if a == d:
             continue
@@ -3012,7 +3075,16 @@ def _calc_poisson_full_count_matrix(
         if (mean_count > 0).sum() == 0:
             continue
         pm_start = time.time()
-        out += np.random.poisson(
+        category_rng = randomness.generator(
+            operation_seed,
+            'category',
+            str(obs_col),
+            int(i),
+            int(sg),
+            str(a),
+            str(d),
+        )
+        out += category_rng.poisson(
             lam=mean_count[:, None],
             size=(mean_count.shape[0], niter),
         ).astype(np.float64, copy=False)
@@ -3031,6 +3103,16 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
     )
     static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
     null_model = _resolve_omega_pvalue_null_model(g=g)
+    operation_seed = randomness.next_seed(
+        g,
+        'omega_pvalue',
+        str(SN),
+        str(mode),
+        int(niter),
+        str(null_model),
+    )
+    local_g = dict(g)
+    local_g['_omega_operation_seed'] = int(operation_seed)
     txt = 'pomegaC {}{}: {} count matrix (rows={:,}, niter={:,}, categories={:,})'
     model_label = 'randomization'
     if null_model == 'poisson':
@@ -3050,7 +3132,7 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
             obs_col=obs_col,
             num_gad_combinat=num_gad_combinat,
             list_igad=list_igad,
-            g=g,
+            g=local_g,
             static_sub_sites=static_sub_sites,
         )
     if null_model == 'poisson':
@@ -3063,7 +3145,7 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
             obs_col=obs_col,
             num_gad_combinat=num_gad_combinat,
             list_igad=list_igad,
-            g=g,
+            g=local_g,
             static_sub_sites=static_sub_sites,
         )
     if null_model == 'poisson_full':
@@ -3075,7 +3157,7 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
             obs_col=obs_col,
             num_gad_combinat=num_gad_combinat,
             list_igad=list_igad,
-            g=g,
+            g=local_g,
         )
     if null_model == 'nbinom':
         return _calc_nbinom_count_matrix(
@@ -3087,7 +3169,7 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
             obs_col=obs_col,
             num_gad_combinat=num_gad_combinat,
             list_igad=list_igad,
-            g=g,
+            g=local_g,
             static_sub_sites=static_sub_sites,
             obs_count=obs_count,
         )
@@ -3493,7 +3575,7 @@ def print_cb_stats(cb, prefix, output_stats):
     hd = 'Arity = {:,}, {}:'.format(arity, prefix)
     for sub in output_stats:
         col_omega = 'omegaC'+sub
-        if not col_omega in cb.columns:
+        if col_omega not in cb.columns:
             continue
         median_value = cb.loc[:,col_omega].median()
         txt = '{} median {} (non-corrected for dNc vs dSc distribution ranges): {:.3f}'

@@ -13,12 +13,15 @@ except ImportError:  # pragma: no cover
 from csubst.__init__ import __version__
 from csubst import output_stat
 from csubst import pseudocount
+from csubst import randomness
 from csubst import recoding
 from csubst import runtime
 from csubst import table
 
 DEPENDENCY_DISTRIBUTIONS = (
     'ete4',
+    'biopython',
+    'requests',
     'numpy',
     'scipy',
     'pandas',
@@ -195,6 +198,10 @@ def get_global_parameters(args):
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:
         g[attr] = getattr(args, attr)
+    g['random_seed'] = randomness.normalize_seed(
+        g.get('random_seed', randomness.DEFAULT_RANDOM_SEED),
+        param_name='--random_seed',
+    )
     if 'full_cds_alignment_file' in g.keys():
         if g['full_cds_alignment_file'] is None:
             g['full_cds_alignment_file'] = ''

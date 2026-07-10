@@ -6,3 +6,6 @@ requires = [
     "Cython>=3",
 ]
 build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+extend-exclude = ["csubst/_vendor"]

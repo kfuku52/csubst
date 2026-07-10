@@ -139,7 +139,7 @@ def get_biased_nonsynonymous_substitution_index(biased_aas, codon_table, codon_o
     for conv_aa in biased_aas:
         conv_cdn = get_codons(amino_acids=conv_aa, codon_table=codon_table)
         index_bool = np.array([ pco in conv_cdn for pco in codon_order ])
-        biased_cdn_index0 = np.argwhere(index_bool==True)
+        biased_cdn_index0 = np.argwhere(index_bool)
         biased_cdn_index0 = biased_cdn_index0.reshape(biased_cdn_index0.shape[0])
         conv_cdn_iter = itertools.product(row_index, biased_cdn_index0)
         biased_cdn_index1 = [ cci for cci in conv_cdn_iter if not ((cci[0] in biased_cdn_index0)&(cci[1] in biased_cdn_index0)) ]
@@ -177,7 +177,7 @@ def get_biased_codon_index(biased_aas, codon_table, codon_order):
     for conv_aa in biased_aas:
         conv_cdn = get_codons(amino_acids=conv_aa, codon_table=codon_table)
         index_bool = np.array([ pco in conv_cdn for pco in codon_order ])
-        biased_cdn_index0 = np.argwhere(index_bool==True).tolist()
+        biased_cdn_index0 = np.argwhere(index_bool).tolist()
         biased_cdn_index = biased_cdn_index + biased_cdn_index0
     biased_cdn_index = np.array(biased_cdn_index)
     return biased_cdn_index
@@ -192,7 +192,7 @@ def get_synonymous_codon_substitution_index(g, codon_order):
         if len(codons)==1:
             continue
         index_bool = np.array([ pco in codons for pco in codon_order ])
-        cdn_index0 = np.argwhere(index_bool==True)
+        cdn_index0 = np.argwhere(index_bool)
         cdn_index0 = cdn_index0.reshape(cdn_index0.shape[0])
         cdn_index1 = list(itertools.permutations(cdn_index0, 2))
         cdn_index = cdn_index + cdn_index1
@@ -278,7 +278,6 @@ def rescale_substitution_matrix(mat, target_index, scaling_factor, eq_freq=None)
 
 def generate_Q_matrix(eq_freq, omega, all_nsy_cdn_index, all_syn_cdn_index):
     pyvolve = _require_pyvolve()
-    all_cdn_index = np.concatenate([all_syn_cdn_index, all_nsy_cdn_index])
     cmp = {'omega':omega, 'k_ti':1, 'k_tv':1} # background_omega have to be readjusted.
     model = pyvolve.Model(model_type='ECMunrest', name='placeholder', parameters=cmp, state_freqs=eq_freq)
     mat = model.matrix

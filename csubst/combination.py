@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from csubst import parallel
 from csubst import ete
+from csubst import randomness
 try:
     from csubst import combination_cy
 except Exception:  # pragma: no cover - Cython extension is optional
@@ -308,7 +309,6 @@ def _generate_union_candidates_arity3_from_pairs(pair_nodes, pair_nodes_are_sort
     starts = np.r_[0, np.flatnonzero(centers[1:] != centers[:-1]) + 1]
     ends = np.r_[starts[1:], centers.shape[0]]
     encoded_chunks = list()
-    base2 = num_nodes * num_nodes
     triu_cache = dict()
     for start, end in zip(starts.tolist(), ends.tolist()):
         degree = end - start
@@ -1015,6 +1015,7 @@ def node_combination_subsamples_rifle(g, arity, rep):
     consecutive_fail = 0
     selected_combinations = list()
     seen_combinations = set()
+    rng = randomness.next_generator(g, 'node_combination_rifle', int(arity), int(rep))
     while (len(selected_combinations) < rep) and (consecutive_fail < max_consecutive_fail):
         selected_ids = set()
         unavailable_ids = set()
@@ -1023,7 +1024,8 @@ def node_combination_subsamples_rifle(g, arity, rep):
             if len(available_ids) == 0:
                 consecutive_fail += 1
                 break
-            selected_id = int(np.random.choice(list(available_ids), 1)[0])
+            available_array = np.array(sorted(available_ids), dtype=np.int64)
+            selected_id = int(rng.choice(available_array))
             selected_ids.add(selected_id)
             unavailable_ids |= dep_lookup.get(selected_id, {selected_id})
         if len(selected_ids) != arity:
@@ -1053,10 +1055,11 @@ def node_combination_subsamples_shotgun(g, arity, rep):
     id_combinations = np.zeros(shape=(0,arity), dtype=np.int64)
     id_combinations_dif = np.inf
     round = 1
+    rng = randomness.next_generator(g, 'node_combination_shotgun', int(arity), int(rep))
     while (id_combinations.shape[0] < rep)&(id_combinations_dif > rep/200):
         ss_matrix = np.zeros(shape=(len(all_ids), rep), dtype=bool, order='C')
         for i in np.arange(rep):
-            ind = np.random.choice(a=sub_rows, size=arity, replace=False)
+            ind = rng.choice(a=sub_rows, size=arity, replace=False)
             ss_matrix[ind,i] = 1
         is_dependent_col = np.zeros(shape=(ss_matrix.shape[1],), dtype=bool)
         for dep_id in g['dep_ids']:

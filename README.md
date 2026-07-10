@@ -44,6 +44,13 @@ conda install bioconda::csubst
 pip install git+https://github.com/kfuku52/csubst
 ```
 
+Biopython and the Python HTTP client used by the core commands are installed
+automatically. Protein-structure mapping additionally requires PyMOL:
+
+```bash
+pip install "csubst[structure] @ git+https://github.com/kfuku52/csubst"
+```
+
 ## Test run
 ```
 # Generate a test dataset

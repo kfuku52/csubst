@@ -66,6 +66,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         raise ValueError('--max_combination should be >= 1.')
     OS_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=OS_tensor, g=g, label='OS')
     ON_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=ON_tensor, g=g, label='ON')
+    cb = pd.DataFrame()
     for current_arity in np.arange(2, g['max_arity'] + 1):
         start = time.time()
         g['current_arity'] = current_arity

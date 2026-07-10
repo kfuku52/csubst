@@ -236,17 +236,19 @@ def test_calc_wallenius_expected_overlap_supports_stochastic_rounding():
         g=g,
         float_type=np.float64,
     )
-    np.random.seed(5)
+    rng = np.random.default_rng(5)
     size_by_iter = omega._prepare_permutation_branch_sizes(
         sub_branches=sub_branches,
         niter=20000,
         g=g,
+        rng=rng,
     )
     perm = omega._get_permutations_fast(
         cb_ids=cb_ids,
         sub_branches=size_by_iter,
         p=p,
         niter=20000,
+        rng=rng,
     )
     np.testing.assert_allclose(expected[0], float(perm.mean()), atol=0.08)
 
@@ -281,10 +283,12 @@ def test_get_permutations_fast_rejects_branch_size_matrix_niter_mismatch():
 
 def test_weighted_sample_without_replacement_packed_matches_mask_packbits():
     p = np.array([0.4, 0.25, 0.2, 0.15, 0.0], dtype=np.float64)
-    np.random.seed(11)
-    packed = omega._weighted_sample_without_replacement_packed(p=p, size=2, niter=64)
-    np.random.seed(11)
-    masks = omega._weighted_sample_without_replacement_masks(p=p, size=2, niter=64)
+    packed = omega._weighted_sample_without_replacement_packed(
+        p=p, size=2, niter=64, rng=np.random.default_rng(11)
+    )
+    masks = omega._weighted_sample_without_replacement_masks(
+        p=p, size=2, niter=64, rng=np.random.default_rng(11)
+    )
     expected = np.packbits(masks, axis=1)
     np.testing.assert_array_equal(packed, expected)
 
@@ -350,22 +354,22 @@ def test_get_permutations_fast_can_use_cython_packed_shared_counts(monkeypatch):
 
     dummy = DummyOmegaCy()
     monkeypatch.setattr(omega, "omega_cy", dummy)
-    np.random.seed(7)
     out_cy = omega._get_permutations_fast(
         cb_ids=cb_ids,
         sub_branches=sub_branches,
         p=p / p.sum(),
         niter=128,
+        rng=np.random.default_rng(7),
     )
     assert dummy.called > 0
 
     monkeypatch.setattr(omega, "omega_cy", None)
-    np.random.seed(7)
     out_np = omega._get_permutations_fast(
         cb_ids=cb_ids,
         sub_branches=sub_branches,
         p=p / p.sum(),
         niter=128,
+        rng=np.random.default_rng(7),
     )
     np.testing.assert_array_equal(out_cy, out_np)
 
@@ -624,6 +628,29 @@ def test_calc_poisson_count_matrix_matches_expected_means():
     assert np.all(out >= 0)
     np.testing.assert_allclose(out, np.round(out), atol=0.0)
     np.testing.assert_allclose(out.mean(axis=1), expected_mean, atol=0.12)
+
+
+def test_calc_poisson_count_matrix_is_reproducible_from_configured_seed():
+    kwargs = {
+        "mode": "any2any",
+        "cb_ids": np.array([[0, 1], [1, 2]], dtype=np.int64),
+        "sub_sg": np.zeros((2, 1), dtype=np.float64),
+        "sub_bg": np.array([[1.0], [2.0], [3.0]], dtype=np.float64),
+        "niter": 256,
+        "obs_col": "OCNany2any",
+        "num_gad_combinat": 1,
+        "list_igad": [[0, 0, "any2", "2any"]],
+        "static_sub_sites": np.array(
+            [[0.6, 0.4], [0.5, 0.5], [0.2, 0.8]], dtype=np.float64
+        ),
+    }
+
+    first = omega._calc_poisson_count_matrix(g={"float_tol": 1e-12, "random_seed": 41}, **kwargs)
+    second = omega._calc_poisson_count_matrix(g={"float_tol": 1e-12, "random_seed": 41}, **kwargs)
+    different = omega._calc_poisson_count_matrix(g={"float_tol": 1e-12, "random_seed": 42}, **kwargs)
+
+    np.testing.assert_array_equal(first, second)
+    assert not np.array_equal(first, different)
 
 
 def test_calc_poisson_count_matrix_uses_wallenius_mean_for_skewed_weights():
