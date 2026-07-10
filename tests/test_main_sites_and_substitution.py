@@ -587,6 +587,20 @@ def test_resolve_site_jobs_intersection_mode_preserves_branch_set_and_outdir_pre
     assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_sites.branch_id")
 
 
+def test_resolve_site_jobs_honors_output_namespace(tmp_path, tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    g = {
+        "tree": tiny_tree,
+        "mode": "intersection",
+        "branch_id": "{},{}".format(labels["A"], labels["C"]),
+        "outdir": str(tmp_path / "sites"),
+        "output_prefix": "result",
+    }
+    out = main_sites.resolve_site_jobs(g)
+    expected = tmp_path / "sites" / "result.branch_id{},{}".format(labels["A"], labels["C"])
+    assert out["site_jobs"][0]["site_outdir"] == str(expected)
+
+
 def test_resolve_site_jobs_rejects_duplicate_branch_ids(tiny_tree):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
     g = {"tree": tiny_tree, "mode": "intersection", "branch_id": "{},{}".format(labels["A"], labels["A"])}

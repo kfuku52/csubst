@@ -246,7 +246,7 @@ class Nucleotide_Matrix(MatrixBuilder):
 
 
     def _calc_instantaneous_prob(self, source, target, parameters = None):
-        ''' 
+        r'''
             Returns the substitution probability (\mu_ij * p_j, where \mu_ij are nucleotide mutation rates and p_j is target nucleotide frequency) from source to target for nucleotide models.
             Arguments "source" and "target" are indices for the relevant nucleotide (0-3).
         '''

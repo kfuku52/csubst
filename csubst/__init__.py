@@ -1,18 +1,10 @@
-__version__ = '1.11.15'
+__version__ = '1.11.16'
 
-from importlib import import_module
-
-
-def _load_optional_extension(module_name):
-    try:
-        return import_module('.' + str(module_name), __name__)
-    except Exception:  # pragma: no cover - compiled extensions are optional
-        return None
-
-
-combination_cy = _load_optional_extension('combination_cy')
-omega_cy = _load_optional_extension('omega_cy')
-parser_iqtree_cy = _load_optional_extension('parser_iqtree_cy')
-recoding_cy = _load_optional_extension('recoding_cy')
-substitution_cy = _load_optional_extension('substitution_cy')
-substitution_sparse_cy = _load_optional_extension('substitution_sparse_cy')
+# These compatibility attributes remain available when the optional compiled
+# extensions have not been built. Internal modules load extensions lazily.
+combination_cy = None
+omega_cy = None
+parser_iqtree_cy = None
+recoding_cy = None
+substitution_cy = None
+substitution_sparse_cy = None

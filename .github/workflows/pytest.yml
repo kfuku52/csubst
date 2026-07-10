@@ -10,14 +10,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -39,8 +39,14 @@ jobs:
             fi
           done
 
-      - name: Build Cython extensions in place
-        run: python setup.py build_ext --inplace
+      - name: Verify compiled extensions
+        run: |
+          python -c "import csubst.combination_cy"
+          python -c "import csubst.omega_cy"
+          python -c "import csubst.parser_iqtree_cy"
+          python -c "import csubst.recoding_cy"
+          python -c "import csubst.substitution_cy"
+          python -c "import csubst.substitution_sparse_cy"
 
       - name: Run tests
         run: pytest -q
@@ -49,10 +55,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -74,8 +80,8 @@ jobs:
             fi
           done
 
-      - name: Build Cython extensions in place
-        run: python setup.py build_ext --inplace
+      - name: Verify compiled extensions
+        run: python -c "import csubst.combination_cy, csubst.omega_cy, csubst.substitution_cy"
 
       - name: Run parity and performance checks (PGK/PEPC)
         run: |
@@ -92,13 +98,13 @@ jobs:
           cat omega_pvalue_calibration_runtime.tsv
 
       - name: Upload parity metrics artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: parity-metrics
           path: parity_metrics.tsv
 
       - name: Upload omega p-value calibration artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: omega-pvalue-calibration
           path: |
@@ -109,10 +115,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -132,3 +138,36 @@ jobs:
 
       - name: Verify package contents and dependency metadata
         run: python .github/scripts/package_artifact_check.py
+
+      - name: Install and smoke-test the wheel
+        run: |
+          python -m venv /tmp/csubst-wheel-smoke
+          /tmp/csubst-wheel-smoke/bin/python -m pip install dist/from-sdist/csubst-*.whl pytest
+          smoke_dir=$(mktemp -d)
+          cd "$smoke_dir"
+          /tmp/csubst-wheel-smoke/bin/csubst --version
+          test -z "$(find . -mindepth 1 -print -quit)"
+          /tmp/csubst-wheel-smoke/bin/python -c "import csubst.combination_cy, csubst.omega_cy, csubst.parser_iqtree_cy, csubst.recoding_cy, csubst.substitution_cy, csubst.substitution_sparse_cy"
+
+      - name: Run tests from the source distribution
+        run: |
+          python -c "import glob, tarfile; tarfile.open(glob.glob('dist/csubst-*.tar.gz')[0]).extractall('/tmp/csubst-sdist-test', filter='data')"
+          cd /tmp/csubst-sdist-test/csubst-*
+          /tmp/csubst-wheel-smoke/bin/python -m pytest -q
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Run Ruff
+        run: |
+          python -m pip install --upgrade ruff
+          python -m ruff check csubst tests setup.py .github/scripts

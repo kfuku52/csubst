@@ -14,10 +14,9 @@ from csubst import runtime
 from csubst import sequence
 from csubst import tree
 from csubst import ete
-try:
-    from csubst import parser_iqtree_cy
-except Exception:  # pragma: no cover - Cython extension is optional
-    parser_iqtree_cy = None
+from csubst._extensions import load_optional_extension
+
+parser_iqtree_cy = load_optional_extension('parser_iqtree_cy')
 
 
 def _parse_version_tuple(version_text):

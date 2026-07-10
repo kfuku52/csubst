@@ -13,7 +13,6 @@ if (__package__ is None) or (__package__ == ''):
         sys.path.insert(0, repo_root)
 
 from csubst.__init__ import __version__
-from csubst import param
 from csubst import runtime
 
 
@@ -180,7 +179,15 @@ def _resolve_log_file_from_argv(argv):
         return os.path.abspath('csubst.log')
 
 
+def _is_informational_invocation(argv):
+    if len(argv) == 0:
+        return True
+    return any(str(token) in {'-h', '--help', '--version'} for token in argv)
+
+
 def get_global_parameters_or_exit(args):
+    from csubst import param
+
     try:
         return param.get_global_parameters(args)
     except (ValueError, AssertionError) as e:
@@ -633,6 +640,7 @@ def _build_parser():
     psr_out_inspect = _make_output_parent_parser(default_outdir='csubst_inspect', default_prefix='csubst')
     psr_out_simulate = _make_output_parent_parser(default_outdir='csubst_simulate', default_prefix='csubst')
     psr_out_scan = _make_output_parent_parser(default_outdir='csubst_scan', default_prefix='csubst')
+    psr_out_sites = _make_output_parent_parser(default_outdir='csubst_sites', default_prefix='csubst')
 
     # shared: IQ-TREE inputs
     psr_iq = argparse.ArgumentParser(add_help=False)
@@ -644,7 +652,7 @@ def _build_parser():
                         help='default=%(default)s: Codon substitution model for ancestral state reconstruction. '
                              'Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. '
                              'Among-site rate heterogeneity and codon frequencies can be specified. '
-                             'See here for details: http://www.iqtree.org/doc/Substitution-Models')
+                             'See here for details: https://iqtree.github.io/doc/Substitution-Models')
     psr_iq.add_argument('--iqtree_redo', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Whether to rerun IQ-TREE even if all intermediate files exist.')
     psr_iq.add_argument('--iqtree_treefile', metavar='PATH', default='infer', type=str, required=False,
@@ -905,7 +913,12 @@ def _build_parser():
     # sites
     help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps them onto protein structure. '
     help_txt += 'See `csubst sites -h` (legacy alias: `csubst site -h`).'
-    site = subparsers.add_parser('sites', aliases=['site'], help=help_txt, parents=[psr_co,psr_iq,psr_as,psr_rc,psr_treeplot,psr_output_manifest])
+    site = subparsers.add_parser(
+        'sites',
+        aliases=['site'],
+        help=help_txt,
+        parents=[psr_co,psr_iq,psr_as,psr_rc,psr_treeplot,psr_output_manifest,psr_out_sites],
+    )
     site.add_argument('--branch_id', metavar='fg|INT,INT,INT,...', default='', required=False, type=str,
                       help='default=%(default)s: Comma-delimited list of branch_ids to characterize. '
                       'Run `csubst search` first and select branches of interest. '
@@ -923,7 +936,7 @@ def _build_parser():
                       help='default=%(default)s: Generate a matplotlib-based tree + site summary plot.')
     site.add_argument('--site_state_plot', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Generate substitution-pattern summary outputs '
-                           '(csubst_sites.state.pdf, csubst_sites.state_N.tsv, csubst_sites.state_S.tsv).')
+                           '(<output_prefix>.state.pdf and corresponding N/S TSV files).')
     site.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
                       choices=['pdf', 'png', 'svg'],
                       help='default=%(default)s: Output format for --tree_site_plot.')
@@ -1000,7 +1013,7 @@ def _build_parser():
                                'If the number of chains in the PDB file is larger than this value, '
                                '--pymol_img will be disabled.')
     site.add_argument('--uniprot_feature_types', metavar='all|TYPE1,TYPE2,...', default='all', required=False, type=str,
-                      help='default=%(default)s: UniProt feature types to append to csubst_sites output. '
+                      help='default=%(default)s: UniProt feature types to append to the sites output table. '
                            'By default ("all"), all available UniProt features are considered. '
                            'Redundant annotations (including the uniprot_feature_types_* column) are excluded unless '
                            '--uniprot_include_redundant is "yes". '
@@ -1062,33 +1075,32 @@ def _build_parser():
 
 
 def _main():
-    # Start time
+    parser = _build_parser()
+    args = parser.parse_args()
+    if not hasattr(args, 'handler'):
+        parser.print_help()
+        return
+
     csubst_start = time.time()
     print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
-    parser = _build_parser()
+    try:
+        with runtime.run_tempdir_context(base_dir=os.getcwd()):
+            args.handler(args)
+    except (ValueError, AssertionError) as e:
+        sys.stderr.write(str(e).strip() + '\n')
+        sys.exit(2)
 
-    # Handler
-    args = parser.parse_args()
-    #param.set_num_thread_variables(num_thread=args.threads)
-    if hasattr(args, 'handler'):
-        try:
-            with runtime.run_tempdir_context(base_dir=os.getcwd()):
-                args.handler(args)
-        except (ValueError, AssertionError) as e:
-            sys.stderr.write(str(e).strip() + '\n')
-            sys.exit(2)
-    else:
-        parser.print_help()
-
-    # End time
     txt = '\nCSUBST end: {}, Elapsed time = {:,.1f} sec'
     print(txt.format(datetime.datetime.now(datetime.timezone.utc), int(time.time()-csubst_start)), flush=True)
 
 
 if __name__ == "__main__":
-    log_path = _resolve_log_file_from_argv(sys.argv[1:])
-    with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
-        stdout_tee = _TeeTextStream(sys.stdout, log_file)
-        stderr_tee = _TeeTextStream(sys.stderr, log_file)
-        with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):
-            _main()
+    if _is_informational_invocation(sys.argv[1:]):
+        _main()
+    else:
+        log_path = _resolve_log_file_from_argv(sys.argv[1:])
+        with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
+            stdout_tee = _TeeTextStream(sys.stdout, log_file)
+            stderr_tee = _TeeTextStream(sys.stderr, log_file)
+            with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):
+                _main()

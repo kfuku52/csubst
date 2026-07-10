@@ -18,16 +18,21 @@ def _run_csubst(args, cwd):
     return subprocess.run(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 
-def test_cli_writes_help_output_to_csubst_log(tmp_path):
+def test_cli_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["--help"], cwd=tmp_path)
     assert result.returncode == 0
     log_file = tmp_path / "csubst.log"
-    assert log_file.exists()
-    log_text = log_file.read_text(encoding="utf-8")
-    assert "CSUBST start:" in result.stdout
+    assert not log_file.exists()
+    assert "CSUBST start:" not in result.stdout
     assert "usage:" in result.stdout.lower()
-    assert "CSUBST start:" in log_text
-    assert "usage:" in log_text.lower()
+
+
+def test_cli_version_has_no_log_side_effect(tmp_path):
+    result = _run_csubst(["--version"], cwd=tmp_path)
+    assert result.returncode == 0
+    assert result.stdout.strip().startswith("CSUBST version: ")
+    assert "CSUBST start:" not in result.stdout
+    assert not (tmp_path / "csubst.log").exists()
 
 
 def test_cli_writes_stderr_output_to_csubst_log(tmp_path):
@@ -54,67 +59,67 @@ def test_legacy_analyze_alias_still_writes_to_csubst_search_log(tmp_path):
     assert "--does_not_exist" in log_text
 
 
-def test_cli_honors_custom_log_file_for_help(tmp_path):
+def test_cli_ignores_custom_log_file_for_help(tmp_path):
     custom_log = tmp_path / "logs" / "custom-help.log"
     result = _run_csubst(["--log_file", str(custom_log), "--help"], cwd=tmp_path)
     assert result.returncode == 0
-    assert custom_log.exists()
+    assert not custom_log.exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_cli_honors_custom_log_file_after_subcommand(tmp_path):
+def test_cli_ignores_custom_log_file_for_subcommand_help(tmp_path):
     custom_log = tmp_path / "logs" / "inspect.log"
     result = _run_csubst(["inspect", "--log_file", str(custom_log), "-h"], cwd=tmp_path)
     assert result.returncode == 0
-    assert custom_log.exists()
+    assert not custom_log.exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_simulate_help_uses_simulate_default_log_name(tmp_path):
+def test_simulate_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["simulate", "-h"], cwd=tmp_path)
     assert result.returncode == 0
     log_file = tmp_path / "csubst_simulate" / "csubst.log"
-    assert log_file.exists()
+    assert not log_file.exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_benchmark_help_uses_benchmark_default_log_name(tmp_path):
+def test_benchmark_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["benchmark", "-h"], cwd=tmp_path)
     assert result.returncode == 0
     log_file = tmp_path / "csubst_benchmark" / "csubst.log"
-    assert log_file.exists()
+    assert not log_file.exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_benchmark_plot_help_uses_benchmark_plot_default_log_name(tmp_path):
+def test_benchmark_plot_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["benchmark-plot", "-h"], cwd=tmp_path)
     assert result.returncode == 0
     log_file = tmp_path / "csubst_benchmark_plot" / "csubst.log"
-    assert log_file.exists()
+    assert not log_file.exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_doctor_help_uses_doctor_default_log_name(tmp_path):
+def test_doctor_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["doctor", "-h"], cwd=tmp_path)
     assert result.returncode == 0
     log_file = tmp_path / "csubst_doctor" / "csubst.log"
-    assert log_file.exists()
+    assert not log_file.exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_sites_help_uses_site_default_log_name(tmp_path):
+def test_sites_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["sites", "-h"], cwd=tmp_path)
     assert result.returncode == 0
     log_file = tmp_path / "csubst_sites" / "csubst.log"
-    assert log_file.exists()
+    assert not log_file.exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_legacy_site_help_uses_site_default_log_name(tmp_path):
+def test_legacy_site_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["site", "-h"], cwd=tmp_path)
     assert result.returncode == 0
     log_file = tmp_path / "csubst_sites" / "csubst.log"
-    assert log_file.exists()
+    assert not log_file.exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
@@ -151,3 +156,7 @@ def test_subcommand_output_namespace_defaults_are_command_specific():
     simulate = parser.parse_args(["simulate"])
     assert simulate.outdir == "csubst_simulate"
     assert simulate.output_prefix == "csubst"
+
+    sites = parser.parse_args(["sites"])
+    assert sites.outdir == "csubst_sites"
+    assert sites.output_prefix == "csubst"

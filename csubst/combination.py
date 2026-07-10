@@ -6,18 +6,33 @@ import math
 import re
 import sys
 import time
+import warnings
 from collections import defaultdict
 
 from csubst import parallel
 from csubst import ete
 from csubst import randomness
-try:
-    from csubst import combination_cy
-except Exception:  # pragma: no cover - Cython extension is optional
-    combination_cy = None
+from csubst._extensions import load_optional_extension
+
+combination_cy = load_optional_extension('combination_cy')
 
 
 _ARITY3_DENSE_EDGE_LOOKUP_MAX_NODES = 6000
+_CYTHON_FALLBACK_WARNED = set()
+
+
+def _warn_cython_fallback(fastpath_name, exc):
+    if fastpath_name in _CYTHON_FALLBACK_WARNED:
+        return
+    warnings.warn(
+        'Cython fast path "{}" failed; using the Python implementation instead: {}'.format(
+            fastpath_name,
+            exc,
+        ),
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    _CYTHON_FALLBACK_WARNED.add(fastpath_name)
 
 
 def _unique_rows_int64(values, hash_threshold=2048):
@@ -61,8 +76,8 @@ def _generate_all_k_combinations_from_sorted_nodes(unique_nodes, k):
         if cython_fn is not None:
             try:
                 return np.asarray(cython_fn(unique_nodes, int(k)), dtype=np.int64)
-            except Exception:
-                pass
+            except Exception as exc:
+                _warn_cython_fallback('generate_all_k_combinations', exc)
     if k == 3:
         return _generate_all_triples_from_sorted_nodes(unique_nodes)
     total = int(math.comb(int(unique_nodes.shape[0]), int(k)))
@@ -207,8 +222,8 @@ def _generate_all_triples_from_sorted_nodes(unique_nodes):
         if cython_fn is not None:
             try:
                 return cython_fn(unique_nodes)
-            except Exception:
-                pass
+            except Exception as exc:
+                _warn_cython_fallback('generate_all_triples', exc)
     total = (num_nodes * (num_nodes - 1) * (num_nodes - 2)) // 6
     out = np.empty(shape=(total, 3), dtype=np.int64)
     write_pos = 0
@@ -287,8 +302,8 @@ def _generate_union_candidates_arity3_from_pairs(pair_nodes, pair_nodes_are_sort
                         unique_nodes=unique_nodes,
                         num_nodes=num_nodes,
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _warn_cython_fallback('generate_union_arity3', exc)
     left = remapped_pairs[:, 0]
     right = remapped_pairs[:, 1]
     dense_edge_lookup = None
@@ -385,8 +400,8 @@ def _generate_union_candidates_arity4_from_triples(triple_nodes, triple_nodes_ar
                 if cy_out.shape[0] == 0:
                     return np.zeros(shape=(0, 4), dtype=np.int64)
                 return _unique_rows_int64(cy_out)
-            except Exception:
-                pass
+            except Exception as exc:
+                _warn_cython_fallback('generate_union_arity4', exc)
     return _generate_union_candidates_by_shared_subset_python_dict(
         sorted_nodes=triple_nodes,
         arity=4,
@@ -404,8 +419,8 @@ def _generate_union_candidates_by_shared_subset_cython(sorted_nodes, arity):
                 if cy_out.shape[0] == 0:
                     return np.zeros(shape=(0, arity), dtype=np.int64)
                 return _unique_rows_int64(cy_out)
-            except Exception:
-                pass
+            except Exception as exc:
+                _warn_cython_fallback('generate_union_shared_subset', exc)
     return _generate_union_candidates_by_shared_subset_python_dict(
         sorted_nodes=sorted_nodes,
         arity=arity,

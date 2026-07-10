@@ -1,13 +1,13 @@
 from collections import OrderedDict
+import warnings
 
 import numpy as np
 
 from csubst import parallel
 from csubst import sequence
-try:
-    from csubst import recoding_cy
-except Exception:  # pragma: no cover - Cython extension is optional
-    recoding_cy = None
+from csubst._extensions import load_optional_extension
+
+recoding_cy = load_optional_extension('recoding_cy')
 
 
 _CANONICAL_AA = tuple("ACDEFGHIKLMNPQRSTVWY")
@@ -17,6 +17,21 @@ _DEFAULT_AUTO_RANDOM_SEED = 42
 _AA_ALIGNMENT_CACHE_KEY = "_nonsyn_recode_alignment_cache"
 _AA_PSEUDOCOUNT = 1e-12
 _OBJ_EPS = 1e-8
+_CYTHON_FALLBACK_WARNED = set()
+
+
+def _warn_cython_fallback(fastpath_name, exc):
+    if fastpath_name in _CYTHON_FALLBACK_WARNED:
+        return
+    warnings.warn(
+        'Cython fast path "{}" failed; using the Python implementation instead: {}'.format(
+            fastpath_name,
+            exc,
+        ),
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    _CYTHON_FALLBACK_WARNED.add(fastpath_name)
 
 RECODING_SCHEMES = OrderedDict(
     [
@@ -310,8 +325,8 @@ def _random_bin_assignments(num_item, num_bin, rng, n_random):
             if out.shape != (n_random, num_item):
                 raise ValueError("Unexpected shape from random_bin_assignments_int64.")
             return out
-        except Exception:
-            pass
+        except Exception as exc:
+            _warn_cython_fallback('random_bin_assignments', exc)
     out = np.empty((n_random, num_item), dtype=np.int64)
     for i in range(n_random):
         out[i, :] = _random_bin_assignment(num_item=num_item, num_bin=num_bin, rng=rng)
@@ -697,7 +712,8 @@ def _search_initial_bins_chunk_chisq(initial_bins_chunk, start_index, num_bin, f
                 obj_eps=float(_OBJ_EPS),
             )
             return bins.copy(), float(crit), int(start_index + int(best_offset))
-        except Exception:
+        except Exception as exc:
+            _warn_cython_fallback('search_initial_bins_chisq', exc)
             use_cython = False
     cython_fn = None
     if use_cython:
@@ -764,7 +780,8 @@ def _search_initial_bins_chunk_conductance(initial_bins_chunk, start_index, num_
                 obj_eps=float(_OBJ_EPS),
             )
             return bins.copy(), float(crit), int(start_index + int(best_offset))
-        except Exception:
+        except Exception as exc:
+            _warn_cython_fallback('search_initial_bins_conductance', exc)
             use_cython = False
     cython_fn = None
     if use_cython:
@@ -1239,7 +1256,7 @@ def _build_3di20_dataset_feature_vector(g):
         return None
     try:
         from csubst import structural_alphabet
-    except Exception:
+    except ImportError:
         return None
     try:
         g_for_3di = dict(g)
@@ -1251,7 +1268,12 @@ def _build_3di20_dataset_feature_vector(g):
             g=g_for_3di,
             output_path=None,
         )
-    except Exception:
+    except Exception as exc:
+        warnings.warn(
+            'Skipping the optional 3Di20 PCA feature because structural-alphabet inference failed: {}'.format(exc),
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return None
     if (len(aa_by_tip) == 0) or (len(threedi_by_tip) == 0):
         return None

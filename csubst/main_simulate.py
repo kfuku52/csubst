@@ -21,7 +21,7 @@ def _require_pyvolve():
         return _PYVOLVE
     try:
         from csubst._vendor import pyvolve as _pyvolve
-    except Exception:
+    except ImportError:
         # Backward-compatible fallback for legacy environments where the
         # vendored backend is unavailable.
         import pyvolve as _pyvolve

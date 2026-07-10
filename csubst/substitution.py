@@ -13,18 +13,14 @@ from collections import defaultdict
 from csubst import table
 from csubst import parallel
 from csubst import runtime
-try:
-    from csubst import substitution_cy
-except Exception:  # pragma: no cover - Cython extension is optional
-    substitution_cy = None
+from csubst._extensions import load_optional_extension
 from csubst import substitution_sparse
-try:
-    from csubst import substitution_sparse_cy
-except Exception:  # pragma: no cover - Cython extension is optional
-    substitution_sparse_cy = None
 from csubst import ete
 from csubst import output_stat
 from csubst import sequence
+
+substitution_cy = load_optional_extension('substitution_cy')
+substitution_sparse_cy = load_optional_extension('substitution_sparse_cy')
 
 _CB_BASE_SUBSTITUTIONS = ("any2any", "spe2any", "any2spe", "spe2spe")
 _SUB_TENSOR_BACKENDS = ('auto', 'dense', 'sparse')

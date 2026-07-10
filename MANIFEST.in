@@ -3,8 +3,11 @@ include README.md
 include THIRD_PARTY_NOTICES.md
 include pyproject.toml
 include setup.py
+include pytest.ini
 recursive-include licenses *.rst
 recursive-include csubst *.pyx
 recursive-include csubst/dataset *
 recursive-include csubst/substitution_matrix *.dat
+recursive-include tests *.py
+include tools/evaluate_epistasis_simulation.py
 include csubst/_vendor/pyvolve/LICENSE.txt

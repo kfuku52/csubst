@@ -1,9 +1,9 @@
 import numpy as np
 import scipy.sparse as sp
-try:
-    from csubst import substitution_sparse_cy
-except Exception:  # pragma: no cover - Cython extension is optional
-    substitution_sparse_cy = None
+
+from csubst._extensions import load_optional_extension
+
+substitution_sparse_cy = load_optional_extension('substitution_sparse_cy')
 
 
 def _sum_result_dtype(dtype):

@@ -8,4 +8,8 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.ruff]
-extend-exclude = ["csubst/_vendor"]
+extend-exclude = [
+    "csubst/_vendor",
+    "tests/cython_test.py",
+    "tests/equation_parser.ipynb",
+]

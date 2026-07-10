@@ -3,13 +3,13 @@
 [![Pytest](https://github.com/kfuku52/csubst/actions/workflows/pytest.yml/badge.svg)](https://github.com/kfuku52/csubst/actions/workflows/pytest.yml)
 [![GitHub release](https://img.shields.io/github/v/tag/kfuku52/csubst?label=release)](https://github.com/kfuku52/csubst/releases)
 [![Bioconda](https://img.shields.io/conda/vn/bioconda/csubst.svg)](https://anaconda.org/bioconda/csubst)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://github.com/kfuku52/csubst)
+[![Python](https://img.shields.io/badge/python-3.10--3.14-blue)](https://github.com/kfuku52/csubst)
 [![Platforms](https://img.shields.io/conda/pn/bioconda/csubst.svg)](https://anaconda.org/bioconda/csubst)
 [![Downloads](https://img.shields.io/conda/dn/bioconda/csubst.svg)](https://anaconda.org/bioconda/csubst)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
-**CSUBST** ([/si:sʌbst/](http://ipa-reader.xyz/?text=si:s%CA%8Cbst&voice=Salli)) is a tool for analyzing **C**ombinatorial **SUBST**itutions in codon sequences on phylogenetic trees.
+**CSUBST** (/si:sʌbst/) is a tool for analyzing **C**ombinatorial **SUBST**itutions in codon sequences on phylogenetic trees.
 A combinatorial substitution is a recurrent substitution at the same protein site on multiple independent branches.
 When independent substitutions lead to the same amino acid, they are interpreted as convergent amino acid substitutions.
 The main features of **CSUBST** are:
@@ -31,7 +31,7 @@ The main features of **CSUBST** are:
 - A [FASTA](https://en.wikipedia.org/wiki/FASTA_format) file containing a multiple sequence alignment of in-frame coding sequences
 
 ## Installation
-**CSUBST** runs on Python 3. Installation via [Bioconda](https://anaconda.org/bioconda/csubst) is recommended because it installs the required dependencies automatically. `pip` installation is also supported, but [IQ-TREE](https://iqtree.github.io/) and several Python packages must then be installed separately.
+**CSUBST** supports Python 3.10–3.14. Installation via [Bioconda](https://anaconda.org/bioconda/csubst) is recommended because it installs IQ-TREE and the required Python dependencies automatically. `pip` installs the core Python dependencies automatically, but [IQ-TREE](https://iqtree.github.io/) and a C compiler must be available separately.
 
 #### Option 1: Install with `conda`
 ```
@@ -44,8 +44,8 @@ conda install bioconda::csubst
 pip install git+https://github.com/kfuku52/csubst
 ```
 
-Biopython and the Python HTTP client used by the core commands are installed
-automatically. Protein-structure mapping additionally requires PyMOL:
+Protein-structure mapping additionally requires PyMOL and MAFFT. PyMOL can be
+installed with the `structure` extra; install the MAFFT executable separately:
 
 ```bash
 pip install "csubst[structure] @ git+https://github.com/kfuku52/csubst"
@@ -114,8 +114,14 @@ csubst scan \
 csubst sites \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
-  --branch_id 23,51
+  --branch_id 23,51 \
+  --outdir csubst_sites \
+  --output_prefix csubst
 ```
+
+All analysis subcommands accept `--outdir`, `--output_prefix`, and `--log_file`.
+The `sites` command creates one branch-selection directory under `--outdir` for
+each requested branch set.
 
 For advanced settings, including foreground formats, higher-order search, structure mapping, and simulation parameters, see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
 

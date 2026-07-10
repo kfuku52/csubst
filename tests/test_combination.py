@@ -56,7 +56,8 @@ def test_generate_all_k_combinations_from_sorted_nodes_falls_back_when_cython_ra
 
     monkeypatch.setattr(combination, "combination_cy", _BrokenCy)
     node_ids = np.array([2, 4, 7, 11, 13], dtype=np.int64)
-    out = combination._generate_all_k_combinations_from_sorted_nodes(node_ids, k=4)
+    with pytest.warns(RuntimeWarning, match="generate_all_k_combinations"):
+        out = combination._generate_all_k_combinations_from_sorted_nodes(node_ids, k=4)
     expected = np.array(list(itertools.combinations(node_ids.tolist(), 4)), dtype=np.int64)
     np.testing.assert_array_equal(out, expected)
 
@@ -110,7 +111,8 @@ def test_generate_all_triples_from_sorted_nodes_falls_back_when_cython_raises(mo
 
     monkeypatch.setattr(combination, "combination_cy", _BrokenCy)
     node_ids = np.array([2, 4, 7, 11], dtype=np.int64)
-    out = combination._generate_all_triples_from_sorted_nodes(node_ids)
+    with pytest.warns(RuntimeWarning, match="generate_all_triples"):
+        out = combination._generate_all_triples_from_sorted_nodes(node_ids)
     expected = np.array(list(itertools.combinations(node_ids.tolist(), 3)), dtype=np.int64)
     np.testing.assert_array_equal(out, expected)
 
@@ -148,7 +150,8 @@ def test_generate_union_candidates_arity3_from_pairs_falls_back_when_dense_cytho
         ],
         dtype=np.int64,
     )
-    out = combination._generate_union_candidates_arity3_from_pairs(pair_nodes=pair_nodes)
+    with pytest.warns(RuntimeWarning, match="generate_union_arity3"):
+        out = combination._generate_union_candidates_arity3_from_pairs(pair_nodes=pair_nodes)
     expected = combination._generate_valid_unions_by_pair_scan(target_nodes=pair_nodes, arity=3)
     np.testing.assert_array_equal(out, expected)
 
@@ -180,7 +183,8 @@ def test_generate_union_candidates_arity4_from_triples_falls_back_when_cython_ra
         ],
         dtype=np.int64,
     )
-    out = combination._generate_union_candidates_arity4_from_triples(triple_nodes=triple_nodes)
+    with pytest.warns(RuntimeWarning, match="generate_union_arity4"):
+        out = combination._generate_union_candidates_arity4_from_triples(triple_nodes=triple_nodes)
     expected = combination._generate_valid_unions_by_pair_scan(target_nodes=triple_nodes, arity=4)
     np.testing.assert_array_equal(out, expected)
 
@@ -278,7 +282,8 @@ def test_generate_union_candidates_by_shared_subset_arity5_falls_back_when_cytho
         ],
         dtype=np.int64,
     )
-    out = combination._generate_union_candidates_by_shared_subset(target_nodes=target_nodes, arity=5)
+    with pytest.warns(RuntimeWarning, match="generate_union_shared_subset"):
+        out = combination._generate_union_candidates_by_shared_subset(target_nodes=target_nodes, arity=5)
     expected = combination._generate_valid_unions_by_pair_scan(target_nodes=target_nodes, arity=5)
     np.testing.assert_array_equal(out, expected)
 

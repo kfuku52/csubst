@@ -5,7 +5,7 @@ from csubst import output_stat
 
 try:
     from scipy.special import gammaln as _gammaln
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     _gammaln = np.vectorize(math.lgamma, otypes=[np.float64])
 
 

@@ -12,6 +12,7 @@ import itertools
 import re
 import sys
 import time
+import warnings
 
 from csubst import parallel
 from csubst import randomness
@@ -21,10 +22,9 @@ from csubst import table
 from csubst import ete
 from csubst import output_stat
 from csubst import pseudocount
-try:
-    from csubst import omega_cy
-except Exception:  # pragma: no cover - Cython extension is optional
-    omega_cy = None
+from csubst._extensions import load_optional_extension
+
+omega_cy = load_optional_extension('omega_cy')
 
 _UINT8_POPCOUNT = np.unpackbits(
     np.arange(256, dtype=np.uint8)[:, None],
@@ -38,6 +38,21 @@ _DEFAULT_E_STAT_MIN_ITEMS_FOR_PARALLEL = 1000000000
 _DEFAULT_E_STAT_MIN_CATEGORIES_PER_JOB = 64
 _EPI_AUTO_CLIP_QUANTILE = 0.995
 _EPI_AUTO_CLIP_MIN = 1.5
+_CYTHON_FALLBACK_WARNED = set()
+
+
+def _warn_cython_fallback(fastpath_name, exc):
+    if fastpath_name in _CYTHON_FALLBACK_WARNED:
+        return
+    warnings.warn(
+        'Cython fast path "{}" failed; using the NumPy implementation instead: {}'.format(
+            fastpath_name,
+            exc,
+        ),
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    _CYTHON_FALLBACK_WARNED.add(fastpath_name)
 _EPI_AUTO_CLIP_MAX = 5.0
 _EPI_CV_FOLDS = 5
 _OMEGA_PVALUE_REFINE_UPPER_EDGE_BINS = 2
@@ -954,8 +969,8 @@ def _calc_shared_counts_from_packed_masks(packed_masks, remapped_cb_ids):
                 packed_masks=packed_masks,
                 remapped_cb_ids=remapped_cb_ids,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            _warn_cython_fallback('packed_shared_counts', exc)
     arity = remapped_cb_ids.shape[1]
     if arity == 1:
         return _UINT8_POPCOUNT[packed_masks[remapped_cb_ids[:, 0], :, :]].sum(axis=2, dtype=np.int32)
@@ -989,8 +1004,8 @@ def _pack_sampled_site_indices_to_uint8(sampled_site_indices, num_site):
                 sampled_site_indices=sampled_site_indices,
                 num_site=num_site,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            _warn_cython_fallback('pack_sampled_site_indices', exc)
     row_indices = np.repeat(np.arange(niter, dtype=np.int64), size)
     flattened_sites = sampled_site_indices.reshape(-1)
     if (flattened_sites < 0).any() or (flattened_sites >= num_site).any():
@@ -1148,8 +1163,8 @@ def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type, cb_site_overlap
                 sub_sites=sub_sites,
                 sub_branches=sub_branches,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            _warn_cython_fallback('expected_overlap', exc)
     if (cb_ids.shape[1] == 1):
         bids = cb_ids[:, 0]
         site_overlap = sub_sites[bids, :].sum(axis=1)
