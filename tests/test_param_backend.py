@@ -21,6 +21,7 @@ def _args(**kwargs):
 
 def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     g = param.get_global_parameters(_args())
+    assert g["infile_type"] == "iqtree"
     assert g["random_seed"] == 1
     assert g["sub_tensor_backend"] == "auto"
     assert g["sub_tensor_sparse_density_cutoff"] == pytest.approx(0.15)

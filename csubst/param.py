@@ -198,6 +198,7 @@ def get_global_parameters(args):
     g = dict()
     for attr in [a for a in dir(args) if not a.startswith('_')]:
         g[attr] = getattr(args, attr)
+    g['infile_type'] = 'iqtree'
     g['random_seed'] = randomness.normalize_seed(
         g.get('random_seed', randomness.DEFAULT_RANDOM_SEED),
         param_name='--random_seed',

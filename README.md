@@ -78,6 +78,7 @@ Display available commands and options:
 ```bash
 csubst -h
 csubst SUBCOMMAND -h
+csubst SUBCOMMAND --help-advanced  # include expert tuning options
 ```
 
 Typical workflow:

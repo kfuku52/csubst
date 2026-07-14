@@ -53,6 +53,19 @@ def strtobool(value):
     raise argparse.ArgumentTypeError('invalid truth value: {}'.format(value))
 
 
+def _add_advanced_argument(parser, *args, **kwargs):
+    show_advanced = bool(kwargs.pop('show_advanced', False))
+    if not show_advanced:
+        kwargs['help'] = argparse.SUPPRESS
+    return parser.add_argument(*args, **kwargs)
+
+
+def _normalize_help_argv(argv):
+    show_advanced = '--help-advanced' in argv
+    normalized = ['--help' if token == '--help-advanced' else token for token in argv]
+    return normalized, show_advanced
+
+
 def _default_prostt5_cache_file():
     return "csubst_prostt5_cache.tsv"
 
@@ -182,7 +195,7 @@ def _resolve_log_file_from_argv(argv):
 def _is_informational_invocation(argv):
     if len(argv) == 0:
         return True
-    return any(str(token) in {'-h', '--help', '--version'} for token in argv)
+    return any(str(token) in {'-h', '--help', '--help-advanced', '--version'} for token in argv)
 
 
 def get_global_parameters_or_exit(args):
@@ -292,7 +305,7 @@ def command_inspect(args):
     print('csubst inspect end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
 
-def _add_search_subcommand_args(parser):
+def _add_search_subcommand_args(parser, show_advanced=False):
     # branch combinations
     parser.add_argument('--max_arity', metavar='INTEGER', default=2, type=int,
                         help='default=%(default)s: The maximum combinatorial number of branches (K). '
@@ -360,7 +373,9 @@ def _add_search_subcommand_args(parser):
                         help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
                              'P values of omega_C by substitution randomization (--expectation_method urn only). '
                              'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib".')
-    parser.add_argument('--omega_pvalue_null_model', metavar='hypergeom|poisson|poisson_full|nbinom', default='hypergeom', type=str,
+    advanced_statistics = parser.add_argument_group('advanced statistical tuning')
+    _add_advanced_argument(advanced_statistics, '--omega_pvalue_null_model', show_advanced=show_advanced,
+                        metavar='hypergeom|poisson|poisson_full|nbinom', default='hypergeom', type=str,
                         choices=['hypergeom', 'poisson', 'poisson_full', 'nbinom'],
                         help='default=%(default)s: Experimental feature. Null count generator for --calc_omega_pvalue. '
                              '"hypergeom" uses legacy site-subset randomization with integer draw sizes. '
@@ -368,22 +383,26 @@ def _add_search_subcommand_args(parser):
                              '"poisson_full" uses branch-specific site masses without branch-site factorization; '
                              '"nbinom" adds Gamma-Poisson overdispersion on factorized mean counts. '
                              'Both Poisson-based models reduce sensitivity to --min_sub_pp.')
-    parser.add_argument('--omega_pvalue_nbinom_alpha', metavar='auto|FLOAT', default='auto', type=str,
+    _add_advanced_argument(advanced_statistics, '--omega_pvalue_nbinom_alpha', show_advanced=show_advanced,
+                        metavar='auto|FLOAT', default='auto', type=str,
                         help='default=%(default)s: Experimental feature. Overdispersion coefficient for '
                              '--omega_pvalue_null_model nbinom. Variance is mean + alpha*mean^2. '
                              '"auto" estimates alpha from observed-vs-expected count dispersion.')
-    parser.add_argument('--omega_pvalue_niter_schedule', metavar='0|N1,N2,...', default='0', type=str,
+    _add_advanced_argument(advanced_statistics, '--omega_pvalue_niter_schedule', show_advanced=show_advanced,
+                        metavar='0|N1,N2,...', default='0', type=str,
                         help='default=%(default)s: Experimental feature. Iteration schedule for staged '
                              '--calc_omega_pvalue refinement under all --omega_pvalue_null_model modes '
                              '(upper-tail edge focused). '
                              'Set 0 (auto) to use adaptive stages (100,1000). '
                              'Custom values should be comma-delimited strictly increasing integers '
                              '(e.g., 200,2000,10000).')
-    parser.add_argument('--omega_pvalue_refine_upper_edge_bins', metavar='INTEGER', default=2, type=int,
+    _add_advanced_argument(advanced_statistics, '--omega_pvalue_refine_upper_edge_bins', show_advanced=show_advanced,
+                        metavar='INTEGER', default=2, type=int,
                         help='default=%(default)s: Experimental feature. Number of upper-tail p-value edge bins '
                              'used to select rows for the next refinement stage. '
                              'Rows with exceedance rank <= this value are refined; set 0 to disable.')
-    parser.add_argument('--omega_pvalue_rounding', metavar='round|stochastic|floor|ceil', default='stochastic', type=str,
+    _add_advanced_argument(advanced_statistics, '--omega_pvalue_rounding', show_advanced=show_advanced,
+                        metavar='round|stochastic|floor|ceil', default='stochastic', type=str,
                         choices=['round', 'stochastic', 'floor', 'ceil'],
                         help='default=%(default)s: Experimental feature. How fractional branch-wise substitution masses are converted to '
                              'integer draw sizes in randomization for --calc_omega_pvalue. '
@@ -401,15 +420,19 @@ def _add_search_subcommand_args(parser):
                              'to calculate their respective ASRVs. '
                              '"file", ASRV is obtained from the IQ-TREE\'s .rate file (1 set). '
                              '"file_each", Hybrid of site-rate and category-specific empirical site mass. ')
-    parser.add_argument('--asrv_dirichlet_alpha', metavar='FLOAT', default=1.0, type=float,
+    _add_advanced_argument(advanced_statistics, '--asrv_dirichlet_alpha', show_advanced=show_advanced,
+                        metavar='FLOAT', default=1.0, type=float,
                         help='default=%(default)s: Dirichlet pseudo-count alpha for branch-wise ASRV normalization '
                              'in --asrv sn/each/file_each. Set >0 to smooth sparse site-mass profiles.')
-    parser.add_argument('--epistasis_apply_to', metavar='N|S|NS', default='N', type=str,
+    advanced_epistasis = parser.add_argument_group('advanced epistasis options')
+    _add_advanced_argument(advanced_epistasis, '--epistasis_apply_to', show_advanced=show_advanced,
+                        metavar='N|S|NS', default='N', type=str,
                         help='default=%(default)s: Experimental feature. Expected-count channels to apply structure-aware epistasis correction. '
                              '"N" adjusts nonsynonymous expectations (ECN), '
                              '"S" adjusts synonymous expectations (ECS; useful as a negative-control check), '
                              '"NS" adjusts both.')
-    parser.add_argument('--epistasis_site_metric', metavar='off|auto|degree|proximity|hybrid', default='off', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_site_metric', show_advanced=show_advanced,
+                        metavar='off|auto|degree|proximity|hybrid', default='off', type=str,
                         help='default=%(default)s: Experimental feature. Site-level structure feature for epistasis weighting. '
                              '"off" keeps epistasis-site-feature selection disabled by default '
                              '(auto-enabled when --epistasis_beta is active), '
@@ -417,60 +440,81 @@ def _add_search_subcommand_args(parser):
                              '"proximity" uses distance-weighted local proximity, '
                              '"hybrid" averages degree/proximity z-scores, '
                              '"auto" selects hybrid when both are available (otherwise falls back).')
-    parser.add_argument('--epistasis_beta', metavar='off|auto|FLOAT', default='off', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_beta', show_advanced=show_advanced,
+                        metavar='off|auto|FLOAT', default='off', type=str,
                         help='default=%(default)s: Experimental feature. Strength of structure-aware epistasis correction. '
                              'Set "off"/0 to disable, a non-negative float for fixed strength, '
                              'or "auto" for branch-level CV tuning.')
-    parser.add_argument('--epistasis_beta_partition', metavar='global|branch_depth', default='global', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_beta_partition', show_advanced=show_advanced,
+                        metavar='global|branch_depth', default='global', type=str,
                         help='default=%(default)s: Experimental feature. Scope of epistasis beta estimation. '
                              '"global" fits one beta per channel; '
                              '"branch_depth" fits beta per branch-depth bin to reduce over-shrinkage from global averaging.')
-    parser.add_argument('--epistasis_branch_depth_bins', metavar='INT', default=3, type=int,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_branch_depth_bins', show_advanced=show_advanced,
+                        metavar='INT', default=3, type=int,
                         help='default=%(default)s: Experimental feature. Number of branch-depth bins for --epistasis_beta_partition branch_depth.')
-    parser.add_argument('--epistasis_feature_mode', metavar='single|paired', default='single', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_feature_mode', show_advanced=show_advanced,
+                        metavar='single|paired', default='single', type=str,
                         help='default=%(default)s: Experimental feature. Site-feature dimensionality for epistasis weighting. '
                              '"single" uses resolved --epistasis_site_metric only; '
                              '"paired" uses both degree and proximity when both are available.')
-    parser.add_argument('--epistasis_clip', metavar='auto|FLOAT', default='3.0', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_clip', show_advanced=show_advanced,
+                        metavar='auto|FLOAT', default='3.0', type=str,
                         help='default=%(default)s: Experimental feature. Absolute clipping bound for the internal epistasis score '
                              'before exponentiation. Set a positive float or "auto".')
-    parser.add_argument('--epistasis_joint_auto', metavar='yes|no', default='no', type=strtobool,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_joint_auto', show_advanced=show_advanced,
+                        metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Experimental feature. Jointly optimize epistasis alpha/clip with beta CV. '
                              'When enabled with --epistasis_beta auto, the best (alpha, clip, beta) tuple is selected by CV score.')
-    parser.add_argument('--epistasis_joint_alpha_grid', metavar='FLOAT,FLOAT,...', default='0,0.5,1,2', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_joint_alpha_grid', show_advanced=show_advanced,
+                        metavar='FLOAT,FLOAT,...', default='0,0.5,1,2', type=str,
                         help='default=%(default)s: Experimental feature. Candidate ASRV Dirichlet alpha grid for --epistasis_joint_auto.')
-    parser.add_argument('--epistasis_joint_clip_grid', metavar='FLOAT,FLOAT,...', default='1.5,2,2.5,3,4,5', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_joint_clip_grid', show_advanced=show_advanced,
+                        metavar='FLOAT,FLOAT,...', default='1.5,2,2.5,3,4,5', type=str,
                         help='default=%(default)s: Experimental feature. Candidate clip grid for --epistasis_joint_auto.')
-    parser.add_argument('--epistasis_degree_file', metavar='PATH', default='', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_degree_file', show_advanced=show_advanced,
+                        metavar='PATH', default='', type=str,
                         help='default=%(default)s: Experimental feature. Optional precomputed site-wise structure-degree table. '
                              'If omitted, structure degree is computed during search when --epistasis_pdb is set.')
-    parser.add_argument('--epistasis_pdb', metavar='PATH/PDB_CODE/besthit', default='', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_pdb', show_advanced=show_advanced,
+                        metavar='PATH/PDB_CODE/besthit', default='', type=str,
                         help='default=%(default)s: Experimental feature. Structure source for search-time epistasis degree generation. '
                              'PATH: local structure file; PDB code: fetched from PDB; '
                              '"besthit": online sequence search + best-hit retrieval.')
-    parser.add_argument('--epistasis_database', metavar='DATABASE1,DATABASE2,...', default='swissmodel,pdb,alphafold,alphafill', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_database', show_advanced=show_advanced,
+                        metavar='DATABASE1,DATABASE2,...', default='swissmodel,pdb,alphafold,alphafill', type=str,
                         help='default=%(default)s: Experimental feature. Comma-delimited database priority for --epistasis_pdb besthit. '
                              'Supported: swissmodel, pdb, alphafold, alphafill.')
-    parser.add_argument('--epistasis_database_evalue_cutoff', metavar='FLOAT', default=1.0, type=float,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_database_evalue_cutoff', show_advanced=show_advanced,
+                        metavar='FLOAT', default=1.0, type=float,
                         help='default=%(default)s: Experimental feature. E-value cutoff for --epistasis_pdb besthit searches.')
-    parser.add_argument('--epistasis_database_minimum_identity', metavar='FLOAT', default=0.25, type=float,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_database_minimum_identity', show_advanced=show_advanced,
+                        metavar='FLOAT', default=0.25, type=float,
                         help='default=%(default)s: Experimental feature. Minimum sequence identity for MMseqs2 PDB search in --epistasis_pdb besthit.')
-    parser.add_argument('--epistasis_database_timeout', metavar='FLOAT', default=30.0, type=float,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_database_timeout', show_advanced=show_advanced,
+                        metavar='FLOAT', default=30.0, type=float,
                         help='default=%(default)s: Experimental feature. Network timeout in seconds for --epistasis_pdb besthit retrieval.')
-    parser.add_argument('--epistasis_user_alignment', metavar='PATH', default='', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_user_alignment', show_advanced=show_advanced,
+                        metavar='PATH', default='', type=str,
                         help='default=%(default)s: Experimental feature. Optional user-provided protein alignment for mapping structure residues '
                              'to alignment sites in search-time epistasis degree generation.')
-    parser.add_argument('--epistasis_contact_distance', metavar='FLOAT', default=8.0, type=float,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_contact_distance', show_advanced=show_advanced,
+                        metavar='FLOAT', default=8.0, type=float,
                         help='default=%(default)s: Experimental feature. CA-CA distance threshold (Angstrom) used to compute structure contact degree.')
-    parser.add_argument('--epistasis_mafft_exe', metavar='PATH', default='mafft', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_mafft_exe', show_advanced=show_advanced,
+                        metavar='PATH', default='mafft', type=str,
                         help='default=%(default)s: Experimental feature. PATH to mafft executable for search-time structure mapping.')
-    parser.add_argument('--epistasis_mafft_op', metavar='FLOAT', default=-1, type=float,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_mafft_op', show_advanced=show_advanced,
+                        metavar='FLOAT', default=-1, type=float,
                         help='default=%(default)s: Experimental feature. mafft --op value for search-time structure mapping. -1 uses default.')
-    parser.add_argument('--epistasis_mafft_ep', metavar='FLOAT', default=-1, type=float,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_mafft_ep', show_advanced=show_advanced,
+                        metavar='FLOAT', default=-1, type=float,
                         help='default=%(default)s: Experimental feature. mafft --ep value for search-time structure mapping. -1 uses default.')
-    parser.add_argument('--epistasis_pymol_max_num_chain', metavar='INT', default=20, type=int,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_pymol_max_num_chain', show_advanced=show_advanced,
+                        metavar='INT', default=20, type=int,
                         help='default=%(default)s: Experimental feature. Maximum chain count threshold for candidate structures in --epistasis_pdb besthit.')
-    parser.add_argument('--epistasis_degree_outfile', metavar='PATH', default='csubst_epistasis_structure_degree.tsv', type=str,
+    _add_advanced_argument(advanced_epistasis, '--epistasis_degree_outfile', show_advanced=show_advanced,
+                        metavar='PATH', default='csubst_epistasis_structure_degree.tsv', type=str,
                         help='default=%(default)s: Experimental feature. Output TSV path for search-time structure degree table.')
     parser.add_argument('--pseudocount_alpha', metavar='FLOAT|auto', default='0.0', type=str,
                         help='default=%(default)s: Dirichlet pseudo-count alpha for convergence-statistic '
@@ -482,17 +526,19 @@ def _add_search_subcommand_args(parser):
                              '"none" keeps legacy behavior; '
                              '"symmetric" applies equal pseudo-counts; '
                              '"empirical" shrinks toward global substitution-category frequencies.')
-    parser.add_argument('--pseudocount_target', metavar='observed|expected|both', default='both', type=str,
+    _add_advanced_argument(advanced_statistics, '--pseudocount_target', show_advanced=show_advanced,
+                        metavar='observed|expected|both', default='both', type=str,
                         choices=['observed', 'expected', 'both'],
                         help='default=%(default)s: Apply pseudo-counts to observed counts, expected counts, or both.')
-    parser.add_argument('--pseudocount_report', action='store_true',
+    _add_advanced_argument(advanced_statistics, '--pseudocount_report', show_advanced=show_advanced,
+                        action='store_true',
                         help='Write pseudocount configuration and pre-smoothing sparsity diagnostics to logs and outputs.')
     parser.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
                              'by quantile-based transformation.')
 
 
-def _add_scan_subcommand_args(parser):
+def _add_scan_subcommand_args(parser, show_advanced=False):
     parser.add_argument('--scan_match', metavar='MATCH1,MATCH2,...', default='any2spe', type=str,
                         help='default=%(default)s: Comma-delimited recurrent substitution pattern classes to scan. '
                              'Choose from any2any, any2spe, any2dif, spe2any, spe2spe, spe2dif, '
@@ -532,12 +578,15 @@ def _add_scan_subcommand_args(parser):
                              'and reports maxT-style empirical P values.')
     parser.add_argument('--scan_n_permutations', metavar='INT', default=1000, type=int,
                         help='default=%(default)s: Number of foreground clade permutations for scan P-value calibration. '
-                             'Permutation iterations are parallelized over --threads using --parallel_backend.')
+                             'Permutation iterations are parallelized over --threads.')
     parser.add_argument('--scan_permutation_seed', metavar='INT', default=1, type=int,
                         help='default=%(default)s: Random seed for scan foreground clade permutations.')
-    parser.add_argument('--scan_permutation_sample_original', metavar='yes|no', default='no', type=strtobool,
+    advanced_scan = parser.add_argument_group('advanced scan tuning')
+    _add_advanced_argument(advanced_scan, '--scan_permutation_sample_original', show_advanced=show_advanced,
+                        metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Allow original foreground clades to be sampled as permutation targets.')
-    parser.add_argument('--scan_permutation_retry_sample_original', metavar='yes|no', default='yes', type=strtobool,
+    _add_advanced_argument(advanced_scan, '--scan_permutation_retry_sample_original', show_advanced=show_advanced,
+                        metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Retry a failed scan permutation while allowing original foreground clades.')
     parser.add_argument('--scan_site_plot', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Generate a tree + detected-site summary plot using the csubst sites plotter. '
@@ -547,15 +596,22 @@ def _add_scan_subcommand_args(parser):
                         help='default=%(default)s: Output format for --scan_site_plot.')
     parser.add_argument('--tree_site_plot_max_sites', metavar='INT', default=30, required=False, type=int,
                         help='default=%(default)s: Maximum number of detected sites plotted in the scan tree + site summary.')
-    parser.add_argument('--tree_site_tip_label_spacing', metavar='FLOAT', default=1.35, required=False, type=float,
+    _add_advanced_argument(advanced_scan, '--tree_site_tip_label_spacing', show_advanced=show_advanced,
+                        metavar='FLOAT', default=1.35, required=False, type=float,
                         help='default=%(default)s: Vertical spacing multiplier for tip labels in the scan tree + site summary.')
-    parser.add_argument('--tree_site_fig_max_height', metavar='FLOAT', default=24.0, required=False, type=float,
+    _add_advanced_argument(advanced_scan, '--tree_site_fig_max_height', show_advanced=show_advanced,
+                        metavar='FLOAT', default=24.0, required=False, type=float,
                         help='default=%(default)s: Maximum figure height in inches for the scan tree + site summary.')
 
 
-def _build_parser():
+def _build_parser(show_advanced=False):
     # Main parser
-    parser = argparse.ArgumentParser(description='CSUBST - a toolkit for molecular convergence detection. For details, see https://github.com/kfuku52/csubst')
+    help_epilog = ('This help includes advanced options.' if show_advanced else
+                   'Advanced options are hidden. Use `csubst SUBCOMMAND --help-advanced` to show them.')
+    parser = argparse.ArgumentParser(
+        description='CSUBST - a toolkit for molecular convergence detection. For details, see https://github.com/kfuku52/csubst',
+        epilog=help_epilog,
+    )
     parser.add_argument('--version', action='version', version='CSUBST version: {}'.format(__version__))
     _add_output_namespace_args(parser, include_outdir=False, include_output_prefix=False, include_log_file=True)
     subparsers = parser.add_subparsers(dest='subcommand')
@@ -572,65 +628,87 @@ def _build_parser():
     psr_co.add_argument('--genetic_code', metavar='INTEGER', type=int, required=False, default=1,
                        help='default=%(default)s: NCBI codon table ID. 1 = "Standard". See here: '
                             'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
-    psr_co.add_argument('--infile_type', metavar='[iqtree]', default='iqtree', type=str, choices=['iqtree',],
-                       help='default=%(default)s: The input file format.')
     psr_co.add_argument('--threads', metavar='INTEGER', default=1, type=int, required=False,
                        help='default=%(default)s: The number of CPUs for parallel computations.')
     psr_co.add_argument('--random_seed', metavar='INT', default=1, type=int, required=False,
                         help='default=%(default)s: Reproducible seed for stochastic search, omega p-value, '
                              'and foreground-clade permutation operations. Set -1 for a non-deterministic seed.')
-    psr_co.add_argument('--float_type', metavar='16|32|64', default=64, type=int, required=False,
+    advanced_performance = psr_co.add_argument_group('advanced performance and memory options')
+    _add_advanced_argument(advanced_performance, '--float_type', show_advanced=show_advanced,
+                        metavar='16|32|64', default=64, type=int, required=False,
                         help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
-    psr_co.add_argument('--sub_tensor_backend', metavar='auto|dense|sparse', default='auto', type=str,
+    _add_advanced_argument(advanced_performance, '--sub_tensor_backend', show_advanced=show_advanced,
+                        metavar='auto|dense|sparse', default='auto', type=str,
                         choices=['auto', 'dense', 'sparse'],
                         help='default=%(default)s: Backend for substitution tensors. '
                              '"auto" selects sparse reducers for low-density tensors.')
-    psr_co.add_argument('--sub_tensor_sparse_density_cutoff', metavar='FLOAT', default=0.15, type=float, required=False,
+    _add_advanced_argument(advanced_performance, '--sub_tensor_sparse_density_cutoff', show_advanced=show_advanced,
+                        metavar='FLOAT', default=0.15, type=float, required=False,
                         help='default=%(default)s: Density cutoff for --sub_tensor_backend auto. '
                              'Sparse reducers are selected when estimated substitution tensor density is <= this value.')
-    psr_co.add_argument('--sub_tensor_auto_sparse_min_elements', metavar='INT', default=100000000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--sub_tensor_auto_sparse_min_elements', show_advanced=show_advanced,
+                        metavar='INT', default=100000000, type=int, required=False,
                         help='default=%(default)s: For --sub_tensor_backend auto, build sparse substitution tensors '
                              'when estimated tensor elements (branch x site x group x from x to) are >= this threshold.')
-    psr_co.add_argument('--parallel_backend', metavar='auto|multiprocessing|threading', default='auto', type=str,
+    _add_advanced_argument(advanced_performance, '--parallel_backend', show_advanced=show_advanced,
+                        metavar='auto|multiprocessing|threading', default='auto', type=str,
                         choices=['auto', 'multiprocessing', 'threading'],
                         help='default=%(default)s: Backend policy for parallel workloads. '
                              '"auto" uses multiprocessing.')
-    psr_co.add_argument('--parallel_chunk_factor', metavar='INT', default=1, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_chunk_factor', show_advanced=show_advanced,
+                        metavar='INT', default=1, type=int, required=False,
                         help='default=%(default)s: Number of chunks per worker for general parallel workloads.')
-    psr_co.add_argument('--parallel_chunk_factor_reducer', metavar='INT', default=4, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_chunk_factor_reducer', show_advanced=show_advanced,
+                        metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of chunks per worker for dense/sparse combinatorial reducers.')
-    psr_co.add_argument('--parallel_min_items_sub_tensor', metavar='INT', default=256, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_sub_tensor', show_advanced=show_advanced,
+                        metavar='INT', default=256, type=int, required=False,
                         help='default=%(default)s: Minimum number of branch pairs to enable parallel substitution-tensor generation.')
-    psr_co.add_argument('--parallel_min_items_per_job_sub_tensor', metavar='INT', default=64, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_sub_tensor', show_advanced=show_advanced,
+                        metavar='INT', default=64, type=int, required=False,
                         help='default=%(default)s: Minimum branch pairs assigned per worker in substitution-tensor generation.')
-    psr_co.add_argument('--parallel_min_items_node_union', metavar='INT', default=20000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_node_union', show_advanced=show_advanced,
+                        metavar='INT', default=20000, type=int, required=False,
                         help='default=%(default)s: Minimum pair-union workload to enable parallel node-union in branch-combination generation.')
-    psr_co.add_argument('--parallel_min_items_per_job_node_union', metavar='INT', default=5000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_node_union', show_advanced=show_advanced,
+                        metavar='INT', default=5000, type=int, required=False,
                         help='default=%(default)s: Minimum pair-unions assigned per worker in node-union.')
-    psr_co.add_argument('--parallel_min_items_nc_matrix', metavar='INT', default=100000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_nc_matrix', show_advanced=show_advanced,
+                        metavar='INT', default=100000, type=int, required=False,
                         help='default=%(default)s: Minimum number of branch combinations to enable parallel nc-matrix population.')
-    psr_co.add_argument('--parallel_min_items_per_job_nc_matrix', metavar='INT', default=25000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_nc_matrix', show_advanced=show_advanced,
+                        metavar='INT', default=25000, type=int, required=False,
                         help='default=%(default)s: Minimum branch combinations assigned per worker in nc-matrix population.')
-    psr_co.add_argument('--parallel_min_items_cb', metavar='INT', default=20000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_cb', show_advanced=show_advanced,
+                        metavar='INT', default=20000, type=int, required=False,
                         help='default=%(default)s: Minimum number of branch combinations to enable parallel cb reducers.')
-    psr_co.add_argument('--parallel_min_items_per_job_cb', metavar='INT', default=5000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_cb', show_advanced=show_advanced,
+                        metavar='INT', default=5000, type=int, required=False,
                         help='default=%(default)s: Minimum branch combinations assigned per worker in cb reducers.')
-    psr_co.add_argument('--parallel_min_rows_cbs', metavar='INT', default=200000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_rows_cbs', show_advanced=show_advanced,
+                        metavar='INT', default=200000, type=int, required=False,
                         help='default=%(default)s: Minimum number of output rows (combination x site) to enable parallel cbs reducers.')
-    psr_co.add_argument('--parallel_min_rows_per_job_cbs', metavar='INT', default=50000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_rows_per_job_cbs', show_advanced=show_advanced,
+                        metavar='INT', default=50000, type=int, required=False,
                         help='default=%(default)s: Minimum cbs output rows assigned per worker.')
-    psr_co.add_argument('--parallel_min_items_branch_dist', metavar='INT', default=20000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_branch_dist', show_advanced=show_advanced,
+                        metavar='INT', default=20000, type=int, required=False,
                         help='default=%(default)s: Minimum number of branch combinations to enable parallel branch-distance calculation.')
-    psr_co.add_argument('--parallel_min_items_per_job_branch_dist', metavar='INT', default=5000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_branch_dist', show_advanced=show_advanced,
+                        metavar='INT', default=5000, type=int, required=False,
                         help='default=%(default)s: Minimum branch combinations assigned per worker in branch-distance calculation.')
-    psr_co.add_argument('--parallel_min_items_expected_state', metavar='INT', default=50000000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_expected_state', show_advanced=show_advanced,
+                        metavar='INT', default=50000000, type=int, required=False,
                         help='default=%(default)s: Minimum estimated expected-state workload '
                              '(branch x site x state x state) to enable parallel expected-state projection.')
-    psr_co.add_argument('--parallel_min_items_per_job_expected_state', metavar='INT', default=10000000, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_expected_state', show_advanced=show_advanced,
+                        metavar='INT', default=10000000, type=int, required=False,
                         help='default=%(default)s: Minimum estimated expected-state workload per worker.')
-    psr_co.add_argument('--float_digit', metavar='INT', default=4, type=int, required=False,
+    _add_advanced_argument(advanced_performance, '--float_digit', show_advanced=show_advanced,
+                        metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')
-    psr_co.add_argument('--write_instantaneous_rate_matrix', metavar='yes|no', default='no', type=strtobool,
+    _add_advanced_argument(advanced_performance, '--write_instantaneous_rate_matrix', show_advanced=show_advanced,
+                        metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Write csubst instantaneous codon rate matrix TSV.')
 
     psr_out_analyze = _make_output_parent_parser(default_outdir='csubst_search', default_prefix='csubst')
@@ -655,19 +733,25 @@ def _build_parser():
                              'See here for details: https://iqtree.github.io/doc/Substitution-Models')
     psr_iq.add_argument('--iqtree_redo', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Whether to rerun IQ-TREE even if all intermediate files exist.')
-    psr_iq.add_argument('--iqtree_treefile', metavar='PATH', default='infer', type=str, required=False,
+    advanced_iqtree = psr_iq.add_argument_group('advanced IQ-TREE intermediate files')
+    _add_advanced_argument(advanced_iqtree, '--iqtree_treefile', show_advanced=show_advanced,
+                       metavar='PATH', default='infer', type=str, required=False,
                        help='default=%(default)s: PATH to the IQ-TREE\'s .treefile output. '
                             '"infer" resolves inside --iqtree_outdir from --alignment_file')
-    psr_iq.add_argument('--iqtree_state', metavar='PATH', default='infer', type=str, required=False,
+    _add_advanced_argument(advanced_iqtree, '--iqtree_state', show_advanced=show_advanced,
+                       metavar='PATH', default='infer', type=str, required=False,
                        help='default=%(default)s: PATH to the IQ-TREE\'s .state output. '
                             '"infer" resolves inside --iqtree_outdir from --alignment_file')
-    psr_iq.add_argument('--iqtree_rate', metavar='PATH', default='infer', type=str, required=False,
+    _add_advanced_argument(advanced_iqtree, '--iqtree_rate', show_advanced=show_advanced,
+                       metavar='PATH', default='infer', type=str, required=False,
                        help='default=%(default)s: PATH to the IQ-TREE\'s .rate output. '
                             '"infer" resolves inside --iqtree_outdir from --alignment_file')
-    psr_iq.add_argument('--iqtree_iqtree', metavar='PATH', default='infer', type=str, required=False,
+    _add_advanced_argument(advanced_iqtree, '--iqtree_iqtree', show_advanced=show_advanced,
+                       metavar='PATH', default='infer', type=str, required=False,
                        help='default=%(default)s: PATH to the IQ-TREE\'s .iqtree output. '
                             '"infer" resolves inside --iqtree_outdir from --alignment_file')
-    psr_iq.add_argument('--iqtree_log', metavar='PATH', default='infer', type=str, required=False,
+    _add_advanced_argument(advanced_iqtree, '--iqtree_log', show_advanced=show_advanced,
+                        metavar='PATH', default='infer', type=str, required=False,
                         help='default=%(default)s: PATH to the IQ-TREE\'s .log output. '
                              '"infer" resolves inside --iqtree_outdir from --alignment_file')
 
@@ -700,28 +784,38 @@ def _build_parser():
                              '"translate" converts ML amino-acid states to 3Di via ProstT5, then one-hot encodes '
                              'each branch-site by argmax state. '
                              '"direct" runs direct 3Di ancestral-state reconstruction with IQ-TREE.')
-    psr_rc.add_argument('--prostt5_model', metavar='STR', default='Rostlab/ProstT5', type=str,
+    advanced_resources = psr_rc.add_argument_group('advanced model resources and caches')
+    _add_advanced_argument(advanced_resources, '--prostt5_model', show_advanced=show_advanced,
+                        metavar='STR', default='Rostlab/ProstT5', type=str,
                         help='default=%(default)s: ProstT5 model identifier used for --nonsyn_recode 3di20.')
-    psr_rc.add_argument('--prostt5_local_dir', metavar='PATH', default='', type=str,
+    _add_advanced_argument(advanced_resources, '--prostt5_local_dir', show_advanced=show_advanced,
+                        metavar='PATH', default='', type=str,
                         help='default=%(default)s: Optional local directory containing ProstT5 files. '
                              'If provided, it is used instead of --prostt5_model.')
-    psr_rc.add_argument('--prostt5_no_download', metavar='yes|no', default='no', type=strtobool,
+    _add_advanced_argument(advanced_resources, '--prostt5_no_download', show_advanced=show_advanced,
+                        metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Set "yes" to disable automatic ProstT5 download and require local files.')
-    psr_rc.add_argument('--prostt5_device', metavar='auto|cpu|cuda|mps', default='auto', type=str,
+    _add_advanced_argument(advanced_resources, '--prostt5_device', show_advanced=show_advanced,
+                        metavar='auto|cpu|cuda|mps', default='auto', type=str,
                         help='default=%(default)s: Device for ProstT5 inference. '
                              'With "auto", CUDA is preferred, then MPS, then CPU. '
                              'When MPS is used, CSUBST enables PYTORCH_ENABLE_MPS_FALLBACK=1 automatically.')
-    psr_rc.add_argument('--prostt5_cache', metavar='yes|no', default='yes', type=strtobool,
+    _add_advanced_argument(advanced_resources, '--prostt5_cache', show_advanced=show_advanced,
+                        metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Reuse ProstT5 sequence-level cache.')
-    psr_rc.add_argument('--prostt5_cache_file', metavar='PATH', default=_default_prostt5_cache_file(), type=str,
+    _add_advanced_argument(advanced_resources, '--prostt5_cache_file', show_advanced=show_advanced,
+                        metavar='PATH', default=_default_prostt5_cache_file(), type=str,
                         help='default=%(default)s: ProstT5 cache file path.')
-    psr_rc.add_argument('--sa_state_cache', metavar='auto|yes|no', default='auto', type=str,
+    _add_advanced_argument(advanced_resources, '--sa_state_cache', show_advanced=show_advanced,
+                        metavar='auto|yes|no', default='auto', type=str,
                         help='default=%(default)s: Shared 3Di-state cache mode for --nonsyn_recode 3di20. '
                              '"auto" uses --sa_state_cache_file when a compatible cache exists, otherwise computes and writes it. '
                              '"yes" requires a compatible cache file. "no" disables cache read/write.')
-    psr_rc.add_argument('--sa_state_cache_file', metavar='PATH', default=_default_sa_state_cache_file(), type=str,
+    _add_advanced_argument(advanced_resources, '--sa_state_cache_file', show_advanced=show_advanced,
+                        metavar='PATH', default=_default_sa_state_cache_file(), type=str,
                         help='default=%(default)s: Shared 3Di-state cache file path used by search and inspect.')
-    psr_rc.add_argument('--sa_iqtree_model', metavar='STR', default='GTR', type=str,
+    _add_advanced_argument(advanced_resources, '--sa_iqtree_model', show_advanced=show_advanced,
+                        metavar='STR', default='GTR', type=str,
                         help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20 '
                              '(used with --seqtype MORPH).')
     psr_treeplot = argparse.ArgumentParser(add_help=False)
@@ -766,9 +860,11 @@ def _build_parser():
     psr_fg.add_argument('--fg_clade_permutation', metavar='INT', default=0, type=int,
                     help='default=%(default)s: Experimental. Randomly select the same/similar number and size of clades as foreground '
                          'and run analysis N times to obtain a permutation-based P value of convergence. '
-                         'Permutation candidate statistics are parallelized over --threads using --parallel_backend. '
+                         'Permutation candidate statistics are parallelized over --threads. '
                          'At least 1000 is recommended.')
-    psr_fg.add_argument('--min_clade_bin_count', metavar='INT', default=10, type=int,
+    advanced_foreground = psr_fg.add_argument_group('advanced foreground tuning')
+    _add_advanced_argument(advanced_foreground, '--min_clade_bin_count', show_advanced=show_advanced,
+                    metavar='INT', default=10, type=int,
                     help='default=%(default)s: Experimental. Minimum number of branches per bin for foreground clade permutation. ')
 
     psr_fg_scan = argparse.ArgumentParser(add_help=False)
@@ -786,7 +882,9 @@ def _build_parser():
                     metavar='yes|no', default='no', type=strtobool,
                     help='default=%(default)s: With --scan_other_scope sister, include sister clade-internal branches. '
                          'Set "yes" to use only sister stem branches.')
-    psr_fg_scan.add_argument('--min_clade_bin_count', metavar='INT', default=10, type=int,
+    advanced_foreground_scan = psr_fg_scan.add_argument_group('advanced foreground tuning')
+    _add_advanced_argument(advanced_foreground_scan, '--min_clade_bin_count', show_advanced=show_advanced,
+                    metavar='INT', default=10, type=int,
                     help='default=%(default)s: Minimum number of branches per bin for scan foreground-clade permutations.')
 
     # dataset
@@ -857,12 +955,12 @@ def _build_parser():
     help_txt = 'scans foreground recurrent nonsynonymous-state substitutions without omega_C branch-combination search. See `csubst scan -h`'
     scan = subparsers.add_parser('scan', help=help_txt, parents=[psr_co,psr_iq,psr_fg_scan,psr_as,psr_rc,psr_treeplot,psr_out_scan])
     scan.set_defaults(handler=command_scan)
-    _add_scan_subcommand_args(scan)
+    _add_scan_subcommand_args(scan, show_advanced=show_advanced)
 
     # benchmark
     help_txt = 'benchmarks `csubst search` across parameter grids on the same input data and summarizes runtime/output metrics. See `csubst benchmark -h`'
     benchmark = subparsers.add_parser('benchmark', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_output_manifest,psr_out_benchmark])
-    _add_search_subcommand_args(benchmark)
+    _add_search_subcommand_args(benchmark, show_advanced=show_advanced)
     benchmark.add_argument('--benchmark_expectation_methods', metavar='LIST', default='', type=str,
                            help='default=current --expectation_method: Comma-delimited expectation methods to compare.')
     benchmark.add_argument('--benchmark_asrv_modes', metavar='LIST', default='', type=str,
@@ -949,12 +1047,13 @@ def _build_parser():
     site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=30, required=False, type=int,
                       help='default=%(default)s: Maximum number of plotted sites in the tree + site summary '
                            '(convergent and divergent columns are balanced when both are available).')
-    site.add_argument('--tree_site_tip_label_spacing', metavar='FLOAT', default=1.35, required=False, type=float,
+    advanced_sites = site.add_argument_group('advanced rendering and external-tool tuning')
+    _add_advanced_argument(advanced_sites, '--tree_site_tip_label_spacing', show_advanced=show_advanced,
+                      metavar='FLOAT', default=1.35, required=False, type=float,
                       help='default=%(default)s: Vertical spacing multiplier for tip labels in the tree + site summary.')
-    site.add_argument('--tree_site_fig_max_height', metavar='FLOAT', default=24.0, required=False, type=float,
+    _add_advanced_argument(advanced_sites, '--tree_site_fig_max_height', show_advanced=show_advanced,
+                      metavar='FLOAT', default=24.0, required=False, type=float,
                       help='default=%(default)s: Maximum figure height in inches for the tree + site summary.')
-    site.add_argument('--site_output_manifest', metavar='yes|no', dest='output_manifest', default='yes', required=False, type=strtobool,
-                      help=argparse.SUPPRESS)
     site.add_argument('--cb_file', metavar='PATH', default='csubst_cb_2.tsv', required=False, type=str,
                       help='default=%(default)s: PATH to csubst_cb_*.tsv output of csubst search.')
     site.add_argument('--untrimmed_cds', metavar='PATH', default=None, required=False, type=str,
@@ -980,7 +1079,8 @@ def _build_parser():
                       help='default=%(default)s: E-value cutoff in the database searches. Applied to MMseqs2 and QBLAST.')
     site.add_argument('--database_minimum_identity', metavar='FLOAT', default=0.25, required=False, type=float,
                       help='default=%(default)s: The minimum sequence identity for the database searches. Applied to MMseqs2. See https://search.rcsb.org/index.html#search-api')
-    site.add_argument('--database_timeout', metavar='FLOAT', default=30.0, required=False, type=float,
+    _add_advanced_argument(advanced_sites, '--database_timeout', show_advanced=show_advanced,
+                      metavar='FLOAT', default=30.0, required=False, type=float,
                       help='default=%(default)s: Network timeout in seconds for online structure database requests.')
     site.add_argument('--user_alignment', metavar='PATH', default=None, required=False, type=str,
                       help='default=%(default)s: The user-provided alignment FASTA for the substitution mapping to protein structures.')
@@ -996,19 +1096,23 @@ def _build_parser():
                            'Used only with --pdb.')
     site.add_argument('--mafft_exe', metavar='PATH', default='mafft', required=False, type=str,
                       help='default=%(default)s: PATH to mafft executable.')
-    site.add_argument('--mafft_op', metavar='FLOAT', default=-1, required=False, type=float,
+    _add_advanced_argument(advanced_sites, '--mafft_op', show_advanced=show_advanced,
+                      metavar='FLOAT', default=-1, required=False, type=float,
                       help='default=%(default)s: mafft --op parameter. -1 to use the default value.')
-    site.add_argument('--mafft_ep', metavar='FLOAT', default=-1, required=False, type=float,
+    _add_advanced_argument(advanced_sites, '--mafft_ep', show_advanced=show_advanced,
+                      metavar='FLOAT', default=-1, required=False, type=float,
                       help='default=%(default)s: mafft --ep parameter. -1 to use the default value.')
     site.add_argument('--pymol_gray', metavar='INT', default=80, required=False, type=int,
                       help='default=%(default)s: Gray value for no-substitution sites. 0=black, 100=white')
     site.add_argument('--pymol_transparency', metavar='FLOAT', default=0.65, required=False, type=float,
                       help='default=%(default)s: Surface transparency. 0=non-transparent, 1=completely transparent')
-    site.add_argument('--pymol_surface_quality', metavar='INT', default=-1, required=False, type=int,
+    _add_advanced_argument(advanced_sites, '--pymol_surface_quality', show_advanced=show_advanced,
+                      metavar='INT', default=-1, required=False, type=int,
                       help='default=%(default)s: PyMOL surface quality setting. Lower values speed up surface generation at the cost of smoothness.')
     site.add_argument('--pymol_img', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Whether to generate a rendered 6-view image file of protein structure.')
-    site.add_argument('--pymol_max_num_chain', metavar='INT', default=20, required=False, type=int,
+    _add_advanced_argument(advanced_sites, '--pymol_max_num_chain', show_advanced=show_advanced,
+                         metavar='INT', default=20, required=False, type=int,
                          help='default=%(default)s: Maximum number of chains to visualize. '
                                'If the number of chains in the PDB file is larger than this value, '
                                '--pymol_img will be disabled.')
@@ -1033,7 +1137,7 @@ def _build_parser():
     help_txt += 'See `csubst search -h` (legacy alias: `csubst analyze -h`).'
     analyze = subparsers.add_parser('search', aliases=['analyze'], help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_analyze])
     analyze.set_defaults(handler=command_search)
-    _add_search_subcommand_args(analyze)
+    _add_search_subcommand_args(analyze, show_advanced=show_advanced)
 
     # inspect
     help_txt = 'writes branch/tree/state inspection outputs without running convergence statistics. See `csubst inspect -h`'
@@ -1054,29 +1158,39 @@ def _build_parser():
                               'If all descendant leaves of a clade match, branch/clade coloring is also highlighted.')
     inspect.add_argument('--plot_state_aa_highlight_color', metavar='COLOR', default='crimson', type=str,
                          help='default=%(default)s: Matplotlib color for --plot_state_aa_highlight_pattern matches.')
-    inspect.add_argument('--tree_tip_label_spacing', metavar='FLOAT', default=1.0, type=float,
+    advanced_inspect = inspect.add_argument_group('advanced inspection and rendering tuning')
+    _add_advanced_argument(advanced_inspect, '--tree_tip_label_spacing', show_advanced=show_advanced,
+                         metavar='FLOAT', default=1.0, type=float,
                          help='default=%(default)s: Vertical spacing multiplier for inspect tree tip labels. '
                               '1.0 keeps the current layout; 2.0 doubles the spacing by increasing figure height per leaf.')
-    inspect.add_argument('--tree_fig_max_height', metavar='FLOAT', default=180.0, type=float,
+    _add_advanced_argument(advanced_inspect, '--tree_fig_max_height', show_advanced=show_advanced,
+                         metavar='FLOAT', default=180.0, type=float,
                          help='default=%(default)s: Maximum PDF page height in inches for inspect tree plots. '
                               'Increase this together with --tree_tip_label_spacing for very large trees.')
     inspect.add_argument('--plot_nonsyn_recode_pca', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Write csubst_nonsyn_recoding_pca.png from input alignment.')
     inspect.add_argument('--plot_nonsyn_recode_pca_3di20', metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Include 3di20 in csubst_nonsyn_recoding_pca.png.')
-    inspect.add_argument('--sa_smoke_max_branches', metavar='INTEGER', default=0, type=int,
+    _add_advanced_argument(advanced_inspect, '--sa_smoke_max_branches', show_advanced=show_advanced,
+                         metavar='INTEGER', default=0, type=int,
                          help='default=%(default)s: CPU smoke mode for --nonsyn_recode 3di20. '
                               'Limit 3Di inference to the first N non-root branches ordered by branch_id. '
                               'Set 0 to disable.')
-    inspect.add_argument('--download_prostt5', metavar='yes|no', default='no', type=strtobool,
+    _add_advanced_argument(advanced_inspect, '--download_prostt5', show_advanced=show_advanced,
+                         metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Download/check ProstT5 model files and exit.')
     inspect.set_defaults(handler=command_inspect)
+    for subparser in set(subparsers.choices.values()):
+        subparser.epilog = help_epilog
     return parser
 
 
-def _main():
-    parser = _build_parser()
-    args = parser.parse_args()
+def _main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    argv, show_advanced = _normalize_help_argv(list(argv))
+    parser = _build_parser(show_advanced=show_advanced)
+    args = parser.parse_args(argv)
     if not hasattr(args, 'handler'):
         parser.print_help()
         return

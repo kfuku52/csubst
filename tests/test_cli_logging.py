@@ -75,6 +75,14 @@ def test_cli_ignores_custom_log_file_for_subcommand_help(tmp_path):
     assert not (tmp_path / "csubst.log").exists()
 
 
+def test_cli_advanced_help_has_no_log_side_effect(tmp_path):
+    result = _run_csubst(["sites", "--help-advanced"], cwd=tmp_path)
+    assert result.returncode == 0
+    assert "--parallel_backend" in result.stdout
+    assert not (tmp_path / "csubst_sites" / "csubst.log").exists()
+    assert not (tmp_path / "csubst.log").exists()
+
+
 def test_simulate_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["simulate", "-h"], cwd=tmp_path)
     assert result.returncode == 0
@@ -160,3 +168,19 @@ def test_subcommand_output_namespace_defaults_are_command_specific():
     sites = parser.parse_args(["sites"])
     assert sites.outdir == "csubst_sites"
     assert sites.output_prefix == "csubst"
+
+
+def test_advanced_options_remain_parseable_in_normal_execution_mode():
+    repo_root = Path(__file__).resolve().parents[1]
+    script_path = repo_root / "csubst" / "csubst"
+    ns = runpy.run_path(str(script_path), run_name="not_main")
+    parser = ns["_build_parser"]()
+
+    sites = parser.parse_args(
+        ["sites", "--parallel_backend", "threading", "--database_timeout", "45"]
+    )
+    assert sites.parallel_backend == "threading"
+    assert sites.database_timeout == 45
+
+    search = parser.parse_args(["search", "--epistasis_beta", "auto"])
+    assert search.epistasis_beta == "auto"

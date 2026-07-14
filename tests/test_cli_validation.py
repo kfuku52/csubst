@@ -1,7 +1,10 @@
 import subprocess
 import sys
 import os
+import re
 from pathlib import Path
+
+import pytest
 
 
 def _resolve_log_path(repo_root, args):
@@ -109,12 +112,15 @@ def test_inspect_help_includes_species_overlap_node_plot_option():
     assert "--output_manifest" in help_text
 
 
-def test_sites_help_shows_output_manifest_and_hides_legacy_site_output_manifest():
+def test_sites_help_shows_output_manifest_and_removed_site_output_manifest_is_rejected():
     proc, log_text = _run_cli("sites", "-h")
     assert proc.returncode == 0
     help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
     assert "--output_manifest" in help_text
     assert "--site_output_manifest" not in help_text
+    proc, log_text = _run_cli("sites", "--branch_id", "0", "--site_output_manifest", "no")
+    assert proc.returncode == 2
+    assert "unrecognized arguments: --site_output_manifest no" in log_text
 
 
 def test_sites_help_shows_swissmodel_first_in_database_default():
@@ -126,11 +132,17 @@ def test_sites_help_shows_swissmodel_first_in_database_default():
 
 
 def test_inspect_help_includes_state_highlight_options():
-    proc, log_text = _run_cli("inspect", "-h")
+    proc, _ = _run_cli("inspect", "-h")
     assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    help_text = (proc.stdout or "") + (proc.stderr or "")
     assert "--plot_state_aa_highlight_pattern" in help_text
     assert "--plot_state_aa_highlight_color" in help_text
+    assert "--tree_tip_label_spacing" not in help_text
+    assert "--tree_fig_max_height" not in help_text
+
+    proc, _ = _run_cli("inspect", "--help-advanced")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "")
     assert "--tree_tip_label_spacing" in help_text
     assert "--tree_fig_max_height" in help_text
 
@@ -153,13 +165,64 @@ def test_search_rejects_removed_pseudocount_strength_option():
     assert "unrecognized arguments: --pseudocount_strength 2.0" in log_text
 
 
-def test_search_help_shows_swissmodel_first_in_epistasis_database_default():
-    proc, log_text = _run_cli("search", "-h")
+@pytest.mark.parametrize("subcommand", ["search", "benchmark"])
+def test_epistasis_options_are_advanced_only(subcommand):
+    proc, _ = _run_cli(subcommand, "-h")
     assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    help_text = (proc.stdout or "") + (proc.stderr or "")
+    assert "--epistasis_" not in help_text
+
+    proc, _ = _run_cli(subcommand, "--help-advanced")
+    assert proc.returncode == 0
+    help_text = (proc.stdout or "") + (proc.stderr or "")
     assert "default=swissmodel,pdb,alphafold,alphafill" in help_text
     assert "Supported:" in help_text
     assert "swissmodel" in help_text
+    assert "--epistasis_beta" in help_text
+    assert "--epistasis_pdb" in help_text
+
+
+@pytest.mark.parametrize(
+    "subcommand",
+    ["search", "scan", "sites", "simulate", "benchmark", "doctor", "inspect"],
+)
+def test_parallel_options_are_advanced_only_for_shared_subcommands(subcommand):
+    expected_parallel_options = {
+        "--parallel_backend",
+        "--parallel_chunk_factor",
+        "--parallel_chunk_factor_reducer",
+        "--parallel_min_items_sub_tensor",
+        "--parallel_min_items_per_job_sub_tensor",
+        "--parallel_min_items_node_union",
+        "--parallel_min_items_per_job_node_union",
+        "--parallel_min_items_nc_matrix",
+        "--parallel_min_items_per_job_nc_matrix",
+        "--parallel_min_items_cb",
+        "--parallel_min_items_per_job_cb",
+        "--parallel_min_rows_cbs",
+        "--parallel_min_rows_per_job_cbs",
+        "--parallel_min_items_branch_dist",
+        "--parallel_min_items_per_job_branch_dist",
+        "--parallel_min_items_expected_state",
+        "--parallel_min_items_per_job_expected_state",
+    }
+    proc, _ = _run_cli(subcommand, "-h")
+    assert proc.returncode == 0
+    normal_help = (proc.stdout or "") + (proc.stderr or "")
+    assert "--threads" in normal_help
+    assert "--parallel_" not in normal_help
+
+    proc, _ = _run_cli(subcommand, "--help-advanced")
+    assert proc.returncode == 0
+    advanced_help = (proc.stdout or "") + (proc.stderr or "")
+    shown_parallel_options = set(re.findall(r"--parallel_[a-z0-9_]+", advanced_help))
+    assert shown_parallel_options == expected_parallel_options
+
+
+def test_removed_infile_type_option_is_rejected():
+    proc, log_text = _run_cli("search", "--infile_type", "iqtree")
+    assert proc.returncode == 2
+    assert "unrecognized arguments: --infile_type iqtree" in log_text
 
 
 def test_cli_help_lists_primary_commands_and_legacy_aliases():
@@ -196,9 +259,9 @@ def test_benchmark_help_is_available():
 
 
 def test_scan_help_is_available():
-    proc, log_text = _run_cli("scan", "-h")
+    proc, _ = _run_cli("scan", "-h")
     assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    help_text = (proc.stdout or "") + (proc.stderr or "")
     assert "--scan_match" in help_text
     assert "--random_seed" in help_text
     assert "any2any" in help_text
@@ -216,8 +279,8 @@ def test_scan_help_is_available():
     assert "--scan_site_plot" in help_text
     assert "--tree_site_plot_format" in help_text
     assert "--tree_site_plot_max_sites" in help_text
-    assert "--tree_site_tip_label_spacing" in help_text
-    assert "--tree_site_fig_max_height" in help_text
+    assert "--tree_site_tip_label_spacing" not in help_text
+    assert "--tree_site_fig_max_height" not in help_text
     assert "--scan_permutation_mode" not in help_text
     assert "--scan_rate_length" in help_text
     assert "default=n_rescaled" in help_text
@@ -228,6 +291,13 @@ def test_scan_help_is_available():
     assert "--fg_exclude_wg" not in help_text
     assert "--mg_parent" not in help_text
     assert "--mg_sister" not in help_text
+
+    proc, _ = _run_cli("scan", "--help-advanced")
+    assert proc.returncode == 0
+    advanced_help = (proc.stdout or "") + (proc.stderr or "")
+    assert "--tree_site_tip_label_spacing" in advanced_help
+    assert "--tree_site_fig_max_height" in advanced_help
+    assert "--scan_permutation_sample_original" in advanced_help
 
 
 def test_benchmark_plot_help_is_available():
@@ -263,13 +333,19 @@ def test_doctor_help_is_available():
 
 
 def test_inspect_help_includes_nonsyn_recode_pca_option():
-    proc, log_text = _run_cli("inspect", "-h")
+    proc, _ = _run_cli("inspect", "-h")
     assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
+    help_text = (proc.stdout or "") + (proc.stderr or "")
     assert "--plot_nonsyn_recode_pca" in help_text
-    assert "--download_prostt5" in help_text
-    assert "--sa_smoke_max_branches" in help_text
+    assert "--download_prostt5" not in help_text
+    assert "--sa_smoke_max_branches" not in help_text
     assert "--nonsyn_recode" in help_text
+
+    proc, _ = _run_cli("inspect", "--help-advanced")
+    assert proc.returncode == 0
+    advanced_help = (proc.stdout or "") + (proc.stderr or "")
+    assert "--download_prostt5" in advanced_help
+    assert "--sa_smoke_max_branches" in advanced_help
 
 
 def test_inspect_rejects_legacy_yes_state_plot_option():
