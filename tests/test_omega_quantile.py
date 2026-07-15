@@ -136,8 +136,12 @@ def test_calc_wallenius_inclusion_probabilities_matches_sampling():
         draw_size=draw_size,
         float_type=np.float64,
     )
-    np.random.seed(2)
-    masks = omega._weighted_sample_without_replacement_masks(p=p, size=draw_size, niter=16000)
+    masks = omega._weighted_sample_without_replacement_masks(
+        p=p,
+        size=draw_size,
+        niter=16000,
+        rng=np.random.default_rng(2),
+    )
     empirical = masks.mean(axis=0)
     np.testing.assert_allclose(expected, empirical, atol=0.03)
     np.testing.assert_allclose(expected.sum(), float(draw_size), atol=1e-8)
