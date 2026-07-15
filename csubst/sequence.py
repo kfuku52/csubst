@@ -2,6 +2,7 @@ import gzip
 import os
 import itertools
 import re
+from collections import OrderedDict
 
 import numpy as np
 
@@ -370,6 +371,66 @@ def read_fasta(path):
     if seq_name is not None:
         seq_dict[seq_name] = ''.join(seq_parts)
     return seq_dict
+
+
+def _build_codon_to_aa_lookup(codon_table):
+    if codon_table is None:
+        raise ValueError("codon_table is required to translate a codon alignment.")
+    codon_to_aa = dict()
+    for aa, codon in codon_table:
+        aa = str(aa)
+        codon = str(codon).upper().replace("U", "T")
+        if aa == "*":
+            continue
+        codon_to_aa[codon] = aa
+    if len(codon_to_aa) == 0:
+        raise ValueError("No sense codons were found in codon_table.")
+    return codon_to_aa
+
+
+def translate_codon_aligned_sequence_to_aa(seq_txt, codon_table):
+    seq_txt = str(seq_txt).strip().upper().replace("U", "T")
+    if (len(seq_txt) % 3) != 0:
+        txt = "Input CDS sequence length should be a multiple of 3 (length={})."
+        raise ValueError(txt.format(len(seq_txt)))
+    codon_to_aa = _build_codon_to_aa_lookup(codon_table=codon_table)
+    aa_out = list()
+    for i in range(0, len(seq_txt), 3):
+        codon = seq_txt[i : i + 3]
+        if codon == "---":
+            aa_out.append("-")
+        elif ("-" in codon) or any(base not in {"A", "C", "G", "T"} for base in codon):
+            aa_out.append("X")
+        else:
+            aa_out.append(str(codon_to_aa.get(codon, "X")))
+    return "".join(aa_out)
+
+
+def build_tip_aa_alignment_from_codon_alignment(g, alignment_path=None):
+    if alignment_path is None:
+        alignment_path = str(g.get("alignment_file", "")).strip()
+    else:
+        alignment_path = str(alignment_path).strip()
+    if alignment_path == "":
+        raise ValueError("A codon alignment path is required to build the tip AA alignment.")
+    seq_dict = read_fasta(alignment_path)
+    if len(seq_dict) == 0:
+        raise ValueError("Codon alignment is empty: {}".format(alignment_path))
+    tip_names = [str(leaf.name) for leaf in ete.iter_leaves(g["tree"])]
+    missing = sorted(name for name in tip_names if name not in seq_dict)
+    if len(missing) > 0:
+        missing_txt = ",".join(missing[:10]) + (",..." if len(missing) > 10 else "")
+        raise ValueError("Tip sequence(s) missing in codon alignment: {}".format(missing_txt))
+    aa_by_tip = OrderedDict()
+    for name in tip_names:
+        aa_by_tip[name] = translate_codon_aligned_sequence_to_aa(
+            seq_txt=seq_dict[name],
+            codon_table=g.get("codon_table", None),
+        )
+    lengths = sorted(set(len(seq) for seq in aa_by_tip.values()))
+    if len(lengths) != 1:
+        raise ValueError("Translated tip AA alignment should have equal sequence lengths.")
+    return aa_by_tip
 
 
 def calc_identity(seq1, seq2):

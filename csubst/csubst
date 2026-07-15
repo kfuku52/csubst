@@ -216,6 +216,15 @@ def command_dataset(args):
     print('csubst dataset: Time elapsed: {:,} sec'.format(int(time.time() - start)))
     print('csubst dataset end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
 
+
+def command_download(args):
+    print('csubst download start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+    start = time.time()
+    from csubst.main_download import main_download
+    main_download(vars(args))
+    print('csubst download: Time elapsed: {:,} sec'.format(int(time.time() - start)))
+    print('csubst download end:', datetime.datetime.now(datetime.timezone.utc), flush=True)
+
 def command_simulate(args):
     print('csubst simulate start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
@@ -795,6 +804,15 @@ def _build_parser(show_advanced=False):
     _add_advanced_argument(advanced_resources, '--prostt5_no_download', show_advanced=show_advanced,
                         metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Set "yes" to disable automatic ProstT5 download and require local files.')
+    _add_advanced_argument(advanced_resources, '--resource_cache_dir', show_advanced=show_advanced,
+                        metavar='PATH', default='', type=str,
+                        help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: Shared model/structure resource cache and lock directory.')
+    _add_advanced_argument(advanced_resources, '--resource_lock_poll', show_advanced=show_advanced,
+                        metavar='SECONDS', default=5.0, type=float,
+                        help='default=%(default)s: Polling interval while waiting for a shared-resource lock.')
+    _add_advanced_argument(advanced_resources, '--resource_lock_timeout', show_advanced=show_advanced,
+                        metavar='SECONDS', default=3600.0, type=float,
+                        help='default=%(default)s: Maximum wait for a shared-resource lock.')
     _add_advanced_argument(advanced_resources, '--prostt5_device', show_advanced=show_advanced,
                         metavar='auto|cpu|cuda|mps', default='auto', type=str,
                         help='default=%(default)s: Device for ProstT5 inference. '
@@ -895,6 +913,34 @@ def _build_parser(show_advanced=False):
     dataset.add_argument('--iqtree_outdir', metavar='PATH', default='csubst_iqtree', type=str,
                          help='default=%(default)s: Directory for bundled IQ-TREE intermediate files.')
     dataset.set_defaults(handler=command_dataset)
+
+    # download
+    help_txt = 'downloads and verifies shared model resources. See `csubst download -h`'
+    download = subparsers.add_parser('download', help=help_txt, parents=[])
+    download.add_argument('--resource', metavar='vesm-35m|prostt5|all', default='vesm-35m', type=str,
+                          choices=['vesm-35m', 'prostt5', 'all'],
+                          help='default=%(default)s: Shared model resource to download and verify.')
+    advanced_download = download.add_argument_group('advanced model resources and caches')
+    _add_advanced_argument(advanced_download, '--resource_cache_dir', show_advanced=show_advanced,
+                          metavar='PATH', default='', type=str,
+                          help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: Shared CSUBST resource cache.')
+    _add_advanced_argument(advanced_download, '--resource_lock_poll', show_advanced=show_advanced,
+                          metavar='SECONDS', default=5.0, type=float,
+                          help='default=%(default)s: Polling interval while waiting for another downloader.')
+    _add_advanced_argument(advanced_download, '--resource_lock_timeout', show_advanced=show_advanced,
+                          metavar='SECONDS', default=3600.0, type=float,
+                          help='default=%(default)s: Maximum wait for a shared-resource lock.')
+    download.add_argument('--no_download', metavar='yes|no', default='no', type=strtobool,
+                          help='default=%(default)s: Check local availability without network access.')
+    download.add_argument('--verify', metavar='yes|no', default='no', type=strtobool,
+                          help='default=%(default)s: Recompute SHA-256 for an existing managed resource.')
+    _add_advanced_argument(advanced_download, '--prostt5_model', show_advanced=show_advanced,
+                          metavar='STR', default='Rostlab/ProstT5', type=str,
+                          help='default=%(default)s: ProstT5 Hugging Face model identifier.')
+    _add_advanced_argument(advanced_download, '--prostt5_local_dir', show_advanced=show_advanced,
+                          metavar='PATH', default='', type=str,
+                          help='default=%(default)s: Optional local ProstT5 directory.')
+    download.set_defaults(handler=command_download)
 
     # simulate
     help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
@@ -1044,6 +1090,20 @@ def _build_parser(show_advanced=False):
     site.add_argument('--min_combinat_prob', metavar='FLOAT', default=0.5, required=False, type=float,
                       help='default=%(default)s: Minimum probability threshold for combinatorial substitutions. '
                            'Shared by site plotting and PyMOL outputs.')
+    site.add_argument('--vep_model', metavar='none|vesm-35m', default='none', required=False, type=str,
+                      choices=['none', 'vesm-35m'],
+                      help='default=%(default)s: Variant-effect model for amino-acid substitutions in selected branches. '
+                           'VESM currently supports --mode intersection and lineage with --nonsyn_recode no.')
+    site.add_argument('--vep_min_event_pp', metavar='FLOAT', default=0.8, required=False, type=float,
+                      help='default=%(default)s: Inclusive posterior-probability threshold for atomic parent-AA to '
+                           'child-AA substitutions scored by --vep_model. Independent of --min_sub_pp.')
+    site.add_argument('--vep_plot', metavar='yes|no', default='yes', required=False, type=strtobool,
+                      help='default=%(default)s: Write a VESM tree + branch-by-site plot. Marker size represents '
+                           'substitution PP and color represents VESM LLR (lower = more deleterious).')
+    site.add_argument('--vep_site_aggregate', metavar='most_deleterious|pp_weighted_mean|mean',
+                      default='most_deleterious', required=False, type=str,
+                      choices=['most_deleterious', 'pp_weighted_mean', 'mean'],
+                      help='default=%(default)s: Aggregate branch/event VESM values to one structure color per site.')
     site.add_argument('--tree_site_plot_max_sites', metavar='INT', default=30, required=False, type=int,
                       help='default=%(default)s: Maximum number of plotted sites in the tree + site summary '
                            '(convergent and divergent columns are balanced when both are available).')
@@ -1104,6 +1164,10 @@ def _build_parser(show_advanced=False):
                       help='default=%(default)s: mafft --ep parameter. -1 to use the default value.')
     site.add_argument('--pymol_gray', metavar='INT', default=80, required=False, type=int,
                       help='default=%(default)s: Gray value for no-substitution sites. 0=black, 100=white')
+    site.add_argument('--pymol_color_by', metavar='auto|substitution|vesm', default='auto', required=False, type=str,
+                      choices=['auto', 'substitution', 'vesm'],
+                      help='default=%(default)s: Residue coloring in PyMOL. "auto" uses VESM when enabled and '
+                           'otherwise preserves substitution-category coloring.')
     site.add_argument('--pymol_transparency', metavar='FLOAT', default=0.65, required=False, type=float,
                       help='default=%(default)s: Surface transparency. 0=non-transparent, 1=completely transparent')
     _add_advanced_argument(advanced_sites, '--pymol_surface_quality', show_advanced=show_advanced,
@@ -1116,6 +1180,18 @@ def _build_parser(show_advanced=False):
                          help='default=%(default)s: Maximum number of chains to visualize. '
                                'If the number of chains in the PDB file is larger than this value, '
                                '--pymol_img will be disabled.')
+    _add_advanced_argument(advanced_sites, '--vep_device', show_advanced=show_advanced,
+                           metavar='auto|cpu|cuda|mps', default='auto', type=str,
+                           help='default=%(default)s: Device for VESM inference. "auto" prefers CUDA, then MPS, then CPU.')
+    _add_advanced_argument(advanced_sites, '--vep_no_download', show_advanced=show_advanced,
+                           metavar='yes|no', default='no', type=strtobool,
+                           help='default=%(default)s: Require an existing local VESM resource.')
+    _add_advanced_argument(advanced_sites, '--vep_cache', show_advanced=show_advanced,
+                           metavar='yes|no', default='yes', type=strtobool,
+                           help='default=%(default)s: Reuse the shared VESM mutation-score cache.')
+    _add_advanced_argument(advanced_sites, '--vep_cache_file', show_advanced=show_advanced,
+                           metavar='PATH', default='', type=str,
+                           help='default=<resource cache>/scores/vesm-35m.tsv: Optional VESM score-cache path.')
     site.add_argument('--uniprot_feature_types', metavar='all|TYPE1,TYPE2,...', default='all', required=False, type=str,
                       help='default=%(default)s: UniProt feature types to append to the sites output table. '
                            'By default ("all"), all available UniProt features are considered. '

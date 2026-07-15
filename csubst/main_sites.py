@@ -16,9 +16,11 @@ from csubst import sequence
 from csubst import substitution
 from csubst import tree
 from csubst import ete
+from csubst import variant_effect
 
 font_size = 8
 TREE_LINE_CAPSTYLE = 'round'
+VESM_XTICK_LABEL_GAP_POINTS = 1.0
 matplotlib.rcParams['font.size'] = font_size
 matplotlib.rcParams['font.family'] = 'sans-serif'
 matplotlib.rcParams['font.sans-serif'] = ['Helvetica', 'Arial', 'Nimbus Sans', 'DejaVu Sans']
@@ -92,6 +94,9 @@ def _get_site_output_manifest_metadata(g):
         'tree_site_plot_min_prob_effective': effective_min_prob,
         'tree_site_plot_max_sites': int(get_tree_site_plot_max_sites(g)),
         'pdb_mode': bool2yn(g.get('pdb', None) is not None),
+        'vep_model': str(g.get('vep_model', 'none')),
+        'vep_min_event_pp': float(g.get('vep_min_event_pp', 0.8)),
+        'vep_site_aggregate': str(g.get('vep_site_aggregate', 'most_deleterious')),
     }
 
 
@@ -3360,6 +3365,11 @@ def resolve_site_jobs(g):
     g['mode'] = mode
     g['mode_expression'] = mode_expression
     g['set_stat_type'] = set_stat_type
+    if variant_effect.is_enabled(g):
+        if mode == 'set':
+            raise ValueError('--vep_model currently supports --mode intersection and lineage; set mode is not yet supported.')
+        if str(g.get('nonsyn_recode', 'no')).strip().lower() != 'no':
+            raise ValueError('--vep_model currently requires --nonsyn_recode no.')
     node_by_id = _get_node_by_branch_id(g)
     branch_id_list = []
     lineage_input_branch_txt = None
@@ -3444,17 +3454,275 @@ def combinatorial2single_columns(df):
         return df
     return df.drop(labels=drop_cols, axis=1)
 
+
+def _select_vesm_plot_sites(events, max_sites):
+    if events.shape[0] == 0:
+        return []
+    finite = events.loc[
+        np.isfinite(pd.to_numeric(events['vesm_llr'], errors='coerce')),
+        :,
+    ].copy()
+    if finite.shape[0] == 0:
+        return []
+    summary = finite.groupby('codon_site_alignment', as_index=False).agg(
+        vep_rank_score=('vesm_llr', 'min'),
+        vep_rank_pp=('event_pp', 'max'),
+    )
+    summary = summary.sort_values(
+        by=['vep_rank_score', 'vep_rank_pp', 'codon_site_alignment'],
+        ascending=[True, False, True],
+        kind='mergesort',
+    )
+    selected = summary.iloc[:int(max_sites), :]['codon_site_alignment'].astype(int).tolist()
+    return sorted(selected)
+
+
+def _get_vesm_structure_label_by_site(df, sites):
+    pdb_cols = [str(col) for col in df.columns if str(col).startswith('codon_site_pdb_')]
+    if len(pdb_cols) == 0:
+        return {int(site): '' for site in sites}
+    best_col = None
+    best_count = -1
+    for col in pdb_cols:
+        values = pd.to_numeric(df[col], errors='coerce').fillna(0).to_numpy(dtype=np.int64, copy=False)
+        count = int((values > 0).sum())
+        if count > best_count:
+            best_col = col
+            best_count = count
+    if best_col is None:
+        return {int(site): '' for site in sites}
+    chain_label = best_col.replace('codon_site_pdb_', '', 1)
+    row_by_site = {
+        int(value): index
+        for index,value in zip(df.index.tolist(), df['codon_site_alignment'].astype(int).tolist())
+    }
+    out = {}
+    for site in sites:
+        row_index = row_by_site.get(int(site), None)
+        if row_index is None:
+            out[int(site)] = ''
+            continue
+        residue = pd.to_numeric(pd.Series([df.at[row_index, best_col]]), errors='coerce').iloc[0]
+        if pd.isna(residue) or int(residue) <= 0:
+            out[int(site)] = 'unmapped'
+        else:
+            out[int(site)] = '{}:{}'.format(chain_label, int(residue))
+    return out
+
+
+def _get_vesm_branch_color_by_id(g, branch_ids):
+    branch_ids = _normalize_branch_ids(branch_ids).tolist()
+    if str(g.get('mode', '')).strip().lower() == 'lineage':
+        return get_tree_site_branch_color_by_id(
+            branch_ids=branch_ids,
+            g=g,
+            default_color='crimson',
+        )
+    return {int(branch_id): 'crimson' for branch_id in branch_ids}
+
+
+def _draw_vesm_tree_axis(ax, g, selected_branch_ids, branch_color_by_id):
+    xcoord,ycoord,leaf_order = get_tree_plot_coordinates(tree=g['tree'])
+    selected = set(int(value) for value in _normalize_branch_ids(selected_branch_ids).tolist())
+    for node in g['tree'].traverse():
+        node_id = int(ete.get_prop(node, 'numerical_label'))
+        children = list(ete.get_children(node))
+        if len(children) > 0:
+            for child in children:
+                child_id = int(ete.get_prop(child, 'numerical_label'))
+                is_selected_segment = (node_id in selected) and (child_id in selected)
+                color = branch_color_by_id.get(child_id, 'crimson') if is_selected_segment else '0.65'
+                linewidth = 2.0 if is_selected_segment else 0.8
+                ax.plot(
+                    [xcoord[node_id], xcoord[node_id]],
+                    [ycoord[node_id], ycoord[child_id]],
+                    color=color,
+                    linewidth=linewidth,
+                    solid_capstyle=TREE_LINE_CAPSTYLE,
+                )
+        if ete.is_root(node):
+            continue
+        parent_id = int(ete.get_prop(node.up, 'numerical_label'))
+        color = branch_color_by_id.get(node_id, 'crimson') if node_id in selected else '0.55'
+        linewidth = 2.0 if node_id in selected else 0.8
+        ax.plot(
+            [xcoord[parent_id], xcoord[node_id]],
+            [ycoord[node_id], ycoord[node_id]],
+            color=color,
+            linewidth=linewidth,
+            solid_capstyle=TREE_LINE_CAPSTYLE,
+        )
+    max_x = max(xcoord.values()) if len(xcoord) else 1.0
+    label_offset = max(max_x * 0.02, 0.01)
+    for leaf in ete.iter_leaves(g['tree']):
+        leaf_id = int(ete.get_prop(leaf, 'numerical_label'))
+        ax.text(max_x + label_offset, ycoord[leaf_id], str(leaf.name), va='center', fontsize=6)
+    ax.set_title('Selected branches on phylogeny')
+    ax.set_axis_off()
+    if len(leaf_order) > 0:
+        ax.set_ylim(max(ycoord.values()) + 0.5, min(ycoord.values()) - 0.5)
+    ax.set_xlim(min(xcoord.values()) if len(xcoord) else 0, max_x + (label_offset * 20))
+
+
+def _get_vesm_plot_dimensions(num_sites, leaf_count, num_branches, max_height):
+    num_sites = max(int(num_sites), 1)
+    tick_pitch_points = float(font_size) + VESM_XTICK_LABEL_GAP_POINTS
+    site_data_width = num_sites * tick_pitch_points / 72.0
+    # Reserve space taken from the site panel by its colorbar and padding.
+    site_panel_width = max(1.5, site_data_width / 0.92)
+    tree_panel_width = 3.2
+    figure_width = max(6.5, tree_panel_width + site_panel_width + 0.5)
+    figure_height = min(max(4.5, leaf_count * 0.18, num_branches * 0.35), max_height)
+    return figure_width,figure_height,tree_panel_width,site_panel_width
+
+
+def plot_vesm_tree_site(events, df, g, outbase):
+    table_path = outbase + '.vesm_tree_site.tsv'
+    plot_format = str(g.get('tree_site_plot_format', 'pdf')).strip().lower()
+    fig_path = outbase + '.vesm_tree_site.' + plot_format
+    plot_events = events.copy(deep=True)
+    selected_sites = _select_vesm_plot_sites(
+        events=plot_events,
+        max_sites=get_tree_site_plot_max_sites(g),
+    )
+    plot_events.loc[:, 'is_plotted'] = plot_events['codon_site_alignment'].astype(int).isin(selected_sites)
+    plot_order = {int(site): index + 1 for index,site in enumerate(selected_sites)}
+    plot_events.loc[:, 'plot_order'] = [
+        plot_order.get(int(site), np.nan)
+        for site in plot_events['codon_site_alignment'].astype(int).tolist()
+    ]
+    plot_events.to_csv(table_path, sep='\t', index=False, float_format=g['float_format'])
+    print('Writing VESM tree + site table: {}'.format(table_path), flush=True)
+    if (not bool(g.get('vep_plot', True))) or len(selected_sites) == 0:
+        if len(selected_sites) == 0:
+            print('Skipping VESM tree + site plot because no scored events passed the PP threshold.', flush=True)
+        return [table_path]
+
+    branch_ids = _normalize_branch_ids(g.get('branch_ids', [])).tolist()
+    representatives = plot_events.loc[plot_events['is_plotted'], :].sort_values(
+        by=['branch_id', 'codon_site_alignment', 'event_pp', 'vesm_llr', 'event_id'],
+        ascending=[True, True, False, True, True],
+        kind='mergesort',
+    ).drop_duplicates(subset=['branch_id', 'codon_site_alignment'], keep='first')
+    leaf_count = len(list(ete.iter_leaves(g['tree'])))
+    max_height = get_tree_site_fig_max_height(g)
+    fig_width,fig_height,tree_panel_width,site_panel_width = _get_vesm_plot_dimensions(
+        num_sites=len(selected_sites),
+        leaf_count=leaf_count,
+        num_branches=len(branch_ids),
+        max_height=max_height,
+    )
+    fig,axes = plt.subplots(
+        nrows=1,
+        ncols=2,
+        figsize=(fig_width, fig_height),
+        gridspec_kw={'width_ratios': [tree_panel_width, site_panel_width]},
+    )
+    ax_tree,ax_grid = axes
+    branch_color_by_id = _get_vesm_branch_color_by_id(g=g, branch_ids=branch_ids)
+    _draw_vesm_tree_axis(
+        ax=ax_tree,
+        g=g,
+        selected_branch_ids=branch_ids,
+        branch_color_by_id=branch_color_by_id,
+    )
+
+    x_by_site = {int(site): index for index,site in enumerate(selected_sites)}
+    y_by_branch = {int(branch_id): index for index,branch_id in enumerate(branch_ids)}
+    finite_scores = representatives['vesm_llr'].to_numpy(dtype=float, copy=False)
+    finite_scores = finite_scores[np.isfinite(finite_scores)]
+    color_limit = max(
+        float(g.get('_vep_color_limit', 0.0)),
+        float(np.max(np.abs(finite_scores))) if finite_scores.size else 0.0,
+        1e-6,
+    )
+    norm = matplotlib.colors.TwoSlopeNorm(vmin=-color_limit, vcenter=0.0, vmax=color_limit)
+    cmap = plt.get_cmap('coolwarm_r')
+    for row in representatives.itertuples(index=False):
+        branch_id = int(row.branch_id)
+        site = int(row.codon_site_alignment)
+        if branch_id not in y_by_branch or site not in x_by_site:
+            continue
+        marker_size = 35.0 + (220.0 * float(row.event_pp))
+        ax_grid.scatter(
+            [x_by_site[site]],
+            [y_by_branch[branch_id]],
+            s=marker_size,
+            c=[float(row.vesm_llr)],
+            cmap=cmap,
+            norm=norm,
+            edgecolors='black',
+            linewidths=0.45,
+            zorder=3,
+        )
+        ax_grid.text(
+            x_by_site[site],
+            y_by_branch[branch_id],
+            '{}>{}'.format(row.from_aa, row.to_aa),
+            ha='center',
+            va='center',
+            fontsize=5 if len(selected_sites) <= 18 else 4,
+            zorder=4,
+        )
+    structure_label = _get_vesm_structure_label_by_site(df=df, sites=selected_sites)
+    tick_labels = []
+    for site in selected_sites:
+        label = 'aln {}'.format(int(site))
+        if structure_label[int(site)] != '':
+            label += '\n' + structure_label[int(site)]
+        tick_labels.append(label)
+    ax_grid.set_xticks(np.arange(len(selected_sites), dtype=float))
+    ax_grid.set_xticklabels(tick_labels, rotation=90, fontsize=font_size)
+    ax_grid.set_yticks(np.arange(len(branch_ids), dtype=float))
+    ax_grid.set_yticklabels(['b{}'.format(int(branch_id)) for branch_id in branch_ids])
+    for tick,branch_id in zip(ax_grid.get_yticklabels(), branch_ids):
+        tick.set_color(branch_color_by_id.get(int(branch_id), 'black'))
+    ax_grid.set_xlim(-0.6, len(selected_sites) - 0.4)
+    ax_grid.set_ylim(len(branch_ids) - 0.4, -0.6)
+    ax_grid.set_xlabel('Aligned codon site / mapped structure residue')
+    ax_grid.set_ylabel('Selected branch')
+    ax_grid.set_title(
+        'VESM-35M: marker size = substitution PP; color = LLR (lower = more deleterious)\n'
+        'event PP threshold >= {:.3g}'.format(float(g.get('vep_min_event_pp', 0.8)))
+    )
+    ax_grid.grid(color='0.9', linewidth=0.5, zorder=0)
+    scalar_mappable = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
+    scalar_mappable.set_array([])
+    colorbar = fig.colorbar(scalar_mappable, ax=ax_grid, fraction=0.035, pad=0.03)
+    colorbar.set_label('VESM LLR (lower = more deleterious)')
+    pp_values = sorted(set([float(g.get('vep_min_event_pp', 0.8)), 1.0]))
+    handles = [
+        ax_grid.scatter([], [], s=35.0 + (220.0 * value), facecolor='white', edgecolor='black')
+        for value in pp_values
+    ]
+    ax_grid.legend(handles, ['PP {:.2g}'.format(value) for value in pp_values], loc='upper right')
+    fig.tight_layout()
+    fig.savefig(fig_path, format=plot_format, transparent=False, facecolor='white')
+    plt.close(fig)
+    print('Writing VESM tree + site plot: {}'.format(fig_path), flush=True)
+    return [fig_path, table_path]
+
 def main_sites(g):
     if g['pdb'] is not None:
         from csubst import parser_pymol
     print("Reading and parsing input files.", flush=True)
+    vep_enabled = variant_effect.is_enabled(g)
+    if vep_enabled and str(g.get('mode', 'intersection')).strip().lower().startswith('set'):
+        raise ValueError('--vep_model currently supports --mode intersection and lineage; set mode is not yet supported.')
+    if vep_enabled and str(g.get('nonsyn_recode', 'no')).strip().lower() != 'no':
+        raise ValueError('--vep_model currently requires --nonsyn_recode no.')
     g = parser_misc.prepare_input_context(
         g,
         include_foreground=False,
         include_marginal=False,
         resolve_state_subset=False,
-        prepare_state=True,
+        prepare_state=(not vep_enabled),
     )
+    if vep_enabled:
+        # Preserve a compact full-length ancestral context before ordinary site filtering.
+        g = parser_misc.prep_state(g, apply_site_filtering=False)
+        variant_effect.prepare_ancestral_contexts(g=g)
+        g = parser_misc.apply_site_filters(g)
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
@@ -3491,6 +3759,32 @@ def main_sites(g):
         df = add_branch_sub_prob(df, branch_ids=g['branch_ids'], sub_tensor=ON_tensor, attr='N')
         df = add_set_mode_columns(df=df, g=g, ON_tensor=ON_tensor, OS_tensor=OS_tensor)
         df = add_states(df, g['branch_ids'], g)
+        vep_events = variant_effect.empty_event_table()
+        if vep_enabled:
+            from csubst import vesm
+            vep_events = variant_effect.extract_atomic_aa_events(g=g, branch_ids=g['branch_ids'])
+            if vep_events.shape[0] > 0:
+                print(
+                    'Scoring {:,} amino-acid event(s) with VESM-35M (event PP >= {}).'.format(
+                        int(vep_events.shape[0]),
+                        float(g.get('vep_min_event_pp', 0.8)),
+                    ),
+                    flush=True,
+                )
+                vep_events = vesm.score_events(events=vep_events, g=g)
+            else:
+                print(
+                    'No amino-acid events passed --vep_min_event_pp {}; VESM model loading was skipped.'.format(
+                        float(g.get('vep_min_event_pp', 0.8))
+                    ),
+                    flush=True,
+                )
+            df = variant_effect.attach_scores_to_site_table(
+                df=df,
+                events=vep_events,
+                branch_ids=g['branch_ids'],
+                g=g,
+            )
         if (g['untrimmed_cds'] is not None):
             df = add_gene_index(df, g)
         df = remap_codon_site_columns_to_alignment(df=df, g=g)
@@ -3506,7 +3800,7 @@ def main_sites(g):
             id_base = re.sub('.pdb$', '', id_base)
             id_base = re.sub('.cif$', '', id_base)
             g['pdb_outfile_base'] = os.path.join(g['site_outdir'], site_prefix + '.' + id_base)
-            parser_pymol.initialize_pymol(pdb_id=g['pdb'])
+            parser_pymol.initialize_pymol(pdb_id=g['pdb'], g=g)
             num_chain = parser_pymol.get_num_chain()
             if num_chain >= g['pymol_max_num_chain']:
                 print(f'Number of chains ({num_chain}) in the PDB file is larger than the maximum number of chains allowed (--pymol_max_num_chain {g["pymol_max_num_chain"]}). PyMOL session image generation is disabled.', flush=True)
@@ -3540,6 +3834,45 @@ def main_sites(g):
                     manifest_rows=manifest_rows,
                     output_path=pymol_pdf_path,
                     output_kind='pymol_summary_pdf',
+                    g=g,
+                    branch_ids=g['branch_ids'],
+                )
+        if vep_enabled:
+            if g['pdb'] is None:
+                vep_outbase = os.path.join(g['site_outdir'], site_prefix)
+            else:
+                vep_outbase = g['pdb_outfile_base']
+            vep_output_events = variant_effect.add_structure_coordinates_to_events(
+                events=vep_events,
+                site_df=df,
+            )
+            vep_table_path = vep_outbase + '.vesm.tsv'
+            vep_output_events.to_csv(
+                vep_table_path,
+                sep='\t',
+                index=False,
+                float_format=g['float_format'],
+            )
+            print('Writing VESM event table: {}'.format(vep_table_path), flush=True)
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=vep_table_path,
+                output_kind='vesm_event_tsv',
+                g=g,
+                branch_ids=g['branch_ids'],
+            )
+            vep_plot_paths = plot_vesm_tree_site(
+                events=vep_output_events,
+                df=df,
+                g=g,
+                outbase=vep_outbase,
+            )
+            for vep_plot_path in vep_plot_paths:
+                output_kind = 'vesm_tree_site_tsv' if vep_plot_path.endswith('.tsv') else 'vesm_tree_site_plot'
+                add_site_output_manifest_row(
+                    manifest_rows=manifest_rows,
+                    output_path=vep_plot_path,
+                    output_kind=output_kind,
                     g=g,
                     branch_ids=g['branch_ids'],
                 )

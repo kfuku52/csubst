@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from csubst import ete
+from csubst import resource_cache
 from csubst import runtime
 from csubst import sequence
 from csubst import tree
@@ -236,59 +237,75 @@ def _load_prostt5_from_local_only(source, tokenizer_cls, model_cls):
 
 def _load_or_download_prostt5(g, tokenizer_cls, model_cls):
     model_name, local_dir, no_download = _resolve_prostt5_model_options(g=g)
-    if local_dir != "":
-        try:
-            tokenizer, model = _load_prostt5_from_local_only(
-                source=local_dir,
-                tokenizer_cls=tokenizer_cls,
-                model_cls=model_cls,
-            )
-            return tokenizer, model, local_dir
-        except Exception as local_exc:
-            if no_download:
+    model_source = local_dir if local_dir != "" else model_name
+    try:
+        tokenizer, model = _load_prostt5_from_local_only(
+            source=model_source,
+            tokenizer_cls=tokenizer_cls,
+            model_cls=model_cls,
+        )
+        return tokenizer, model, model_source
+    except Exception as local_exc:
+        if no_download:
+            if local_dir != "":
                 txt = (
                     "ProstT5 model files were not found in --prostt5_local_dir. "
                     "Download once with internet access or disable --prostt5_no_download. "
                     "prostt5_local_dir={}"
                 )
                 raise RuntimeError(txt.format(local_dir)) from local_exc
-            print(
-                "ProstT5 local files were not found in --prostt5_local_dir; downloading model files.",
-                flush=True,
-            )
-            tokenizer = tokenizer_cls.from_pretrained(
-                model_name,
-                do_lower_case=False,
-            )
-            model = model_cls.from_pretrained(model_name)
-            tokenizer.save_pretrained(local_dir)
-            model.save_pretrained(local_dir)
-            return tokenizer, model, local_dir
-    try:
-        tokenizer, model = _load_prostt5_from_local_only(
-            source=model_name,
-            tokenizer_cls=tokenizer_cls,
-            model_cls=model_cls,
-        )
-        return tokenizer, model, model_name
-    except Exception as local_exc:
-        if no_download:
             txt = (
                 "ProstT5 model files were not found locally. "
                 "Download once with internet access or disable --prostt5_no_download. "
                 "model_source={}"
             )
             raise RuntimeError(txt.format(model_name)) from local_exc
-        print(
-            "ProstT5 local cache was not found; downloading model files (first run only).",
-            flush=True,
+    if local_dir != "":
+        lock_path = resource_cache.resolve_path_lock_path(local_dir, lock_label="prostt5-model")
+        resource_id = "ProstT5 local model"
+    else:
+        lock_path = resource_cache.resolve_resource_lock_path(
+            resource_id="prostt5-huggingface:{}".format(model_name),
+            cache_dir=g.get("resource_cache_dir", ""),
         )
-        tokenizer = tokenizer_cls.from_pretrained(
-            model_name,
-            do_lower_case=False,
-        )
+        resource_id = "ProstT5 model download"
+    with resource_cache.acquire_exclusive_lock(
+        lock_path=lock_path,
+        lock_label=resource_id,
+        poll_seconds=float(g.get("resource_lock_poll", resource_cache.DEFAULT_LOCK_POLL_SECONDS)),
+        timeout_seconds=float(g.get("resource_lock_timeout", resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS)),
+    ):
+        try:
+            tokenizer, model = _load_prostt5_from_local_only(
+                source=model_source,
+                tokenizer_cls=tokenizer_cls,
+                model_cls=model_cls,
+            )
+            return tokenizer, model, model_source
+        except Exception:
+            pass
+        if local_dir != "":
+            print(
+                "ProstT5 local files were not found in --prostt5_local_dir; downloading model files.",
+                flush=True,
+            )
+        else:
+            print(
+                "ProstT5 local cache was not found; downloading model files (first run only).",
+                flush=True,
+            )
+        tokenizer = tokenizer_cls.from_pretrained(model_name, do_lower_case=False)
         model = model_cls.from_pretrained(model_name)
-        return tokenizer, model, model_name
+        if local_dir == "":
+            return tokenizer, model, model_name
+        tokenizer.save_pretrained(local_dir)
+        model.save_pretrained(local_dir)
+        tokenizer, model = _load_prostt5_from_local_only(
+            source=local_dir,
+            tokenizer_cls=tokenizer_cls,
+            model_cls=model_cls,
+        )
+        return tokenizer, model, local_dir
 
 
 def ensure_prostt5_model_files(g, tokenizer_cls=None, model_cls=None):
@@ -444,18 +461,55 @@ def _load_prostt5_sequence_cache(cache_file, model_key):
     return out
 
 
-def _append_prostt5_sequence_cache(cache_file, model_key, seq_to_pred):
+def _append_prostt5_sequence_cache(
+    cache_file,
+    model_key,
+    seq_to_pred,
+    poll_seconds=resource_cache.DEFAULT_LOCK_POLL_SECONDS,
+    timeout_seconds=resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS,
+):
     if len(seq_to_pred) == 0:
         return
     cache_file = str(cache_file).strip()
     if cache_file == "":
         return
-    cache_dir = os.path.dirname(cache_file)
-    if cache_dir != "":
-        os.makedirs(cache_dir, exist_ok=True)
-    with open(cache_file, mode="a", encoding="utf-8") as f:
+    cache_file = os.path.abspath(os.path.expanduser(cache_file))
+    lock_path = resource_cache.resolve_path_lock_path(cache_file, lock_label="prostt5-sequence-cache")
+    with resource_cache.acquire_exclusive_lock(
+        lock_path=lock_path,
+        lock_label="ProstT5 sequence cache",
+        poll_seconds=poll_seconds,
+        timeout_seconds=timeout_seconds,
+    ):
+        existing_text = ""
+        existing_keys = set()
+        if os.path.isfile(cache_file):
+            with open(cache_file, encoding="utf-8", errors="replace") as handle:
+                existing_text = handle.read()
+            for raw_line in existing_text.splitlines():
+                cols = raw_line.split("\t")
+                if len(cols) == 3:
+                    key_txt, seq_txt, pred_txt = cols
+                    seq_txt = str(seq_txt).strip().upper()
+                    pred_txt = str(pred_txt).strip().upper()
+                    if (
+                        seq_txt != ""
+                        and len(seq_txt) == len(pred_txt)
+                        and all(ch in _THREEDI_STATE_SET for ch in pred_txt)
+                    ):
+                        existing_keys.add((key_txt, seq_txt))
+        new_lines = []
         for seq_txt, pred_txt in seq_to_pred.items():
-            f.write("{}\t{}\t{}\n".format(model_key, seq_txt, pred_txt))
+            cache_key = (str(model_key), str(seq_txt))
+            if cache_key in existing_keys:
+                continue
+            new_lines.append("{}\t{}\t{}\n".format(model_key, seq_txt, pred_txt))
+            existing_keys.add(cache_key)
+        if len(new_lines) == 0:
+            return
+        if existing_text != "" and not existing_text.endswith("\n"):
+            existing_text += "\n"
+        resource_cache.atomic_write_text(cache_file, existing_text + "".join(new_lines))
 
 
 def _is_prostt5_oom_error(exc):
@@ -609,6 +663,8 @@ def predict_3di_with_prostt5(aa_sequences, g):
             cache_file=cache_file,
             model_key=model_key,
             seq_to_pred=new_cache_entries,
+            poll_seconds=float(g.get("resource_lock_poll", resource_cache.DEFAULT_LOCK_POLL_SECONDS)),
+            timeout_seconds=float(g.get("resource_lock_timeout", resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS)),
         )
         txt = "ProstT5 cache update: wrote {} new unique sequence(s) to {}"
         print(txt.format(len(new_cache_entries), cache_file), flush=True)

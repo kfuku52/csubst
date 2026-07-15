@@ -651,6 +651,54 @@ def test_resolve_site_jobs_lineage_mode_rejects_non_ancestor_pairs(tiny_tree):
         main_sites.resolve_site_jobs(g)
 
 
+def test_resolve_site_jobs_accepts_vesm_for_intersection_and_lineage(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    intersection = main_sites.resolve_site_jobs(
+        {
+            "tree": tiny_tree,
+            "mode": "intersection",
+            "branch_id": str(labels["A"]),
+            "vep_model": "vesm-35m",
+            "nonsyn_recode": "no",
+        }
+    )
+    assert intersection["site_jobs"][0]["branch_ids"].tolist() == [labels["A"]]
+    lineage = main_sites.resolve_site_jobs(
+        {
+            "tree": tiny_tree,
+            "mode": "lineage",
+            "branch_id": "{},{}".format(labels["X"], labels["C"]),
+            "vep_model": "vesm-35m",
+            "nonsyn_recode": "no",
+        }
+    )
+    assert lineage["site_jobs"][0]["branch_ids"].tolist() == [labels["X"], labels["C"]]
+
+
+def test_resolve_site_jobs_rejects_vesm_set_mode_and_recoding(tiny_tree):
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
+    with pytest.raises(ValueError, match="set mode is not yet supported"):
+        main_sites.resolve_site_jobs(
+            {
+                "tree": tiny_tree,
+                "mode": "set,any,{}|{}".format(labels["A"], labels["C"]),
+                "branch_id": "unused",
+                "vep_model": "vesm-35m",
+                "nonsyn_recode": "no",
+            }
+        )
+    with pytest.raises(ValueError, match="requires --nonsyn_recode no"):
+        main_sites.resolve_site_jobs(
+            {
+                "tree": tiny_tree,
+                "mode": "intersection",
+                "branch_id": str(labels["A"]),
+                "vep_model": "vesm-35m",
+                "nonsyn_recode": "charge",
+            }
+        )
+
+
 @pytest.mark.parametrize("mode_name", ["total", "each", "all", "clade"])
 def test_resolve_site_jobs_rejects_removed_modes(tiny_tree, mode_name):
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}

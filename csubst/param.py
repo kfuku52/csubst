@@ -825,6 +825,40 @@ def get_global_parameters(args):
         )
         if (g['min_combinat_prob'] < 0) or (g['min_combinat_prob'] > 1):
             raise ValueError('--min_combinat_prob should satisfy 0 <= value <= 1.')
+    g['vep_model'] = str(g.get('vep_model', 'none')).strip().lower().replace('_', '-')
+    if g['vep_model'] not in ['none', 'vesm-35m']:
+        raise ValueError('--vep_model should be one of none, vesm-35m.')
+    g['vep_min_event_pp'] = _require_finite_float(
+        value=float(g.get('vep_min_event_pp', 0.8)),
+        param_name='--vep_min_event_pp',
+    )
+    if (g['vep_min_event_pp'] < 0) or (g['vep_min_event_pp'] > 1):
+        raise ValueError('--vep_min_event_pp should satisfy 0 <= value <= 1.')
+    g['vep_plot'] = _parse_bool_like(
+        value=g.get('vep_plot', True),
+        param_name='--vep_plot',
+    )
+    g['vep_site_aggregate'] = str(g.get('vep_site_aggregate', 'most_deleterious')).strip().lower()
+    if g['vep_site_aggregate'] not in ['most_deleterious', 'pp_weighted_mean', 'mean']:
+        raise ValueError('--vep_site_aggregate should be one of most_deleterious, pp_weighted_mean, mean.')
+    g['vep_device'] = str(g.get('vep_device', 'auto')).strip().lower()
+    if g['vep_device'] not in ['auto', 'cpu', 'cuda', 'mps']:
+        raise ValueError('--vep_device should be one of auto, cpu, cuda, mps.')
+    g['vep_no_download'] = _parse_bool_like(
+        value=g.get('vep_no_download', False),
+        param_name='--vep_no_download',
+    )
+    g['vep_cache'] = _parse_bool_like(
+        value=g.get('vep_cache', True),
+        param_name='--vep_cache',
+    )
+    raw_vep_cache_file = g.get('vep_cache_file', '')
+    g['vep_cache_file'] = '' if raw_vep_cache_file is None else str(raw_vep_cache_file).strip()
+    g['pymol_color_by'] = str(g.get('pymol_color_by', 'auto')).strip().lower()
+    if g['pymol_color_by'] not in ['auto', 'substitution', 'vesm']:
+        raise ValueError('--pymol_color_by should be one of auto, substitution, vesm.')
+    if (g['pymol_color_by'] == 'vesm') and (g['vep_model'] == 'none'):
+        raise ValueError('--pymol_color_by vesm requires --vep_model vesm-35m.')
     if 'database_timeout' in g.keys():
         g['database_timeout'] = _require_finite_float(
             value=float(g['database_timeout']),
@@ -910,6 +944,19 @@ def get_global_parameters(args):
         value=g['prostt5_no_download'],
         param_name='--prostt5_no_download',
     )
+    if 'resource_cache_dir' not in g.keys() or g['resource_cache_dir'] is None:
+        g['resource_cache_dir'] = ''
+    g['resource_cache_dir'] = str(g['resource_cache_dir']).strip()
+    if 'resource_lock_poll' not in g.keys():
+        g['resource_lock_poll'] = 5.0
+    g['resource_lock_poll'] = float(g['resource_lock_poll'])
+    if g['resource_lock_poll'] <= 0:
+        raise ValueError('--resource_lock_poll should be > 0.')
+    if 'resource_lock_timeout' not in g.keys():
+        g['resource_lock_timeout'] = 3600.0
+    g['resource_lock_timeout'] = float(g['resource_lock_timeout'])
+    if g['resource_lock_timeout'] <= 0:
+        raise ValueError('--resource_lock_timeout should be > 0.')
     if 'download_prostt5' not in g.keys():
         g['download_prostt5'] = False
     g['download_prostt5'] = _parse_bool_like(

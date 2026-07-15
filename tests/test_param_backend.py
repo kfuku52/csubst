@@ -38,6 +38,34 @@ def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     assert g["parallel_min_items_per_job_expected_state"] == 10000000
 
 
+def test_get_global_parameters_sets_vesm_defaults():
+    g = param.get_global_parameters(_args())
+    assert g["vep_model"] == "none"
+    assert g["vep_min_event_pp"] == pytest.approx(0.8)
+    assert g["vep_plot"] is True
+    assert g["vep_site_aggregate"] == "most_deleterious"
+    assert g["vep_device"] == "auto"
+    assert g["vep_cache"] is True
+    assert g["pymol_color_by"] == "auto"
+
+
+@pytest.mark.parametrize("value", [-0.01, 1.01, float("nan"), float("inf")])
+def test_get_global_parameters_validates_vesm_event_pp(value):
+    with pytest.raises(ValueError, match="vep_min_event_pp"):
+        param.get_global_parameters(_args(vep_min_event_pp=value))
+
+
+def test_get_global_parameters_validates_vesm_related_choices():
+    with pytest.raises(ValueError, match="vep_model"):
+        param.get_global_parameters(_args(vep_model="unknown"))
+    with pytest.raises(ValueError, match="vep_site_aggregate"):
+        param.get_global_parameters(_args(vep_site_aggregate="median"))
+    with pytest.raises(ValueError, match="vep_device"):
+        param.get_global_parameters(_args(vep_device="tpu"))
+    with pytest.raises(ValueError, match="pymol_color_by vesm requires"):
+        param.get_global_parameters(_args(pymol_color_by="vesm", vep_model="none"))
+
+
 def test_get_global_parameters_builds_run_context_and_output_namespace(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     g = param.get_global_parameters(_args(outdir="results", output_prefix="scan"))
@@ -258,6 +286,12 @@ def test_get_global_parameters_parses_download_prostt5_bool():
 def test_get_global_parameters_rejects_invalid_download_prostt5_bool():
     with pytest.raises(ValueError, match="download_prostt5"):
         param.get_global_parameters(_args(download_prostt5="maybe"))
+
+
+@pytest.mark.parametrize("name", ["resource_lock_poll", "resource_lock_timeout"])
+def test_get_global_parameters_rejects_nonpositive_resource_lock_option(name):
+    with pytest.raises(ValueError, match=name):
+        param.get_global_parameters(_args(**{name: 0}))
 
 
 def test_get_global_parameters_requires_foreground_for_exhaustive_until_one():

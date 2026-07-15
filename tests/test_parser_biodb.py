@@ -349,6 +349,54 @@ def test_pdb_sequence_search_pdb_request_uses_timeout_and_raise_for_status(monke
     assert state["raise_called"] is True
 
 
+def test_pdb_sequence_search_uses_full_input_alignment_query_after_internal_filtering(monkeypatch, tmp_path):
+    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    a_node = [n for n in tr.traverse() if n.name == "A"][0]
+    a_bid = int(ete.get_prop(a_node, "numerical_label"))
+    alignment_path = tmp_path / "full.fa"
+    alignment_path.write_text(
+        ">A\nGCTGCTGCT\n>B\nGCT---GCT\n",
+        encoding="utf-8",
+    )
+    observed = {}
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"result_set": []}
+
+    def _post(*_args, **kwargs):
+        observed["query"] = json.loads(kwargs["data"])["query"]["parameters"]["value"]
+        return _Response()
+
+    monkeypatch.setattr(parser_biodb.requests, "post", _post)
+    monkeypatch.setattr(
+        parser_biodb.sequence,
+        "translate_state",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("filtered state sequence should not be used")
+        ),
+    )
+    g = {
+        "branch_ids": [a_bid],
+        "tree": tr,
+        "alignment_file": str(alignment_path),
+        "codon_table": [("A", "GCT")],
+        "database": "pdb",
+        "database_timeout": 12,
+        "database_evalue_cutoff": 10,
+        "database_minimum_identity": 0.0,
+        "pymol_max_num_chain": 999,
+    }
+    out = parser_biodb.pdb_sequence_search(g)
+    assert out["pdb"] is None
+    assert observed["query"] == "AAA"
+    assert out["structure_search_query_length_aa"] == 3
+
+
 def test_pdb_sequence_search_rejects_unknown_database_names(monkeypatch):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
@@ -385,34 +433,26 @@ def test_pdb_sequence_search_rejects_empty_database_list(monkeypatch):
         parser_biodb.pdb_sequence_search(g)
 
 
-def test_pdb_sequence_search_alphafold_download_uses_context_manager(monkeypatch, tmp_path):
+def test_pdb_sequence_search_alphafold_download_uses_shared_cache(monkeypatch, tmp_path):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     a_node = [n for n in tr.traverse() if n.name == "A"][0]
     a_bid = int(ete.get_prop(a_node, "numerical_label"))
     monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda nlabel, mode, g: "AAAA")
     monkeypatch.setattr(parser_biodb, "run_qblast", lambda aa_query, num_display=10, evalue_cutoff=10: ["P12345"])
-    monkeypatch.setattr(parser_biodb, "is_url_valid", lambda url, timeout=30: True)
     monkeypatch.chdir(tmp_path)
-    state = {"closed": False, "timeout": None}
+    state = {"timeout": None, "source": None, "filename": None}
+    cached_path = tmp_path / "cache" / "AF-P12345-F1-model_v2.pdb"
+    cached_path.parent.mkdir()
+    cached_path.write_bytes(b"MODEL")
 
-    class _Inner:
-        def read(self):
-            return b"MODEL"
+    def _ensure_remote_structure(**kwargs):
+        state["timeout"] = kwargs["network_timeout"]
+        state["source"] = kwargs["source"]
+        state["filename"] = kwargs["filename"]
+        return str(cached_path)
 
-    class _UrlOpenResult:
-        def __enter__(self):
-            return _Inner()
-
-        def __exit__(self, exc_type, exc, tb):
-            state["closed"] = True
-            return False
-
-    def _urlopen(_url, timeout=None):
-        state["timeout"] = timeout
-        return _UrlOpenResult()
-
-    monkeypatch.setattr(parser_biodb.urllib.request, "urlopen", _urlopen)
+    monkeypatch.setattr(parser_biodb.structure_resources, "ensure_remote_structure", _ensure_remote_structure)
     g = {
         "branch_ids": [a_bid],
         "tree": tr,
@@ -424,9 +464,11 @@ def test_pdb_sequence_search_alphafold_download_uses_context_manager(monkeypatch
     }
     out = parser_biodb.pdb_sequence_search(g)
     assert out["selected_database"] == "alphafold"
-    assert out["pdb"] == "AF-P12345-F1-model_v2.pdb"
-    assert state["closed"] is True
+    assert out["pdb"] == str(cached_path)
     assert state["timeout"] == 9.0
+    assert state["source"] == "alphafold"
+    assert state["filename"] == "AF-P12345-F1-model_v2.pdb"
+    assert not (tmp_path / "AF-P12345-F1-model_v2.pdb").exists()
 
 
 def test_get_swissmodel_download_info_selects_best_provider_model(monkeypatch):
@@ -484,7 +526,7 @@ def test_get_swissmodel_download_info_selects_best_provider_model(monkeypatch):
     assert download_info["to"] == 190
 
 
-def test_pdb_sequence_search_swissmodel_download_uses_context_manager(monkeypatch, tmp_path):
+def test_pdb_sequence_search_swissmodel_download_uses_shared_cache(monkeypatch, tmp_path):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     a_node = [n for n in tr.traverse() if n.name == "A"][0]
@@ -499,27 +541,19 @@ def test_pdb_sequence_search_swissmodel_download_uses_context_manager(monkeypatc
             {"template": "1abc.1.A", "gmqe": 0.88, "identity": 72.0, "from": 2, "to": 180},
         ),
     )
-    monkeypatch.setattr(parser_biodb, "is_url_valid", lambda url, timeout=30: True)
     monkeypatch.chdir(tmp_path)
-    state = {"closed": False, "timeout": None}
+    state = {"timeout": None, "source": None, "filename": None}
+    cached_path = tmp_path / "cache" / "P12345.swissmodel.pdb"
+    cached_path.parent.mkdir()
+    cached_path.write_bytes(b"MODEL")
 
-    class _Inner:
-        def read(self):
-            return b"MODEL"
+    def _ensure_remote_structure(**kwargs):
+        state["timeout"] = kwargs["network_timeout"]
+        state["source"] = kwargs["source"]
+        state["filename"] = kwargs["filename"]
+        return str(cached_path)
 
-    class _UrlOpenResult:
-        def __enter__(self):
-            return _Inner()
-
-        def __exit__(self, exc_type, exc, tb):
-            state["closed"] = True
-            return False
-
-    def _urlopen(_url, timeout=None):
-        state["timeout"] = timeout
-        return _UrlOpenResult()
-
-    monkeypatch.setattr(parser_biodb.urllib.request, "urlopen", _urlopen)
+    monkeypatch.setattr(parser_biodb.structure_resources, "ensure_remote_structure", _ensure_remote_structure)
     g = {
         "branch_ids": [a_bid],
         "tree": tr,
@@ -531,9 +565,11 @@ def test_pdb_sequence_search_swissmodel_download_uses_context_manager(monkeypatc
     }
     out = parser_biodb.pdb_sequence_search(g)
     assert out["selected_database"] == "swissmodel"
-    assert out["pdb"] == "P12345.swissmodel.pdb"
-    assert state["closed"] is True
+    assert out["pdb"] == str(cached_path)
     assert state["timeout"] == 9.0
+    assert state["source"] == "swissmodel"
+    assert state["filename"] == "P12345.swissmodel.pdb"
+    assert not (tmp_path / "P12345.swissmodel.pdb").exists()
 
 
 def test_pdb_sequence_search_swissmodel_tries_next_hit_when_first_has_no_model(monkeypatch, tmp_path):
@@ -552,21 +588,15 @@ def test_pdb_sequence_search_swissmodel_tries_next_hit_when_first_has_no_model(m
         return "https://example.com/P22222_model.pdb", {"template": "9xyz.1.A", "gmqe": 0.80, "identity": 61.0, "from": 1, "to": 150}
 
     monkeypatch.setattr(parser_biodb, "get_swissmodel_download_info", _get_swissmodel_download_info)
-    monkeypatch.setattr(parser_biodb, "is_url_valid", lambda url, timeout=30: True)
     monkeypatch.chdir(tmp_path)
-
-    class _Inner:
-        def read(self):
-            return b"MODEL"
-
-    class _UrlOpenResult:
-        def __enter__(self):
-            return _Inner()
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-    monkeypatch.setattr(parser_biodb.urllib.request, "urlopen", lambda _url, timeout=None: _UrlOpenResult())
+    cached_path = tmp_path / "cache" / "P22222.swissmodel.pdb"
+    cached_path.parent.mkdir()
+    cached_path.write_bytes(b"MODEL")
+    monkeypatch.setattr(
+        parser_biodb.structure_resources,
+        "ensure_remote_structure",
+        lambda **_kwargs: str(cached_path),
+    )
     g = {
         "branch_ids": [a_bid],
         "tree": tr,
@@ -579,4 +609,4 @@ def test_pdb_sequence_search_swissmodel_tries_next_hit_when_first_has_no_model(m
     out = parser_biodb.pdb_sequence_search(g)
     assert state["lookups"] == ["P11111", "P22222"]
     assert out["selected_database"] == "swissmodel"
-    assert out["pdb"] == "P22222.swissmodel.pdb"
+    assert out["pdb"] == str(cached_path)

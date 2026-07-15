@@ -312,6 +312,23 @@ def test_write_alignment_uses_name_only_header_without_branch_id(tmp_path):
     assert all(["|" not in h for h in headers])
 
 
+def test_build_tip_aa_alignment_uses_original_codon_columns(tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    alignment_path = tmp_path / "full.fa"
+    alignment_path.write_text(
+        ">A\nGCT---AAGNNN\n>B\nGCTGCTAAG---\n",
+        encoding="utf-8",
+    )
+    out = sequence.build_tip_aa_alignment_from_codon_alignment(
+        g={
+            "tree": tr,
+            "codon_table": [("A", "GCT"), ("K", "AAG")],
+        },
+        alignment_path=alignment_path,
+    )
+    assert out == {"A": "A-KX", "B": "AAK-"}
+
+
 def test_translate_state_rejects_unknown_mode():
     g = {
         "float_tol": 1e-12,

@@ -83,6 +83,17 @@ def test_cli_advanced_help_has_no_log_side_effect(tmp_path):
     assert not (tmp_path / "csubst.log").exists()
 
 
+def test_download_no_download_missing_resource_fails_cleanly(tmp_path):
+    cache_dir = tmp_path / "empty-cache"
+    result = _run_csubst(
+        ["download", "--resource", "vesm-35m", "--resource_cache_dir", str(cache_dir), "--no_download", "yes"],
+        cwd=tmp_path,
+    )
+    assert result.returncode == 2
+    assert "automatic download is disabled" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 def test_simulate_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["simulate", "-h"], cwd=tmp_path)
     assert result.returncode == 0

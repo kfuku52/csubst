@@ -488,7 +488,7 @@ def _compute_epistasis_degree_from_structure(g, num_site):
         g_pdb = parser_biodb.pdb_sequence_search(g_pdb)
     if g_pdb.get('pdb', None) in [None, '']:
         raise ValueError('No structure could be resolved for epistasis degree generation.')
-    parser_pymol.initialize_pymol(pdb_id=g_pdb['pdb'])
+    parser_pymol.initialize_pymol(pdb_id=g_pdb['pdb'], g=g_pdb)
     epistasis_user_alignment = str(g.get('epistasis_user_alignment', '')).strip()
     if epistasis_user_alignment != '':
         print('Using epistasis user alignment for structure mapping: {}'.format(epistasis_user_alignment), flush=True)

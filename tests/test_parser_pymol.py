@@ -1,10 +1,14 @@
 import importlib
+import os
 import sys
 import types
 
 import numpy as np
 import pandas as pd
 import pytest
+
+from csubst import ete
+from csubst import tree
 
 
 def _import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta, chains=None, commands=None, names=None, count_atoms=None):
@@ -31,6 +35,92 @@ def _import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta, chains=None, co
     monkeypatch.setitem(sys.modules, "pymol", fake_pymol)
     sys.modules.pop("csubst.parser_pymol", None)
     return importlib.import_module("csubst.parser_pymol")
+
+
+def test_initialize_pymol_loads_pdb_code_from_shared_cache(tmp_path, monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        commands=commands,
+    )
+    cached_path = tmp_path / "cache" / "structures" / "rcsb" / "3zgb" / "3zgb.cif"
+    cached_path.parent.mkdir(parents=True)
+    cached_path.write_text("data_3zgb\n#\n", encoding="utf-8")
+    observed = {}
+
+    def ensure_rcsb_structure(**kwargs):
+        observed.update(kwargs)
+        return str(cached_path)
+
+    monkeypatch.setattr(parser_pymol.structure_resources, "ensure_rcsb_structure", ensure_rcsb_structure)
+    parser_pymol.initialize_pymol(
+        pdb_id="3ZGB",
+        g={
+            "resource_cache_dir": str(tmp_path / "cache"),
+            "database_timeout": 17,
+            "resource_lock_poll": 0.25,
+            "resource_lock_timeout": 33,
+        },
+    )
+    assert observed == {
+        "pdb_id": "3ZGB",
+        "cache_dir": str(tmp_path / "cache"),
+        "network_timeout": 17.0,
+        "poll_seconds": 0.25,
+        "lock_timeout_seconds": 33.0,
+    }
+    assert commands == ["delete all", "load {}, 3ZGB".format(cached_path)]
+
+
+def test_write_mafft_alignment_uses_input_codon_alignment_before_internal_filtering(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">1ABC_A\nAAA\n",
+    )
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    alignment_path = tmp_path / "full.fa"
+    alignment_path.write_text(
+        ">A\nGCTGCTGCT\n>B\nGCT---GCT\n",
+        encoding="utf-8",
+    )
+    captured = {}
+
+    class _Proc:
+        stdout = b">A\nAAA\n>B\nA-A\n>1ABC_A\nAAA\n"
+        stderr = b""
+        returncode = 0
+
+    def _run(cmd, cwd, **_kwargs):
+        leaf_path = os.path.join(cwd, cmd[-1])
+        captured["leaf_alignment"] = open(leaf_path, encoding="utf-8").read()
+        open(os.path.join(cwd, "tmp.csubst.pdb_seq.fa.map"), "w", encoding="utf-8").write(
+            ">1ABC_A\nA,1,1\nA,2,2\nA,3,3\n"
+        )
+        return _Proc()
+
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_path),
+        "codon_table": [("A", "GCT")],
+        "mafft_exe": "mafft",
+        "mafft_op": -1,
+        "mafft_ep": -1,
+        "mafft_add_fasta": str(tmp_path / "add.fa"),
+        "pdb": "1ABC",
+    }
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("CSUBST_RUN_TMPDIR", raising=False)
+    monkeypatch.setattr(
+        parser_pymol.sequence,
+        "write_alignment",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("filtered state alignment should not be used")
+        ),
+    )
+    monkeypatch.setattr(parser_pymol.subprocess, "run", _run)
+    parser_pymol.write_mafft_alignment(g)
+    assert captured["leaf_alignment"] == ">A\nAAA\n>B\nA-A\n"
 
 
 def test_add_coordinate_from_user_alignment_raises_descriptive_error_on_unmappable_sequence(tmp_path, monkeypatch):
@@ -782,3 +872,31 @@ def test_write_pymol_session_keeps_ligand_preset_with_organic_atoms(tmp_path, mo
     assert any("preset.ligand_sites_trans_hq" in cmd for cmd in commands)
     assert any("util.cbag organic" in cmd for cmd in commands)
     assert any("set surface_quality, 0" in cmd for cmd in commands)
+
+
+def test_set_substitution_colors_auto_uses_continuous_vesm_colors(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">obj_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": [10, 11, 12],
+            "vesm_structure_llr": [-2.0, 0.0, 2.0],
+        }
+    )
+    parser_pymol.set_substitution_colors(
+        df=df,
+        g={"vep_model": "vesm-35m", "pymol_color_by": "auto"},
+        object_names=["obj"],
+        N_sub_cols=[],
+    )
+    color_commands = [command for command in commands if command.startswith("color 0x")]
+    assert len(color_commands) == 3
+    assert any("resi 10" in command for command in color_commands)
+    assert any("resi 11" in command for command in color_commands)
+    assert any("resi 12" in command for command in color_commands)
+    assert any(command.startswith("select vesm_scored") for command in commands)

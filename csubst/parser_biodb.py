@@ -11,6 +11,8 @@ import urllib
 
 from csubst import sequence
 from csubst import parser_pymol
+from csubst import resource_cache
+from csubst import structure_resources
 from csubst import ete
 
 def get_top_hit_ids(my_hits):
@@ -190,17 +192,23 @@ def pdb_sequence_search(g):
         raise ValueError('No branch IDs were provided for selecting a representative sequence.')
     representative_branch_id = branch_ids[0]
     representative_leaf = None
+    structure_tip_aa = parser_pymol.get_structure_tip_aa_alignment(g=g)
     for node in g['tree'].traverse():
         if (ete.get_prop(node, "numerical_label")==representative_branch_id):
             representative_leaf = get_representative_leaf(node, size='median')
             nlabel = ete.get_prop(representative_leaf, "numerical_label")
-            aa_query = sequence.translate_state(nlabel=nlabel, mode='aa', g=g)
+            representative_name = str(representative_leaf.name)
+            if (structure_tip_aa is not None) and (representative_name in structure_tip_aa):
+                aa_query = str(structure_tip_aa[representative_name])
+            else:
+                aa_query = sequence.translate_state(nlabel=nlabel, mode='aa', g=g)
             aa_query = aa_query.replace('-', '')
             break
     if representative_leaf is None:
         raise ValueError('Representative branch ID {} was not found in the tree.'.format(representative_branch_id))
     if aa_query == '':
         raise ValueError('Representative amino acid query was empty.')
+    g['structure_search_query_length_aa'] = int(len(aa_query))
     pdb_id = None
     top_hit_ids = []
     database_names = [db.strip().lower() for db in g['database'].split(',') if db.strip()]
@@ -252,7 +260,7 @@ def pdb_sequence_search(g):
                 for hit in mmseqs2_out['result_set']:
                     if best_hit is None:
                         hit_pdb_id = re.sub('_.*', '', hit['identifier'])
-                        parser_pymol.initialize_pymol(pdb_id=hit_pdb_id)
+                        parser_pymol.initialize_pymol(pdb_id=hit_pdb_id, g=g)
                         num_chain = parser_pymol.get_num_chain()
                         if num_chain <= g['pymol_max_num_chain']:
                             best_hit = hit
@@ -301,36 +309,42 @@ def pdb_sequence_search(g):
                         download_url = 'https://alphafill.eu/v1/aff/'+top_hit_ids[i]
                     elif (database_name=='alphafold'):
                         download_url = 'https://alphafold.ebi.ac.uk/files/AF-' + top_hit_ids[i] + '-F1-model_v2.pdb'
-                    if is_url_valid(url=download_url, timeout=network_timeout):
-                        try:
-                            with urllib.request.urlopen(download_url, timeout=network_timeout) as response:
-                                structure_bytes = response.read()
-                            if (database_name == 'swissmodel'):
-                                structure_path = top_hit_ids[i] + '.swissmodel.pdb'
-                            elif (database_name == 'alphafill'):
-                                structure_path = os.path.basename(download_url)+'.cif'
-                            elif (database_name=='alphafold'):
-                                structure_path = os.path.basename(download_url)
-                            with open(structure_path, mode='wb') as f:
-                                f.write(structure_bytes)
-                            print('Download succeeded at: {}'.format(download_url), flush=True)
-                            if (database_name == 'swissmodel') and (download_info is not None):
-                                txt = 'SWISS-MODEL best hit: template={} GMQE={} identity={} range={}-{}'
-                                print(txt.format(
-                                    download_info.get('template', ''),
-                                    download_info.get('gmqe', ''),
-                                    download_info.get('identity', ''),
-                                    download_info.get('from', ''),
-                                    download_info.get('to', ''),
-                                ), flush=True)
-                            pdb_id = structure_path
-                            g['selected_database'] = database_name
-                            break
-                        except Exception as exc:
-                            print('Download failed at: {} ({})'.format(download_url, exc), flush=True)
-                            pdb_id = None
-                    else:
-                        print('Download URL not found: {}'.format(download_url), flush=True)
+                    try:
+                        if (database_name == 'swissmodel'):
+                            structure_filename = top_hit_ids[i] + '.swissmodel.pdb'
+                        elif (database_name == 'alphafill'):
+                            structure_filename = os.path.basename(download_url)+'.cif'
+                        elif (database_name=='alphafold'):
+                            structure_filename = os.path.basename(download_url)
+                        structure_path = structure_resources.ensure_remote_structure(
+                            source=database_name,
+                            structure_id=top_hit_ids[i],
+                            url=download_url,
+                            filename=structure_filename,
+                            cache_dir=g.get('resource_cache_dir', ''),
+                            network_timeout=network_timeout,
+                            poll_seconds=float(
+                                g.get('resource_lock_poll', resource_cache.DEFAULT_LOCK_POLL_SECONDS)
+                            ),
+                            lock_timeout_seconds=float(
+                                g.get('resource_lock_timeout', resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS)
+                            ),
+                        )
+                        print('Structure download/cache ready: {}'.format(structure_path), flush=True)
+                        if (database_name == 'swissmodel') and (download_info is not None):
+                            txt = 'SWISS-MODEL best hit: template={} GMQE={} identity={} range={}-{}'
+                            print(txt.format(
+                                download_info.get('template', ''),
+                                download_info.get('gmqe', ''),
+                                download_info.get('identity', ''),
+                                download_info.get('from', ''),
+                                download_info.get('to', ''),
+                            ), flush=True)
+                        pdb_id = structure_path
+                        g['selected_database'] = database_name
+                        break
+                    except Exception as exc:
+                        print('Structure download failed at: {} ({})'.format(download_url, exc), flush=True)
                         pdb_id = None
     g['pdb'] = pdb_id
     if g['pdb'] is not None:

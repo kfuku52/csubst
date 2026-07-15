@@ -7,12 +7,14 @@ import os
 import pkgutil
 import re
 import sys
+import tempfile
 
 from csubst import genetic_code
 from csubst import foreground
 from csubst import sequence
 from csubst import parser_iqtree
 from csubst import recoding
+from csubst import resource_cache
 from csubst import runtime
 from csubst import structural_alphabet
 from csubst import tree
@@ -209,14 +211,24 @@ def _write_3di_state_cache(g, selected_branch_ids, state_cdn_shape, state_nsy, s
         state_cdn_shape=state_cdn_shape,
     )
     metadata_json = json.dumps(context, sort_keys=True, separators=(',', ':'))
-    tmp_path = cache_path + '.tmp.npz'
-    np.savez_compressed(
-        tmp_path,
-        metadata_json=np.array([metadata_json], dtype=np.str_),
-        state_orders=np.asarray([str(v) for v in np.asarray(state_orders, dtype=object).reshape(-1)], dtype=np.str_),
-        state_nsy=np.asarray(state_nsy, dtype=g['float_type']),
-    )
-    os.replace(tmp_path, cache_path)
+    fd, tmp_path = tempfile.mkstemp(prefix='.{}.tmp.'.format(os.path.basename(cache_path)), suffix='.npz', dir=cache_dir or '.')
+    os.close(fd)
+    try:
+        np.savez_compressed(
+            tmp_path,
+            metadata_json=np.array([metadata_json], dtype=np.str_),
+            state_orders=np.asarray([str(v) for v in np.asarray(state_orders, dtype=object).reshape(-1)], dtype=np.str_),
+            state_nsy=np.asarray(state_nsy, dtype=g['float_type']),
+        )
+        with open(tmp_path, mode='rb') as handle:
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, cache_path)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except FileNotFoundError:
+            pass
+        raise
     return cache_path
 
 
@@ -969,6 +981,38 @@ def prep_state(g, apply_site_filtering=True):
         cache_mode = _normalize_sa_state_cache_mode(g.get('sa_state_cache', 'auto'))
         sa_mode = str(g.get('sa_asr_mode', 'direct')).strip().lower()
         state_cdn_shape = tuple([int(v) for v in state_cdn_local.shape])
+
+        def _activate_cached_state(cached_state_nsy, cached_orders, after_lock=False):
+            g['nonsyn_state_orders'] = np.asarray(cached_orders, dtype=object)
+            g.pop('_3di_alignment_by_branch_id', None)
+            g.pop('_3di_tip_alignment_by_leaf', None)
+            if after_lock:
+                txt = 'Loaded 3Di state cache after lock acquisition: {}'
+            else:
+                txt = 'Loaded 3Di state cache: {}'
+            print(txt.format(os.path.abspath(str(g.get('sa_state_cache_file', '')).strip())), flush=True)
+            return cached_state_nsy
+
+        def _compute_3di_state():
+            if sa_mode == 'translate':
+                state_nsy_local, state_orders, aligned_3di = structural_alphabet.build_3di_state_from_state_pep(
+                    g=g,
+                    state_pep=state_pep_local,
+                    selected_branch_ids=nsy_branch_ids,
+                )
+                g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
+                g['_3di_alignment_by_branch_id'] = aligned_3di
+                return state_nsy_local, state_orders
+            if sa_mode == 'direct':
+                state_nsy_local, state_orders, tip_3di = structural_alphabet.build_3di_state_direct(
+                    g=g,
+                    selected_branch_ids=nsy_branch_ids,
+                )
+                g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
+                g['_3di_tip_alignment_by_leaf'] = tip_3di
+                return state_nsy_local, state_orders
+            raise ValueError('--sa_asr_mode should be one of translate, direct.')
+
         if cache_mode in ['auto', 'yes']:
             cached_state_nsy, cached_orders, cache_msg = _try_load_3di_state_cache(
                 g=g,
@@ -976,50 +1020,47 @@ def prep_state(g, apply_site_filtering=True):
                 state_cdn_shape=state_cdn_shape,
             )
             if cached_state_nsy is not None:
-                g['nonsyn_state_orders'] = np.asarray(cached_orders, dtype=object)
-                g.pop('_3di_alignment_by_branch_id', None)
-                g.pop('_3di_tip_alignment_by_leaf', None)
-                txt = 'Loaded 3Di state cache: {}'
-                print(txt.format(os.path.abspath(str(g.get('sa_state_cache_file', '')).strip())), flush=True)
-                return cached_state_nsy
+                return _activate_cached_state(cached_state_nsy, cached_orders)
             if cache_mode == 'yes':
                 txt = '--sa_state_cache yes requested a compatible 3Di cache, but it was unavailable: {}'
                 raise ValueError(txt.format(cache_msg))
             if cache_msg is not None:
                 txt = '3Di state cache was not used (--sa_state_cache auto): {}'
                 print(txt.format(cache_msg), flush=True)
-        state_nsy_local = None
-        state_orders = None
-        if sa_mode == 'translate':
-            state_nsy_local, state_orders, aligned_3di = structural_alphabet.build_3di_state_from_state_pep(
-                g=g,
-                state_pep=state_pep_local,
-                selected_branch_ids=nsy_branch_ids,
-            )
-            g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
-            g['_3di_alignment_by_branch_id'] = aligned_3di
-        elif sa_mode == 'direct':
-            state_nsy_local, state_orders, tip_3di = structural_alphabet.build_3di_state_direct(
-                g=g,
-                selected_branch_ids=nsy_branch_ids,
-            )
-            g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
-            g['_3di_tip_alignment_by_leaf'] = tip_3di
-        else:
-            raise ValueError('--sa_asr_mode should be one of translate, direct.')
         if cache_mode == 'auto':
-            try:
-                cache_path = _write_3di_state_cache(
+            cache_file = str(g.get('sa_state_cache_file', '')).strip()
+            if cache_file == '':
+                state_nsy_local, _ = _compute_3di_state()
+                return state_nsy_local
+            lock_path = resource_cache.resolve_path_lock_path(cache_file, lock_label='3di-state-cache')
+            with resource_cache.acquire_exclusive_lock(
+                lock_path=lock_path,
+                lock_label='3Di state cache',
+                poll_seconds=float(g.get('resource_lock_poll', resource_cache.DEFAULT_LOCK_POLL_SECONDS)),
+                timeout_seconds=float(g.get('resource_lock_timeout', resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS)),
+            ):
+                cached_state_nsy, cached_orders, _ = _try_load_3di_state_cache(
                     g=g,
                     selected_branch_ids=nsy_branch_ids,
                     state_cdn_shape=state_cdn_shape,
-                    state_nsy=state_nsy_local,
-                    state_orders=state_orders,
                 )
-                print('Wrote 3Di state cache: {}'.format(cache_path), flush=True)
-            except Exception as exc:
-                txt = 'Failed to write 3Di state cache in auto mode: {}'
-                print(txt.format(str(exc)), flush=True)
+                if cached_state_nsy is not None:
+                    return _activate_cached_state(cached_state_nsy, cached_orders, after_lock=True)
+                state_nsy_local, state_orders = _compute_3di_state()
+                try:
+                    cache_path = _write_3di_state_cache(
+                        g=g,
+                        selected_branch_ids=nsy_branch_ids,
+                        state_cdn_shape=state_cdn_shape,
+                        state_nsy=state_nsy_local,
+                        state_orders=state_orders,
+                    )
+                    print('Wrote 3Di state cache: {}'.format(cache_path), flush=True)
+                except Exception as exc:
+                    txt = 'Failed to write 3Di state cache in auto mode: {}'
+                    print(txt.format(str(exc)), flush=True)
+                return state_nsy_local
+        state_nsy_local, _ = _compute_3di_state()
         return state_nsy_local
 
     if g['infile_type'] == 'iqtree':

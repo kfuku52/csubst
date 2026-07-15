@@ -13,7 +13,9 @@ import subprocess
 import time
 
 from csubst import sequence
+from csubst import resource_cache
 from csubst import runtime
+from csubst import structure_resources
 from csubst import utility
 from csubst import ete
 
@@ -24,11 +26,15 @@ def _cmd_delete_all():
     return pymol.cmd.do('delete all')
 
 
-def _cmd_fetch(pdb_id):
-    fetch = getattr(pymol.cmd, 'fetch', None)
-    if callable(fetch):
-        return fetch(pdb_id)
-    return pymol.cmd.do('fetch {}'.format(pdb_id))
+def _cmd_load(path, object_name=None):
+    load = getattr(pymol.cmd, 'load', None)
+    if callable(load):
+        if object_name is None:
+            return load(path)
+        return load(path, object=str(object_name))
+    if object_name is None:
+        return pymol.cmd.do('load {}'.format(path))
+    return pymol.cmd.do('load {}, {}'.format(path, object_name))
 
 
 def _cmd_remove(selection):
@@ -82,6 +88,13 @@ def _cmd_zoom(selection='all'):
     return pymol.cmd.do('zoom')
 
 
+def _cmd_select(name, selection):
+    select = getattr(pymol.cmd, 'select', None)
+    if callable(select):
+        return select(str(name), str(selection))
+    return pymol.cmd.do('select {}, {}'.format(name, selection))
+
+
 def _cmd_preset_ligand_sites_trans_hq(selection='all'):
     preset_module = getattr(pymol, 'preset', None)
     preset_func = getattr(preset_module, 'ligand_sites_trans_hq', None)
@@ -118,18 +131,73 @@ def _extract_positive_site_array(series):
     return site_values, valid_mask
 
 
-def initialize_pymol(pdb_id):
+def initialize_pymol(pdb_id, g=None):
     #pymol.pymol_argv = ['pymol','-qc']
     #pymol.finish_launching()
     _cmd_delete_all()
+    pdb_id = str(pdb_id)
     is_old_pdb_code = bool(re.fullmatch('[0-9][A-Za-z0-9]{3}', pdb_id))
-    is_new_pdb_code = bool(re.fullmatch('pdb_[0-9]{5}[A-Za-z0-9]{3}', pdb_id))
+    is_new_pdb_code = bool(re.fullmatch('pdb_[0-9]{5}[A-Za-z0-9]{3}', pdb_id, flags=re.IGNORECASE))
     if is_old_pdb_code|is_new_pdb_code:
-        print('Fetching PDB code {}. Internet connection is needed.'.format(pdb_id), flush=True)
-        _cmd_fetch(pdb_id)
+        g = {} if g is None else g
+        structure_path = structure_resources.ensure_rcsb_structure(
+            pdb_id=pdb_id,
+            cache_dir=g.get('resource_cache_dir', ''),
+            network_timeout=float(g.get('database_timeout', 30.0)),
+            poll_seconds=float(
+                g.get('resource_lock_poll', resource_cache.DEFAULT_LOCK_POLL_SECONDS)
+            ),
+            lock_timeout_seconds=float(
+                g.get('resource_lock_timeout', resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS)
+            ),
+        )
+        print('Loading cached RCSB structure {}: {}'.format(pdb_id, structure_path), flush=True)
+        _cmd_load(structure_path, object_name=pdb_id)
     else:
         print('Loading PDB file: {}'.format(pdb_id), flush=True)
-        pymol.cmd.load(pdb_id)
+        _cmd_load(pdb_id)
+
+
+def get_structure_tip_aa_alignment(g):
+    alignment_path = str(g.get('alignment_file', '')).strip()
+    if alignment_path == '':
+        return None
+    alignment_path_abs = os.path.abspath(alignment_path)
+    cached = g.get('_structure_tip_aa_alignment', None)
+    if isinstance(cached, dict) and cached.get('alignment_path', None) == alignment_path_abs:
+        return cached.get('sequences', None)
+    aa_by_tip = sequence.build_tip_aa_alignment_from_codon_alignment(
+        g=g,
+        alignment_path=alignment_path,
+    )
+    g['_structure_tip_aa_alignment'] = {
+        'alignment_path': alignment_path_abs,
+        'sequences': aa_by_tip,
+    }
+    if not bool(g.get('_structure_tip_aa_alignment_reported', False)):
+        aligned_sites = len(next(iter(aa_by_tip.values()))) if len(aa_by_tip) > 0 else 0
+        print(
+            'Using input codon alignment for full-length structure search/mapping: {} '
+            '({:,} aligned amino-acid sites).'.format(alignment_path_abs, aligned_sites),
+            flush=True,
+        )
+        g['_structure_tip_aa_alignment_reported'] = True
+    return aa_by_tip
+
+
+def write_structure_tip_aa_alignment(outfile, g):
+    aa_by_tip = get_structure_tip_aa_alignment(g=g)
+    if aa_by_tip is None:
+        return False
+    lines = list()
+    for name, aligned_sequence in aa_by_tip.items():
+        lines.append('>' + str(name))
+        lines.append(str(aligned_sequence))
+    with open(outfile, 'w') as handle:
+        if len(lines) > 0:
+            handle.write('\n'.join(lines) + '\n')
+    print('Writing full-length tip AA alignment:', outfile, flush=True)
+    return True
 
 def write_mafft_alignment(g):
     tmp_pdb_fasta = runtime.temp_path('tmp.csubst.pdb_seq.fa')
@@ -141,7 +209,9 @@ def write_mafft_alignment(g):
     with open(tmp_pdb_fasta, 'w') as f:
         f.write(pdb_seq)
     leaf_aa_fasta = runtime.temp_path('tmp.csubst.leaf.aa.fa')
-    sequence.write_alignment(outfile=leaf_aa_fasta, mode='aa', g=g, leaf_only=True)
+    wrote_input_alignment = write_structure_tip_aa_alignment(outfile=leaf_aa_fasta, g=g)
+    if not wrote_input_alignment:
+        sequence.write_alignment(outfile=leaf_aa_fasta, mode='aa', g=g, leaf_only=True)
     cmd_mafft = [g['mafft_exe'], '--keeplength', '--mapout', '--quiet',
                  '--thread', '1',]
     if g['mafft_op'] >= 0:
@@ -746,7 +816,88 @@ def _parse_bool_like(value):
     return False
 
 
+def _resolve_pymol_color_by(g):
+    color_by = str(g.get('pymol_color_by', 'auto')).strip().lower()
+    if color_by == 'auto':
+        return 'vesm' if str(g.get('vep_model', 'none')).strip().lower() != 'none' else 'substitution'
+    return color_by
+
+
+def _vesm_score_hex(score, color_limit):
+    color_limit = max(float(color_limit), 1e-12)
+    fraction = (float(score) + color_limit) / (2.0 * color_limit)
+    fraction = min(max(fraction, 0.0), 1.0)
+    red,green,blue,_alpha = plt.get_cmap('coolwarm_r')(fraction)
+    return utility.rgb_to_hex(r=float(red), g=float(green), b=float(blue))
+
+
+def set_vesm_colors(df, g, object_names):
+    score_col = 'vesm_structure_llr'
+    if score_col not in df.columns:
+        print('Skipping VESM site painting because vesm_structure_llr was not found.', flush=True)
+        return None
+    scores_all = pd.to_numeric(df[score_col], errors='coerce').to_numpy(dtype=np.float64, copy=False)
+    finite_scores = scores_all[np.isfinite(scores_all)]
+    if finite_scores.shape[0] == 0:
+        print('Skipping VESM site painting because no finite scores were available.', flush=True)
+        return None
+    color_limit = max(
+        float(g.get('_vep_color_limit', 0.0)),
+        float(np.max(np.abs(finite_scores))),
+        1e-6,
+    )
+    selection_parts = []
+    num_bin = 41
+    for object_name in object_names:
+        if object_name.endswith('_pol_conts'):
+            continue
+        for chain_id in pymol.cmd.get_chains(object_name):
+            codon_site_col = 'codon_site_pdb_{}_{}'.format(object_name, chain_id)
+            if codon_site_col not in df.columns:
+                continue
+            site_values,valid_site = _extract_positive_site_array(df[codon_site_col])
+            bins = {index: [] for index in range(num_bin)}
+            for row_index in np.flatnonzero(valid_site).tolist():
+                score = float(scores_all[row_index])
+                if not np.isfinite(score):
+                    continue
+                fraction = (score + color_limit) / (2.0 * color_limit)
+                fraction = min(max(fraction, 0.0), 1.0)
+                bin_index = int(round(fraction * (num_bin - 1)))
+                bins[bin_index].append(int(site_values[row_index]))
+            for bin_index,sites in bins.items():
+                if len(sites) == 0:
+                    continue
+                bin_fraction = bin_index / (num_bin - 1)
+                bin_score = (bin_fraction * 2.0 * color_limit) - color_limit
+                hex_value = _vesm_score_hex(score=bin_score, color_limit=color_limit)
+                _paint_sites_with_hex(
+                    object_name=object_name,
+                    chain_id=chain_id,
+                    sites=sites,
+                    hex_value=hex_value,
+                    label='VESM LLR bin {}/{}'.format(bin_index + 1, num_bin),
+                )
+                txt_resi = '+'.join(str(site) for site in sorted(set(sites)))
+                selection_parts.append(
+                    '({} and chain {} and resi {})'.format(object_name, chain_id, txt_resi)
+                )
+    if len(selection_parts) > 0:
+        _cmd_select('vesm_scored', ' or '.join(selection_parts))
+    print(
+        'VESM LLR residue colors use a red-white-blue scale centered at 0 with limits '
+        '[{:.4g}, {:.4g}]; lower values are more deleterious.'.format(
+            -color_limit,
+            color_limit,
+        ),
+        flush=True,
+    )
+    return None
+
+
 def set_substitution_colors(df, g, object_names, N_sub_cols):
+    if _resolve_pymol_color_by(g) == 'vesm':
+        return set_vesm_colors(df=df, g=g, object_names=object_names)
     single_branch_mode = bool(g.get('single_branch_mode', False))
     mode = str(g.get('mode', 'intersection')).lower()
     need_single_prob = (mode not in ['set', 'lineage', 'total'])
