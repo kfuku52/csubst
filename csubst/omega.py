@@ -6,6 +6,7 @@
 
 import numpy as np
 import scipy.stats as stats
+import scipy.sparse as sp
 from scipy.linalg import expm
 
 import itertools
@@ -2283,6 +2284,251 @@ def _get_fused_expected_sparse_substitution_tensor(g, mode):
     )
 
 
+def _expected_projection_feature_count(stat, num_group, num_state):
+    if stat == 'any2any':
+        return int(num_group)
+    if stat in ('spe2any', 'any2spe'):
+        return int(num_group) * int(num_state)
+    if stat == 'spe2spe':
+        return int(num_group) * int(num_state) * int(num_state)
+    raise ValueError('Unsupported expected projection statistic: {}'.format(stat))
+
+
+def _get_expected_branch_projection_values(
+    parent_state,
+    expected_state,
+    sub_mode,
+    num_group,
+    num_state,
+    syn_indices_list,
+    selected,
+):
+    num_site = parent_state.shape[0]
+    out = {
+        stat: np.zeros(
+            (num_site, _expected_projection_feature_count(stat, num_group, num_state)),
+            dtype=np.float64,
+        )
+        for stat in selected
+    }
+    total_by_site = np.zeros(num_site, dtype=np.float64)
+    groups = [np.arange(num_state, dtype=np.int64)] if sub_mode == 'asis' else syn_indices_list
+    for sg, state_indices in enumerate(groups):
+        state_indices = np.asarray(state_indices, dtype=np.int64)
+        size = int(state_indices.shape[0])
+        if size <= 1:
+            continue
+        parent = np.asarray(parent_state[:, state_indices], dtype=np.float64)
+        child = np.asarray(expected_state[:, state_indices], dtype=np.float64)
+        parent_sum = parent.sum(axis=1)
+        child_sum = child.sum(axis=1)
+        diagonal = (parent * child).sum(axis=1)
+        total_sg = parent_sum * child_sum - diagonal
+        total_by_site += total_sg
+        if 'any2any' in out:
+            out['any2any'][:, sg] = total_sg
+        if 'spe2any' in out:
+            base = sg * num_state
+            out['spe2any'][:, base:base + size] = parent * (child_sum[:, None] - child)
+        if 'any2spe' in out:
+            base = sg * num_state
+            out['any2spe'][:, base:base + size] = child * (parent_sum[:, None] - parent)
+        if 'spe2spe' in out:
+            pair = parent[:, :, None] * child[:, None, :]
+            diagonal_ids = np.arange(size)
+            pair[:, diagonal_ids, diagonal_ids] = 0.0
+            base = sg * num_state * num_state
+            for a in range(size):
+                row_start = base + a * num_state
+                out['spe2spe'][:, row_start:row_start + size] = pair[:, a, :]
+    return out, total_by_site
+
+
+def _project_expected_branch_expm(
+    parent_state,
+    branch_length,
+    unique_site_rates,
+    rate_site_indices,
+    inst,
+    float_tol,
+):
+    expected_state = np.zeros_like(parent_state, dtype=np.float64)
+    inst_bl = np.asarray(inst, dtype=np.float64) * float(branch_length)
+    for site_rate, site_indices in zip(unique_site_rates, rate_site_indices):
+        if site_indices.shape[0] == 0:
+            continue
+        transition_prob = expm(inst_bl * float(site_rate))
+        expected_state[site_indices, :] = _project_expected_state_block(
+            parent_state_block=parent_state[site_indices, :],
+            transition_prob=transition_prob,
+            float_tol=float_tol,
+        )
+    return expected_state
+
+
+def _finalize_expected_projection_rows(row_payloads, num_branch, num_site, num_feature):
+    indptr = np.zeros(num_branch + 1, dtype=np.int64)
+    for branch_id, (indices, _data) in row_payloads.items():
+        indptr[int(branch_id) + 1] = int(indices.shape[0])
+    np.cumsum(indptr, out=indptr)
+    nnz = int(indptr[-1])
+    indices = np.empty(nnz, dtype=np.int32)
+    data = np.empty(nnz, dtype=np.float64)
+    for branch_id, (row_indices, row_data) in row_payloads.items():
+        start = int(indptr[int(branch_id)])
+        stop = int(indptr[int(branch_id) + 1])
+        indices[start:stop] = row_indices
+        data[start:stop] = row_data
+    return sp.csr_matrix(
+        (data, indices, indptr),
+        shape=(num_branch, num_feature * num_site),
+        dtype=np.float64,
+    )
+
+
+def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
+    """Build only reducer projections, never an expected 5-D tensor."""
+    selected = substitution._resolve_cb_base_substitutions(selected_base_stats)
+    if mode == 'cdn':
+        state = g['state_cdn'].astype(g['float_type'], copy=False)
+        inst = g['instantaneous_codon_rate_matrix']
+        stationary = g.get('equilibrium_frequency', g.get('empirical_eq_freq', None))
+        sub_mode = 'syn'
+        num_group = len(g['amino_acid_orders'])
+        num_state = int(g['max_synonymous_size'])
+        syn_indices_list = [
+            np.asarray(g['synonymous_indices'][aa], dtype=np.int64)
+            for aa in g['amino_acid_orders']
+        ]
+    elif mode == 'nsy':
+        state = g['state_nsy'].astype(g['float_type'], copy=False)
+        inst = g['instantaneous_nsy_rate_matrix']
+        stationary = None
+        sub_mode = 'asis'
+        num_group = 1
+        num_state = state.shape[2]
+        syn_indices_list = None
+    else:
+        raise ValueError('Unsupported expected sparse reducer mode: {}'.format(mode))
+    float_tol = float(g['float_tol'])
+    site_rates = np.asarray(g['iqtree_rate_values'], dtype=np.float64).reshape(-1)
+    unique_site_rates, inverse_rate_indices = np.unique(site_rates, return_inverse=True)
+    rate_site_indices = [np.where(inverse_rate_indices == i)[0] for i in range(unique_site_rates.shape[0])]
+    state_has_mass = state.sum(axis=(1, 2)) >= float_tol
+    branch_jobs = _collect_expected_state_branch_jobs(
+        tree=g['tree'],
+        mode=mode,
+        num_node=state.shape[0],
+        float_tol=float_tol,
+        state_has_mass=state_has_mass,
+    )
+    selected_branch_set = substitution._get_selected_branch_set(g)
+    if selected_branch_set is not None:
+        branch_jobs = [job for job in branch_jobs if int(job[0]) in selected_branch_set]
+    requested_backend = str(g.get('expected_state_backend', 'auto')).strip().lower()
+    if requested_backend not in ['auto', 'expm', 'eigen']:
+        raise ValueError('Unsupported expected_state_backend: {}'.format(requested_backend))
+    projector = None
+    if requested_backend != 'expm':
+        projector = _build_expected_state_projector(
+            inst=inst,
+            float_tol=float_tol,
+            stationary=stationary,
+        )
+    if requested_backend == 'eigen' and projector is None:
+        warnings.warn(
+            'The expected-state rate matrix does not have a stable eigendecomposition; using scipy.linalg.expm.',
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    resolved_backend = 'eigen_{}'.format(projector['kind']) if projector is not None else 'expm'
+    if projector is not None:
+        branch_jobs = sorted(branch_jobs, key=lambda job: (job[1], job[0]))
+    print(
+        'Tensor-free expected reducer (mode={}): backend={}, branches={}, projections={}'.format(
+            mode, resolved_backend, len(branch_jobs), ','.join(selected)
+        ),
+        flush=True,
+    )
+    row_payloads = {stat: {} for stat in selected}
+    total = 0.0
+    cached_parent_nl = None
+    parent_eigen_state = None
+    try:
+        for nl, parent_nl, branch_length in branch_jobs:
+            parent_state = np.asarray(state[parent_nl, :, :], dtype=np.float64)
+            if projector is not None:
+                if cached_parent_nl != parent_nl:
+                    parent_eigen_state = _transform_parent_state_to_eigen(parent_state, projector)
+                    cached_parent_nl = parent_nl
+                expected_state = _project_parent_eigen_state(
+                    parent_eigen_state=parent_eigen_state,
+                    branch_length=branch_length,
+                    site_rates=site_rates,
+                    projector=projector,
+                    float_tol=float_tol,
+                )
+            else:
+                expected_state = _project_expected_branch_expm(
+                    parent_state=parent_state,
+                    branch_length=branch_length,
+                    unique_site_rates=unique_site_rates,
+                    rate_site_indices=rate_site_indices,
+                    inst=inst,
+                    float_tol=float_tol,
+                )
+            branch_values, total_by_site = _get_expected_branch_projection_values(
+                parent_state=parent_state,
+                expected_state=expected_state,
+                sub_mode=sub_mode,
+                num_group=num_group,
+                num_state=num_state,
+                syn_indices_list=syn_indices_list,
+                selected=selected,
+            )
+            total += float(total_by_site.sum())
+            for stat, values in branch_values.items():
+                flat = values.T.reshape(-1)
+                nonzero = np.flatnonzero(flat != 0)
+                if nonzero.shape[0] > 0:
+                    row_payloads[stat][int(nl)] = (
+                        nonzero.astype(np.int32, copy=False),
+                        flat[nonzero].astype(np.float64, copy=False),
+                    )
+    except FloatingPointError:
+        if projector is None:
+            raise
+        fallback_g = dict(g)
+        fallback_g['expected_state_backend'] = 'expm'
+        warnings.warn(
+            'Tensor-free eigen reducer was numerically unstable; retrying with scipy.linalg.expm.',
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return _get_fused_expected_sparse_reducer(fallback_g, mode, selected)
+    projections = {}
+    for stat in selected:
+        stat_payloads = row_payloads.pop(stat)
+        projections[stat] = _finalize_expected_projection_rows(
+            row_payloads=stat_payloads,
+            num_branch=state.shape[0],
+            num_site=state.shape[1],
+            num_feature=_expected_projection_feature_count(stat, num_group, num_state),
+        )
+        del stat_payloads
+    storage = sum(substitution._sparse_matrix_nbytes(mat) for mat in projections.values())
+    print(
+        'Generated tensor-free expected projections: storage={:,} bytes, total={:,.6f}'.format(storage, total),
+        flush=True,
+    )
+    return {
+        'projections': projections,
+        'total': total,
+        'storage': storage,
+        'mode': mode,
+    }
+
+
 def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g, static_sub_sites=None, cb_site_overlap=None):
     E_b = np.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
     for i,sg,a,d in list_igad:
@@ -2623,61 +2869,59 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             cb['ECS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='mean', SN='S', g=g)
     elif expectation_method == 'codon_model':
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
-        if 'EN_tensor' not in g:
-            g['EN_tensor'] = _get_fused_expected_sparse_substitution_tensor(g=g, mode='nsy')
-            if g['EN_tensor'] is None:
-                state_nsyE = get_exp_state(g=g, mode='nsy')
-                g['EN_tensor'] = substitution.get_substitution_tensor(state_nsyE, g['state_nsy'], mode='asis', g=g, mmap_attr='EN')
-                del state_nsyE
+        if 'EN_reducer' not in g:
+            g['EN_reducer'] = _get_fused_expected_sparse_reducer(
+                g=g,
+                mode='nsy',
+                selected_base_stats=base_stats,
+            )
         else:
-            print('Reusing expected nonsynonymous substitution tensor.', flush=True)
+            print('Reusing expected nonsynonymous sparse projections.', flush=True)
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(substitution.get_total_substitution(g['EN_tensor'])))
+        print(txt.format(g['EN_reducer']['total']))
         print('Preparing the ECN table with up to {:,} process(es).'.format(g['threads']), flush=True)
-        cbEN = substitution.get_cb(
-            cb.loc[:,id_cols].values,
-            g['EN_tensor'],
-            g,
-            'ECN',
+        cbEN = substitution.get_cb_from_sparse_projections(
+            id_combinations=cb.loc[:, id_cols].values,
+            projections=g['EN_reducer']['projections'],
+            attr='ECN',
+            g=g,
             selected_base_stats=base_stats,
         )
         cb = table.merge_tables(cb, cbEN)
         del cbEN
         is_final_arity = int(g.get('current_arity', 0)) >= int(g.get('max_arity', 1))
         if is_final_arity:
-            en_tensor = g.pop('EN_tensor')
-            released_nbytes = substitution.clear_sparse_cb_projection_cache(en_tensor)
-            del en_tensor
+            released_nbytes = int(g['EN_reducer']['storage'])
+            del g['EN_reducer']
             print(
-                'Released final-arity EN tensor and {:,} bytes of projection cache.'.format(released_nbytes),
+                'Released final-arity EN sparse projections ({:,} bytes).'.format(released_nbytes),
                 flush=True,
             )
-        if 'ES_tensor' not in g:
-            g['ES_tensor'] = _get_fused_expected_sparse_substitution_tensor(g=g, mode='cdn')
-            if g['ES_tensor'] is None:
-                state_cdnE = get_exp_state(g=g, mode='cdn')
-                g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
-                del state_cdnE
+        if 'ES_reducer' not in g:
+            g['ES_reducer'] = _get_fused_expected_sparse_reducer(
+                g=g,
+                mode='cdn',
+                selected_base_stats=base_stats,
+            )
         else:
-            print('Reusing expected synonymous substitution tensor.', flush=True)
+            print('Reusing expected synonymous sparse projections.', flush=True)
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
-        print(txt.format(substitution.get_total_substitution(g['ES_tensor'])))
+        print(txt.format(g['ES_reducer']['total']))
         print('Preparing the ECS table with up to {:,} process(es).'.format(g['threads']), flush=True)
-        cbES = substitution.get_cb(
-            cb.loc[:,id_cols].values,
-            g['ES_tensor'],
-            g,
-            'ECS',
+        cbES = substitution.get_cb_from_sparse_projections(
+            id_combinations=cb.loc[:, id_cols].values,
+            projections=g['ES_reducer']['projections'],
+            attr='ECS',
+            g=g,
             selected_base_stats=base_stats,
         )
         cb = table.merge_tables(cb, cbES)
         del cbES
         if is_final_arity:
-            es_tensor = g.pop('ES_tensor')
-            released_nbytes = substitution.clear_sparse_cb_projection_cache(es_tensor)
-            del es_tensor
+            released_nbytes = int(g['ES_reducer']['storage'])
+            del g['ES_reducer']
             print(
-                'Released final-arity ES tensor and {:,} bytes of projection cache.'.format(released_nbytes),
+                'Released final-arity ES sparse projections ({:,} bytes).'.format(released_nbytes),
                 flush=True,
             )
     else:
@@ -3453,9 +3697,7 @@ def _calc_nbinom_count_matrix(
 def _get_mode_branch_site_mass(sub_tensor, mode, sg, a, d):
     if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
         if mode == 'spe2spe':
-            mat = sub_tensor.blocks.get((int(sg), int(a), int(d)), None)
-            if mat is None:
-                return np.zeros(shape=(sub_tensor.num_branch, sub_tensor.num_site), dtype=np.float64)
+            mat = sub_tensor.get_block(int(sg), int(a), int(d))
             return np.asarray(mat.toarray(), dtype=np.float64)
         if mode == 'spe2any':
             return np.asarray(sub_tensor.project_spe2any(int(sg), int(a)).toarray(), dtype=np.float64)

@@ -45,6 +45,61 @@ def _remap_site_column_to_alignment(df, g, column_name='site'):
     return out
 
 
+def _write_cbs_stream(id_combinations, OS_tensor, ON_tensor, g, output_path):
+    """Calculate and write cbs in bounded combination chunks."""
+    ids = np.asarray(id_combinations)
+    ids = np.sort(ids, axis=1)
+    if ids.shape[0] > 1:
+        sort_keys = tuple(ids[:, col] for col in reversed(range(ids.shape[1])))
+        ids = ids[np.lexsort(sort_keys), :]
+    num_site = int(OS_tensor.shape[1])
+    arity = int(ids.shape[1])
+    # OS, ON, and the merged table coexist briefly.  Keep their aggregate
+    # numeric payload near 64 MiB regardless of alignment length.
+    bytes_per_combo = max(1, num_site * (arity + 11) * 8 * 3)
+    target_bytes = int(g.get('_cbs_stream_target_bytes', 64 * 1024 * 1024))
+    chunk_size = max(1, target_bytes // bytes_per_combo)
+    peak_chunk_bytes = 0
+    wrote_header = False
+    for start in range(0, ids.shape[0], chunk_size):
+        stop = min(start + chunk_size, ids.shape[0])
+        id_chunk = ids[start:stop, :]
+        cbsOS = substitution.get_cbs(id_chunk, OS_tensor, attr='S', g=g)
+        cbsON = substitution.get_cbs(id_chunk, ON_tensor, attr='N', g=g)
+        cbs = table.merge_tables(cbsOS, cbsON)
+        live_chunk_bytes = sum(
+            int(frame.memory_usage(index=True, deep=True).sum())
+            for frame in (cbsOS, cbsON, cbs)
+        )
+        peak_chunk_bytes = max(peak_chunk_bytes, live_chunk_bytes)
+        cbs = _remap_site_column_to_alignment(df=cbs, g=g, column_name='site')
+        if bool(g.get('drop_invariant_tip_sites', False)):
+            cbs_group_cols = [col for col in cbs.columns.tolist() if str(col).startswith('branch_id_')]
+            cbs = parser_misc.expand_site_axis_table_to_alignment(
+                df=cbs,
+                g=g,
+                site_col='site',
+                group_cols=cbs_group_cols,
+                site_is_one_based=False,
+            )
+        cbs.to_csv(
+            output_path,
+            sep='\t',
+            index=False,
+            float_format=g['float_format'],
+            header=(not wrote_header),
+            mode='w' if not wrote_header else 'a',
+        )
+        wrote_header = True
+        print(
+            'Streamed cbs combinations {:,}-{:,}/{:,} (rows={:,})'.format(
+                start + 1, stop, ids.shape[0], cbs.shape[0]
+            ),
+            flush=True,
+        )
+    return peak_chunk_bytes
+
+
 def _plot_state_tree_in_directory(output_dir, state, orders, mode, g):
     if os.path.exists(output_dir):
         if os.path.isdir(output_dir):
@@ -723,24 +778,17 @@ def main_analyze(g):
         print("Generating cbs table", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, exhaustive=True, arity=g['current_arity'], check_attr="name")
-        cbsOS = substitution.get_cbs(id_combinations, OS_tensor, attr='S', g=g)
-        cbsON = substitution.get_cbs(id_combinations, ON_tensor, attr='N', g=g)
-        cbs = table.merge_tables(cbsOS, cbsON)
-        del cbsOS, cbsON
-        cbs = _remap_site_column_to_alignment(df=cbs, g=g, column_name='site')
-        if bool(g.get('drop_invariant_tip_sites', False)):
-            cbs_group_cols = [col for col in cbs.columns.tolist() if str(col).startswith('branch_id_')]
-            cbs = parser_misc.expand_site_axis_table_to_alignment(
-                df=cbs,
-                g=g,
-                site_col='site',
-                group_cols=cbs_group_cols,
-                site_is_one_based=False,
-            )
-        cbs.to_csv(runtime.output_path(g, "cbs.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
-        txt = 'Memory consumption of cbs table: {:,.1f} Mbytes (dtype={})'
-        print(txt.format(cbs.values.nbytes/1024/1024, cbs.values.dtype), flush=True)
-        del cbs
+        peak_chunk_bytes = _write_cbs_stream(
+            id_combinations=id_combinations,
+            OS_tensor=OS_tensor,
+            ON_tensor=ON_tensor,
+            g=g,
+            output_path=runtime.output_path(g, "cbs.tsv"),
+        )
+        print(
+            'Peak in-memory cbs chunk: {:,.1f} Mbytes'.format(peak_chunk_bytes / 1024 / 1024),
+            flush=True,
+        )
         elapsed_time = int(time.time() - start)
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 

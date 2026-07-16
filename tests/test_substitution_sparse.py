@@ -40,9 +40,10 @@ def test_dense_sparse_roundtrip_preserves_values_and_shape():
 def test_sparse_tensor_reports_payload_and_dense_storage_bytes():
     dense = _toy_dense_tensor()
     sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(dense)
-    expected_payload = sum(
-        mat.data.nbytes + mat.indices.nbytes + mat.indptr.nbytes
-        for mat in sparse_tensor.blocks.values()
+    expected_payload = (
+        sparse_tensor.matrix.data.nbytes
+        + sparse_tensor.matrix.indices.nbytes
+        + sparse_tensor.matrix.indptr.nbytes
     )
     assert sparse_tensor.nbytes == expected_payload
     assert sparse_tensor.dense_nbytes == dense.nbytes
@@ -748,15 +749,13 @@ def test_sub_tensor2cb_sparse_cython_fastpath_supports_spe2spe(monkeypatch):
     np.testing.assert_allclose(observed, expected, atol=1e-12)
 
 
-def test_sub_tensor2cb_sparse_cython_failure_warns_and_falls_back(monkeypatch):
-    if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
-        pytest.skip("Cython sparse-summary reducer fast path is unavailable")
+def test_sub_tensor2cb_sparse_projection_failure_warns_and_uses_bounded_fallback(monkeypatch):
     dense = _toy_reducer_tensor()
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
     ids = np.array([[2, 0], [1, 2]], dtype=np.int64)
     selected = ["any2any", "any2spe"]
 
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    monkeypatch.setattr(substitution, "_can_use_sparse_projection_product", lambda *args, **kwargs: False)
     expected = substitution.sub_tensor2cb_sparse(
         ids,
         sparse_tensor,
@@ -768,13 +767,13 @@ def test_sub_tensor2cb_sparse_cython_failure_warns_and_falls_back(monkeypatch):
     )
 
     monkeypatch.setattr(substitution, "_CYTHON_FALLBACK_WARNED", set())
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: True)
+    monkeypatch.setattr(substitution, "_can_use_sparse_projection_product", lambda *args, **kwargs: True)
 
-    def _raise_cython(*args, **kwargs):
-        raise RuntimeError("forced-sparse-fastpath-failure")
+    def _raise_projection(*args, **kwargs):
+        raise RuntimeError("forced-projection-failure")
 
-    monkeypatch.setattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2", _raise_cython)
-    with pytest.warns(RuntimeWarning, match='Cython fast path "sub_tensor2cb_sparse" failed'):
+    monkeypatch.setattr(substitution, "_calc_sparse_projection_products", _raise_projection)
+    with pytest.warns(RuntimeWarning, match='Sparse fast path "sub_tensor2cb_sparse_projection_product" failed'):
         observed = substitution.sub_tensor2cb_sparse(
             ids,
             sparse_tensor,
@@ -872,7 +871,7 @@ def test_resolve_dense_cython_n_jobs_allows_parallel_for_large_workload():
     assert out >= 2
 
 
-def test_sparse_group_tensor_cache_matches_uncached():
+def test_sparse_group_tensor_packed_path_ignores_legacy_block_cache():
     dense = _toy_reducer_tensor()
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
     ids = np.array([2, 0], dtype=np.int64)
@@ -893,7 +892,7 @@ def test_sparse_group_tensor_cache_matches_uncached():
         row_cache=row_cache,
     )
     np.testing.assert_allclose(cached, uncached, atol=1e-12)
-    assert len(row_cache) > 0
+    assert row_cache == {}
     assert substitution._get_sparse_group_block_index(sparse_tensor) is group_block_index
 
 

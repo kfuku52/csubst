@@ -385,6 +385,49 @@ def test_fused_expected_sparse_tensor_matches_materialized_path():
     np.testing.assert_allclose(fused.to_dense(), materialized.to_dense(), atol=1e-12, rtol=1e-12)
 
 
+@pytest.mark.parametrize("expected_state_backend", ["auto", "eigen", "expm"])
+def test_tensor_free_expected_reducer_matches_materialized_projections(expected_state_backend):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((max(labels.values()) + 1, 3, 2), dtype=np.float64)
+    state[labels["R"], :, :] = [[1.0, 0.0], [0.75, 0.25], [0.25, 0.75]]
+    state[labels["A"], :, :] = state[labels["R"], :, :]
+    state[labels["B"], :, :] = state[labels["R"], :, :]
+    g = {
+        "tree": tr,
+        "state_nsy": state,
+        "instantaneous_nsy_rate_matrix": np.array([[-0.6, 0.6], [0.4, -0.4]], dtype=np.float64),
+        "iqtree_rate_values": np.array([0.5, 1.0, 2.0], dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+        "threads": 1,
+        "expected_state_backend": expected_state_backend,
+        "ml_anc": False,
+    }
+    for node in tr.traverse():
+        if not ete.is_root(node):
+            ete.set_prop(node, "Ndist", 0.3)
+
+    reducer = omega._get_fused_expected_sparse_reducer(
+        g=g,
+        mode="nsy",
+        selected_base_stats=["any2any", "spe2any", "any2spe", "spe2spe"],
+    )
+    expected_state = omega.get_exp_state(g=g, mode="nsy")
+    materialized = substitution.get_substitution_tensor(
+        expected_state,
+        state,
+        mode="asis",
+        g=g,
+        mmap_attr="EN",
+    )
+
+    assert reducer["total"] == pytest.approx(substitution.get_total_substitution(materialized), abs=1e-12)
+    for stat, projection in reducer["projections"].items():
+        expected_projection = substitution._build_sparse_cb_projection(materialized, stat)
+        np.testing.assert_allclose(projection.toarray(), expected_projection.toarray(), atol=1e-12, rtol=1e-12)
+
+
 def test_get_exp_state_rejects_unknown_mode():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))

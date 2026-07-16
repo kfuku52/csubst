@@ -366,23 +366,17 @@ def extract_atomic_events(sub_tensor, min_event_pp=0.5, float_tol=1e-12):
     threshold = max(float(min_event_pp), float(float_tol))
     rows = []
     if _is_sparse_sub_tensor(sub_tensor):
-        for (_sg, anc, der), mat in sub_tensor.blocks.items():
-            if int(anc) == int(der):
-                continue
-            coo = mat.tocoo()
-            if coo.data.shape[0] == 0:
-                continue
-            keep = np.asarray(coo.data >= threshold, dtype=bool)
-            if not keep.any():
-                continue
+        branch, site, _sg, anc, der, event_pp = sub_tensor._coordinates()
+        keep = (anc != der) & np.asarray(event_pp >= threshold, dtype=bool)
+        if keep.any():
             rows.append(
                 pd.DataFrame(
                     {
-                        "branch_id": coo.row[keep].astype(np.int64, copy=False),
-                        "site": coo.col[keep].astype(np.int64, copy=False),
-                        "from_state_id": int(anc),
-                        "to_state_id": int(der),
-                        "event_pp": coo.data[keep].astype(np.float64, copy=False),
+                        "branch_id": branch[keep].astype(np.int64, copy=False),
+                        "site": site[keep].astype(np.int64, copy=False),
+                        "from_state_id": anc[keep].astype(np.int64, copy=False),
+                        "to_state_id": der[keep].astype(np.int64, copy=False),
+                        "event_pp": event_pp[keep].astype(np.float64, copy=False),
                     }
                 )
             )
@@ -444,9 +438,7 @@ def extract_candidate_posterior_events(sub_tensor, site, from_ids, to_ids, float
             if (int(der) < 0) or (int(der) >= num_to) or (int(anc) == int(der)):
                 continue
             if _is_sparse_sub_tensor(sub_tensor):
-                mat = sub_tensor.blocks.get((0, int(anc), int(der)), None)
-                if mat is None:
-                    continue
+                mat = sub_tensor.get_block(0, int(anc), int(der))
                 col = mat.getcol(site).tocoo()
                 if col.data.shape[0] == 0:
                     continue

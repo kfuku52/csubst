@@ -4,6 +4,8 @@ import pandas as pd
 import pytest
 
 from csubst import main_analyze
+from csubst import substitution
+from csubst import table
 from csubst import tree
 from csubst import ete
 
@@ -447,3 +449,32 @@ def test_resolve_epistasis_feature_matrix_falls_back_to_single():
     assert resolved == "single"
     assert features.shape == (3, 1)
     np.testing.assert_allclose(features[:, 0], np.array([-1.0, 0.0, 1.0], dtype=np.float64))
+
+
+def test_write_cbs_stream_matches_full_table_across_chunks(tmp_path):
+    os_tensor = np.zeros((4, 3, 1, 2, 2), dtype=np.float64)
+    on_tensor = np.zeros_like(os_tensor)
+    os_tensor[1, 0, 0, 0, 1] = 0.4
+    os_tensor[2, 0, 0, 0, 1] = 0.5
+    os_tensor[3, 1, 0, 1, 0] = 0.6
+    on_tensor[1, 0, 0, 0, 1] = 0.7
+    on_tensor[2, 0, 0, 0, 1] = 0.8
+    on_tensor[3, 1, 0, 1, 0] = 0.9
+    ids = np.array([[1, 2], [1, 3], [2, 3]], dtype=np.int64)
+    g = {
+        "threads": 1,
+        "float_format": "%.8f",
+        "drop_invariant_tip_sites": False,
+        "_cbs_stream_target_bytes": 1,
+    }
+    expected = table.merge_tables(
+        substitution.get_cbs(ids, os_tensor, attr="S", g=g),
+        substitution.get_cbs(ids, on_tensor, attr="N", g=g),
+    ).reset_index(drop=True)
+    output_path = tmp_path / "cbs.tsv"
+
+    peak_bytes = main_analyze._write_cbs_stream(ids, os_tensor, on_tensor, g, str(output_path))
+    observed = pd.read_csv(output_path, sep="\t")
+
+    assert peak_bytes > 0
+    pd.testing.assert_frame_equal(observed, expected, check_dtype=False, atol=1e-8, rtol=0)

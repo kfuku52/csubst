@@ -14,6 +14,7 @@ from csubst import parser_misc
 from csubst import runtime
 from csubst import sequence
 from csubst import substitution
+from csubst import substitution_sparse
 from csubst import tree
 from csubst import ete
 from csubst import variant_effect
@@ -1176,8 +1177,21 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     titles = ['Nonsynonymous substitution','Synonymous substitution']
     iter_items = zip(ax_cols,['nsy','syn'],[ON_tensor,OS_tensor],outfiles,colors,titles)
     for ax_col,mode,sub_tensor,outfile,color,title in iter_items:
-        sub_target = substitution.get_branches_sub_tensor(sub_tensor=sub_tensor, branch_ids=branch_ids)
-        sub_target_combinat = np.expand_dims(sub_target.prod(axis=0), axis=0)
+        if isinstance(sub_tensor, substitution_sparse.SparseSubstitutionTensor):
+            sub_target = substitution.aggregate_sparse_branches(
+                sub_tensor=sub_tensor,
+                branch_ids=branch_ids,
+                operation='sum',
+            )
+            sub_target_combinat = substitution.aggregate_sparse_branches(
+                sub_tensor=sub_tensor,
+                branch_ids=branch_ids,
+                operation='product',
+            )
+        else:
+            selected_tensor = substitution.get_branches_sub_tensor(sub_tensor=sub_tensor, branch_ids=branch_ids)
+            sub_target = np.expand_dims(selected_tensor.sum(axis=0), axis=0)
+            sub_target_combinat = np.expand_dims(selected_tensor.prod(axis=0), axis=0)
         df_ad = get_df_ad(sub_tensor=sub_tensor, g=g, mode=mode)
         df_ad_target = get_df_ad(sub_tensor=sub_target, g=g, mode=mode)
         df_ad_combinat = get_df_ad(sub_tensor=sub_target_combinat, g=g, mode=mode)
@@ -3159,9 +3173,9 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
         if ON_tensor is not None:
             bid = int(branch_id)
             if 0 <= bid < ON_tensor.shape[0]:
-                branch_tensor = substitution.get_branch_sub_tensor(sub_tensor=ON_tensor, branch_id=bid)
-                n_sub_prob = _get_set_stat_channels_from_branch_tensor(
-                    branch_tensor=branch_tensor,
+                n_sub_prob = substitution.get_branch_set_stat_channels(
+                    sub_tensor=ON_tensor,
+                    branch_id=bid,
                     set_stat_type=set_stat_type,
                 )
             else:
@@ -3196,10 +3210,10 @@ def add_set_mode_columns(df, g, ON_tensor=None, OS_tensor=None):
             if len(other_branch_ids) > 0:
                 other_prob_rows = []
                 for other_bid in other_branch_ids:
-                    other_tensor = substitution.get_branch_sub_tensor(sub_tensor=ON_tensor, branch_id=other_bid)
                     other_prob_rows.append(
-                        _get_set_stat_channels_from_branch_tensor(
-                            branch_tensor=other_tensor,
+                        substitution.get_branch_set_stat_channels(
+                            sub_tensor=ON_tensor,
+                            branch_id=other_bid,
                             set_stat_type=set_stat_type,
                         )
                     )

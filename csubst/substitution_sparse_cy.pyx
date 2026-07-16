@@ -11,6 +11,159 @@ ctypedef fused index_t:
 @cython.nonecheck(False)
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cpdef build_packed_sub_tensor_asis_double(
+    numpy.ndarray[numpy.float64_t, ndim=3] state_tensor,
+    numpy.ndarray[numpy.float64_t, ndim=3] state_tensor_anc,
+    numpy.ndarray[numpy.int64_t, ndim=2] branch_pairs,
+    long num_branch,
+):
+    """Build branch x (event*site) CSR arrays without Python entry maps."""
+    cdef Py_ssize_t num_pair = branch_pairs.shape[0]
+    cdef Py_ssize_t num_site = state_tensor.shape[1]
+    cdef Py_ssize_t num_state = state_tensor.shape[2]
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] indptr = numpy.zeros(num_branch + 1, dtype=numpy.int64)
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] row_counts = numpy.zeros(num_branch, dtype=numpy.int64)
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] cursor
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] indices
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] data
+    cdef const double[:, :, :] child_mv = state_tensor
+    cdef const double[:, :, :] parent_mv = state_tensor_anc
+    cdef const long[:, :] pairs_mv = branch_pairs
+    cdef long[:] indptr_mv = indptr
+    cdef long[:] counts_mv = row_counts
+    cdef long[:] cursor_mv
+    cdef long[:] indices_mv
+    cdef double[:] data_mv
+    cdef Py_ssize_t p, site, a, d, pos, nnz
+    cdef long child, parent, event_id
+    cdef double value
+
+    for p in range(num_pair):
+        child = pairs_mv[p, 0]
+        parent = pairs_mv[p, 1]
+        for a in range(num_state):
+            for d in range(num_state):
+                if a == d:
+                    continue
+                for site in range(num_site):
+                    value = parent_mv[parent, site, a] * child_mv[child, site, d]
+                    if value != 0.0:
+                        counts_mv[child] += 1
+    for child in range(num_branch):
+        indptr_mv[child + 1] = indptr_mv[child] + counts_mv[child]
+    nnz = indptr_mv[num_branch]
+    indices = numpy.empty(nnz, dtype=numpy.int64)
+    data = numpy.empty(nnz, dtype=numpy.float64)
+    cursor = indptr[0:num_branch].copy()
+    indices_mv = indices
+    data_mv = data
+    cursor_mv = cursor
+    for p in range(num_pair):
+        child = pairs_mv[p, 0]
+        parent = pairs_mv[p, 1]
+        for a in range(num_state):
+            for d in range(num_state):
+                if a == d:
+                    continue
+                event_id = a * num_state + d
+                for site in range(num_site):
+                    value = parent_mv[parent, site, a] * child_mv[child, site, d]
+                    if value != 0.0:
+                        pos = cursor_mv[child]
+                        indices_mv[pos] = event_id * num_site + site
+                        data_mv[pos] = value
+                        cursor_mv[child] = pos + 1
+    return data, indices, indptr
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef build_packed_sub_tensor_syn_double(
+    numpy.ndarray[numpy.float64_t, ndim=3] state_tensor,
+    numpy.ndarray[numpy.float64_t, ndim=3] state_tensor_anc,
+    numpy.ndarray[numpy.int64_t, ndim=2] branch_pairs,
+    numpy.ndarray[numpy.int64_t, ndim=2] state_indices,
+    long num_branch,
+):
+    """Two-pass packed CSR builder for synonymous substitution groups."""
+    cdef Py_ssize_t num_pair = branch_pairs.shape[0]
+    cdef Py_ssize_t num_site = state_tensor.shape[1]
+    cdef Py_ssize_t num_group = state_indices.shape[0]
+    cdef Py_ssize_t num_state = state_indices.shape[1]
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] indptr = numpy.zeros(num_branch + 1, dtype=numpy.int64)
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] row_counts = numpy.zeros(num_branch, dtype=numpy.int64)
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] cursor
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] indices
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] data
+    cdef const double[:, :, :] child_mv = state_tensor
+    cdef const double[:, :, :] parent_mv = state_tensor_anc
+    cdef const long[:, :] pairs_mv = branch_pairs
+    cdef const long[:, :] states_mv = state_indices
+    cdef long[:] indptr_mv = indptr
+    cdef long[:] counts_mv = row_counts
+    cdef long[:] cursor_mv
+    cdef long[:] indices_mv
+    cdef double[:] data_mv
+    cdef Py_ssize_t p, site, sg, a, d, pos, nnz
+    cdef long child, parent, source_a, source_d, event_id
+    cdef double value
+
+    for p in range(num_pair):
+        child = pairs_mv[p, 0]
+        parent = pairs_mv[p, 1]
+        for sg in range(num_group):
+            for a in range(num_state):
+                source_a = states_mv[sg, a]
+                if source_a < 0:
+                    continue
+                for d in range(num_state):
+                    if a == d:
+                        continue
+                    source_d = states_mv[sg, d]
+                    if source_d < 0:
+                        continue
+                    for site in range(num_site):
+                        value = parent_mv[parent, site, source_a] * child_mv[child, site, source_d]
+                        if value != 0.0:
+                            counts_mv[child] += 1
+    for child in range(num_branch):
+        indptr_mv[child + 1] = indptr_mv[child] + counts_mv[child]
+    nnz = indptr_mv[num_branch]
+    indices = numpy.empty(nnz, dtype=numpy.int64)
+    data = numpy.empty(nnz, dtype=numpy.float64)
+    cursor = indptr[0:num_branch].copy()
+    indices_mv = indices
+    data_mv = data
+    cursor_mv = cursor
+    for p in range(num_pair):
+        child = pairs_mv[p, 0]
+        parent = pairs_mv[p, 1]
+        for sg in range(num_group):
+            for a in range(num_state):
+                source_a = states_mv[sg, a]
+                if source_a < 0:
+                    continue
+                for d in range(num_state):
+                    if a == d:
+                        continue
+                    source_d = states_mv[sg, d]
+                    if source_d < 0:
+                        continue
+                    event_id = (sg * num_state + a) * num_state + d
+                    for site in range(num_site):
+                        value = parent_mv[parent, site, source_a] * child_mv[child, site, source_d]
+                        if value != 0.0:
+                            pos = cursor_mv[child]
+                            indices_mv[pos] = event_id * num_site + site
+                            data_mv[pos] = value
+                            cursor_mv[child] = pos + 1
+    return data, indices, indptr
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cpdef dense_block_to_csr_arrays_double(
     numpy.ndarray[numpy.float64_t, ndim=2] block,
     double tol,
