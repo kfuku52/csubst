@@ -41,8 +41,8 @@ def test_normalize_scan_matches_all_expands_to_nine_classes():
     ]
 
 
-def test_normalize_scan_unit_mode_defaults_to_lineage_and_rejects_unknown_values():
-    assert substitution_scan.normalize_scan_unit_mode(None) == "lineage"
+def test_normalize_scan_unit_mode_defaults_to_clade_and_rejects_unknown_values():
+    assert substitution_scan.normalize_scan_unit_mode(None) == "clade"
     assert substitution_scan.normalize_scan_unit_mode(" STEM ") == "stem"
     assert substitution_scan.normalize_scan_unit_mode("clade") == "clade"
     with pytest.raises(ValueError, match="scan_unit_mode"):

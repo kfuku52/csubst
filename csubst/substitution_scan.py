@@ -167,7 +167,7 @@ def normalize_scan_matches(value):
 
 
 def normalize_scan_unit_mode(value):
-    value_txt = "lineage" if value is None else str(value).strip().lower()
+    value_txt = "clade" if value is None else str(value).strip().lower()
     if value_txt not in SCAN_UNIT_MODES:
         txt = "--scan_unit_mode should be one of {}."
         raise ValueError(txt.format(", ".join(SCAN_UNIT_MODES)))
@@ -634,7 +634,7 @@ def build_scan_units(g, branch_meta):
     rows = []
     valid_branches = set(branch_meta["branch_id"].astype(int).tolist())
     node_by_id = _node_by_branch_id(g)
-    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage"))
+    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
     for trait_name in g["fg_df"].columns[1:].tolist():
         groups = _lineage_component_groups(
             g=g,
@@ -763,7 +763,7 @@ def _unit_sister_branch_ids(g, fg_branch_ids, all_fg_branch_ids, node_by_id):
 
 def _selected_stem_fg_branch_ids(g, trait_cache, stem_index):
     stem_index = int(stem_index)
-    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage"))
+    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
     if (unit_mode == "stem") or (
         (unit_mode == "lineage") and bool(g.get("fg_stem_only", False))
     ):
@@ -846,7 +846,7 @@ def _build_permuted_trait_context(
     stem_indices = np.where(stem_flags)[0].astype(np.int64, copy=False)
     valid_set = set(int(v) for v in np.asarray(valid_branch_ids, dtype=np.int64).reshape(-1).tolist())
     node_by_id = _node_by_branch_id(g)
-    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage"))
+    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
     selected_components = []
     for stem_index in stem_indices.tolist():
         fg_ids = _selected_stem_fg_branch_ids(g=g, trait_cache=trait_cache, stem_index=stem_index)
@@ -2002,7 +2002,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     "to_state_distribution": cand["to_state_distribution"],
                     "state_change": state_change,
                     "candidate_event_pp_sum": float(cand["candidate_event_pp_sum"]),
-                    "scan_unit_mode": normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage")),
+                    "scan_unit_mode": normalize_scan_unit_mode(g.get("scan_unit_mode", "clade")),
                     "scan_min_support_count": int(min_support_count),
                     "scan_min_event_pp": float(min_event_pp),
                     "scan_rate_length_used": rate_length,

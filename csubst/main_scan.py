@@ -88,7 +88,7 @@ def main_scan(g):
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
     _require_foreground(g)
-    unit_mode = substitution_scan.normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage"))
+    unit_mode = substitution_scan.normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
     if unit_mode == "stem":
         g["fg_stem_only"] = True
     elif unit_mode == "clade":

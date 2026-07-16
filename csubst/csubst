@@ -543,7 +543,7 @@ def _add_search_subcommand_args(parser, show_advanced=False):
 
 
 def _add_scan_subcommand_args(parser, show_advanced=False):
-    parser.add_argument('--scan_unit_mode', metavar='lineage|stem|clade', default='lineage', type=str,
+    parser.add_argument('--scan_unit_mode', metavar='lineage|stem|clade', default='clade', type=str,
                         choices=['lineage', 'stem', 'clade'],
                         help='default=%(default)s: Definition of independent foreground support units. '
                              '"lineage" uses each nonzero lineage ID in --foreground as one unit and follows '

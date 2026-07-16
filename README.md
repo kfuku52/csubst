@@ -132,7 +132,7 @@ csubst scan \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt \
-  --scan_unit_mode lineage \
+  --scan_unit_mode clade \
   --scan_other_scope all \
   --scan_rate_event_mode posterior_sum \
   --scan_rate_exposure q_weighted \
