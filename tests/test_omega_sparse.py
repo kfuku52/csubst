@@ -428,6 +428,57 @@ def test_tensor_free_expected_reducer_matches_materialized_projections(expected_
         np.testing.assert_allclose(projection.toarray(), expected_projection.toarray(), atol=1e-12, rtol=1e-12)
 
 
+def test_expected_projection_cython_payloads_match_synonymous_dense_layout():
+    if omega.omega_cy is None or not hasattr(
+        omega.omega_cy,
+        "build_expected_projection_rows_double",
+    ):
+        pytest.skip("Cython expected projection-row builder is unavailable")
+    parent = np.array(
+        [[0.6, 0.4, 0.0, 0.0], [0.1, 0.2, 0.3, 0.4]],
+        dtype=np.float64,
+    )
+    child = np.array(
+        [[0.3, 0.7, 0.0, 0.0], [0.4, 0.3, 0.2, 0.1]],
+        dtype=np.float64,
+    )
+    groups = [np.array([0, 1], dtype=np.int64), np.array([2, 3], dtype=np.int64)]
+    selected = ["any2any", "spe2any", "any2spe", "spe2spe"]
+    state_indices = omega._build_expected_projection_state_indices(
+        sub_mode="syn",
+        num_group=2,
+        num_state=2,
+        syn_indices_list=groups,
+    )
+    payloads, total = omega._get_expected_branch_projection_payloads(
+        parent_state=parent,
+        expected_state=child,
+        sub_mode="syn",
+        num_group=2,
+        num_state=2,
+        syn_indices_list=groups,
+        state_indices=state_indices,
+        selected=selected,
+    )
+    dense_values, total_by_site = omega._get_expected_branch_projection_values(
+        parent_state=parent,
+        expected_state=child,
+        sub_mode="syn",
+        num_group=2,
+        num_state=2,
+        syn_indices_list=groups,
+        selected=selected,
+    )
+    assert total == pytest.approx(total_by_site.sum(), abs=1e-12)
+    for stat in selected:
+        expected = dense_values[stat].T.reshape(-1)
+        observed = np.zeros_like(expected)
+        if stat in payloads:
+            indices, data = payloads[stat]
+            observed[indices] = data
+        np.testing.assert_allclose(observed, expected, atol=1e-12, rtol=1e-12)
+
+
 def test_get_exp_state_rejects_unknown_mode():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))

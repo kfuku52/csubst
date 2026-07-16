@@ -728,7 +728,10 @@ def main_analyze(g):
         start = time.time()
         print("Generating b table", flush=True)
         bOS = substitution.get_b(g=g, sub_tensor=OS_tensor, attr='S', sitewise=False)
-        bON = substitution.get_b(g=g, sub_tensor=ON_tensor, attr='N', sitewise=True)
+        # N_sitewise is only part of the optional b.tsv output.  The cb
+        # reducer needs branch totals but never consumes the formatted event
+        # strings, so avoid scanning every packed row when --b no.
+        bON = substitution.get_b(g=g, sub_tensor=ON_tensor, attr='N', sitewise=bool(g['b']))
         b = table.merge_tables(bOS, bON)
         b = _annotate_branch_length_column(b=b, tree_obj=g['tree'])
         txt = 'Number of {} patterns among {:,} branches={:,}, min={:,.1f}, max={:,.1f}'

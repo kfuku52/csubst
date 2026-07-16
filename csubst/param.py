@@ -14,7 +14,7 @@ from csubst.__init__ import __version__
 from csubst import output_stat
 from csubst import pseudocount
 from csubst import randomness
-from csubst import recoding
+from csubst import recoding_config
 from csubst import runtime
 from csubst import table
 
@@ -217,7 +217,7 @@ def get_global_parameters(args):
             g['alignment_file'] = str(g['alignment_file']).strip()
     raw_recode_token = str(g.get('nonsyn_recode', 'no')).strip()
     try:
-        raw_recode_normalized = recoding.normalize_nonsyn_recode(raw_recode_token)
+        raw_recode_normalized = recoding_config.normalize_nonsyn_recode(raw_recode_token)
     except ValueError:
         raw_recode_normalized = None
     if raw_recode_normalized == '3di20':
@@ -834,7 +834,7 @@ def get_global_parameters(args):
             raise ValueError('--threads should be >= 1.')
         set_num_thread_variables(num_thread=g['threads'])
     if 'nonsyn_recode' in g.keys():
-        g['nonsyn_recode'] = recoding.normalize_nonsyn_recode(g['nonsyn_recode'])
+        g['nonsyn_recode'] = recoding_config.normalize_nonsyn_recode(g['nonsyn_recode'])
     else:
         g['nonsyn_recode'] = 'no'
     if 'sa_asr_mode' in g.keys():

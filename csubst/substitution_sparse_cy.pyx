@@ -630,6 +630,83 @@ cpdef update_sitewise_max_from_csr_row_double(
 @cython.nonecheck(False)
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cpdef scan_packed_sitewise_max_row_double(
+    numpy.ndarray[index_t, ndim=1] packed_indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+    long num_site,
+    long num_state_from,
+    long num_state_to,
+    double min_sitewise_pp,
+):
+    cdef Py_ssize_t nnz = packed_indices.shape[0]
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] max_prob
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] max_a
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] max_d
+    cdef numpy.ndarray[numpy.uint8_t, ndim=1] seen
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] site_idx
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] anc_idx
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] der_idx
+    cdef double[:] prob_mv
+    cdef long[:] max_a_mv
+    cdef long[:] max_d_mv
+    cdef unsigned char[:] seen_mv
+    cdef long[:] site_mv
+    cdef long[:] anc_mv
+    cdef long[:] der_mv
+    cdef Py_ssize_t k, out_count
+    cdef long packed_col, event_id, site, a, d
+    cdef double value
+    if data.shape[0] != nnz:
+        raise ValueError('packed_indices and data should have identical length.')
+    if num_site < 1 or num_state_from < 1 or num_state_to < 1:
+        raise ValueError('Packed tensor dimensions should be positive.')
+    max_prob = numpy.zeros(num_site, dtype=numpy.float64)
+    max_a = numpy.full(num_site, -1, dtype=numpy.int64)
+    max_d = numpy.full(num_site, -1, dtype=numpy.int64)
+    seen = numpy.zeros(num_site, dtype=numpy.uint8)
+    prob_mv = max_prob
+    max_a_mv = max_a
+    max_d_mv = max_d
+    seen_mv = seen
+    for k in range(nnz):
+        packed_col = packed_indices[k]
+        if packed_col < 0:
+            raise IndexError('Packed substitution column should be nonnegative.')
+        site = packed_col % num_site
+        event_id = packed_col // num_site
+        d = event_id % num_state_to
+        a = (event_id // num_state_to) % num_state_from
+        value = data[k]
+        if not isfinite(value):
+            continue
+        if (seen_mv[site] == 0) or (value > prob_mv[site]):
+            prob_mv[site] = value
+            max_a_mv[site] = a
+            max_d_mv[site] = d
+        seen_mv[site] = 1
+    site_idx = numpy.empty(num_site, dtype=numpy.int64)
+    anc_idx = numpy.empty(num_site, dtype=numpy.int64)
+    der_idx = numpy.empty(num_site, dtype=numpy.int64)
+    site_mv = site_idx
+    anc_mv = anc_idx
+    der_mv = der_idx
+    out_count = 0
+    for site in range(num_site):
+        if (seen_mv[site] != 0) and (prob_mv[site] >= min_sitewise_pp):
+            site_mv[out_count] = site
+            anc_mv[out_count] = max_a_mv[site]
+            der_mv[out_count] = max_d_mv[site]
+            out_count += 1
+    return (
+        numpy.asarray(site_idx[:out_count]),
+        numpy.asarray(anc_idx[:out_count]),
+        numpy.asarray(der_idx[:out_count]),
+    )
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cpdef scan_sitewise_max_indices_double(
     numpy.ndarray[numpy.float64_t, ndim=4] branch_tensor,
     double min_sitewise_pp,

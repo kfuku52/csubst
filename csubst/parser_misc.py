@@ -8,12 +8,13 @@ import pkgutil
 import re
 import sys
 import tempfile
+from collections import OrderedDict
 
 from csubst import genetic_code
 from csubst import foreground
 from csubst import sequence
 from csubst import parser_iqtree
-from csubst import recoding
+from csubst import recoding_config
 from csubst import resource_cache
 from csubst import runtime
 from csubst import structural_alphabet
@@ -24,8 +25,46 @@ _THREEDI_STATE_CACHE_FORMAT_VERSION = 2
 
 
 def _initialize_and_report_nonsyn_recode(g):
-    g = recoding.initialize_nonsyn_groups(g)
+    recode = recoding_config.normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
+    g["nonsyn_recode"] = recode
     write_pca = bool(g.get("plot_nonsyn_recode_pca", False))
+    if (recode in ["no", "3di20"]) and (not write_pca):
+        required_keys = ["amino_acid_orders", "synonymous_indices", "matrix_groups"]
+        missing_keys = [key for key in required_keys if key not in g]
+        if len(missing_keys) > 0:
+            txt = "Missing required key(s) for nonsynonymous recoding initialization: {}"
+            raise ValueError(txt.format(", ".join(missing_keys)))
+        state_orders = [str(aa) for aa in g["amino_acid_orders"]]
+        index_map = OrderedDict()
+        codon_map = OrderedDict()
+        members = OrderedDict()
+        aa_to_state = OrderedDict()
+        for aa in state_orders:
+            index_map[aa] = np.asarray(g["synonymous_indices"][aa], dtype=np.int64).reshape(-1).tolist()
+            codon_map[aa] = [str(c) for c in g["matrix_groups"][aa]]
+            members[aa] = (aa,)
+            aa_to_state[aa] = aa
+        if len(state_orders) == 0:
+            raise ValueError("No nonsynonymous recoding states were generated.")
+        g["nonsyn_state_orders"] = np.array(state_orders, dtype=object)
+        g["nonsynonymous_indices"] = index_map
+        g["nonsyn_matrix_groups"] = codon_map
+        g["nonsyn_state_members"] = members
+        g["nonsyn_aa_to_state"] = aa_to_state
+        g["max_nonsynonymous_size"] = max(len(index_map[state]) for state in state_orders)
+        if recode == "3di20":
+            print("Applying nonsynonymous recoding scheme: 3di20")
+            txt = "3Di mode: --sa_asr_mode={}, ProstT5 model={}, direct IQ-TREE model={} (--seqtype MORPH)"
+            print(
+                txt.format(
+                    g.get("sa_asr_mode", "direct"),
+                    g.get("prostt5_model", "Rostlab/ProstT5"),
+                    g.get("sa_iqtree_model", "GTR"),
+                )
+            )
+        return g
+    from csubst import recoding
+    g = recoding.initialize_nonsyn_groups(g)
     if g["nonsyn_recode"] != "no":
         txt = "Applying nonsynonymous recoding scheme: {}"
         print(txt.format(g["nonsyn_recode"]))

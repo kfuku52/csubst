@@ -82,6 +82,198 @@ cpdef project_expected_state_block_double(
 @cython.nonecheck(False)
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cpdef build_expected_projection_rows_double(
+    numpy.ndarray[numpy.float64_t, ndim=2] parent_state,
+    numpy.ndarray[numpy.float64_t, ndim=2] expected_state,
+    numpy.ndarray[numpy.int64_t, ndim=2] state_indices,
+    long num_state,
+    bint need_any2any,
+    bint need_spe2any,
+    bint need_any2spe,
+    bint need_spe2spe,
+):
+    """Build feature-major sparse projection rows without dense intermediates."""
+    cdef Py_ssize_t num_site = parent_state.shape[0]
+    cdef Py_ssize_t source_state = parent_state.shape[1]
+    cdef Py_ssize_t num_group = state_indices.shape[0]
+    cdef Py_ssize_t max_group_size = state_indices.shape[1]
+    cdef double[:, :] parent_mv = parent_state
+    cdef double[:, :] expected_mv = expected_state
+    cdef long[:, :] state_index_mv = state_indices
+    cdef Py_ssize_t site, sg, a, d, size
+    cdef Py_ssize_t source_a, source_d
+    cdef Py_ssize_t count_any = 0
+    cdef Py_ssize_t count_from = 0
+    cdef Py_ssize_t count_to = 0
+    cdef Py_ssize_t count_pair = 0
+    cdef Py_ssize_t pos_any = 0
+    cdef Py_ssize_t pos_from = 0
+    cdef Py_ssize_t pos_to = 0
+    cdef Py_ssize_t pos_pair = 0
+    cdef double parent_sum, child_sum, diagonal, value, total = 0.0
+    cdef numpy.ndarray[numpy.int32_t, ndim=1] any_indices
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] any_data
+    cdef numpy.ndarray[numpy.int32_t, ndim=1] from_indices
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] from_data
+    cdef numpy.ndarray[numpy.int32_t, ndim=1] to_indices
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] to_data
+    cdef numpy.ndarray[numpy.int32_t, ndim=1] pair_indices
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] pair_data
+    cdef int[:] any_indices_mv
+    cdef double[:] any_data_mv
+    cdef int[:] from_indices_mv
+    cdef double[:] from_data_mv
+    cdef int[:] to_indices_mv
+    cdef double[:] to_data_mv
+    cdef int[:] pair_indices_mv
+    cdef double[:] pair_data_mv
+    cdef long long feature
+    cdef long long packed_col
+
+    if expected_state.shape[0] != num_site or expected_state.shape[1] != source_state:
+        raise ValueError('parent_state and expected_state shape mismatch.')
+    if num_state <= 0:
+        raise ValueError('num_state should be positive.')
+
+    # Count exact output sizes first. This repeats cheap arithmetic, but avoids
+    # allocating dense site-by-feature arrays (especially for spe2spe).
+    for sg in range(num_group):
+        size = 0
+        while size < max_group_size and state_index_mv[sg, size] >= 0:
+            if state_index_mv[sg, size] >= source_state:
+                raise ValueError('state_indices contain an out-of-range state ID.')
+            size += 1
+        if size <= 1:
+            continue
+        for site in range(num_site):
+            parent_sum = 0.0
+            child_sum = 0.0
+            diagonal = 0.0
+            for a in range(size):
+                source_a = state_index_mv[sg, a]
+                parent_sum += parent_mv[site, source_a]
+                child_sum += expected_mv[site, source_a]
+                diagonal += parent_mv[site, source_a] * expected_mv[site, source_a]
+            value = parent_sum * child_sum - diagonal
+            total += value
+            if need_any2any and value != 0.0:
+                count_any += 1
+            if need_spe2any:
+                for a in range(size):
+                    source_a = state_index_mv[sg, a]
+                    value = parent_mv[site, source_a] * (child_sum - expected_mv[site, source_a])
+                    if value != 0.0:
+                        count_from += 1
+            if need_any2spe:
+                for d in range(size):
+                    source_d = state_index_mv[sg, d]
+                    value = expected_mv[site, source_d] * (parent_sum - parent_mv[site, source_d])
+                    if value != 0.0:
+                        count_to += 1
+            if need_spe2spe:
+                for a in range(size):
+                    source_a = state_index_mv[sg, a]
+                    for d in range(size):
+                        if a == d:
+                            continue
+                        source_d = state_index_mv[sg, d]
+                        value = parent_mv[site, source_a] * expected_mv[site, source_d]
+                        if value != 0.0:
+                            count_pair += 1
+
+    any_indices = numpy.empty(count_any, dtype=numpy.int32)
+    any_data = numpy.empty(count_any, dtype=numpy.float64)
+    from_indices = numpy.empty(count_from, dtype=numpy.int32)
+    from_data = numpy.empty(count_from, dtype=numpy.float64)
+    to_indices = numpy.empty(count_to, dtype=numpy.int32)
+    to_data = numpy.empty(count_to, dtype=numpy.float64)
+    pair_indices = numpy.empty(count_pair, dtype=numpy.int32)
+    pair_data = numpy.empty(count_pair, dtype=numpy.float64)
+    any_indices_mv = any_indices
+    any_data_mv = any_data
+    from_indices_mv = from_indices
+    from_data_mv = from_data
+    to_indices_mv = to_indices
+    to_data_mv = to_data
+    pair_indices_mv = pair_indices
+    pair_data_mv = pair_data
+
+    for sg in range(num_group):
+        size = 0
+        while size < max_group_size and state_index_mv[sg, size] >= 0:
+            size += 1
+        if size <= 1:
+            continue
+        for site in range(num_site):
+            parent_sum = 0.0
+            child_sum = 0.0
+            diagonal = 0.0
+            for a in range(size):
+                source_a = state_index_mv[sg, a]
+                parent_sum += parent_mv[site, source_a]
+                child_sum += expected_mv[site, source_a]
+                diagonal += parent_mv[site, source_a] * expected_mv[site, source_a]
+            value = parent_sum * child_sum - diagonal
+            if need_any2any and value != 0.0:
+                feature = sg
+                packed_col = feature * num_site + site
+                if packed_col > 2147483647:
+                    raise OverflowError('Expected projection column exceeds int32 range.')
+                any_indices_mv[pos_any] = <int>packed_col
+                any_data_mv[pos_any] = value
+                pos_any += 1
+            if need_spe2any:
+                for a in range(size):
+                    source_a = state_index_mv[sg, a]
+                    value = parent_mv[site, source_a] * (child_sum - expected_mv[site, source_a])
+                    if value != 0.0:
+                        feature = sg * num_state + a
+                        packed_col = feature * num_site + site
+                        if packed_col > 2147483647:
+                            raise OverflowError('Expected projection column exceeds int32 range.')
+                        from_indices_mv[pos_from] = <int>packed_col
+                        from_data_mv[pos_from] = value
+                        pos_from += 1
+            if need_any2spe:
+                for d in range(size):
+                    source_d = state_index_mv[sg, d]
+                    value = expected_mv[site, source_d] * (parent_sum - parent_mv[site, source_d])
+                    if value != 0.0:
+                        feature = sg * num_state + d
+                        packed_col = feature * num_site + site
+                        if packed_col > 2147483647:
+                            raise OverflowError('Expected projection column exceeds int32 range.')
+                        to_indices_mv[pos_to] = <int>packed_col
+                        to_data_mv[pos_to] = value
+                        pos_to += 1
+            if need_spe2spe:
+                for a in range(size):
+                    source_a = state_index_mv[sg, a]
+                    for d in range(size):
+                        if a == d:
+                            continue
+                        source_d = state_index_mv[sg, d]
+                        value = parent_mv[site, source_a] * expected_mv[site, source_d]
+                        if value != 0.0:
+                            feature = sg * num_state * num_state + a * num_state + d
+                            packed_col = feature * num_site + site
+                            if packed_col > 2147483647:
+                                raise OverflowError('Expected projection column exceeds int32 range.')
+                            pair_indices_mv[pos_pair] = <int>packed_col
+                            pair_data_mv[pos_pair] = value
+                            pos_pair += 1
+    return (
+        any_indices, any_data,
+        from_indices, from_data,
+        to_indices, to_data,
+        pair_indices, pair_data,
+        total,
+    )
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cpdef calc_tmp_E_sum_double(
     numpy.ndarray[numpy.int64_t, ndim=2] cb_ids,
     numpy.ndarray[numpy.float64_t, ndim=2] sub_sites,

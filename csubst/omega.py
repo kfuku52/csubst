@@ -5,7 +5,6 @@
 #    my_class.wait()
 
 import numpy as np
-import scipy.stats as stats
 import scipy.sparse as sp
 from scipy.linalg import expm
 
@@ -2344,6 +2343,80 @@ def _get_expected_branch_projection_values(
     return out, total_by_site
 
 
+def _build_expected_projection_state_indices(sub_mode, num_group, num_state, syn_indices_list):
+    if sub_mode == 'asis':
+        return np.arange(num_state, dtype=np.int64).reshape(1, num_state)
+    state_indices = np.full((num_group, num_state), -1, dtype=np.int64)
+    for sg, indices in enumerate(syn_indices_list):
+        indices = np.asarray(indices, dtype=np.int64).reshape(-1)
+        if indices.shape[0] > num_state:
+            raise ValueError('A synonymous state group is larger than max_synonymous_size.')
+        state_indices[sg, :indices.shape[0]] = indices
+    return state_indices
+
+
+def _get_expected_branch_projection_payloads(
+    parent_state,
+    expected_state,
+    sub_mode,
+    num_group,
+    num_state,
+    syn_indices_list,
+    state_indices,
+    selected,
+):
+    """Return packed CSR row payloads without materializing dense projections."""
+    cython_fn = None if omega_cy is None else getattr(
+        omega_cy,
+        'build_expected_projection_rows_double',
+        None,
+    )
+    if cython_fn is not None:
+        try:
+            rows = cython_fn(
+                np.ascontiguousarray(parent_state, dtype=np.float64),
+                np.ascontiguousarray(expected_state, dtype=np.float64),
+                np.ascontiguousarray(state_indices, dtype=np.int64),
+                int(num_state),
+                'any2any' in selected,
+                'spe2any' in selected,
+                'any2spe' in selected,
+                'spe2spe' in selected,
+            )
+            arrays = {
+                'any2any': (rows[0], rows[1]),
+                'spe2any': (rows[2], rows[3]),
+                'any2spe': (rows[4], rows[5]),
+                'spe2spe': (rows[6], rows[7]),
+            }
+            return {
+                stat: arrays[stat]
+                for stat in selected
+                if arrays[stat][0].shape[0] > 0
+            }, float(rows[8])
+        except Exception as exc:
+            _warn_cython_fallback('expected_projection_rows', exc)
+    branch_values, total_by_site = _get_expected_branch_projection_values(
+        parent_state=parent_state,
+        expected_state=expected_state,
+        sub_mode=sub_mode,
+        num_group=num_group,
+        num_state=num_state,
+        syn_indices_list=syn_indices_list,
+        selected=selected,
+    )
+    payloads = {}
+    for stat, values in branch_values.items():
+        flat = values.T.reshape(-1)
+        nonzero = np.flatnonzero(flat != 0)
+        if nonzero.shape[0] > 0:
+            payloads[stat] = (
+                nonzero.astype(np.int32, copy=False),
+                flat[nonzero].astype(np.float64, copy=False),
+            )
+    return payloads, float(total_by_site.sum())
+
+
 def _project_expected_branch_expm(
     parent_state,
     branch_length,
@@ -2451,6 +2524,12 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
         flush=True,
     )
     row_payloads = {stat: {} for stat in selected}
+    state_indices = _build_expected_projection_state_indices(
+        sub_mode=sub_mode,
+        num_group=num_group,
+        num_state=num_state,
+        syn_indices_list=syn_indices_list,
+    )
     total = 0.0
     cached_parent_nl = None
     parent_eigen_state = None
@@ -2477,24 +2556,19 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
                     inst=inst,
                     float_tol=float_tol,
                 )
-            branch_values, total_by_site = _get_expected_branch_projection_values(
+            branch_payloads, branch_total = _get_expected_branch_projection_payloads(
                 parent_state=parent_state,
                 expected_state=expected_state,
                 sub_mode=sub_mode,
                 num_group=num_group,
                 num_state=num_state,
                 syn_indices_list=syn_indices_list,
+                state_indices=state_indices,
                 selected=selected,
             )
-            total += float(total_by_site.sum())
-            for stat, values in branch_values.items():
-                flat = values.T.reshape(-1)
-                nonzero = np.flatnonzero(flat != 0)
-                if nonzero.shape[0] > 0:
-                    row_payloads[stat][int(nl)] = (
-                        nonzero.astype(np.int32, copy=False),
-                        flat[nonzero].astype(np.float64, copy=False),
-                    )
+            total += branch_total
+            for stat, payload in branch_payloads.items():
+                row_payloads[stat][int(nl)] = payload
     except FloatingPointError:
         if projector is None:
             raise
@@ -3076,6 +3150,9 @@ def _calc_raw_omega(dNc, dSc, float_tol):
 
 
 def _calibrate_dsc_vector(dNc_values, dSc_values, transformation='quantile'):
+    # scipy.stats has a large import graph; most analyses never calibrate dS.
+    import scipy.stats as stats
+
     dNc_values = np.asarray(dNc_values, dtype=np.float64).reshape(-1)
     dSc_values = np.asarray(dSc_values, dtype=np.float64).reshape(-1)
     if dNc_values.shape != dSc_values.shape:

@@ -2,6 +2,41 @@ import numpy
 cimport numpy
 cimport cython
 
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef mark_dependent_combinations_bitset_int64(
+    numpy.ndarray[numpy.int64_t, ndim=2] row_combinations,
+    numpy.ndarray[numpy.uint8_t, ndim=2] dependency_bitset,
+):
+    cdef Py_ssize_t num_combination = row_combinations.shape[0]
+    cdef Py_ssize_t arity = row_combinations.shape[1]
+    cdef Py_ssize_t num_row = dependency_bitset.shape[0]
+    cdef numpy.ndarray[numpy.uint8_t, ndim=1] out = numpy.zeros(num_combination, dtype=numpy.uint8)
+    cdef const numpy.int64_t[:, :] combo_mv = row_combinations
+    cdef const numpy.uint8_t[:, :] bitset_mv = dependency_bitset
+    cdef numpy.uint8_t[:] out_mv = out
+    cdef Py_ssize_t combo, i, j
+    cdef long left, right
+    cdef unsigned char mask
+    for combo in range(num_combination):
+        for i in range(arity - 1):
+            left = combo_mv[combo, i]
+            if left < 0 or left >= num_row:
+                raise IndexError('Combination row ID is out of range for dependency bitset.')
+            for j in range(i + 1, arity):
+                right = combo_mv[combo, j]
+                if right < 0 or right >= num_row:
+                    raise IndexError('Combination row ID is out of range for dependency bitset.')
+                mask = <unsigned char>(1 << (right & 7))
+                if bitset_mv[left, right >> 3] & mask:
+                    out_mv[combo] = 1
+                    break
+            if out_mv[combo] != 0:
+                break
+    return out
+
 @cython.nonecheck(False)
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False) # turn off negative index wrapping for entire function

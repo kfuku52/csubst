@@ -182,6 +182,28 @@ def test_sparse_projections_match_dense_reductions():
             np.testing.assert_allclose(observed_any2spe, expected_any2spe, atol=1e-12)
 
 
+def test_packed_sitewise_max_cython_matches_python_fallback(monkeypatch):
+    if substitution_sparse_cy is None or not hasattr(
+        substitution_sparse_cy,
+        "scan_packed_sitewise_max_row_double",
+    ):
+        pytest.skip("Cython packed sitewise scan is unavailable")
+    sparse_tensor = substitution_sparse.SparseSubstitutionTensor.from_dense(_toy_dense_tensor())
+    observed = substitution._get_sparse_branch_sitewise_max_indices(
+        sparse_tensor,
+        branch_id=0,
+        min_sitewise_pp=0.1,
+    )
+    monkeypatch.setattr(substitution, "substitution_sparse_cy", None)
+    expected = substitution._get_sparse_branch_sitewise_max_indices(
+        sparse_tensor,
+        branch_id=0,
+        min_sitewise_pp=0.1,
+    )
+    for observed_array, expected_array in zip(observed, expected):
+        np.testing.assert_array_equal(observed_array, expected_array)
+
+
 def test_substitution_helpers_convert_dense_and_sparse():
     dense = _toy_dense_tensor()
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
@@ -707,6 +729,37 @@ def test_sparse_projection_gram_switches_sparse_and_dense_per_projection(monkeyp
     assert dense_backend == "dense"
     np.testing.assert_allclose(sparse_values, [2.0, 2.0], atol=1e-12)
     np.testing.assert_allclose(dense_values, [4.0, 4.0], atol=1e-12)
+
+
+def test_adaptive_projection_gram_uses_pair_coverage_and_density():
+    num_branch = 20
+    dense_projection = sp.csr_matrix(np.ones((num_branch, 10), dtype=np.float64))
+    few_pairs = np.array(list(itertools.combinations(range(num_branch), 2))[:10], dtype=np.int64)
+    use_gram, coverage, threshold = substitution._should_use_adaptive_projection_gram(
+        few_pairs,
+        dense_projection,
+    )
+    assert not use_gram
+    assert coverage < threshold
+
+    all_pairs = np.array(list(itertools.combinations(range(num_branch), 2)), dtype=np.int64)
+    use_gram, coverage, threshold = substitution._should_use_adaptive_projection_gram(
+        all_pairs,
+        dense_projection,
+    )
+    assert use_gram
+    assert coverage >= threshold
+
+    sparse_projection = sp.csr_matrix(
+        (np.ones(2), ([0, 1], [0, 1])),
+        shape=(num_branch, 10),
+    )
+    use_gram, coverage, threshold = substitution._should_use_adaptive_projection_gram(
+        few_pairs,
+        sparse_projection,
+    )
+    assert use_gram
+    assert coverage >= threshold
 
 
 def test_sparse_projection_gram_is_disabled_for_nonfinite_values():

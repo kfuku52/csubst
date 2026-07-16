@@ -319,6 +319,42 @@ def test_mark_dependent_row_combinations_flags_pairs_only_when_group_has_two_or_
     np.testing.assert_array_equal(observed, expected)
 
 
+def test_mark_dependent_row_combinations_bitset_matches_python_randomized():
+    if combination.combination_cy is None or not hasattr(
+        combination.combination_cy,
+        "mark_dependent_combinations_bitset_int64",
+    ):
+        pytest.skip("Cython dependency-bitset fast path is unavailable")
+    rng = np.random.default_rng(91)
+    num_row = 80
+    row_combinations = np.array(
+        [rng.choice(num_row, size=4, replace=False) for _ in range(1000)],
+        dtype=np.int64,
+    )
+    dep_groups = [
+        rng.choice(num_row, size=int(size), replace=False).astype(np.int64)
+        for size in rng.integers(1, 10, size=30)
+    ]
+    expected = combination._mark_dependent_row_combinations_python(
+        row_combinations=row_combinations,
+        dep_row_groups=dep_groups,
+    )
+    bitset = combination._build_dependency_bitset(dep_groups, num_row=num_row)
+    observed = combination.combination_cy.mark_dependent_combinations_bitset_int64(
+        row_combinations,
+        bitset,
+    ).astype(bool)
+    np.testing.assert_array_equal(observed, expected)
+
+
+def test_mark_dependent_row_combinations_falls_back_when_bitset_exceeds_cap(monkeypatch):
+    rows = np.array([[0, 1], [0, 2], [1, 3]], dtype=np.int64)
+    dep_groups = [np.array([0, 1], dtype=np.int64)]
+    monkeypatch.setattr(combination, "_DEPENDENCY_BITSET_MAX_BYTES", 0)
+    observed = combination._mark_dependent_row_combinations(rows, dep_groups)
+    np.testing.assert_array_equal(observed, np.array([True, False, False]))
+
+
 def test_get_node_combinations_target_dict_verbose_false():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     non_root_ids = [ete.get_prop(n, "numerical_label") for n in tr.traverse() if not ete.is_root(n)]

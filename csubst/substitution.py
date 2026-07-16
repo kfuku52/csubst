@@ -31,6 +31,8 @@ _SPARSE_CB_SUMMARY_SYRK_MIN_FEATURES = 10000
 # 78% projected density. Densify only when the projection is nearly full; this
 # still caps CSR's worst-case storage overhead for genuinely dense inputs.
 _SPARSE_CB_PROJECTION_DENSE_CUTOFF = 0.90
+_SPARSE_CB_PROJECTION_GRAM_MIN_PAIR_COVERAGE = 0.01
+_SPARSE_CB_PROJECTION_GRAM_MAX_PAIR_COVERAGE = 0.25
 _SPARSE_CB_PROJECTION_ARITY3_DENSE_CUTOFF = 0.35
 _SPARSE_CB_PROJECTION_ARITY3_DENSE_MIN_COMBINATIONS = 10000
 _SPARSE_CB_PROJECTION_ARITY3_DENSE_MAX_BRANCHES = 256
@@ -927,6 +929,27 @@ def _get_sparse_branch_sitewise_max_indices(sub_tensor, branch_id, min_sitewise_
     end = int(sub_tensor.matrix.indptr[branch_id + 1])
     packed_cols = sub_tensor.matrix.indices[start:end]
     vals = sub_tensor.matrix.data[start:end]
+    cython_fn = None if substitution_sparse_cy is None else getattr(
+        substitution_sparse_cy,
+        'scan_packed_sitewise_max_row_double',
+        None,
+    )
+    if (
+        cython_fn is not None
+        and packed_cols.dtype in [np.int32, np.int64]
+        and vals.dtype == np.float64
+    ):
+        try:
+            return cython_fn(
+                packed_cols,
+                vals,
+                int(sub_tensor.num_site),
+                int(sub_tensor.num_state_from),
+                int(sub_tensor.num_state_to),
+                float(min_sitewise_pp),
+            )
+        except Exception as exc:
+            _warn_cython_fallback('packed_sitewise_max_row', exc)
     event_ids, sites = np.divmod(packed_cols, num_site)
     _sg, anc, der = sub_tensor.decode_event_ids(event_ids)
     for site, a, d, value in zip(sites.tolist(), anc.tolist(), der.tolist(), vals.tolist()):
@@ -1697,6 +1720,33 @@ def _calc_projection_gram_pair_values(projection, row_ids, col_ids):
     return values, density, 'sparse'
 
 
+def _should_use_adaptive_projection_gram(id_combinations, projection):
+    """Choose full Gram only when requested pair coverage amortizes its cost."""
+    ids = np.asarray(id_combinations)
+    num_branch = int(projection.shape[0])
+    if ids.ndim != 2 or ids.shape[1] != 2 or num_branch < 2:
+        return False, 0.0, 1.0
+    if num_branch > _SPARSE_CB_SUMMARY_GRAM_MAX_BRANCHES:
+        return False, 0.0, 1.0
+    if projection.nnz and (not np.isfinite(projection.data).all()):
+        return False, 0.0, 1.0
+    low = np.minimum(ids[:, 0], ids[:, 1]).astype(np.int64, copy=False)
+    high = np.maximum(ids[:, 0], ids[:, 1]).astype(np.int64, copy=False)
+    valid = (low >= 0) & (high < num_branch) & (low != high)
+    if not valid.any():
+        return False, 0.0, 1.0
+    pair_keys = low[valid] * num_branch + high[valid]
+    requested_pairs = int(np.unique(pair_keys).shape[0])
+    possible_pairs = num_branch * (num_branch - 1) // 2
+    pair_coverage = min(1.0, float(requested_pairs) / float(possible_pairs))
+    density = _get_sparse_matrix_density(projection)
+    coverage_threshold = min(
+        _SPARSE_CB_PROJECTION_GRAM_MAX_PAIR_COVERAGE,
+        max(_SPARSE_CB_PROJECTION_GRAM_MIN_PAIR_COVERAGE, density),
+    )
+    return pair_coverage >= coverage_threshold, pair_coverage, coverage_threshold
+
+
 def _run_sparse_cb_projection_gram(
     id_combinations,
     sub_tensor,
@@ -1798,13 +1848,12 @@ def get_cb_from_sparse_projections(
     arity = ids.shape[1]
     out = np.zeros((ids.shape[0], arity + len(selected)), dtype=np.float64)
     out[:, :arity] = ids
-    use_gram = (
-        arity == 2
-        and ids.shape[0] >= _SPARSE_CB_SUMMARY_GRAM_MIN_COMBINATIONS
-        and next(iter(projections.values())).shape[0] <= _SPARSE_CB_SUMMARY_GRAM_MAX_BRANCHES
-    )
     for stat_index, stat in enumerate(selected):
         projection = projections[stat]
+        use_gram, pair_coverage, coverage_threshold = _should_use_adaptive_projection_gram(
+            id_combinations=ids,
+            projection=projection,
+        )
         if use_gram:
             values, density, backend = _calc_projection_gram_pair_values(
                 projection=projection,
@@ -1822,7 +1871,10 @@ def get_cb_from_sparse_projections(
         out[:, arity + stat_index] = values
         print(
             'Expected sparse reducer: stat={}, shape={}, nnz={:,}, density={:.6f}, backend={}'.format(
-                stat, projection.shape, projection.nnz, density, resolved
+                stat, projection.shape, projection.nnz, density,
+                '{} (pair_coverage={:.3f}, threshold={:.3f})'.format(
+                    resolved, pair_coverage, coverage_threshold
+                ),
             ),
             flush=True,
         )

@@ -18,6 +18,7 @@ combination_cy = load_optional_extension('combination_cy')
 
 
 _ARITY3_DENSE_EDGE_LOOKUP_MAX_NODES = 6000
+_DEPENDENCY_BITSET_MAX_BYTES = 64 * 1024 * 1024
 _CYTHON_FALLBACK_WARNED = set()
 
 
@@ -731,7 +732,7 @@ def _populate_nc_matrix(nc_matrix, node_combinations, all_node_ids, g):
     return None
 
 
-def _mark_dependent_row_combinations(row_combinations, dep_row_groups):
+def _mark_dependent_row_combinations_python(row_combinations, dep_row_groups):
     row_combinations = np.asarray(row_combinations, dtype=np.int64)
     if row_combinations.shape[0] == 0:
         return np.zeros(shape=(0,), dtype=bool)
@@ -749,6 +750,64 @@ def _mark_dependent_row_combinations(row_combinations, dep_row_groups):
             continue
         is_dependent |= (np.isin(row_combinations, dep_rows).sum(axis=1) > 1)
     return is_dependent
+
+
+def _build_dependency_bitset(dep_row_groups, num_row):
+    bytes_per_row = (int(num_row) + 7) // 8
+    required_bytes = int(num_row) * bytes_per_row
+    if required_bytes > _DEPENDENCY_BITSET_MAX_BYTES:
+        return None
+    bitset = np.zeros((int(num_row), bytes_per_row), dtype=np.uint8)
+    for dep_rows in dep_row_groups:
+        dep_rows = np.unique(np.asarray(dep_rows, dtype=np.int64).reshape(-1))
+        if dep_rows.shape[0] < 2:
+            continue
+        if (dep_rows[0] < 0) or (dep_rows[-1] >= int(num_row)):
+            raise IndexError('Dependency row ID is out of range.')
+        byte_ids = dep_rows >> 3
+        masks = np.left_shift(np.uint8(1), (dep_rows & 7).astype(np.uint8, copy=False))
+        for row_id in dep_rows.tolist():
+            np.bitwise_or.at(bitset[int(row_id)], byte_ids, masks)
+    return bitset
+
+
+def _mark_dependent_row_combinations(row_combinations, dep_row_groups):
+    row_combinations = np.ascontiguousarray(row_combinations, dtype=np.int64)
+    if row_combinations.ndim != 2:
+        raise ValueError('row_combinations should be a 2D array.')
+    if row_combinations.shape[0] == 0:
+        return np.zeros(shape=(0,), dtype=bool)
+    dep_row_groups = tuple(
+        np.asarray(dep_rows, dtype=np.int64).reshape(-1)
+        for dep_rows in dep_row_groups
+    )
+    max_row = int(row_combinations.max(initial=-1))
+    for dep_rows in dep_row_groups:
+        if dep_rows.shape[0] > 0:
+            max_row = max(max_row, int(dep_rows.max()))
+    num_row = max_row + 1
+    cython_fn = None if combination_cy is None else getattr(
+        combination_cy,
+        'mark_dependent_combinations_bitset_int64',
+        None,
+    )
+    if (cython_fn is not None) and (num_row > 0):
+        dependency_bitset = _build_dependency_bitset(
+            dep_row_groups=dep_row_groups,
+            num_row=num_row,
+        )
+        if dependency_bitset is not None:
+            try:
+                return np.asarray(
+                    cython_fn(row_combinations, dependency_bitset),
+                    dtype=bool,
+                )
+            except Exception as exc:
+                _warn_cython_fallback('mark_dependent_combinations_bitset', exc)
+    return _mark_dependent_row_combinations_python(
+        row_combinations=row_combinations,
+        dep_row_groups=dep_row_groups,
+    )
 
 
 def nc_matrix2id_combinations(
