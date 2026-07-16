@@ -50,6 +50,18 @@ def test_sparse_tensor_reports_payload_and_dense_storage_bytes():
     assert sparse_tensor.compression_ratio == pytest.approx(dense.nbytes / expected_payload)
 
 
+def test_clear_sparse_cb_projection_cache_releases_cached_payload():
+    sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(_toy_dense_tensor())
+    projection = substitution._get_sparse_cb_projection(sparse_tensor, stat="any2spe")
+    expected_nbytes = projection.data.nbytes + projection.indices.nbytes + projection.indptr.nbytes
+
+    released_nbytes = substitution.clear_sparse_cb_projection_cache(sparse_tensor)
+
+    assert released_nbytes == expected_nbytes
+    assert sparse_tensor._cb_sparse_projection_cache == {}
+    assert substitution.clear_sparse_cb_projection_cache(sparse_tensor) == 0
+
+
 def test_sparse_tensor_blocks_and_csr_payload_are_read_only():
     sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(_toy_dense_tensor())
     key = next(iter(sparse_tensor.blocks))

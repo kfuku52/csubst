@@ -13,6 +13,7 @@ import re
 import sys
 import time
 import warnings
+from collections import defaultdict
 
 from csubst import parallel
 from csubst import randomness
@@ -1071,6 +1072,121 @@ def _project_expected_state_block(parent_state_block, transition_prob, float_tol
     return expected_state_block
 
 
+def _infer_stationary_distribution(inst, validation_tol):
+    eigenvalues, eigenvectors = np.linalg.eig(np.asarray(inst, dtype=np.float64).T)
+    zero_index = int(np.argmin(np.abs(eigenvalues)))
+    stationary = eigenvectors[:, zero_index]
+    if np.max(np.abs(stationary.imag)) > validation_tol:
+        return None
+    stationary = stationary.real
+    if stationary.sum(dtype=np.float64) < 0:
+        stationary = -stationary
+    if (not np.isfinite(stationary).all()) or (stationary <= validation_tol).any():
+        return None
+    stationary /= stationary.sum(dtype=np.float64)
+    residual = np.max(np.abs(stationary @ np.asarray(inst, dtype=np.float64)))
+    if residual > validation_tol:
+        return None
+    return stationary
+
+
+def _build_reversible_expected_state_projector(inst, float_tol, stationary=None):
+    inst = np.asarray(inst, dtype=np.float64)
+    if (inst.ndim != 2) or (inst.shape[0] != inst.shape[1]) or (inst.shape[0] == 0):
+        return None
+    if not np.isfinite(inst).all():
+        return None
+    matrix_scale = max(1.0, float(np.max(np.abs(inst))))
+    validation_tol = max(
+        1e-10 * matrix_scale,
+        min(float(float_tol) * 0.1, 1e-5) * matrix_scale,
+        np.finfo(np.float64).eps * inst.shape[0] * matrix_scale * 100.0,
+    )
+    if np.max(np.abs(inst.sum(axis=1))) > validation_tol:
+        return None
+    if stationary is not None:
+        stationary = np.asarray(stationary, dtype=np.float64).reshape(-1)
+        if stationary.shape[0] != inst.shape[0]:
+            stationary = None
+        elif (not np.isfinite(stationary).all()) or (stationary <= validation_tol).any():
+            stationary = None
+        else:
+            stationary = stationary / stationary.sum(dtype=np.float64)
+            if np.max(np.abs(stationary @ inst)) > validation_tol:
+                stationary = None
+    if stationary is None:
+        stationary = _infer_stationary_distribution(inst=inst, validation_tol=validation_tol)
+    if stationary is None:
+        return None
+    sqrt_stationary = np.sqrt(stationary)
+    symmetric_inst = (sqrt_stationary[:, None] * inst) / sqrt_stationary[None, :]
+    if np.max(np.abs(symmetric_inst - symmetric_inst.T)) > validation_tol:
+        return None
+    symmetric_inst = (symmetric_inst + symmetric_inst.T) * 0.5
+    eigenvalues, eigenvectors = np.linalg.eigh(symmetric_inst)
+    if eigenvalues.max(initial=-np.inf) > validation_tol:
+        return None
+    eigenvalues = np.minimum(eigenvalues, 0.0)
+    reconstructed = (eigenvectors * eigenvalues[None, :]) @ eigenvectors.T
+    if np.max(np.abs(reconstructed - symmetric_inst)) > validation_tol * 10.0:
+        return None
+    return {
+        'kind': 'reversible',
+        'eigenvalues': np.ascontiguousarray(eigenvalues, dtype=np.float64),
+        'eigenvectors': np.ascontiguousarray(eigenvectors, dtype=np.float64),
+        'sqrt_stationary': np.ascontiguousarray(sqrt_stationary, dtype=np.float64),
+        'validation_tol': float(validation_tol),
+    }
+
+
+def _build_general_expected_state_projector(inst, float_tol):
+    inst = np.asarray(inst, dtype=np.float64)
+    if (inst.ndim != 2) or (inst.shape[0] != inst.shape[1]) or (inst.shape[0] == 0):
+        return None
+    if not np.isfinite(inst).all():
+        return None
+    matrix_scale = max(1.0, float(np.max(np.abs(inst))))
+    validation_tol = max(
+        1e-10 * matrix_scale,
+        min(float(float_tol) * 0.1, 1e-5) * matrix_scale,
+        np.finfo(np.float64).eps * inst.shape[0] * matrix_scale * 100.0,
+    )
+    if np.max(np.abs(inst.sum(axis=1))) > validation_tol:
+        return None
+    eigenvalues, eigenvectors = np.linalg.eig(inst)
+    condition_number = float(np.linalg.cond(eigenvectors))
+    if (not np.isfinite(condition_number)) or (condition_number > 1e8):
+        return None
+    inverse_eigenvectors = np.linalg.inv(eigenvectors)
+    reconstructed = (eigenvectors * eigenvalues[None, :]) @ inverse_eigenvectors
+    if np.max(np.abs(reconstructed - inst)) > validation_tol * 10.0:
+        return None
+    if eigenvalues.real.max(initial=-np.inf) > validation_tol:
+        return None
+    eigenvalues = eigenvalues.copy()
+    nearly_zero = np.abs(eigenvalues) <= validation_tol
+    eigenvalues[nearly_zero] = 0.0
+    return {
+        'kind': 'general',
+        'eigenvalues': np.ascontiguousarray(eigenvalues),
+        'eigenvectors': np.ascontiguousarray(eigenvectors),
+        'inverse_eigenvectors': np.ascontiguousarray(inverse_eigenvectors),
+        'validation_tol': float(validation_tol),
+        'condition_number': condition_number,
+    }
+
+
+def _build_expected_state_projector(inst, float_tol, stationary=None):
+    projector = _build_reversible_expected_state_projector(
+        inst=inst,
+        float_tol=float_tol,
+        stationary=stationary,
+    )
+    if projector is not None:
+        return projector
+    return _build_general_expected_state_projector(inst=inst, float_tol=float_tol)
+
+
 def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
     if g['asrv'] in ['each', 'file_each']:
         sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
@@ -1923,6 +2039,261 @@ def _project_expected_state_chunk(
     return None
 
 
+def _run_expected_state_workers(worker_func, branch_jobs, worker_common_args, n_jobs, g):
+    if n_jobs == 1:
+        worker_func(branch_jobs, *worker_common_args)
+        return None
+    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    branch_chunks, _ = parallel.get_chunks(input_data=branch_jobs, threads=n_jobs, chunk_factor=chunk_factor)
+    tasks = [(chunk,) + worker_common_args for chunk in branch_chunks]
+    parallel.run_starmap(
+        func=worker_func,
+        args_iterable=tasks,
+        n_jobs=n_jobs,
+        backend='threading',
+    )
+    return None
+
+
+def _project_expected_state_chunk_eigen(
+    branch_jobs,
+    state,
+    stateE,
+    site_rates,
+    projector,
+    float_tol,
+):
+    if len(branch_jobs) == 0:
+        return None
+    site_rates = np.asarray(site_rates, dtype=np.float64).reshape(-1)
+    cached_parent_nl = None
+    parent_eigen_state = None
+    for nl, parent_nl, branch_length in branch_jobs:
+        if cached_parent_nl != parent_nl:
+            parent_state = np.asarray(state[parent_nl, :, :], dtype=np.float64)
+            parent_eigen_state = _transform_parent_state_to_eigen(parent_state, projector)
+            cached_parent_nl = parent_nl
+        expected_state = _project_parent_eigen_state(
+            parent_eigen_state=parent_eigen_state,
+            branch_length=branch_length,
+            site_rates=site_rates,
+            projector=projector,
+            float_tol=float_tol,
+        )
+        stateE[nl, :, :] = expected_state
+    return None
+
+
+def _transform_parent_state_to_eigen(parent_state, projector):
+    if projector['kind'] == 'reversible':
+        return (parent_state / projector['sqrt_stationary'][None, :]) @ projector['eigenvectors']
+    return parent_state @ projector['eigenvectors']
+
+
+def _project_parent_eigen_state(parent_eigen_state, branch_length, site_rates, projector, float_tol):
+    decay = np.exp(
+        (np.asarray(site_rates, dtype=np.float64) * branch_length)[:, None]
+        * projector['eigenvalues'][None, :]
+    )
+    if projector['kind'] == 'reversible':
+        expected_state = (
+            (parent_eigen_state * decay) @ projector['eigenvectors'].T
+        ) * projector['sqrt_stationary'][None, :]
+    else:
+        expected_state = (parent_eigen_state * decay) @ projector['inverse_eigenvectors']
+        max_imag = float(np.max(np.abs(expected_state.imag)))
+        if max_imag > projector['validation_tol'] * 10.0:
+            raise FloatingPointError(
+                'General eigen expected-state projection produced an imaginary probability: {}'.format(max_imag)
+            )
+        expected_state = expected_state.real
+    min_expected = float(expected_state.min(initial=0.0))
+    if min_expected < -projector['validation_tol']:
+        raise FloatingPointError(
+            'Eigen expected-state projection produced a negative probability: {}'.format(min_expected)
+        )
+    np.maximum(expected_state, 0.0, out=expected_state)
+    expected_sum = expected_state.sum(axis=1)
+    is_over = (expected_sum - 1) > float_tol
+    if is_over.any():
+        expected_state[is_over, :] /= expected_sum[is_over][:, None]
+    return expected_state
+
+
+class _ProjectedBranchStateView:
+    def __init__(self, child_id, matrix, num_branch):
+        self.child_id = int(child_id)
+        self.matrix = np.asarray(matrix)
+        self.shape = (int(num_branch), self.matrix.shape[0], self.matrix.shape[1])
+        self.dtype = self.matrix.dtype
+
+    def __getitem__(self, index):
+        child_index, site_index, state_index = index
+        if int(child_index) != self.child_id:
+            raise IndexError('Projected branch state view only contains branch {}.'.format(self.child_id))
+        return self.matrix[site_index, state_index]
+
+
+def _project_expected_sparse_chunk(
+    branch_jobs,
+    state,
+    site_rates,
+    projector,
+    float_tol,
+    sub_mode,
+    amino_acid_orders,
+    syn_indices_list,
+):
+    sparse_entries = defaultdict(dict)
+    site_rates = np.asarray(site_rates, dtype=np.float64).reshape(-1)
+    cached_parent_nl = None
+    parent_eigen_state = None
+    for nl, parent_nl, branch_length in branch_jobs:
+        if cached_parent_nl != parent_nl:
+            parent_state = np.asarray(state[parent_nl, :, :], dtype=np.float64)
+            parent_eigen_state = _transform_parent_state_to_eigen(parent_state, projector)
+            cached_parent_nl = parent_nl
+        expected_state = _project_parent_eigen_state(
+            parent_eigen_state=parent_eigen_state,
+            branch_length=branch_length,
+            site_rates=site_rates,
+            projector=projector,
+            float_tol=float_tol,
+        )
+        projected_view = _ProjectedBranchStateView(
+            child_id=nl,
+            matrix=expected_state.astype(state.dtype, copy=False),
+            num_branch=state.shape[0],
+        )
+        branch_entries = substitution._accumulate_sparse_sub_tensor_chunk(
+            branch_pairs=[(nl, parent_nl)],
+            state_tensor=projected_view,
+            state_tensor_anc=state,
+            mode=sub_mode,
+            amino_acid_orders=amino_acid_orders,
+            syn_indices_list=syn_indices_list,
+        )
+        for key, row_map in branch_entries.items():
+            sparse_entries[key].update(row_map)
+    return sparse_entries
+
+
+def _get_fused_expected_sparse_substitution_tensor(g, mode):
+    if str(g.get('sub_tensor_backend', 'auto')).strip().lower() != 'sparse':
+        return None
+    if str(g.get('expected_state_backend', 'auto')).strip().lower() == 'expm':
+        return None
+    if mode == 'cdn':
+        state = g['state_cdn'].astype(g['float_type'], copy=False)
+        inst = g['instantaneous_codon_rate_matrix']
+        stationary = g.get('equilibrium_frequency', g.get('empirical_eq_freq', None))
+        sub_mode = 'syn'
+    elif mode == 'nsy':
+        state = g['state_nsy'].astype(g['float_type'], copy=False)
+        inst = g['instantaneous_nsy_rate_matrix']
+        stationary = None
+        sub_mode = 'asis'
+    else:
+        return None
+    projector = _build_expected_state_projector(
+        inst=inst,
+        float_tol=float(g['float_tol']),
+        stationary=stationary,
+    )
+    if projector is None:
+        return None
+    rate_values = np.asarray(g['iqtree_rate_values'], dtype=g['float_type']).reshape(-1)
+    state_has_mass = (state.sum(axis=(1, 2)) >= float(g['float_tol']))
+    branch_jobs = _collect_expected_state_branch_jobs(
+        tree=g['tree'],
+        mode=mode,
+        num_node=state.shape[0],
+        float_tol=float(g['float_tol']),
+        state_has_mass=state_has_mass,
+    )
+    selected_branch_set = substitution._get_selected_branch_set(g)
+    if selected_branch_set is not None:
+        branch_jobs = [job for job in branch_jobs if int(job[0]) in selected_branch_set]
+    branch_jobs = sorted(branch_jobs, key=lambda job: (job[1], job[0]))
+    n_jobs, estimated_work = _resolve_expected_state_n_jobs(
+        num_branch_jobs=len(branch_jobs),
+        num_site=state.shape[1],
+        num_state=state.shape[2],
+        g=g,
+    )
+    # The eigendecomposition path already batches every site through BLAS.
+    # Outer Python threading duplicates temporary matrices and causes BLAS
+    # contention, so keep the fused builder single-worker.
+    n_jobs = 1
+    print(
+        'Expected-state sparse fusion (mode={}): backend=eigen_{}, branches={}, estimated_work={}, workers={} (threads={})'.format(
+            mode,
+            projector['kind'],
+            len(branch_jobs),
+            estimated_work,
+            n_jobs,
+            int(g.get('threads', 1)),
+        ),
+        flush=True,
+    )
+    substitution.resolve_sub_tensor_backend(
+        g=g,
+        state_tensor=state,
+        state_tensor_anc=state,
+        mode=sub_mode,
+    )
+    if sub_mode == 'asis':
+        num_syngroup = 1
+        num_state = state.shape[2]
+        amino_acid_orders = None
+        syn_indices_list = None
+    else:
+        num_syngroup = len(g['amino_acid_orders'])
+        num_state = int(g['max_synonymous_size'])
+        amino_acid_orders = list(g['amino_acid_orders'])
+        syn_indices_list = [
+            np.asarray(g['synonymous_indices'][aa], dtype=np.int64)
+            for aa in amino_acid_orders
+        ]
+    common_args = (
+        state,
+        rate_values,
+        projector,
+        float(g['float_tol']),
+        sub_mode,
+        amino_acid_orders,
+        syn_indices_list,
+    )
+    try:
+        if n_jobs == 1:
+            sparse_entries = _project_expected_sparse_chunk(branch_jobs, *common_args)
+        else:
+            chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+            branch_chunks, _ = parallel.get_chunks(branch_jobs, threads=n_jobs, chunk_factor=chunk_factor)
+            chunk_maps = parallel.run_starmap(
+                func=_project_expected_sparse_chunk,
+                args_iterable=[(chunk,) + common_args for chunk in branch_chunks],
+                n_jobs=n_jobs,
+                backend='threading',
+            )
+            sparse_entries = substitution._merge_sparse_entry_maps(chunk_maps)
+    except FloatingPointError as exc:
+        warnings.warn(
+            'Expected-state sparse fusion was numerically unstable; using the materialized fallback: {}'.format(exc),
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return None
+    return substitution._finalize_sparse_substitution_tensor(
+        sparse_entries=sparse_entries,
+        num_branch=state.shape[0],
+        num_site=state.shape[1],
+        num_syngroup=num_syngroup,
+        num_state=num_state,
+        dtype=state.dtype,
+    )
+
+
 def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g, static_sub_sites=None, cb_site_overlap=None):
     E_b = np.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
     for i,sg,a,d in list_igad:
@@ -2272,9 +2643,11 @@ def get_E(cb, g, ON_tensor, OS_tensor):
     elif expectation_method == 'codon_model':
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
         if 'EN_tensor' not in g:
-            state_nsyE = get_exp_state(g=g, mode='nsy')
-            g['EN_tensor'] = substitution.get_substitution_tensor(state_nsyE, g['state_nsy'], mode='asis', g=g, mmap_attr='EN')
-            del state_nsyE
+            g['EN_tensor'] = _get_fused_expected_sparse_substitution_tensor(g=g, mode='nsy')
+            if g['EN_tensor'] is None:
+                state_nsyE = get_exp_state(g=g, mode='nsy')
+                g['EN_tensor'] = substitution.get_substitution_tensor(state_nsyE, g['state_nsy'], mode='asis', g=g, mmap_attr='EN')
+                del state_nsyE
         else:
             print('Reusing expected nonsynonymous substitution tensor.', flush=True)
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
@@ -2289,10 +2662,21 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         )
         cb = table.merge_tables(cb, cbEN)
         del cbEN
+        is_final_arity = int(g.get('current_arity', 0)) >= int(g.get('max_arity', 1))
+        if is_final_arity:
+            en_tensor = g.pop('EN_tensor')
+            released_nbytes = substitution.clear_sparse_cb_projection_cache(en_tensor)
+            del en_tensor
+            print(
+                'Released final-arity EN tensor and {:,} bytes of projection cache.'.format(released_nbytes),
+                flush=True,
+            )
         if 'ES_tensor' not in g:
-            state_cdnE = get_exp_state(g=g, mode='cdn')
-            g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
-            del state_cdnE
+            g['ES_tensor'] = _get_fused_expected_sparse_substitution_tensor(g=g, mode='cdn')
+            if g['ES_tensor'] is None:
+                state_cdnE = get_exp_state(g=g, mode='cdn')
+                g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
+                del state_cdnE
         else:
             print('Reusing expected synonymous substitution tensor.', flush=True)
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
@@ -2307,6 +2691,14 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         )
         cb = table.merge_tables(cb, cbES)
         del cbES
+        if is_final_arity:
+            es_tensor = g.pop('ES_tensor')
+            released_nbytes = substitution.clear_sparse_cb_projection_cache(es_tensor)
+            del es_tensor
+            print(
+                'Released final-arity ES tensor and {:,} bytes of projection cache.'.format(released_nbytes),
+                flush=True,
+            )
     else:
         raise ValueError('Unsupported expectation_method: {}'.format(expectation_method))
     cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC', output_stats=requested_output_stats)
@@ -2315,13 +2707,13 @@ def get_E(cb, g, ON_tensor, OS_tensor):
 
 def get_exp_state(g, mode):
     if mode=='cdn':
-        state = g['state_cdn'].astype(g['float_type'])
+        state = g['state_cdn'].astype(g['float_type'], copy=False)
         inst = g['instantaneous_codon_rate_matrix']
     elif mode=='pep':
-        state = g['state_pep'].astype(g['float_type'])
+        state = g['state_pep'].astype(g['float_type'], copy=False)
         inst = g['instantaneous_aa_rate_matrix']
     elif mode=='nsy':
-        state = g['state_nsy'].astype(g['float_type'])
+        state = g['state_nsy'].astype(g['float_type'], copy=False)
         inst = g['instantaneous_nsy_rate_matrix']
     else:
         raise ValueError('Unsupported expected-state mode: {}'.format(mode))
@@ -2339,16 +2731,43 @@ def get_exp_state(g, mode):
         float_tol=float(g['float_tol']),
         state_has_mass=state_has_mass,
     )
+    requested_backend = str(g.get('expected_state_backend', 'auto')).strip().lower()
+    if requested_backend not in ['auto', 'expm', 'eigen']:
+        raise ValueError('Unsupported expected_state_backend: {}'.format(requested_backend))
+    stationary = None
+    if mode == 'cdn':
+        stationary = g.get('equilibrium_frequency', g.get('empirical_eq_freq', None))
+    projector = None
+    if requested_backend != 'expm':
+        projector = _build_expected_state_projector(
+            inst=inst,
+            float_tol=float(g['float_tol']),
+            stationary=stationary,
+        )
+    resolved_backend = 'eigen_{}'.format(projector['kind']) if projector is not None else 'expm'
+    if (requested_backend == 'eigen') and (projector is None):
+        warnings.warn(
+            'The expected-state rate matrix does not have a stable eigendecomposition; using scipy.linalg.expm.',
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    if projector is not None:
+        branch_jobs = sorted(branch_jobs, key=lambda job: (job[1], job[0]))
     n_jobs, estimated_work = _resolve_expected_state_n_jobs(
         num_branch_jobs=len(branch_jobs),
         num_site=state.shape[1],
         num_state=state.shape[2],
         g=g,
     )
-    txt = 'Expected-state scheduler (mode={}): branches={}, site_rates={}, estimated_work={}, workers={} (threads={})'
+    if projector is not None:
+        # Site-vectorized BLAS projection is faster and lower-memory without
+        # an additional layer of Python threads.
+        n_jobs = 1
+    txt = 'Expected-state scheduler (mode={}): backend={}, branches={}, site_rates={}, estimated_work={}, workers={} (threads={})'
     print(
         txt.format(
             mode,
+            resolved_backend,
             len(branch_jobs),
             unique_site_rates.shape[0],
             estimated_work,
@@ -2357,28 +2776,55 @@ def get_exp_state(g, mode):
         ),
         flush=True,
     )
-    if n_jobs == 1:
-        _project_expected_state_chunk(
-            branch_jobs=branch_jobs,
-            state=state,
-            stateE=stateE,
-            unique_site_rates=unique_site_rates,
-            rate_site_indices=rate_site_indices,
-            inst=inst,
-            float_tol=float(g['float_tol']),
-        )
+    if projector is not None:
+        worker_func = _project_expected_state_chunk_eigen
+        worker_common_args = (state, stateE, rate_values, projector, float(g['float_tol']))
     else:
-        chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
-        branch_chunks, _ = parallel.get_chunks(input_data=branch_jobs, threads=n_jobs, chunk_factor=chunk_factor)
-        tasks = [
-            (chunk, state, stateE, unique_site_rates, rate_site_indices, inst, float(g['float_tol']))
-            for chunk in branch_chunks
-        ]
-        parallel.run_starmap(
-            func=_project_expected_state_chunk,
-            args_iterable=tasks,
+        worker_func = _project_expected_state_chunk
+        worker_common_args = (
+            state,
+            stateE,
+            unique_site_rates,
+            rate_site_indices,
+            inst,
+            float(g['float_tol']),
+        )
+    try:
+        _run_expected_state_workers(
+            worker_func=worker_func,
+            branch_jobs=branch_jobs,
+            worker_common_args=worker_common_args,
             n_jobs=n_jobs,
-            backend='threading',
+            g=g,
+        )
+    except FloatingPointError as exc:
+        if projector is None:
+            raise
+        warnings.warn(
+            'Eigen expected-state projection was numerically unstable; using scipy.linalg.expm: {}'.format(exc),
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        stateE.fill(0)
+        fallback_n_jobs, _ = _resolve_expected_state_n_jobs(
+            num_branch_jobs=len(branch_jobs),
+            num_site=state.shape[1],
+            num_state=state.shape[2],
+            g=g,
+        )
+        _run_expected_state_workers(
+            worker_func=_project_expected_state_chunk,
+            branch_jobs=branch_jobs,
+            worker_common_args=(
+                state,
+                stateE,
+                unique_site_rates,
+                rate_site_indices,
+                inst,
+                float(g['float_tol']),
+            ),
+            n_jobs=fallback_n_jobs,
+            g=g,
         )
     max_stateE = stateE.sum(axis=(2)).max()
     if (max_stateE - 1) >= g['float_tol']:

@@ -578,6 +578,12 @@ def get_global_parameters(args):
         g['sub_tensor_backend'] = 'auto'
     if g['sub_tensor_backend'] not in ['auto', 'dense', 'sparse']:
         raise ValueError('--sub_tensor_backend should be one of auto, dense, sparse.')
+    if 'expected_state_backend' in g.keys():
+        g['expected_state_backend'] = str(g['expected_state_backend']).lower()
+    else:
+        g['expected_state_backend'] = 'auto'
+    if g['expected_state_backend'] not in ['auto', 'expm', 'eigen']:
+        raise ValueError('--expected_state_backend should be one of auto, expm, eigen.')
     if 'sub_tensor_sparse_density_cutoff' in g.keys():
         g['sub_tensor_sparse_density_cutoff'] = _require_finite_float(
             value=float(g['sub_tensor_sparse_density_cutoff']),

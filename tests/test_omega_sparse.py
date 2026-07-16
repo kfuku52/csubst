@@ -233,6 +233,163 @@ def test_get_exp_state_nsy_uses_nonsynonymous_rate_matrix():
     np.testing.assert_allclose(out[labels["B"], 0, :], [0.0, 0.0], atol=1e-12)
 
 
+def test_reversible_expected_state_projector_matches_expm():
+    stationary = np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float64)
+    exchangeability = np.array(
+        [
+            [0.0, 0.5, 0.2, 0.1],
+            [0.5, 0.0, 0.3, 0.4],
+            [0.2, 0.3, 0.0, 0.6],
+            [0.1, 0.4, 0.6, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    inst = exchangeability * stationary[None, :]
+    np.fill_diagonal(inst, -inst.sum(axis=1))
+    projector = omega._build_reversible_expected_state_projector(
+        inst=inst,
+        float_tol=1e-12,
+        stationary=stationary,
+    )
+    assert projector is not None
+
+    rng = np.random.default_rng(14)
+    state = rng.random((2, 7, 4), dtype=np.float64)
+    state /= state.sum(axis=2, keepdims=True)
+    state_eigen = np.zeros_like(state)
+    rates = np.array([0.1, 0.25, 0.5, 1.0, 1.5, 2.0, 4.0], dtype=np.float64)
+    omega._project_expected_state_chunk_eigen(
+        branch_jobs=[(1, 0, 0.7)],
+        state=state,
+        stateE=state_eigen,
+        site_rates=rates,
+        projector=projector,
+        float_tol=1e-12,
+    )
+    expected = np.vstack([
+        state[0, i, :] @ omega.expm(inst * 0.7 * rate)
+        for i, rate in enumerate(rates)
+    ])
+    np.testing.assert_allclose(state_eigen[1, :, :], expected, atol=1e-12, rtol=1e-12)
+
+
+def test_reversible_expected_state_projector_rejects_nonreversible_matrix():
+    inst = np.array(
+        [
+            [-2.0, 2.0, 0.0],
+            [0.0, -2.0, 2.0],
+            [2.0, 0.0, -2.0],
+        ],
+        dtype=np.float64,
+    )
+    projector = omega._build_reversible_expected_state_projector(
+        inst=inst,
+        float_tol=1e-12,
+    )
+    assert projector is None
+
+
+def test_general_expected_state_projector_matches_expm_for_nonreversible_matrix():
+    inst = np.array(
+        [
+            [-2.0, 2.0, 0.0],
+            [0.0, -2.0, 2.0],
+            [2.0, 0.0, -2.0],
+        ],
+        dtype=np.float64,
+    )
+    projector = omega._build_expected_state_projector(inst=inst, float_tol=1e-12)
+    assert projector is not None
+    assert projector["kind"] == "general"
+    parent = np.array([[1.0, 0.0, 0.0], [0.2, 0.3, 0.5]], dtype=np.float64)
+    rates = np.array([0.25, 1.5], dtype=np.float64)
+    parent_eigen = omega._transform_parent_state_to_eigen(parent, projector)
+    observed = omega._project_parent_eigen_state(
+        parent_eigen_state=parent_eigen,
+        branch_length=0.4,
+        site_rates=rates,
+        projector=projector,
+        float_tol=1e-12,
+    )
+    expected = np.vstack([
+        parent[i, :] @ omega.expm(inst * 0.4 * rate)
+        for i, rate in enumerate(rates)
+    ])
+    np.testing.assert_allclose(observed, expected, atol=1e-12, rtol=1e-12)
+
+
+def test_get_exp_state_falls_back_to_expm_when_eigen_projection_is_unstable(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((max(labels.values()) + 1, 2, 2), dtype=np.float64)
+    state[labels["R"], :, 0] = 1.0
+    for node in tr.traverse():
+        if not ete.is_root(node):
+            ete.set_prop(node, "Ndist", 0.4)
+    g = {
+        "tree": tr,
+        "state_nsy": state,
+        "instantaneous_nsy_rate_matrix": np.array([[-0.5, 0.5], [0.25, -0.25]], dtype=np.float64),
+        "iqtree_rate_values": np.array([0.5, 1.5], dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+        "threads": 1,
+        "expected_state_backend": "auto",
+    }
+    original_project = omega._project_parent_eigen_state
+
+    def _fail_eigen(*_args, **_kwargs):
+        raise FloatingPointError("synthetic instability")
+
+    monkeypatch.setattr(omega, "_project_parent_eigen_state", _fail_eigen)
+    with pytest.warns(RuntimeWarning, match="using scipy.linalg.expm"):
+        fallback = omega.get_exp_state(g=g, mode="nsy")
+    monkeypatch.setattr(omega, "_project_parent_eigen_state", original_project)
+    g["expected_state_backend"] = "expm"
+    expected = omega.get_exp_state(g=g, mode="nsy")
+    np.testing.assert_allclose(fallback, expected, atol=1e-12, rtol=1e-12)
+
+
+def test_fused_expected_sparse_tensor_matches_materialized_path():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    state = np.zeros((num_node, 3, 2), dtype=np.float64)
+    state[labels["R"], :, 0] = [1.0, 0.75, 0.25]
+    state[labels["R"], :, 1] = [0.0, 0.25, 0.75]
+    state[labels["A"], :, :] = state[labels["R"], :, :]
+    state[labels["B"], :, :] = state[labels["R"], :, :]
+    inst = np.array([[-0.6, 0.6], [0.4, -0.4]], dtype=np.float64)
+    g = {
+        "tree": tr,
+        "state_nsy": state,
+        "instantaneous_nsy_rate_matrix": inst,
+        "iqtree_rate_values": np.array([0.5, 1.0, 2.0], dtype=np.float64),
+        "float_type": np.float64,
+        "float_tol": 1e-12,
+        "threads": 1,
+        "sub_tensor_backend": "sparse",
+        "expected_state_backend": "eigen",
+        "ml_anc": False,
+    }
+    for node in tr.traverse():
+        if not ete.is_root(node):
+            ete.set_prop(node, "Ndist", 0.3)
+
+    fused = omega._get_fused_expected_sparse_substitution_tensor(g=g, mode="nsy")
+    materialized_state = omega.get_exp_state(g=g, mode="nsy")
+    materialized = substitution.get_substitution_tensor(
+        materialized_state,
+        state,
+        mode="asis",
+        g=g,
+        mmap_attr="EN",
+    )
+
+    assert fused is not None
+    np.testing.assert_allclose(fused.to_dense(), materialized.to_dense(), atol=1e-12, rtol=1e-12)
+
+
 def test_get_exp_state_rejects_unknown_mode():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))

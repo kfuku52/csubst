@@ -692,6 +692,48 @@ def _merge_sparse_entry_maps(entry_maps):
     return merged
 
 
+def _finalize_sparse_substitution_tensor(
+    sparse_entries,
+    num_branch,
+    num_site,
+    num_syngroup,
+    num_state,
+    dtype,
+):
+    blocks = dict()
+    shape = (int(num_branch), int(num_site))
+    dtype = np.dtype(dtype)
+    for key, row_map in sparse_entries.items():
+        if len(row_map) == 0:
+            continue
+        indptr = np.zeros(shape=(num_branch + 1,), dtype=np.int64)
+        nnz = 0
+        for row, (cols, _vals) in row_map.items():
+            row = int(row)
+            indptr[row + 1] = int(cols.shape[0])
+            nnz += int(cols.shape[0])
+        np.cumsum(indptr, out=indptr)
+        indices = np.empty(shape=(nnz,), dtype=np.int32)
+        data = np.empty(shape=(nnz,), dtype=dtype)
+        for row, (cols, vals) in row_map.items():
+            row = int(row)
+            start = int(indptr[row])
+            end = int(indptr[row + 1])
+            indices[start:end] = np.asarray(cols, dtype=np.int32)
+            data[start:end] = np.asarray(vals, dtype=dtype)
+        mat = sp.csr_matrix((data, indices, indptr), shape=shape, dtype=dtype)
+        if mat.nnz > 0:
+            blocks[key] = mat
+    tensor_shape = (num_branch, num_site, num_syngroup, num_state, num_state)
+    out = substitution_sparse.SparseSubstitutionTensor(shape=tensor_shape, dtype=dtype, blocks=blocks)
+    txt = 'Generated sparse substitution tensor: shape={}, density={:.6f} ({:,}/{:,}), storage={:,} bytes, compression={:.1f}x'
+    print(
+        txt.format(out.shape, out.density, out.nnz, out.size, out.nbytes, out.compression_ratio),
+        flush=True,
+    )
+    return out
+
+
 def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
     dtype = state_tensor.dtype
     num_branch = state_tensor.shape[0]
@@ -747,41 +789,14 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
             backend='threading',
         )
         sparse_entries = _merge_sparse_entry_maps(chunk_maps)
-    blocks = dict()
-    shape = (num_branch, num_site)
-    for key, row_map in sparse_entries.items():
-        if len(row_map) == 0:
-            continue
-        indptr = np.zeros(shape=(num_branch + 1,), dtype=np.int64)
-        nnz = 0
-        for row, (cols, _vals) in row_map.items():
-            row = int(row)
-            indptr[row + 1] = int(cols.shape[0])
-            nnz += int(cols.shape[0])
-        np.cumsum(indptr, out=indptr)
-        indices = np.empty(shape=(nnz,), dtype=np.int32)
-        data = np.empty(shape=(nnz,), dtype=dtype)
-        for row, (cols, vals) in row_map.items():
-            row = int(row)
-            start = int(indptr[row])
-            end = int(indptr[row + 1])
-            indices[start:end] = np.asarray(cols, dtype=np.int32)
-            data[start:end] = np.asarray(vals, dtype=dtype)
-        mat = sp.csr_matrix(
-            (data, indices, indptr),
-            shape=shape,
-            dtype=dtype,
-        )
-        if mat.nnz > 0:
-            blocks[key] = mat
-    tensor_shape = (num_branch, num_site, num_syngroup, num_state, num_state)
-    out = substitution_sparse.SparseSubstitutionTensor(shape=tensor_shape, dtype=dtype, blocks=blocks)
-    txt = 'Generated sparse substitution tensor: shape={}, density={:.6f} ({:,}/{:,}), storage={:,} bytes, compression={:.1f}x'
-    print(
-        txt.format(out.shape, out.density, out.nnz, out.size, out.nbytes, out.compression_ratio),
-        flush=True,
+    return _finalize_sparse_substitution_tensor(
+        sparse_entries=sparse_entries,
+        num_branch=num_branch,
+        num_site=num_site,
+        num_syngroup=num_syngroup,
+        num_state=num_state,
+        dtype=dtype,
     )
-    return out
 
 
 def _is_sparse_csr_cython_compatible(mat):
@@ -1900,6 +1915,22 @@ def _get_sparse_cb_projection(sub_tensor, stat):
         projection = _build_sparse_cb_projection(sub_tensor=sub_tensor, stat=stat)
         cache[stat] = projection
     return projection
+
+
+def clear_sparse_cb_projection_cache(sub_tensor):
+    cache = getattr(sub_tensor, '_cb_sparse_projection_cache', None)
+    if not isinstance(cache, dict):
+        return 0
+    released_nbytes = 0
+    for projection in cache.values():
+        if sp.issparse(projection):
+            released_nbytes += int(
+                projection.data.nbytes
+                + projection.indices.nbytes
+                + projection.indptr.nbytes
+            )
+    cache.clear()
+    return released_nbytes
 
 
 def _can_use_cython_sparse_projection_product(projection, ids, by_site):

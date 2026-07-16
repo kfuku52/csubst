@@ -651,6 +651,12 @@ def _build_parser(show_advanced=False):
                         choices=['auto', 'dense', 'sparse'],
                         help='default=%(default)s: Backend for substitution tensors. '
                              '"auto" selects sparse reducers for low-density tensors.')
+    _add_advanced_argument(advanced_performance, '--expected_state_backend', show_advanced=show_advanced,
+                        metavar='auto|expm|eigen', default='auto', type=str,
+                        choices=['auto', 'expm', 'eigen'],
+                        help='default=%(default)s: Backend for codon-model expected-state projection. '
+                             '"auto" uses a vectorized eigendecomposition for numerically stable rate matrices '
+                             'and falls back to scipy.linalg.expm otherwise.')
     _add_advanced_argument(advanced_performance, '--sub_tensor_sparse_density_cutoff', show_advanced=show_advanced,
                         metavar='FLOAT', default=0.15, type=float, required=False,
                         help='default=%(default)s: Density cutoff for --sub_tensor_backend auto. '

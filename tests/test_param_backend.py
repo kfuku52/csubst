@@ -24,6 +24,7 @@ def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     assert g["infile_type"] == "iqtree"
     assert g["random_seed"] == 1
     assert g["sub_tensor_backend"] == "auto"
+    assert g["expected_state_backend"] == "auto"
     assert g["sub_tensor_sparse_density_cutoff"] == pytest.approx(0.15)
     assert g["sub_tensor_auto_sparse_min_elements"] == 100000000
     assert g["sub_tensor_auto_sparse_min_bytes"] == 67108864
@@ -99,6 +100,16 @@ def test_get_global_parameters_rejects_output_prefix_paths():
 def test_get_global_parameters_normalizes_sub_tensor_backend_case():
     g = param.get_global_parameters(_args(sub_tensor_backend="SpArSe"))
     assert g["sub_tensor_backend"] == "sparse"
+
+
+def test_get_global_parameters_normalizes_expected_state_backend_case():
+    g = param.get_global_parameters(_args(expected_state_backend="EiGeN"))
+    assert g["expected_state_backend"] == "eigen"
+
+
+def test_get_global_parameters_rejects_invalid_expected_state_backend():
+    with pytest.raises(ValueError, match="expected_state_backend"):
+        param.get_global_parameters(_args(expected_state_backend="invalid"))
 
 
 def test_get_global_parameters_prints_dependency_versions(capsys):
