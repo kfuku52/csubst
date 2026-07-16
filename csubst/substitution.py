@@ -269,170 +269,15 @@ def _get_combo_index_range(mmap_start, num_combinations):
     return start, end
 
 
-def _estimate_sub_tensor_num_elements(state_tensor, mode, g):
-    if state_tensor is None:
-        return None
-    if not hasattr(state_tensor, 'shape'):
-        return None
-    if len(state_tensor.shape) < 3:
-        return None
-    num_branch = int(state_tensor.shape[0])
-    num_site = int(state_tensor.shape[1])
-    if mode == 'asis':
-        num_group = 1
-        num_state = int(state_tensor.shape[2])
-    elif mode == 'syn':
-        num_group = int(len(g['amino_acid_orders']))
-        num_state = int(g['max_synonymous_size'])
-    else:
-        return None
-    return num_branch * num_site * num_group * num_state * num_state
-
-
-def _estimate_sub_tensor_nnz_from_state(state_tensor, state_tensor_anc, mode, g):
-    if state_tensor is None:
-        return None
-    if state_tensor_anc is None:
-        state_tensor_anc = state_tensor
-    if ('tree' not in g) or (g.get('tree', None) is None):
-        return None
-    if (not hasattr(state_tensor, 'shape')) or len(state_tensor.shape) != 3:
-        return None
-    if (not hasattr(state_tensor_anc, 'shape')) or len(state_tensor_anc.shape) != 3:
-        return None
-    selected_branch_set = _get_selected_branch_set(g)
-    branch_pairs = _collect_sub_tensor_branch_pairs(
-        g=g,
-        state_tensor_anc=state_tensor_anc,
-        selected_branch_set=selected_branch_set,
-    )
-    estimated_nnz = 0
-    if mode == 'asis':
-        for child, parent in branch_pairs:
-            parent_support = np.asarray(state_tensor_anc[parent, :, :] != 0, dtype=bool)
-            child_support = np.asarray(state_tensor[child, :, :] != 0, dtype=bool)
-            parent_count = parent_support.sum(axis=1, dtype=np.int64)
-            child_count = child_support.sum(axis=1, dtype=np.int64)
-            same_state_count = np.logical_and(parent_support, child_support).sum(axis=1, dtype=np.int64)
-            estimated_nnz += int(np.sum((parent_count * child_count) - same_state_count, dtype=np.int64))
-        return estimated_nnz
-    if mode == 'syn':
-        if ('amino_acid_orders' not in g) or ('synonymous_indices' not in g):
-            return None
-        syn_indices_list = [
-            np.asarray(g['synonymous_indices'][aa], dtype=np.int64)
-            for aa in list(g['amino_acid_orders'])
-        ]
-        for child, parent in branch_pairs:
-            for ind in syn_indices_list:
-                if ind.shape[0] <= 1:
-                    continue
-                parent_support = np.asarray(state_tensor_anc[parent, :, ind] != 0, dtype=bool)
-                child_support = np.asarray(state_tensor[child, :, ind] != 0, dtype=bool)
-                # Advanced indexing may move the state axis to the front.
-                if parent_support.shape[0] == ind.shape[0]:
-                    parent_support = parent_support.T
-                if child_support.shape[0] == ind.shape[0]:
-                    child_support = child_support.T
-                parent_count = parent_support.sum(axis=1, dtype=np.int64)
-                child_count = child_support.sum(axis=1, dtype=np.int64)
-                same_state_count = np.logical_and(parent_support, child_support).sum(axis=1, dtype=np.int64)
-                estimated_nnz += int(np.sum((parent_count * child_count) - same_state_count, dtype=np.int64))
-        return estimated_nnz
-    return None
-
-
-def _estimate_sparse_sub_tensor_nbytes(state_tensor, mode, g, estimated_nnz):
-    if estimated_nnz is None or state_tensor is None:
-        return None
-    num_branch = int(state_tensor.shape[0])
-    value_nbytes = int(np.dtype(state_tensor.dtype).itemsize)
-    if mode == 'asis':
-        num_state = int(state_tensor.shape[2])
-        max_blocks = num_state * max(num_state - 1, 0)
-    elif mode == 'syn':
-        if ('amino_acid_orders' not in g) or ('synonymous_indices' not in g):
-            return None
-        max_blocks = 0
-        for aa in list(g['amino_acid_orders']):
-            group_size = int(len(g['synonymous_indices'][aa]))
-            max_blocks += group_size * max(group_size - 1, 0)
-    else:
-        return None
-    # SciPy uses 32-bit CSR indices while dimensions fit int32. Include a
-    # conservative row pointer for every potentially non-empty state block.
-    index_nbytes = 4
-    data_and_indices = int(estimated_nnz) * (value_nbytes + index_nbytes)
-    row_pointers = int(max_blocks) * (num_branch + 1) * index_nbytes
-    return int(data_and_indices + row_pointers)
-
-
 def resolve_sub_tensor_backend(g, state_tensor=None, state_tensor_anc=None, mode=''):
     requested = _resolve_requested_sub_tensor_backend(g)
-    details = ''
-    if requested == 'dense':
-        resolved = 'dense'
-    elif requested == 'sparse':
-        resolved = 'sparse'
-    elif requested == 'auto':
-        min_elements = int(g.get('sub_tensor_auto_sparse_min_elements', 100000000))
-        min_dense_bytes = int(g.get('sub_tensor_auto_sparse_min_bytes', 67108864))
-        density_cutoff = float(g.get('sub_tensor_sparse_density_cutoff', 0.15))
-        estimated_elements = _estimate_sub_tensor_num_elements(
-            state_tensor=state_tensor,
-            mode=mode,
-            g=g,
-        )
-        if estimated_elements is None:
-            resolved = 'dense'
-        else:
-            estimated_dense_bytes = int(estimated_elements * np.dtype(state_tensor.dtype).itemsize)
-            estimated_nnz = _estimate_sub_tensor_nnz_from_state(
-                state_tensor=state_tensor,
-                state_tensor_anc=state_tensor_anc,
-                mode=mode,
-                g=g,
-            )
-            estimated_density = None
-            estimated_sparse_bytes = None
-            if estimated_nnz is not None:
-                estimated_density = 0.0 if estimated_elements == 0 else float(estimated_nnz) / float(estimated_elements)
-                estimated_sparse_bytes = _estimate_sparse_sub_tensor_nbytes(
-                    state_tensor=state_tensor,
-                    mode=mode,
-                    g=g,
-                    estimated_nnz=estimated_nnz,
-                )
-            large_by_elements = estimated_elements >= min_elements
-            sparse_is_cost_effective = (
-                (estimated_density is not None)
-                and (estimated_sparse_bytes is not None)
-                and (estimated_density <= density_cutoff)
-                and (estimated_sparse_bytes < estimated_dense_bytes)
-            )
-            if estimated_density is None:
-                # Retain the size-only behavior when state support cannot be
-                # inspected (for example, callers without a tree context).
-                resolved = 'sparse' if large_by_elements else 'dense'
-            else:
-                large_enough = large_by_elements or (estimated_dense_bytes >= min_dense_bytes)
-                resolved = 'sparse' if (large_enough and sparse_is_cost_effective) else 'dense'
-            details = 'mode={}, estimated_elements={:,}, dense_bytes={:,}, min_elements={:,}'.format(
-                mode, estimated_elements, estimated_dense_bytes, min_elements,
-            )
-            if estimated_density is not None:
-                details += ', estimated_density={:.6f}, sparse_bytes={:,}, density_cutoff={:.6f}'.format(
-                    estimated_density,
-                    estimated_sparse_bytes,
-                    density_cutoff,
-                )
+    # SparseSubstitutionTensor is the canonical production representation.
+    # The explicit dense backend remains temporarily available as a reference
+    # and compatibility path while downstream ndarray assumptions are retired.
+    resolved = 'dense' if requested == 'dense' else 'sparse'
     g['sub_tensor_backend'] = requested
     g['resolved_sub_tensor_backend'] = resolved
-    txt = 'Substitution tensor backend: requested={}, resolved={}'
-    if details == '':
-        print(txt.format(requested, resolved), flush=True)
-    else:
-        print((txt + ' ({})').format(requested, resolved, details), flush=True)
+    print('Substitution tensor backend: requested={}, resolved={}'.format(requested, resolved), flush=True)
     return resolved
 
 def dense_to_sparse_sub_tensor(sub_tensor, tol=0):
@@ -458,19 +303,7 @@ def estimate_sub_tensor_density(sub_tensor, tol=0):
 
 def resolve_reducer_backend(g, sub_tensor=None, label=''):
     requested = _resolve_requested_sub_tensor_backend(g)
-    if requested in ['dense', 'sparse']:
-        resolved = requested
-    else:
-        if sub_tensor is None:
-            resolved = 'dense'
-        else:
-            tol = float(g.get('float_tol', 0))
-            cutoff = float(g.get('sub_tensor_sparse_density_cutoff', 0.15))
-            density = estimate_sub_tensor_density(sub_tensor=sub_tensor, tol=tol)
-            resolved = 'sparse' if (density <= cutoff) else 'dense'
-            txt = 'Auto-selected substitution reducer backend{}: density={:.6f}, cutoff={:.6f}, resolved={}'
-            lbl = '' if label == '' else ' for {}'.format(label)
-            print(txt.format(lbl, density, cutoff, resolved), flush=True)
+    resolved = 'dense' if requested == 'dense' else 'sparse'
     if 'resolved_reducer_backend' not in g.keys():
         g['resolved_reducer_backend'] = dict()
     if label != '':

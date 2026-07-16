@@ -350,7 +350,8 @@ def test_get_exp_state_falls_back_to_expm_when_eigen_projection_is_unstable(monk
     np.testing.assert_allclose(fallback, expected, atol=1e-12, rtol=1e-12)
 
 
-def test_fused_expected_sparse_tensor_matches_materialized_path():
+@pytest.mark.parametrize("sub_tensor_backend", ["auto", "sparse"])
+def test_fused_expected_sparse_tensor_matches_materialized_path(sub_tensor_backend):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
     num_node = max(labels.values()) + 1
@@ -368,7 +369,7 @@ def test_fused_expected_sparse_tensor_matches_materialized_path():
         "float_type": np.float64,
         "float_tol": 1e-12,
         "threads": 1,
-        "sub_tensor_backend": "sparse",
+        "sub_tensor_backend": sub_tensor_backend,
         "expected_state_backend": "eigen",
         "ml_anc": False,
     }

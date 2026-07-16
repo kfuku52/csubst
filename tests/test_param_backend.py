@@ -1004,8 +1004,14 @@ def test_get_global_parameters_validates_convergent_amino_acids():
     assert g["convergent_amino_acids"] == "AQ"
 
 
-def test_resolve_sub_tensor_backend_auto_to_dense():
+def test_resolve_sub_tensor_backend_auto_to_sparse_without_state_tensor():
     g = {"sub_tensor_backend": "auto"}
+    assert substitution.resolve_sub_tensor_backend(g) == "sparse"
+    assert g["resolved_sub_tensor_backend"] == "sparse"
+
+
+def test_resolve_sub_tensor_backend_dense_remains_legacy_compatibility_path():
+    g = {"sub_tensor_backend": "dense"}
     assert substitution.resolve_sub_tensor_backend(g) == "dense"
     assert g["resolved_sub_tensor_backend"] == "dense"
 
@@ -1016,15 +1022,15 @@ def test_resolve_sub_tensor_backend_sparse_is_sparse():
     assert g["resolved_sub_tensor_backend"] == "sparse"
 
 
-def test_resolve_sub_tensor_backend_auto_can_switch_to_sparse_for_large_tensors():
+def test_resolve_sub_tensor_backend_auto_is_sparse_for_large_tensors():
     g = {"sub_tensor_backend": "auto", "sub_tensor_auto_sparse_min_elements": 1000}
     state = np.zeros((2, 2, 20), dtype=float)
     assert substitution.resolve_sub_tensor_backend(g=g, state_tensor=state, mode="asis") == "sparse"
     assert g["resolved_sub_tensor_backend"] == "sparse"
 
 
-def test_resolve_sub_tensor_backend_auto_keeps_dense_for_small_tensors():
+def test_resolve_sub_tensor_backend_auto_is_sparse_for_small_tensors():
     g = {"sub_tensor_backend": "auto", "sub_tensor_auto_sparse_min_elements": 100000}
     state = np.zeros((2, 2, 20), dtype=float)
-    assert substitution.resolve_sub_tensor_backend(g=g, state_tensor=state, mode="asis") == "dense"
-    assert g["resolved_sub_tensor_backend"] == "dense"
+    assert substitution.resolve_sub_tensor_backend(g=g, state_tensor=state, mode="asis") == "sparse"
+    assert g["resolved_sub_tensor_backend"] == "sparse"

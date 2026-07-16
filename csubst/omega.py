@@ -2179,7 +2179,7 @@ def _project_expected_sparse_chunk(
 
 
 def _get_fused_expected_sparse_substitution_tensor(g, mode):
-    if str(g.get('sub_tensor_backend', 'auto')).strip().lower() != 'sparse':
+    if str(g.get('sub_tensor_backend', 'auto')).strip().lower() == 'dense':
         return None
     if str(g.get('expected_state_backend', 'auto')).strip().lower() == 'expm':
         return None

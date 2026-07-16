@@ -1004,12 +1004,12 @@ def test_estimate_sub_tensor_density_matches_dense_and_sparse():
     assert substitution.estimate_sub_tensor_density(sparse_tensor) == expected
 
 
-def test_resolve_reducer_backend_auto_threshold_switches_dense_sparse():
+def test_resolve_reducer_backend_auto_always_uses_sparse_container():
     dense = _toy_dense_tensor()
     high_cutoff = {"sub_tensor_backend": "auto", "sub_tensor_sparse_density_cutoff": 1.0}
     low_cutoff = {"sub_tensor_backend": "auto", "sub_tensor_sparse_density_cutoff": 0.00001}
     assert substitution.resolve_reducer_backend(high_cutoff, dense, label="x") == "sparse"
-    assert substitution.resolve_reducer_backend(low_cutoff, dense, label="y") == "dense"
+    assert substitution.resolve_reducer_backend(low_cutoff, dense, label="y") == "sparse"
 
 
 def test_get_reducer_sub_tensor_converts_and_caches_sparse():
@@ -1053,7 +1053,7 @@ def test_get_substitution_tensor_sparse_asis_matches_dense():
             sparse_mmap.unlink()
 
 
-def test_auto_substitution_backend_uses_state_density_below_element_threshold():
+def test_auto_substitution_backend_uses_sparse_below_legacy_element_threshold():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
     state = np.zeros((3, 2, 2), dtype=np.float64)
@@ -1070,12 +1070,6 @@ def test_auto_substitution_backend_uses_state_density_below_element_threshold():
         "sub_tensor_sparse_density_cutoff": 0.15,
     }
 
-    estimated_nnz = substitution._estimate_sub_tensor_nnz_from_state(
-        state_tensor=state,
-        state_tensor_anc=state,
-        mode="asis",
-        g=g,
-    )
     observed = substitution.get_substitution_tensor(
         state_tensor=state,
         mode="asis",
@@ -1084,11 +1078,11 @@ def test_auto_substitution_backend_uses_state_density_below_element_threshold():
     )
 
     assert isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
-    assert observed.nnz == estimated_nnz
+    assert observed.nnz > 0
     assert g["resolved_sub_tensor_backend"] == "sparse"
 
 
-def test_auto_substitution_backend_keeps_high_density_tensor_dense_below_element_threshold():
+def test_auto_substitution_backend_uses_sparse_for_small_high_density_tensor():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     state = np.full((3, 2, 2), 0.5, dtype=np.float64)
     g = {
@@ -1108,14 +1102,14 @@ def test_auto_substitution_backend_keeps_high_density_tensor_dense_below_element
             g=g,
             mmap_attr="toy_auto_dense_density",
         )
-        assert not isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
-        assert g["resolved_sub_tensor_backend"] == "dense"
+        assert isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
+        assert g["resolved_sub_tensor_backend"] == "sparse"
     finally:
         if mmap_path.exists():
             mmap_path.unlink()
 
 
-def test_auto_substitution_backend_keeps_high_density_tensor_dense_above_element_threshold():
+def test_auto_substitution_backend_uses_sparse_for_large_high_density_tensor():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     state = np.full((3, 2, 2), 0.5, dtype=np.float64)
     g = {
@@ -1135,8 +1129,8 @@ def test_auto_substitution_backend_keeps_high_density_tensor_dense_above_element
             g=g,
             mmap_attr="toy_auto_dense_large_density",
         )
-        assert not isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
-        assert g["resolved_sub_tensor_backend"] == "dense"
+        assert isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
+        assert g["resolved_sub_tensor_backend"] == "sparse"
     finally:
         if mmap_path.exists():
             mmap_path.unlink()

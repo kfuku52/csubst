@@ -650,7 +650,9 @@ def _build_parser(show_advanced=False):
                         metavar='auto|dense|sparse', default='auto', type=str,
                         choices=['auto', 'dense', 'sparse'],
                         help='default=%(default)s: Backend for substitution tensors. '
-                             '"auto" selects sparse reducers for low-density tensors.')
+                             '"auto" and "sparse" use the sparse 5D container. '
+                             '"dense" is a legacy comparison and compatibility backend; '
+                             'dense 2D kernels may still be used internally.')
     _add_advanced_argument(advanced_performance, '--expected_state_backend', show_advanced=show_advanced,
                         metavar='auto|expm|eigen', default='auto', type=str,
                         choices=['auto', 'expm', 'eigen'],
@@ -659,17 +661,16 @@ def _build_parser(show_advanced=False):
                              'and falls back to scipy.linalg.expm otherwise.')
     _add_advanced_argument(advanced_performance, '--sub_tensor_sparse_density_cutoff', show_advanced=show_advanced,
                         metavar='FLOAT', default=0.15, type=float, required=False,
-                        help='default=%(default)s: Density cutoff for --sub_tensor_backend auto. '
-                             'Sparse reducers are selected when estimated substitution tensor density is <= this value.')
+                        help='default=%(default)s: Deprecated compatibility option; '
+                             '--sub_tensor_backend auto now always uses the sparse 5D container.')
     _add_advanced_argument(advanced_performance, '--sub_tensor_auto_sparse_min_elements', show_advanced=show_advanced,
                         metavar='INT', default=100000000, type=int, required=False,
-                        help='default=%(default)s: For --sub_tensor_backend auto, build sparse substitution tensors '
-                             'when estimated tensor elements (branch x site x group x from x to) are >= this threshold.')
+                        help='default=%(default)s: Deprecated compatibility option; '
+                             '--sub_tensor_backend auto now always uses the sparse 5D container.')
     _add_advanced_argument(advanced_performance, '--sub_tensor_auto_sparse_min_bytes', show_advanced=show_advanced,
                         metavar='INT', default=67108864, type=int, required=False,
-                        help='default=%(default)s: For --sub_tensor_backend auto, allow direct sparse construction '
-                             'below the element threshold when estimated dense storage reaches this many bytes and '
-                             'estimated density is below --sub_tensor_sparse_density_cutoff.')
+                        help='default=%(default)s: Deprecated compatibility option; '
+                             '--sub_tensor_backend auto now always uses the sparse 5D container.')
     _add_advanced_argument(advanced_performance, '--parallel_backend', show_advanced=show_advanced,
                         metavar='auto|multiprocessing|threading', default='auto', type=str,
                         choices=['auto', 'multiprocessing', 'threading'],

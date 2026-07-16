@@ -2711,10 +2711,12 @@ def test_get_substitution_tensor_asis_matches_manual_outer_products():
     mmap_file = Path("tmp.csubst.sub_tensor.toy.mmap")
     try:
         out = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g, mmap_attr="toy")
+        assert isinstance(out, substitution_sparse.SparseSubstitutionTensor)
+        out_dense = out.to_dense()
         # Branch A, site 0: parent state 0 -> child state 1 with prob 1.
-        np.testing.assert_allclose(out[labels["A"], 0, 0, :, :], [[0.0, 1.0], [0.0, 0.0]], atol=1e-12)
+        np.testing.assert_allclose(out_dense[labels["A"], 0, 0, :, :], [[0.0, 1.0], [0.0, 0.0]], atol=1e-12)
         # Branch A, site 1: parent [0.5, 0.5], child state 0 => only 1->0 survives diag masking.
-        np.testing.assert_allclose(out[labels["A"], 1, 0, :, :], [[0.0, 0.0], [0.5, 0.0]], atol=1e-12)
+        np.testing.assert_allclose(out_dense[labels["A"], 1, 0, :, :], [[0.0, 0.0], [0.5, 0.0]], atol=1e-12)
     finally:
         if mmap_file.exists():
             mmap_file.unlink()
@@ -3053,12 +3055,14 @@ def test_get_substitution_tensor_syn_matches_manual_groupwise_products():
     mmap_file = Path("tmp.csubst.sub_tensor.toy_syn.mmap")
     try:
         out = substitution.get_substitution_tensor(state_tensor=state, mode="syn", g=g, mmap_attr="toy_syn")
+        assert isinstance(out, substitution_sparse.SparseSubstitutionTensor)
+        out_dense = out.to_dense()
         # Branch A, group K: diag masked outer product of parent [0.6,0.4] and child [0.1,0.9].
-        np.testing.assert_allclose(out[labels["A"], 0, 0, :, :], [[0.0, 0.54], [0.04, 0.0]], atol=1e-12)
+        np.testing.assert_allclose(out_dense[labels["A"], 0, 0, :, :], [[0.0, 0.54], [0.04, 0.0]], atol=1e-12)
         # Group F has no support in this toy example.
-        np.testing.assert_allclose(out[labels["A"], 0, 1, :, :], [[0.0, 0.0], [0.0, 0.0]], atol=1e-12)
+        np.testing.assert_allclose(out_dense[labels["A"], 0, 1, :, :], [[0.0, 0.0], [0.0, 0.0]], atol=1e-12)
         # Branch B, group K:
-        np.testing.assert_allclose(out[labels["B"], 0, 0, :, :], [[0.0, 0.12], [0.32, 0.0]], atol=1e-12)
+        np.testing.assert_allclose(out_dense[labels["B"], 0, 0, :, :], [[0.0, 0.12], [0.32, 0.0]], atol=1e-12)
     finally:
         if mmap_file.exists():
             mmap_file.unlink()
