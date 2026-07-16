@@ -6,6 +6,7 @@ import sys
 import time
 
 from csubst import combination
+from csubst.config_types import AnalysisConfig
 from csubst import foreground
 from csubst import omega
 from csubst import param
@@ -16,6 +17,7 @@ from csubst import ete
 from csubst import output_stat
 from csubst import runtime
 from csubst import tree
+from csubst import tsv
 
 
 def _resolve_expectation_method(g):
@@ -82,10 +84,9 @@ def _write_cbs_stream(id_combinations, OS_tensor, ON_tensor, g, output_path):
                 group_cols=cbs_group_cols,
                 site_is_one_based=False,
             )
-        cbs.to_csv(
+        tsv.write_dataframe(
+            cbs,
             output_path,
-            sep='\t',
-            index=False,
             float_format=g['float_format'],
             header=(not wrote_header),
             mode='w' if not wrote_header else 'a',
@@ -265,7 +266,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             file_name = runtime.output_path(g, "cb_" + str(current_arity) + ".tsv")
             cb_column_original = cb.columns.tolist()
             cb.columns = cb.columns.str.replace('_PLACEHOLDER', '')
-            cb.to_csv(file_name, sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+            tsv.write_dataframe(cb, file_name, float_format=g['float_format'], chunksize=10000)
             cb.columns = cb_column_original
             txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
@@ -570,10 +571,9 @@ def _compute_epistasis_degree_from_structure(g, num_site):
         'epistasis_contact_proximity_z',
     ]
     degree_cols_existing = [col for col in degree_cols if col in df.columns]
-    df.loc[:, degree_cols_existing].to_csv(
+    tsv.write_dataframe(
+        df.loc[:, degree_cols_existing],
         degree_outfile,
-        sep='\t',
-        index=False,
         float_format=g['float_format'],
     )
     print('Writing epistasis structure degree table: {}'.format(degree_outfile), flush=True)
@@ -636,7 +636,7 @@ def _prepare_epistasis_configuration(g, ON_tensor, OS_tensor):
     return g
 
 
-def main_analyze(g):
+def main_analyze(g: AnalysisConfig) -> None:
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
     print("Reading and parsing input files.", flush=True)
@@ -687,7 +687,12 @@ def main_analyze(g):
                 site_is_one_based=False,
             )
         bs = table.sort_branch_ids(df=bs)
-        bs.to_csv(runtime.output_path(g, "bs.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        tsv.write_dataframe(
+            bs,
+            runtime.output_path(g, "bs.tsv"),
+            float_format=g['float_format'],
+            chunksize=10000,
+        )
         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(bs.values.nbytes/1024/1024, bs.values.dtype), flush=True)
         del bs
@@ -713,7 +718,12 @@ def main_analyze(g):
                     group_cols=[],
                     site_is_one_based=False,
                 )
-            s.to_csv(runtime.output_path(g, "s.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+            tsv.write_dataframe(
+                s,
+                runtime.output_path(g, "s.tsv"),
+                float_format=g['float_format'],
+                chunksize=10000,
+            )
         txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(s.values.nbytes/1024/1024, s.values.dtype), flush=True)
         elapsed_time = int(time.time() - start)
@@ -744,7 +754,12 @@ def main_analyze(g):
         if (g['b']):
             b_column_original = b.columns.tolist()
             b.columns = b.columns.str.replace('_PLACEHOLDER', '')
-            b.to_csv(runtime.output_path(g, "b.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+            tsv.write_dataframe(
+                b,
+                runtime.output_path(g, "b.tsv"),
+                float_format=g['float_format'],
+                chunksize=10000,
+            )
             b.columns = b_column_original
         txt = 'Memory consumption of b table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(b.values.nbytes/1024/1024, b.values.dtype), flush=True)
@@ -769,7 +784,12 @@ def main_analyze(g):
                 group_cols=[],
                 site_is_one_based=False,
             )
-        cs.to_csv(runtime.output_path(g, "cs.tsv"), sep="\t", index=False, float_format=g['float_format'], chunksize=10000)
+        tsv.write_dataframe(
+            cs,
+            runtime.output_path(g, "cs.tsv"),
+            float_format=g['float_format'],
+            chunksize=10000,
+        )
         txt = 'Memory consumption of cs table: {:,.1f} Mbytes (dtype={})'
         print(txt.format(cs.values.nbytes/1024/1024, cs.values.dtype), flush=True)
         del cs
@@ -796,6 +816,12 @@ def main_analyze(g):
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if (g['cb']):
+        # Site annotations and observed reducers are complete.  Expected sparse
+        # reducers can therefore release their much larger source state arrays
+        # as soon as each reducer has been constructed.
+        # Clade permutation can discover uncached branch combinations and
+        # rebuild expected reducers later in the same arity.
+        g['_release_state_after_expected_reducer'] = int(g.get('fg_clade_permutation', 0)) <= 0
         g['df_cb_stats_main'] = pd.DataFrame()
         g,cb = cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True)
         #if (g['fg_clade_permutation']>0):
@@ -807,10 +833,9 @@ def main_analyze(g):
         g['df_cb_stats_main'].columns = pd.Index(
             [str(col).replace('_PLACEHOLDER', '') for col in column_original]
         )
-        g['df_cb_stats_main'].to_csv(
+        tsv.write_dataframe(
+            g['df_cb_stats_main'],
             runtime.output_path(g, 'cb_stats.tsv'),
-            sep="\t",
-            index=False,
             float_format=g['float_format'],
             chunksize=10000,
         )

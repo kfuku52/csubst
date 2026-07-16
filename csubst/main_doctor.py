@@ -11,6 +11,7 @@ from csubst import runtime
 from csubst import sequence
 from csubst import tree
 from csubst import ete
+from csubst import tsv
 
 
 _SEVERITY_RANK = {
@@ -339,7 +340,7 @@ def _write_doctor_outputs(rows, g):
             ascending=[False, True, True, True],
         ).reset_index(drop=True)
         df = df.drop(columns=["_severity_rank"])
-    df.to_csv(summary_tsv, sep="\t", index=False)
+    tsv.write_dataframe(df, summary_tsv)
     summary_payload = {
         "counts": {
             "pass": int((df["status"] == "pass").sum()) if df.shape[0] > 0 else 0,

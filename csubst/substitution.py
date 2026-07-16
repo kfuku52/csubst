@@ -1715,6 +1715,29 @@ def _calc_projection_gram_pair_values(projection, row_ids, col_ids):
             col_ids=col_ids,
         )
         return values, density, 'dense'
+    cython_gram = None if substitution_sparse_cy is None else getattr(
+        substitution_sparse_cy,
+        'calc_csr_gram_dense_double',
+        None,
+    )
+    if (
+        cython_gram is not None
+        and projection.has_canonical_format
+        and projection.data.dtype == np.float64
+        and projection.indptr.dtype in (np.dtype(np.int32), np.dtype(np.int64))
+        and projection.indices.dtype in (np.dtype(np.int32), np.dtype(np.int64))
+    ):
+        try:
+            gram = cython_gram(
+                projection.indptr,
+                projection.indices,
+                projection.data,
+                int(projection.shape[1]),
+            )
+            values = np.asarray(gram[row_ids, col_ids], dtype=np.float64).reshape(-1)
+            return values, density, 'sparse'
+        except Exception as exc:
+            _warn_cython_fallback('sparse_projection_gram', exc)
     gram = projection @ projection.T
     values = np.asarray(gram[row_ids, col_ids], dtype=np.float64).reshape(-1)
     return values, density, 'sparse'

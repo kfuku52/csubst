@@ -20,6 +20,7 @@ from csubst import runtime
 from csubst import structural_alphabet
 from csubst import tree
 from csubst import ete
+from csubst import tsv
 
 _THREEDI_STATE_CACHE_FORMAT_VERSION = 2
 
@@ -679,7 +680,7 @@ def write_site_index_map(g, output_path='csubst_sites_index_map.tsv'):
         'site_1based': np.where(internal_site >= 0, internal_site + 1, 0).astype(np.int64),
         'is_retained': np.where(internal_site >= 0, 'Y', 'N'),
     })
-    out.to_csv(output_path, sep='\t', index=False)
+    tsv.write_dataframe(out, output_path)
     return os.path.abspath(output_path)
 
 
@@ -1109,7 +1110,13 @@ def prep_state(g, apply_site_filtering=True):
             )
         state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
         state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
-        state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
+        # The default nonsynonymous alphabet is the amino-acid alphabet, so
+        # state_nsy and state_pep are semantically identical.  Sharing the
+        # array avoids keeping a second node x site x 20 tensor alive.
+        if g.get('nonsyn_recode', 'no') == 'no':
+            state_nsy = state_pep
+        else:
+            state_nsy = _resolve_state_nsy(state_cdn_local=state_cdn, state_pep_local=state_pep)
     else:
         raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     g['state_nuc'] = state_nuc

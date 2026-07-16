@@ -6,6 +6,7 @@ import pandas as pd
 
 from csubst import output_manifest
 from csubst import runtime
+from csubst import tsv
 
 
 _DEFAULT_METRICS = ["elapsed_sec", "hit_rows", "score_max"]
@@ -458,8 +459,8 @@ def main_benchmark_plot(g):
     summary_tsv = runtime.output_path(g, "benchmark_plot_summary.tsv")
     summary_json = runtime.output_path(g, "benchmark_plot_summary.json")
     overview_plot = runtime.output_path(g, "benchmark_plot_overview.{}".format(plot_format))
-    runs.to_csv(runs_tsv, sep="\t", index=False)
-    parameter_summary.to_csv(summary_tsv, sep="\t", index=False)
+    tsv.write_dataframe(runs, runs_tsv)
+    tsv.write_dataframe(parameter_summary, summary_tsv)
     payload = {
         "benchmark_dir": benchmark_dir,
         "recursive": bool(recursive),

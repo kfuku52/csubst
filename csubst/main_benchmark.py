@@ -15,6 +15,7 @@ from csubst import output_manifest
 from csubst import pseudocount
 from csubst import recoding
 from csubst import runtime
+from csubst import tsv
 
 
 _IQTREE_EXTENSIONS = ["iqtree", "log", "rate", "state", "treefile"]
@@ -537,7 +538,7 @@ def _dataframe_records_for_json(df):
 def _write_benchmark_outputs(g, summary):
     summary_tsv = runtime.output_path(g, "benchmark_summary.tsv")
     summary_json = runtime.output_path(g, "benchmark_summary.json")
-    summary.to_csv(summary_tsv, sep="\t", index=False)
+    tsv.write_dataframe(summary, summary_tsv)
     payload = {
         "counts": {
             "pass": int((summary["status"] == "pass").sum()) if summary.shape[0] > 0 else 0,

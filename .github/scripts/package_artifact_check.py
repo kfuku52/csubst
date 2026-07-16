@@ -49,11 +49,17 @@ required_test_support = [
     "/tests/conftest.py",
     "/tools/evaluate_epistasis_simulation.py",
 ]
+required_typed_package_files = [
+    "csubst/config_types.py",
+    "csubst/expected_sparse.py",
+    "csubst/py.typed",
+    "csubst/tsv.py",
+]
 
 with tarfile.open(sdist_path, "r:gz") as archive:
     _require_suffixes(
         archive.getnames(),
-        required_sources + required_notices + required_test_support,
+        required_sources + required_notices + required_test_support + required_typed_package_files,
         sdist_path,
     )
 
@@ -61,7 +67,12 @@ with zipfile.ZipFile(wheel_path) as archive:
     names = archive.namelist()
     _require_suffixes(
         names,
-        ["/THIRD_PARTY_NOTICES.md", "/BIOPYTHON_LICENSE.rst", "/csubst/_vendor/pyvolve/LICENSE.txt"],
+        [
+            "/THIRD_PARTY_NOTICES.md",
+            "/BIOPYTHON_LICENSE.rst",
+            "/csubst/_vendor/pyvolve/LICENSE.txt",
+        ]
+        + required_typed_package_files,
         wheel_path,
     )
     _forbid_suffixes(

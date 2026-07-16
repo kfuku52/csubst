@@ -9,6 +9,7 @@ from csubst import substitution
 from csubst import substitution_scan
 from csubst import tree
 from csubst import main_sites
+from csubst import tsv
 
 
 def _require_foreground(g):
@@ -146,17 +147,15 @@ def main_scan(g):
     if scan_df.shape[0] == 0:
         print("No scan candidates passed the configured thresholds.", flush=True)
     scan_output_df = _prepare_scan_output_table(scan_df)
-    scan_output_df.to_csv(
+    tsv.write_dataframe(
+        scan_output_df,
         scan_path,
-        sep="\t",
-        index=False,
         float_format=g["float_format"],
         chunksize=10000,
     )
-    units_df.to_csv(
+    tsv.write_dataframe(
+        units_df,
         units_path,
-        sep="\t",
-        index=False,
         float_format=g["float_format"],
     )
     print("Writing {}".format(scan_path), flush=True)

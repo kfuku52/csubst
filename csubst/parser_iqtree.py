@@ -1,4 +1,5 @@
 import gzip
+import math
 import os
 import re
 import subprocess
@@ -227,6 +228,63 @@ def _get_state_file_path(g):
     return str(g.get('path_iqtree_state', '')).strip()
 
 
+def _open_state_text(state_path):
+    open_fn = gzip.open if str(state_path).lower().endswith('.gz') else open
+    return open_fn(state_path, mode='rt', encoding='utf-8', errors='replace')
+
+
+def _read_state_header_columns(state_path):
+    with _open_state_text(state_path) as handle:
+        for line in handle:
+            stripped = line.rstrip('\r\n')
+            if (stripped == '') or stripped.startswith('#'):
+                continue
+            columns = [column.strip() for column in stripped.split('\t')]
+            missing = [column for column in ('Node', 'Site', 'State') if column not in columns]
+            if missing:
+                raise ValueError(
+                    '.state file is missing required column(s): {}.'.format(','.join(missing))
+                )
+            if columns[:3] != ['Node', 'Site', 'State']:
+                raise ValueError('.state columns Node, Site, and State must be the first three columns.')
+            return columns
+    raise ValueError('.state file does not contain a header: {}'.format(state_path))
+
+
+def _iter_state_rows(state_path):
+    """Yield the first three fields and the unsplit probability suffix."""
+    header_seen = False
+    with _open_state_text(state_path) as handle:
+        for line_number, line in enumerate(handle, start=1):
+            stripped = line.rstrip('\r\n')
+            if (stripped == '') or stripped.startswith('#'):
+                continue
+            if not header_seen:
+                header_seen = True
+                continue
+            fields = stripped.split('\t', 3)
+            if len(fields) != 4:
+                raise ValueError(
+                    'Malformed .state row at line {}: expected Node, Site, State, and probabilities.'.format(
+                        line_number
+                    )
+                )
+            yield fields[0], fields[1], fields[2], fields[3], line_number
+
+
+def _parse_state_site_label(site_text):
+    try:
+        site_value = float(site_text)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('Non-numeric Site value(s) were found in .state file.') from exc
+    if not math.isfinite(site_value):
+        raise ValueError('Non-numeric Site value(s) were found in .state file.')
+    rounded = round(site_value)
+    if abs(site_value - rounded) > 1e-12:
+        raise ValueError('Non-integer Site value(s) were found in .state file.')
+    return int(rounded)
+
+
 def _populate_state_metadata_from_columns(g, state_columns):
     state_columns = pd.Index(state_columns)
     g['state_probability_columns'] = state_columns.tolist()
@@ -387,9 +445,16 @@ def run_iqtree_ancestral(g, force_notree_run=False):
 def read_state(g):
     state_path = _get_state_file_path(g)
     print('Reading the state file:', state_path)
-    state_table = pd.read_csv(state_path, sep="\t", index_col=False, header=0, comment='#')
-    g['num_input_site'] = state_table['Site'].unique().shape[0]
-    g = _populate_state_metadata_from_columns(g=g, state_columns=state_table.columns[3:])
+    state_columns = _read_state_header_columns(state_path)[3:]
+    alignment_file = str(g.get('alignment_file', '')).strip()
+    if alignment_file != '':
+        g['num_input_site'] = _infer_num_input_site_from_alignment_file(alignment_file)
+    else:
+        site_labels = set()
+        for _node, site_text, _state, _probabilities, _line_number in _iter_state_rows(state_path):
+            site_labels.add(_parse_state_site_label(site_text))
+        g['num_input_site'] = len(site_labels)
+    g = _populate_state_metadata_from_columns(g=g, state_columns=state_columns)
     print('')
     return g
 
@@ -397,9 +462,9 @@ def read_state(g):
 def read_state_header(g):
     state_path = _get_state_file_path(g)
     print('Reading the state file header:', state_path)
-    state_header = pd.read_csv(state_path, sep='\t', index_col=False, header=0, comment='#', nrows=0)
+    state_columns = _read_state_header_columns(state_path)[3:]
     g['num_input_site'] = _infer_num_input_site_from_alignment_file(g['alignment_file'])
-    g = _populate_state_metadata_from_columns(g=g, state_columns=state_header.columns[3:])
+    g = _populate_state_metadata_from_columns(g=g, state_columns=state_columns)
     print('')
     return g
 
@@ -726,6 +791,107 @@ def _validate_state_table_node_site_rows(state_table, expected_num_site):
     return state_table, site_labels
 
 
+def _scan_state_node_sites(state_path, expected_num_site, target_node_names=None):
+    """Validate Node/Site keys without loading probability columns into RAM."""
+    if target_node_names is not None:
+        target_node_names = set(target_node_names)
+        if not target_node_names:
+            return np.array([], dtype=np.int64), {}
+    sites_by_node = OrderedDict()
+    for node_name, site_text, _state, _probabilities, _line_number in _iter_state_rows(state_path):
+        if (target_node_names is not None) and (node_name not in target_node_names):
+            continue
+        site_label = _parse_state_site_label(site_text)
+        node_sites = sites_by_node.setdefault(node_name, set())
+        if site_label in node_sites:
+            raise ValueError(
+                'Duplicate Node/Site row(s) were found in .state file: {}:{}'.format(
+                    node_name, site_label
+                )
+            )
+        node_sites.add(site_label)
+    if not sites_by_node:
+        return np.array([], dtype=np.int64), sites_by_node
+
+    expected_num_site = int(expected_num_site)
+    invalid_nodes = [
+        (node_name, len(node_sites))
+        for node_name, node_sites in sites_by_node.items()
+        if len(node_sites) != expected_num_site
+    ]
+    if invalid_nodes:
+        invalid_txt = ', '.join(
+            ['{}:{}'.format(node_name, count) for node_name, count in invalid_nodes[:10]]
+        )
+        if len(invalid_nodes) > 10:
+            invalid_txt += ',...'
+        txt = 'Unexpected number of unique Site rows in .state file. '
+        txt += 'Expected {} sites per node; observed {}'
+        raise ValueError(txt.format(expected_num_site, invalid_txt))
+
+    site_labels = np.array(
+        sorted(set().union(*sites_by_node.values())),
+        dtype=np.int64,
+    )
+    if site_labels.shape[0] != expected_num_site:
+        txt = 'Unexpected number of unique Site labels in .state file. '
+        txt += 'Expected {}, observed {}.'
+        raise ValueError(txt.format(expected_num_site, site_labels.shape[0]))
+    expected_site_set = set(site_labels.tolist())
+    mismatched_nodes = [
+        node_name
+        for node_name, node_sites in sites_by_node.items()
+        if node_sites != expected_site_set
+    ]
+    if mismatched_nodes:
+        mismatch_txt = ', '.join(mismatched_nodes[:10])
+        if len(mismatched_nodes) > 10:
+            mismatch_txt += ',...'
+        raise ValueError(
+            'Inconsistent Site label sets were found among nodes in .state file: {}'.format(
+                mismatch_txt
+            )
+        )
+    return site_labels, sites_by_node
+
+
+def _fill_internal_state_rows(
+    state_tensor,
+    state_path,
+    state_columns,
+    site_labels,
+    internal_id_by_name,
+    dtype,
+):
+    if not internal_id_by_name or site_labels.shape[0] == 0:
+        return set()
+    site_index_by_label = {
+        int(site_label): index for index, site_label in enumerate(site_labels.tolist())
+    }
+    num_state = len(state_columns)
+    loaded_names = set()
+    for node_name, site_text, state_text, probabilities, line_number in _iter_state_rows(state_path):
+        node_id = internal_id_by_name.get(node_name)
+        if node_id is None:
+            continue
+        site_label = _parse_state_site_label(site_text)
+        row_index = site_index_by_label.get(site_label)
+        if row_index is None:
+            continue
+        values = np.fromstring(probabilities, sep='\t', dtype=dtype)
+        if values.shape[0] != num_state:
+            raise ValueError(
+                'Malformed .state probabilities at line {}: expected {}, observed {}.'.format(
+                    line_number, num_state, values.shape[0]
+                )
+            )
+        if state_text in ('?', '???'):
+            values.fill(0)
+        state_tensor[int(node_id), int(row_index), :] = values
+        loaded_names.add(node_name)
+    return loaded_names
+
+
 def get_state_tensor(g, selected_branch_ids=None):
     if g.get('input_data_type', None) != 'cdn':
         raise NotImplementedError(
@@ -749,56 +915,51 @@ def get_state_tensor(g, selected_branch_ids=None):
         tree=g['tree'],
         selected_branch_ids=selected_branch_ids,
     )
-    state_table = pd.read_csv(g['path_iqtree_state'], sep="\t", index_col=False, header=0, comment='#')
+    state_path = g['path_iqtree_state']
+    state_columns = _read_state_header_columns(state_path)[3:]
+    if len(state_columns) != int(g['num_input_state']):
+        raise ValueError(
+            'The number of probability columns in .state ({}) did not match num_input_state ({}).'.format(
+                len(state_columns), int(g['num_input_state'])
+            )
+        )
+    internal_id_by_name = {
+        node.name: int(ete.get_prop(node, "numerical_label"))
+        for node in g['tree'].traverse()
+        if not ete.is_leaf(node)
+    }
     if selected_set is not None:
-        target_internal_names = []
-        for node in g['tree'].traverse():
-            if ete.is_leaf(node):
-                continue
-            nl = int(ete.get_prop(node, "numerical_label"))
-            if nl in selected_set:
-                target_internal_names.append(node.name)
-        if len(target_internal_names) == 0:
-            state_table = state_table.iloc[0:0,:].copy()
-        else:
-            state_table = state_table.loc[state_table.loc[:, 'Node'].isin(target_internal_names), :].copy()
-    state_table, site_labels = _validate_state_table_node_site_rows(
-        state_table=state_table,
-        expected_num_site=g['num_input_site'],
-    )
-    state_columns = state_table.columns[3:]
-    if state_table.shape[0] > 0:
-        is_missing = (state_table.loc[:,'State']=='???') | (state_table.loc[:,'State']=='?')
-        state_table.loc[is_missing, state_columns] = 0
-        state_table_by_node = dict()
-        site_labels = np.asarray(site_labels, dtype=np.int64)
-        site_start = int(site_labels[0]) if site_labels.shape[0] else 0
-        expected_site_labels = np.arange(site_start, site_start + site_labels.shape[0], dtype=np.int64)
-        is_contiguous_site_labels = np.array_equal(site_labels, expected_site_labels)
-        expected_row_indices = np.arange(g['num_input_site'], dtype=np.int64)
-        if not is_contiguous_site_labels:
-            site_index_by_label = {int(site_label): i for i, site_label in enumerate(site_labels.tolist())}
-        for node_name, tmp in state_table.groupby('Node', sort=False):
-            row_values = tmp.loc[:, state_columns].to_numpy(dtype=g['float_type'], copy=False)
-            row_sites = tmp.loc[:, 'Site'].to_numpy(dtype=np.int64, copy=False)
-            if is_contiguous_site_labels:
-                row_indices = row_sites - site_start
-            else:
-                row_indices = np.array([site_index_by_label[int(site)] for site in row_sites], dtype=np.int64)
-            if (row_indices.shape[0] == expected_row_indices.shape[0]) and np.array_equal(row_indices, expected_row_indices):
-                state_table_by_node[node_name] = np.asarray(row_values, dtype=g['float_type'])
-                continue
-            state_matrix = np.zeros(shape=(g['num_input_site'], g['num_input_state']), dtype=g['float_type'])
-            state_matrix[row_indices, :] = row_values
-            state_table_by_node[node_name] = state_matrix
+        target_internal_names = {
+            node_name
+            for node_name, node_id in internal_id_by_name.items()
+            if node_id in selected_set
+        }
+        internal_id_by_name = {
+            node_name: node_id
+            for node_name, node_id in internal_id_by_name.items()
+            if node_name in target_internal_names
+        }
     else:
-        state_table_by_node = dict()
+        target_internal_names = None
+    site_labels, _sites_by_node = _scan_state_node_sites(
+        state_path=state_path,
+        expected_num_site=g['num_input_site'],
+        target_node_names=target_internal_names,
+    )
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = _initialize_state_tensor(
         axis=axis,
         dtype=g['float_type'],
         selective=(selected_set is not None),
         mmap_name='tmp.csubst.state_tensor.mmap',
+    )
+    loaded_internal_names = _fill_internal_state_rows(
+        state_tensor=state_tensor,
+        state_path=state_path,
+        state_columns=state_columns,
+        site_labels=site_labels,
+        internal_id_by_name=internal_id_by_name,
+        dtype=g['float_type'],
     )
     codon_lookup = None
     codon_state_lookup = None
@@ -835,11 +996,8 @@ def get_state_tensor(g, selected_branch_ids=None):
                 )
             state_tensor[nl,:,:] = state_matrix
         else: # Internal nodes
-            state_matrix = state_table_by_node.get(node.name, None)
-            if state_matrix is None:
+            if node.name not in loaded_internal_names:
                 print('Node name not found in .state file:', node.name)
-            else:
-                state_tensor[nl,:,:] = state_matrix
     state_tensor = np.nan_to_num(state_tensor, copy=False)
     if selected_set is None:
         state_tensor = mask_missing_sites(state_tensor, g['tree'])

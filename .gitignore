@@ -23,6 +23,7 @@ tmp.csubst.*
 /csubst_benchmark_plot/
 /csubst_doctor/
 /csubst_inspect/
+/csubst_iqtree/
 /csubst_scan/
 /csubst_search/
 /csubst_simulate/

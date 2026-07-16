@@ -731,6 +731,28 @@ def test_sparse_projection_gram_switches_sparse_and_dense_per_projection(monkeyp
     np.testing.assert_allclose(dense_values, [4.0, 4.0], atol=1e-12)
 
 
+@pytest.mark.parametrize("seed", range(8))
+def test_cython_csr_gram_matches_dense_randomized(seed):
+    cython_module = substitution.substitution_sparse_cy
+    if cython_module is None or not hasattr(cython_module, "calc_csr_gram_dense_double"):
+        pytest.skip("Cython CSR Gram extension is unavailable")
+    rng = np.random.default_rng(seed)
+    num_row = int(rng.integers(2, 18))
+    num_column = int(rng.integers(1, 180))
+    dense = rng.normal(size=(num_row, num_column))
+    dense[rng.random(size=dense.shape) > rng.uniform(0.02, 0.8)] = 0.0
+    projection = sp.csr_matrix(dense, dtype=np.float64)
+
+    observed = cython_module.calc_csr_gram_dense_double(
+        projection.indptr,
+        projection.indices,
+        projection.data,
+        num_column,
+    )
+
+    np.testing.assert_allclose(observed, dense @ dense.T, rtol=1e-12, atol=1e-12)
+
+
 def test_adaptive_projection_gram_uses_pair_coverage_and_density():
     num_branch = 20
     dense_projection = sp.csr_matrix(np.ones((num_branch, 10), dtype=np.float64))

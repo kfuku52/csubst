@@ -5,7 +5,6 @@
 #    my_class.wait()
 
 import numpy as np
-import scipy.sparse as sp
 from scipy.linalg import expm
 
 import itertools
@@ -21,6 +20,7 @@ from csubst import substitution
 from csubst import substitution_sparse
 from csubst import table
 from csubst import ete
+from csubst import expected_sparse
 from csubst import output_stat
 from csubst import pseudocount
 from csubst._extensions import load_optional_extension
@@ -2283,138 +2283,12 @@ def _get_fused_expected_sparse_substitution_tensor(g, mode):
     )
 
 
-def _expected_projection_feature_count(stat, num_group, num_state):
-    if stat == 'any2any':
-        return int(num_group)
-    if stat in ('spe2any', 'any2spe'):
-        return int(num_group) * int(num_state)
-    if stat == 'spe2spe':
-        return int(num_group) * int(num_state) * int(num_state)
-    raise ValueError('Unsupported expected projection statistic: {}'.format(stat))
-
-
-def _get_expected_branch_projection_values(
-    parent_state,
-    expected_state,
-    sub_mode,
-    num_group,
-    num_state,
-    syn_indices_list,
-    selected,
-):
-    num_site = parent_state.shape[0]
-    out = {
-        stat: np.zeros(
-            (num_site, _expected_projection_feature_count(stat, num_group, num_state)),
-            dtype=np.float64,
-        )
-        for stat in selected
-    }
-    total_by_site = np.zeros(num_site, dtype=np.float64)
-    groups = [np.arange(num_state, dtype=np.int64)] if sub_mode == 'asis' else syn_indices_list
-    for sg, state_indices in enumerate(groups):
-        state_indices = np.asarray(state_indices, dtype=np.int64)
-        size = int(state_indices.shape[0])
-        if size <= 1:
-            continue
-        parent = np.asarray(parent_state[:, state_indices], dtype=np.float64)
-        child = np.asarray(expected_state[:, state_indices], dtype=np.float64)
-        parent_sum = parent.sum(axis=1)
-        child_sum = child.sum(axis=1)
-        diagonal = (parent * child).sum(axis=1)
-        total_sg = parent_sum * child_sum - diagonal
-        total_by_site += total_sg
-        if 'any2any' in out:
-            out['any2any'][:, sg] = total_sg
-        if 'spe2any' in out:
-            base = sg * num_state
-            out['spe2any'][:, base:base + size] = parent * (child_sum[:, None] - child)
-        if 'any2spe' in out:
-            base = sg * num_state
-            out['any2spe'][:, base:base + size] = child * (parent_sum[:, None] - parent)
-        if 'spe2spe' in out:
-            pair = parent[:, :, None] * child[:, None, :]
-            diagonal_ids = np.arange(size)
-            pair[:, diagonal_ids, diagonal_ids] = 0.0
-            base = sg * num_state * num_state
-            for a in range(size):
-                row_start = base + a * num_state
-                out['spe2spe'][:, row_start:row_start + size] = pair[:, a, :]
-    return out, total_by_site
-
-
-def _build_expected_projection_state_indices(sub_mode, num_group, num_state, syn_indices_list):
-    if sub_mode == 'asis':
-        return np.arange(num_state, dtype=np.int64).reshape(1, num_state)
-    state_indices = np.full((num_group, num_state), -1, dtype=np.int64)
-    for sg, indices in enumerate(syn_indices_list):
-        indices = np.asarray(indices, dtype=np.int64).reshape(-1)
-        if indices.shape[0] > num_state:
-            raise ValueError('A synonymous state group is larger than max_synonymous_size.')
-        state_indices[sg, :indices.shape[0]] = indices
-    return state_indices
-
-
-def _get_expected_branch_projection_payloads(
-    parent_state,
-    expected_state,
-    sub_mode,
-    num_group,
-    num_state,
-    syn_indices_list,
-    state_indices,
-    selected,
-):
-    """Return packed CSR row payloads without materializing dense projections."""
-    cython_fn = None if omega_cy is None else getattr(
-        omega_cy,
-        'build_expected_projection_rows_double',
-        None,
-    )
-    if cython_fn is not None:
-        try:
-            rows = cython_fn(
-                np.ascontiguousarray(parent_state, dtype=np.float64),
-                np.ascontiguousarray(expected_state, dtype=np.float64),
-                np.ascontiguousarray(state_indices, dtype=np.int64),
-                int(num_state),
-                'any2any' in selected,
-                'spe2any' in selected,
-                'any2spe' in selected,
-                'spe2spe' in selected,
-            )
-            arrays = {
-                'any2any': (rows[0], rows[1]),
-                'spe2any': (rows[2], rows[3]),
-                'any2spe': (rows[4], rows[5]),
-                'spe2spe': (rows[6], rows[7]),
-            }
-            return {
-                stat: arrays[stat]
-                for stat in selected
-                if arrays[stat][0].shape[0] > 0
-            }, float(rows[8])
-        except Exception as exc:
-            _warn_cython_fallback('expected_projection_rows', exc)
-    branch_values, total_by_site = _get_expected_branch_projection_values(
-        parent_state=parent_state,
-        expected_state=expected_state,
-        sub_mode=sub_mode,
-        num_group=num_group,
-        num_state=num_state,
-        syn_indices_list=syn_indices_list,
-        selected=selected,
-    )
-    payloads = {}
-    for stat, values in branch_values.items():
-        flat = values.T.reshape(-1)
-        nonzero = np.flatnonzero(flat != 0)
-        if nonzero.shape[0] > 0:
-            payloads[stat] = (
-                nonzero.astype(np.int32, copy=False),
-                flat[nonzero].astype(np.float64, copy=False),
-            )
-    return payloads, float(total_by_site.sum())
+# Backward-compatible private aliases used by focused parity tests.  Sparse
+# packing and storage mechanics live outside this high-level workflow module.
+_expected_projection_feature_count = expected_sparse.feature_count
+_get_expected_branch_projection_values = expected_sparse.projection_values
+_build_expected_projection_state_indices = expected_sparse.build_state_indices
+_get_expected_branch_projection_payloads = expected_sparse.branch_projection_payloads
 
 
 def _project_expected_branch_expm(
@@ -2437,26 +2311,6 @@ def _project_expected_branch_expm(
             float_tol=float_tol,
         )
     return expected_state
-
-
-def _finalize_expected_projection_rows(row_payloads, num_branch, num_site, num_feature):
-    indptr = np.zeros(num_branch + 1, dtype=np.int64)
-    for branch_id, (indices, _data) in row_payloads.items():
-        indptr[int(branch_id) + 1] = int(indices.shape[0])
-    np.cumsum(indptr, out=indptr)
-    nnz = int(indptr[-1])
-    indices = np.empty(nnz, dtype=np.int32)
-    data = np.empty(nnz, dtype=np.float64)
-    for branch_id, (row_indices, row_data) in row_payloads.items():
-        start = int(indptr[int(branch_id)])
-        stop = int(indptr[int(branch_id) + 1])
-        indices[start:stop] = row_indices
-        data[start:stop] = row_data
-    return sp.csr_matrix(
-        (data, indices, indptr),
-        shape=(num_branch, num_feature * num_site),
-        dtype=np.float64,
-    )
 
 
 def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
@@ -2515,15 +2369,22 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
             stacklevel=2,
         )
     resolved_backend = 'eigen_{}'.format(projector['kind']) if projector is not None else 'expm'
-    if projector is not None:
-        branch_jobs = sorted(branch_jobs, key=lambda job: (job[1], job[0]))
+    # Monotonic branch order lets the reducers write directly into final CSR
+    # buffers instead of retaining one NumPy payload object per branch.
+    branch_jobs = sorted(branch_jobs, key=lambda job: job[0])
     print(
         'Tensor-free expected reducer (mode={}): backend={}, branches={}, projections={}'.format(
             mode, resolved_backend, len(branch_jobs), ','.join(selected)
         ),
         flush=True,
     )
-    row_payloads = {stat: {} for stat in selected}
+    row_builders = {
+        stat: expected_sparse.CSRRowBuilder(
+            num_row=state.shape[0],
+            num_column=_expected_projection_feature_count(stat, num_group, num_state) * state.shape[1],
+        )
+        for stat in selected
+    }
     state_indices = _build_expected_projection_state_indices(
         sub_mode=sub_mode,
         num_group=num_group,
@@ -2567,11 +2428,18 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
                 selected=selected,
             )
             total += branch_total
-            for stat, payload in branch_payloads.items():
-                row_payloads[stat][int(nl)] = payload
+            for stat in selected:
+                payload = branch_payloads.get(stat)
+                if payload is None:
+                    payload = (
+                        np.empty(0, dtype=np.int32),
+                        np.empty(0, dtype=np.float64),
+                    )
+                row_builders[stat].append(int(nl), payload[0], payload[1])
     except FloatingPointError:
         if projector is None:
             raise
+        row_builders.clear()
         fallback_g = dict(g)
         fallback_g['expected_state_backend'] = 'expm'
         warnings.warn(
@@ -2580,16 +2448,10 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
             stacklevel=2,
         )
         return _get_fused_expected_sparse_reducer(fallback_g, mode, selected)
-    projections = {}
-    for stat in selected:
-        stat_payloads = row_payloads.pop(stat)
-        projections[stat] = _finalize_expected_projection_rows(
-            row_payloads=stat_payloads,
-            num_branch=state.shape[0],
-            num_site=state.shape[1],
-            num_feature=_expected_projection_feature_count(stat, num_group, num_state),
-        )
-        del stat_payloads
+    projections = {
+        stat: row_builders.pop(stat).finalize()
+        for stat in selected
+    }
     storage = sum(substitution._sparse_matrix_nbytes(mat) for mat in projections.values())
     print(
         'Generated tensor-free expected projections: storage={:,} bytes, total={:,.6f}'.format(storage, total),
@@ -2949,6 +2811,22 @@ def get_E(cb, g, ON_tensor, OS_tensor):
                 mode='nsy',
                 selected_base_stats=base_stats,
             )
+            if bool(g.get('_release_state_after_expected_reducer', False)):
+                state_objects = {
+                    id(value): value
+                    for key in ('state_pep', 'state_nsy')
+                    for value in [g.get(key)]
+                    if isinstance(value, np.ndarray)
+                }
+                released_nbytes = sum(int(value.nbytes) for value in state_objects.values())
+                g['state_pep'] = None
+                g['state_nsy'] = None
+                print(
+                    'Released peptide/nonsynonymous state storage ({:,} bytes).'.format(
+                        released_nbytes
+                    ),
+                    flush=True,
+                )
         else:
             print('Reusing expected nonsynonymous sparse projections.', flush=True)
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
@@ -2977,6 +2855,14 @@ def get_E(cb, g, ON_tensor, OS_tensor):
                 mode='cdn',
                 selected_base_stats=base_stats,
             )
+            if bool(g.get('_release_state_after_expected_reducer', False)):
+                state_cdn = g.get('state_cdn')
+                released_nbytes = int(state_cdn.nbytes) if isinstance(state_cdn, np.ndarray) else 0
+                g['state_cdn'] = None
+                print(
+                    'Released codon state storage ({:,} bytes).'.format(released_nbytes),
+                    flush=True,
+                )
         else:
             print('Reusing expected synonymous sparse projections.', flush=True)
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'

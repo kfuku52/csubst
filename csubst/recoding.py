@@ -8,7 +8,6 @@ from csubst import sequence
 from csubst.recoding_config import (
     AUTO_RECODING_SCHEMES,
     RECODING_SCHEMES,
-    SUPPORTED_RECODINGS,
     normalize_nonsyn_recode,
 )
 from csubst._extensions import load_optional_extension

@@ -131,6 +131,7 @@ setup(
                             '':['substitution_matrix/*.dat',
                                 'dataset/*',
                                 ],
+                            'csubst':['py.typed'],
                             'csubst._vendor.pyvolve':['LICENSE.txt'],
     },
     license_files    = [

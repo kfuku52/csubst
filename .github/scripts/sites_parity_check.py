@@ -40,6 +40,23 @@ EXPECTED = {
     },
 }
 
+# Deliberately allow broad hosted-runner variance while still failing on the
+# order-of-magnitude regressions that sparse/dense fallback bugs can cause.
+PERFORMANCE_LIMITS = {
+    "PGK": {
+        "analyze_elapsed_sec": 30.0,
+        "analyze_max_rss_kb": 800_000,
+        "site_elapsed_sec": 60.0,
+        "site_max_rss_kb": 800_000,
+    },
+    "PEPC": {
+        "analyze_elapsed_sec": 60.0,
+        "analyze_max_rss_kb": 1_200_000,
+        "site_elapsed_sec": 120.0,
+        "site_max_rss_kb": 1_200_000,
+    },
+}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -82,6 +99,20 @@ def parse_time_metrics(stderr_text):
     if (m_elapsed is not None) and (m_rss is not None):
         return parse_elapsed_seconds(m_elapsed.group(1)), int(m_rss.group(1))
 
+    # BSD time -l reports resident size in bytes.
+    m_elapsed_bsd = re.search(
+        r"^\s*([0-9.]+)\s+real\s+",
+        stderr_text,
+        flags=re.MULTILINE,
+    )
+    m_rss_bsd = re.search(
+        r"^\s*([0-9]+)\s+maximum resident set size\s*$",
+        stderr_text,
+        flags=re.MULTILINE,
+    )
+    if (m_elapsed_bsd is not None) and (m_rss_bsd is not None):
+        return float(m_elapsed_bsd.group(1)), int(m_rss_bsd.group(1)) // 1024
+
     # POSIX time -p fallback (elapsed only)
     m_elapsed_p = re.search(r"^real\s+([0-9.]+)$", stderr_text, flags=re.MULTILINE)
     if m_elapsed_p is not None:
@@ -93,6 +124,8 @@ def parse_time_metrics(stderr_text):
 def run_timed_command(cmd, cwd, label, env=None):
     if sys.platform.startswith("linux"):
         wrapper = ["/usr/bin/time", "-v"]
+    elif sys.platform == "darwin":
+        wrapper = ["/usr/bin/time", "-l"]
     else:
         wrapper = ["/usr/bin/time", "-p"]
     proc = subprocess.run(
@@ -343,6 +376,23 @@ def validate_metrics(rows):
                     dataset, expected["omegaCany2spe"], row["omegaCany2spe"]
                 )
             )
+        limits = PERFORMANCE_LIMITS[dataset]
+        for key in ["analyze_elapsed_sec", "site_elapsed_sec"]:
+            value = float(row[key])
+            if (not math.isfinite(value)) or value > float(limits[key]):
+                errors.append(
+                    "{}: {} {:.3f} exceeded {:.3f}".format(
+                        dataset, key, value, float(limits[key])
+                    )
+                )
+        for key in ["analyze_max_rss_kb", "site_max_rss_kb"]:
+            value = int(row[key])
+            if value >= 0 and value > int(limits[key]):
+                errors.append(
+                    "{}: {} {:,} exceeded {:,}".format(
+                        dataset, key, value, int(limits[key])
+                    )
+                )
     if len(errors) > 0:
         raise RuntimeError("Parity check failed:\n- " + "\n- ".join(errors))
 

@@ -1,4 +1,4 @@
-__version__ = '1.11.17'
+__version__ = '1.12.0'
 
 # These compatibility attributes remain available when the optional compiled
 # extensions have not been built. Internal modules load extensions lazily.

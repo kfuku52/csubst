@@ -867,6 +867,41 @@ def test_prep_state_rejects_nucleotide_input_before_iqtree_loader(monkeypatch):
         parser_misc.prep_state(g)
 
 
+def test_prep_state_default_nonsynonymous_state_reuses_peptide_storage(monkeypatch):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    num_node = len(list(tr.traverse()))
+    state_cdn = np.zeros((num_node, 2, 3), dtype=float)
+    state_pep = np.zeros((num_node, 2, 20), dtype=float)
+    state_pep[:, :, 0] = 1.0
+
+    monkeypatch.setattr(
+        parser_misc.parser_iqtree,
+        "get_state_tensor",
+        lambda g, selected_branch_ids=None: state_cdn,
+    )
+    monkeypatch.setattr(
+        sequence,
+        "cdn2pep_state",
+        lambda state_cdn, g, selected_branch_ids=None: state_pep,
+    )
+    monkeypatch.setattr(
+        sequence,
+        "cdn2nsy_state",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("duplicate conversion")),
+    )
+
+    out = parser_misc.prep_state(
+        {
+            "tree": tr,
+            "infile_type": "iqtree",
+            "input_data_type": "cdn",
+            "nonsyn_recode": "no",
+        }
+    )
+
+    assert out["state_nsy"] is out["state_pep"]
+
+
 def test_prep_state_3di20_direct_uses_direct_builder(monkeypatch):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))

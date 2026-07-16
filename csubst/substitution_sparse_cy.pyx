@@ -294,6 +294,85 @@ cpdef calc_sparse_projection_product_double(
 @cython.nonecheck(False)
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cpdef calc_csr_gram_dense_double(
+    numpy.ndarray[index_t, ndim=1] indptr,
+    numpy.ndarray[index_t, ndim=1] indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+    long num_column,
+):
+    """Compute CSR * CSR.T through a compact column index.
+
+    The branch axis is small in the Gram fast path.  Accumulating by feature
+    avoids SciPy's temporary sparse product and is especially effective for
+    the many moderately sparse expected-substitution projections.
+    """
+    cdef Py_ssize_t num_row = indptr.shape[0] - 1
+    cdef Py_ssize_t nnz = data.shape[0]
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] counts
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] offsets
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] cursor
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] row_ids
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] column_data
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] gram
+    cdef long[:] counts_mv
+    cdef long[:] offsets_mv
+    cdef long[:] cursor_mv
+    cdef long[:] row_ids_mv
+    cdef double[:] column_data_mv
+    cdef double[:, :] gram_mv
+    cdef Py_ssize_t row, position, left, right, start, end, target
+    cdef long column, row_left, row_right
+    cdef double product
+
+    if num_column < 0:
+        raise ValueError('num_column should be non-negative.')
+    if indices.shape[0] != nnz:
+        raise ValueError('indices and data should have identical length.')
+    counts = numpy.zeros(num_column, dtype=numpy.int64)
+    offsets = numpy.zeros(num_column + 1, dtype=numpy.int64)
+    counts_mv = counts
+    offsets_mv = offsets
+    for position in range(nnz):
+        column = indices[position]
+        if column < 0 or column >= num_column:
+            raise IndexError('CSR column index is out of range.')
+        counts_mv[column] += 1
+    for column in range(num_column):
+        offsets_mv[column + 1] = offsets_mv[column] + counts_mv[column]
+
+    cursor = offsets[0:num_column].copy()
+    row_ids = numpy.empty(nnz, dtype=numpy.int64)
+    column_data = numpy.empty(nnz, dtype=numpy.float64)
+    cursor_mv = cursor
+    row_ids_mv = row_ids
+    column_data_mv = column_data
+    for row in range(num_row):
+        for position in range(indptr[row], indptr[row + 1]):
+            column = indices[position]
+            target = cursor_mv[column]
+            row_ids_mv[target] = row
+            column_data_mv[target] = data[position]
+            cursor_mv[column] = target + 1
+
+    gram = numpy.zeros((num_row, num_row), dtype=numpy.float64)
+    gram_mv = gram
+    for column in range(num_column):
+        start = offsets_mv[column]
+        end = offsets_mv[column + 1]
+        for left in range(start, end):
+            row_left = row_ids_mv[left]
+            for right in range(left, end):
+                row_right = row_ids_mv[right]
+                product = column_data_mv[left] * column_data_mv[right]
+                gram_mv[row_left, row_right] += product
+                if row_left != row_right:
+                    gram_mv[row_right, row_left] += product
+    return gram
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cpdef calc_sparse_projection_product_by_site_double(
     numpy.ndarray[numpy.int64_t, ndim=2] id_combinations,
     numpy.ndarray[index_t, ndim=1] indptr,

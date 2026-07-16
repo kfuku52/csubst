@@ -14,6 +14,7 @@ from csubst import runtime
 from csubst import sequence
 from csubst import structural_alphabet
 from csubst import tree
+from csubst import tsv
 
 _FAST_STATE_PLOT_CHUNK_ROWS = 20000
 
@@ -202,10 +203,9 @@ def _write_branch_maps(g):
         combined_df.loc[:, "branch_color_" + trait_name] = trait_df.loc[:, "branch_color"].values
         combined_df.loc[:, "label_color_" + trait_name] = trait_df.loc[:, "label_color"].values
     combined_path = runtime.output_path(g, "branch_map.tsv")
-    _sanitize_placeholder_columns(combined_df).to_csv(
+    tsv.write_dataframe(
+        _sanitize_placeholder_columns(combined_df),
         combined_path,
-        sep="\t",
-        index=False,
     )
     output_paths.append(combined_path)
     for trait_name in trait_names:
@@ -213,7 +213,7 @@ def _write_branch_maps(g):
         out_file = out_file.replace("_PLACEHOLDER", "")
         if out_file == combined_path:
             continue
-        _sanitize_placeholder_columns(trait_specific_frames[trait_name]).to_csv(out_file, sep="\t", index=False)
+        tsv.write_dataframe(_sanitize_placeholder_columns(trait_specific_frames[trait_name]), out_file)
         output_paths.append(out_file)
     return output_paths
 

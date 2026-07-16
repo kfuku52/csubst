@@ -397,6 +397,31 @@ def test_get_state_tensor_reads_root_rows_from_state_file(tmp_path):
     np.testing.assert_allclose(out[root_id, 1, :], [0.0, 1.0, 0.0], atol=1e-12)
 
 
+def test_get_state_tensor_streams_state_rows_without_pandas_read_csv(tmp_path, monkeypatch):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAAAAC\n",
+    )
+    state_file = tmp_path / "toy.state.tsv"
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n"
+        "R\t1\tAAG\t0.0\t0.0\t1.0\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        parser_iqtree.pd,
+        "read_csv",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("pandas state load")),
+    )
+
+    out = parser_iqtree.get_state_tensor(g)
+
+    root_id = int(ete.get_prop(ete.get_tree_root(g["tree"]), "numerical_label"))
+    np.testing.assert_allclose(out[root_id, 0, :], [0.0, 0.0, 1.0], atol=1e-12)
+    np.testing.assert_allclose(out[root_id, 1, :], [0.0, 1.0, 0.0], atol=1e-12)
+
+
 def test_get_state_tensor_raises_when_leaf_sequence_missing(tmp_path):
     g = _make_state_tensor_g(
         tmp_path=tmp_path,
