@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -264,9 +265,11 @@ def test_scan_help_is_available():
     assert proc.returncode == 0
     help_text = (proc.stdout or "") + (proc.stderr or "")
     assert "--scan_match" in help_text
+    assert "--scan_unit_mode" in help_text
+    assert "lineage|stem|clade" in help_text
     assert "--random_seed" in help_text
     assert "any2any" in help_text
-    assert "--scan_unit" not in help_text
+    assert re.search(r"--scan_unit(?![A-Za-z0-9_])", help_text) is None
     assert "--scan_rate_exposure" in help_text
     assert "q_weighted" in help_text
     assert "default=q_weighted" in help_text

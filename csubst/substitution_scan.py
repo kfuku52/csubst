@@ -34,6 +34,7 @@ SCAN_RATE_EVENT_MODES = ("called", "posterior_sum")
 SCAN_RATE_EXPOSURES = ("q_weighted", "state_aware", "raw_branch_length")
 SCAN_OTHER_SCOPES = ("all", "sister")
 SCAN_PVALUE_CALIBRATIONS = ("none", "candidate_fixed", "full_scan")
+SCAN_UNIT_MODES = ("lineage", "stem", "clade")
 
 
 class _RetryableScanPermutationError(RuntimeError):
@@ -57,6 +58,7 @@ SCAN_OUTPUT_COLUMNS = (
     "to_state_distribution",
     "state_change",
     "candidate_event_pp_sum",
+    "scan_unit_mode",
     "scan_min_support_count",
     "scan_min_event_pp",
     "scan_rate_length_used",
@@ -124,6 +126,18 @@ SCAN_OUTPUT_COLUMNS = (
     "q_rate_enrichment_by_trait_match",
 )
 
+SCAN_UNIT_COLUMNS = (
+    "trait",
+    "unit_id",
+    "unit_mode",
+    "lineage_value",
+    "stem_branch_ids",
+    "fg_leaf_names",
+    "fg_branch_ids",
+    "sister_branch_ids",
+    "fg_clade_branch_ids",
+)
+
 
 def normalize_scan_matches(value):
     value_txt = "" if value is None else str(value).strip().lower()
@@ -150,6 +164,14 @@ def normalize_scan_matches(value):
     if len(out) == 0:
         raise ValueError("--scan_match should contain at least one value.")
     return out
+
+
+def normalize_scan_unit_mode(value):
+    value_txt = "lineage" if value is None else str(value).strip().lower()
+    if value_txt not in SCAN_UNIT_MODES:
+        txt = "--scan_unit_mode should be one of {}."
+        raise ValueError(txt.format(", ".join(SCAN_UNIT_MODES)))
+    return value_txt
 
 
 def normalize_scan_rate_event_mode(value):
@@ -549,53 +571,166 @@ def _lineage_sister_branch_ids(g, trait_name, lineage_index, fg_branch_ids, node
     return np.array(sorted(sister_ids), dtype=np.int64)
 
 
+def _lineage_component_groups(g, trait_name, valid_branches):
+    valid_branches = set(int(v) for v in valid_branches)
+    groups = []
+    lineages = _lineage_values(g=g, trait_name=trait_name)
+    for lineage_index, lineage_value in enumerate(lineages):
+        lineage_key = "is_lineage_fg_{}_{}".format(trait_name, int(lineage_index) + 1)
+        components = []
+        for node in g["tree"].traverse():
+            if ete.is_root(node) or (not bool(ete.get_prop(node, lineage_key, False))):
+                continue
+            is_parent_lineage = bool(ete.get_prop(node.up, lineage_key, False))
+            if is_parent_lineage:
+                continue
+            stem_branch_id = int(ete.get_prop(node, "numerical_label"))
+            clade_branch_ids = np.array(
+                sorted(
+                    int(ete.get_prop(desc, "numerical_label"))
+                    for desc in node.traverse()
+                    if int(ete.get_prop(desc, "numerical_label")) in valid_branches
+                ),
+                dtype=np.int64,
+            )
+            components.append(
+                {
+                    "stem_branch_id": stem_branch_id,
+                    "stem_is_valid": stem_branch_id in valid_branches,
+                    "clade_branch_ids": clade_branch_ids,
+                    "leaf_names": sorted(str(v) for v in ete.get_leaf_names(node)),
+                }
+            )
+        components = sorted(components, key=lambda item: int(item["stem_branch_id"]))
+        leaf_names = []
+        trait_leaf_names = g.get("fg_leaf_names", {}).get(trait_name, [])
+        if lineage_index < len(trait_leaf_names):
+            leaf_names = sorted(str(v) for v in trait_leaf_names[lineage_index])
+        groups.append(
+            {
+                "lineage_index": int(lineage_index),
+                "lineage_value": lineage_value,
+                "leaf_names": leaf_names,
+                "components": components,
+            }
+        )
+    return groups
+
+
+def _format_branch_id_list(values):
+    values = np.asarray(values, dtype=np.int64).reshape(-1)
+    return ",".join(str(int(v)) for v in values.tolist())
+
+
+def _component_ids(components, key):
+    arrays = [np.asarray(component[key], dtype=np.int64).reshape(-1) for component in components]
+    arrays = [values for values in arrays if values.shape[0] > 0]
+    if len(arrays) == 0:
+        return np.array([], dtype=np.int64)
+    return np.unique(np.concatenate(arrays).astype(np.int64, copy=False))
+
+
 def build_scan_units(g, branch_meta):
     rows = []
     valid_branches = set(branch_meta["branch_id"].astype(int).tolist())
     node_by_id = _node_by_branch_id(g)
+    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage"))
     for trait_name in g["fg_df"].columns[1:].tolist():
-        lineages = _lineage_values(g=g, trait_name=trait_name)
-        for i, lineage_value in enumerate(lineages):
-            fg_ids = foreground._get_lineage_target_ids(
-                lineage_index=i,
-                trait_name=trait_name,
-                g=g,
-            )
-            fg_ids = np.array([int(v) for v in fg_ids.tolist() if int(v) in valid_branches], dtype=np.int64)
-            fg_clade_ids = set()
-            for branch_id in fg_ids.tolist():
-                node = node_by_id.get(int(branch_id), None)
-                if node is None:
-                    continue
-                fg_clade_ids.update(
-                    int(ete.get_prop(desc, "numerical_label"))
-                    for desc in node.traverse()
-                    if int(ete.get_prop(desc, "numerical_label")) in valid_branches
+        groups = _lineage_component_groups(
+            g=g,
+            trait_name=trait_name,
+            valid_branches=valid_branches,
+        )
+        trait_rows = []
+        if unit_mode == "lineage":
+            for group in groups:
+                lineage_index = int(group["lineage_index"])
+                fg_ids = foreground._get_lineage_target_ids(
+                    lineage_index=lineage_index,
+                    trait_name=trait_name,
+                    g=g,
                 )
-            fg_clade_ids = np.array(sorted(fg_clade_ids), dtype=np.int64)
-            sister_ids = _lineage_sister_branch_ids(
-                g=g,
-                trait_name=trait_name,
-                lineage_index=i,
-                fg_branch_ids=fg_ids,
-                node_by_id=node_by_id,
+                fg_ids = np.array(
+                    [int(v) for v in fg_ids.tolist() if int(v) in valid_branches],
+                    dtype=np.int64,
+                )
+                stem_ids = np.array(
+                    [
+                        int(component["stem_branch_id"])
+                        for component in group["components"]
+                        if bool(component["stem_is_valid"])
+                    ],
+                    dtype=np.int64,
+                )
+                fg_clade_ids = _component_ids(group["components"], "clade_branch_ids")
+                sister_ids = _lineage_sister_branch_ids(
+                    g=g,
+                    trait_name=trait_name,
+                    lineage_index=lineage_index,
+                    fg_branch_ids=fg_ids,
+                    node_by_id=node_by_id,
+                )
+                sister_ids = np.array(
+                    [int(v) for v in sister_ids.tolist() if int(v) in valid_branches],
+                    dtype=np.int64,
+                )
+                trait_rows.append(
+                    {
+                        "trait": trait_name,
+                        "unit_mode": unit_mode,
+                        "lineage_value": group["lineage_value"],
+                        "stem_branch_ids": _format_branch_id_list(stem_ids),
+                        "fg_leaf_names": ",".join(group["leaf_names"]),
+                        "fg_branch_ids": _format_branch_id_list(fg_ids),
+                        "sister_branch_ids": _format_branch_id_list(sister_ids),
+                        "fg_clade_branch_ids": _format_branch_id_list(fg_clade_ids),
+                    }
+                )
+        else:
+            for group in groups:
+                for component in group["components"]:
+                    stem_ids = np.array(
+                        [int(component["stem_branch_id"])] if bool(component["stem_is_valid"]) else [],
+                        dtype=np.int64,
+                    )
+                    clade_ids = np.asarray(component["clade_branch_ids"], dtype=np.int64)
+                    fg_ids = stem_ids if unit_mode == "stem" else clade_ids
+                    if fg_ids.shape[0] == 0:
+                        continue
+                    trait_rows.append(
+                        {
+                            "trait": trait_name,
+                            "unit_mode": unit_mode,
+                            "lineage_value": group["lineage_value"],
+                            "stem_branch_ids": _format_branch_id_list(stem_ids),
+                            "fg_leaf_names": ",".join(component["leaf_names"]),
+                            "fg_branch_ids": _format_branch_id_list(fg_ids),
+                            "sister_branch_ids": "",
+                            "fg_clade_branch_ids": _format_branch_id_list(clade_ids),
+                        }
+                    )
+            all_fg_ids = _component_ids(
+                [{"ids": _parse_id_list(row["fg_branch_ids"])} for row in trait_rows],
+                "ids",
             )
-            sister_ids = np.array([int(v) for v in sister_ids.tolist() if int(v) in valid_branches], dtype=np.int64)
-            leaf_names = []
-            if trait_name in g.get("fg_leaf_names", {}) and i < len(g["fg_leaf_names"][trait_name]):
-                leaf_names = sorted([str(v) for v in g["fg_leaf_names"][trait_name][i]])
-            rows.append(
-                {
-                    "trait": trait_name,
-                    "unit_id": i + 1,
-                    "lineage_value": lineage_value,
-                    "fg_leaf_names": ",".join(leaf_names),
-                    "fg_branch_ids": ",".join(str(v) for v in fg_ids.tolist()),
-                    "sister_branch_ids": ",".join(str(v) for v in sister_ids.tolist()),
-                    "fg_clade_branch_ids": ",".join(str(v) for v in fg_clade_ids.tolist()),
-                }
-            )
-    return pd.DataFrame(rows)
+            for row in trait_rows:
+                sister_ids = _unit_sister_branch_ids(
+                    g=g,
+                    fg_branch_ids=_parse_id_list(row["fg_branch_ids"]),
+                    all_fg_branch_ids=all_fg_ids,
+                    node_by_id=node_by_id,
+                )
+                sister_ids = np.array(
+                    [int(v) for v in sister_ids.tolist() if int(v) in valid_branches],
+                    dtype=np.int64,
+                )
+                row["sister_branch_ids"] = _format_branch_id_list(sister_ids)
+        for unit_id, row in enumerate(trait_rows, start=1):
+            row["unit_id"] = int(unit_id)
+            rows.append(row)
+    if len(rows) == 0:
+        return pd.DataFrame(columns=list(SCAN_UNIT_COLUMNS))
+    return pd.DataFrame(rows).loc[:, list(SCAN_UNIT_COLUMNS)]
 
 
 def _parse_id_list(value):
@@ -628,9 +763,61 @@ def _unit_sister_branch_ids(g, fg_branch_ids, all_fg_branch_ids, node_by_id):
 
 def _selected_stem_fg_branch_ids(g, trait_cache, stem_index):
     stem_index = int(stem_index)
-    if bool(g.get("fg_stem_only", False)):
+    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage"))
+    if (unit_mode == "stem") or (
+        (unit_mode == "lineage") and bool(g.get("fg_stem_only", False))
+    ):
         return np.array([int(trait_cache["branch_ids"][stem_index])], dtype=np.int64)
     return np.array(trait_cache["descendant_branch_ids_by_index"][stem_index], dtype=np.int64)
+
+
+def _component_has_candidate_branches(g, unit_mode, component):
+    if unit_mode == "stem":
+        return bool(component["stem_is_valid"])
+    if unit_mode == "clade":
+        return np.asarray(component["clade_branch_ids"], dtype=np.int64).shape[0] > 0
+    if bool(g.get("fg_stem_only", False)):
+        return bool(component["stem_is_valid"])
+    return np.asarray(component["clade_branch_ids"], dtype=np.int64).shape[0] > 0
+
+
+def _assign_permuted_components_to_lineages(selected_components, observed_groups, trait_name, g):
+    slots = []
+    for group_index, group in enumerate(observed_groups):
+        for component_index, component in enumerate(group["components"]):
+            if not _component_has_candidate_branches(
+                g=g,
+                unit_mode="lineage",
+                component=component,
+            ):
+                continue
+            slots.append(
+                (
+                    int(np.asarray(component["clade_branch_ids"], dtype=np.int64).shape[0]),
+                    int(group_index),
+                    int(component_index),
+                )
+            )
+    selected_components = sorted(
+        selected_components,
+        key=lambda component: (
+            -int(np.asarray(component["clade_branch_ids"], dtype=np.int64).shape[0]),
+            int(component["stem_branch_id"]),
+        ),
+    )
+    slots = sorted(slots, key=lambda slot: (-int(slot[0]), int(slot[1]), int(slot[2])))
+    if len(selected_components) != len(slots):
+        txt = (
+            "A scan permutation retained {} of {} foreground components for trait {} after filtering "
+            "branches without analyzable states."
+        )
+        raise _RetryableScanPermutationError(
+            txt.format(len(selected_components), len(slots), trait_name)
+        )
+    assigned = [[] for _ in observed_groups]
+    for component, (_, group_index, _) in zip(selected_components, slots):
+        assigned[int(group_index)].append(component)
+    return assigned
 
 
 def _build_permuted_trait_context(
@@ -659,15 +846,13 @@ def _build_permuted_trait_context(
     stem_indices = np.where(stem_flags)[0].astype(np.int64, copy=False)
     valid_set = set(int(v) for v in np.asarray(valid_branch_ids, dtype=np.int64).reshape(-1).tolist())
     node_by_id = _node_by_branch_id(g)
-    unit_fg_arrays = []
-    unit_fg_clade_arrays = []
-    fg_leaf_names = []
+    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage"))
+    selected_components = []
     for stem_index in stem_indices.tolist():
         fg_ids = _selected_stem_fg_branch_ids(g=g, trait_cache=trait_cache, stem_index=stem_index)
         fg_ids = np.array([int(v) for v in fg_ids.tolist() if int(v) in valid_set], dtype=np.int64)
         if fg_ids.shape[0] == 0:
             continue
-        unit_fg_arrays.append(fg_ids)
         fg_clade_ids = np.array(
             [
                 int(v)
@@ -676,36 +861,107 @@ def _build_permuted_trait_context(
             ],
             dtype=np.int64,
         )
-        unit_fg_clade_arrays.append(fg_clade_ids)
-        fg_leaf_names.append(sorted([str(v) for v in trait_cache["leaf_names_by_index"][int(stem_index)]]))
-    expected_unit_count = len(_lineage_values(g=g, trait_name=trait_name))
-    if len(unit_fg_arrays) != expected_unit_count:
+        selected_components.append(
+            {
+                "stem_branch_id": int(trait_cache["branch_ids"][int(stem_index)]),
+                "fg_branch_ids": fg_ids,
+                "clade_branch_ids": fg_clade_ids,
+                "leaf_names": sorted(
+                    str(v) for v in trait_cache["leaf_names_by_index"][int(stem_index)]
+                ),
+            }
+        )
+    observed_groups = _lineage_component_groups(
+        g=g,
+        trait_name=trait_name,
+        valid_branches=valid_set,
+    )
+    expected_component_count = sum(
+        1
+        for group in observed_groups
+        for component in group["components"]
+        if _component_has_candidate_branches(g=g, unit_mode=unit_mode, component=component)
+    )
+    if len(selected_components) != expected_component_count:
         txt = (
-            "A scan permutation retained {} of {} foreground units for trait {} after filtering "
+            "A scan permutation retained {} of {} foreground components for trait {} after filtering "
             "branches without analyzable states."
         )
         raise _RetryableScanPermutationError(
-            txt.format(len(unit_fg_arrays), expected_unit_count, trait_name)
+            txt.format(len(selected_components), expected_component_count, trait_name)
         )
     occupied_clade_ids = set()
-    for clade_ids in unit_fg_clade_arrays:
+    for component in selected_components:
+        clade_ids = np.asarray(component["clade_branch_ids"], dtype=np.int64)
         clade_id_set = set(int(v) for v in clade_ids.tolist())
         if len(occupied_clade_ids.intersection(clade_id_set)) > 0:
             raise _RetryableScanPermutationError(
                 "A scan permutation produced overlapping foreground clades for trait {}.".format(trait_name)
             )
         occupied_clade_ids.update(clade_id_set)
-    if len(unit_fg_arrays) == 0:
+    if len(selected_components) == 0:
         return {
-            "units": pd.DataFrame(columns=["trait", "unit_id", "lineage_value", "fg_leaf_names", "fg_branch_ids", "sister_branch_ids", "fg_clade_branch_ids"]),
+            "units": pd.DataFrame(columns=list(SCAN_UNIT_COLUMNS)),
             "fg_ids": np.array([], dtype=np.int64),
             "rate_fg_ids": np.array([], dtype=np.int64),
             "fg_leaf_names": [],
         }
-    all_fg_ids = np.unique(np.concatenate(unit_fg_arrays).astype(np.int64, copy=False))
-    all_rate_fg_ids = np.unique(np.concatenate(unit_fg_clade_arrays).astype(np.int64, copy=False))
+    if unit_mode == "lineage":
+        assigned_components = _assign_permuted_components_to_lineages(
+            selected_components=selected_components,
+            observed_groups=observed_groups,
+            trait_name=trait_name,
+            g=g,
+        )
+        unit_specs = []
+        for group, components in zip(observed_groups, assigned_components):
+            fg_ids = _component_ids(components, "fg_branch_ids")
+            clade_ids = _component_ids(components, "clade_branch_ids")
+            stem_ids = np.array(
+                sorted(int(component["stem_branch_id"]) for component in components),
+                dtype=np.int64,
+            )
+            leaf_names = sorted(
+                {
+                    str(leaf_name)
+                    for component in components
+                    for leaf_name in component["leaf_names"]
+                }
+            )
+            unit_specs.append(
+                {
+                    "lineage_value": group["lineage_value"],
+                    "stem_branch_ids": stem_ids,
+                    "fg_branch_ids": fg_ids,
+                    "clade_branch_ids": clade_ids,
+                    "leaf_names": leaf_names,
+                }
+            )
+    else:
+        unit_specs = [
+            {
+                "lineage_value": int(i) + 1,
+                "stem_branch_ids": np.array([int(component["stem_branch_id"])], dtype=np.int64),
+                "fg_branch_ids": np.asarray(component["fg_branch_ids"], dtype=np.int64),
+                "clade_branch_ids": np.asarray(component["clade_branch_ids"], dtype=np.int64),
+                "leaf_names": component["leaf_names"],
+            }
+            for i, component in enumerate(selected_components)
+        ]
+    unit_fg_arrays = [np.asarray(spec["fg_branch_ids"], dtype=np.int64) for spec in unit_specs]
+    unit_fg_clade_arrays = [np.asarray(spec["clade_branch_ids"], dtype=np.int64) for spec in unit_specs]
+    all_fg_ids = _component_ids(
+        [{"ids": values} for values in unit_fg_arrays],
+        "ids",
+    )
+    all_rate_fg_ids = _component_ids(
+        [{"ids": values} for values in unit_fg_clade_arrays],
+        "ids",
+    )
     rows = []
-    for i, fg_ids in enumerate(unit_fg_arrays):
+    fg_leaf_names = []
+    for i, spec in enumerate(unit_specs):
+        fg_ids = np.asarray(spec["fg_branch_ids"], dtype=np.int64)
         sister_ids = _unit_sister_branch_ids(
             g=g,
             fg_branch_ids=fg_ids,
@@ -713,19 +969,23 @@ def _build_permuted_trait_context(
             node_by_id=node_by_id,
         )
         sister_ids = np.array([int(v) for v in sister_ids.tolist() if int(v) in valid_set], dtype=np.int64)
+        leaf_names = sorted(str(v) for v in spec["leaf_names"])
+        fg_leaf_names.append(leaf_names)
         rows.append(
             {
                 "trait": trait_name,
                 "unit_id": i + 1,
-                "lineage_value": i + 1,
-                "fg_leaf_names": ",".join(fg_leaf_names[i]),
-                "fg_branch_ids": ",".join(str(v) for v in fg_ids.tolist()),
-                "sister_branch_ids": ",".join(str(v) for v in sister_ids.tolist()),
-                "fg_clade_branch_ids": ",".join(str(v) for v in unit_fg_clade_arrays[i].tolist()),
+                "unit_mode": unit_mode,
+                "lineage_value": spec["lineage_value"],
+                "stem_branch_ids": _format_branch_id_list(spec["stem_branch_ids"]),
+                "fg_leaf_names": ",".join(leaf_names),
+                "fg_branch_ids": _format_branch_id_list(fg_ids),
+                "sister_branch_ids": _format_branch_id_list(sister_ids),
+                "fg_clade_branch_ids": _format_branch_id_list(spec["clade_branch_ids"]),
             }
         )
     return {
-        "units": pd.DataFrame(rows),
+        "units": pd.DataFrame(rows).loc[:, list(SCAN_UNIT_COLUMNS)],
         "fg_ids": all_fg_ids,
         "rate_fg_ids": all_rate_fg_ids,
         "fg_leaf_names": fg_leaf_names,
@@ -953,18 +1213,29 @@ def _union_unit_branch_ids(units_df, column):
     return out
 
 
-def _rate_fg_ids_map_from_units(units, fg_ids_map, trait_names):
+def _fg_ids_map_from_units(units, trait_names, column, fallback_map=None):
     out = {}
+    if fallback_map is None:
+        fallback_map = {}
     for trait_name in trait_names:
         units_trait = units.loc[units["trait"] == trait_name, :]
-        clade_ids = _union_unit_branch_ids(units_df=units_trait, column="fg_clade_branch_ids")
-        if len(clade_ids) == 0:
-            clade_ids = set(
+        branch_ids = _union_unit_branch_ids(units_df=units_trait, column=column)
+        if len(branch_ids) == 0:
+            branch_ids = set(
                 int(v)
-                for v in np.asarray(fg_ids_map.get(trait_name, []), dtype=np.int64).reshape(-1).tolist()
+                for v in np.asarray(fallback_map.get(trait_name, []), dtype=np.int64).reshape(-1).tolist()
             )
-        out[trait_name] = np.array(sorted(clade_ids), dtype=np.int64)
+        out[trait_name] = np.array(sorted(branch_ids), dtype=np.int64)
     return out
+
+
+def _rate_fg_ids_map_from_units(units, fg_ids_map, trait_names):
+    return _fg_ids_map_from_units(
+        units=units,
+        trait_names=trait_names,
+        column="fg_clade_branch_ids",
+        fallback_map=fg_ids_map,
+    )
 
 
 def _other_branch_ids_from_maps(
@@ -1582,8 +1853,13 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
     valid_branch_ids = scan_static["valid_branch_ids"]
     if scan_context is None:
         units = build_scan_units(g=g, branch_meta=branch_meta)
-        fg_ids_map = g.get("fg_ids", {})
         trait_names = g["fg_df"].columns[1:].tolist()
+        fg_ids_map = _fg_ids_map_from_units(
+            units=units,
+            trait_names=trait_names,
+            column="fg_branch_ids",
+            fallback_map=g.get("fg_ids", {}),
+        )
         rate_fg_ids_map = _rate_fg_ids_map_from_units(
             units=units,
             fg_ids_map=fg_ids_map,
@@ -1726,6 +2002,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     "to_state_distribution": cand["to_state_distribution"],
                     "state_change": state_change,
                     "candidate_event_pp_sum": float(cand["candidate_event_pp_sum"]),
+                    "scan_unit_mode": normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage")),
                     "scan_min_support_count": int(min_support_count),
                     "scan_min_event_pp": float(min_event_pp),
                     "scan_rate_length_used": rate_length,

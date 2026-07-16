@@ -543,15 +543,23 @@ def _add_search_subcommand_args(parser, show_advanced=False):
 
 
 def _add_scan_subcommand_args(parser, show_advanced=False):
+    parser.add_argument('--scan_unit_mode', metavar='lineage|stem|clade', default='lineage', type=str,
+                        choices=['lineage', 'stem', 'clade'],
+                        help='default=%(default)s: Definition of independent foreground support units. '
+                             '"lineage" uses each nonzero lineage ID in --foreground as one unit and follows '
+                             '--fg_stem_only for its candidate branches; "stem" splits disconnected foreground '
+                             'regions into separate units and scans only each stem branch; "clade" uses the same '
+                             'automatic split but scans all branches within each foreground clade. '
+                             'The stem and clade modes allow all foreground rows to use the same nonzero lineage ID.')
     parser.add_argument('--scan_match', metavar='MATCH1,MATCH2,...', default='any2spe', type=str,
                         help='default=%(default)s: Comma-delimited recurrent substitution pattern classes to scan. '
                              'Choose from any2any, any2spe, any2dif, spe2any, spe2spe, spe2dif, '
                              'dif2any, dif2spe, dif2dif, or "all".')
     parser.add_argument('--scan_min_event_pp', metavar='FLOAT', default=0.5, type=float,
-                        help='default=%(default)s: Minimum posterior probability for candidate discovery and lineage-support calls. '
+                        help='default=%(default)s: Minimum posterior probability for candidate discovery and foreground-unit support calls. '
                              'With --scan_rate_event_mode posterior_sum, this threshold does not filter the event mass used for rate P values.')
     parser.add_argument('--scan_min_support', metavar='FRACTION|INTEGER', default='2', type=str,
-                        help='default=%(default)s: Minimum foreground-lineage support for a scanned candidate. '
+                        help='default=%(default)s: Minimum foreground-unit support for a scanned candidate. '
                              'Integer tokens (including "1") are counts; decimal/scientific values <=1 are fractions.')
     parser.add_argument('--scan_rate_exposure', metavar='q_weighted|state_aware|raw_branch_length', default='q_weighted', type=str,
                         choices=['state_aware', 'raw_branch_length', 'q_weighted'],
@@ -825,8 +833,9 @@ def _build_parser(show_advanced=False):
     psr_fg_scan.add_argument('--fg_format', metavar='1|2', default=1, type=int, choices=[1,2],
                     help='default=%(default)s: Table format of --foreground.')
     psr_fg_scan.add_argument('--fg_stem_only', metavar='yes|no', default='yes', type=strtobool,
-                    help='default=%(default)s: Set "yes" to scan only foreground stem branches. '
-                         'Set "no" to include foreground clade-internal branches in candidate discovery/support.')
+                    help='default=%(default)s: In --scan_unit_mode lineage, set "yes" to scan only foreground '
+                         'stem branches or "no" to include foreground clade-internal branches. '
+                         'The stem and clade unit modes define their branch coverage directly.')
     psr_fg_scan.add_argument('--scan_sister_stem_only', dest='scan_sister_stem_only',
                     metavar='yes|no', default='no', type=strtobool,
                     help='default=%(default)s: With --scan_other_scope sister, include sister clade-internal branches. '

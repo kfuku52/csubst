@@ -17,8 +17,14 @@ def _require_foreground(g):
     return None
 
 
-def _scan_foreground_branch_ids(g):
+def _scan_foreground_branch_ids(g, units_df=None):
     fg_ids = []
+    if (units_df is not None) and ("fg_branch_ids" in units_df.columns):
+        for value in units_df["fg_branch_ids"].tolist():
+            text = "" if value is None else str(value).strip()
+            if text == "":
+                continue
+            fg_ids.extend(int(v) for v in text.split(",") if str(v).strip() != "")
     for values in g.get("fg_ids", {}).values():
         arr = np.asarray(values, dtype=np.int64).reshape(-1)
         fg_ids.extend(int(v) for v in arr.tolist())
@@ -39,7 +45,7 @@ def _prepare_scan_output_table(scan_df):
     return out
 
 
-def _write_scan_site_plot(g, scan_df, ON_tensor):
+def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
     if not bool(g.get("scan_site_plot", True)):
         print("Skipping scan site visualization (--scan_site_plot no).", flush=True)
         return []
@@ -54,7 +60,7 @@ def _write_scan_site_plot(g, scan_df, ON_tensor):
     if (site_df.shape[0] == 0) or (branch_ids.shape[0] == 0):
         print("Skipping scan site visualization because no supporting branches were available.", flush=True)
         return []
-    foreground_branch_ids = _scan_foreground_branch_ids(g)
+    foreground_branch_ids = _scan_foreground_branch_ids(g, units_df=units_df)
     if foreground_branch_ids.shape[0] == 0:
         foreground_branch_ids = branch_ids
     plot_g = dict(g)
@@ -81,6 +87,12 @@ def main_scan(g):
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
     _require_foreground(g)
+    unit_mode = substitution_scan.normalize_scan_unit_mode(g.get("scan_unit_mode", "lineage"))
+    if unit_mode == "stem":
+        g["fg_stem_only"] = True
+    elif unit_mode == "clade":
+        g["fg_stem_only"] = False
+    print("Scan foreground unit mode: {}".format(unit_mode), flush=True)
     print("Reading and parsing input files.", flush=True)
     g["current_arity"] = 2
     g = parser_misc.prepare_input_context(
@@ -149,7 +161,7 @@ def main_scan(g):
     )
     print("Writing {}".format(scan_path), flush=True)
     print("Writing {}".format(units_path), flush=True)
-    _write_scan_site_plot(g=g, scan_df=scan_df, ON_tensor=ON_tensor_called)
+    _write_scan_site_plot(g=g, scan_df=scan_df, ON_tensor=ON_tensor_called, units_df=units_df)
     print(
         "Scan candidates: {:,} rows, {:,} foreground units.".format(
             int(scan_df.shape[0]),

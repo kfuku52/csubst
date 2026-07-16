@@ -73,7 +73,7 @@ CSUBST provides ten main subcommands:
 - `csubst download`: download and verify shared model resources without requiring an input alignment.
 - [`csubst doctor`](https://github.com/kfuku52/csubst/wiki/csubst-doctor): validate input files, inferred IQ-TREE paths, and optional 3Di settings before longer runs.
 - [`csubst search`](https://github.com/kfuku52/csubst/wiki/csubst-search) (legacy alias: `csubst analyze`): run convergence analysis and report metrics such as `omegaC`, `dNC`, and `dSC`.
-- [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): list recurrent nonsynonymous-state substitutions shared by foreground clades without the omegaC branch-combination search. The output includes lineage-level support, configurable foreground-vs-control rate-enrichment statistics, posterior-sum or called-event rate counts, site evolutionary rates, and amino-acid/state conservation.
+- [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): list recurrent nonsynonymous-state substitutions shared by foreground clades without the omegaC branch-combination search. Foreground support units can be defined by input lineage IDs, automatically split stem branches, or their complete foreground clades. The output includes unit-level support, configurable foreground-vs-control rate-enrichment statistics, posterior-sum or called-event rate counts, site evolutionary rates, and amino-acid/state conservation.
 - [`csubst inspect`](https://github.com/kfuku52/csubst/wiki/csubst-inspect): summarize branch mappings and inspect ancestral states.
 - [`csubst sites`](https://github.com/kfuku52/csubst/wiki/csubst-sites) (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree and site-summary plots, and optionally map sites to protein structures.
 - [`csubst simulate`](https://github.com/kfuku52/csubst/wiki/csubst-simulate): simulate codon sequence evolution under user-defined convergence scenarios.
@@ -132,6 +132,7 @@ csubst scan \
   --alignment_file alignment.fa.gz \
   --rooted_tree_file tree.nwk \
   --foreground foreground.txt \
+  --scan_unit_mode lineage \
   --scan_other_scope all \
   --scan_rate_event_mode posterior_sum \
   --scan_rate_exposure q_weighted \

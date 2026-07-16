@@ -41,6 +41,14 @@ def test_normalize_scan_matches_all_expands_to_nine_classes():
     ]
 
 
+def test_normalize_scan_unit_mode_defaults_to_lineage_and_rejects_unknown_values():
+    assert substitution_scan.normalize_scan_unit_mode(None) == "lineage"
+    assert substitution_scan.normalize_scan_unit_mode(" STEM ") == "stem"
+    assert substitution_scan.normalize_scan_unit_mode("clade") == "clade"
+    with pytest.raises(ValueError, match="scan_unit_mode"):
+        substitution_scan.normalize_scan_unit_mode("branch")
+
+
 def test_build_candidates_supports_scan_match_specific_grouping():
     events = pd.DataFrame(
         {
@@ -479,6 +487,57 @@ def _toy_clade_scan_context():
     return g, on_tensor, labels
 
 
+def _toy_binary_unit_modes_context():
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("(((A:1,B:1)X:1,E:1)U:1,((C:1,D:1)Y:1,F:1)V:1)R;", format=1)
+    )
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()}
+    num_node = max(labels.values()) + 1
+    for node in tr.traverse():
+        ete.set_prop(node, "SNdist", 1.0)
+        ete.set_prop(node, "Ndist", 1.0)
+    g = {
+        "tree": tr,
+        "fg_df": pd.DataFrame(
+            {"name": ["A", "B", "C", "D", "E", "F"], "trait": [1, 1, 1, 1, 0, 0]}
+        ),
+        "fg_stem_only": True,
+    }
+    g = foreground.get_foreground_ids(g=g, write=False)
+    state_nsy = np.zeros((num_node, 1, 2), dtype=float)
+    state_pep = np.zeros((num_node, 1, 2), dtype=float)
+    for node_id in labels.values():
+        _set_state(state_nsy, node_id, 0, 0)
+        _set_state(state_pep, node_id, 0, 0)
+    on_tensor = np.zeros((num_node, 1, 1, 2, 2), dtype=float)
+    on_tensor[labels["A"], 0, 0, 0, 1] = 0.9
+    on_tensor[labels["C"], 0, 0, 0, 1] = 0.8
+    g.update(
+        {
+            "scan_sister_stem_only": False,
+            "state_nsy": state_nsy,
+            "state_pep": state_pep,
+            "nonsyn_state_orders": np.array(["A", "K"], dtype=object),
+            "amino_acid_orders": np.array(["A", "K"], dtype=object),
+            "iqtree_rate_values": np.array([0.25], dtype=float),
+            "float_tol": 1e-12,
+            "nonsyn_recode": "no",
+            "scan_match": "any2spe",
+            "scan_min_event_pp": 0.5,
+            "scan_min_support": "2",
+            "scan_rate_length": "raw",
+            "scan_rate_exposure": "state_aware",
+            "scan_rate_event_mode": "posterior_sum",
+            "scan_other_scope": "all",
+            "scan_pvalue_calibration": "none",
+            "scan_n_permutations": 0,
+            "scan_permutation_seed": 1,
+            "min_clade_bin_count": 1,
+        }
+    )
+    return g, on_tensor, labels
+
+
 def test_scan_substitutions_outputs_foreground_rows():
     g, on_tensor = _toy_scan_context()
 
@@ -494,6 +553,89 @@ def test_scan_substitutions_outputs_foreground_rows():
     assert fg_row["target_event_count"] == pytest.approx(1.7)
     assert fg_row["target_exposure_branch_length"] == pytest.approx(2.0)
     assert fg_row["site_rate"] == pytest.approx(0.25)
+
+
+def test_scan_unit_modes_split_binary_foreground_and_control_internal_branch_coverage():
+    g, on_tensor, labels = _toy_binary_unit_modes_context()
+
+    g["scan_unit_mode"] = "lineage"
+    lineage_df, lineage_units = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
+    g["scan_unit_mode"] = "stem"
+    stem_df, stem_units = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
+    g["scan_unit_mode"] = "clade"
+    clade_df, clade_units = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
+
+    assert lineage_units.shape[0] == 1
+    assert lineage_units.iloc[0]["unit_mode"] == "lineage"
+    assert set(substitution_scan._parse_id_list(lineage_units.iloc[0]["stem_branch_ids"])) == {
+        labels["X"],
+        labels["Y"],
+    }
+    assert lineage_df.empty
+
+    assert stem_units.shape[0] == 2
+    assert set(stem_units["unit_mode"].tolist()) == {"stem"}
+    assert {
+        tuple(substitution_scan._parse_id_list(value).tolist())
+        for value in stem_units["fg_branch_ids"]
+    } == {(labels["X"],), (labels["Y"],)}
+    assert stem_df.empty
+
+    assert clade_units.shape[0] == 2
+    assert set(clade_units["unit_mode"].tolist()) == {"clade"}
+    clade_branch_sets = {
+        frozenset(substitution_scan._parse_id_list(value).tolist())
+        for value in clade_units["fg_branch_ids"]
+    }
+    assert clade_branch_sets == {
+        frozenset([labels["X"], labels["A"], labels["B"]]),
+        frozenset([labels["Y"], labels["C"], labels["D"]]),
+    }
+    assert clade_df.shape[0] == 1
+    assert clade_df.iloc[0]["scan_unit_mode"] == "clade"
+    assert clade_df.iloc[0]["support_unit_count"] == 2
+
+
+@pytest.mark.parametrize(
+    ("unit_mode", "expected_unit_count", "expected_branch_counts"),
+    [
+        ("lineage", 1, [2]),
+        ("stem", 2, [1, 1]),
+        ("clade", 2, [3, 3]),
+    ],
+)
+def test_scan_permutation_context_uses_the_same_unit_mode_as_observed(
+    monkeypatch,
+    unit_mode,
+    expected_unit_count,
+    expected_branch_counts,
+):
+    g, _, labels = _toy_binary_unit_modes_context()
+    g["scan_unit_mode"] = unit_mode
+    trait_cache = foreground._get_trait_clade_permutation_cache(g=g, trait_name="trait")
+    selected_flags = np.zeros_like(trait_cache["is_fg_stem"], dtype=bool)
+    selected_flags[trait_cache["branch_id_to_index"][labels["X"]]] = True
+    selected_flags[trait_cache["branch_id_to_index"][labels["Y"]]] = True
+    monkeypatch.setattr(
+        substitution_scan.foreground,
+        "_randomize_foreground_stem_flags_from_plan",
+        lambda **kwargs: selected_flags,
+    )
+
+    context = substitution_scan._build_permuted_trait_context(
+        g=g,
+        trait_name="trait",
+        valid_branch_ids=trait_cache["branch_ids"],
+        sample_original_foreground=True,
+    )
+
+    assert context["units"].shape[0] == expected_unit_count
+    assert context["units"]["unit_mode"].unique().tolist() == [unit_mode]
+    branch_counts = sorted(
+        substitution_scan._parse_id_list(value).shape[0]
+        for value in context["units"]["fg_branch_ids"]
+    )
+    assert branch_counts == sorted(expected_branch_counts)
 
 
 def test_scan_zero_event_probability_does_not_count_as_support_at_zero_threshold():
