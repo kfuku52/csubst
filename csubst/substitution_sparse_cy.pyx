@@ -20,7 +20,7 @@ cpdef dense_block_to_csr_arrays_double(
     cdef numpy.ndarray[numpy.int64_t, ndim=1] indptr
     cdef numpy.ndarray[numpy.int64_t, ndim=1] indices
     cdef numpy.ndarray[numpy.float64_t, ndim=1] data
-    cdef double[:, :] block_mv = block
+    cdef const double[:, :] block_mv = block
     cdef double[:] data_mv
     cdef long[:] indices_mv
     cdef long[:] indptr_mv
@@ -63,6 +63,154 @@ cpdef dense_block_to_csr_arrays_double(
                     indices_mv[k] = j
                     k += 1
     return data, indices, indptr
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef calc_sparse_projection_product_double(
+    numpy.ndarray[numpy.int64_t, ndim=2] id_combinations,
+    numpy.ndarray[index_t, ndim=1] indptr,
+    numpy.ndarray[index_t, ndim=1] indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+):
+    cdef Py_ssize_t num_combination = id_combinations.shape[0]
+    cdef Py_ssize_t arity = id_combinations.shape[1]
+    cdef Py_ssize_t num_branch = indptr.shape[0] - 1
+    cdef numpy.ndarray[numpy.float64_t, ndim=1] out
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] starts
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] ends
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] positions
+    cdef double[:] out_mv
+    cdef long[:] starts_mv
+    cdef long[:] ends_mv
+    cdef long[:] positions_mv
+    cdef Py_ssize_t combo, slot, candidate, pos
+    cdef Py_ssize_t branch_id, min_slot, min_count
+    cdef Py_ssize_t col, current_count
+    cdef double product_value, total
+    cdef bint matched
+    if arity < 1:
+        raise ValueError('id_combinations should contain at least one branch column.')
+    if indices.shape[0] != data.shape[0]:
+        raise ValueError('indices and data should have identical length.')
+    out = numpy.zeros(num_combination, dtype=numpy.float64)
+    starts = numpy.empty(arity, dtype=numpy.int64)
+    ends = numpy.empty(arity, dtype=numpy.int64)
+    positions = numpy.empty(arity, dtype=numpy.int64)
+    out_mv = out
+    starts_mv = starts
+    ends_mv = ends
+    positions_mv = positions
+    for combo in range(num_combination):
+        min_slot = 0
+        min_count = -1
+        for slot in range(arity):
+            branch_id = id_combinations[combo, slot]
+            if branch_id < 0 or branch_id >= num_branch:
+                raise IndexError('branch ID is out of range for sparse projection.')
+            starts_mv[slot] = indptr[branch_id]
+            ends_mv[slot] = indptr[branch_id + 1]
+            positions_mv[slot] = starts_mv[slot]
+            current_count = ends_mv[slot] - starts_mv[slot]
+            if min_count < 0 or current_count < min_count:
+                min_count = current_count
+                min_slot = slot
+        total = 0.0
+        for candidate in range(starts_mv[min_slot], ends_mv[min_slot]):
+            col = indices[candidate]
+            product_value = data[candidate]
+            matched = True
+            for slot in range(arity):
+                if slot == min_slot:
+                    continue
+                pos = positions_mv[slot]
+                while pos < ends_mv[slot] and indices[pos] < col:
+                    pos += 1
+                positions_mv[slot] = pos
+                if pos >= ends_mv[slot] or indices[pos] != col:
+                    matched = False
+                    break
+                product_value *= data[pos]
+            if matched:
+                total += product_value
+        out_mv[combo] = total
+    return out
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef calc_sparse_projection_product_by_site_double(
+    numpy.ndarray[numpy.int64_t, ndim=2] id_combinations,
+    numpy.ndarray[index_t, ndim=1] indptr,
+    numpy.ndarray[index_t, ndim=1] indices,
+    numpy.ndarray[numpy.float64_t, ndim=1] data,
+    long num_site,
+):
+    cdef Py_ssize_t num_combination = id_combinations.shape[0]
+    cdef Py_ssize_t arity = id_combinations.shape[1]
+    cdef Py_ssize_t num_branch = indptr.shape[0] - 1
+    cdef numpy.ndarray[numpy.float64_t, ndim=2] out
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] starts
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] ends
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] positions
+    cdef double[:, :] out_mv
+    cdef long[:] starts_mv
+    cdef long[:] ends_mv
+    cdef long[:] positions_mv
+    cdef Py_ssize_t combo, slot, candidate, pos
+    cdef Py_ssize_t branch_id, min_slot, min_count
+    cdef Py_ssize_t col, site, current_count
+    cdef double product_value
+    cdef bint matched
+    if arity < 1:
+        raise ValueError('id_combinations should contain at least one branch column.')
+    if num_site < 1:
+        raise ValueError('num_site should be >= 1.')
+    if indices.shape[0] != data.shape[0]:
+        raise ValueError('indices and data should have identical length.')
+    out = numpy.zeros((num_combination, num_site), dtype=numpy.float64)
+    starts = numpy.empty(arity, dtype=numpy.int64)
+    ends = numpy.empty(arity, dtype=numpy.int64)
+    positions = numpy.empty(arity, dtype=numpy.int64)
+    out_mv = out
+    starts_mv = starts
+    ends_mv = ends
+    positions_mv = positions
+    for combo in range(num_combination):
+        min_slot = 0
+        min_count = -1
+        for slot in range(arity):
+            branch_id = id_combinations[combo, slot]
+            if branch_id < 0 or branch_id >= num_branch:
+                raise IndexError('branch ID is out of range for sparse projection.')
+            starts_mv[slot] = indptr[branch_id]
+            ends_mv[slot] = indptr[branch_id + 1]
+            positions_mv[slot] = starts_mv[slot]
+            current_count = ends_mv[slot] - starts_mv[slot]
+            if min_count < 0 or current_count < min_count:
+                min_count = current_count
+                min_slot = slot
+        for candidate in range(starts_mv[min_slot], ends_mv[min_slot]):
+            col = indices[candidate]
+            product_value = data[candidate]
+            matched = True
+            for slot in range(arity):
+                if slot == min_slot:
+                    continue
+                pos = positions_mv[slot]
+                while pos < ends_mv[slot] and indices[pos] < col:
+                    pos += 1
+                positions_mv[slot] = pos
+                if pos >= ends_mv[slot] or indices[pos] != col:
+                    matched = False
+                    break
+                product_value *= data[pos]
+            if matched:
+                site = col % num_site
+                out_mv[combo, site] += product_value
+    return out
 
 
 @cython.nonecheck(False)

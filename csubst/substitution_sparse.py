@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
+from types import MappingProxyType
 
 from csubst._extensions import load_optional_extension
 
@@ -36,7 +37,41 @@ class SparseSubstitutionTensor:
             raise ValueError('SparseSubstitutionTensor shape should have 5 dimensions.')
         self.shape = tuple(shape)
         self.dtype = np.dtype(dtype)
-        self.blocks = dict(blocks)
+        normalized_blocks = dict()
+        for raw_key, raw_mat in blocks.items():
+            if (not isinstance(raw_key, tuple)) or len(raw_key) != 3:
+                raise ValueError('Sparse substitution block keys should be (group, from, to) tuples.')
+            key = tuple(int(v) for v in raw_key)
+            sg, a, d = key
+            if not (0 <= sg < self.shape[2] and 0 <= a < self.shape[3] and 0 <= d < self.shape[4]):
+                raise ValueError('Sparse substitution block key {} is out of bounds for shape {}.'.format(key, self.shape))
+            if not sp.issparse(raw_mat):
+                raise TypeError('Sparse substitution blocks should be SciPy sparse matrices.')
+            if raw_mat.shape != self.shape[:2]:
+                txt = 'Sparse substitution block {} has shape {}; expected {}.'
+                raise ValueError(txt.format(key, raw_mat.shape, self.shape[:2]))
+            mat = raw_mat
+            needs_copy = (
+                (not sp.isspmatrix_csr(mat))
+                or (mat.dtype != self.dtype)
+                or (not mat.has_canonical_format)
+                or (not mat.has_sorted_indices)
+                or ((mat.nnz > 0) and np.any(mat.data == 0))
+            )
+            if needs_copy:
+                mat = sp.csr_matrix(mat, dtype=self.dtype, copy=True)
+                mat.sum_duplicates()
+                mat.eliminate_zeros()
+                mat.sort_indices()
+            if mat.nnz == 0:
+                continue
+            # Tensors are immutable after construction. Reducer projections
+            # may therefore be cached safely without stale-data hazards.
+            mat.data.flags.writeable = False
+            mat.indices.flags.writeable = False
+            mat.indptr.flags.writeable = False
+            normalized_blocks[key] = mat
+        self.blocks = MappingProxyType(normalized_blocks)
 
     @property
     def num_branch(self):
@@ -61,6 +96,25 @@ class SparseSubstitutionTensor:
     @property
     def nnz(self):
         return int(sum(mat.nnz for mat in self.blocks.values()))
+
+    @property
+    def nbytes(self):
+        return int(
+            sum(
+                mat.data.nbytes + mat.indices.nbytes + mat.indptr.nbytes
+                for mat in self.blocks.values()
+            )
+        )
+
+    @property
+    def dense_nbytes(self):
+        return int(self.size * self.dtype.itemsize)
+
+    @property
+    def compression_ratio(self):
+        if self.nbytes == 0:
+            return np.inf if self.dense_nbytes > 0 else 1.0
+        return float(self.dense_nbytes) / float(self.nbytes)
 
     @property
     def size(self):

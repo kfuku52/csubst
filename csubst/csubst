@@ -659,6 +659,11 @@ def _build_parser(show_advanced=False):
                         metavar='INT', default=100000000, type=int, required=False,
                         help='default=%(default)s: For --sub_tensor_backend auto, build sparse substitution tensors '
                              'when estimated tensor elements (branch x site x group x from x to) are >= this threshold.')
+    _add_advanced_argument(advanced_performance, '--sub_tensor_auto_sparse_min_bytes', show_advanced=show_advanced,
+                        metavar='INT', default=67108864, type=int, required=False,
+                        help='default=%(default)s: For --sub_tensor_backend auto, allow direct sparse construction '
+                             'below the element threshold when estimated dense storage reaches this many bytes and '
+                             'estimated density is below --sub_tensor_sparse_density_cutoff.')
     _add_advanced_argument(advanced_performance, '--parallel_backend', show_advanced=show_advanced,
                         metavar='auto|multiprocessing|threading', default='auto', type=str,
                         choices=['auto', 'multiprocessing', 'threading'],

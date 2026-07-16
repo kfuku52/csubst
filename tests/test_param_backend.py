@@ -26,6 +26,7 @@ def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
     assert g["sub_tensor_backend"] == "auto"
     assert g["sub_tensor_sparse_density_cutoff"] == pytest.approx(0.15)
     assert g["sub_tensor_auto_sparse_min_elements"] == 100000000
+    assert g["sub_tensor_auto_sparse_min_bytes"] == 67108864
     assert g["parallel_backend"] == "auto"
     assert g["parallel_chunk_factor"] == 1
     assert g["parallel_chunk_factor_reducer"] == 4
@@ -134,6 +135,8 @@ def test_get_global_parameters_rejects_invalid_sparse_density_cutoff():
         param.get_global_parameters(_args(sub_tensor_sparse_density_cutoff=1.5))
     with pytest.raises(ValueError, match="sub_tensor_auto_sparse_min_elements"):
         param.get_global_parameters(_args(sub_tensor_auto_sparse_min_elements=-1))
+    with pytest.raises(ValueError, match="sub_tensor_auto_sparse_min_bytes"):
+        param.get_global_parameters(_args(sub_tensor_auto_sparse_min_bytes=-1))
 
 
 @pytest.mark.parametrize(

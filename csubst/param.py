@@ -593,6 +593,12 @@ def get_global_parameters(args):
         g['sub_tensor_auto_sparse_min_elements'] = 100000000
     if g['sub_tensor_auto_sparse_min_elements'] < 0:
         raise ValueError('--sub_tensor_auto_sparse_min_elements should be >= 0.')
+    if 'sub_tensor_auto_sparse_min_bytes' in g.keys():
+        g['sub_tensor_auto_sparse_min_bytes'] = int(g['sub_tensor_auto_sparse_min_bytes'])
+    else:
+        g['sub_tensor_auto_sparse_min_bytes'] = 67108864
+    if g['sub_tensor_auto_sparse_min_bytes'] < 0:
+        raise ValueError('--sub_tensor_auto_sparse_min_bytes should be >= 0.')
     if 'parallel_backend' in g.keys():
         g['parallel_backend'] = str(g['parallel_backend']).lower()
     else:

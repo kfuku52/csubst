@@ -1,5 +1,6 @@
 import itertools
 import numpy as np
+import scipy.sparse as sp
 from pathlib import Path
 import pytest
 
@@ -35,6 +36,38 @@ def test_dense_sparse_roundtrip_preserves_values_and_shape():
     assert sparse_tensor.shape == dense.shape
     assert sparse_tensor.nnz == int(np.count_nonzero(dense))
     np.testing.assert_allclose(restored, dense, atol=1e-12)
+
+
+def test_sparse_tensor_reports_payload_and_dense_storage_bytes():
+    dense = _toy_dense_tensor()
+    sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(dense)
+    expected_payload = sum(
+        mat.data.nbytes + mat.indices.nbytes + mat.indptr.nbytes
+        for mat in sparse_tensor.blocks.values()
+    )
+    assert sparse_tensor.nbytes == expected_payload
+    assert sparse_tensor.dense_nbytes == dense.nbytes
+    assert sparse_tensor.compression_ratio == pytest.approx(dense.nbytes / expected_payload)
+
+
+def test_sparse_tensor_blocks_and_csr_payload_are_read_only():
+    sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(_toy_dense_tensor())
+    key = next(iter(sparse_tensor.blocks))
+    mat = sparse_tensor.blocks[key]
+
+    with pytest.raises(TypeError):
+        sparse_tensor.blocks[(0, 0, 0)] = sp.csr_matrix(mat.shape)
+    with pytest.raises(ValueError):
+        mat.data[0] = 0.0
+
+
+def test_dense_to_sparse_cython_accepts_read_only_input():
+    if substitution_sparse_cy is None:
+        pytest.skip("Cython substitution_sparse fast path is unavailable")
+    dense = _toy_dense_tensor()
+    dense.setflags(write=False)
+    sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(dense)
+    np.testing.assert_allclose(sparse_tensor.to_dense(), dense, atol=1e-12)
 
 
 def test_dense_to_sparse_applies_tolerance():
@@ -240,6 +273,67 @@ def test_get_cb_sparse_selective_base_stats_matches_dense():
     out_sparse = substitution.get_cb(ids, sparse_tensor, g, attr="OCN", selected_base_stats=selected)
     assert out_sparse.columns.tolist() == ["branch_id_1", "branch_id_2", "OCNany2any", "OCNany2spe"]
     np.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
+
+
+def test_get_cb_sparse_arity3_projection_product_matches_dense_without_5d_reconstruction(monkeypatch):
+    rng = np.random.default_rng(31)
+    dense = rng.random((4, 7, 2, 3, 3), dtype=np.float64)
+    dense[dense < 0.72] = 0
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.array([[0, 1, 2], [1, 2, 3]], dtype=np.int64)
+    g = {"threads": 1, "float_type": np.float64}
+    expected = substitution.get_cb(ids, dense, g, attr="OCN")
+
+    monkeypatch.setattr(
+        substitution,
+        "_get_sparse_combination_group_tensor",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("5D reconstruction should not run")),
+    )
+    observed = substitution.get_cb(ids, sparse_tensor, g, attr="OCN")
+
+    np.testing.assert_allclose(observed.values, expected.values, atol=1e-12)
+
+
+def test_sparse_projection_product_cython_matches_python_for_totals_and_sites(monkeypatch):
+    rng = np.random.default_rng(32)
+    dense = rng.random((5, 9, 2, 3, 3), dtype=np.float64)
+    dense[dense < 0.68] = 0
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    projection = substitution._get_sparse_cb_projection(sparse_tensor, "any2spe")
+    ids = np.array([[0, 1, 2], [1, 3, 4], [0, 2, 4]], dtype=np.int64)
+
+    observed_total = substitution._calc_sparse_projection_products(projection, ids)
+    observed_site = substitution._calc_sparse_projection_products(projection, ids, num_site=dense.shape[1])
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_projection_product", lambda *args, **kwargs: False)
+    expected_total = substitution._calc_sparse_projection_products(projection, ids)
+    expected_site = substitution._calc_sparse_projection_products(projection, ids, num_site=dense.shape[1])
+
+    np.testing.assert_allclose(observed_total, expected_total, atol=1e-12)
+    np.testing.assert_allclose(observed_site, expected_site, atol=1e-12)
+    np.testing.assert_allclose(observed_total, observed_site.sum(axis=1), atol=1e-12)
+
+
+def test_dense_arity3_projection_selector_matches_sparse_intersection(monkeypatch):
+    rng = np.random.default_rng(34)
+    dense = rng.random((6, 8, 2, 3, 3), dtype=np.float64)
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    projection = substitution._get_sparse_cb_projection(sparse_tensor, "any2spe")
+    ids = np.vstack([rng.choice(6, size=3, replace=False) for _ in range(20)]).astype(np.int64)
+    expected = substitution._calc_sparse_projection_products_python(projection, ids)
+    invoked = {"dense": False}
+    original = substitution._calc_dense_arity3_projection_products
+
+    def _wrapped_dense(*args, **kwargs):
+        invoked["dense"] = True
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(substitution, "_SPARSE_CB_PROJECTION_ARITY3_DENSE_MIN_COMBINATIONS", 1)
+    monkeypatch.setattr(substitution, "_SPARSE_CB_PROJECTION_ARITY3_DENSE_CUTOFF", 0.0)
+    monkeypatch.setattr(substitution, "_calc_dense_arity3_projection_products", _wrapped_dense)
+    observed = substitution._calc_sparse_projection_products(projection, ids)
+
+    assert invoked["dense"] is True
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
 
 
 def test_sparse_cb_summary_arrays_match_dense_reductions():
@@ -488,6 +582,7 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback(monkeypatch)
     ids = np.array(list(itertools.combinations(range(40), 2)), dtype=np.int64)
     selected = ["any2any", "any2spe"]
 
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     expected = substitution.sub_tensor2cb_sparse(
@@ -500,6 +595,7 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback(monkeypatch)
         selected_base_stats=selected,
     )
 
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: True)
     monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     observed = substitution.sub_tensor2cb_sparse(
@@ -521,6 +617,7 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback_with_unsorte
     ids_unsorted[1::2, :] = ids_unsorted[1::2, ::-1]
     selected = ["any2any", "spe2any", "any2spe", "spe2spe"]
 
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     expected = substitution.sub_tensor2cb_sparse(
@@ -533,6 +630,7 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback_with_unsorte
         selected_base_stats=selected,
     )
 
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: True)
     monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     observed = substitution.sub_tensor2cb_sparse(
@@ -545,6 +643,66 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback_with_unsorte
         selected_base_stats=selected,
     )
     np.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sub_tensor2cb_sparse_projection_gram_matches_fallback_all_stats(monkeypatch):
+    sparse_tensor = _large_sparse_reducer_tensor(num_branch=40, num_site=12)
+    ids = np.array(list(itertools.combinations(range(40), 2)), dtype=np.int64)
+    ids[1::2, :] = ids[1::2, ::-1]
+    selected = ["any2any", "spe2any", "any2spe", "spe2spe"]
+
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: False)
+    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
+    expected = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+
+    monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: True)
+    observed = substitution.sub_tensor2cb_sparse(
+        ids,
+        sparse_tensor,
+        float_type=np.float64,
+        selected_base_stats=selected,
+    )
+    np.testing.assert_allclose(observed, expected, atol=1e-12)
+
+
+def test_sparse_projection_gram_switches_sparse_and_dense_per_projection(monkeypatch):
+    row_ids = np.array([0, 1], dtype=np.int64)
+    col_ids = np.array([1, 0], dtype=np.int64)
+    sparse_projection = sp.csr_matrix(
+        np.array([[1.0, 0.0, 0.0, 0.0], [2.0, 0.0, 0.0, 0.0]], dtype=np.float64)
+    )
+    dense_projection = sp.csr_matrix(np.ones((2, 4), dtype=np.float64))
+    monkeypatch.setattr(substitution, "_SPARSE_CB_PROJECTION_DENSE_CUTOFF", 0.5)
+
+    sparse_values, _density, sparse_backend = substitution._calc_projection_gram_pair_values(
+        projection=sparse_projection,
+        row_ids=row_ids,
+        col_ids=col_ids,
+    )
+    dense_values, _density, dense_backend = substitution._calc_projection_gram_pair_values(
+        projection=dense_projection,
+        row_ids=row_ids,
+        col_ids=col_ids,
+    )
+
+    assert sparse_backend == "sparse"
+    assert dense_backend == "dense"
+    np.testing.assert_allclose(sparse_values, [2.0, 2.0], atol=1e-12)
+    np.testing.assert_allclose(dense_values, [4.0, 4.0], atol=1e-12)
+
+
+def test_sparse_projection_gram_is_disabled_for_nonfinite_values():
+    dense = _large_sparse_reducer_tensor(num_branch=40, num_site=12).to_dense()
+    dense[0, 0, 0, 0, 1] = np.nan
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.array(list(itertools.combinations(range(40), 2)), dtype=np.int64)
+    assert not substitution._can_use_sparse_cb_projection_gram(ids, sparse_tensor)
 
 
 def test_sub_tensor2cb_sparse_cython_fastpath_supports_spe2spe(monkeypatch):
@@ -651,6 +809,45 @@ def test_get_cb_auto_parallel_matches_single_thread_for_dense_and_sparse():
     np.testing.assert_allclose(out_sparse_auto.values, out_sparse_single.values, atol=1e-12)
 
 
+def test_sparse_projection_gram_scheduler_uses_one_worker():
+    sparse_tensor = _large_sparse_reducer_tensor(num_branch=40, num_site=12)
+    ids = np.array(list(itertools.combinations(range(40), 2)), dtype=np.int64)
+    g = {
+        "threads": 8,
+        "parallel_min_items_cb": 0,
+        "parallel_min_items_per_job_cb": 1,
+    }
+    observed = substitution._resolve_cb_n_jobs(
+        id_combinations=ids,
+        sub_tensor=sparse_tensor,
+        g=g,
+        writer=substitution.sub_tensor2cb_sparse,
+        selected=["any2any", "any2spe"],
+    )
+    assert observed == 1
+
+
+def test_dense_arity3_projection_scheduler_uses_one_worker(monkeypatch):
+    dense = np.ones((6, 5, 1, 2, 2), dtype=np.float64)
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.tile(np.array([[0, 1, 2]], dtype=np.int64), (20, 1))
+    g = {
+        "threads": 8,
+        "parallel_min_items_cb": 0,
+        "parallel_min_items_per_job_cb": 1,
+    }
+    monkeypatch.setattr(substitution, "_SPARSE_CB_PROJECTION_ARITY3_DENSE_MIN_COMBINATIONS", 1)
+    observed = substitution._resolve_cb_n_jobs(
+        id_combinations=ids,
+        sub_tensor=sparse_tensor,
+        g=g,
+        writer=substitution.sub_tensor2cb_sparse,
+        selected=["any2any"],
+    )
+
+    assert observed == 1
+
+
 def test_resolve_dense_cython_n_jobs_prefers_single_for_small_workload():
     ids = np.zeros((1200, 2), dtype=np.int64)
     sub = np.zeros((10, 100, 1, 4, 4), dtype=np.float64)
@@ -740,6 +937,25 @@ def test_get_cbs_sparse_matches_dense():
     np.testing.assert_allclose(out_sparse.values, out_dense.values, atol=1e-12)
 
 
+def test_get_cbs_sparse_arity3_projection_product_matches_dense_without_5d_reconstruction(monkeypatch):
+    rng = np.random.default_rng(33)
+    dense = rng.random((4, 6, 2, 3, 3), dtype=np.float64)
+    dense[dense < 0.7] = 0
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.array([[0, 1, 2], [1, 2, 3]], dtype=np.int64)
+    g = {"threads": 1}
+    expected = substitution.get_cbs(ids, dense, attr="N", g=g)
+
+    monkeypatch.setattr(
+        substitution,
+        "_get_sparse_combination_group_tensor",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("5D reconstruction should not run")),
+    )
+    observed = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g)
+
+    np.testing.assert_allclose(observed.values, expected.values, atol=1e-12)
+
+
 def test_get_cbs_threading_matches_single_thread_for_dense_and_sparse():
     dense = _toy_reducer_tensor()
     sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
@@ -823,6 +1039,95 @@ def test_get_substitution_tensor_sparse_asis_matches_dense():
             dense_mmap.unlink()
         if sparse_mmap.exists():
             sparse_mmap.unlink()
+
+
+def test_auto_substitution_backend_uses_state_density_below_element_threshold():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
+    state = np.zeros((3, 2, 2), dtype=np.float64)
+    state[labels["R"], :, :] = [[1.0, 0.0], [1.0, 0.0]]
+    state[labels["A"], :, :] = [[0.0, 1.0], [1.0, 0.0]]
+    state[labels["B"], :, :] = [[1.0, 0.0], [0.0, 1.0]]
+    g = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "sub_tensor_backend": "auto",
+        "sub_tensor_auto_sparse_min_elements": 1_000_000,
+        "sub_tensor_auto_sparse_min_bytes": 0,
+        "sub_tensor_sparse_density_cutoff": 0.15,
+    }
+
+    estimated_nnz = substitution._estimate_sub_tensor_nnz_from_state(
+        state_tensor=state,
+        state_tensor_anc=state,
+        mode="asis",
+        g=g,
+    )
+    observed = substitution.get_substitution_tensor(
+        state_tensor=state,
+        mode="asis",
+        g=g,
+        mmap_attr="toy_auto_sparse_density",
+    )
+
+    assert isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
+    assert observed.nnz == estimated_nnz
+    assert g["resolved_sub_tensor_backend"] == "sparse"
+
+
+def test_auto_substitution_backend_keeps_high_density_tensor_dense_below_element_threshold():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    state = np.full((3, 2, 2), 0.5, dtype=np.float64)
+    g = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "sub_tensor_backend": "auto",
+        "sub_tensor_auto_sparse_min_elements": 1_000_000,
+        "sub_tensor_auto_sparse_min_bytes": 0,
+        "sub_tensor_sparse_density_cutoff": 0.15,
+    }
+    mmap_path = Path("tmp.csubst.sub_tensor.toy_auto_dense_density.mmap")
+    try:
+        observed = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="asis",
+            g=g,
+            mmap_attr="toy_auto_dense_density",
+        )
+        assert not isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
+        assert g["resolved_sub_tensor_backend"] == "dense"
+    finally:
+        if mmap_path.exists():
+            mmap_path.unlink()
+
+
+def test_auto_substitution_backend_keeps_high_density_tensor_dense_above_element_threshold():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
+    state = np.full((3, 2, 2), 0.5, dtype=np.float64)
+    g = {
+        "tree": tr,
+        "ml_anc": "yes",
+        "float_tol": 1e-12,
+        "sub_tensor_backend": "auto",
+        "sub_tensor_auto_sparse_min_elements": 1,
+        "sub_tensor_auto_sparse_min_bytes": 0,
+        "sub_tensor_sparse_density_cutoff": 0.15,
+    }
+    mmap_path = Path("tmp.csubst.sub_tensor.toy_auto_dense_large_density.mmap")
+    try:
+        observed = substitution.get_substitution_tensor(
+            state_tensor=state,
+            mode="asis",
+            g=g,
+            mmap_attr="toy_auto_dense_large_density",
+        )
+        assert not isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
+        assert g["resolved_sub_tensor_backend"] == "dense"
+    finally:
+        if mmap_path.exists():
+            mmap_path.unlink()
 
 
 def test_get_substitution_tensor_dense_asis_parallel_matches_single_thread():

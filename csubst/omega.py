@@ -1891,8 +1891,17 @@ def _project_expected_state_chunk(
 ):
     if len(branch_jobs) == 0:
         return None
+    # Each codon transition matrix is about 30 KiB.  Keeping every
+    # (branch_length, site_rate) pair until the whole chunk completes can grow
+    # to gigabytes on empirical-rate inputs.  Retain only the most recently
+    # used branch length: consecutive equal-length branches still reuse the
+    # matrices, while memory stays bounded by one branch's rate categories.
     transition_prob_cache = dict()
+    cached_branch_length = None
     for nl, parent_nl, branch_length in branch_jobs:
+        if (cached_branch_length is None) or (branch_length != cached_branch_length):
+            transition_prob_cache.clear()
+            cached_branch_length = branch_length
         inst_bl = inst * branch_length
         for site_rate, site_indices in zip(unique_site_rates, rate_site_indices):
             if site_indices.shape[0] == 0:
@@ -2262,9 +2271,12 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             cb['ECS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='mean', SN='S', g=g)
     elif expectation_method == 'codon_model':
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
-        state_nsyE = get_exp_state(g=g, mode='nsy')
-        if (g['current_arity']==2):
+        if 'EN_tensor' not in g:
+            state_nsyE = get_exp_state(g=g, mode='nsy')
             g['EN_tensor'] = substitution.get_substitution_tensor(state_nsyE, g['state_nsy'], mode='asis', g=g, mmap_attr='EN')
+            del state_nsyE
+        else:
+            print('Reusing expected nonsynonymous substitution tensor.', flush=True)
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
         print(txt.format(substitution.get_total_substitution(g['EN_tensor'])))
         print('Preparing the ECN table with up to {:,} process(es).'.format(g['threads']), flush=True)
@@ -2276,10 +2288,13 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             selected_base_stats=base_stats,
         )
         cb = table.merge_tables(cb, cbEN)
-        del state_nsyE,cbEN
-        state_cdnE = get_exp_state(g=g, mode='cdn')
-        if (g['current_arity'] == 2):
+        del cbEN
+        if 'ES_tensor' not in g:
+            state_cdnE = get_exp_state(g=g, mode='cdn')
             g['ES_tensor'] = substitution.get_substitution_tensor(state_cdnE, g['state_cdn'], mode='syn', g=g, mmap_attr='ES')
+            del state_cdnE
+        else:
+            print('Reusing expected synonymous substitution tensor.', flush=True)
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
         print(txt.format(substitution.get_total_substitution(g['ES_tensor'])))
         print('Preparing the ECS table with up to {:,} process(es).'.format(g['threads']), flush=True)
@@ -2291,7 +2306,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             selected_base_stats=base_stats,
         )
         cb = table.merge_tables(cb, cbES)
-        del state_cdnE,cbES
+        del cbES
     else:
         raise ValueError('Unsupported expectation_method: {}'.format(expectation_method))
     cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC', output_stats=requested_output_stats)

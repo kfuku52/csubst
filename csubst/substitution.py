@@ -28,6 +28,14 @@ _CYTHON_FALLBACK_WARNED = set()
 _SPARSE_CB_SUMMARY_GRAM_MIN_COMBINATIONS = 512
 _SPARSE_CB_SUMMARY_GRAM_MAX_BRANCHES = 512
 _SPARSE_CB_SUMMARY_SYRK_MIN_FEATURES = 10000
+# CSR Gram remained faster on the representative expected-N tensor at about
+# 78% projected density. Densify only when the projection is nearly full; this
+# still caps CSR's worst-case storage overhead for genuinely dense inputs.
+_SPARSE_CB_PROJECTION_DENSE_CUTOFF = 0.90
+_SPARSE_CB_PROJECTION_ARITY3_DENSE_CUTOFF = 0.35
+_SPARSE_CB_PROJECTION_ARITY3_DENSE_MIN_COMBINATIONS = 10000
+_SPARSE_CB_PROJECTION_ARITY3_DENSE_MAX_BRANCHES = 256
+_SPARSE_CB_PROJECTION_ARITY3_DENSE_MAX_BYTES = 134217728
 _SPARSE_SUB_TENSOR_INDEXED_CHILD_MAX_DENSITY = 0.35
 _SUB_TENSOR_PARALLEL_SITE_BLOCK_SIZE = 5000
 
@@ -37,6 +45,15 @@ def _warn_cython_fallback(fastpath_name, exc):
         return
     _CYTHON_FALLBACK_WARNED.add(fastpath_name)
     txt = 'Cython fast path "{}" failed ({}: {}). Falling back to Python implementation.'
+    warnings.warn(txt.format(fastpath_name, type(exc).__name__, exc), RuntimeWarning, stacklevel=2)
+
+
+def _warn_sparse_fallback(fastpath_name, exc):
+    warning_key = 'sparse:' + fastpath_name
+    if warning_key in _CYTHON_FALLBACK_WARNED:
+        return
+    _CYTHON_FALLBACK_WARNED.add(warning_key)
+    txt = 'Sparse fast path "{}" failed ({}: {}). Falling back to the compatibility implementation.'
     warnings.warn(txt.format(fastpath_name, type(exc).__name__, exc), RuntimeWarning, stacklevel=2)
 
 
@@ -272,7 +289,85 @@ def _estimate_sub_tensor_num_elements(state_tensor, mode, g):
     return num_branch * num_site * num_group * num_state * num_state
 
 
-def resolve_sub_tensor_backend(g, state_tensor=None, mode=''):
+def _estimate_sub_tensor_nnz_from_state(state_tensor, state_tensor_anc, mode, g):
+    if state_tensor is None:
+        return None
+    if state_tensor_anc is None:
+        state_tensor_anc = state_tensor
+    if ('tree' not in g) or (g.get('tree', None) is None):
+        return None
+    if (not hasattr(state_tensor, 'shape')) or len(state_tensor.shape) != 3:
+        return None
+    if (not hasattr(state_tensor_anc, 'shape')) or len(state_tensor_anc.shape) != 3:
+        return None
+    selected_branch_set = _get_selected_branch_set(g)
+    branch_pairs = _collect_sub_tensor_branch_pairs(
+        g=g,
+        state_tensor_anc=state_tensor_anc,
+        selected_branch_set=selected_branch_set,
+    )
+    estimated_nnz = 0
+    if mode == 'asis':
+        for child, parent in branch_pairs:
+            parent_support = np.asarray(state_tensor_anc[parent, :, :] != 0, dtype=bool)
+            child_support = np.asarray(state_tensor[child, :, :] != 0, dtype=bool)
+            parent_count = parent_support.sum(axis=1, dtype=np.int64)
+            child_count = child_support.sum(axis=1, dtype=np.int64)
+            same_state_count = np.logical_and(parent_support, child_support).sum(axis=1, dtype=np.int64)
+            estimated_nnz += int(np.sum((parent_count * child_count) - same_state_count, dtype=np.int64))
+        return estimated_nnz
+    if mode == 'syn':
+        if ('amino_acid_orders' not in g) or ('synonymous_indices' not in g):
+            return None
+        syn_indices_list = [
+            np.asarray(g['synonymous_indices'][aa], dtype=np.int64)
+            for aa in list(g['amino_acid_orders'])
+        ]
+        for child, parent in branch_pairs:
+            for ind in syn_indices_list:
+                if ind.shape[0] <= 1:
+                    continue
+                parent_support = np.asarray(state_tensor_anc[parent, :, ind] != 0, dtype=bool)
+                child_support = np.asarray(state_tensor[child, :, ind] != 0, dtype=bool)
+                # Advanced indexing may move the state axis to the front.
+                if parent_support.shape[0] == ind.shape[0]:
+                    parent_support = parent_support.T
+                if child_support.shape[0] == ind.shape[0]:
+                    child_support = child_support.T
+                parent_count = parent_support.sum(axis=1, dtype=np.int64)
+                child_count = child_support.sum(axis=1, dtype=np.int64)
+                same_state_count = np.logical_and(parent_support, child_support).sum(axis=1, dtype=np.int64)
+                estimated_nnz += int(np.sum((parent_count * child_count) - same_state_count, dtype=np.int64))
+        return estimated_nnz
+    return None
+
+
+def _estimate_sparse_sub_tensor_nbytes(state_tensor, mode, g, estimated_nnz):
+    if estimated_nnz is None or state_tensor is None:
+        return None
+    num_branch = int(state_tensor.shape[0])
+    value_nbytes = int(np.dtype(state_tensor.dtype).itemsize)
+    if mode == 'asis':
+        num_state = int(state_tensor.shape[2])
+        max_blocks = num_state * max(num_state - 1, 0)
+    elif mode == 'syn':
+        if ('amino_acid_orders' not in g) or ('synonymous_indices' not in g):
+            return None
+        max_blocks = 0
+        for aa in list(g['amino_acid_orders']):
+            group_size = int(len(g['synonymous_indices'][aa]))
+            max_blocks += group_size * max(group_size - 1, 0)
+    else:
+        return None
+    # SciPy uses 32-bit CSR indices while dimensions fit int32. Include a
+    # conservative row pointer for every potentially non-empty state block.
+    index_nbytes = 4
+    data_and_indices = int(estimated_nnz) * (value_nbytes + index_nbytes)
+    row_pointers = int(max_blocks) * (num_branch + 1) * index_nbytes
+    return int(data_and_indices + row_pointers)
+
+
+def resolve_sub_tensor_backend(g, state_tensor=None, state_tensor_anc=None, mode=''):
     requested = _resolve_requested_sub_tensor_backend(g)
     details = ''
     if requested == 'dense':
@@ -281,6 +376,8 @@ def resolve_sub_tensor_backend(g, state_tensor=None, mode=''):
         resolved = 'sparse'
     elif requested == 'auto':
         min_elements = int(g.get('sub_tensor_auto_sparse_min_elements', 100000000))
+        min_dense_bytes = int(g.get('sub_tensor_auto_sparse_min_bytes', 67108864))
+        density_cutoff = float(g.get('sub_tensor_sparse_density_cutoff', 0.15))
         estimated_elements = _estimate_sub_tensor_num_elements(
             state_tensor=state_tensor,
             mode=mode,
@@ -289,12 +386,46 @@ def resolve_sub_tensor_backend(g, state_tensor=None, mode=''):
         if estimated_elements is None:
             resolved = 'dense'
         else:
-            resolved = 'sparse' if (estimated_elements >= min_elements) else 'dense'
-            details = 'mode={}, estimated_elements={:,}, min_elements={:,}'.format(
-                mode,
-                estimated_elements,
-                min_elements,
+            estimated_dense_bytes = int(estimated_elements * np.dtype(state_tensor.dtype).itemsize)
+            estimated_nnz = _estimate_sub_tensor_nnz_from_state(
+                state_tensor=state_tensor,
+                state_tensor_anc=state_tensor_anc,
+                mode=mode,
+                g=g,
             )
+            estimated_density = None
+            estimated_sparse_bytes = None
+            if estimated_nnz is not None:
+                estimated_density = 0.0 if estimated_elements == 0 else float(estimated_nnz) / float(estimated_elements)
+                estimated_sparse_bytes = _estimate_sparse_sub_tensor_nbytes(
+                    state_tensor=state_tensor,
+                    mode=mode,
+                    g=g,
+                    estimated_nnz=estimated_nnz,
+                )
+            large_by_elements = estimated_elements >= min_elements
+            sparse_is_cost_effective = (
+                (estimated_density is not None)
+                and (estimated_sparse_bytes is not None)
+                and (estimated_density <= density_cutoff)
+                and (estimated_sparse_bytes < estimated_dense_bytes)
+            )
+            if estimated_density is None:
+                # Retain the size-only behavior when state support cannot be
+                # inspected (for example, callers without a tree context).
+                resolved = 'sparse' if large_by_elements else 'dense'
+            else:
+                large_enough = large_by_elements or (estimated_dense_bytes >= min_dense_bytes)
+                resolved = 'sparse' if (large_enough and sparse_is_cost_effective) else 'dense'
+            details = 'mode={}, estimated_elements={:,}, dense_bytes={:,}, min_elements={:,}'.format(
+                mode, estimated_elements, estimated_dense_bytes, min_elements,
+            )
+            if estimated_density is not None:
+                details += ', estimated_density={:.6f}, sparse_bytes={:,}, density_cutoff={:.6f}'.format(
+                    estimated_density,
+                    estimated_sparse_bytes,
+                    density_cutoff,
+                )
     g['sub_tensor_backend'] = requested
     g['resolved_sub_tensor_backend'] = resolved
     txt = 'Substitution tensor backend: requested={}, resolved={}'
@@ -358,9 +489,19 @@ def get_reducer_sub_tensor(sub_tensor, g, label=''):
         return g['reducer_sub_tensor_cache'][label]
     tol = float(g.get('float_tol', 0))
     sparse_sub_tensor = dense_to_sparse_sub_tensor(sub_tensor=sub_tensor, tol=tol)
-    txt = 'Converted substitution tensor{} to sparse: density={:.6f} ({:,}/{:,})'
+    txt = 'Converted substitution tensor{} to sparse: density={:.6f} ({:,}/{:,}), storage={:,} bytes, compression={:.1f}x'
     lbl = '' if label == '' else ' for {}'.format(label)
-    print(txt.format(lbl, sparse_sub_tensor.density, sparse_sub_tensor.nnz, sparse_sub_tensor.size), flush=True)
+    print(
+        txt.format(
+            lbl,
+            sparse_sub_tensor.density,
+            sparse_sub_tensor.nnz,
+            sparse_sub_tensor.size,
+            sparse_sub_tensor.nbytes,
+            sparse_sub_tensor.compression_ratio,
+        ),
+        flush=True,
+    )
     if label != '':
         g['reducer_sub_tensor_cache'][label] = sparse_sub_tensor
     return sparse_sub_tensor
@@ -635,8 +776,11 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
             blocks[key] = mat
     tensor_shape = (num_branch, num_site, num_syngroup, num_state, num_state)
     out = substitution_sparse.SparseSubstitutionTensor(shape=tensor_shape, dtype=dtype, blocks=blocks)
-    txt = 'Generated sparse substitution tensor: shape={}, density={:.6f} ({:,}/{:,})'
-    print(txt.format(out.shape, out.density, out.nnz, out.size), flush=True)
+    txt = 'Generated sparse substitution tensor: shape={}, density={:.6f} ({:,}/{:,}), storage={:,} bytes, compression={:.1f}x'
+    print(
+        txt.format(out.shape, out.density, out.nnz, out.size, out.nbytes, out.compression_ratio),
+        flush=True,
+    )
     return out
 
 
@@ -1056,10 +1200,15 @@ def _fill_dense_sub_tensor_chunk_syn(
 def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None, mmap_attr=''):
     if g is None:
         raise ValueError('g is required.')
-    backend = resolve_sub_tensor_backend(g=g, state_tensor=state_tensor, mode=mode)
-    ml_anc = _parse_bool_like(g.get('ml_anc', False), 'ml_anc')
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
+    backend = resolve_sub_tensor_backend(
+        g=g,
+        state_tensor=state_tensor,
+        state_tensor_anc=state_tensor_anc,
+        mode=mode,
+    )
+    ml_anc = _parse_bool_like(g.get('ml_anc', False), 'ml_anc')
     selected_branch_set = _get_selected_branch_set(g)
     if backend == 'sparse':
         return _build_sparse_substitution_tensor(
@@ -1676,6 +1825,332 @@ def _can_use_sparse_cb_summary_gram(id_combinations, sub_tensor):
     return True
 
 
+def _can_use_sparse_cb_projection_gram(id_combinations, sub_tensor):
+    if not _can_use_sparse_cb_summary_gram(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+    ):
+        return False
+    return _sparse_tensor_has_only_finite_explicit_values(sub_tensor)
+
+
+def _sparse_tensor_has_only_finite_explicit_values(sub_tensor):
+    # Sparse multiplication does not reproduce NumPy's propagation of
+    # non-finite explicit values through implicit zeros. Keep those uncommon
+    # tensors on the established dense-compatible reducer paths.
+    for mat in sub_tensor.blocks.values():
+        if (mat.nnz > 0) and (not np.isfinite(mat.data).all()):
+            return False
+    return True
+
+
+def _can_use_sparse_projection_product(id_combinations, sub_tensor):
+    if not _is_sparse_sub_tensor(sub_tensor):
+        return False
+    if (not isinstance(id_combinations, np.ndarray)) or id_combinations.ndim != 2:
+        return False
+    if id_combinations.shape[1] < 1:
+        return False
+    if id_combinations.dtype.kind not in ['i', 'u']:
+        return False
+    return _sparse_tensor_has_only_finite_explicit_values(sub_tensor)
+
+
+def _build_sparse_cb_projection(sub_tensor, stat):
+    mats = []
+    if stat == 'any2any':
+        for sg in range(sub_tensor.num_group):
+            mat = sub_tensor.project_any2any(sg)
+            if mat.nnz > 0:
+                mats.append(mat)
+    elif stat == 'spe2any':
+        for sg in range(sub_tensor.num_group):
+            for a in range(sub_tensor.num_state_from):
+                mat = sub_tensor.project_spe2any(sg, a)
+                if mat.nnz > 0:
+                    mats.append(mat)
+    elif stat == 'any2spe':
+        for sg in range(sub_tensor.num_group):
+            for d in range(sub_tensor.num_state_to):
+                mat = sub_tensor.project_any2spe(sg, d)
+                if mat.nnz > 0:
+                    mats.append(mat)
+    elif stat == 'spe2spe':
+        mats = [mat for _key, mat in _get_sorted_sparse_block_items(sub_tensor) if mat.nnz > 0]
+    else:
+        raise ValueError('Unsupported sparse cb projection statistic: {}'.format(stat))
+    if len(mats) == 0:
+        return sp.csr_matrix((sub_tensor.num_branch, 0), dtype=np.float64)
+    projection = sp.hstack(mats, format='csr', dtype=np.float64)
+    projection.sum_duplicates()
+    projection.eliminate_zeros()
+    projection.sort_indices()
+    if projection.dtype != np.float64:
+        projection = projection.astype(np.float64)
+    return projection
+
+
+def _get_sparse_cb_projection(sub_tensor, stat):
+    cache = getattr(sub_tensor, '_cb_sparse_projection_cache', None)
+    if cache is None:
+        cache = dict()
+        setattr(sub_tensor, '_cb_sparse_projection_cache', cache)
+    projection = cache.get(stat, None)
+    if projection is None:
+        projection = _build_sparse_cb_projection(sub_tensor=sub_tensor, stat=stat)
+        cache[stat] = projection
+    return projection
+
+
+def _can_use_cython_sparse_projection_product(projection, ids, by_site):
+    if substitution_sparse_cy is None:
+        return False
+    if not sp.isspmatrix_csr(projection):
+        return False
+    if projection.data.dtype != np.float64:
+        return False
+    if projection.indices.dtype not in [np.int32, np.int64]:
+        return False
+    if projection.indptr.dtype != projection.indices.dtype:
+        return False
+    if (not isinstance(ids, np.ndarray)) or ids.dtype != np.int64 or ids.ndim != 2:
+        return False
+    func_name = (
+        'calc_sparse_projection_product_by_site_double'
+        if by_site
+        else 'calc_sparse_projection_product_double'
+    )
+    return hasattr(substitution_sparse_cy, func_name)
+
+
+def _calc_sparse_projection_products_python(projection, ids, num_site=None):
+    if num_site is None:
+        out = np.zeros(shape=(ids.shape[0],), dtype=np.float64)
+    else:
+        out = np.zeros(shape=(ids.shape[0], int(num_site)), dtype=np.float64)
+    for combo_index, branch_ids in enumerate(ids):
+        rows = []
+        for branch_id in branch_ids:
+            start = int(projection.indptr[int(branch_id)])
+            end = int(projection.indptr[int(branch_id) + 1])
+            rows.append((projection.indices[start:end], projection.data[start:end]))
+        min_row = int(np.argmin([row_indices.shape[0] for row_indices, _row_data in rows]))
+        common_indices = rows[min_row][0]
+        products = rows[min_row][1]
+        for row_index, (row_indices, row_data) in enumerate(rows):
+            if row_index == min_row:
+                continue
+            common_indices, left, right = np.intersect1d(
+                common_indices,
+                row_indices,
+                assume_unique=True,
+                return_indices=True,
+            )
+            if common_indices.shape[0] == 0:
+                products = np.array([], dtype=np.float64)
+                break
+            products = products[left] * row_data[right]
+        if num_site is None:
+            out[combo_index] = products.sum(dtype=np.float64)
+        elif common_indices.shape[0] > 0:
+            np.add.at(out[combo_index], common_indices % int(num_site), products)
+    return out
+
+
+def _can_use_dense_arity3_projection_product(projection, ids, num_site):
+    if num_site is not None:
+        return False
+    if ids.shape[1] != 3:
+        return False
+    if ids.shape[0] < _SPARSE_CB_PROJECTION_ARITY3_DENSE_MIN_COMBINATIONS:
+        return False
+    if projection.shape[0] > _SPARSE_CB_PROJECTION_ARITY3_DENSE_MAX_BRANCHES:
+        return False
+    dense_bytes = int(projection.shape[0]) * int(projection.shape[1]) * np.dtype(np.float64).itemsize
+    if dense_bytes > _SPARSE_CB_PROJECTION_ARITY3_DENSE_MAX_BYTES:
+        return False
+    return _get_sparse_matrix_density(projection) > _SPARSE_CB_PROJECTION_ARITY3_DENSE_CUTOFF
+
+
+def _calc_dense_arity3_projection_products(projection, ids):
+    matrix = np.asarray(projection.toarray(), dtype=np.float64)
+    weighted = np.empty_like(matrix)
+    out = np.zeros(shape=(ids.shape[0],), dtype=np.float64)
+    for branch_id in np.unique(ids[:, 2]):
+        np.multiply(matrix, matrix[int(branch_id), :], out=weighted)
+        gram = weighted @ matrix.T
+        selected = (ids[:, 2] == branch_id)
+        out[selected] = gram[ids[selected, 0], ids[selected, 1]]
+    return out
+
+
+def _calc_sparse_projection_products(projection, id_combinations, num_site=None):
+    ids = np.ascontiguousarray(id_combinations, dtype=np.int64)
+    if ids.ndim != 2 or ids.shape[1] < 1:
+        raise ValueError('id_combinations should be a two-dimensional array with at least one branch column.')
+    if ids.size > 0:
+        if (ids.min() < 0) or (ids.max() >= projection.shape[0]):
+            raise IndexError('branch ID is out of range for sparse projection.')
+    if _can_use_dense_arity3_projection_product(
+        projection=projection,
+        ids=ids,
+        num_site=num_site,
+    ):
+        return _calc_dense_arity3_projection_products(projection=projection, ids=ids)
+    by_site = num_site is not None
+    if _can_use_cython_sparse_projection_product(projection=projection, ids=ids, by_site=by_site):
+        try:
+            if by_site:
+                return substitution_sparse_cy.calc_sparse_projection_product_by_site_double(
+                    ids,
+                    projection.indptr,
+                    projection.indices,
+                    projection.data,
+                    int(num_site),
+                )
+            return substitution_sparse_cy.calc_sparse_projection_product_double(
+                ids,
+                projection.indptr,
+                projection.indices,
+                projection.data,
+            )
+        except Exception as exc:
+            _warn_cython_fallback('sparse_projection_product', exc)
+    return _calc_sparse_projection_products_python(
+        projection=projection,
+        ids=ids,
+        num_site=num_site,
+    )
+
+
+def _get_sparse_matrix_density(mat):
+    size = int(mat.shape[0]) * int(mat.shape[1])
+    if size == 0:
+        return 0.0
+    return float(mat.nnz) / float(size)
+
+
+def _calc_dense_gram_pair_values(matrix_2d, row_ids, col_ids):
+    if matrix_2d.shape[1] < _SPARSE_CB_SUMMARY_SYRK_MIN_FEATURES:
+        gram = matrix_2d @ matrix_2d.T
+        return np.asarray(gram[row_ids, col_ids], dtype=np.float64).reshape(-1)
+    try:
+        # dsyrk computes A*A^T while exploiting symmetry; only requested
+        # branch-pair entries are copied out of the dense Gram matrix.
+        matrix_ft = np.asfortranarray(matrix_2d.T, dtype=np.float64)
+        gram_upper = scipy_blas.dsyrk(alpha=1.0, a=matrix_ft, trans=1, lower=0)
+        upper_rows = np.minimum(row_ids, col_ids)
+        upper_cols = np.maximum(row_ids, col_ids)
+        return np.asarray(gram_upper[upper_rows, upper_cols], dtype=np.float64).reshape(-1)
+    except Exception:
+        gram = matrix_2d @ matrix_2d.T
+        return np.asarray(gram[row_ids, col_ids], dtype=np.float64).reshape(-1)
+
+
+def _calc_projection_gram_pair_values(projection, row_ids, col_ids):
+    density = _get_sparse_matrix_density(projection)
+    if projection.shape[1] == 0:
+        return np.zeros(shape=(row_ids.shape[0],), dtype=np.float64), density, 'sparse'
+    if density > _SPARSE_CB_PROJECTION_DENSE_CUTOFF:
+        values = _calc_dense_gram_pair_values(
+            matrix_2d=np.asarray(projection.toarray(), dtype=np.float64),
+            row_ids=row_ids,
+            col_ids=col_ids,
+        )
+        return values, density, 'dense'
+    gram = projection @ projection.T
+    values = np.asarray(gram[row_ids, col_ids], dtype=np.float64).reshape(-1)
+    return values, density, 'sparse'
+
+
+def _run_sparse_cb_projection_gram(
+    id_combinations,
+    sub_tensor,
+    selected,
+    mmap,
+    df_mmap,
+    mmap_start,
+    float_type,
+):
+    arity = id_combinations.shape[1]
+    ids = np.asarray(id_combinations, dtype=np.int64)
+    b0 = ids[:, 0]
+    b1 = ids[:, 1]
+    selected_df = np.zeros(shape=(ids.shape[0], arity + len(selected)), dtype=np.float64)
+    selected_df[:, :arity] = ids
+    for stat_index, stat in enumerate(selected):
+        projection = _get_sparse_cb_projection(sub_tensor=sub_tensor, stat=stat)
+        values, density, backend = _calc_projection_gram_pair_values(
+            projection=projection,
+            row_ids=b0,
+            col_ids=b1,
+        )
+        selected_df[:, arity + stat_index] = values
+        txt = 'Sparse cb projection: stat={}, shape={}, nnz={:,}, density={:.6f}, gram={}'
+        print(
+            txt.format(stat, projection.shape, int(projection.nnz), density, backend),
+            flush=True,
+        )
+    if mmap:
+        row_start, row_end = _get_combo_index_range(
+            mmap_start=mmap_start,
+            num_combinations=id_combinations.shape[0],
+        )
+        df_mmap[row_start:row_end, :] = selected_df.astype(df_mmap.dtype, copy=False)
+        return None
+    return selected_df.astype(float_type, copy=False)
+
+
+def _run_sparse_cb_projection_product(
+    id_combinations,
+    sub_tensor,
+    selected,
+    mmap,
+    df_mmap,
+    mmap_start,
+    float_type,
+):
+    arity = id_combinations.shape[1]
+    ids = np.ascontiguousarray(id_combinations, dtype=np.int64)
+    selected_df = np.zeros(shape=(ids.shape[0], arity + len(selected)), dtype=np.float64)
+    selected_df[:, :arity] = ids
+    for stat_index, stat in enumerate(selected):
+        projection = _get_sparse_cb_projection(sub_tensor=sub_tensor, stat=stat)
+        product_backend = (
+            'dense_arity3'
+            if _can_use_dense_arity3_projection_product(
+                projection=projection,
+                ids=ids,
+                num_site=None,
+            )
+            else 'sparse_intersection'
+        )
+        selected_df[:, arity + stat_index] = _calc_sparse_projection_products(
+            projection=projection,
+            id_combinations=ids,
+        )
+        txt = 'Sparse cb projection product: stat={}, arity={}, shape={}, nnz={:,}, density={:.6f}, backend={}'
+        print(
+            txt.format(
+                stat,
+                arity,
+                projection.shape,
+                int(projection.nnz),
+                _get_sparse_matrix_density(projection),
+                product_backend,
+            ),
+            flush=True,
+        )
+    if mmap:
+        row_start, row_end = _get_combo_index_range(
+            mmap_start=mmap_start,
+            num_combinations=id_combinations.shape[0],
+        )
+        df_mmap[row_start:row_end, :] = selected_df.astype(df_mmap.dtype, copy=False)
+        return None
+    return selected_df.astype(float_type, copy=False)
+
+
 def _run_sparse_cb_summary_gram(
     id_combinations,
     selected,
@@ -1688,19 +2163,6 @@ def _run_sparse_cb_summary_gram(
     branch_group_to_site,
     branch_group_pair_site,
 ):
-    def _calc_selected_gram_values(matrix_2d, upper_rows, upper_cols):
-        if matrix_2d.shape[1] < _SPARSE_CB_SUMMARY_SYRK_MIN_FEATURES:
-            gram = matrix_2d @ matrix_2d.T
-            return gram[upper_rows, upper_cols]
-        try:
-            # dsyrk computes A*A^T while exploiting symmetry; we keep only upper-triangular pairs.
-            matrix_ft = np.asfortranarray(matrix_2d.T, dtype=np.float64)
-            gram_upper = scipy_blas.dsyrk(alpha=1.0, a=matrix_ft, trans=1, lower=0)
-            return gram_upper[upper_rows, upper_cols]
-        except Exception:
-            gram = matrix_2d @ matrix_2d.T
-            return gram[upper_rows, upper_cols]
-
     arity = id_combinations.shape[1]
     ids = np.asarray(id_combinations, dtype=np.int64)
     b0 = ids[:, 0]
@@ -1713,31 +2175,31 @@ def _run_sparse_cb_summary_gram(
     selected_col_map = {stat: (arity + i) for i, stat in enumerate(selected)}
     if 'any2any' in selected:
         total2d = np.asarray(branch_group_site_total, dtype=np.float64).reshape((branch_group_site_total.shape[0], -1))
-        selected_df[:, selected_col_map['any2any']] = _calc_selected_gram_values(
+        selected_df[:, selected_col_map['any2any']] = _calc_dense_gram_pair_values(
             matrix_2d=total2d,
-            upper_rows=upper_rows,
-            upper_cols=upper_cols,
+            row_ids=upper_rows,
+            col_ids=upper_cols,
         )
     if 'spe2any' in selected:
         from2d = np.asarray(branch_group_from_site, dtype=np.float64).reshape((branch_group_from_site.shape[0], -1))
-        selected_df[:, selected_col_map['spe2any']] = _calc_selected_gram_values(
+        selected_df[:, selected_col_map['spe2any']] = _calc_dense_gram_pair_values(
             matrix_2d=from2d,
-            upper_rows=upper_rows,
-            upper_cols=upper_cols,
+            row_ids=upper_rows,
+            col_ids=upper_cols,
         )
     if 'any2spe' in selected:
         to2d = np.asarray(branch_group_to_site, dtype=np.float64).reshape((branch_group_to_site.shape[0], -1))
-        selected_df[:, selected_col_map['any2spe']] = _calc_selected_gram_values(
+        selected_df[:, selected_col_map['any2spe']] = _calc_dense_gram_pair_values(
             matrix_2d=to2d,
-            upper_rows=upper_rows,
-            upper_cols=upper_cols,
+            row_ids=upper_rows,
+            col_ids=upper_cols,
         )
     if 'spe2spe' in selected:
         pair2d = np.asarray(branch_group_pair_site, dtype=np.float64).reshape((branch_group_pair_site.shape[0], -1))
-        selected_df[:, selected_col_map['spe2spe']] = _calc_selected_gram_values(
+        selected_df[:, selected_col_map['spe2spe']] = _calc_dense_gram_pair_values(
             matrix_2d=pair2d,
-            upper_rows=upper_rows,
-            upper_cols=upper_cols,
+            row_ids=upper_rows,
+            col_ids=upper_cols,
         )
     if mmap:
         row_start, row_end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
@@ -1884,6 +2346,48 @@ def sub_tensor2cb_sparse(
         source_dtype=sub_tensor.dtype,
         default_dtype=float_type,
     )
+    if _can_use_sparse_cb_projection_gram(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+    ):
+        try:
+            txt = 'Sparse cb backend: resolved=projection_gram (combinations={}, branches={})'
+            print(txt.format(id_combinations.shape[0], int(sub_tensor.num_branch)), flush=True)
+            out = _run_sparse_cb_projection_gram(
+                id_combinations=id_combinations,
+                sub_tensor=sub_tensor,
+                selected=selected,
+                mmap=mmap,
+                df_mmap=df_mmap,
+                mmap_start=mmap_start,
+                float_type=float_type,
+            )
+            if not mmap:
+                return out
+            return
+        except Exception as exc:
+            _warn_sparse_fallback('sub_tensor2cb_sparse_projection_gram', exc)
+    if (arity >= 3) and _can_use_sparse_projection_product(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+    ):
+        try:
+            txt = 'Sparse cb backend: resolved=projection_product (combinations={}, branches={}, arity={})'
+            print(txt.format(id_combinations.shape[0], int(sub_tensor.num_branch), arity), flush=True)
+            out = _run_sparse_cb_projection_product(
+                id_combinations=id_combinations,
+                sub_tensor=sub_tensor,
+                selected=selected,
+                mmap=mmap,
+                df_mmap=df_mmap,
+                mmap_start=mmap_start,
+                float_type=float_type,
+            )
+            if not mmap:
+                return out
+            return
+        except Exception as exc:
+            _warn_sparse_fallback('sub_tensor2cb_sparse_projection_product', exc)
     if _can_use_sparse_cb_summary_gram(id_combinations=id_combinations, sub_tensor=sub_tensor):
         try:
             summary_arrays = _get_sparse_cb_summary_arrays(
@@ -2002,6 +2506,34 @@ def _resolve_cb_n_jobs(id_combinations, sub_tensor, g, writer, selected):
         min_items_for_parallel=int(g.get('parallel_min_items_cb', 20000)),
         min_items_per_job=int(g.get('parallel_min_items_per_job_cb', 5000)),
     )
+    if (writer is sub_tensor2cb_sparse) and _can_use_sparse_cb_projection_gram(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+    ):
+        if n_jobs != 1:
+            txt = 'Sparse projection Gram scheduler: combinations={}, workers {} -> 1'
+            print(txt.format(id_combinations.shape[0], n_jobs), flush=True)
+        # Each Gram call covers all branch pairs. Splitting combinations would
+        # rebuild identical projections and Gram matrices in every worker.
+        n_jobs = 1
+    if (
+        (writer is sub_tensor2cb_sparse)
+        and (id_combinations.shape[1] == 3)
+        and _can_use_sparse_projection_product(id_combinations=id_combinations, sub_tensor=sub_tensor)
+    ):
+        uses_dense_arity3 = False
+        ids = np.ascontiguousarray(id_combinations, dtype=np.int64)
+        for stat in selected:
+            projection = _get_sparse_cb_projection(sub_tensor=sub_tensor, stat=stat)
+            if _can_use_dense_arity3_projection_product(projection=projection, ids=ids, num_site=None):
+                uses_dense_arity3 = True
+                break
+        if uses_dense_arity3 and n_jobs != 1:
+            txt = 'Dense arity-3 projection scheduler: combinations={}, workers {} -> 1'
+            print(txt.format(id_combinations.shape[0], n_jobs), flush=True)
+            # The dense kernel computes every branch-pair Gram for each third
+            # branch. Chunking would repeat that full calculation per worker.
+            n_jobs = 1
     if (writer is sub_tensor2cb) and _can_use_cython_dense_cb(
         id_combinations=id_combinations,
         sub_tensor=sub_tensor,
@@ -2172,6 +2704,33 @@ def sub_tensor2cbs_sparse(id_combinations, sub_tensor, mmap=False, df_mmap=None,
         source_dtype=sub_tensor.dtype,
         default_dtype=sub_tensor.dtype,
     )
+    if _can_use_sparse_projection_product(
+        id_combinations=id_combinations,
+        sub_tensor=sub_tensor,
+    ):
+        ids = np.ascontiguousarray(id_combinations, dtype=np.int64)
+        start, _end = _get_combo_index_range(
+            mmap_start=mmap_start,
+            num_combinations=id_combinations.shape[0],
+        )
+        row_start = start * num_site
+        row_end = row_start + (ids.shape[0] * num_site)
+        df[row_start:row_end, :arity] = np.repeat(ids, repeats=num_site, axis=0)
+        df[row_start:row_end, arity] = np.tile(sites, ids.shape[0])
+        stats = ('any2any', 'spe2any', 'any2spe', 'spe2spe')
+        for stat_index, stat in enumerate(stats):
+            projection = _get_sparse_cb_projection(sub_tensor=sub_tensor, stat=stat)
+            values = _calc_sparse_projection_products(
+                projection=projection,
+                id_combinations=ids,
+                num_site=num_site,
+            )
+            df[row_start:row_end, arity + 1 + stat_index] = values.reshape(-1)
+        txt = 'Sparse cbs backend: resolved=projection_product (combinations={}, sites={}, arity={})'
+        print(txt.format(ids.shape[0], num_site, arity), flush=True)
+        if not mmap:
+            return df
+        return
     start_time = time.time()
     group_block_index = _get_sparse_group_block_index(sub_tensor)
     row_cache = dict()

@@ -440,6 +440,32 @@ def test_get_exp_state_parallel_projection_matches_single_thread():
     np.testing.assert_allclose(out_parallel, out_single, atol=1e-12)
 
 
+def test_expected_state_transition_cache_retains_only_latest_branch_length(monkeypatch):
+    state = np.zeros((4, 2, 2), dtype=np.float64)
+    state[0, :, 0] = 1.0
+    state_e = np.zeros_like(state)
+    calls = []
+
+    def _fake_expm(matrix):
+        calls.append(matrix.copy())
+        return np.eye(2, dtype=np.float64)
+
+    monkeypatch.setattr(omega, "expm", _fake_expm)
+    omega._project_expected_state_chunk(
+        branch_jobs=[(1, 0, 0.5), (2, 0, 1.0), (3, 0, 0.5)],
+        state=state,
+        stateE=state_e,
+        unique_site_rates=np.array([0.5, 1.0], dtype=np.float64),
+        rate_site_indices=[np.array([0]), np.array([1])],
+        inst=np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=np.float64),
+        float_tol=1e-12,
+    )
+
+    # The first branch length was evicted when the second was processed, so
+    # returning to it recomputes its two rate-specific matrices.
+    assert len(calls) == 6
+
+
 def test_get_exp_state_respects_parallel_threshold(monkeypatch):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1):1,C:1)R;", format=1))
     labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
