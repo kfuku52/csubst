@@ -111,10 +111,9 @@ def test_resolve_adaptive_n_jobs_rejects_invalid_thresholds():
         )
 
 
-def test_resolve_parallel_backend_auto_uses_task_policy():
-    g = {"parallel_backend": "auto"}
-    assert parallel.resolve_parallel_backend(g=g, task="general") == "multiprocessing"
-    assert parallel.resolve_parallel_backend(g=g, task="reducer") == "multiprocessing"
+def test_resolve_parallel_backend_uses_internal_policy():
+    assert parallel.resolve_parallel_backend() == "multiprocessing"
+    assert parallel.resolve_parallel_backend(prefer_threading=True) == "threading"
 
 
 def test_run_starmap_single_process_matches_direct_evaluation():

@@ -18,6 +18,8 @@ _AA_ALIGNMENT_CACHE_KEY = "_nonsyn_recode_alignment_cache"
 _AA_PSEUDOCOUNT = 1e-12
 _OBJ_EPS = 1e-8
 _CYTHON_FALLBACK_WARNED = set()
+_AUTO_RECODE_MIN_TOTAL_STARTS = 30000
+_AUTO_RECODE_MIN_STARTS_PER_JOB = 5000
 
 
 def _warn_cython_fallback(fastpath_name, exc):
@@ -638,42 +640,22 @@ def _resolve_auto_recode_parallel_n_jobs(g, n_random, work_scale=1):
     n_random = int(n_random)
     work_scale = max(1, int(work_scale))
     effective_starts = int(n_random * work_scale)
-    requested_backend = str(g.get("parallel_backend", "auto")).lower()
-    if requested_backend == "auto":
-        min_total_starts = int(g.get("nonsyn_recode_parallel_min_total_starts", 30000))
-        if min_total_starts < 1:
-            raise ValueError("nonsyn_recode_parallel_min_total_starts should be >= 1.")
-        if effective_starts < min_total_starts:
-            return 1
+    if effective_starts < _AUTO_RECODE_MIN_TOTAL_STARTS:
+        return 1
     threads = int(g.get("threads", 1))
     n_jobs = parallel.resolve_n_jobs(num_items=n_random, threads=threads)
     if n_jobs <= 1:
         return 1
-    min_starts = int(g.get("nonsyn_recode_parallel_min_starts_per_job", 5000))
-    if min_starts < 1:
-        raise ValueError("nonsyn_recode_parallel_min_starts_per_job should be >= 1.")
-    max_jobs_by_work = max(1, effective_starts // min_starts)
+    max_jobs_by_work = max(1, effective_starts // _AUTO_RECODE_MIN_STARTS_PER_JOB)
     return max(1, min(n_jobs, max_jobs_by_work))
 
 
-def _resolve_auto_recode_parallel_backend(g, prefer_threading=False):
-    if g is None:
-        if prefer_threading:
-            return "threading"
-        return "multiprocessing"
-    resolved = parallel.resolve_parallel_backend(g=g, task="general")
-    requested_backend = str(g.get("parallel_backend", "auto")).lower()
-    if prefer_threading and (requested_backend == "auto"):
-        return "threading"
-    return resolved
+def _resolve_auto_recode_parallel_backend(prefer_threading=False):
+    return parallel.resolve_parallel_backend(prefer_threading=prefer_threading)
 
 
-def _resolve_auto_recode_chunk_factor(g, total_work_units):
-    base_chunk_factor = parallel.resolve_chunk_factor(g=g, task="general")
-    if g is None:
-        return int(base_chunk_factor)
-    if "parallel_chunk_factor" in g:
-        return int(base_chunk_factor)
+def _resolve_auto_recode_chunk_factor(total_work_units):
+    base_chunk_factor = parallel.resolve_chunk_factor(task="general")
     total_work_units = int(total_work_units)
     if total_work_units >= 10_000_000:
         return max(int(base_chunk_factor), 8)
@@ -843,9 +825,9 @@ def _optimize_bins_random_start_chisq(num_item, num_bin, fmat, fr, nsitev, rng, 
             )
         ]
     else:
-        backend = _resolve_auto_recode_parallel_backend(g=g, prefer_threading=use_cython)
+        backend = _resolve_auto_recode_parallel_backend(prefer_threading=use_cython)
         total_work_units = int(n_random * int(fmat.shape[0]))
-        chunk_factor = _resolve_auto_recode_chunk_factor(g=g, total_work_units=total_work_units)
+        chunk_factor = _resolve_auto_recode_chunk_factor(total_work_units=total_work_units)
         initial_chunks, starts = parallel.get_chunks(input_data=initial_bins_all, threads=n_jobs, chunk_factor=chunk_factor)
         args_iterable = [
             (initial_chunk, int(start), num_bin, fmat, fr, nsitev, use_cython)
@@ -896,8 +878,8 @@ def _optimize_bins_random_start_conductance(num_item, num_bin, pi, weighted_q, r
             )
         ]
     else:
-        backend = _resolve_auto_recode_parallel_backend(g=g, prefer_threading=use_cython)
-        chunk_factor = parallel.resolve_chunk_factor(g=g, task="general")
+        backend = _resolve_auto_recode_parallel_backend(prefer_threading=use_cython)
+        chunk_factor = parallel.resolve_chunk_factor(task="general")
         initial_chunks, starts = parallel.get_chunks(input_data=initial_bins_all, threads=n_jobs, chunk_factor=chunk_factor)
         args_iterable = [
             (initial_chunk, int(start), num_bin, pi, weighted_q, use_cython)

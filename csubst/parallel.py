@@ -7,6 +7,19 @@ import sys
 _PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _VALID_PARALLEL_BACKENDS = ('auto', 'multiprocessing', 'threading')
 _DEFAULT_AUTO_BACKEND = 'multiprocessing'
+_CHUNK_FACTORS = {
+    'general': 1,
+    'reducer': 4,
+}
+_ADAPTIVE_JOB_POLICIES = {
+    'sub_tensor': (256, 64),
+    'trait_unions': (2, 1),
+    'nc_matrix': (100000, 25000),
+    'cb': (20000, 5000),
+    'cbs': (200000, 50000),
+    'branch_dist': (20000, 5000),
+    'expected_state': (50000000, 10000000),
+}
 
 
 def _has_shape(input_data):
@@ -103,28 +116,28 @@ def resolve_adaptive_n_jobs(num_items, threads, min_items_for_parallel=0, min_it
     return max(1, min(requested, max_jobs_by_work))
 
 
-def resolve_parallel_backend(g, task='general'):
-    backend = str(g.get('parallel_backend', 'auto')).lower()
-    if backend not in _VALID_PARALLEL_BACKENDS:
-        raise ValueError('parallel_backend should be one of auto, multiprocessing, threading.')
-    if backend != 'auto':
-        return backend
+def resolve_task_n_jobs(num_items, threads, task):
+    if task not in _ADAPTIVE_JOB_POLICIES:
+        raise ValueError('Unknown parallel task policy: {}'.format(task))
+    min_items_for_parallel, min_items_per_job = _ADAPTIVE_JOB_POLICIES[task]
+    return resolve_adaptive_n_jobs(
+        num_items=num_items,
+        threads=threads,
+        min_items_for_parallel=min_items_for_parallel,
+        min_items_per_job=min_items_per_job,
+    )
+
+
+def resolve_parallel_backend(prefer_threading=False):
+    if prefer_threading:
+        return 'threading'
     return _DEFAULT_AUTO_BACKEND
 
 
-def resolve_joblib_backend(g, task='general'):
-    # Backward-compatible alias retained while migration off joblib is in progress.
-    return resolve_parallel_backend(g=g, task=task)
-
-
-def resolve_chunk_factor(g, task='general'):
-    if task == 'reducer':
-        value = int(g.get('parallel_chunk_factor_reducer', 4))
-    else:
-        value = int(g.get('parallel_chunk_factor', 1))
-    if value < 1:
-        raise ValueError('parallel_chunk_factor should be >= 1.')
-    return value
+def resolve_chunk_factor(task='general'):
+    if task not in _CHUNK_FACTORS:
+        raise ValueError('Unknown parallel chunking task: {}'.format(task))
+    return _CHUNK_FACTORS[task]
 
 
 def _normalize_parallel_backend(backend):

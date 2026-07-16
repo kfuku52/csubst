@@ -239,24 +239,14 @@ def get_global_parameters(args):
     urn_model = None
     if (raw_urn_model is not None) and (str(raw_urn_model).strip() != ''):
         urn_model = _normalize_urn_model(raw_urn_model, param_name='--urn_model')
-    raw_legacy_omega_method = g.get('omegaC_method', None)
-    if (raw_legacy_omega_method is not None) and (str(raw_legacy_omega_method).strip() != ''):
-        legacy_expectation_method = _normalize_expectation_method(raw_legacy_omega_method, param_name='--omegaC_method')
-        if (expectation_method is not None) and (expectation_method != legacy_expectation_method):
-            raise ValueError('--omegaC_method conflicts with --expectation_method.')
-        expectation_method = legacy_expectation_method
-        sys.stderr.write('Deprecated option --omegaC_method detected. Use --expectation_method instead.\n')
     if expectation_method is None:
         expectation_method = 'codon_model'
     if urn_model is None:
         urn_model = 'wallenius'
     g['expectation_method'] = expectation_method
     g['urn_model'] = urn_model
-    g['omegaC_method'] = 'modelfree' if (expectation_method == 'urn') else 'submodel'
     if g['calc_omega_pvalue'] and (g['expectation_method'] != 'urn'):
-        txt = '--calc_omega_pvalue "yes" should be used with --expectation_method "urn" '
-        txt += '(legacy alias: --omegaC_method "modelfree").'
-        raise ValueError(txt)
+        raise ValueError('--calc_omega_pvalue "yes" should be used with --expectation_method "urn".')
     if 'omega_pvalue_null_model' in g.keys():
         g['omega_pvalue_null_model'] = str(g['omega_pvalue_null_model']).strip().lower()
     else:
@@ -559,102 +549,15 @@ def get_global_parameters(args):
                     iqtree_outdir=g['iqtree_outdir'],
                 )
                 g['iqtree_iqtree'] = iqtree_prefix+'.iqtree'
-    if 'float_type' in g.keys():
-        g['float_type'] = int(g['float_type'])
-        if (g['float_type']==16):
-            g['float_type'] = np.float16
-            g['float_tol'] = 10**-1
-        elif (g['float_type']==32):
-            g['float_type'] = np.float32
-            g['float_tol'] = 10**-3
-        elif (g['float_type']==64):
-            g['float_type'] = np.float64
-            g['float_tol'] = 10**-9
-        else:
-            raise ValueError('--float_type should be one of 16, 32, 64.')
-    if 'sub_tensor_backend' in g.keys():
-        g['sub_tensor_backend'] = str(g['sub_tensor_backend']).lower()
-    else:
-        g['sub_tensor_backend'] = 'auto'
-    if g['sub_tensor_backend'] not in ['auto', 'dense', 'sparse']:
-        raise ValueError('--sub_tensor_backend should be one of auto, dense, sparse.')
+    # Numerical kernels and sparse fast paths are standardized on float64.
+    g['float_type'] = np.float64
+    g['float_tol'] = 10**-9
     if 'expected_state_backend' in g.keys():
         g['expected_state_backend'] = str(g['expected_state_backend']).lower()
     else:
         g['expected_state_backend'] = 'auto'
     if g['expected_state_backend'] not in ['auto', 'expm', 'eigen']:
         raise ValueError('--expected_state_backend should be one of auto, expm, eigen.')
-    if 'sub_tensor_sparse_density_cutoff' in g.keys():
-        g['sub_tensor_sparse_density_cutoff'] = _require_finite_float(
-            value=float(g['sub_tensor_sparse_density_cutoff']),
-            param_name='--sub_tensor_sparse_density_cutoff',
-        )
-    else:
-        g['sub_tensor_sparse_density_cutoff'] = 0.15
-    if (g['sub_tensor_sparse_density_cutoff'] < 0) or (g['sub_tensor_sparse_density_cutoff'] > 1):
-        raise ValueError('--sub_tensor_sparse_density_cutoff should be between 0 and 1.')
-    if 'sub_tensor_auto_sparse_min_elements' in g.keys():
-        g['sub_tensor_auto_sparse_min_elements'] = int(g['sub_tensor_auto_sparse_min_elements'])
-    else:
-        g['sub_tensor_auto_sparse_min_elements'] = 100000000
-    if g['sub_tensor_auto_sparse_min_elements'] < 0:
-        raise ValueError('--sub_tensor_auto_sparse_min_elements should be >= 0.')
-    if 'sub_tensor_auto_sparse_min_bytes' in g.keys():
-        g['sub_tensor_auto_sparse_min_bytes'] = int(g['sub_tensor_auto_sparse_min_bytes'])
-    else:
-        g['sub_tensor_auto_sparse_min_bytes'] = 67108864
-    if g['sub_tensor_auto_sparse_min_bytes'] < 0:
-        raise ValueError('--sub_tensor_auto_sparse_min_bytes should be >= 0.')
-    if 'parallel_backend' in g.keys():
-        g['parallel_backend'] = str(g['parallel_backend']).lower()
-    else:
-        g['parallel_backend'] = 'auto'
-    if g['parallel_backend'] not in ['auto', 'multiprocessing', 'threading']:
-        raise ValueError('--parallel_backend should be one of auto, multiprocessing, threading.')
-    if 'parallel_chunk_factor' in g.keys():
-        g['parallel_chunk_factor'] = int(g['parallel_chunk_factor'])
-    else:
-        g['parallel_chunk_factor'] = 1
-    if g['parallel_chunk_factor'] < 1:
-        raise ValueError('--parallel_chunk_factor should be >= 1.')
-    if 'parallel_chunk_factor_reducer' in g.keys():
-        g['parallel_chunk_factor_reducer'] = int(g['parallel_chunk_factor_reducer'])
-    else:
-        g['parallel_chunk_factor_reducer'] = 4
-    if g['parallel_chunk_factor_reducer'] < 1:
-        raise ValueError('--parallel_chunk_factor_reducer should be >= 1.')
-    parallel_min_items_defaults = {
-        'parallel_min_items_sub_tensor': 256,
-        'parallel_min_items_node_union': 20000,
-        'parallel_min_items_nc_matrix': 100000,
-        'parallel_min_items_cb': 20000,
-        'parallel_min_rows_cbs': 200000,
-        'parallel_min_items_branch_dist': 20000,
-        'parallel_min_items_expected_state': 50000000,
-    }
-    for key, default_value in parallel_min_items_defaults.items():
-        if key in g.keys():
-            g[key] = int(g[key])
-        else:
-            g[key] = int(default_value)
-        if g[key] < 0:
-            raise ValueError('--{} should be >= 0.'.format(key))
-    parallel_min_per_job_defaults = {
-        'parallel_min_items_per_job_sub_tensor': 64,
-        'parallel_min_items_per_job_node_union': 5000,
-        'parallel_min_items_per_job_nc_matrix': 25000,
-        'parallel_min_items_per_job_cb': 5000,
-        'parallel_min_rows_per_job_cbs': 50000,
-        'parallel_min_items_per_job_branch_dist': 5000,
-        'parallel_min_items_per_job_expected_state': 10000000,
-    }
-    for key, default_value in parallel_min_per_job_defaults.items():
-        if key in g.keys():
-            g[key] = int(g[key])
-        else:
-            g[key] = int(default_value)
-        if g[key] < 1:
-            raise ValueError('--{} should be >= 1.'.format(key))
     if 'pdb' in g.keys():
         if g['pdb']=='besthit':
             g['run_pdb_sequence_search'] = True

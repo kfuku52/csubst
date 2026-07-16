@@ -1,7 +1,6 @@
 import subprocess
 import sys
 import os
-import re
 from pathlib import Path
 
 import pytest
@@ -186,37 +185,39 @@ def test_epistasis_options_are_advanced_only(subcommand):
     "subcommand",
     ["search", "scan", "sites", "simulate", "benchmark", "doctor", "inspect"],
 )
-def test_parallel_options_are_advanced_only_for_shared_subcommands(subcommand):
-    expected_parallel_options = {
-        "--parallel_backend",
-        "--parallel_chunk_factor",
-        "--parallel_chunk_factor_reducer",
-        "--parallel_min_items_sub_tensor",
-        "--parallel_min_items_per_job_sub_tensor",
-        "--parallel_min_items_node_union",
-        "--parallel_min_items_per_job_node_union",
-        "--parallel_min_items_nc_matrix",
-        "--parallel_min_items_per_job_nc_matrix",
-        "--parallel_min_items_cb",
-        "--parallel_min_items_per_job_cb",
-        "--parallel_min_rows_cbs",
-        "--parallel_min_rows_per_job_cbs",
-        "--parallel_min_items_branch_dist",
-        "--parallel_min_items_per_job_branch_dist",
-        "--parallel_min_items_expected_state",
-        "--parallel_min_items_per_job_expected_state",
-    }
+def test_removed_performance_options_are_absent_from_shared_help(subcommand):
     proc, _ = _run_cli(subcommand, "-h")
     assert proc.returncode == 0
     normal_help = (proc.stdout or "") + (proc.stderr or "")
     assert "--threads" in normal_help
     assert "--parallel_" not in normal_help
+    assert "--sub_tensor_backend" not in normal_help
+    assert "--float_type" not in normal_help
+    assert "--expected_state_backend" not in normal_help
 
     proc, _ = _run_cli(subcommand, "--help-advanced")
     assert proc.returncode == 0
     advanced_help = (proc.stdout or "") + (proc.stderr or "")
-    shown_parallel_options = set(re.findall(r"--parallel_[a-z0-9_]+", advanced_help))
-    assert shown_parallel_options == expected_parallel_options
+    assert "--threads" in advanced_help
+    assert "--parallel_" not in advanced_help
+    assert "--sub_tensor_backend" not in advanced_help
+    assert "--float_type" not in advanced_help
+    assert "--expected_state_backend" in advanced_help
+
+
+@pytest.mark.parametrize(
+    "option,value",
+    [
+        ("--parallel_backend", "threading"),
+        ("--sub_tensor_backend", "dense"),
+        ("--float_type", "32"),
+        ("--omegaC_method", "modelfree"),
+    ],
+)
+def test_removed_performance_options_are_rejected(option, value):
+    proc, log_text = _run_cli("search", option, value)
+    assert proc.returncode == 2
+    assert "unrecognized arguments:" in log_text
 
 
 def test_removed_infile_type_option_is_rejected():

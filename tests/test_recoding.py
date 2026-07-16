@@ -125,19 +125,17 @@ def test_initialize_nonsyn_groups_auto_recode_builds_six_states(scheme_name):
 
 
 @pytest.mark.parametrize("scheme_name", ["srchisq6", "kgbauto6"])
-def test_initialize_nonsyn_groups_auto_recode_threaded_matches_single_thread(scheme_name):
+def test_initialize_nonsyn_groups_auto_recode_threaded_matches_single_thread(scheme_name, monkeypatch):
     g1 = _toy_auto_grouping_g()
     g1["nonsyn_recode"] = scheme_name
     g1["threads"] = 1
-    g1["parallel_backend"] = "threading"
-    g1["nonsyn_recode_parallel_min_starts_per_job"] = 1
     out1 = recoding.initialize_nonsyn_groups(g1)
 
+    monkeypatch.setattr(recoding, "_AUTO_RECODE_MIN_TOTAL_STARTS", 1)
+    monkeypatch.setattr(recoding, "_AUTO_RECODE_MIN_STARTS_PER_JOB", 1)
     g2 = _toy_auto_grouping_g()
     g2["nonsyn_recode"] = scheme_name
     g2["threads"] = 4
-    g2["parallel_backend"] = "threading"
-    g2["nonsyn_recode_parallel_min_starts_per_job"] = 1
     out2 = recoding.initialize_nonsyn_groups(g2)
 
     assert out1["nonsyn_state_orders"].tolist() == out2["nonsyn_state_orders"].tolist()
@@ -180,9 +178,6 @@ def test_random_bin_assignments_matches_sequential_generator():
 def test_resolve_auto_recode_parallel_n_jobs_uses_work_scale():
     g = {
         "threads": 8,
-        "parallel_backend": "auto",
-        "nonsyn_recode_parallel_min_total_starts": 30000,
-        "nonsyn_recode_parallel_min_starts_per_job": 5000,
     }
     n1 = recoding._resolve_auto_recode_parallel_n_jobs(g=g, n_random=1000, work_scale=1)
     n2 = recoding._resolve_auto_recode_parallel_n_jobs(g=g, n_random=1000, work_scale=40)
@@ -190,22 +185,15 @@ def test_resolve_auto_recode_parallel_n_jobs_uses_work_scale():
     assert n2 > 1
 
 
-def test_resolve_auto_recode_parallel_backend_prefers_threading_for_auto():
-    g = {"parallel_backend": "auto"}
-    out = recoding._resolve_auto_recode_parallel_backend(g=g, prefer_threading=True)
+def test_resolve_auto_recode_parallel_backend_prefers_threading():
+    out = recoding._resolve_auto_recode_parallel_backend(prefer_threading=True)
     assert out == "threading"
 
 
 def test_resolve_auto_recode_chunk_factor_adaptive_defaults():
-    assert recoding._resolve_auto_recode_chunk_factor(g={"threads": 8}, total_work_units=5_000_000) == 1
-    assert recoding._resolve_auto_recode_chunk_factor(g={"threads": 8}, total_work_units=6_500_000) == 4
-    assert recoding._resolve_auto_recode_chunk_factor(g={"threads": 8}, total_work_units=12_000_000) == 8
-
-
-def test_resolve_auto_recode_chunk_factor_respects_user_setting():
-    g = {"threads": 8, "parallel_chunk_factor": 2}
-    out = recoding._resolve_auto_recode_chunk_factor(g=g, total_work_units=20_000_000)
-    assert out == 2
+    assert recoding._resolve_auto_recode_chunk_factor(total_work_units=5_000_000) == 1
+    assert recoding._resolve_auto_recode_chunk_factor(total_work_units=6_500_000) == 4
+    assert recoding._resolve_auto_recode_chunk_factor(total_work_units=12_000_000) == 8
 
 
 def _estimate_empirical_transition_matrix_reference(aa_matrix, num_state):

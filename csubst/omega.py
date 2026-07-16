@@ -1344,13 +1344,11 @@ def _resolve_omega_pvalue_rounding_mode(g):
 def _resolve_expectation_method(g):
     token = 'codon_model'
     if g is not None:
-        token = g.get('expectation_method', None)
-        if (token is None) or (str(token).strip() == ''):
-            token = g.get('omegaC_method', 'submodel')
+        token = g.get('expectation_method', 'codon_model')
     normalized = str(token).strip().lower()
-    if normalized in ['codon_model', 'submodel', '']:
+    if normalized in ['codon_model', '']:
         return 'codon_model'
-    if normalized in ['urn', 'modelfree']:
+    if normalized == 'urn':
         return 'urn'
     raise ValueError('Unsupported expectation_method: {}'.format(token))
 
@@ -1899,7 +1897,7 @@ def _calc_hypergeom_count_matrix(
     local_g = dict(g)
     local_g['_omega_operation_seed'] = int(operation_seed)
     requested_n_jobs = parallel.resolve_n_jobs(num_items=len(list_igad), threads=g['threads'])
-    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    chunk_factor = parallel.resolve_chunk_factor(task='general')
     n_jobs, chunk_factor = _resolve_hypergeom_parallel_plan(
         cb_rows=cb_ids.shape[0],
         num_categories=len(list_igad),
@@ -1986,11 +1984,10 @@ def _resolve_expected_state_n_jobs(num_branch_jobs, num_site, num_state, g):
     if (threads <= 1) or (num_branch_jobs <= 1):
         return 1, 0
     estimated_work = int(num_branch_jobs) * int(num_site) * int(num_state) * int(num_state)
-    n_jobs = parallel.resolve_adaptive_n_jobs(
+    n_jobs = parallel.resolve_task_n_jobs(
         num_items=estimated_work,
         threads=threads,
-        min_items_for_parallel=int(g.get('parallel_min_items_expected_state', 50000000)),
-        min_items_per_job=int(g.get('parallel_min_items_per_job_expected_state', 10000000)),
+        task='expected_state',
     )
     max_jobs_by_branch = parallel.resolve_n_jobs(num_items=num_branch_jobs, threads=threads)
     return min(n_jobs, max_jobs_by_branch), estimated_work
@@ -2043,7 +2040,7 @@ def _run_expected_state_workers(worker_func, branch_jobs, worker_common_args, n_
     if n_jobs == 1:
         worker_func(branch_jobs, *worker_common_args)
         return None
-    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    chunk_factor = parallel.resolve_chunk_factor(task='general')
     branch_chunks, _ = parallel.get_chunks(input_data=branch_jobs, threads=n_jobs, chunk_factor=chunk_factor)
     tasks = [(chunk,) + worker_common_args for chunk in branch_chunks]
     parallel.run_starmap(
@@ -2179,8 +2176,6 @@ def _project_expected_sparse_chunk(
 
 
 def _get_fused_expected_sparse_substitution_tensor(g, mode):
-    if str(g.get('sub_tensor_backend', 'auto')).strip().lower() == 'dense':
-        return None
     if str(g.get('expected_state_backend', 'auto')).strip().lower() == 'expm':
         return None
     if mode == 'cdn':
@@ -2236,12 +2231,6 @@ def _get_fused_expected_sparse_substitution_tensor(g, mode):
         ),
         flush=True,
     )
-    substitution.resolve_sub_tensor_backend(
-        g=g,
-        state_tensor=state,
-        state_tensor_anc=state,
-        mode=sub_mode,
-    )
     if sub_mode == 'asis':
         num_syngroup = 1
         num_state = state.shape[2]
@@ -2268,7 +2257,7 @@ def _get_fused_expected_sparse_substitution_tensor(g, mode):
         if n_jobs == 1:
             sparse_entries = _project_expected_sparse_chunk(branch_jobs, *common_args)
         else:
-            chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+            chunk_factor = parallel.resolve_chunk_factor(task='general')
             branch_chunks, _ = parallel.get_chunks(branch_jobs, threads=n_jobs, chunk_factor=chunk_factor)
             chunk_maps = parallel.run_starmap(
                 func=_project_expected_sparse_chunk,
@@ -2506,17 +2495,9 @@ def _resolve_E_stat_n_jobs(num_cb_rows, num_site, num_categories, g):
     estimated_work = num_cb_rows * num_site * num_categories
     if (threads <= 1) or (num_cb_rows <= 0) or (num_site <= 0) or (num_categories <= 1):
         return 1, estimated_work
-    min_items = int(g.get('parallel_min_items_e_stat', _DEFAULT_E_STAT_MIN_ITEMS_FOR_PARALLEL))
-    min_categories_per_job = int(
-        g.get('parallel_min_categories_per_job_e_stat', _DEFAULT_E_STAT_MIN_CATEGORIES_PER_JOB)
-    )
-    if min_items < 0:
-        raise ValueError('parallel_min_items_e_stat should be >= 0.')
-    if min_categories_per_job < 1:
-        raise ValueError('parallel_min_categories_per_job_e_stat should be >= 1.')
-    if estimated_work < min_items:
+    if estimated_work < _DEFAULT_E_STAT_MIN_ITEMS_FOR_PARALLEL:
         return 1, estimated_work
-    max_jobs_by_category = num_categories // min_categories_per_job
+    max_jobs_by_category = num_categories // _DEFAULT_E_STAT_MIN_CATEGORIES_PER_JOB
     if max_jobs_by_category <= 1:
         return 1, estimated_work
     requested_n_jobs = parallel.resolve_n_jobs(num_items=num_categories, threads=threads)
@@ -2559,7 +2540,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
         ),
         flush=True,
     )
-    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    chunk_factor = parallel.resolve_chunk_factor(task='general')
     igad_chunks = None
     if stat == 'mean':
         igad_chunks,mmap_start_not_necessary_here = parallel.get_chunks(

@@ -372,8 +372,8 @@ def _analyze_command(paths, args, mode, degree_file):
         str(int(args.threads)),
         "--iqtree_exe",
         str(args.iqtree_exe),
-        "--omegaC_method",
-        "modelfree",
+        "--expectation_method",
+        "urn",
         "--fg_stem_only",
         "no",
     ]

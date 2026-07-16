@@ -618,12 +618,11 @@ def node_union(index_combinations, target_nodes, df_mmap, mmap_start):
             df_mmap[i, :] = node_union
             i += 1
 
-def _resolve_combination_step_n_jobs(g, num_items, min_items_key, min_items_per_job_key, default_min_items, default_min_items_per_job):
-    return parallel.resolve_adaptive_n_jobs(
+def _resolve_combination_step_n_jobs(g, num_items, task):
+    return parallel.resolve_task_n_jobs(
         num_items=num_items,
         threads=int(g.get('threads', 1)),
-        min_items_for_parallel=int(g.get(min_items_key, default_min_items)),
-        min_items_per_job=int(g.get(min_items_per_job_key, default_min_items_per_job)),
+        task=task,
     )
 
 
@@ -646,10 +645,7 @@ def _generate_trait_unions_parallel(g, trait_row_items, arity):
         n_jobs = _resolve_combination_step_n_jobs(
             g=g,
             num_items=len(trait_row_items),
-            min_items_key='parallel_min_items_trait_unions',
-            min_items_per_job_key='parallel_min_items_per_job_trait_unions',
-            default_min_items=2,
-            default_min_items_per_job=1,
+            task='trait_unions',
         )
     args_iterable = [(trait_rows, arity) for _, trait_rows in trait_row_items]
     if n_jobs == 1:
@@ -708,10 +704,7 @@ def _populate_nc_matrix(nc_matrix, node_combinations, all_node_ids, g):
     n_jobs = _resolve_combination_step_n_jobs(
         g=g,
         num_items=num_combinations,
-        min_items_key='parallel_min_items_nc_matrix',
-        min_items_per_job_key='parallel_min_items_per_job_nc_matrix',
-        default_min_items=100000,
-        default_min_items_per_job=25000,
+        task='nc_matrix',
     )
     if n_jobs == 1:
         row_ids, col_ids = _map_node_combination_chunk_to_matrix_indices(
@@ -722,7 +715,7 @@ def _populate_nc_matrix(nc_matrix, node_combinations, all_node_ids, g):
         )
         nc_matrix[row_ids, col_ids] = True
         return None
-    chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+    chunk_factor = parallel.resolve_chunk_factor(task='general')
     chunks, starts = parallel.get_chunks(node_combinations, n_jobs, chunk_factor=chunk_factor)
     tasks = [(chunk, start, sorted_node_ids, sorted_row_ids) for chunk, start in zip(chunks, starts)]
     out = parallel.run_starmap(

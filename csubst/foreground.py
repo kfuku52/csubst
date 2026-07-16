@@ -1742,8 +1742,6 @@ def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_re
             cb=cb_missing,
             ncpu=g['threads'],
             float_type=g['float_type'],
-            min_items_for_parallel=int(g.get('parallel_min_items_branch_dist', 20000)),
-            min_items_per_job=int(g.get('parallel_min_items_per_job_branch_dist', 5000)),
         )
     cb_missing = substitution.get_substitutions_per_branch(cb_missing, g['branch_table'], g)
     cb_missing = table.get_linear_regression(cb_missing)
@@ -2326,11 +2324,8 @@ def _resolve_clade_permutation_n_jobs(g):
     )
 
 
-def _resolve_clade_permutation_backend(g):
-    backend = str(g.get('parallel_backend', 'auto')).strip().lower()
-    if backend not in ['auto', 'multiprocessing', 'threading']:
-        raise ValueError('--parallel_backend should be one of auto, multiprocessing, threading.')
-    return parallel.resolve_parallel_backend(g=g, task='general')
+def _resolve_clade_permutation_backend():
+    return parallel.resolve_parallel_backend()
 
 
 def _make_clade_permutation_worker_g(g):
@@ -2685,7 +2680,7 @@ def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
     max_trials = g['fg_clade_permutation'] * 10
     cb_cache = pd.DataFrame()
     n_jobs = _resolve_clade_permutation_n_jobs(g=g)
-    backend = _resolve_clade_permutation_backend(g=g)
+    backend = _resolve_clade_permutation_backend()
     if n_jobs > 1:
         target_col_prefixes = ['is_fg', 'is_mg', 'is_mf', 'is_all']
         _get_clade_permutation_selected_rows_plan(

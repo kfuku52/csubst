@@ -10,7 +10,7 @@ for stat in "${stats[@]}"; do
       --alignment_file simulate.fa \
       --rooted_tree_file tree.nwk \
       --foreground foreground.txt \
-      --omegaC_method modelfree \
+      --expectation_method urn \
       --output_stat "$stat" \
       --calc_omega_pvalue yes \
       --omega_pvalue_null_model "$model" \

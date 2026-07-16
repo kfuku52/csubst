@@ -10,7 +10,7 @@ PYTHONPATH="/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp
   --alignment_file PGK.alignment.fa \
   --rooted_tree_file PGK.tree.nwk \
   --foreground PGK.foreground.txt \
-  --omegaC_method modelfree \
+  --expectation_method urn \
   --calc_quantile yes \
   --asrv no \
   --output_stat any2spe \
@@ -23,7 +23,7 @@ PYTHONPATH="/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp
   --alignment_file PGK.alignment.fa \
   --rooted_tree_file PGK.tree.nwk \
   --foreground PGK.foreground.txt \
-  --omegaC_method modelfree \
+  --expectation_method urn \
   --calc_quantile yes \
   --asrv no \
   --output_stat any2spe \
@@ -36,7 +36,7 @@ PYTHONPATH="/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp
   --alignment_file PGK.alignment.fa \
   --rooted_tree_file PGK.tree.nwk \
   --foreground PGK.foreground.txt \
-  --omegaC_method modelfree \
+  --expectation_method urn \
   --calc_quantile yes \
   --asrv no \
   --output_stat any2spe \

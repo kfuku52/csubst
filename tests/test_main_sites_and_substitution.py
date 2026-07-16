@@ -2736,7 +2736,7 @@ def test_apply_min_sub_pp_parses_ml_anc_string_no_as_false():
     np.testing.assert_allclose(out, [[[[[0.0, 0.4], [0.0, 0.5]]]]], atol=1e-12)
 
 
-def test_get_substitution_tensor_treats_ml_anc_string_no_same_as_false(monkeypatch):
+def test_get_substitution_tensor_treats_ml_anc_string_no_same_as_false():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
     state = np.zeros((3, 1, 2), dtype=float)
@@ -2744,21 +2744,13 @@ def test_get_substitution_tensor_treats_ml_anc_string_no_same_as_false(monkeypat
     state[labels["A"], 0, :] = [0.0, 1.0]
     state[labels["B"], 0, :] = [1.0, 0.0]
 
-    def _init_with_ones(state_tensor, mode, g, mmap_attr, dtype=None):
-        dtype = state_tensor.dtype if dtype is None else dtype
-        if mode != "asis":
-            raise AssertionError("unexpected mode")
-        axis = (state_tensor.shape[0], state_tensor.shape[1], 1, state_tensor.shape[2], state_tensor.shape[2])
-        return np.ones(shape=axis, dtype=dtype)
-
-    monkeypatch.setattr(substitution, "initialize_substitution_tensor", _init_with_ones)
-
-    g_bool = {"tree": tr, "ml_anc": False, "float_tol": 1e-12, "sub_tensor_backend": "dense"}
-    g_str = {"tree": tr, "ml_anc": "no", "float_tol": 1e-12, "sub_tensor_backend": "dense"}
+    g_bool = {"tree": tr, "ml_anc": False, "float_tol": 1e-12}
+    g_str = {"tree": tr, "ml_anc": "no", "float_tol": 1e-12}
     out_bool = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g_bool, mmap_attr="toy_bool")
     out_str = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g_str, mmap_attr="toy_str")
-    np.testing.assert_allclose(out_bool, out_str, atol=1e-12)
-    np.testing.assert_allclose(out_bool[labels["R"], :, :, :, :], 0.0, atol=1e-12)
+    dense_bool = out_bool.to_dense()
+    np.testing.assert_allclose(dense_bool, out_str.to_dense(), atol=1e-12)
+    np.testing.assert_allclose(dense_bool[labels["R"], :, :, :, :], 0.0, atol=1e-12)
 
 
 def test_get_s_get_cs_and_get_bs_match_manual_values():
@@ -2843,13 +2835,13 @@ def test_get_substitution_tensor_collapses_state_less_synthetic_parent():
     state[labels["B"], 0, :] = [0.0, 1.0]
     state[labels["C"], 0, :] = [1.0, 0.0]
     state[labels["D"], 0, :] = [1.0, 0.0]
-    g = {"tree": tr, "ml_anc": False, "float_tol": 1e-12, "sub_tensor_backend": "dense"}
+    g = {"tree": tr, "ml_anc": False, "float_tol": 1e-12}
     pairs = substitution._collect_sub_tensor_branch_pairs(g=g, state_tensor_anc=state, selected_branch_set=None)
     assert (labels["B"], labels["R"]) in pairs
     assert all(child != synthetic_id for child, _parent in pairs)
 
     out = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g, mmap_attr="synthetic_parent")
-    assert pytest.approx(float(np.nansum(out[labels["B"]])), abs=1e-12) == 1.0
+    assert pytest.approx(float(np.nansum(out.to_dense()[labels["B"]])), abs=1e-12) == 1.0
 
 
 def test_get_parent_branch_ids_skips_state_less_synthetic_parent():

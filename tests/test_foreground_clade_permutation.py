@@ -716,7 +716,6 @@ def test_clade_permutation_parallelizes_candidates_over_resolved_backend(monkeyp
         "current_arity": 2,
         "cutoff_stat": "dummy,0",
         "threads": 2,
-        "parallel_backend": "auto",
     }
     cb = pd.DataFrame({"branch_id_1": [1], "branch_id_2": [2], "dummy": [1.0]})
     random_calls = []

@@ -6,38 +6,26 @@ import pytest
 from csubst import param
 from csubst import output_stat
 from csubst import runtime
-from csubst import substitution
 
 
 def _args(**kwargs):
     defaults = {
         "threads": 1,
-        "float_type": 64,
         "float_digit": 4,
     }
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)
 
 
-def test_get_global_parameters_defaults_sub_tensor_backend_to_auto():
+def test_get_global_parameters_sets_fixed_numerical_defaults():
     g = param.get_global_parameters(_args())
     assert g["infile_type"] == "iqtree"
     assert g["random_seed"] == 1
-    assert g["sub_tensor_backend"] == "auto"
     assert g["expected_state_backend"] == "auto"
-    assert g["sub_tensor_sparse_density_cutoff"] == pytest.approx(0.15)
-    assert g["sub_tensor_auto_sparse_min_elements"] == 100000000
-    assert g["sub_tensor_auto_sparse_min_bytes"] == 67108864
-    assert g["parallel_backend"] == "auto"
-    assert g["parallel_chunk_factor"] == 1
-    assert g["parallel_chunk_factor_reducer"] == 4
-    assert g["parallel_min_items_sub_tensor"] == 256
-    assert g["parallel_min_items_per_job_sub_tensor"] == 64
-    assert g["parallel_min_items_cb"] == 20000
-    assert g["parallel_min_rows_cbs"] == 200000
-    assert g["parallel_min_items_branch_dist"] == 20000
-    assert g["parallel_min_items_expected_state"] == 50000000
-    assert g["parallel_min_items_per_job_expected_state"] == 10000000
+    assert g["float_type"] is np.float64
+    assert g["float_tol"] == pytest.approx(1e-9)
+    assert "sub_tensor_backend" not in g
+    assert "parallel_backend" not in g
 
 
 def test_get_global_parameters_sets_vesm_defaults():
@@ -81,11 +69,6 @@ def test_get_global_parameters_builds_run_context_and_output_namespace(tmp_path,
     assert g.config["threads"] == 1
 
 
-def test_get_global_parameters_rejects_unsupported_float_type():
-    with pytest.raises(ValueError, match="float_type"):
-        param.get_global_parameters(_args(float_type=128))
-
-
 @pytest.mark.parametrize("seed", [-2, 1.5, "1.5", True])
 def test_get_global_parameters_rejects_invalid_random_seed(seed):
     with pytest.raises(ValueError, match="random_seed"):
@@ -95,11 +78,6 @@ def test_get_global_parameters_rejects_invalid_random_seed(seed):
 def test_get_global_parameters_rejects_output_prefix_paths():
     with pytest.raises(ValueError, match="output_prefix"):
         param.get_global_parameters(_args(output_prefix="nested/run"))
-
-
-def test_get_global_parameters_normalizes_sub_tensor_backend_case():
-    g = param.get_global_parameters(_args(sub_tensor_backend="SpArSe"))
-    assert g["sub_tensor_backend"] == "sparse"
 
 
 def test_get_global_parameters_normalizes_expected_state_backend_case():
@@ -136,24 +114,9 @@ def test_get_global_parameters_reports_missing_dependency_packages(monkeypatch, 
     assert txt in captured.out
 
 
-def test_get_global_parameters_rejects_invalid_sub_tensor_backend():
-    with pytest.raises(ValueError, match="sub_tensor_backend"):
-        param.get_global_parameters(_args(sub_tensor_backend="not-a-backend"))
-
-
-def test_get_global_parameters_rejects_invalid_sparse_density_cutoff():
-    with pytest.raises(ValueError, match="sub_tensor_sparse_density_cutoff"):
-        param.get_global_parameters(_args(sub_tensor_sparse_density_cutoff=1.5))
-    with pytest.raises(ValueError, match="sub_tensor_auto_sparse_min_elements"):
-        param.get_global_parameters(_args(sub_tensor_auto_sparse_min_elements=-1))
-    with pytest.raises(ValueError, match="sub_tensor_auto_sparse_min_bytes"):
-        param.get_global_parameters(_args(sub_tensor_auto_sparse_min_bytes=-1))
-
-
 @pytest.mark.parametrize(
     "kwargs,expected",
     [
-        ({"sub_tensor_sparse_density_cutoff": float("nan")}, "sub_tensor_sparse_density_cutoff"),
         ({"min_single_prob": float("nan")}, "min_single_prob"),
         ({"min_combinat_prob": float("inf")}, "min_combinat_prob"),
         ({"percent_biased_sub": float("inf")}, "percent_biased_sub"),
@@ -164,36 +127,6 @@ def test_get_global_parameters_rejects_invalid_sparse_density_cutoff():
 def test_get_global_parameters_rejects_non_finite_float_values(kwargs, expected):
     with pytest.raises(ValueError, match=expected):
         param.get_global_parameters(_args(**kwargs))
-
-
-def test_get_global_parameters_rejects_invalid_parallel_backend():
-    with pytest.raises(ValueError, match="parallel_backend"):
-        param.get_global_parameters(_args(parallel_backend="invalid"))
-
-
-def test_get_global_parameters_rejects_removed_loky_backend():
-    with pytest.raises(ValueError, match="parallel_backend"):
-        param.get_global_parameters(_args(parallel_backend="loky"))
-
-
-def test_get_global_parameters_rejects_invalid_chunk_factors():
-    with pytest.raises(ValueError, match="parallel_chunk_factor"):
-        param.get_global_parameters(_args(parallel_chunk_factor=0))
-    with pytest.raises(ValueError, match="parallel_chunk_factor_reducer"):
-        param.get_global_parameters(_args(parallel_chunk_factor_reducer=0))
-
-
-def test_get_global_parameters_rejects_invalid_parallel_auto_thresholds():
-    with pytest.raises(ValueError, match="parallel_min_items_sub_tensor"):
-        param.get_global_parameters(_args(parallel_min_items_sub_tensor=-1))
-    with pytest.raises(ValueError, match="parallel_min_items_per_job_sub_tensor"):
-        param.get_global_parameters(_args(parallel_min_items_per_job_sub_tensor=0))
-    with pytest.raises(ValueError, match="parallel_min_rows_per_job_cbs"):
-        param.get_global_parameters(_args(parallel_min_rows_per_job_cbs=0))
-    with pytest.raises(ValueError, match="parallel_min_items_expected_state"):
-        param.get_global_parameters(_args(parallel_min_items_expected_state=-1))
-    with pytest.raises(ValueError, match="parallel_min_items_per_job_expected_state"):
-        param.get_global_parameters(_args(parallel_min_items_per_job_expected_state=0))
 
 
 def test_get_global_parameters_parses_output_stat_and_required_base_stats():
@@ -318,37 +251,21 @@ def test_get_global_parameters_requires_foreground_for_clade_permutation():
         param.get_global_parameters(_args(fg_clade_permutation=1, foreground=None))
 
 
-def test_get_global_parameters_rejects_calc_omega_pvalue_without_modelfree():
-    with pytest.raises(ValueError, match='--omegaC_method "modelfree"'):
-        param.get_global_parameters(_args(calc_omega_pvalue=True, omegaC_method="submodel"))
+def test_get_global_parameters_rejects_calc_omega_pvalue_without_urn_expectation():
+    with pytest.raises(ValueError, match='--expectation_method "urn"'):
+        param.get_global_parameters(_args(calc_omega_pvalue=True, expectation_method="codon_model"))
 
 
 def test_get_global_parameters_sets_expectation_defaults():
     g = param.get_global_parameters(_args())
     assert g["expectation_method"] == "codon_model"
     assert g["urn_model"] == "wallenius"
-    assert g["omegaC_method"] == "submodel"
-
-
-def test_get_global_parameters_maps_legacy_omegaC_method_to_expectation_method():
-    g = param.get_global_parameters(_args(omegaC_method="modelfree"))
-    assert g["expectation_method"] == "urn"
-    assert g["urn_model"] == "wallenius"
-    assert g["omegaC_method"] == "modelfree"
 
 
 def test_get_global_parameters_accepts_fisher_urn_model():
     g = param.get_global_parameters(_args(expectation_method="urn", urn_model="fisher"))
     assert g["expectation_method"] == "urn"
     assert g["urn_model"] == "fisher"
-    assert g["omegaC_method"] == "modelfree"
-
-
-def test_get_global_parameters_rejects_conflicting_legacy_and_new_expectation_methods():
-    with pytest.raises(ValueError, match="conflicts with --expectation_method"):
-        param.get_global_parameters(
-            _args(expectation_method="codon_model", omegaC_method="modelfree")
-        )
 
 
 def test_get_global_parameters_sets_omega_pvalue_defaults():
@@ -445,7 +362,7 @@ def test_get_global_parameters_keeps_min_sub_pp_unchanged_for_omega_pvalue(capsy
     g = param.get_global_parameters(
         _args(
             calc_omega_pvalue=True,
-            omegaC_method="modelfree",
+            expectation_method="urn",
             min_sub_pp=0,
             ml_anc="no",
         )
@@ -464,7 +381,7 @@ def test_get_global_parameters_keeps_explicit_min_sub_pp_for_omega_pvalue(capsys
     g = param.get_global_parameters(
         _args(
             calc_omega_pvalue=True,
-            omegaC_method="modelfree",
+            expectation_method="urn",
             min_sub_pp=0.2,
             ml_anc="no",
         )
@@ -478,7 +395,7 @@ def test_get_global_parameters_does_not_auto_set_min_sub_pp_when_ml_anc_yes(caps
     g = param.get_global_parameters(
         _args(
             calc_omega_pvalue=True,
-            omegaC_method="modelfree",
+            expectation_method="urn",
             min_sub_pp=0,
             ml_anc="yes",
         )
@@ -1002,35 +919,3 @@ def test_get_global_parameters_validates_convergent_amino_acids():
         param.get_global_parameters(_args(convergent_amino_acids="Z"))
     g = param.get_global_parameters(_args(convergent_amino_acids="AQ"))
     assert g["convergent_amino_acids"] == "AQ"
-
-
-def test_resolve_sub_tensor_backend_auto_to_sparse_without_state_tensor():
-    g = {"sub_tensor_backend": "auto"}
-    assert substitution.resolve_sub_tensor_backend(g) == "sparse"
-    assert g["resolved_sub_tensor_backend"] == "sparse"
-
-
-def test_resolve_sub_tensor_backend_dense_remains_legacy_compatibility_path():
-    g = {"sub_tensor_backend": "dense"}
-    assert substitution.resolve_sub_tensor_backend(g) == "dense"
-    assert g["resolved_sub_tensor_backend"] == "dense"
-
-
-def test_resolve_sub_tensor_backend_sparse_is_sparse():
-    g = {"sub_tensor_backend": "sparse"}
-    assert substitution.resolve_sub_tensor_backend(g) == "sparse"
-    assert g["resolved_sub_tensor_backend"] == "sparse"
-
-
-def test_resolve_sub_tensor_backend_auto_is_sparse_for_large_tensors():
-    g = {"sub_tensor_backend": "auto", "sub_tensor_auto_sparse_min_elements": 1000}
-    state = np.zeros((2, 2, 20), dtype=float)
-    assert substitution.resolve_sub_tensor_backend(g=g, state_tensor=state, mode="asis") == "sparse"
-    assert g["resolved_sub_tensor_backend"] == "sparse"
-
-
-def test_resolve_sub_tensor_backend_auto_is_sparse_for_small_tensors():
-    g = {"sub_tensor_backend": "auto", "sub_tensor_auto_sparse_min_elements": 100000}
-    state = np.zeros((2, 2, 20), dtype=float)
-    assert substitution.resolve_sub_tensor_backend(g=g, state_tensor=state, mode="asis") == "sparse"
-    assert g["resolved_sub_tensor_backend"] == "sparse"

@@ -242,8 +242,6 @@ def get_node_distance(
     cb,
     ncpu,
     float_type,
-    min_items_for_parallel=20000,
-    min_items_per_job=5000,
 ):
     txt = 'Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no'
     print(txt, flush=True)
@@ -255,11 +253,10 @@ def get_node_distance(
         tree_dict[ete.get_prop(node, "numerical_label")] = node
     cn1 = cb.columns[cb.columns.str.startswith('branch_id_')]
     id_combinations = cb.loc[:,cn1].values
-    n_jobs = parallel.resolve_adaptive_n_jobs(
+    n_jobs = parallel.resolve_task_n_jobs(
         num_items=id_combinations.shape[0],
         threads=ncpu,
-        min_items_for_parallel=min_items_for_parallel,
-        min_items_per_job=min_items_per_job,
+        task='branch_dist',
     )
     txt = 'Branch-distance scheduler: combinations={}, workers={} (threads={})'
     print(txt.format(id_combinations.shape[0], n_jobs, ncpu), flush=True)

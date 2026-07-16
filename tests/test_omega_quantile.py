@@ -957,7 +957,7 @@ def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
         OS_tensor=None,
         g={
             "calc_omega_pvalue": True,
-            "omegaC_method": "modelfree",
+            "expectation_method": "urn",
             "omega_pvalue_niter_schedule": [3],
             "output_stats": ["any2dif"],
             "float_tol": 1e-12,
@@ -1008,7 +1008,7 @@ def test_add_omega_empirical_pvalues_hypergeom_refines_only_upper_edge_rows(monk
         OS_tensor=None,
         g={
             "calc_omega_pvalue": True,
-            "omegaC_method": "modelfree",
+            "expectation_method": "urn",
             "omega_pvalue_null_model": "hypergeom",
             "omega_pvalue_niter_schedule": [100, 1000],
             "omega_pvalue_refine_upper_edge_bins": 2,
@@ -1059,7 +1059,7 @@ def test_add_omega_empirical_pvalues_uses_dsc_calibrated_null_when_columns_prese
         OS_tensor=None,
         g={
             "calc_omega_pvalue": True,
-            "omegaC_method": "modelfree",
+            "expectation_method": "urn",
             "omega_pvalue_niter_schedule": [3],
             "output_stats": ["any2spe"],
             "float_tol": 1e-12,

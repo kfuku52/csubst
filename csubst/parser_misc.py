@@ -84,13 +84,11 @@ def _normalize_sa_state_cache_mode(value):
 
 
 def _resolve_expectation_method(g):
-    token = g.get('expectation_method', None)
-    if (token is None) or (str(token).strip() == ''):
-        token = g.get('omegaC_method', 'submodel')
+    token = g.get('expectation_method', 'codon_model')
     normalized = str(token).strip().lower()
-    if normalized in ['codon_model', 'submodel', '']:
+    if normalized in ['codon_model', '']:
         return 'codon_model'
-    if normalized in ['urn', 'modelfree']:
+    if normalized == 'urn':
         return 'urn'
     raise ValueError('Unsupported expectation method: {}'.format(token))
 

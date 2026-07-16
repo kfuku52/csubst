@@ -244,7 +244,6 @@ def _prepare_run_context(base_g, config, run_dir):
     local_g["output_prefix"] = str(base_g.get("output_prefix", "csubst"))
     local_g["log_file"] = os.path.join(local_g["outdir"], local_g["output_prefix"] + ".log")
     local_g["expectation_method"] = config["expectation_method"]
-    local_g["omegaC_method"] = "modelfree" if (config["expectation_method"] == "urn") else "submodel"
     local_g["asrv"] = config["asrv"]
     local_g["nonsyn_recode"] = recoding.normalize_nonsyn_recode(config["nonsyn_recode"])
     local_g["sa_asr_mode"] = config["sa_asr_mode"]

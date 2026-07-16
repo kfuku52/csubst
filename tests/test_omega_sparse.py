@@ -88,13 +88,9 @@ def test_calc_E_stat_parallel_chunks_match_single_thread(monkeypatch):
     cb = _toy_cb()
     g_single = _toy_g(dense)
     g_parallel = _toy_g(dense)
-    g_parallel.update(
-        {
-            "threads": 2,
-            "parallel_min_items_e_stat": 1,
-            "parallel_min_categories_per_job_e_stat": 1,
-        }
-    )
+    g_parallel["threads"] = 2
+    monkeypatch.setattr(omega, "_DEFAULT_E_STAT_MIN_ITEMS_FOR_PARALLEL", 1)
+    monkeypatch.setattr(omega, "_DEFAULT_E_STAT_MIN_CATEGORIES_PER_JOB", 1)
     invoked = {"parallel": False}
     orig_run_starmap = parallel.run_starmap
 
@@ -350,8 +346,7 @@ def test_get_exp_state_falls_back_to_expm_when_eigen_projection_is_unstable(monk
     np.testing.assert_allclose(fallback, expected, atol=1e-12, rtol=1e-12)
 
 
-@pytest.mark.parametrize("sub_tensor_backend", ["auto", "sparse"])
-def test_fused_expected_sparse_tensor_matches_materialized_path(sub_tensor_backend):
+def test_fused_expected_sparse_tensor_matches_materialized_path():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
     num_node = max(labels.values()) + 1
@@ -369,7 +364,6 @@ def test_fused_expected_sparse_tensor_matches_materialized_path(sub_tensor_backe
         "float_type": np.float64,
         "float_tol": 1e-12,
         "threads": 1,
-        "sub_tensor_backend": sub_tensor_backend,
         "expected_state_backend": "eigen",
         "ml_anc": False,
     }
@@ -558,7 +552,7 @@ def test_get_exp_state_matches_numpy_fallback(monkeypatch):
     np.testing.assert_allclose(out_default, out_numpy, atol=1e-12)
 
 
-def test_get_exp_state_parallel_projection_matches_single_thread():
+def test_get_exp_state_parallel_projection_matches_single_thread(monkeypatch):
     tr = tree.add_numerical_node_labels(
         ete.PhyloNode("((((A:1,B:1):1,(C:1,D:1):1):1,((E:1,F:1):1,(G:1,H:1):1):1):1,I:1)R;", format=1)
     )
@@ -583,9 +577,6 @@ def test_get_exp_state_parallel_projection_matches_single_thread():
         "float_type": np.float64,
         "float_tol": 1e-12,
         "threads": 4,
-        "parallel_chunk_factor": 2,
-        "parallel_min_items_expected_state": 1,
-        "parallel_min_items_per_job_expected_state": 1,
     }
     for node in tr.traverse():
         if ete.is_root(node):
@@ -593,6 +584,11 @@ def test_get_exp_state_parallel_projection_matches_single_thread():
         ete.set_prop(node, "Ndist", 0.2)
     g_single = dict(g_parallel)
     g_single["threads"] = 1
+    monkeypatch.setattr(
+        omega.parallel,
+        "resolve_task_n_jobs",
+        lambda num_items, threads, task: min(int(threads), max(1, int(num_items))),
+    )
     out_parallel = omega.get_exp_state(g=g_parallel, mode="pep")
     out_single = omega.get_exp_state(g=g_single, mode="pep")
     np.testing.assert_allclose(out_parallel, out_single, atol=1e-12)
@@ -647,8 +643,6 @@ def test_get_exp_state_respects_parallel_threshold(monkeypatch):
         "float_type": np.float64,
         "float_tol": 1e-12,
         "threads": 4,
-        "parallel_min_items_expected_state": 10**18,
-        "parallel_min_items_per_job_expected_state": 10**18,
     }
     for node in tr.traverse():
         if ete.is_root(node):

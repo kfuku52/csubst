@@ -78,7 +78,8 @@ def test_cli_ignores_custom_log_file_for_subcommand_help(tmp_path):
 def test_cli_advanced_help_has_no_log_side_effect(tmp_path):
     result = _run_csubst(["sites", "--help-advanced"], cwd=tmp_path)
     assert result.returncode == 0
-    assert "--parallel_backend" in result.stdout
+    assert "--expected_state_backend" in result.stdout
+    assert "--parallel_" not in result.stdout
     assert not (tmp_path / "csubst_sites" / "csubst.log").exists()
     assert not (tmp_path / "csubst.log").exists()
 
@@ -188,9 +189,9 @@ def test_advanced_options_remain_parseable_in_normal_execution_mode():
     parser = ns["_build_parser"]()
 
     sites = parser.parse_args(
-        ["sites", "--parallel_backend", "threading", "--database_timeout", "45"]
+        ["sites", "--expected_state_backend", "eigen", "--database_timeout", "45"]
     )
-    assert sites.parallel_backend == "threading"
+    assert sites.expected_state_backend == "eigen"
     assert sites.database_timeout == 45
 
     search = parser.parse_args(["search", "--epistasis_beta", "auto"])

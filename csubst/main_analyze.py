@@ -19,13 +19,11 @@ from csubst import tree
 
 
 def _resolve_expectation_method(g):
-    token = g.get('expectation_method', None)
-    if (token is None) or (str(token).strip() == ''):
-        token = g.get('omegaC_method', 'submodel')
+    token = g.get('expectation_method', 'codon_model')
     normalized = str(token).strip().lower()
-    if normalized in ['codon_model', 'submodel', '']:
+    if normalized in ['codon_model', '']:
         return 'codon_model'
-    if normalized in ['urn', 'modelfree']:
+    if normalized == 'urn':
         return 'urn'
     raise ValueError('Unsupported expectation method: {}'.format(token))
 
@@ -64,8 +62,8 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         raise ValueError('--max_arity should be >= 2.')
     if int(g['max_combination']) < 1:
         raise ValueError('--max_combination should be >= 1.')
-    OS_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=OS_tensor, g=g, label='OS')
-    ON_tensor_reducer = substitution.get_reducer_sub_tensor(sub_tensor=ON_tensor, g=g, label='ON')
+    OS_tensor_reducer = OS_tensor
+    ON_tensor_reducer = ON_tensor
     cb = pd.DataFrame()
     for current_arity in np.arange(2, g['max_arity'] + 1):
         start = time.time()
@@ -201,8 +199,6 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                 cb=cb,
                 ncpu=g['threads'],
                 float_type=g['float_type'],
-                min_items_for_parallel=int(g.get('parallel_min_items_branch_dist', 20000)),
-                min_items_per_job=int(g.get('parallel_min_items_per_job_branch_dist', 5000)),
             )
         cb = substitution.get_substitutions_per_branch(cb, b, g)
         #cb = combination.calc_substitution_patterns(cb)
@@ -702,10 +698,8 @@ def main_analyze(g):
         print("Generating cs table", flush=True)
         if id_combinations is None:
             g,id_combinations = combination.get_node_combinations(g=g, exhaustive=True, arity=g['current_arity'], check_attr="name")
-        reducer_OS_tensor = substitution.get_reducer_sub_tensor(sub_tensor=OS_tensor, g=g, label='csOS')
-        reducer_ON_tensor = substitution.get_reducer_sub_tensor(sub_tensor=ON_tensor, g=g, label='csON')
-        csOS = substitution.get_cs(id_combinations, reducer_OS_tensor, attr='S')
-        csON = substitution.get_cs(id_combinations, reducer_ON_tensor, attr='N')
+        csOS = substitution.get_cs(id_combinations, OS_tensor, attr='S')
+        csON = substitution.get_cs(id_combinations, ON_tensor, attr='N')
         cs = table.merge_tables(csOS, csON)
         del csOS, csON
         cs = _remap_site_column_to_alignment(df=cs, g=g, column_name='site')

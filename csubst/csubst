@@ -373,11 +373,6 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              '"wallenius" uses Wallenius-type inclusion probabilities; '
                              '"fisher" uses Fisher-type inclusion probabilities; '
                              '"factorized_approx" uses the legacy factorized approximation.')
-    parser.add_argument('--omegaC_method', metavar='[submodel|modelfree]', default=None, type=str,
-                        choices=['modelfree','submodel'],
-                        help='Deprecated alias for --expectation_method. '
-                             '"submodel" maps to --expectation_method codon_model. '
-                             '"modelfree" maps to --expectation_method urn.')
     parser.add_argument('--calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
                              'P values of omega_C by substitution randomization (--expectation_method urn only). '
@@ -642,89 +637,13 @@ def _build_parser(show_advanced=False):
     psr_co.add_argument('--random_seed', metavar='INT', default=1, type=int, required=False,
                         help='default=%(default)s: Reproducible seed for stochastic search, omega p-value, '
                              'and foreground-clade permutation operations. Set -1 for a non-deterministic seed.')
-    advanced_performance = psr_co.add_argument_group('advanced performance and memory options')
-    _add_advanced_argument(advanced_performance, '--float_type', show_advanced=show_advanced,
-                        metavar='16|32|64', default=64, type=int, required=False,
-                        help='default=%(default)s: Float data type for tensors. "16" is not recommended.')
-    _add_advanced_argument(advanced_performance, '--sub_tensor_backend', show_advanced=show_advanced,
-                        metavar='auto|dense|sparse', default='auto', type=str,
-                        choices=['auto', 'dense', 'sparse'],
-                        help='default=%(default)s: Backend for substitution tensors. '
-                             '"auto" and "sparse" use the sparse 5D container. '
-                             '"dense" is a legacy comparison and compatibility backend; '
-                             'dense 2D kernels may still be used internally.')
+    advanced_performance = psr_co.add_argument_group('advanced numerical and output options')
     _add_advanced_argument(advanced_performance, '--expected_state_backend', show_advanced=show_advanced,
                         metavar='auto|expm|eigen', default='auto', type=str,
                         choices=['auto', 'expm', 'eigen'],
                         help='default=%(default)s: Backend for codon-model expected-state projection. '
                              '"auto" uses a vectorized eigendecomposition for numerically stable rate matrices '
                              'and falls back to scipy.linalg.expm otherwise.')
-    _add_advanced_argument(advanced_performance, '--sub_tensor_sparse_density_cutoff', show_advanced=show_advanced,
-                        metavar='FLOAT', default=0.15, type=float, required=False,
-                        help='default=%(default)s: Deprecated compatibility option; '
-                             '--sub_tensor_backend auto now always uses the sparse 5D container.')
-    _add_advanced_argument(advanced_performance, '--sub_tensor_auto_sparse_min_elements', show_advanced=show_advanced,
-                        metavar='INT', default=100000000, type=int, required=False,
-                        help='default=%(default)s: Deprecated compatibility option; '
-                             '--sub_tensor_backend auto now always uses the sparse 5D container.')
-    _add_advanced_argument(advanced_performance, '--sub_tensor_auto_sparse_min_bytes', show_advanced=show_advanced,
-                        metavar='INT', default=67108864, type=int, required=False,
-                        help='default=%(default)s: Deprecated compatibility option; '
-                             '--sub_tensor_backend auto now always uses the sparse 5D container.')
-    _add_advanced_argument(advanced_performance, '--parallel_backend', show_advanced=show_advanced,
-                        metavar='auto|multiprocessing|threading', default='auto', type=str,
-                        choices=['auto', 'multiprocessing', 'threading'],
-                        help='default=%(default)s: Backend policy for parallel workloads. '
-                             '"auto" uses multiprocessing.')
-    _add_advanced_argument(advanced_performance, '--parallel_chunk_factor', show_advanced=show_advanced,
-                        metavar='INT', default=1, type=int, required=False,
-                        help='default=%(default)s: Number of chunks per worker for general parallel workloads.')
-    _add_advanced_argument(advanced_performance, '--parallel_chunk_factor_reducer', show_advanced=show_advanced,
-                        metavar='INT', default=4, type=int, required=False,
-                        help='default=%(default)s: Number of chunks per worker for dense/sparse combinatorial reducers.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_sub_tensor', show_advanced=show_advanced,
-                        metavar='INT', default=256, type=int, required=False,
-                        help='default=%(default)s: Minimum number of branch pairs to enable parallel substitution-tensor generation.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_sub_tensor', show_advanced=show_advanced,
-                        metavar='INT', default=64, type=int, required=False,
-                        help='default=%(default)s: Minimum branch pairs assigned per worker in substitution-tensor generation.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_node_union', show_advanced=show_advanced,
-                        metavar='INT', default=20000, type=int, required=False,
-                        help='default=%(default)s: Minimum pair-union workload to enable parallel node-union in branch-combination generation.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_node_union', show_advanced=show_advanced,
-                        metavar='INT', default=5000, type=int, required=False,
-                        help='default=%(default)s: Minimum pair-unions assigned per worker in node-union.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_nc_matrix', show_advanced=show_advanced,
-                        metavar='INT', default=100000, type=int, required=False,
-                        help='default=%(default)s: Minimum number of branch combinations to enable parallel nc-matrix population.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_nc_matrix', show_advanced=show_advanced,
-                        metavar='INT', default=25000, type=int, required=False,
-                        help='default=%(default)s: Minimum branch combinations assigned per worker in nc-matrix population.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_cb', show_advanced=show_advanced,
-                        metavar='INT', default=20000, type=int, required=False,
-                        help='default=%(default)s: Minimum number of branch combinations to enable parallel cb reducers.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_cb', show_advanced=show_advanced,
-                        metavar='INT', default=5000, type=int, required=False,
-                        help='default=%(default)s: Minimum branch combinations assigned per worker in cb reducers.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_rows_cbs', show_advanced=show_advanced,
-                        metavar='INT', default=200000, type=int, required=False,
-                        help='default=%(default)s: Minimum number of output rows (combination x site) to enable parallel cbs reducers.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_rows_per_job_cbs', show_advanced=show_advanced,
-                        metavar='INT', default=50000, type=int, required=False,
-                        help='default=%(default)s: Minimum cbs output rows assigned per worker.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_branch_dist', show_advanced=show_advanced,
-                        metavar='INT', default=20000, type=int, required=False,
-                        help='default=%(default)s: Minimum number of branch combinations to enable parallel branch-distance calculation.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_branch_dist', show_advanced=show_advanced,
-                        metavar='INT', default=5000, type=int, required=False,
-                        help='default=%(default)s: Minimum branch combinations assigned per worker in branch-distance calculation.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_expected_state', show_advanced=show_advanced,
-                        metavar='INT', default=50000000, type=int, required=False,
-                        help='default=%(default)s: Minimum estimated expected-state workload '
-                             '(branch x site x state x state) to enable parallel expected-state projection.')
-    _add_advanced_argument(advanced_performance, '--parallel_min_items_per_job_expected_state', show_advanced=show_advanced,
-                        metavar='INT', default=10000000, type=int, required=False,
-                        help='default=%(default)s: Minimum estimated expected-state workload per worker.')
     _add_advanced_argument(advanced_performance, '--float_digit', show_advanced=show_advanced,
                         metavar='INT', default=4, type=int, required=False,
                         help='default=%(default)s: Number of output float digits.')

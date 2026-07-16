@@ -686,7 +686,7 @@ def test_read_input_submodel_rejects_unsupported_substitution_model(monkeypatch)
     monkeypatch.setattr(parser_misc.parser_iqtree, "get_input_information", fake_get_input_information)
     g = {
         "infile_type": "iqtree",
-        "omegaC_method": "submodel",
+        "expectation_method": "codon_model",
     }
     with pytest.raises(ValueError, match="Unsupported substitution model"):
         parser_misc.read_input(g)
@@ -734,7 +734,7 @@ def test_read_input_submodel_detects_reverse_signed_rate_sum_mismatch(monkeypatc
 
     g = {
         "infile_type": "iqtree",
-        "omegaC_method": "submodel",
+        "expectation_method": "codon_model",
         "float_tol": 1e-12,
     }
     with pytest.raises(AssertionError, match="Sum of rates did not match"):
@@ -790,7 +790,7 @@ def test_read_input_writes_instantaneous_rate_matrix_only_when_enabled(monkeypat
 
     g_disabled = {
         "infile_type": "iqtree",
-        "omegaC_method": "submodel",
+        "expectation_method": "codon_model",
         "float_tol": 1e-12,
         "write_instantaneous_rate_matrix": False,
         "nonsyn_recode": "no",
@@ -800,7 +800,7 @@ def test_read_input_writes_instantaneous_rate_matrix_only_when_enabled(monkeypat
 
     g_enabled = {
         "infile_type": "iqtree",
-        "omegaC_method": "submodel",
+        "expectation_method": "codon_model",
         "float_tol": 1e-12,
         "write_instantaneous_rate_matrix": True,
         "nonsyn_recode": "no",

@@ -130,7 +130,6 @@ def test_cb_search_recomputes_empirical_pvalues_after_calibration(monkeypatch):
         return out
 
     monkeypatch.setattr(main_analyze.combination, "get_node_combinations", fake_get_node_combinations)
-    monkeypatch.setattr(main_analyze.substitution, "get_reducer_sub_tensor", lambda sub_tensor, g, label: label + "_reducer")
     monkeypatch.setattr(main_analyze.substitution, "get_cb", fake_get_cb)
     monkeypatch.setattr(main_analyze.table, "merge_tables", fake_merge_tables)
     monkeypatch.setattr(
@@ -164,11 +163,18 @@ def test_cb_search_recomputes_empirical_pvalues_after_calibration(monkeypatch):
         "output_stats": ["any2spe"],
     }
 
-    _, cb = main_analyze.cb_search(g=g, b=None, OS_tensor=None, ON_tensor=None, id_combinations=None, write_cb=False)
+    _, cb = main_analyze.cb_search(
+        g=g,
+        b=None,
+        OS_tensor="OS_tensor",
+        ON_tensor="ON_tensor",
+        id_combinations=None,
+        write_cb=False,
+    )
 
     assert calls["recompute"] == 1
-    assert calls["recompute_ON"] == "ON_reducer"
-    assert calls["recompute_OS"] == "OS_reducer"
+    assert calls["recompute_ON"] == "ON_tensor"
+    assert calls["recompute_OS"] == "OS_tensor"
     assert "pomegaCany2spe_nocalib" in cb.columns
     assert "qomegaCany2spe_nocalib" in cb.columns
     assert "pomegaCany2spe" in cb.columns

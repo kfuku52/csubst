@@ -23,7 +23,6 @@ substitution_cy = load_optional_extension('substitution_cy')
 substitution_sparse_cy = load_optional_extension('substitution_sparse_cy')
 
 _CB_BASE_SUBSTITUTIONS = ("any2any", "spe2any", "any2spe", "spe2spe")
-_SUB_TENSOR_BACKENDS = ('auto', 'dense', 'sparse')
 _CYTHON_FALLBACK_WARNED = set()
 _SPARSE_CB_SUMMARY_GRAM_MIN_COMBINATIONS = 512
 _SPARSE_CB_SUMMARY_GRAM_MAX_BRANCHES = 512
@@ -38,6 +37,8 @@ _SPARSE_CB_PROJECTION_ARITY3_DENSE_MAX_BRANCHES = 256
 _SPARSE_CB_PROJECTION_ARITY3_DENSE_MAX_BYTES = 134217728
 _SPARSE_SUB_TENSOR_INDEXED_CHILD_MAX_DENSITY = 0.35
 _SUB_TENSOR_PARALLEL_SITE_BLOCK_SIZE = 5000
+_DENSE_CYTHON_MIN_COMBINATIONS_PER_JOB = 5000
+_DENSE_CYTHON_MIN_OPERATIONS_PER_JOB = 500000000
 
 
 def _warn_cython_fallback(fastpath_name, exc):
@@ -77,13 +78,6 @@ def _resolve_cb_base_substitutions(selected_base_stats=None):
         seen.add(token)
         selected.append(token)
     return [s for s in _CB_BASE_SUBSTITUTIONS if s in selected]
-
-
-def _resolve_requested_sub_tensor_backend(g):
-    requested = str(g.get('sub_tensor_backend', 'auto')).lower()
-    if requested not in _SUB_TENSOR_BACKENDS:
-        raise ValueError('Invalid sub_tensor_backend: {}'.format(requested))
-    return requested
 
 
 def _normalize_branch_ids(branch_ids):
@@ -176,28 +170,16 @@ def _estimate_sub_tensor_parallel_items(num_branch_pairs, state_tensor, mode):
 
 
 def _resolve_sub_tensor_parallel_n_jobs(num_branch_pairs, g, state_tensor=None, mode=''):
-    # Backward compatibility: explicit legacy knob keeps old behavior unless new total-size threshold is set.
-    if ('parallel_sub_tensor_min_branches_per_job' in g.keys()) and ('parallel_min_items_sub_tensor' not in g.keys()):
-        min_items_for_parallel = 0
-    else:
-        min_items_for_parallel = int(g.get('parallel_min_items_sub_tensor', 256))
-    min_items_per_job = int(
-        g.get(
-            'parallel_min_items_per_job_sub_tensor',
-            g.get('parallel_sub_tensor_min_branches_per_job', 64),
-        )
-    )
     estimated_items = _estimate_sub_tensor_parallel_items(
         num_branch_pairs=num_branch_pairs,
         state_tensor=state_tensor,
         mode=mode,
     )
     effective_items = max(int(num_branch_pairs), int(estimated_items))
-    return parallel.resolve_adaptive_n_jobs(
+    return parallel.resolve_task_n_jobs(
         num_items=effective_items,
         threads=int(g.get('threads', 1)),
-        min_items_for_parallel=min_items_for_parallel,
-        min_items_per_job=min_items_per_job,
+        task='sub_tensor',
     )
 
 
@@ -232,15 +214,15 @@ def _build_branch_id_columns(arity):
     return ["branch_id_" + str(num + 1) for num in range(0, arity)]
 
 
-def _resolve_reducer_chunks(id_combinations, n_jobs, g):
-    chunk_factor = parallel.resolve_chunk_factor(g=g, task='reducer')
+def _resolve_reducer_chunks(id_combinations, n_jobs):
+    chunk_factor = parallel.resolve_chunk_factor(task='reducer')
     return parallel.get_chunks(id_combinations, n_jobs, chunk_factor=chunk_factor)
 
 
-def _run_parallel_reducer_to_dataframe(write_func, args_iterable, n_jobs, mmap_out, axis, dtype, columns, g):
+def _run_parallel_reducer_to_dataframe(write_func, args_iterable, n_jobs, mmap_out, axis, dtype, columns):
     _remove_file_if_exists(mmap_out)
     df_mmap = np.memmap(mmap_out, dtype=dtype, shape=axis, mode='w+')
-    backend = parallel.resolve_parallel_backend(g=g, task='reducer')
+    backend = parallel.resolve_parallel_backend()
     try:
         parallel.run_starmap(
             func=write_func,
@@ -269,17 +251,6 @@ def _get_combo_index_range(mmap_start, num_combinations):
     return start, end
 
 
-def resolve_sub_tensor_backend(g, state_tensor=None, state_tensor_anc=None, mode=''):
-    requested = _resolve_requested_sub_tensor_backend(g)
-    # SparseSubstitutionTensor is the canonical production representation.
-    # The explicit dense backend remains temporarily available as a reference
-    # and compatibility path while downstream ndarray assumptions are retired.
-    resolved = 'dense' if requested == 'dense' else 'sparse'
-    g['sub_tensor_backend'] = requested
-    g['resolved_sub_tensor_backend'] = resolved
-    print('Substitution tensor backend: requested={}, resolved={}'.format(requested, resolved), flush=True)
-    return resolved
-
 def dense_to_sparse_sub_tensor(sub_tensor, tol=0):
     return substitution_sparse.dense_to_sparse_substitution_tensor(sub_tensor=sub_tensor, tol=tol)
 
@@ -301,20 +272,8 @@ def estimate_sub_tensor_density(sub_tensor, tol=0):
         nnz = np.count_nonzero(arr)
     return nnz / arr.size
 
-def resolve_reducer_backend(g, sub_tensor=None, label=''):
-    requested = _resolve_requested_sub_tensor_backend(g)
-    resolved = 'dense' if requested == 'dense' else 'sparse'
-    if 'resolved_reducer_backend' not in g.keys():
-        g['resolved_reducer_backend'] = dict()
-    if label != '':
-        g['resolved_reducer_backend'][label] = resolved
-    return resolved
-
 def get_reducer_sub_tensor(sub_tensor, g, label=''):
     if _is_sparse_sub_tensor(sub_tensor):
-        return sub_tensor
-    resolved = resolve_reducer_backend(g=g, sub_tensor=sub_tensor, label=label)
-    if resolved != 'sparse':
         return sub_tensor
     if 'reducer_sub_tensor_cache' not in g.keys():
         g['reducer_sub_tensor_cache'] = dict()
@@ -607,7 +566,7 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
             syn_indices_list=syn_indices_list,
         )
     else:
-        chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
+        chunk_factor = parallel.resolve_chunk_factor(task='general')
         branch_chunks, _ = parallel.get_chunks(input_data=branch_pairs, threads=n_jobs, chunk_factor=chunk_factor)
         txt = 'Parallel sparse substitution-tensor generation: branches={}, workers={}, chunks={}'
         print(txt.format(len(branch_pairs), n_jobs, len(branch_chunks)), flush=True)
@@ -952,198 +911,17 @@ def get_cs_sparse(id_combinations, sub_tensor, attr):
     df = table.set_substitution_dtype(df=df)
     return df
 
-def initialize_substitution_tensor(state_tensor, mode, g, mmap_attr, dtype=None):
-    if dtype is None:
-        dtype = state_tensor.dtype
-    num_branch = state_tensor.shape[0]
-    num_site = state_tensor.shape[1]
-    if mode=='asis':
-        num_syngroup = 1
-        num_state = state_tensor.shape[2]
-    elif mode=='syn':
-        num_syngroup = len(g['amino_acid_orders'])
-        num_state = g['max_synonymous_size']
-    axis = (num_branch,num_site,num_syngroup,num_state,num_state) # axis = [branch,site,matrix_group,state_from,state_to]
-    mmap_tensor = runtime.temp_path('tmp.csubst.sub_tensor.'+mmap_attr+'.mmap')
-    if os.path.exists(mmap_tensor):
-        os.unlink(mmap_tensor)
-    txt = 'Generating memory map: dtype={}, axis={}, path={}'
-    print(txt.format(state_tensor.dtype, axis, mmap_tensor), flush=True)
-    sub_tensor = np.memmap(mmap_tensor, dtype=dtype, shape=axis, mode='w+')
-    return sub_tensor
-
-
-def _fill_dense_sub_tensor_chunk_asis(branch_pairs, state_tensor, state_tensor_anc, sub_tensor):
-    if len(branch_pairs) == 0:
-        return None
-    num_state = state_tensor.shape[2]
-    diag_zero = np.diag([-1] * num_state) + 1
-    for child, parent in branch_pairs:
-        parent_matrix = state_tensor_anc[parent, :, :]
-        child_matrix = state_tensor[child, :, :]
-        out_branch_group = sub_tensor[child, :, 0, :, :]
-        if _can_use_cython_asis_sub_tensor_fill(
-            parent_matrix=parent_matrix,
-            child_matrix=child_matrix,
-            out_branch_group=out_branch_group,
-        ):
-            substitution_cy.fill_sub_tensor_asis_branch_double(
-                parent_matrix=parent_matrix,
-                child_matrix=child_matrix,
-                out_branch_group=out_branch_group,
-            )
-        else:
-            sub_matrix = np.einsum("sa,sd,ad->sad", parent_matrix, child_matrix, diag_zero)
-            out_branch_group[:, :, :] = sub_matrix
-    return None
-
-
-def _fill_dense_sub_tensor_chunk_syn(
-    branch_pairs,
-    state_tensor,
-    state_tensor_anc,
-    sub_tensor,
-    amino_acid_orders,
-    syn_indices_list,
-    syn_index_matrix,
-    syn_group_sizes,
-):
-    if len(branch_pairs) == 0:
-        return None
-    diag_zero_by_size = dict()
-    for child, parent in branch_pairs:
-        parent_matrix = state_tensor_anc[parent, :, :]
-        child_matrix = state_tensor[child, :, :]
-        out_branch_tensor = sub_tensor[child, :, :, :, :]
-        if _can_use_cython_syn_sub_tensor_fill(
-            parent_matrix=parent_matrix,
-            child_matrix=child_matrix,
-            syn_index_matrix=syn_index_matrix,
-            syn_group_sizes=syn_group_sizes,
-            out_branch_tensor=out_branch_tensor,
-        ):
-            substitution_cy.fill_sub_tensor_syn_branch_double(
-                parent_matrix=parent_matrix,
-                child_matrix=child_matrix,
-                syn_index_matrix=syn_index_matrix,
-                syn_group_sizes=syn_group_sizes,
-                out_branch_tensor=out_branch_tensor,
-            )
-            continue
-        for s, _aa in enumerate(amino_acid_orders):
-            ind = syn_indices_list[s]
-            size = ind.shape[0]
-            if size == 0:
-                continue
-            if size not in diag_zero_by_size:
-                diag_zero_by_size[size] = np.diag([-1] * size) + 1
-            diag_zero = diag_zero_by_size[size]
-            parent_group_matrix = state_tensor_anc[parent, :, ind]
-            child_group_matrix = state_tensor[child, :, ind]
-            sub_matrix = np.einsum("as,ds,ad->sad", parent_group_matrix, child_group_matrix, diag_zero)
-            sub_tensor[child, :, s, :size, :size] = sub_matrix
-    return None
-
-
 def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None, mmap_attr=''):
     if g is None:
         raise ValueError('g is required.')
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
-    backend = resolve_sub_tensor_backend(
-        g=g,
+    return _build_sparse_substitution_tensor(
         state_tensor=state_tensor,
         state_tensor_anc=state_tensor_anc,
         mode=mode,
-    )
-    ml_anc = _parse_bool_like(g.get('ml_anc', False), 'ml_anc')
-    selected_branch_set = _get_selected_branch_set(g)
-    if backend == 'sparse':
-        return _build_sparse_substitution_tensor(
-            state_tensor=state_tensor,
-            state_tensor_anc=state_tensor_anc,
-            mode=mode,
-            g=g,
-        )
-    sub_tensor = initialize_substitution_tensor(state_tensor, mode, g, mmap_attr)
-    if not ml_anc:
-        sub_tensor[:,:,:,:,:] = np.nan
-    branch_pairs = _collect_sub_tensor_branch_pairs(
         g=g,
-        state_tensor_anc=state_tensor_anc,
-        selected_branch_set=selected_branch_set,
     )
-    n_jobs = _resolve_sub_tensor_parallel_n_jobs(
-        num_branch_pairs=len(branch_pairs),
-        g=g,
-        state_tensor=state_tensor,
-        mode=mode,
-    )
-    txt = 'Sub-tensor scheduler (dense, mode={}): branches={}, workers={} (threads={})'
-    print(txt.format(mode, len(branch_pairs), n_jobs, int(g.get('threads', 1))), flush=True)
-    if mode=='asis':
-        if n_jobs == 1:
-            _fill_dense_sub_tensor_chunk_asis(
-                branch_pairs=branch_pairs,
-                state_tensor=state_tensor,
-                state_tensor_anc=state_tensor_anc,
-                sub_tensor=sub_tensor,
-            )
-        else:
-            chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
-            branch_chunks, _ = parallel.get_chunks(input_data=branch_pairs, threads=n_jobs, chunk_factor=chunk_factor)
-            txt = 'Parallel dense substitution-tensor generation (asis): branches={}, workers={}, chunks={}'
-            print(txt.format(len(branch_pairs), n_jobs, len(branch_chunks)), flush=True)
-            tasks = [(chunk, state_tensor, state_tensor_anc, sub_tensor) for chunk in branch_chunks]
-            parallel.run_starmap(
-                func=_fill_dense_sub_tensor_chunk_asis,
-                args_iterable=tasks,
-                n_jobs=n_jobs,
-                backend='threading',
-            )
-    elif mode=='syn':
-        syn_index_matrix, syn_group_sizes = _get_syn_group_index_cache(g)
-        amino_acid_orders = list(g['amino_acid_orders'])
-        syn_indices_list = [np.asarray(g['synonymous_indices'][aa], dtype=np.int64) for aa in amino_acid_orders]
-        if n_jobs == 1:
-            _fill_dense_sub_tensor_chunk_syn(
-                branch_pairs=branch_pairs,
-                state_tensor=state_tensor,
-                state_tensor_anc=state_tensor_anc,
-                sub_tensor=sub_tensor,
-                amino_acid_orders=amino_acid_orders,
-                syn_indices_list=syn_indices_list,
-                syn_index_matrix=syn_index_matrix,
-                syn_group_sizes=syn_group_sizes,
-            )
-        else:
-            chunk_factor = parallel.resolve_chunk_factor(g=g, task='general')
-            branch_chunks, _ = parallel.get_chunks(input_data=branch_pairs, threads=n_jobs, chunk_factor=chunk_factor)
-            txt = 'Parallel dense substitution-tensor generation (syn): branches={}, workers={}, chunks={}'
-            print(txt.format(len(branch_pairs), n_jobs, len(branch_chunks)), flush=True)
-            tasks = [
-                (
-                    chunk,
-                    state_tensor,
-                    state_tensor_anc,
-                    sub_tensor,
-                    amino_acid_orders,
-                    syn_indices_list,
-                    syn_index_matrix,
-                    syn_group_sizes,
-                )
-                for chunk in branch_chunks
-            ]
-            parallel.run_starmap(
-                func=_fill_dense_sub_tensor_chunk_syn,
-                args_iterable=tasks,
-                n_jobs=n_jobs,
-                backend='threading',
-            )
-    if np.isnan(sub_tensor).any():
-        sub_tensor = np.nan_to_num(sub_tensor, nan=0, copy=False)
-    return sub_tensor
-
 def apply_min_sub_pp(g, sub_tensor):
     if g['min_sub_pp']==0:
         return sub_tensor
@@ -1333,95 +1111,14 @@ def _can_use_cython_dense_cbs(id_combinations, sub_tensor, mmap=False, df_mmap=N
     return hasattr(substitution_cy, 'calc_combinatorial_sub_by_site_double_arity2')
 
 
-def _can_use_cython_asis_sub_tensor_fill(parent_matrix, child_matrix, out_branch_group):
-    if not hasattr(substitution_cy, 'fill_sub_tensor_asis_branch_double'):
-        return False
-    if (
-        (not isinstance(parent_matrix, np.ndarray))
-        or (not isinstance(child_matrix, np.ndarray))
-        or (not isinstance(out_branch_group, np.ndarray))
-    ):
-        return False
-    if parent_matrix.dtype != np.float64 or child_matrix.dtype != np.float64 or out_branch_group.dtype != np.float64:
-        return False
-    if parent_matrix.ndim != 2 or child_matrix.ndim != 2 or out_branch_group.ndim != 3:
-        return False
-    if parent_matrix.shape != child_matrix.shape:
-        return False
-    expected_shape = (parent_matrix.shape[0], parent_matrix.shape[1], parent_matrix.shape[1])
-    if out_branch_group.shape != expected_shape:
-        return False
-    return True
-
-
-def _get_syn_group_index_cache(g):
-    cache = g.get('_syn_group_index_cache', None)
-    if cache is not None:
-        return cache
-    aa_orders = list(g['amino_acid_orders'])
-    max_syn = int(g['max_synonymous_size'])
-    index_matrix = np.full(shape=(len(aa_orders), max_syn), fill_value=-1, dtype=np.int64)
-    group_sizes = np.zeros(shape=(len(aa_orders),), dtype=np.int64)
-    for sg, aa in enumerate(aa_orders):
-        ind = np.asarray(g['synonymous_indices'][aa], dtype=np.int64).reshape(-1)
-        if ind.shape[0] > max_syn:
-            txt = 'Synonymous group "{}" size ({}) exceeded max_synonymous_size ({}).'
-            raise ValueError(txt.format(aa, ind.shape[0], max_syn))
-        if ind.shape[0] == 0:
-            continue
-        index_matrix[sg, :ind.shape[0]] = ind
-        group_sizes[sg] = ind.shape[0]
-    cache = (index_matrix, group_sizes)
-    g['_syn_group_index_cache'] = cache
-    return cache
-
-
-def _can_use_cython_syn_sub_tensor_fill(parent_matrix, child_matrix, syn_index_matrix, syn_group_sizes, out_branch_tensor):
-    if not hasattr(substitution_cy, 'fill_sub_tensor_syn_branch_double'):
-        return False
-    if (
-        (not isinstance(parent_matrix, np.ndarray))
-        or (not isinstance(child_matrix, np.ndarray))
-        or (not isinstance(syn_index_matrix, np.ndarray))
-        or (not isinstance(syn_group_sizes, np.ndarray))
-        or (not isinstance(out_branch_tensor, np.ndarray))
-    ):
-        return False
-    if parent_matrix.dtype != np.float64 or child_matrix.dtype != np.float64 or out_branch_tensor.dtype != np.float64:
-        return False
-    if syn_index_matrix.dtype != np.int64 or syn_group_sizes.dtype != np.int64:
-        return False
-    if parent_matrix.ndim != 2 or child_matrix.ndim != 2:
-        return False
-    if syn_index_matrix.ndim != 2 or syn_group_sizes.ndim != 1 or out_branch_tensor.ndim != 4:
-        return False
-    if parent_matrix.shape != child_matrix.shape:
-        return False
-    if out_branch_tensor.shape[0] != parent_matrix.shape[0]:
-        return False
-    if out_branch_tensor.shape[1] != syn_group_sizes.shape[0]:
-        return False
-    if syn_index_matrix.shape[0] != syn_group_sizes.shape[0]:
-        return False
-    if syn_index_matrix.shape[1] > out_branch_tensor.shape[2] or syn_index_matrix.shape[1] > out_branch_tensor.shape[3]:
-        return False
-    return True
-
-
-def _resolve_dense_cython_n_jobs(n_jobs, id_combinations, sub_tensor, g, task='cb'):
+def _resolve_dense_cython_n_jobs(n_jobs, id_combinations, sub_tensor, task='cb'):
     if n_jobs <= 1:
         return 1
-    min_combos_per_job = int(g.get('parallel_dense_cython_min_combos_per_job', 5000))
-    min_ops_per_job = int(g.get('parallel_dense_cython_min_ops_per_job', 500000000))
-    if min_combos_per_job < 1:
-        min_combos_per_job = 1
-    if min_ops_per_job < 1:
-        min_ops_per_job = 1
     num_comb = int(id_combinations.shape[0])
     ops_per_comb = int(sub_tensor.shape[1]) * int(sub_tensor.shape[2]) * int(sub_tensor.shape[3]) * int(sub_tensor.shape[4])
     total_ops = num_comb * ops_per_comb
-    max_jobs_by_combos = max(1, num_comb // min_combos_per_job)
-    max_jobs_by_ops = max(1, total_ops // min_ops_per_job)
+    max_jobs_by_combos = max(1, num_comb // _DENSE_CYTHON_MIN_COMBINATIONS_PER_JOB)
+    max_jobs_by_ops = max(1, total_ops // _DENSE_CYTHON_MIN_OPERATIONS_PER_JOB)
     resolved = max(1, min(int(n_jobs), max_jobs_by_combos, max_jobs_by_ops))
     txt = 'Dense Cython scheduler for {}: combos={}, estimated_ops={}, workers {} -> {}'
     print(txt.format(task, num_comb, total_ops, n_jobs, resolved), flush=True)
@@ -2364,11 +2061,10 @@ def _resolve_cb_writer_and_columns(sub_tensor, attr, arity, selected):
 
 
 def _resolve_cb_n_jobs(id_combinations, sub_tensor, g, writer, selected):
-    n_jobs = parallel.resolve_adaptive_n_jobs(
+    n_jobs = parallel.resolve_task_n_jobs(
         num_items=id_combinations.shape[0],
         threads=g['threads'],
-        min_items_for_parallel=int(g.get('parallel_min_items_cb', 20000)),
-        min_items_per_job=int(g.get('parallel_min_items_per_job_cb', 5000)),
+        task='cb',
     )
     if (writer is sub_tensor2cb_sparse) and _can_use_sparse_cb_projection_gram(
         id_combinations=id_combinations,
@@ -2410,7 +2106,6 @@ def _resolve_cb_n_jobs(id_combinations, sub_tensor, g, writer, selected):
                 n_jobs=n_jobs,
                 id_combinations=id_combinations,
                 sub_tensor=sub_tensor,
-                g=g,
                 task='cb',
             )
         else:
@@ -2451,7 +2146,7 @@ def _run_cb_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, selecte
             selected=selected,
             columns=columns,
         )
-    id_chunks, mmap_starts = _resolve_reducer_chunks(id_combinations=id_combinations, n_jobs=n_jobs, g=g)
+    id_chunks, mmap_starts = _resolve_reducer_chunks(id_combinations=id_combinations, n_jobs=n_jobs)
     mmap_out = runtime.temp_path('tmp.csubst.cb.out.mmap')
     axis = (id_combinations.shape[0], arity + len(selected))
     my_dtype = _resolve_output_dtype(source_dtype=sub_tensor.dtype, default_dtype=sub_tensor.dtype)
@@ -2467,7 +2162,6 @@ def _run_cb_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, selecte
         axis=axis,
         dtype=my_dtype,
         columns=columns,
-        g=g,
     )
 
 
@@ -2641,11 +2335,10 @@ def _resolve_cbs_writer_and_columns(sub_tensor, attr, arity):
 
 def _resolve_cbs_n_jobs(id_combinations, sub_tensor, g, writer):
     num_rows = int(id_combinations.shape[0]) * int(sub_tensor.shape[1])
-    n_jobs = parallel.resolve_adaptive_n_jobs(
+    n_jobs = parallel.resolve_task_n_jobs(
         num_items=num_rows,
         threads=g['threads'],
-        min_items_for_parallel=int(g.get('parallel_min_rows_cbs', 200000)),
-        min_items_per_job=int(g.get('parallel_min_rows_per_job_cbs', 50000)),
+        task='cbs',
     )
     if (writer is sub_tensor2cbs) and _can_use_cython_dense_cbs(
         id_combinations=id_combinations,
@@ -2657,7 +2350,6 @@ def _resolve_cbs_n_jobs(id_combinations, sub_tensor, g, writer):
             n_jobs=n_jobs,
             id_combinations=id_combinations,
             sub_tensor=sub_tensor,
-            g=g,
             task='cbs',
         )
     return n_jobs
@@ -2685,7 +2377,7 @@ def _run_cbs_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, column
             sub_tensor=sub_tensor,
             columns=columns,
         )
-    id_chunks, mmap_starts = _resolve_reducer_chunks(id_combinations=id_combinations, n_jobs=n_jobs, g=g)
+    id_chunks, mmap_starts = _resolve_reducer_chunks(id_combinations=id_combinations, n_jobs=n_jobs)
     mmap_out = runtime.temp_path('tmp.csubst.cbs.out.mmap')
     axis = (id_combinations.shape[0] * sub_tensor.shape[1], arity + 5)
     my_dtype = _resolve_output_dtype(source_dtype=sub_tensor.dtype, default_dtype=sub_tensor.dtype)
@@ -2701,7 +2393,6 @@ def _run_cbs_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, column
         axis=axis,
         dtype=my_dtype,
         columns=columns,
-        g=g,
     )
 
 

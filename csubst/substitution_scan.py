@@ -205,11 +205,8 @@ def normalize_scan_n_permutations(value):
     return n_permutations
 
 
-def _resolve_scan_permutation_backend(g):
-    backend = str(g.get("parallel_backend", "auto")).strip().lower()
-    if backend not in ["auto", "multiprocessing", "threading"]:
-        raise ValueError("--parallel_backend should be one of auto, multiprocessing, threading.")
-    return parallel.resolve_parallel_backend(g=g, task="general")
+def _resolve_scan_permutation_backend():
+    return parallel.resolve_parallel_backend()
 
 
 def _resolve_scan_permutation_n_jobs(g, n_permutations):
@@ -1579,7 +1576,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
     pvalue_calibration = normalize_scan_pvalue_calibration(g.get("scan_pvalue_calibration", "full_scan"))
     n_permutations = normalize_scan_n_permutations(g.get("scan_n_permutations", 1000))
     permutation_seed = int(g.get("scan_permutation_seed", 1))
-    permutation_backend = _resolve_scan_permutation_backend(g)
+    permutation_backend = _resolve_scan_permutation_backend()
     permutation_n_jobs = _resolve_scan_permutation_n_jobs(g=g, n_permutations=n_permutations)
     min_event_pp = float(g.get("scan_min_event_pp", 0.5))
     if (not np.isfinite(min_event_pp)) or (min_event_pp < 0) or (min_event_pp > 1):
@@ -2056,9 +2053,9 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
     min_perm_p = []
     failure_reasons = []
     n_jobs = _resolve_scan_permutation_n_jobs(g=g, n_permutations=n_permutations)
-    backend = _resolve_scan_permutation_backend(g=g)
+    backend = _resolve_scan_permutation_backend()
     permutation_indices = np.arange(1, n_permutations + 1, dtype=np.int64)
-    chunk_factor = parallel.resolve_chunk_factor(g=g, task="general")
+    chunk_factor = parallel.resolve_chunk_factor(task="general")
     permutation_chunks, _ = parallel.get_chunks(
         input_data=permutation_indices,
         threads=n_jobs,
