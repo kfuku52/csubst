@@ -94,6 +94,11 @@ for distribution in ("ete4", "numpy", "scipy", "pandas", "matplotlib", "biopytho
     if not any(requirement.startswith(distribution) for requirement in normalized_requirements):
         raise RuntimeError("Wheel metadata is missing dependency {!r}.".format(distribution))
 if not any(
+    requirement.startswith("matplotlib") and "<3.11" in requirement
+    for requirement in normalized_requirements
+):
+    raise RuntimeError("Wheel metadata is missing the Matplotlib <3.11 compatibility constraint.")
+if not any(
     "pymol-open-source" in requirement
     and ">=3.2.0a0" in requirement
     and "<3.3" in requirement

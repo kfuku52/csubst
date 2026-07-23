@@ -170,12 +170,15 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                 g,id_combinations = combination.get_node_combinations(g=g, cb_passed=cb_passed, cb_all=False,
                                                                       arity=current_arity, check_attr='name')
             else:
-                txt = 'Arity (K) = {:,}: Exhaustive search with {:,} K-1 branch combinations'
-                print(txt.format(current_arity, cb.shape[0]))
+                txt = 'Arity (K) = {:,}: Direct exhaustive generation of all independent branch combinations'
+                print(txt.format(current_arity))
                 g['df_cb_stats'].at[0, 'mode'] = 'exhaustive'
-                cb_passed = cb.loc[:,cb_passed_columns].reset_index(drop=True)
-                g,id_combinations = combination.get_node_combinations(g=g, cb_passed=cb_passed, cb_all=True,
-                                                                      arity=current_arity, check_attr='name')
+                g,id_combinations = combination.get_node_combinations(
+                    g=g,
+                    exhaustive=True,
+                    arity=current_arity,
+                    check_attr='name',
+                )
         else:
             raise ValueError('Invalid arity: {}'.format(current_arity))
         if id_combinations.shape[0] == 0:

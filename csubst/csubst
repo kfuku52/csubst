@@ -1174,6 +1174,10 @@ def _build_parser(show_advanced=False):
                               'If all descendant leaves of a clade match, branch/clade coloring is also highlighted.')
     inspect.add_argument('--plot_state_aa_highlight_color', metavar='COLOR', default='crimson', type=str,
                          help='default=%(default)s: Matplotlib color for --plot_state_aa_highlight_pattern matches.')
+    inspect.add_argument('--combination_count_max_arity', metavar='INTEGER', default=10, type=int,
+                         help='default=%(default)s: Maximum branch-combination arity (K) reported in '
+                              'csubst_combination_count.tsv. Counts are computed exactly from tree topology '
+                              'without enumerating branch combinations.')
     advanced_inspect = inspect.add_argument_group('advanced inspection and rendering tuning')
     _add_advanced_argument(advanced_inspect, '--tree_tip_label_spacing', show_advanced=show_advanced,
                          metavar='FLOAT', default=1.0, type=float,

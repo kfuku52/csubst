@@ -13,6 +13,7 @@ cpdef mark_dependent_combinations_bitset_int64(
     cdef Py_ssize_t num_combination = row_combinations.shape[0]
     cdef Py_ssize_t arity = row_combinations.shape[1]
     cdef Py_ssize_t num_row = dependency_bitset.shape[0]
+    cdef Py_ssize_t expected_bytes_per_row = (num_row + 7) // 8
     cdef numpy.ndarray[numpy.uint8_t, ndim=1] out = numpy.zeros(num_combination, dtype=numpy.uint8)
     cdef const numpy.int64_t[:, :] combo_mv = row_combinations
     cdef const numpy.uint8_t[:, :] bitset_mv = dependency_bitset
@@ -20,6 +21,8 @@ cpdef mark_dependent_combinations_bitset_int64(
     cdef Py_ssize_t combo, i, j
     cdef long left, right
     cdef unsigned char mask
+    if dependency_bitset.shape[1] < expected_bytes_per_row:
+        raise ValueError('dependency_bitset has too few columns for its number of rows.')
     for combo in range(num_combination):
         for i in range(arity - 1):
             left = combo_mv[combo, i]
@@ -36,6 +39,183 @@ cpdef mark_dependent_combinations_bitset_int64(
             if out_mv[combo] != 0:
                 break
     return out
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef bint _independent_candidate_is_compatible(
+    numpy.int64_t row_id,
+    numpy.int64_t[:] prefix,
+    Py_ssize_t depth,
+    const numpy.uint8_t[:, :] dependency_bitset,
+):
+    cdef Py_ssize_t prefix_index
+    cdef numpy.int64_t other
+    cdef unsigned char mask
+    for prefix_index in range(depth):
+        other = prefix[prefix_index]
+        mask = <unsigned char>(1 << (other & 7))
+        if dependency_bitset[row_id, other >> 3] & mask:
+            return False
+    return True
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef unsigned long long _count_independent_combinations(
+    const numpy.int64_t[:] candidate_rows,
+    Py_ssize_t start,
+    Py_ssize_t depth,
+    Py_ssize_t arity,
+    numpy.int64_t[:] prefix,
+    const numpy.uint8_t[:, :] dependency_bitset,
+):
+    cdef Py_ssize_t remaining = arity - depth
+    cdef Py_ssize_t max_index = candidate_rows.shape[0] - remaining
+    cdef Py_ssize_t candidate_index
+    cdef numpy.int64_t row_id
+    cdef unsigned long long total = 0
+    cdef unsigned long long subtotal
+    cdef unsigned long long next_total
+    for candidate_index in range(start, max_index + 1):
+        row_id = candidate_rows[candidate_index]
+        if not _independent_candidate_is_compatible(
+            row_id,
+            prefix,
+            depth,
+            dependency_bitset,
+        ):
+            continue
+        if remaining == 1:
+            subtotal = 1
+        else:
+            prefix[depth] = row_id
+            subtotal = _count_independent_combinations(
+                candidate_rows,
+                candidate_index + 1,
+                depth + 1,
+                arity,
+                prefix,
+                dependency_bitset,
+            )
+        next_total = total + subtotal
+        if next_total < total:
+            raise OverflowError('Independent combination count exceeds uint64 capacity.')
+        total = next_total
+    return total
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef Py_ssize_t _fill_independent_combinations(
+    const numpy.int64_t[:] candidate_rows,
+    Py_ssize_t start,
+    Py_ssize_t depth,
+    Py_ssize_t arity,
+    numpy.int64_t[:] prefix,
+    const numpy.uint8_t[:, :] dependency_bitset,
+    numpy.int64_t[:, :] out,
+    Py_ssize_t write_pos,
+):
+    cdef Py_ssize_t remaining = arity - depth
+    cdef Py_ssize_t max_index = candidate_rows.shape[0] - remaining
+    cdef Py_ssize_t candidate_index, column
+    cdef numpy.int64_t row_id
+    for candidate_index in range(start, max_index + 1):
+        row_id = candidate_rows[candidate_index]
+        if not _independent_candidate_is_compatible(
+            row_id,
+            prefix,
+            depth,
+            dependency_bitset,
+        ):
+            continue
+        prefix[depth] = row_id
+        if remaining == 1:
+            for column in range(arity):
+                out[write_pos, column] = prefix[column]
+            write_pos += 1
+        else:
+            write_pos = _fill_independent_combinations(
+                candidate_rows,
+                candidate_index + 1,
+                depth + 1,
+                arity,
+                prefix,
+                dependency_bitset,
+                out,
+                write_pos,
+            )
+    return write_pos
+
+
+@cython.nonecheck(False)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef generate_independent_combinations_int64(
+    numpy.ndarray[numpy.int64_t, ndim=1] candidate_rows,
+    numpy.ndarray[numpy.uint8_t, ndim=2] dependency_bitset,
+    int arity,
+):
+    cdef Py_ssize_t num_candidate = candidate_rows.shape[0]
+    cdef Py_ssize_t num_row = dependency_bitset.shape[0]
+    cdef Py_ssize_t expected_bytes_per_row = (num_row + 7) // 8
+    cdef Py_ssize_t kk = <Py_ssize_t> arity
+    cdef Py_ssize_t candidate_index
+    cdef numpy.int64_t[:] candidate_view = candidate_rows
+    cdef const numpy.uint8_t[:, :] bitset_view = dependency_bitset
+    cdef numpy.ndarray[numpy.int64_t, ndim=1] prefix
+    cdef numpy.int64_t[:] prefix_view
+    cdef unsigned long long total_ull
+    cdef Py_ssize_t total
+    cdef numpy.ndarray[numpy.int64_t, ndim=2] out
+    cdef numpy.int64_t[:, :] out_view
+    cdef Py_ssize_t written
+
+    if kk <= 0:
+        return numpy.zeros(shape=(0, 0), dtype=numpy.int64)
+    if num_candidate < kk:
+        return numpy.zeros(shape=(0, kk), dtype=numpy.int64)
+    if dependency_bitset.shape[1] < expected_bytes_per_row:
+        raise ValueError('dependency_bitset has too few columns for its number of rows.')
+    for candidate_index in range(num_candidate):
+        if candidate_view[candidate_index] < 0 or candidate_view[candidate_index] >= num_row:
+            raise IndexError('Candidate row ID is out of range for dependency bitset.')
+
+    prefix = numpy.empty(shape=(kk,), dtype=numpy.int64)
+    prefix_view = prefix
+    total_ull = _count_independent_combinations(
+        candidate_view,
+        0,
+        0,
+        kk,
+        prefix_view,
+        bitset_view,
+    )
+    if total_ull == 0:
+        return numpy.zeros(shape=(0, kk), dtype=numpy.int64)
+    if total_ull > <unsigned long long> 9223372036854775807:
+        raise OverflowError('Independent combination array exceeds platform index capacity.')
+    total = <Py_ssize_t> total_ull
+    out = numpy.empty(shape=(total, kk), dtype=numpy.int64)
+    out_view = out
+    written = _fill_independent_combinations(
+        candidate_view,
+        0,
+        0,
+        kk,
+        prefix_view,
+        bitset_view,
+        out_view,
+        0,
+    )
+    if written != total:
+        raise RuntimeError('Independent combination generation count mismatch.')
+    return out
+
 
 @cython.nonecheck(False)
 @cython.boundscheck(False) # turn off bounds-checking for entire function
@@ -408,6 +588,7 @@ cpdef generate_union_candidates_arity4_from_triples_int64(
 @cython.wraparound(False)
 cpdef generate_union_candidates_shared_subset_int64(
     numpy.ndarray[numpy.int64_t, ndim=2] sorted_nodes,
+    object dependency_bitset=None,
 ):
     cdef Py_ssize_t num_rows = sorted_nodes.shape[0]
     cdef Py_ssize_t width = sorted_nodes.shape[1]
@@ -429,14 +610,29 @@ cpdef generate_union_candidates_shared_subset_int64(
     cdef Py_ssize_t p, r
     cdef Py_ssize_t write_pos = 0
     cdef unsigned long long total_ull = 0
+    cdef unsigned long long pair_count
+    cdef unsigned long long uint64_max = <unsigned long long>-1
     cdef Py_ssize_t total_out
     cdef numpy.int64_t a, b, lo, hi
     cdef bint differs
+    cdef bint use_dependency = dependency_bitset is not None
+    cdef numpy.ndarray[numpy.uint8_t, ndim=2] dependency_array
+    cdef const numpy.uint8_t[:, :] dependency_view
+    cdef unsigned char dependency_mask
+    cdef Py_ssize_t expected_dependency_bytes
 
     if num_rows < 2:
         return numpy.zeros(shape=(0, out_width), dtype=numpy.int64)
     if width < 2:
         return numpy.zeros(shape=(0, out_width), dtype=numpy.int64)
+    if use_dependency:
+        dependency_array = numpy.ascontiguousarray(dependency_bitset, dtype=numpy.uint8)
+        if dependency_array.ndim != 2:
+            raise ValueError('dependency_bitset should be a 2D array.')
+        dependency_view = dependency_array
+        expected_dependency_bytes = (dependency_view.shape[0] + 7) // 8
+        if dependency_view.shape[1] < expected_dependency_bytes:
+            raise ValueError('dependency_bitset has too few columns for its number of rows.')
 
     num_entries = num_rows * width
     keys = numpy.empty(shape=(num_entries, key_len), dtype=numpy.int64)
@@ -475,9 +671,30 @@ cpdef generate_union_candidates_shared_subset_int64(
             end += 1
         run_len = end - start
         if run_len >= 2:
-            total_ull += (<unsigned long long> run_len) * (<unsigned long long> (run_len - 1)) // 2
+            if use_dependency:
+                for i in range(start, end - 1):
+                    a = vals_view[order_view[i]]
+                    if a < 0 or a >= dependency_view.shape[0]:
+                        raise IndexError('Candidate row ID is out of range for dependency bitset.')
+                    for j in range(i + 1, end):
+                        b = vals_view[order_view[j]]
+                        if b < 0 or b >= dependency_view.shape[0]:
+                            raise IndexError('Candidate row ID is out of range for dependency bitset.')
+                        dependency_mask = <unsigned char>(1 << (b & 7))
+                        if dependency_view[a, b >> 3] & dependency_mask:
+                            continue
+                        if total_ull == uint64_max:
+                            raise OverflowError('Union candidate count exceeds uint64 capacity.')
+                        total_ull += 1
+            else:
+                pair_count = (<unsigned long long> run_len) * (<unsigned long long> (run_len - 1)) // 2
+                if pair_count > (uint64_max - total_ull):
+                    raise OverflowError('Union candidate count exceeds uint64 capacity.')
+                total_ull += pair_count
         start = end
 
+    if total_ull > <unsigned long long> 9223372036854775807:
+        raise OverflowError('Union candidate array exceeds platform index capacity.')
     total_out = <Py_ssize_t> total_ull
     if total_out <= 0:
         return numpy.zeros(shape=(0, out_width), dtype=numpy.int64)
@@ -505,6 +722,10 @@ cpdef generate_union_candidates_shared_subset_int64(
                 a = vals_view[order_view[i]]
                 for j in range(i + 1, end):
                     b = vals_view[order_view[j]]
+                    if use_dependency:
+                        dependency_mask = <unsigned char>(1 << (b & 7))
+                        if dependency_view[a, b >> 3] & dependency_mask:
+                            continue
                     if a < b:
                         lo = a
                         hi = b

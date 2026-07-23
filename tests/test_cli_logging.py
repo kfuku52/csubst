@@ -160,6 +160,7 @@ def test_subcommand_output_namespace_defaults_are_command_specific():
     inspect = parser.parse_args(["inspect"])
     assert inspect.outdir == "csubst_inspect"
     assert inspect.output_prefix == "csubst"
+    assert inspect.combination_count_max_arity == 10
 
     benchmark = parser.parse_args(["benchmark"])
     assert benchmark.outdir == "csubst_benchmark"

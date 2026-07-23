@@ -1,3 +1,4 @@
+import math
 import os
 import time
 from glob import glob
@@ -6,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from csubst import ete
+from csubst import combination
 from csubst import genetic_code
 from csubst import output_manifest
 from csubst import parser_iqtree
@@ -100,6 +102,7 @@ def _get_inspect_output_manifest_metadata(g):
         "species_overlap_node_plot": str(g.get("species_overlap_node_plot", "auto")).strip().lower(),
         "tree_tip_label_spacing": float(g.get("tree_tip_label_spacing", 1.0)),
         "tree_fig_max_height": float(g.get("tree_fig_max_height", 180.0)),
+        "combination_count_max_arity": int(g.get("combination_count_max_arity", 10)),
     }
 
 
@@ -154,6 +157,48 @@ def _write_inspect_output_manifest(g):
     )
     print("Writing inspect output manifest: {}".format(manifest_path), flush=True)
     return manifest_path
+
+
+def _write_combination_counts(g):
+    max_arity = int(g.get("combination_count_max_arity", 10))
+    if max_arity < 1:
+        raise ValueError("--combination_count_max_arity should be >= 1.")
+    num_branch = int(sum([not ete.is_root(node) for node in g["tree"].traverse()]))
+    counts_allow_sister = combination.count_independent_branch_combinations(
+        tree_obj=g["tree"],
+        max_arity=max_arity,
+        exclude_sister_pair=False,
+    )
+    counts_exclude_sister = combination.count_independent_branch_combinations(
+        tree_obj=g["tree"],
+        max_arity=max_arity,
+        exclude_sister_pair=True,
+    )
+    rows = []
+    for arity in range(1, max_arity + 1):
+        all_count = math.comb(num_branch, arity) if arity <= num_branch else 0
+        rows.append(
+            {
+                "arity": arity,
+                "all_branch_combinations": all_count,
+                "independent_combinations_allow_sister": int(counts_allow_sister[arity]),
+                "independent_combinations_exclude_sister": int(counts_exclude_sister[arity]),
+            }
+        )
+    output_path = runtime.output_path(g, "combination_count.tsv")
+    pd.DataFrame(rows).to_csv(output_path, sep="\t", index=False)
+    print("Writing analytical branch-combination counts: {}".format(output_path), flush=True)
+    for row in rows:
+        print(
+            "  K={}: independent={:,} (exclude sisters), {:,} (allow sisters), all={:,}".format(
+                row["arity"],
+                row["independent_combinations_exclude_sister"],
+                row["independent_combinations_allow_sister"],
+                row["all_branch_combinations"],
+            ),
+            flush=True,
+        )
+    return output_path
 
 
 def _strip_placeholder_suffix(text):
@@ -727,11 +772,21 @@ def _finalize_inspect_outputs(g):
     _record_inspect_output_paths(g=g, output_paths=branch_nolabel_paths, output_kind="branch_category_nolabel_pdf")
     branch_map_paths = _write_branch_maps(g)
     _record_inspect_output_paths(g=g, output_paths=branch_map_paths, output_kind="branch_map_tsv")
+    combination_count_path = _write_combination_counts(g)
+    _record_inspect_output_paths(
+        g=g,
+        output_paths=combination_count_path,
+        output_kind="combination_count_tsv",
+        note="topology_only_exact_count_without_combination_enumeration",
+    )
     return g
 
 
 def main_inspect(g):
     start = time.time()
+    g["combination_count_max_arity"] = int(g.get("combination_count_max_arity", 10))
+    if g["combination_count_max_arity"] < 1:
+        raise ValueError("--combination_count_max_arity should be >= 1.")
     g = runtime.ensure_output_layout(g, create_dir=True)
     g["_inspect_output_manifest_rows"] = list()
     g["plot_state_aa"] = tree.normalize_state_plot_request(

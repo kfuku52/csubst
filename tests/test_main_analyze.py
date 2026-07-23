@@ -73,6 +73,85 @@ def test_cb_search_respects_max_combination_limit(monkeypatch):
     assert cb_passed["score"].tolist() == [9.0, 8.0]
 
 
+def test_cb_search_uses_direct_generation_for_higher_order_exhaustive_search(monkeypatch):
+    combination_calls = []
+    merge_call = {"arity": 1}
+
+    def fake_get_node_combinations(
+        g,
+        target_id_dict=None,
+        cb_passed=None,
+        exhaustive=False,
+        cb_all=False,
+        arity=2,
+        check_attr=None,
+        verbose=True,
+    ):
+        combination_calls.append(
+            {
+                "arity": arity,
+                "exhaustive": exhaustive,
+                "cb_passed": cb_passed,
+                "cb_all": cb_all,
+            }
+        )
+        return g, np.arange(arity, dtype=np.int64).reshape(1, arity)
+
+    def fake_get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
+        return pd.DataFrame({"_unused": [1.0]})
+
+    def fake_merge_tables(cbOS, cbON):
+        merge_call["arity"] += 1
+        arity = merge_call["arity"]
+        out = {
+            "score": [9.0],
+            "is_fg_traitA": ["Y"],
+            "is_mf_traitA": ["N"],
+            "is_mg_traitA": ["N"],
+        }
+        for branch_index in range(1, arity + 1):
+            out["branch_id_" + str(branch_index)] = [branch_index - 1]
+        return pd.DataFrame(out)
+
+    monkeypatch.setattr(main_analyze.combination, "get_node_combinations", fake_get_node_combinations)
+    monkeypatch.setattr(main_analyze.substitution, "get_reducer_sub_tensor", lambda sub_tensor, g, label: sub_tensor)
+    monkeypatch.setattr(main_analyze.substitution, "get_cb", fake_get_cb)
+    monkeypatch.setattr(main_analyze.table, "merge_tables", fake_merge_tables)
+    monkeypatch.setattr(main_analyze.substitution, "add_dif_stats", lambda cb, tol, prefix, output_stats=None: cb)
+    monkeypatch.setattr(main_analyze.omega, "calc_omega", lambda cb, OS, ON, g: (cb, g))
+    monkeypatch.setattr(main_analyze.substitution, "get_substitutions_per_branch", lambda cb, b, g: cb)
+    monkeypatch.setattr(main_analyze.table, "get_linear_regression", lambda cb: cb)
+    monkeypatch.setattr(main_analyze.foreground, "get_foreground_branch_num", lambda cb, g: (cb, g))
+    monkeypatch.setattr(main_analyze.table, "sort_cb", lambda cb: cb)
+    monkeypatch.setattr(main_analyze.foreground, "add_median_cb_stats", lambda g, cb, current_arity, start: g)
+
+    g = {
+        "max_arity": 3,
+        "exhaustive_until": 3,
+        "foreground": None,
+        "cutoff_stat": "score,0",
+        "max_combination": 100,
+        "threads": 1,
+        "float_tol": 1e-12,
+        "calibrate_longtail": False,
+        "branch_dist": False,
+        "float_format": "%.6f",
+        "fg_clade_permutation": 0,
+        "df_cb_stats_main": pd.DataFrame(),
+    }
+
+    main_analyze.cb_search(g=g, b=None, OS_tensor=None, ON_tensor=None, id_combinations=None, write_cb=False)
+
+    assert combination_calls[0]["arity"] == 2
+    assert combination_calls[0]["exhaustive"] is True
+    assert combination_calls[1] == {
+        "arity": 3,
+        "exhaustive": True,
+        "cb_passed": None,
+        "cb_all": False,
+    }
+
+
 def test_cb_search_recomputes_empirical_pvalues_after_calibration(monkeypatch):
     calls = {
         "recompute": 0,

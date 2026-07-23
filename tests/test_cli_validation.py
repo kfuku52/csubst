@@ -110,6 +110,14 @@ def test_inspect_help_includes_species_overlap_node_plot_option():
     help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
     assert "--species_overlap_node_plot" in help_text
     assert "--output_manifest" in help_text
+    assert "--combination_count_max_arity" in help_text
+
+
+def test_inspect_rejects_invalid_combination_count_max_arity():
+    proc, log_text = _run_cli("inspect", "--combination_count_max_arity", "0")
+    assert proc.returncode == 2
+    assert "--combination_count_max_arity should be >= 1" in log_text
+    assert "Traceback" not in log_text
 
 
 def test_sites_help_shows_output_manifest_and_removed_site_output_manifest_is_rejected():

@@ -110,7 +110,7 @@ setup(
                             'numpy',
                             'scipy',
                             'pandas',
-                            'matplotlib',
+                            'matplotlib<3.11',
                             'biopython',
                             'requests',
     ],

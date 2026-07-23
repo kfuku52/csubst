@@ -409,12 +409,23 @@ def _generate_union_candidates_arity4_from_triples(triple_nodes, triple_nodes_ar
     )
 
 
-def _generate_union_candidates_by_shared_subset_cython(sorted_nodes, arity):
+def _generate_union_candidates_by_shared_subset_cython(sorted_nodes, arity, dependency_bitset=None):
+    if dependency_bitset is not None:
+        dependency_bitset = _validate_dependency_bitset(dependency_bitset)
     if combination_cy is not None:
         cython_fn = getattr(combination_cy, 'generate_union_candidates_shared_subset_int64', None)
         if cython_fn is not None:
             try:
-                cy_out = np.asarray(cython_fn(sorted_nodes), dtype=np.int64)
+                if dependency_bitset is None:
+                    cy_out = np.asarray(cython_fn(sorted_nodes), dtype=np.int64)
+                else:
+                    cy_out = np.asarray(
+                        cython_fn(
+                            sorted_nodes,
+                            np.ascontiguousarray(dependency_bitset, dtype=np.uint8),
+                        ),
+                        dtype=np.int64,
+                    )
                 if cy_out.ndim != 2 or cy_out.shape[1] != int(arity):
                     raise ValueError('Unexpected Cython output shape for shared-subset unions.')
                 if cy_out.shape[0] == 0:
@@ -425,10 +436,13 @@ def _generate_union_candidates_by_shared_subset_cython(sorted_nodes, arity):
     return _generate_union_candidates_by_shared_subset_python_dict(
         sorted_nodes=sorted_nodes,
         arity=arity,
+        dependency_bitset=dependency_bitset,
     )
 
 
-def _generate_union_candidates_by_shared_subset_python_dict(sorted_nodes, arity):
+def _generate_union_candidates_by_shared_subset_python_dict(sorted_nodes, arity, dependency_bitset=None):
+    if dependency_bitset is not None:
+        dependency_bitset = _validate_dependency_bitset(dependency_bitset)
     width = int(sorted_nodes.shape[1])
     key_to_values = defaultdict(set)
     if width == 3:
@@ -460,6 +474,19 @@ def _generate_union_candidates_by_shared_subset_python_dict(sorted_nodes, arity)
         left, right = np.triu_indices(unique_values.shape[0], k=1)
         if left.shape[0] == 0:
             continue
+        if dependency_bitset is not None:
+            left_values = unique_values[left]
+            right_values = unique_values[right]
+            byte_values = dependency_bitset[left_values, right_values >> 3]
+            masks = np.left_shift(
+                np.uint8(1),
+                (right_values & 7).astype(np.uint8, copy=False),
+            )
+            keep = ((byte_values & masks) == 0)
+            left = left[keep]
+            right = right[keep]
+            if left.shape[0] == 0:
+                continue
         chunk = np.empty(shape=(left.shape[0], arity), dtype=np.int64)
         if key_len > 0:
             chunk[:, :key_len] = np.asarray(key, dtype=np.int64)
@@ -526,7 +553,7 @@ def _generate_union_candidates_by_shared_subset_grouped(sorted_nodes, arity):
     return _unique_rows_int64(np.concatenate(generated, axis=0))
 
 
-def _generate_union_candidates_by_shared_subset(target_nodes, arity):
+def _generate_union_candidates_by_shared_subset(target_nodes, arity, dependency_bitset=None):
     target_nodes = np.asarray(target_nodes, dtype=np.int64)
     if target_nodes.ndim != 2:
         raise ValueError('target_nodes should be a 2D array.')
@@ -535,14 +562,35 @@ def _generate_union_candidates_by_shared_subset(target_nodes, arity):
     width = int(target_nodes.shape[1])
     if width + 1 != int(arity):
         raise ValueError('target_nodes width should be arity - 1.')
+    if dependency_bitset is not None:
+        dependency_bitset = _validate_dependency_bitset(dependency_bitset)
     sorted_nodes = np.sort(target_nodes, axis=1)
     if width > 1:
         # Keep exact set-union semantics for degenerate rows with duplicates.
         if np.any(np.diff(sorted_nodes, axis=1) == 0):
-            return _generate_valid_unions_by_pair_scan(sorted_nodes, arity=arity)
+            generated = _generate_valid_unions_by_pair_scan(sorted_nodes, arity=arity)
+            if dependency_bitset is None:
+                return generated
+            is_dependent = _mark_dependent_row_combinations_from_bitset(
+                generated,
+                dependency_bitset,
+            )
+            return generated[~np.asarray(is_dependent, dtype=bool), :]
     sorted_nodes = _unique_rows_int64(sorted_nodes)
     if sorted_nodes.shape[0] < 2:
         return np.zeros(shape=(0, arity), dtype=np.int64)
+    if dependency_bitset is not None:
+        if width == 1:
+            return _generate_independent_row_combinations(
+                candidate_rows=sorted_nodes[:, 0],
+                arity=2,
+                dependency_bitset=dependency_bitset,
+            )
+        return _generate_union_candidates_by_shared_subset_cython(
+            sorted_nodes=sorted_nodes,
+            arity=arity,
+            dependency_bitset=dependency_bitset,
+        )
     if width >= 3:
         is_complete_family, family_nodes = _is_complete_subset_family(sorted_nodes)
         if is_complete_family:
@@ -627,19 +675,26 @@ def _resolve_combination_step_n_jobs(g, num_items, task):
     )
 
 
-def _generate_unions_from_trait_rows(trait_rows, arity):
+def _generate_unions_from_trait_rows(trait_rows, arity, dependency_bitset=None):
     return _generate_union_candidates_by_shared_subset(
         target_nodes=trait_rows,
         arity=arity,
+        dependency_bitset=dependency_bitset,
     )
 
 
-def _generate_trait_unions_parallel(g, trait_row_items, arity):
+def _generate_trait_unions_parallel(g, trait_row_items, arity, dependency_bitset=None):
     if len(trait_row_items) == 0:
         return dict()
     if len(trait_row_items) == 1:
         trait_name, trait_rows = trait_row_items[0]
-        return {trait_name: _generate_unions_from_trait_rows(trait_rows=trait_rows, arity=arity)}
+        return {
+            trait_name: _generate_unions_from_trait_rows(
+                trait_rows=trait_rows,
+                arity=arity,
+                dependency_bitset=dependency_bitset,
+            )
+        }
     if combination_cy is None:
         n_jobs = 1
     else:
@@ -648,11 +703,18 @@ def _generate_trait_unions_parallel(g, trait_row_items, arity):
             num_items=len(trait_row_items),
             task='trait_unions',
         )
-    args_iterable = [(trait_rows, arity) for _, trait_rows in trait_row_items]
+    args_iterable = [
+        (trait_rows, arity, dependency_bitset)
+        for _, trait_rows in trait_row_items
+    ]
     if n_jobs == 1:
         unions = [
-            _generate_unions_from_trait_rows(trait_rows=trait_rows, arity=arity_local)
-            for trait_rows, arity_local in args_iterable
+            _generate_unions_from_trait_rows(
+                trait_rows=trait_rows,
+                arity=arity_local,
+                dependency_bitset=dependency_bitset_local,
+            )
+            for trait_rows, arity_local, dependency_bitset_local in args_iterable
         ]
     else:
         unions = parallel.run_starmap(
@@ -771,6 +833,166 @@ def _build_dependency_bitset(dep_row_groups, num_row):
     return bitset
 
 
+def _validate_dependency_bitset(dependency_bitset):
+    dependency_bitset = np.asarray(dependency_bitset, dtype=np.uint8)
+    if dependency_bitset.ndim != 2:
+        raise ValueError('dependency_bitset should be a 2D array.')
+    expected_bytes_per_row = (int(dependency_bitset.shape[0]) + 7) // 8
+    if int(dependency_bitset.shape[1]) < expected_bytes_per_row:
+        raise ValueError(
+            'dependency_bitset has too few columns for its number of rows.'
+        )
+    return dependency_bitset
+
+
+def _get_cached_dependency_bitset(g, dep_row_groups, num_row):
+    cache = g.get('_combination_dependency_bitset_cache', None)
+    if (
+        (cache is not None)
+        and (cache.get('dep_ids_obj', None) is g.get('dep_ids'))
+        and (int(cache.get('num_row', -1)) == int(num_row))
+    ):
+        return cache.get('dependency_bitset', None)
+    dependency_bitset = _build_dependency_bitset(
+        dep_row_groups=dep_row_groups,
+        num_row=num_row,
+    )
+    g['_combination_dependency_bitset_cache'] = {
+        'dep_ids_obj': g.get('dep_ids'),
+        'num_row': int(num_row),
+        'dependency_bitset': dependency_bitset,
+    }
+    return dependency_bitset
+
+
+def _generate_independent_row_combinations_python(candidate_rows, arity, dependency_bitset):
+    candidate_rows = _unique_sorted_int64_1d(candidate_rows)
+    arity = int(arity)
+    if arity <= 0:
+        return np.zeros(shape=(0, 0), dtype=np.int64)
+    if candidate_rows.shape[0] < arity:
+        return np.zeros(shape=(0, arity), dtype=np.int64)
+    dependency_bitset = _validate_dependency_bitset(dependency_bitset)
+    if (candidate_rows[0] < 0) or (candidate_rows[-1] >= dependency_bitset.shape[0]):
+        raise IndexError('Candidate row ID is out of range for dependency bitset.')
+
+    prefix = np.empty(shape=(arity,), dtype=np.int64)
+    num_candidate = int(candidate_rows.shape[0])
+
+    def is_compatible(row_id, depth):
+        for prefix_index in range(depth):
+            other = int(prefix[prefix_index])
+            if dependency_bitset[row_id, other >> 3] & np.uint8(1 << (other & 7)):
+                return False
+        return True
+
+    def count_from(start, depth):
+        remaining = arity - depth
+        max_index = num_candidate - remaining
+        total = 0
+        for candidate_index in range(start, max_index + 1):
+            row_id = int(candidate_rows[candidate_index])
+            if not is_compatible(row_id, depth):
+                continue
+            if remaining == 1:
+                total += 1
+                continue
+            prefix[depth] = row_id
+            total += count_from(candidate_index + 1, depth + 1)
+        return total
+
+    total = count_from(0, 0)
+    if total == 0:
+        return np.zeros(shape=(0, arity), dtype=np.int64)
+    out = np.empty(shape=(total, arity), dtype=np.int64)
+    write_pos = 0
+
+    def fill_from(start, depth):
+        nonlocal write_pos
+        remaining = arity - depth
+        max_index = num_candidate - remaining
+        for candidate_index in range(start, max_index + 1):
+            row_id = int(candidate_rows[candidate_index])
+            if not is_compatible(row_id, depth):
+                continue
+            prefix[depth] = row_id
+            if remaining == 1:
+                out[write_pos, :] = prefix
+                write_pos += 1
+                continue
+            fill_from(candidate_index + 1, depth + 1)
+
+    fill_from(0, 0)
+    return out
+
+
+def _generate_independent_row_combinations(candidate_rows, arity, dependency_bitset):
+    candidate_rows = _unique_sorted_int64_1d(candidate_rows)
+    arity = int(arity)
+    if arity <= 0:
+        return np.zeros(shape=(0, 0), dtype=np.int64)
+    if candidate_rows.shape[0] < arity:
+        return np.zeros(shape=(0, arity), dtype=np.int64)
+    dependency_bitset = np.ascontiguousarray(
+        _validate_dependency_bitset(dependency_bitset),
+        dtype=np.uint8,
+    )
+    if combination_cy is not None:
+        cython_fn = getattr(combination_cy, 'generate_independent_combinations_int64', None)
+        if cython_fn is not None:
+            try:
+                return np.asarray(
+                    cython_fn(candidate_rows, dependency_bitset, arity),
+                    dtype=np.int64,
+                )
+            except Exception as exc:
+                _warn_cython_fallback('generate_independent_combinations', exc)
+    return _generate_independent_row_combinations_python(
+        candidate_rows=candidate_rows,
+        arity=arity,
+        dependency_bitset=dependency_bitset,
+    )
+
+
+def _mark_dependent_row_combinations_bitset_python(row_combinations, dependency_bitset):
+    row_combinations = np.asarray(row_combinations, dtype=np.int64)
+    dependency_bitset = _validate_dependency_bitset(dependency_bitset)
+    out = np.zeros(shape=(row_combinations.shape[0],), dtype=bool)
+    for combo_index, row in enumerate(row_combinations):
+        for left_index in range(row.shape[0] - 1):
+            left = int(row[left_index])
+            for right_index in range(left_index + 1, row.shape[0]):
+                right = int(row[right_index])
+                if dependency_bitset[left, right >> 3] & np.uint8(1 << (right & 7)):
+                    out[combo_index] = True
+                    break
+            if out[combo_index]:
+                break
+    return out
+
+
+def _mark_dependent_row_combinations_from_bitset(row_combinations, dependency_bitset):
+    row_combinations = np.ascontiguousarray(row_combinations, dtype=np.int64)
+    dependency_bitset = np.ascontiguousarray(
+        _validate_dependency_bitset(dependency_bitset),
+        dtype=np.uint8,
+    )
+    if combination_cy is not None:
+        cython_fn = getattr(combination_cy, 'mark_dependent_combinations_bitset_int64', None)
+        if cython_fn is not None:
+            try:
+                return np.asarray(
+                    cython_fn(row_combinations, dependency_bitset),
+                    dtype=bool,
+                )
+            except Exception as exc:
+                _warn_cython_fallback('mark_dependent_combinations_bitset', exc)
+    return _mark_dependent_row_combinations_bitset_python(
+        row_combinations=row_combinations,
+        dependency_bitset=dependency_bitset,
+    )
+
+
 def _mark_dependent_row_combinations(row_combinations, dep_row_groups):
     row_combinations = np.ascontiguousarray(row_combinations, dtype=np.int64)
     if row_combinations.ndim != 2:
@@ -846,29 +1068,48 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     sorted_order = np.argsort(all_node_ids)
     sorted_node_ids = all_node_ids[sorted_order]
     sorted_row_ids = sorted_order.astype(np.int64, copy=False)
+    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
+    dep_indices, fg_dep_indices = _get_dependency_row_indices(
+        g=g,
+        all_node_ids=all_node_ids,
+        node_id_to_row=node_id_to_row,
+        trait_names=trait_names,
+    )
+    dependency_bitset = _get_cached_dependency_bitset(
+        g=g,
+        dep_row_groups=dep_indices,
+        num_row=all_node_ids.shape[0],
+    )
+    generated_with_global_independence = dependency_bitset is not None
     if verbose:
         print("Number of all branches: {:,}".format(len(all_nodes)), flush=True)
     row_combinations = None
     if exhaustive:
-        target_nodes = list()
-        for node in all_nodes:
-            if (check_attr is None)|(check_attr in dir(node)):
-                target_nodes.append(ete.get_prop(node, "numerical_label"))
-        target_nodes = np.array(target_nodes)
-        node_combinations = list(itertools.combinations(target_nodes, arity))
-        node_combinations = [ set(nc) for nc in node_combinations ]
-        node_combinations = np.array([ list(nc) for nc in node_combinations ])
-        row_combinations = _map_node_combinations_to_rows_vectorized(
-            node_combinations=node_combinations,
-            sorted_node_ids=sorted_node_ids,
-            sorted_row_ids=sorted_row_ids,
+        target_rows = np.array(
+            [
+                row_id
+                for row_id, node in enumerate(all_nodes)
+                if (check_attr is None) or (check_attr in dir(node))
+            ],
+            dtype=np.int64,
         )
+        if dependency_bitset is not None:
+            row_combinations = _generate_independent_row_combinations(
+                candidate_rows=target_rows,
+                arity=arity,
+                dependency_bitset=dependency_bitset,
+            )
+        else:
+            row_combinations = _generate_all_k_combinations_from_sorted_nodes(
+                unique_nodes=target_rows,
+                k=arity,
+            )
     if target_id_dict is not None:
-        trait_names = list(target_id_dict.keys())
+        target_trait_names = list(target_id_dict.keys())
         node_combination_dict = dict()
         trait_union_items = list()
         is_all_trait_no_branch_combination = True
-        for trait_name in trait_names:
+        for trait_name in target_trait_names:
             trait_target_nodes = np.asarray(target_id_dict[trait_name])
             if trait_target_nodes.ndim <= 1:
                 trait_target_nodes = np.expand_dims(_normalize_node_ids(trait_target_nodes), axis=1)
@@ -882,11 +1123,24 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 sorted_node_ids=sorted_node_ids,
                 sorted_row_ids=sorted_row_ids,
             )
-            pair_count = trait_target_nodes.shape[0] * (trait_target_nodes.shape[0] - 1) // 2
+            if (dependency_bitset is not None) and (trait_target_rows.shape[1] > 1):
+                is_input_dependent = _mark_dependent_row_combinations_from_bitset(
+                    row_combinations=trait_target_rows,
+                    dependency_bitset=dependency_bitset,
+                )
+                trait_target_rows = trait_target_rows[~is_input_dependent, :]
+            pair_count = trait_target_rows.shape[0] * (trait_target_rows.shape[0] - 1) // 2
             if (arity == 2) and (trait_target_nodes.shape[1] == 1):
                 if pair_count > 0:
                     is_all_trait_no_branch_combination = False
-                    pairwise = _pairwise_node_combinations(trait_target_rows[:, 0])
+                    if dependency_bitset is None:
+                        pairwise = _pairwise_node_combinations(trait_target_rows[:, 0])
+                    else:
+                        pairwise = _generate_independent_row_combinations(
+                            candidate_rows=trait_target_rows[:, 0],
+                            arity=2,
+                            dependency_bitset=dependency_bitset,
+                        )
                     if verbose:
                         txt = 'Number of branch combinations before independency check for {}: {:,}'
                         print(txt.format(trait_name, pairwise.shape[0]), flush=True)
@@ -913,6 +1167,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 g=g,
                 trait_row_items=trait_union_items,
                 arity=arity,
+                dependency_bitset=dependency_bitset,
             )
         )
         if is_all_trait_no_branch_combination:
@@ -927,9 +1182,9 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     if cb_passed is not None:
         node_combinations_dict = dict()
         if cb_all:
-            trait_names = ['all',]
+            cb_trait_names = ['all',]
         else:
-            trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
+            cb_trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
         bid_cols = cb_passed.columns[cb_passed.columns.str.startswith('branch_id_')].tolist()
         bid_matrix = cb_passed.loc[:, bid_cols].to_numpy(copy=False)
         if cb_all:
@@ -937,22 +1192,22 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             trait_mask_dict = None
         else:
             cb_all_mask = None
-            if len(trait_names) == 1:
-                trait_name = trait_names[0]
+            if len(cb_trait_names) == 1:
+                trait_name = cb_trait_names[0]
                 is_fg = (cb_passed.loc[:, 'is_fg_' + trait_name].to_numpy(copy=False) == 'Y')
                 is_mf = (cb_passed.loc[:, 'is_mf_' + trait_name].to_numpy(copy=False) == 'Y')
                 is_mg = (cb_passed.loc[:, 'is_mg_' + trait_name].to_numpy(copy=False) == 'Y')
                 trait_mask_dict = {trait_name: (is_fg | is_mf | is_mg)}
             else:
                 trait_mask_dict = dict()
-                for trait_name in trait_names:
+                for trait_name in cb_trait_names:
                     is_fg = (cb_passed.loc[:, 'is_fg_' + trait_name].to_numpy(copy=False) == 'Y')
                     is_mf = (cb_passed.loc[:, 'is_mf_' + trait_name].to_numpy(copy=False) == 'Y')
                     is_mg = (cb_passed.loc[:, 'is_mg_' + trait_name].to_numpy(copy=False) == 'Y')
                     trait_mask_dict[trait_name] = (is_fg | is_mf | is_mg)
         trait_union_items = list()
         is_all_trait_no_branch_combination = True
-        for trait_name in trait_names:
+        for trait_name in cb_trait_names:
             if cb_all:
                 is_trait = cb_all_mask
             else:
@@ -967,11 +1222,24 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 sorted_node_ids=sorted_node_ids,
                 sorted_row_ids=sorted_row_ids,
             )
-            pair_count = bid_trait.shape[0] * (bid_trait.shape[0] - 1) // 2
+            if (dependency_bitset is not None) and (bid_trait_rows.shape[1] > 1):
+                is_input_dependent = _mark_dependent_row_combinations_from_bitset(
+                    row_combinations=bid_trait_rows,
+                    dependency_bitset=dependency_bitset,
+                )
+                bid_trait_rows = bid_trait_rows[~is_input_dependent, :]
+            pair_count = bid_trait_rows.shape[0] * (bid_trait_rows.shape[0] - 1) // 2
             if (arity == 2) and (bid_trait.shape[1] == 1):
                 if pair_count > 0:
                     is_all_trait_no_branch_combination = False
-                    pairwise = _pairwise_node_combinations(bid_trait_rows[:, 0])
+                    if dependency_bitset is None:
+                        pairwise = _pairwise_node_combinations(bid_trait_rows[:, 0])
+                    else:
+                        pairwise = _generate_independent_row_combinations(
+                            candidate_rows=bid_trait_rows[:, 0],
+                            arity=2,
+                            dependency_bitset=dependency_bitset,
+                        )
                     if verbose:
                         txt = 'Number of redundant branch combination unions for {}: {:,}'
                         print(txt.format(trait_name, pairwise.shape[0]), flush=True)
@@ -995,6 +1263,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 g=g,
                 trait_row_items=trait_union_items,
                 arity=arity,
+                dependency_bitset=dependency_bitset,
             )
         )
         if is_all_trait_no_branch_combination:
@@ -1009,19 +1278,19 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     if row_combinations is None:
         row_combinations = np.zeros(shape=(0, arity), dtype=np.int64)
     if verbose:
-        print("Number of all branch combinations before independency check: {:,}".format(row_combinations.shape[0]), flush=True)
-    trait_names = g['fg_df'].columns[1:len(g['fg_df'].columns)].tolist()
-    dep_indices, fg_dep_indices = _get_dependency_row_indices(
-        g=g,
-        all_node_ids=all_node_ids,
-        node_id_to_row=node_id_to_row,
-        trait_names=trait_names,
-    )
-    is_dependent_col = _mark_dependent_row_combinations(
-        row_combinations=row_combinations,
-        dep_row_groups=dep_indices,
-    )
-    if verbose:
+        if generated_with_global_independence:
+            txt = "Number of branch combinations generated with global independence constraints: {:,}"
+        else:
+            txt = "Number of all branch combinations before independency check: {:,}"
+        print(txt.format(row_combinations.shape[0]), flush=True)
+    if generated_with_global_independence:
+        is_dependent_col = np.zeros(shape=(row_combinations.shape[0],), dtype=bool)
+    else:
+        is_dependent_col = _mark_dependent_row_combinations(
+            row_combinations=row_combinations,
+            dep_row_groups=dep_indices,
+        )
+    if verbose and (not generated_with_global_independence):
         print('Number of non-independent branch combinations to be removed: {:,}'.format(is_dependent_col.sum()), flush=True)
     independent_row_combinations = row_combinations[~is_dependent_col, :]
     id_combinations = np.zeros(shape=(0,arity), dtype=np.int64)
@@ -1177,6 +1446,112 @@ def calc_substitution_patterns(cb):
         cb.loc[:,key+'_pattern_id'] = sub_patterns4.loc[:,'sub_pattern_id']
     return cb
 
+
+def _add_truncated_polynomials(left, right, max_degree):
+    out_len = min(max(len(left), len(right)), int(max_degree) + 1)
+    out = [0] * out_len
+    for index in range(out_len):
+        if index < len(left):
+            out[index] += int(left[index])
+        if index < len(right):
+            out[index] += int(right[index])
+    return out
+
+
+def _multiply_truncated_polynomials(left, right, max_degree):
+    out_len = min(len(left) + len(right) - 1, int(max_degree) + 1)
+    out = [0] * out_len
+    for left_degree, left_count in enumerate(left):
+        if left_count == 0:
+            continue
+        max_right_degree = min(len(right) - 1, int(max_degree) - left_degree)
+        for right_degree in range(max_right_degree + 1):
+            right_count = right[right_degree]
+            if right_count != 0:
+                out[left_degree + right_degree] += int(left_count) * int(right_count)
+    return out
+
+
+def count_independent_branch_combinations(tree_obj, max_arity, exclude_sister_pair=False):
+    """Count topology-defined independent branch sets without enumerating them."""
+    max_arity = int(max_arity)
+    if max_arity < 0:
+        raise ValueError('max_arity should be >= 0.')
+    if max_arity == 0:
+        return [1]
+
+    nodes = list(tree_obj.traverse())
+    not_selected_polynomial = dict()
+    all_polynomial = dict()
+    for node in reversed(nodes):
+        children = ete.get_children(node)
+        child_not_selected = [
+            not_selected_polynomial[id(child)]
+            for child in children
+        ]
+        child_all = [
+            all_polynomial[id(child)]
+            for child in children
+        ]
+
+        if not bool(exclude_sister_pair):
+            not_selected = [1]
+            for child_polynomial in child_all:
+                not_selected = _multiply_truncated_polynomials(
+                    not_selected,
+                    child_polynomial,
+                    max_degree=max_arity,
+                )
+        else:
+            num_child = len(children)
+            prefix = [[1]]
+            for child_polynomial in child_not_selected:
+                prefix.append(
+                    _multiply_truncated_polynomials(
+                        prefix[-1],
+                        child_polynomial,
+                        max_degree=max_arity,
+                    )
+                )
+            suffix = [None] * (num_child + 1)
+            suffix[num_child] = [1]
+            for child_index in range(num_child - 1, -1, -1):
+                suffix[child_index] = _multiply_truncated_polynomials(
+                    child_not_selected[child_index],
+                    suffix[child_index + 1],
+                    max_degree=max_arity,
+                )
+            not_selected = list(prefix[num_child])
+            for child_index in range(num_child):
+                other_children = _multiply_truncated_polynomials(
+                    prefix[child_index],
+                    suffix[child_index + 1],
+                    max_degree=max_arity,
+                )
+                selected_child = [0] + other_children[:max_arity]
+                not_selected = _add_truncated_polynomials(
+                    not_selected,
+                    selected_child,
+                    max_degree=max_arity,
+                )
+
+        if ete.is_root(node):
+            all_states = list(not_selected)
+        else:
+            all_states = _add_truncated_polynomials(
+                not_selected,
+                [0, 1],
+                max_degree=max_arity,
+            )
+        not_selected_polynomial[id(node)] = not_selected
+        all_polynomial[id(node)] = all_states
+
+    counts = list(not_selected_polynomial[id(tree_obj)])
+    if len(counts) < (max_arity + 1):
+        counts.extend([0] * ((max_arity + 1) - len(counts)))
+    return counts[:(max_arity + 1)]
+
+
 def get_global_dep_ids(g):
     global_dep_ids = list()
     for leaf in ete.iter_leaves(g['tree']):
@@ -1184,12 +1559,12 @@ def get_global_dep_ids(g):
         dep_id = [ete.get_prop(leaf, "numerical_label"), ] + ancestor_nns
         dep_id = np.sort(np.array(dep_id))
         global_dep_ids.append(dep_id)
-        if g['exclude_sister_pair']:
-            for node in g['tree'].traverse():
-                children = ete.get_children(node)
-                if len(children)>1:
-                    dep_id = np.sort(np.array([ ete.get_prop(node, "numerical_label") for node in children ]))
-                    global_dep_ids.append(dep_id)
+    if g['exclude_sister_pair']:
+        for node in g['tree'].traverse():
+            children = ete.get_children(node)
+            if len(children)>1:
+                dep_id = np.sort(np.array([ ete.get_prop(child, "numerical_label") for child in children ]))
+                global_dep_ids.append(dep_id)
     root_nn = ete.get_prop(g['tree'], "numerical_label")
     root_state_sum = g['state_cdn'][root_nn, :, :].sum()
     if (root_state_sum == 0):
@@ -1205,7 +1580,17 @@ def get_global_dep_ids(g):
                 if subroot_nn in ancestor_nns:
                     continue
                 global_dep_ids.append(np.array([subroot_nn, ete.get_prop(node, "numerical_label")]))
-    return global_dep_ids
+    unique_dep_ids = list()
+    seen = set()
+    for dep_id in global_dep_ids:
+        normalized = tuple(
+            np.unique(np.asarray(dep_id, dtype=np.int64).reshape(-1)).tolist()
+        )
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_dep_ids.append(np.asarray(normalized, dtype=np.int64))
+    return unique_dep_ids
 
 def get_foreground_dep_ids(g):
     fg_dep_ids = dict()

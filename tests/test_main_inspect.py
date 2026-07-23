@@ -76,6 +76,24 @@ def test_write_branch_maps_strips_placeholder_suffix_from_columns(tmp_path, monk
     assert not (tmp_path / "csubst_branch_map_PLACEHOLDER.tsv").exists()
 
 
+def test_write_combination_counts_reports_exact_topology_counts(tmp_path):
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1)
+    )
+    g = {
+        "tree": tr,
+        "outdir": str(tmp_path),
+        "output_prefix": "inspect_run",
+        "combination_count_max_arity": 3,
+    }
+    output_path = main_inspect._write_combination_counts(g)
+    observed = pd.read_csv(output_path, sep="\t")
+    assert observed["arity"].tolist() == [1, 2, 3]
+    assert observed["all_branch_combinations"].tolist() == [4, 6, 4]
+    assert observed["independent_combinations_allow_sister"].tolist() == [4, 4, 1]
+    assert observed["independent_combinations_exclude_sister"].tolist() == [4, 2, 0]
+
+
 def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1))
@@ -158,6 +176,7 @@ def test_main_inspect_generates_requested_outputs(tmp_path, monkeypatch):
         "csubst_foreground_branch_traitA.txt",
         "csubst_branch_map.tsv",
         "csubst_branch_map_traitA.tsv",
+        "csubst_combination_count.tsv",
         "csubst_alignment_codon.fa",
         "csubst_alignment_aa.fa",
     ]
@@ -249,6 +268,7 @@ def test_main_inspect_routes_outputs_into_configured_namespace(tmp_path, monkeyp
     assert (manifest_df.loc[:, "output_kind"] == "output_manifest").any()
     assert (manifest_df.loc[:, "output_kind"] == "branch_map_tsv").any()
     assert (manifest_df.loc[:, "output_kind"] == "foreground_branch_txt").any()
+    assert (manifest_df.loc[:, "output_kind"] == "combination_count_tsv").any()
 
 
 def test_main_inspect_uses_recoded_state_for_state_aa_outputs(tmp_path, monkeypatch):
