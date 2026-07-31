@@ -295,16 +295,36 @@ def _read_package_text(file):
     txt = txt.decode('utf-8')
     return txt
 
+
+def _all_iqtree_intermediate_paths_are_explicit(g):
+    extensions = ('iqtree', 'log', 'rate', 'state', 'treefile')
+    return all(
+        str(g.get('iqtree_' + extension, '')).strip().lower() not in ('', 'infer')
+        for extension in extensions
+    )
+
+
 def generate_intermediate_files(g, force_notree_run=False):
     if g['infile_type'] == 'iqtree':
         g,all_exist = parser_iqtree.check_intermediate_files(g)
         dependency_checked = False
         if (all_exist)&(not g['iqtree_redo']):
-            parser_iqtree.check_iqtree_dependency(g)
-            dependency_checked = True
-            compatible, reason = parser_iqtree.is_iqtree_manifest_compatible(g)
+            explicit_paths = _all_iqtree_intermediate_paths_are_explicit(g)
+            compatible = explicit_paths
+            if explicit_paths:
+                print(
+                    'All IQ-TREE intermediate files were explicitly specified. '
+                    'A provenance manifest is not required.'
+                )
+            else:
+                parser_iqtree.check_iqtree_dependency(g)
+                dependency_checked = True
+                compatible, reason = parser_iqtree.is_iqtree_manifest_compatible(g)
+                if compatible:
+                    print('IQ-TREE\'s inferred intermediate files and provenance manifest are compatible.')
+                else:
+                    print('IQ-TREE intermediate files will be regenerated because {}.'.format(reason))
             if compatible:
-                print('IQ-TREE\'s intermediate files and provenance manifest are compatible.')
                 g = parser_iqtree.read_iqtree(g, eq=False)
                 iqtree_model = g['substitution_model']
                 g['substitution_model'] = None
@@ -314,8 +334,6 @@ def generate_intermediate_files(g, force_notree_run=False):
                     return g
                 txt = 'The model in the IQ-TREE\'s output ({}) did not match --iqtree_model ({}). Redoing IQ-TREE.'
                 print(txt.format(iqtree_model, g['iqtree_model']))
-            else:
-                print('IQ-TREE intermediate files will be regenerated because {}.'.format(reason))
         if (all_exist)&(g['iqtree_redo']):
             print('--iqtree_redo is set.')
         print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)

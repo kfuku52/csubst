@@ -9,6 +9,50 @@ from csubst import ete
 from csubst import tree
 
 
+def test_generate_intermediate_files_explicit_paths_do_not_require_manifest(monkeypatch):
+    g = {
+        "infile_type": "iqtree",
+        "iqtree_redo": False,
+        "iqtree_model": "MG",
+        "iqtree_iqtree": "input.iqtree",
+        "iqtree_log": "input.log",
+        "iqtree_rate": "input.rate",
+        "iqtree_state": "input.state",
+        "iqtree_treefile": "input.treefile",
+    }
+    monkeypatch.setattr(
+        parser_misc.parser_iqtree,
+        "check_intermediate_files",
+        lambda value: (value, True),
+    )
+    monkeypatch.setattr(
+        parser_misc.parser_iqtree,
+        "check_iqtree_dependency",
+        lambda value: (_ for _ in ()).throw(AssertionError("dependency check")),
+    )
+    monkeypatch.setattr(
+        parser_misc.parser_iqtree,
+        "is_iqtree_manifest_compatible",
+        lambda value: (_ for _ in ()).throw(AssertionError("manifest check")),
+    )
+
+    def fake_read_iqtree(value, eq=False):
+        assert eq is False
+        value["substitution_model"] = "MG"
+        return value
+
+    monkeypatch.setattr(parser_misc.parser_iqtree, "read_iqtree", fake_read_iqtree)
+    monkeypatch.setattr(
+        parser_misc.parser_iqtree,
+        "run_iqtree_ancestral",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("IQ-TREE rerun")),
+    )
+
+    out = parser_misc.generate_intermediate_files(g)
+
+    assert out["substitution_model"] is None
+
+
 def test_sort_branch_ids_sorts_within_rows_and_by_row():
     df = pd.DataFrame(
         {

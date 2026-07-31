@@ -1062,7 +1062,14 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
     for node in direct_tree.traverse():
         node_name_to_id[str(node.name)] = int(ete.get_prop(node, "numerical_label"))
     expected_internal_names = {
-        str(node.name) for node in direct_tree.traverse() if not ete.is_leaf(node)
+        str(node.name)
+        for node in direct_tree.traverse()
+        if (
+            (not ete.is_leaf(node))
+            and (not ete.is_root(node))
+            and (node.name is not None)
+            and (str(node.name).strip() != "")
+        )
     }
     observed_node_names = set(state_table.loc[:, "Node"].astype(str).tolist())
     missing_internal_names = sorted(expected_internal_names.difference(observed_node_names))

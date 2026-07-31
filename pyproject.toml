@@ -13,3 +13,6 @@ extend-exclude = [
     "tests/cython_test.py",
     "tests/equation_parser.ipynb",
 ]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

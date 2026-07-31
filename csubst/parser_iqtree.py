@@ -888,12 +888,21 @@ def _validate_state_table_node_site_rows(state_table, expected_num_site):
     return state_table, site_labels
 
 
-def _scan_state_node_sites(state_path, expected_num_site, target_node_names=None):
+def _scan_state_node_sites(
+    state_path,
+    expected_num_site,
+    target_node_names=None,
+    required_node_names=None,
+):
     """Validate Node/Site keys without loading probability columns into RAM."""
     if target_node_names is not None:
         target_node_names = set(target_node_names)
         if not target_node_names:
             return np.array([], dtype=np.int64), {}
+    if required_node_names is None:
+        required_node_names = target_node_names
+    elif required_node_names is not None:
+        required_node_names = set(required_node_names)
     sites_by_node = OrderedDict()
     for node_name, site_text, _state, _probabilities, _line_number in _iter_state_rows(state_path):
         if (target_node_names is not None) and (node_name not in target_node_names):
@@ -908,8 +917,8 @@ def _scan_state_node_sites(state_path, expected_num_site, target_node_names=None
             )
         node_sites.add(site_label)
     if not sites_by_node:
-        if target_node_names:
-            missing_txt = ', '.join(sorted(target_node_names)[:10])
+        if required_node_names:
+            missing_txt = ', '.join(sorted(required_node_names)[:10])
             raise ValueError('Internal node(s) were missing from .state file: {}'.format(missing_txt))
         return np.array([], dtype=np.int64), sites_by_node
 
@@ -959,8 +968,8 @@ def _scan_state_node_sites(state_path, expected_num_site, target_node_names=None
                 mismatch_txt
             )
         )
-    if target_node_names is not None:
-        missing_nodes = sorted(set(target_node_names).difference(sites_by_node))
+    if required_node_names is not None:
+        missing_nodes = sorted(set(required_node_names).difference(sites_by_node))
         if missing_nodes:
             missing_txt = ', '.join(missing_nodes[:10])
             if len(missing_nodes) > 10:
@@ -1056,6 +1065,16 @@ def get_state_tensor(g, selected_branch_ids=None):
         for node in g['tree'].traverse()
         if not ete.is_leaf(node)
     }
+    required_internal_names = {
+        node.name
+        for node in g['tree'].traverse()
+        if (
+            (not ete.is_leaf(node))
+            and (not ete.is_root(node))
+            and (node.name is not None)
+            and (str(node.name).strip() != '')
+        )
+    }
     if selected_set is not None:
         target_internal_names = {
             node_name
@@ -1067,12 +1086,14 @@ def get_state_tensor(g, selected_branch_ids=None):
             for node_name, node_id in internal_id_by_name.items()
             if node_name in target_internal_names
         }
+        required_internal_names.intersection_update(target_internal_names)
     else:
         target_internal_names = set(internal_id_by_name)
     site_labels, _sites_by_node = _scan_state_node_sites(
         state_path=state_path,
         expected_num_site=g['num_input_site'],
         target_node_names=target_internal_names,
+        required_node_names=required_internal_names,
     )
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = _initialize_state_tensor(
@@ -1124,7 +1145,12 @@ def get_state_tensor(g, selected_branch_ids=None):
                 )
             state_tensor[nl,:,:] = state_matrix
         else: # Internal nodes
-            if node.name not in loaded_internal_names:
+            if (
+                (not ete.is_root(node))
+                and (node.name is not None)
+                and (str(node.name).strip() != '')
+                and (node.name not in loaded_internal_names)
+            ):
                 raise ValueError('Internal node was missing from .state file: {}'.format(node.name))
     state_tensor = np.nan_to_num(state_tensor, copy=False)
     if selected_set is None:

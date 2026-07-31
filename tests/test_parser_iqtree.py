@@ -455,6 +455,114 @@ def test_get_state_tensor_reads_root_rows_from_state_file(tmp_path):
     np.testing.assert_allclose(out[root_id, 1, :], [0.0, 1.0, 0.0], atol=1e-12)
 
 
+def test_get_state_tensor_allows_iqtree_state_without_root_rows(tmp_path):
+    alignment_file = tmp_path / "toy_without_root.fa"
+    state_file = tmp_path / "toy_without_root.state.tsv"
+    alignment_file.write_text(
+        ">A\nAAAAAC\n>B\nAAGAAG\n>C\nAAAAAC\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "N1\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1)
+    )
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
+        "ml_anc": False,
+    }
+
+    out = parser_iqtree.get_state_tensor(g)
+
+    labels = {
+        node.name: int(ete.get_prop(node, "numerical_label"))
+        for node in tr.traverse()
+    }
+    np.testing.assert_allclose(out[labels["N1"], 0, :], [1.0, 0.0, 0.0])
+    assert out[labels["R"], :, :].sum() == 0
+
+
+def test_get_state_tensor_still_requires_nonroot_internal_rows(tmp_path):
+    alignment_file = tmp_path / "toy_missing_internal.fa"
+    state_file = tmp_path / "toy_missing_internal.state.tsv"
+    alignment_file.write_text(
+        ">A\nAAAAAC\n>B\nAAGAAG\n>C\nAAAAAC\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "R\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1)
+    )
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
+        "ml_anc": False,
+    }
+
+    with pytest.raises(ValueError, match="N1"):
+        parser_iqtree.get_state_tensor(g)
+
+
+def test_get_state_tensor_allows_unnamed_synthetic_internal_node(tmp_path):
+    alignment_file = tmp_path / "toy_unnamed_internal.fa"
+    state_file = tmp_path / "toy_unnamed_internal.state.tsv"
+    alignment_file.write_text(
+        ">A\nAAAAAC\n>B\nAAGAAG\n>C\nAAAAAC\n>D\nAAAAAC\n",
+        encoding="utf-8",
+    )
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "N1\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("((A:1,B:1)N1:1,(C:1,D:1):1)R;", format=1)
+    )
+    g = {
+        "tree": tr,
+        "alignment_file": str(alignment_file),
+        "path_iqtree_state": str(state_file),
+        "num_input_site": 2,
+        "num_input_state": 3,
+        "input_data_type": "cdn",
+        "codon_orders": np.array(["AAA", "AAC", "AAG"]),
+        "float_type": np.float64,
+        "ml_anc": False,
+    }
+
+    out = parser_iqtree.get_state_tensor(g)
+
+    labels = {
+        node.name: int(ete.get_prop(node, "numerical_label"))
+        for node in tr.traverse()
+        if node.name
+    }
+    np.testing.assert_allclose(out[labels["N1"], 0, :], [1.0, 0.0, 0.0])
+
+
 def test_get_state_tensor_streams_state_rows_without_pandas_read_csv(tmp_path, monkeypatch):
     g = _make_state_tensor_g(
         tmp_path=tmp_path,
@@ -877,14 +985,8 @@ def test_run_iqtree_ancestral_nonzero_exit_raises_clear_error_and_cleans_tmp_tre
     def fake_write_tree(tree_obj, outfile, add_numerical_label=False):
         (tmp_path / outfile).write_text("(A:1,B:1)R;\n", encoding="utf-8")
 
-    class _FakeProc:
-        def __init__(self, returncode):
-            self.returncode = returncode
-            self.stdout = None
-            self.stderr = None
-
     monkeypatch.setattr(parser_iqtree.tree, "write_tree", fake_write_tree)
-    monkeypatch.setattr(parser_iqtree.subprocess, "run", lambda *args, **kwargs: _FakeProc(returncode=2))
+    monkeypatch.setattr(parser_iqtree.runtime, "run_subprocess_tee", lambda command: 2)
 
     with pytest.raises(AssertionError, match="exit code 2"):
         parser_iqtree.run_iqtree_ancestral(g)
