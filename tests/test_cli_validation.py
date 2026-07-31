@@ -41,6 +41,8 @@ def _resolve_log_path(repo_root, args):
 
 def _run_cli(*args):
     repo_root = Path(__file__).resolve().parents[1]
+    log_path = _resolve_log_path(repo_root, args)
+    log_mtime_before = log_path.stat().st_mtime_ns if log_path.exists() else None
     cmd = [sys.executable, str(repo_root / "csubst" / "csubst")]
     cmd.extend(args)
     env = os.environ.copy()
@@ -50,8 +52,14 @@ def _run_cli(*args):
     proc = subprocess.run(
         cmd, cwd=str(repo_root), env=env, capture_output=True, text=True
     )
-    log_path = _resolve_log_path(repo_root, args)
-    log_text = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+    log_was_written = log_path.exists() and (
+        log_mtime_before is None or log_path.stat().st_mtime_ns != log_mtime_before
+    )
+    log_text = (
+        log_path.read_text(encoding="utf-8")
+        if log_was_written
+        else (proc.stderr or "")
+    )
     return proc, log_text
 
 
@@ -290,6 +298,8 @@ def test_scan_help_is_available():
     assert "full_scan" in help_text
     assert "--scan_n_permutations" in help_text
     assert "--scan_site_plot" in help_text
+    assert "--scan_site_plot_filter" in help_text
+    assert "--scan_site_plot_alpha" in help_text
     assert "--tree_site_plot_format" in help_text
     assert "--tree_site_plot_max_sites" in help_text
     assert "--tree_site_tip_label_spacing" not in help_text

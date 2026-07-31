@@ -296,7 +296,7 @@ def test_pdb_sequence_search_strips_database_tokens(monkeypatch):
     )
     call_count = {"run_qblast": 0}
 
-    def _fake_run_qblast(aa_query, num_display=10, evalue_cutoff=10):
+    def _fake_run_qblast(aa_query, num_display=10, evalue_cutoff=10, timeout=30):
         call_count["run_qblast"] += 1
         return []
 
@@ -439,7 +439,11 @@ def test_pdb_sequence_search_alphafold_download_uses_shared_cache(monkeypatch, t
     a_node = [n for n in tr.traverse() if n.name == "A"][0]
     a_bid = int(ete.get_prop(a_node, "numerical_label"))
     monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda nlabel, mode, g: "AAAA")
-    monkeypatch.setattr(parser_biodb, "run_qblast", lambda aa_query, num_display=10, evalue_cutoff=10: ["P12345"])
+    monkeypatch.setattr(
+        parser_biodb,
+        "run_qblast",
+        lambda aa_query, num_display=10, evalue_cutoff=10, timeout=30: ["P12345"],
+    )
     monkeypatch.chdir(tmp_path)
     state = {"timeout": None, "source": None, "filename": None}
     cached_path = tmp_path / "cache" / "AF-P12345-F1-model_v2.pdb"
@@ -532,7 +536,11 @@ def test_pdb_sequence_search_swissmodel_download_uses_shared_cache(monkeypatch, 
     a_node = [n for n in tr.traverse() if n.name == "A"][0]
     a_bid = int(ete.get_prop(a_node, "numerical_label"))
     monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda nlabel, mode, g: "AAAA")
-    monkeypatch.setattr(parser_biodb, "run_qblast", lambda aa_query, num_display=10, evalue_cutoff=10: ["P12345"])
+    monkeypatch.setattr(
+        parser_biodb,
+        "run_qblast",
+        lambda aa_query, num_display=10, evalue_cutoff=10, timeout=30: ["P12345"],
+    )
     monkeypatch.setattr(
         parser_biodb,
         "get_swissmodel_download_info",
@@ -578,7 +586,11 @@ def test_pdb_sequence_search_swissmodel_tries_next_hit_when_first_has_no_model(m
     a_node = [n for n in tr.traverse() if n.name == "A"][0]
     a_bid = int(ete.get_prop(a_node, "numerical_label"))
     monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda nlabel, mode, g: "AAAA")
-    monkeypatch.setattr(parser_biodb, "run_qblast", lambda aa_query, num_display=10, evalue_cutoff=10: ["P11111", "P22222"])
+    monkeypatch.setattr(
+        parser_biodb,
+        "run_qblast",
+        lambda aa_query, num_display=10, evalue_cutoff=10, timeout=30: ["P11111", "P22222"],
+    )
     state = {"lookups": []}
 
     def _get_swissmodel_download_info(top_hit_id, timeout=30):

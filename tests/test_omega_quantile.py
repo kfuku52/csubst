@@ -147,6 +147,14 @@ def test_calc_wallenius_inclusion_probabilities_matches_sampling():
     np.testing.assert_allclose(expected.sum(), float(draw_size), atol=1e-8)
 
 
+def test_weighted_urn_draw_one_matches_normalized_weights_exactly():
+    weights = np.array([0.9, 0.1], dtype=np.float64)
+    wallenius = omega._calc_wallenius_inclusion_probabilities(weights, 1)
+    fisher = omega._calc_fisher_inclusion_probabilities(weights, 1)
+    np.testing.assert_allclose(wallenius, [0.9, 0.1], atol=1e-12)
+    np.testing.assert_allclose(fisher, [0.9, 0.1], atol=1e-12)
+
+
 def test_calc_fisher_inclusion_probabilities_returns_valid_probabilities():
     p = np.array([0.8, 0.1, 0.05, 0.05, 0.0], dtype=np.float64)
     draw_size = 2
@@ -165,6 +173,14 @@ def test_calc_fisher_inclusion_probabilities_returns_valid_probabilities():
     assert np.all(fisher <= 1)
     np.testing.assert_allclose(fisher.sum(), float(draw_size), atol=1e-8)
     assert not np.allclose(fisher, wallenius)
+    masks = omega._weighted_sample_without_replacement_masks(
+        p=p,
+        size=draw_size,
+        niter=20000,
+        rng=np.random.default_rng(9),
+        sampling_model="fisher",
+    )
+    np.testing.assert_allclose(masks.mean(axis=0), fisher, atol=0.025)
 
 
 def test_calc_urn_expected_overlap_factorized_approx_matches_legacy_tmp_E_sum():
@@ -494,12 +510,12 @@ def test_get_cod_maps_zero_over_zero_to_zero_and_keeps_positive_over_zero_infini
     np.testing.assert_allclose(out.loc[:, "OCSCoD"].to_numpy(dtype=np.float64), np.array([0.0, 0.5]))
 
 
-def test_calc_dif_count_matrix_marks_negative_counts_as_nan():
+def test_calc_dif_count_matrix_clips_impossible_negative_counts_to_zero():
     any_count = np.array([[4.0, 1.0], [0.0, 2.0]], dtype=np.float64)
     spe_count = np.array([[2.0, 2.0], [1.0, 2.0]], dtype=np.float64)
     out = omega._calc_dif_count_matrix(any_count=any_count, spe_count=spe_count, tol=1e-9)
-    expected = np.array([[2.0, np.nan], [np.nan, 0.0]], dtype=np.float64)
-    np.testing.assert_allclose(out, expected, equal_nan=True)
+    expected = np.array([[2.0, 0.0], [0.0, 0.0]], dtype=np.float64)
+    np.testing.assert_allclose(out, expected)
 
 
 def test_calc_omega_empirical_upper_tail_pvalues_uses_upper_tail_mid_p():

@@ -53,8 +53,33 @@ def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
     if scan_df.shape[0] == 0:
         print("Skipping scan site visualization because no candidates passed.", flush=True)
         return []
-    site_df, branch_ids = substitution_scan.build_scan_site_plot_table(
+    filtered_scan_df = substitution_scan.filter_scan_site_plot_candidates(
         scan_df=scan_df,
+        g=g,
+    )
+    filter_mode = str(g.get("scan_site_plot_filter", "all")).strip().lower()
+    if filter_mode != "all":
+        alpha = float(g.get("scan_site_plot_alpha", 0.05))
+        num_sites = (
+            filtered_scan_df["codon_site_alignment"].nunique()
+            if "codon_site_alignment" in filtered_scan_df.columns
+            else 0
+        )
+        print(
+            "Scan site plot filter: {} P <= {:g}; retained {:,}/{:,} candidates across {:,} site(s).".format(
+                filter_mode,
+                alpha,
+                int(filtered_scan_df.shape[0]),
+                int(scan_df.shape[0]),
+                int(num_sites),
+            ),
+            flush=True,
+        )
+    if filtered_scan_df.shape[0] == 0:
+        print("Skipping scan site visualization because no candidate passed the plot significance filter.", flush=True)
+        return []
+    site_df, branch_ids = substitution_scan.build_scan_site_plot_table(
+        scan_df=filtered_scan_df,
         g=g,
         ON_tensor=ON_tensor,
     )
@@ -64,6 +89,13 @@ def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
     foreground_branch_ids = _scan_foreground_branch_ids(g, units_df=units_df)
     if foreground_branch_ids.shape[0] == 0:
         foreground_branch_ids = branch_ids
+    plot_prefix = str(g.get("output_prefix", "csubst")) + "_scan"
+    if filter_mode != "all":
+        plot_prefix = "{}_scan.{}_p{:g}".format(
+            str(g.get("output_prefix", "csubst")),
+            filter_mode,
+            float(g.get("scan_site_plot_alpha", 0.05)),
+        )
     plot_g = dict(g)
     plot_g.update(
         {
@@ -74,7 +106,7 @@ def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
             "single_branch_mode": False,
             "site_outdir": g["outdir"],
             "tree_site_plot": True,
-            "tree_site_plot_prefix": "csubst_scan",
+            "tree_site_plot_prefix": plot_prefix,
             "tree_site_output_table": False,
             "min_single_prob": float(g.get("scan_min_event_pp", 0.5)),
             "min_combinat_prob": float(g.get("scan_min_event_pp", 0.5)),
@@ -88,6 +120,7 @@ def main_scan(g):
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
     _require_foreground(g)
+    substitution_scan.validate_scan_configuration(g)
     unit_mode = substitution_scan.normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
     if unit_mode == "stem":
         g["fg_stem_only"] = True

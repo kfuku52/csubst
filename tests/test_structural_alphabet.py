@@ -195,12 +195,17 @@ def test_read_direct_3di_state_tensor_accepts_morph_state_columns(tmp_path):
     direct_tree = tree.standardize_node_names(ete.PhyloNode(treefile_path.read_text(), format=1))
     root_name = [n.name for n in direct_tree.traverse() if ete.is_root(n)][0]
     state_path = tmp_path / "direct.state"
+    morph_orders = list("0123456789ABCDEFGHIJ")
+    row1 = np.zeros(20, dtype=float)
+    row2 = np.zeros(20, dtype=float)
+    row1[:2] = [0.10, 0.90]
+    row2[:2] = [0.80, 0.20]
     state_path.write_text(
         "\n".join(
             [
-                "Node\tSite\tState\tp_0\tp_1",
-                "{}\t1\t1\t0.10\t0.90".format(root_name),
-                "{}\t2\t0\t0.80\t0.20".format(root_name),
+                "Node\tSite\tState\t" + "\t".join("p_" + value for value in morph_orders),
+                "{}\t1\t1\t{}".format(root_name, "\t".join(str(value) for value in row1)),
+                "{}\t2\t0\t{}".format(root_name, "\t".join(str(value) for value in row2)),
             ]
         )
         + "\n",
@@ -243,15 +248,15 @@ def test_run_iqtree_direct_3di_uses_morph_and_remaps_gtr20(tmp_path, monkeypatch
     prefix = str(tip_alignment.resolve())
     captured = {"command": None}
 
-    def _fake_run(command, stdout=None, stderr=None):
+    def _fake_run(command, cwd=None):
         captured["command"] = list(command)
         for ext in ["treefile", "state", "iqtree", "log"]:
             (tmp_path / ("csubst_alignment_3di_tip_morph.fa.{}".format(ext))).write_text(
                 "stub\n", encoding="utf-8"
             )
-        return SimpleNamespace(returncode=0)
+        return 0
 
-    monkeypatch.setattr(structural_alphabet.subprocess, "run", _fake_run)
+    monkeypatch.setattr(structural_alphabet.runtime, "run_subprocess_tee", _fake_run)
     g = {
         "rooted_tree": rooted_tree,
         "iqtree_exe": "iqtree",
@@ -403,7 +408,7 @@ class _FakeTokenizer:
         cls.save_calls = []
 
     @classmethod
-    def from_pretrained(cls, source, do_lower_case=False, local_files_only=False):
+    def from_pretrained(cls, source, do_lower_case=False, local_files_only=False, revision=None):
         source = str(source)
         cls.local_only_calls.append((source, bool(local_files_only)))
         if local_files_only:
@@ -436,7 +441,7 @@ class _FakeModel:
         cls.save_calls = []
 
     @classmethod
-    def from_pretrained(cls, source, local_files_only=False):
+    def from_pretrained(cls, source, local_files_only=False, revision=None):
         source = str(source)
         cls.local_only_calls.append((source, bool(local_files_only)))
         if local_files_only:
@@ -629,8 +634,9 @@ def test_resolve_prostt5_auto_batch_size_can_expand_on_mps():
 
 def test_predict_3di_with_prostt5_uses_cache_without_loading_model(tmp_path, monkeypatch):
     cache_path = tmp_path / "prostt5_cache.tsv"
+    model_key = structural_alphabet.get_prostt5_model_cache_key({})
     cache_path.write_text(
-        "Rostlab/ProstT5\tAC\tAA\nRostlab/ProstT5\tXX\tAA\n",
+        "{}\tAC\tAA\n{}\tXX\tAA\n".format(model_key, model_key),
         encoding="utf-8",
     )
     monkeypatch.setattr(
@@ -664,8 +670,9 @@ def test_predict_3di_with_prostt5_appends_new_cache_entries(tmp_path, monkeypatc
     assert out["n1"] == "AA"
     assert out["n2"] == "AAA"
     cache_txt = cache_path.read_text(encoding="utf-8")
-    assert "Rostlab/ProstT5\tAC\tAA" in cache_txt
-    assert "Rostlab/ProstT5\tMNP\tAAA" in cache_txt
+    model_key = structural_alphabet.get_prostt5_model_cache_key({})
+    assert "{}\tAC\tAA".format(model_key) in cache_txt
+    assert "{}\tMNP\tAAA".format(model_key) in cache_txt
 
 
 def test_predict_3di_with_prostt5_prefers_batch_decode_when_available(monkeypatch):

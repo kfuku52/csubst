@@ -438,5 +438,12 @@ def calc_identity(seq1, seq2):
         raise ValueError('Sequence lengths should be identical.')
     if len(seq1) == 0:
         raise ValueError('Sequences should be non-empty.')
-    num_same_site = sum(1 for s1, s2 in zip(seq1, seq2) if s1 == s2)
-    return num_same_site / len(seq1)
+    comparable = [
+        (s1, s2)
+        for s1, s2 in zip(seq1, seq2)
+        if s1 not in '-.' and s2 not in '-.'
+    ]
+    if len(comparable) == 0:
+        return np.nan
+    num_same_site = sum(1 for s1, s2 in comparable if s1 == s2)
+    return num_same_site / len(comparable)

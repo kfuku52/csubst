@@ -57,6 +57,18 @@ def test_is_consistent_tree_checks_leaf_sets():
     assert not tree.is_consistent_tree(t1, t3)
 
 
+def test_is_consistent_tree_rejects_different_topology_with_same_leaves():
+    t1 = ete.PhyloNode("((A:1,B:1):1,(C:1,D:1):1)R;", format=1)
+    t2 = ete.PhyloNode("((A:1,C:1):1,(B:1,D:1):1)R;", format=1)
+    assert not tree.is_consistent_tree(t1, t2)
+
+
+def test_is_consistent_tree_rejects_duplicate_leaf_names():
+    t1 = ete.PhyloNode("(A:1,A:1)R;", format=1)
+    t2 = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    assert not tree.is_consistent_tree(t1, t2)
+
+
 def test_standardize_node_names_removes_suffixes_and_quotes():
     tr = ete.PhyloNode("('A/1':1,'B[abc]':1)'N1[xy]':0;", format=1)
     out = tree.standardize_node_names(tr)

@@ -227,6 +227,44 @@ def normalize_scan_n_permutations(value):
     return n_permutations
 
 
+def validate_scan_configuration(g):
+    calibration = normalize_scan_pvalue_calibration(
+        g.get("scan_pvalue_calibration", "full_scan")
+    )
+    n_permutations = normalize_scan_n_permutations(
+        g.get("scan_n_permutations", 1000)
+    )
+    if calibration != "none" and n_permutations == 0:
+        raise ValueError(
+            "--scan_n_permutations should be > 0 when --scan_pvalue_calibration is {}.".format(
+                calibration
+            )
+        )
+    filter_mode = str(g.get("scan_site_plot_filter", "all")).strip().lower()
+    allowed_filters = {"all", "analytical", "empirical", "full_scan"}
+    if filter_mode not in allowed_filters:
+        raise ValueError(
+            "--scan_site_plot_filter should be one of {}.".format(
+                ", ".join(sorted(allowed_filters))
+            )
+        )
+    alpha = float(g.get("scan_site_plot_alpha", 0.05))
+    if (not np.isfinite(alpha)) or alpha < 0 or alpha > 1:
+        raise ValueError(
+            "--scan_site_plot_alpha should be a finite value between 0 and 1."
+        )
+    if filter_mode == "empirical" and calibration == "none":
+        raise ValueError(
+            "--scan_site_plot_filter empirical requires --scan_pvalue_calibration "
+            "candidate_fixed or full_scan."
+        )
+    if filter_mode == "full_scan" and calibration != "full_scan":
+        raise ValueError(
+            "--scan_site_plot_filter full_scan requires --scan_pvalue_calibration full_scan."
+        )
+    return None
+
+
 def _resolve_scan_permutation_backend():
     return parallel.resolve_parallel_backend()
 
@@ -1732,6 +1770,42 @@ def _select_scan_plot_rows(scan_df):
     return plot_rows.drop(columns=["__plot_empirical_p__", "__plot_analytical_p__"]).reset_index(drop=True)
 
 
+def filter_scan_site_plot_candidates(scan_df, g):
+    mode = str(g.get("scan_site_plot_filter", "all")).strip().lower()
+    allowed = {"all", "analytical", "empirical", "full_scan"}
+    if mode not in allowed:
+        raise ValueError("--scan_site_plot_filter should be one of {}.".format(", ".join(sorted(allowed))))
+    alpha = float(g.get("scan_site_plot_alpha", 0.05))
+    if (not np.isfinite(alpha)) or (alpha < 0) or (alpha > 1):
+        raise ValueError("--scan_site_plot_alpha should be a finite value between 0 and 1.")
+    if mode == "all":
+        return scan_df.copy()
+
+    calibration = normalize_scan_pvalue_calibration(g.get("scan_pvalue_calibration", "full_scan"))
+    if (mode == "empirical") and (calibration == "none"):
+        raise ValueError(
+            "--scan_site_plot_filter empirical requires --scan_pvalue_calibration "
+            "candidate_fixed or full_scan."
+        )
+    if (mode == "full_scan") and (calibration != "full_scan"):
+        raise ValueError(
+            "--scan_site_plot_filter full_scan requires --scan_pvalue_calibration full_scan."
+        )
+    pvalue_columns = {
+        "analytical": "p_rate_enrichment",
+        "empirical": "p_rate_enrichment_empirical",
+        "full_scan": "p_rate_enrichment_empirical_maxT",
+    }
+    pvalue_column = pvalue_columns[mode]
+    if pvalue_column not in scan_df.columns:
+        raise ValueError(
+            "--scan_site_plot_filter {} requires column {}.".format(mode, pvalue_column)
+        )
+    pvalues = pd.to_numeric(scan_df[pvalue_column], errors="coerce")
+    keep = np.isfinite(pvalues.to_numpy(dtype=np.float64)) & (pvalues.to_numpy(dtype=np.float64) <= alpha)
+    return scan_df.loc[keep, :].copy()
+
+
 def build_scan_site_plot_table(scan_df, g, ON_tensor):
     if scan_df.shape[0] == 0:
         return pd.DataFrame(), np.array([], dtype=np.int64)
@@ -2289,8 +2363,17 @@ def _run_scan_permutation_chunk(
     g, scan_static = _unpack_scan_worker_context(g=g, scan_static=scan_static)
     ON_tensor = _unpack_scan_tensor_for_worker(ON_tensor)
     rate_ON_tensor = _unpack_scan_tensor_for_worker(rate_ON_tensor)
-    return [
-        _run_scan_permutation(
+    summary = {
+        "success_count": 0,
+        "failure_count": 0,
+        "failure_reasons": [],
+        "min_p": [],
+        "row_key_to_p": {},
+    }
+    for permutation_index in np.asarray(
+        permutation_indices, dtype=np.int64
+    ).reshape(-1).tolist():
+        result = _run_scan_permutation(
             permutation_index=int(permutation_index),
             g=g,
             observed_df=observed_df,
@@ -2303,8 +2386,20 @@ def _run_scan_permutation_chunk(
             rate_ON_tensor=rate_ON_tensor,
             scan_static=scan_static,
         )
-        for permutation_index in np.asarray(permutation_indices, dtype=np.int64).reshape(-1).tolist()
-    ]
+        if not result.get("success", False):
+            summary["failure_count"] += 1
+            reason = str(result.get("failure_reason", "")).strip()
+            if reason and reason not in summary["failure_reasons"]:
+                summary["failure_reasons"].append(reason)
+            continue
+        summary["success_count"] += 1
+        min_p = float(result.get("min_p", np.nan))
+        summary["min_p"].append(min_p if np.isfinite(min_p) else 1.0)
+        for key, pvalues in result.get("row_key_to_p", {}).items():
+            summary["row_key_to_p"].setdefault(key, []).extend(
+                float(value) for value in pvalues
+            )
+    return summary
 
 
 def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_static):
@@ -2385,20 +2480,14 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
                 os.remove(path)
             except FileNotFoundError:
                 pass
-    results = [result for chunk_result in chunk_results for result in chunk_result]
     success_count = 0
     failure_count = 0
-    for result in results:
-        if not result.get("success", False):
-            failure_count += 1
-            failure_reason = str(result.get("failure_reason", "")).strip()
-            if failure_reason != "":
-                failure_reasons.append(failure_reason)
-            continue
-        success_count += 1
+    for result in chunk_results:
+        success_count += int(result.get("success_count", 0))
+        failure_count += int(result.get("failure_count", 0))
+        failure_reasons.extend(result.get("failure_reasons", []))
         if calibration == "full_scan":
-            min_p = float(result.get("min_p", np.nan))
-            min_perm_p.append(min_p if np.isfinite(min_p) else 1.0)
+            min_perm_p.extend(float(value) for value in result.get("min_p", []))
         for key, pvalues in result.get("row_key_to_p", {}).items():
             if key in row_key_to_perm_p:
                 row_key_to_perm_p[key].extend(float(v) for v in pvalues)

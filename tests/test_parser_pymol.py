@@ -212,6 +212,25 @@ def test_calc_aa_identity_uses_pdb_basename_prefix_matching(tmp_path, monkeypatc
     assert out["aa_identity_means"]["1abc_A"] == pytest.approx(0.75)
 
 
+def test_calc_aa_identity_ignores_all_gap_comparisons(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+    )
+    mafft_add_fasta = tmp_path / "mafft_add.fa"
+    mafft_add_fasta.write_text(
+        ">1abc_A\nAAAA\n>all_gap\n----\n>query\nAATA\n",
+        encoding="utf-8",
+    )
+    out = parser_pymol.calc_aa_identity(
+        {
+            "mafft_add_fasta": str(mafft_add_fasta),
+            "pdb": "1abc.pdb",
+        }
+    )
+    assert out["aa_identity_means"]["1abc_A"] == pytest.approx(0.75)
+
+
 def test_mask_subunit_extracts_chain_id_from_sequence_name(tmp_path, monkeypatch):
     commands = []
     parser_pymol = _import_parser_pymol_with_fake_pymol(
@@ -535,6 +554,33 @@ def test_set_substitution_colors_single_branch_prefers_branch_prob_over_ocn_colu
     n_sub_cols = df.columns[df.columns.str.startswith("N_sub_")]
     parser_pymol.set_substitution_colors(df=df, g=g, object_names=["obj"], N_sub_cols=n_sub_cols)
     assert any(("0x800080" in cmd) and ("resi 8" in cmd) for cmd in commands)
+
+
+def test_set_substitution_colors_total_mode_keeps_mapped_site_array(monkeypatch):
+    commands = []
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A\nAAAA\n",
+        chains=["A"],
+        commands=commands,
+    )
+    df = pd.DataFrame(
+        {
+            "codon_site_pdb_obj_A": [5, 8],
+            "N_sub_1": [0.5, 0.1],
+            "N_sub_2": [0.4, 0.1],
+        }
+    )
+    g = {"mode": "total", "min_single_prob": 0.8, "single_branch_mode": False}
+    n_sub_cols = df.columns[df.columns.str.startswith("N_sub_")]
+    parser_pymol.set_substitution_colors(
+        df=df,
+        g=g,
+        object_names=["obj"],
+        N_sub_cols=n_sub_cols,
+    )
+    assert any("resi 5" in command for command in commands)
+    assert not any("resi 8" in command for command in commands)
 
 
 def test_set_substitution_colors_set_mode_parses_string_booleans_safely(monkeypatch):

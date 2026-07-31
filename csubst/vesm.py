@@ -180,9 +180,13 @@ def _load_components(g):
         use_safetensors=True,
     )
     try:
-        state_dict = torch.load(paths["checkpoint_path"], map_location="cpu", weights_only=True)
-    except TypeError:  # older supported torch releases
-        state_dict = torch.load(paths["checkpoint_path"], map_location="cpu")
+        state_dict = torch.load(
+            paths["checkpoint_path"], map_location="cpu", weights_only=True
+        )
+    except TypeError as exc:
+        raise RuntimeError(
+            "This VESM checkpoint requires a torch release with safe weights_only loading."
+        ) from exc
     model.load_state_dict(state_dict, strict=True)
     model.eval()
     model = model.to(device)

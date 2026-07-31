@@ -1,10 +1,12 @@
 import errno
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
 import socket
+import stat
 import tempfile
 import threading
 import time
@@ -57,9 +59,11 @@ def resolve_path_lock_path(path, lock_label=None):
 
 
 def _assert_regular_file_or_absent(path, label="Path"):
-    if not os.path.lexists(path):
+    try:
+        path_stat = os.lstat(path)
+    except FileNotFoundError:
         return
-    if os.path.islink(path) or (not os.path.isfile(path)):
+    if not stat.S_ISREG(path_stat.st_mode):
         raise IsADirectoryError("{} exists but is not a regular file: {}".format(label, path))
 
 
@@ -246,11 +250,16 @@ def acquire_exclusive_lock(
     timeout_seconds = float(timeout_seconds)
     heartbeat_seconds = float(heartbeat_seconds)
     stale_seconds = float(stale_seconds)
-    if poll_seconds <= 0:
+    if (not math.isfinite(poll_seconds)) or poll_seconds <= 0:
         raise ValueError("poll_seconds must be > 0.")
-    if timeout_seconds <= 0:
+    if (not math.isfinite(timeout_seconds)) or timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be > 0.")
-    if stale_seconds <= heartbeat_seconds:
+    if (
+        (not math.isfinite(heartbeat_seconds))
+        or (not math.isfinite(stale_seconds))
+        or heartbeat_seconds <= 0
+        or stale_seconds <= heartbeat_seconds
+    ):
         raise ValueError("stale_seconds must be greater than heartbeat_seconds.")
     lock_path = os.path.abspath(os.path.expanduser(str(lock_path)))
     _assert_regular_file_or_absent(lock_path, label="{} lock path".format(lock_label))
@@ -343,6 +352,9 @@ def sha256_file(path, chunk_size=1024 * 1024):
 
 def validate_required_files(root_dir, required_files, expected_files=None, verify_hashes=True):
     root_dir = os.path.abspath(str(root_dir))
+    if os.path.islink(root_dir):
+        raise FileNotFoundError("Resource directory should not be a symbolic link: {}".format(root_dir))
+    real_root_dir = os.path.realpath(root_dir)
     expected_files = {} if expected_files is None else dict(expected_files)
     file_records = {}
     for relative_path in required_files:
@@ -350,7 +362,13 @@ def validate_required_files(root_dir, required_files, expected_files=None, verif
         if relative_path.startswith("/") or ".." in relative_path.split("/"):
             raise ValueError("Unsafe resource-relative path: {}".format(relative_path))
         path = os.path.join(root_dir, *relative_path.split("/"))
-        if os.path.islink(path) or (not os.path.isfile(path)):
+        try:
+            is_contained = os.path.commonpath(
+                [os.path.realpath(path), real_root_dir]
+            ) == real_root_dir
+        except ValueError:
+            is_contained = False
+        if (not is_contained) or os.path.islink(path) or (not os.path.isfile(path)):
             raise FileNotFoundError("Required resource file was not found: {}".format(path))
         size = int(os.path.getsize(path))
         expected = expected_files.get(relative_path, {})
@@ -369,6 +387,7 @@ def validate_required_files(root_dir, required_files, expected_files=None, verif
 
 def is_directory_resource_ready(resource_dir, resource_id, verify_hashes=False):
     resource_dir = os.path.abspath(str(resource_dir))
+    real_resource_dir = os.path.realpath(resource_dir)
     if os.path.islink(resource_dir):
         return False
     manifest_path = os.path.join(resource_dir, RESOURCE_MANIFEST_NAME)
@@ -391,7 +410,13 @@ def is_directory_resource_ready(resource_dir, resource_id, verify_hashes=False):
         if relative_path.startswith("/") or ".." in relative_path.split("/"):
             return False
         path = os.path.join(resource_dir, *relative_path.split("/"))
-        if os.path.islink(path) or (not os.path.isfile(path)):
+        try:
+            is_contained = os.path.commonpath(
+                [os.path.realpath(path), real_resource_dir]
+            ) == real_resource_dir
+        except ValueError:
+            is_contained = False
+        if (not is_contained) or os.path.islink(path) or (not os.path.isfile(path)):
             return False
         try:
             if int(os.path.getsize(path)) != int(record.get("size", -1)):
@@ -419,14 +444,16 @@ def ensure_directory_resource(
     resource_id = str(resource_id)
     poll_seconds = float(poll_seconds)
     timeout_seconds = float(timeout_seconds)
-    if poll_seconds <= 0:
+    if (not math.isfinite(poll_seconds)) or poll_seconds <= 0:
         raise ValueError("poll_seconds must be > 0.")
-    if timeout_seconds <= 0:
+    if (not math.isfinite(timeout_seconds)) or timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be > 0.")
     resource_dir = os.path.abspath(os.path.expanduser(str(resource_dir)))
     managed_cache_dir = resolve_cache_dir(cache_dir)
     try:
-        is_managed_path = os.path.commonpath([resource_dir, managed_cache_dir]) == managed_cache_dir
+        is_managed_path = os.path.commonpath(
+            [os.path.realpath(resource_dir), os.path.realpath(managed_cache_dir)]
+        ) == os.path.realpath(managed_cache_dir)
     except ValueError:
         is_managed_path = False
     if not is_managed_path:

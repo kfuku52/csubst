@@ -1,3 +1,6 @@
+import os
+import pathlib
+
 import numpy as np
 import pytest
 
@@ -8,17 +11,20 @@ from csubst import ete
 
 def test_infer_iqtree_output_prefix_from_alignment_uses_shared_dir(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    expected_prefix = str((tmp_path / "csubst_iqtree" / "input.fa").resolve())
-    assert parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa.gz") == expected_prefix
-    assert parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa") == expected_prefix
+    observed = parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa.gz")
+    assert os.path.dirname(observed) == str((tmp_path / "csubst_iqtree").resolve())
+    assert os.path.basename(observed).startswith("input.fa.gz.")
+    uncompressed = parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa")
+    assert os.path.basename(uncompressed).startswith("input.fa.")
+    assert uncompressed != observed
 
 
 def test_check_intermediate_files_infer_uses_shared_iqtree_dir_for_gz_alignment(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    prefix = tmp_path / "csubst_iqtree" / "alignment.fa"
-    prefix.parent.mkdir(parents=True, exist_ok=True)
+    prefix = parser_iqtree._infer_iqtree_output_prefix_from_alignment("alignment.fa.gz")
+    os.makedirs(os.path.dirname(prefix), exist_ok=True)
     for ext in ["iqtree", "log", "rate", "state", "treefile"]:
-        (tmp_path / "csubst_iqtree" / ("alignment.fa." + ext)).write_text("x\n", encoding="utf-8")
+        pathlib.Path(prefix + "." + ext).write_text("x\n", encoding="utf-8")
     g = {
         "alignment_file": "alignment.fa.gz",
         "iqtree_iqtree": "infer",
@@ -31,9 +37,33 @@ def test_check_intermediate_files_infer_uses_shared_iqtree_dir_for_gz_alignment(
     assert all_exist is True
     assert out["path_iqtree_iqtree"] == str(prefix) + ".iqtree"
     assert out["path_iqtree_log"] == str(prefix) + ".log"
-    assert out["path_iqtree_rate"] == str(prefix) + ".rate"
+    assert out["path_iqtree_rate"] == prefix + ".rate"
     assert out["path_iqtree_state"] == str(prefix) + ".state"
     assert out["path_iqtree_treefile"] == str(prefix) + ".treefile"
+
+
+def test_iqtree_manifest_invalidates_reuse_when_alignment_changes(tmp_path):
+    alignment = tmp_path / "alignment.fa"
+    alignment.write_text(">A\nAAA\n>B\nAAA\n", encoding="utf-8")
+    state_path = tmp_path / "alignment.state"
+    g = {
+        "alignment_file": str(alignment),
+        "path_iqtree_state": str(state_path),
+        "rooted_tree": ete.PhyloNode("(A:1,B:1)R;", format=1),
+        "iqtree_exe": "/usr/bin/false",
+        "iqtree_version": "2.3.6",
+        "iqtree_model": "MG",
+        "genetic_code": 1,
+        "threads": 2,
+    }
+    parser_iqtree._write_iqtree_manifest(g)
+    compatible, reason = parser_iqtree.is_iqtree_manifest_compatible(g)
+    assert compatible is True
+    assert reason == ""
+    alignment.write_text(">A\nAAA\n>B\nAAG\n", encoding="utf-8")
+    compatible, reason = parser_iqtree.is_iqtree_manifest_compatible(g)
+    assert compatible is False
+    assert "changed" in reason
 
 
 def _get_base_g(tmp_path, iqtree_text, log_text):
@@ -311,11 +341,39 @@ def test_read_rate_rejects_site_count_mismatch(tmp_path):
         parser_iqtree.read_rate(g)
 
 
+def test_read_rate_orders_values_by_site_and_rejects_negative_rates(tmp_path):
+    rate_file = tmp_path / "unordered.rate"
+    rate_file.write_text(
+        "Site\tRate\n"
+        "2\t1.5\n"
+        "1\t0.5\n",
+        encoding="utf-8",
+    )
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 2}
+    np.testing.assert_allclose(parser_iqtree.read_rate(g), [0.5, 1.5])
+    rate_file.write_text("Site\tRate\n1\t-0.5\n2\t1.5\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="negative"):
+        parser_iqtree.read_rate(g)
+
+
+def test_read_rate_rejects_duplicate_or_out_of_range_site_labels(tmp_path):
+    rate_file = tmp_path / "bad-sites.rate"
+    rate_file.write_text("Site\tRate\n1\t0.5\n1\t1.5\n", encoding="utf-8")
+    g = {"path_iqtree_rate": str(rate_file), "num_input_site": 2}
+    with pytest.raises(ValueError, match="each integer"):
+        parser_iqtree.read_rate(g)
+
+
 def _make_state_tensor_g(tmp_path, alignment_text):
     alignment_file = tmp_path / "toy.fa"
     state_file = tmp_path / "toy.state.tsv"
     alignment_file.write_text(alignment_text, encoding="utf-8")
-    state_file.write_text("Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n", encoding="utf-8")
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "R\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     return {
         "tree": tr,
@@ -474,6 +532,23 @@ def test_get_state_tensor_rejects_non_integer_site_values(tmp_path):
         parser_iqtree.get_state_tensor(g)
 
 
+def test_get_state_tensor_rejects_invalid_probability_rows(tmp_path):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
+    )
+    state_file = tmp_path / "toy_invalid_probability.state.tsv"
+    state_file.write_text(
+        "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
+        "R\t1\tAAA\t0.8\t0.3\t-0.1\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n",
+        encoding="utf-8",
+    )
+    g["path_iqtree_state"] = str(state_file)
+    with pytest.raises(ValueError, match="Invalid probability"):
+        parser_iqtree.get_state_tensor(g)
+
+
 def test_get_state_tensor_selected_branch_ids_preserve_global_branch_index(tmp_path):
     g = _make_state_tensor_g(
         tmp_path=tmp_path,
@@ -502,7 +577,9 @@ def test_get_state_tensor_selected_branch_ids_match_internal_masking_parity(tmp_
     state_file.write_text(
         "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
         "N1\t1\tAAA\t1.0\t0.0\t0.0\n"
-        "N1\t2\tAAC\t0.0\t1.0\t0.0\n",
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n"
+        "R\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n",
         encoding="utf-8",
     )
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
@@ -540,7 +617,9 @@ def test_get_state_tensor_selected_internal_rejects_required_leaf_length_mismatc
     state_file.write_text(
         "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
         "N1\t1\tAAA\t1.0\t0.0\t0.0\n"
-        "N1\t2\tAAC\t0.0\t1.0\t0.0\n",
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n"
+        "R\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n",
         encoding="utf-8",
     )
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
@@ -591,7 +670,9 @@ def test_get_state_tensor_selected_internal_handles_noncontiguous_branch_ids(tmp
     state_file.write_text(
         "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
         "N1\t1\tAAA\t1.0\t0.0\t0.0\n"
-        "N1\t2\tAAC\t0.0\t1.0\t0.0\n",
+        "N1\t2\tAAC\t0.0\t1.0\t0.0\n"
+        "R\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n",
         encoding="utf-8",
     )
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
@@ -630,7 +711,9 @@ def test_get_state_tensor_maps_internal_rows_by_site_label_not_file_order(tmp_pa
     state_file.write_text(
         "Node\tSite\tState\tp_AAA\tp_AAC\tp_AAG\n"
         "N1\t2\tAAC\t0.0\t1.0\t0.0\n"
-        "N1\t1\tAAG\t0.0\t0.0\t1.0\n",
+        "N1\t1\tAAG\t0.0\t0.0\t1.0\n"
+        "R\t1\tAAA\t1.0\t0.0\t0.0\n"
+        "R\t2\tAAC\t0.0\t1.0\t0.0\n",
         encoding="utf-8",
     )
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))

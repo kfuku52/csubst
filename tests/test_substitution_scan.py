@@ -729,6 +729,54 @@ def test_select_scan_plot_rows_keeps_one_best_candidate_per_site():
     assert out["support_unit_count"].tolist() == [4, 3]
 
 
+def test_filter_scan_site_plot_candidates_uses_full_scan_maxt_pvalue():
+    scan_df = pd.DataFrame(
+        {
+            "codon_site_alignment": [10, 20, 30],
+            "p_rate_enrichment": [1e-6, 1e-3, 0.2],
+            "p_rate_enrichment_empirical": [0.01, 0.03, 0.04],
+            "p_rate_enrichment_empirical_maxT": [0.02, 0.05, 0.2],
+        }
+    )
+    g = {
+        "scan_site_plot_filter": "full_scan",
+        "scan_site_plot_alpha": 0.05,
+        "scan_pvalue_calibration": "full_scan",
+    }
+
+    out = substitution_scan.filter_scan_site_plot_candidates(scan_df=scan_df, g=g)
+
+    assert out["codon_site_alignment"].tolist() == [10, 20]
+
+
+def test_filter_scan_site_plot_candidates_rejects_full_scan_filter_without_full_scan_calibration():
+    scan_df = pd.DataFrame(
+        {
+            "codon_site_alignment": [10],
+            "p_rate_enrichment_empirical_maxT": [0.01],
+        }
+    )
+    g = {
+        "scan_site_plot_filter": "full_scan",
+        "scan_site_plot_alpha": 0.05,
+        "scan_pvalue_calibration": "candidate_fixed",
+    }
+
+    with pytest.raises(ValueError, match="requires --scan_pvalue_calibration full_scan"):
+        substitution_scan.filter_scan_site_plot_candidates(scan_df=scan_df, g=g)
+
+
+def test_validate_scan_configuration_rejects_zero_permutations_for_calibration():
+    with pytest.raises(ValueError, match="should be > 0"):
+        substitution_scan.validate_scan_configuration(
+            {
+                "scan_pvalue_calibration": "full_scan",
+                "scan_n_permutations": 0,
+                "scan_site_plot_filter": "all",
+            }
+        )
+
+
 def test_write_scan_site_plot_reuses_sites_plotter(monkeypatch, tmp_path):
     g, on_tensor = _toy_scan_context()
     g["outdir"] = str(tmp_path)

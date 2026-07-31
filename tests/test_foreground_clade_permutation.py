@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import numpy as np
 import pandas as pd
 import pandas.testing as pdt
@@ -734,14 +736,21 @@ def test_clade_permutation_parallelizes_candidates_over_resolved_backend(monkeyp
         local_g["df_cb_stats"].loc[:, "total_OCNany2spe_fg_traitA"] = 3.0
         return local_g
 
-    def fake_run_starmap(func, args_iterable, n_jobs, backend="multiprocessing", chunksize=None):
-        args = list(args_iterable)
-        parallel_calls.append((len(args), n_jobs, backend, chunksize))
-        return [func(*arg) for arg in args]
+    @contextmanager
+    def fake_persistent_starmap_runner(n_jobs, backend="multiprocessing"):
+        def run(func, args_iterable):
+            args = list(args_iterable)
+            parallel_calls.append((len(args), n_jobs, backend, None))
+            return [func(*arg) for arg in args]
+        yield run
 
     monkeypatch.setattr(foreground, "set_random_foreground_branch", fake_set_random_foreground_branch)
     monkeypatch.setattr(foreground, "add_median_cb_stats", fake_add_median_cb_stats)
-    monkeypatch.setattr(foreground.parallel, "run_starmap", fake_run_starmap)
+    monkeypatch.setattr(
+        foreground.parallel,
+        "persistent_starmap_runner",
+        fake_persistent_starmap_runner,
+    )
 
     out = foreground.clade_permutation(cb=cb, g=g)
 

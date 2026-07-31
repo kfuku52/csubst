@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 import multiprocessing
 import os
 import sys
@@ -174,6 +175,36 @@ def run_starmap(func, args_iterable, n_jobs, backend='multiprocessing', chunksiz
     try:
         with ctx.Pool(processes=n_jobs) as pool:
             return pool.starmap(func, args_list, chunksize=chunksize)
+    finally:
+        _restore_import_path(old_pythonpath, old_sys_path, changed)
+
+
+@contextmanager
+def persistent_starmap_runner(n_jobs, backend='multiprocessing'):
+    """Yield a starmap callable while keeping workers alive across batches."""
+    n_jobs = int(n_jobs)
+    if n_jobs < 1:
+        raise ValueError('n_jobs should be >= 1.')
+    backend = _normalize_parallel_backend(backend)
+    if n_jobs == 1:
+        yield lambda func, args: [func(*item) for item in list(args)]
+        return
+    if backend == 'threading':
+        with ThreadPoolExecutor(max_workers=n_jobs) as executor:
+            def thread_starmap(func, args):
+                futures = [executor.submit(func, *item) for item in list(args)]
+                return [future.result() for future in futures]
+            yield thread_starmap
+        return
+    ctx = multiprocessing.get_context()
+    old_pythonpath, old_sys_path, changed = _set_spawn_worker_import_path(ctx)
+    try:
+        with ctx.Pool(processes=n_jobs) as pool:
+            def process_starmap(func, args):
+                args = list(args)
+                chunksize = max(1, len(args) // (n_jobs * 4))
+                return pool.starmap(func, args, chunksize=chunksize)
+            yield process_starmap
     finally:
         _restore_import_path(old_pythonpath, old_sys_path, changed)
 

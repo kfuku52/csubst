@@ -26,7 +26,10 @@ class _FastStatePlotBypassUnavailable(RuntimeError):
 
 
 def _plot_state_tree_in_directory(output_dir, state, orders, mode, g, plot_request, plot_request_name):
-    pattern = os.path.join(str(output_dir), 'csubst_state_*_' + str(mode) + '_*.pdf')
+    output_prefix = str(g.get('output_prefix', 'csubst')).strip()
+    pattern = os.path.join(
+        str(output_dir), output_prefix + '_state_*_' + str(mode) + '_*.pdf'
+    )
     for path in glob(pattern):
         if os.path.isfile(path):
             os.remove(path)

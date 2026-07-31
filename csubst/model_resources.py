@@ -62,7 +62,7 @@ def get_vesm35m_paths(resource_dir):
 def ensure_vesm35m_resource(
     cache_dir=None,
     no_download=False,
-    verify_existing=False,
+    verify_existing=True,
     poll_seconds=resource_cache.DEFAULT_LOCK_POLL_SECONDS,
     timeout_seconds=resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS,
     download_file=None,
@@ -120,5 +120,11 @@ def ensure_vesm35m_resource(
         verify_existing=verify_existing,
         poll_seconds=poll_seconds,
         timeout_seconds=timeout_seconds,
+    )
+    resource_cache.validate_required_files(
+        root_dir=resource_dir,
+        required_files=VESM_REQUIRED_FILES,
+        expected_files=VESM_EXPECTED_FILES,
+        verify_hashes=True,
     )
     return get_vesm35m_paths(resource_dir)

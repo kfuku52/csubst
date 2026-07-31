@@ -143,6 +143,23 @@ def test_runtime_temp_path_uses_per_run_tempdir(tmp_path):
     assert Path(run_tmpdir).exists() is False
 
 
+def test_calc_identity_excludes_gap_gap_and_one_sided_gap_columns():
+    assert sequence.calc_identity("A--C", "A--T") == pytest.approx(0.5)
+    assert np.isnan(sequence.calc_identity("---", "---"))
+
+
+def test_cleanup_legacy_temp_artifacts_never_deletes_cwd_matches(tmp_path, monkeypatch):
+    user_file = tmp_path / "tmp.csubst.user-data.txt"
+    user_dir = tmp_path / "tmp.csubst.user-data"
+    user_file.write_text("keep", encoding="utf-8")
+    user_dir.mkdir()
+    (user_dir / "keep.txt").write_text("keep", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert runtime.cleanup_legacy_temp_artifacts() == []
+    assert user_file.read_text(encoding="utf-8") == "keep"
+    assert (user_dir / "keep.txt").read_text(encoding="utf-8") == "keep"
+
+
 def test_calc_omega_state_matches_manual_tensor_product():
     g = {"state_columns": [[0, 0, 0], [0, 0, 1]]}
     state_nuc = np.array(

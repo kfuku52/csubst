@@ -3356,26 +3356,9 @@ def _build_site_outdir(
 
 
 def _maybe_relocate_site_log_file(g):
-    site_jobs = g.get('site_jobs', [])
-    if len(site_jobs) != 1:
-        return g
-    log_file = str(g.get('log_file', '')).strip()
-    if log_file == '':
-        return g
-    current_log_path = os.path.abspath(log_file)
-    default_log_path = runtime.default_site_log_path(base_dir=os.getcwd(), create_dir=False)
-    if current_log_path != default_log_path:
-        return g
-    target_dir = os.path.abspath(site_jobs[0]['site_outdir'])
-    os.makedirs(target_dir, exist_ok=True)
-    target_log_path = os.path.join(target_dir, os.path.basename(default_log_path))
-    if current_log_path != target_log_path:
-        if os.path.exists(current_log_path):
-            os.replace(current_log_path, target_log_path)
-        parent_dir = os.path.dirname(current_log_path)
-        if (parent_dir != '') and os.path.isdir(parent_dir) and (len(os.listdir(parent_dir)) == 0):
-            os.rmdir(parent_dir)
-    g['log_file'] = target_log_path
+    # The CLI owns an open handle to this path. Moving an open log is not
+    # portable (notably on Windows) and makes the output manifest disagree with
+    # the active handle. Keep the path resolved before command execution.
     return g
 
 

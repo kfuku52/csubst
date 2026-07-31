@@ -3,6 +3,7 @@
 import argparse
 import contextlib
 import datetime
+import io
 import os
 import sys
 import time
@@ -149,7 +150,15 @@ def _resolve_output_namespace_defaults(argv):
     }
 
 
-def _add_output_namespace_args(parser, default_outdir='.', default_prefix='csubst', include_outdir=True, include_output_prefix=True, include_log_file=True):
+def _add_output_namespace_args(
+    parser,
+    default_outdir='.',
+    default_prefix='csubst',
+    include_outdir=True,
+    include_output_prefix=True,
+    include_log_file=True,
+    log_default='',
+):
     if include_outdir:
         parser.add_argument('--outdir', metavar='PATH', default=default_outdir, type=str,
                             help='default=%(default)s: Output directory for generated files.')
@@ -157,14 +166,19 @@ def _add_output_namespace_args(parser, default_outdir='.', default_prefix='csubs
         parser.add_argument('--output_prefix', metavar='STEM', default=default_prefix, type=str,
                             help='default=%(default)s: Output filename stem used inside --outdir.')
     if include_log_file:
-        parser.add_argument('--log_file', metavar='PATH', default='', type=str,
+        parser.add_argument('--log_file', metavar='PATH', default=log_default, type=str,
                             help='default=infer from --outdir/--output_prefix: PATH to log file. '
                                  'Relative paths are resolved under --outdir.')
 
 
 def _make_output_parent_parser(default_outdir='.', default_prefix='csubst'):
     parser = argparse.ArgumentParser(add_help=False)
-    _add_output_namespace_args(parser, default_outdir=default_outdir, default_prefix=default_prefix)
+    _add_output_namespace_args(
+        parser,
+        default_outdir=default_outdir,
+        default_prefix=default_prefix,
+        log_default=argparse.SUPPRESS,
+    )
     return parser
 
 
@@ -603,6 +617,15 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
     parser.add_argument('--scan_site_plot', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Generate a tree + detected-site summary plot using the csubst sites plotter. '
                              'When multiple candidates share a site, the best-supported candidate represents that site.')
+    parser.add_argument('--scan_site_plot_filter', metavar='all|analytical|empirical|full_scan',
+                        default='all', type=str,
+                        choices=['all', 'analytical', 'empirical', 'full_scan'],
+                        help='default=%(default)s: Candidate significance filter for --scan_site_plot. '
+                             '"analytical" uses p_rate_enrichment; "empirical" uses the candidate-wise '
+                             'permutation P value; "full_scan" uses the maxT-style empirical P value from '
+                             '--scan_pvalue_calibration full_scan.')
+    parser.add_argument('--scan_site_plot_alpha', metavar='FLOAT', default=0.05, type=float,
+                        help='default=%(default)s: Inclusive P-value cutoff used by --scan_site_plot_filter.')
     parser.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
                         choices=['pdf', 'png', 'svg'],
                         help='default=%(default)s: Output format for --scan_site_plot.')
@@ -736,6 +759,9 @@ def _build_parser(show_advanced=False):
     _add_advanced_argument(advanced_resources, '--prostt5_model', show_advanced=show_advanced,
                         metavar='STR', default='Rostlab/ProstT5', type=str,
                         help='default=%(default)s: ProstT5 model identifier used for --nonsyn_recode 3di20.')
+    _add_advanced_argument(advanced_resources, '--prostt5_revision', show_advanced=show_advanced,
+                        metavar='REV', default='d7d097d5bf9a993ab8f68488b4681d6ca70db9e5', type=str,
+                        help='default=pinned upstream revision: Immutable ProstT5 model revision.')
     _add_advanced_argument(advanced_resources, '--prostt5_local_dir', show_advanced=show_advanced,
                         metavar='PATH', default='', type=str,
                         help='default=%(default)s: Optional local directory containing ProstT5 files. '
@@ -852,6 +878,8 @@ def _build_parser(show_advanced=False):
                          help='default=%(default)s: Name of dataset to generate.')
     dataset.add_argument('--iqtree_outdir', metavar='PATH', default='csubst_iqtree', type=str,
                          help='default=%(default)s: Directory for bundled IQ-TREE intermediate files.')
+    dataset.add_argument('--force', metavar='yes|no', default='no', type=strtobool,
+                         help='default=%(default)s: Allow overwriting existing dataset output files.')
     dataset.set_defaults(handler=command_dataset)
 
     # download
@@ -877,6 +905,9 @@ def _build_parser(show_advanced=False):
     _add_advanced_argument(advanced_download, '--prostt5_model', show_advanced=show_advanced,
                           metavar='STR', default='Rostlab/ProstT5', type=str,
                           help='default=%(default)s: ProstT5 Hugging Face model identifier.')
+    _add_advanced_argument(advanced_download, '--prostt5_revision', show_advanced=show_advanced,
+                          metavar='REV', default='d7d097d5bf9a993ab8f68488b4681d6ca70db9e5', type=str,
+                          help='default=pinned upstream revision: Immutable ProstT5 model revision.')
     _add_advanced_argument(advanced_download, '--prostt5_local_dir', show_advanced=show_advanced,
                           metavar='PATH', default='', type=str,
                           help='default=%(default)s: Optional local ProstT5 directory.')
@@ -1205,20 +1236,25 @@ def _build_parser(show_advanced=False):
     return parser
 
 
-def _main(argv=None):
+def _main(argv=None, parsed_args=None):
     if argv is None:
         argv = sys.argv[1:]
-    argv, show_advanced = _normalize_help_argv(list(argv))
-    parser = _build_parser(show_advanced=show_advanced)
-    args = parser.parse_args(argv)
+    if parsed_args is None:
+        argv, show_advanced = _normalize_help_argv(list(argv))
+        parser = _build_parser(show_advanced=show_advanced)
+        args = parser.parse_args(argv)
+    else:
+        args = parsed_args
+        parser = None
     if not hasattr(args, 'handler'):
-        parser.print_help()
+        if parser is not None:
+            parser.print_help()
         return
 
     csubst_start = time.time()
     print('CSUBST start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     try:
-        with runtime.run_tempdir_context(base_dir=os.getcwd()):
+        with runtime.run_tempdir_context():
             args.handler(args)
     except (ValueError, AssertionError) as e:
         sys.stderr.write(str(e).strip() + '\n')
@@ -1232,9 +1268,22 @@ if __name__ == "__main__":
     if _is_informational_invocation(sys.argv[1:]):
         _main()
     else:
+        normalized_argv, show_advanced = _normalize_help_argv(list(sys.argv[1:]))
+        preflight_parser = _build_parser(show_advanced=show_advanced)
+        parse_error = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(
+                _TeeTextStream(sys.stderr, parse_error)
+            ):
+                preflight_args = preflight_parser.parse_args(normalized_argv)
+        except SystemExit:
+            log_path = _resolve_log_file_from_argv(sys.argv[1:])
+            with open(log_path, 'a', buffering=1, encoding='utf-8') as log_file:
+                log_file.write(parse_error.getvalue())
+            raise
         log_path = _resolve_log_file_from_argv(sys.argv[1:])
         with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
             stdout_tee = _TeeTextStream(sys.stdout, log_file)
             stderr_tee = _TeeTextStream(sys.stderr, log_file)
             with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):
-                _main()
+                _main(argv=normalized_argv, parsed_args=preflight_args)

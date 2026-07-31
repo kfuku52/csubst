@@ -567,10 +567,13 @@ def calc_aa_identity(g):
         aa_identity_values[pdb_seqname] = np.array(aa_identity_values[pdb_seqname])
     aa_identity_means = dict()
     for pdb_seqname in pdb_seqnames:
-        if aa_identity_values[pdb_seqname].shape[0] == 0:
+        finite_identity = aa_identity_values[pdb_seqname][
+            np.isfinite(aa_identity_values[pdb_seqname])
+        ]
+        if finite_identity.shape[0] == 0:
             aa_identity_means[pdb_seqname] = np.nan
         else:
-            aa_identity_means[pdb_seqname] = aa_identity_values[pdb_seqname].mean()
+            aa_identity_means[pdb_seqname] = finite_identity.mean()
     aa_ranges = dict()
     for pdb_seqname in pdb_seqnames:
         alphabet_sites = [ m.start() for m in re.finditer('[a-zA-Z]', seqs[pdb_seqname]) ]
@@ -953,9 +956,10 @@ def set_substitution_colors(df, g, object_names, N_sub_cols):
                 )
                 continue
             if mode=='total':
+                mapped_sites = site_values
                 site_values = dict()
                 qualifying_mask = valid_site_mask & (total_prob_values >= float(g.get('min_single_prob', 0.8)))
-                for codon_site, total_sub in zip(site_values[qualifying_mask], total_prob_values[qualifying_mask]):
+                for codon_site, total_sub in zip(mapped_sites[qualifying_mask], total_prob_values[qualifying_mask]):
                     site_values[int(codon_site)] = max(site_values.get(int(codon_site), 0.0), float(total_sub))
                 _paint_intensity_sites(
                     object_name=object_name,

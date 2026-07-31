@@ -45,6 +45,7 @@ jobs:
             python -c "import csubst.combination_cy, csubst.omega_cy,
             csubst.parser_iqtree_cy, csubst.recoding_cy,
             csubst.substitution_cy, csubst.substitution_sparse_cy"
+            && csubst --version
         run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: Upload wheels

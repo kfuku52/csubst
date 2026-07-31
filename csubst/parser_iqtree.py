@@ -1,7 +1,10 @@
 import gzip
+import hashlib
+import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections import OrderedDict
@@ -11,6 +14,8 @@ import numpy as np
 import pandas as pd
 
 from csubst import genetic_code
+from csubst import __version__
+from csubst import resource_cache
 from csubst import runtime
 from csubst import sequence
 from csubst import tree
@@ -385,6 +390,65 @@ def _infer_iqtree_output_prefix_from_alignment(alignment_file):
     return runtime.infer_iqtree_output_prefix(alignment_file=alignment_file)
 
 
+def _get_iqtree_manifest_path(g):
+    state_path = str(g.get('path_iqtree_state', '')).strip()
+    if state_path == '':
+        prefix = runtime.infer_iqtree_output_prefix(
+            alignment_file=g.get('alignment_file', ''),
+            iqtree_outdir=g.get('iqtree_outdir', 'csubst_iqtree'),
+        )
+        state_path = prefix + '.state'
+    return os.path.abspath(state_path) + '.csubst-manifest.json'
+
+
+def _build_iqtree_manifest_context(g):
+    alignment_path = os.path.abspath(os.path.expanduser(str(g.get('alignment_file', ''))))
+    if not os.path.isfile(alignment_path):
+        raise FileNotFoundError('Alignment file not found: {}'.format(alignment_path))
+    tree_payload = repr(tree.get_tree_cache_signature(g['rooted_tree'])).encode('utf-8')
+    executable = shutil.which(str(g.get('iqtree_exe', ''))) or str(g.get('iqtree_exe', ''))
+    return {
+        'format': 'csubst-iqtree-v1',
+        'csubst_version': str(__version__),
+        'alignment': {
+            'path': alignment_path,
+            'sha256': resource_cache.sha256_file(alignment_path),
+        },
+        'rooted_tree_sha256': hashlib.sha256(tree_payload).hexdigest(),
+        'iqtree_executable': os.path.realpath(executable) if executable else '',
+        'iqtree_version': str(g.get('iqtree_version', '')),
+        'iqtree_model': str(g.get('iqtree_model', '')),
+        'genetic_code': int(g.get('genetic_code', 1)),
+        'threads': int(g.get('threads', 1)),
+    }
+
+
+def is_iqtree_manifest_compatible(g):
+    manifest_path = _get_iqtree_manifest_path(g)
+    if not os.path.isfile(manifest_path):
+        return False, 'provenance manifest is missing: {}'.format(manifest_path)
+    try:
+        with open(manifest_path, encoding='utf-8') as handle:
+            observed = json.load(handle)
+        expected = _build_iqtree_manifest_context(g)
+    except (OSError, TypeError, ValueError) as exc:
+        return False, 'provenance manifest could not be validated: {}'.format(exc)
+    if observed != expected:
+        return False, 'alignment, tree, IQ-TREE version, or reconstruction options changed'
+    return True, ''
+
+
+def _write_iqtree_manifest(g):
+    manifest_path = _get_iqtree_manifest_path(g)
+    payload = json.dumps(
+        _build_iqtree_manifest_context(g),
+        sort_keys=True,
+        indent=2,
+    ) + '\n'
+    resource_cache.atomic_write_text(manifest_path, payload)
+    return manifest_path
+
+
 def check_intermediate_files(g):
     all_exist = True
     g = runtime.ensure_iqtree_layout(g, create_dir=False)
@@ -429,10 +493,13 @@ def run_iqtree_ancestral(g, force_notree_run=False):
                            '--prefix', iqtree_prefix]
             else:
                 raise ValueError('--rooted_tree and --alignment_file are not consistent.')
-        run_iqtree = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr)
-        if run_iqtree.returncode != 0:
+        returncode = runtime.run_subprocess_tee(command)
+        if returncode != 0:
             msg = 'IQ-TREE did not finish safely (exit code {}).'
-            raise AssertionError(msg.format(run_iqtree.returncode))
+            raise AssertionError(msg.format(returncode))
+        for ext in ['iqtree', 'log', 'rate', 'state', 'treefile']:
+            g['path_iqtree_' + ext] = iqtree_prefix + '.' + ext
+        _write_iqtree_manifest(g)
         ckp_paths = [g['alignment_file']+'.ckp.gz', iqtree_prefix+'.ckp.gz']
         for ckp_path in ckp_paths:
             if os.path.exists(ckp_path):
@@ -475,6 +542,33 @@ def read_rate(g):
         g['iqtree_categorized_rate_values'] = np.ones(g['num_input_site'])
         return np.ones(g['num_input_site'])
     column_by_lower = {str(col).lower(): str(col) for col in rate_table.columns}
+    if 'site' not in column_by_lower:
+        raise ValueError('Unable to find Site column in {}.'.format(g['path_iqtree_rate']))
+    site_col = column_by_lower['site']
+    site_values = pd.to_numeric(rate_table.loc[:, site_col], errors='coerce').to_numpy(dtype=float)
+    rounded_sites = np.round(site_values)
+    if (
+        (not np.isfinite(site_values).all())
+        or (not np.isclose(site_values, rounded_sites, rtol=0.0, atol=1e-12).all())
+    ):
+        raise ValueError('Invalid Site value(s) were found in {}.'.format(g['path_iqtree_rate']))
+    site_values = rounded_sites.astype(np.int64)
+    expected_sites = int(g['num_input_site'])
+    if site_values.shape[0] != expected_sites:
+        raise ValueError(
+            'The number of site-rate rows in {} ({}) did not match num_input_site ({}).'.format(
+                g['path_iqtree_rate'], site_values.shape[0], expected_sites
+            )
+        )
+    if not np.array_equal(np.sort(site_values), np.arange(1, expected_sites + 1)):
+        raise ValueError(
+            'Site values in {} should contain each integer from 1 through {} exactly once.'.format(
+                g['path_iqtree_rate'], expected_sites
+            )
+        )
+    rate_table = rate_table.assign(_csubst_site=site_values).sort_values(
+        '_csubst_site', kind='stable'
+    )
     if 'rate' in column_by_lower:
         rate_col = column_by_lower['rate']
     elif 'c_rate' in column_by_lower:
@@ -486,10 +580,9 @@ def read_rate(g):
         txt = 'Unable to find site-rate column ("C_Rate" or "Rate") in {}. Columns: {}'
         raise ValueError(txt.format(g['path_iqtree_rate'], available_cols))
     rate_sites = pd.to_numeric(rate_table.loc[:, rate_col], errors='coerce').to_numpy(dtype=float)
-    if not np.isfinite(rate_sites).all():
-        txt = 'Non-finite site-rate value(s) were found in {} column of {}.'
+    if (not np.isfinite(rate_sites).all()) or np.any(rate_sites < 0):
+        txt = 'Non-finite or negative site-rate value(s) were found in {} column of {}.'
         raise ValueError(txt.format(rate_col, g['path_iqtree_rate']))
-    expected_sites = int(g['num_input_site'])
     if rate_sites.shape[0] != expected_sites:
         txt = 'The number of site-rate rows in {} ({}) did not match num_input_site ({}).'
         raise ValueError(txt.format(g['path_iqtree_rate'], rate_sites.shape[0], expected_sites))
@@ -497,7 +590,11 @@ def read_rate(g):
         categorized = pd.to_numeric(
             rate_table.loc[:, column_by_lower['c_rate']], errors='coerce'
         ).to_numpy(dtype=float)
-        if (categorized.shape[0] != expected_sites) or (not np.isfinite(categorized).all()):
+        if (
+            (categorized.shape[0] != expected_sites)
+            or (not np.isfinite(categorized).all())
+            or np.any(categorized < 0)
+        ):
             raise ValueError('Invalid categorized site-rate values were found in {}.'.format(g['path_iqtree_rate']))
         g['iqtree_categorized_rate_values'] = categorized
     else:
@@ -811,6 +908,9 @@ def _scan_state_node_sites(state_path, expected_num_site, target_node_names=None
             )
         node_sites.add(site_label)
     if not sites_by_node:
+        if target_node_names:
+            missing_txt = ', '.join(sorted(target_node_names)[:10])
+            raise ValueError('Internal node(s) were missing from .state file: {}'.format(missing_txt))
         return np.array([], dtype=np.int64), sites_by_node
 
     expected_num_site = int(expected_num_site)
@@ -837,6 +937,13 @@ def _scan_state_node_sites(state_path, expected_num_site, target_node_names=None
         txt = 'Unexpected number of unique Site labels in .state file. '
         txt += 'Expected {}, observed {}.'
         raise ValueError(txt.format(expected_num_site, site_labels.shape[0]))
+    expected_labels = np.arange(1, expected_num_site + 1, dtype=np.int64)
+    if not np.array_equal(site_labels, expected_labels):
+        raise ValueError(
+            'Unexpected Site labels in .state file. Expected the contiguous range 1..{}.'.format(
+                expected_num_site
+            )
+        )
     expected_site_set = set(site_labels.tolist())
     mismatched_nodes = [
         node_name
@@ -852,6 +959,15 @@ def _scan_state_node_sites(state_path, expected_num_site, target_node_names=None
                 mismatch_txt
             )
         )
+    if target_node_names is not None:
+        missing_nodes = sorted(set(target_node_names).difference(sites_by_node))
+        if missing_nodes:
+            missing_txt = ', '.join(missing_nodes[:10])
+            if len(missing_nodes) > 10:
+                missing_txt += ',...'
+            raise ValueError(
+                'Internal node(s) were missing from .state file: {}'.format(missing_txt)
+            )
     return site_labels, sites_by_node
 
 
@@ -887,6 +1003,18 @@ def _fill_internal_state_rows(
             )
         if state_text in ('?', '???'):
             values.fill(0)
+        else:
+            if (not np.isfinite(values).all()) or np.any(values < 0):
+                raise ValueError(
+                    'Invalid probability value(s) in .state file at line {}.'.format(line_number)
+                )
+            probability_sum = float(values.sum())
+            if (not math.isfinite(probability_sum)) or (abs(probability_sum - 1.0) > 1e-3):
+                raise ValueError(
+                    '.state probabilities at line {} sum to {:.8g}; expected 1.'.format(
+                        line_number, probability_sum
+                    )
+                )
         state_tensor[int(node_id), int(row_index), :] = values
         loaded_names.add(node_name)
     return loaded_names
@@ -940,7 +1068,7 @@ def get_state_tensor(g, selected_branch_ids=None):
             if node_name in target_internal_names
         }
     else:
-        target_internal_names = None
+        target_internal_names = set(internal_id_by_name)
     site_labels, _sites_by_node = _scan_state_node_sites(
         state_path=state_path,
         expected_num_site=g['num_input_site'],
@@ -997,7 +1125,7 @@ def get_state_tensor(g, selected_branch_ids=None):
             state_tensor[nl,:,:] = state_matrix
         else: # Internal nodes
             if node.name not in loaded_internal_names:
-                print('Node name not found in .state file:', node.name)
+                raise ValueError('Internal node was missing from .state file: {}'.format(node.name))
     state_tensor = np.nan_to_num(state_tensor, copy=False)
     if selected_set is None:
         state_tensor = mask_missing_sites(state_tensor, g['tree'])

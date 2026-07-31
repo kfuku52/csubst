@@ -553,9 +553,22 @@ def _compute_epistasis_degree_from_structure(g, num_site):
         parser_pymol.write_mafft_alignment(g=g_pdb)
         df = parser_pymol.add_coordinate_from_mafft_map(df=df, mafft_map_file='tmp.csubst.pdb_seq.fa.map')
     df = parser_pymol.add_pdb_residue_numbering(df=df)
+    g_pdb = parser_pymol.calc_aa_identity(g_pdb)
+    finite_chain_identities = [
+        (name, value)
+        for name, value in g_pdb.get('aa_identity_means', {}).items()
+        if np.isfinite(value)
+    ]
+    preferred_chain_col = None
+    if finite_chain_identities:
+        preferred_chain_name = max(finite_chain_identities, key=lambda item: item[1])[0]
+        candidate_col = 'codon_site_pdb_' + str(preferred_chain_name)
+        if candidate_col in df.columns:
+            preferred_chain_col = candidate_col
     df = parser_pymol.add_contact_degree_from_structure(
         df=df,
         distance_cutoff=float(g['epistasis_contact_distance']),
+        chain_col=preferred_chain_col,
     )
     degree_outfile = runtime.resolve_user_output_path(
         g,

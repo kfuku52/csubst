@@ -8,6 +8,7 @@ import numpy as np
 from scipy.linalg import expm
 
 import itertools
+import math
 import re
 import sys
 import time
@@ -1018,7 +1019,9 @@ def _pack_sampled_site_indices_to_uint8(sampled_site_indices, num_site):
     return packed
 
 
-def _weighted_sample_without_replacement_packed(p, size, niter, rng=None):
+def _weighted_sample_without_replacement_packed(
+    p, size, niter, rng=None, sampling_model='wallenius'
+):
     if rng is None:
         rng = np.random.default_rng()
     p = np.asarray(p, dtype=np.float64)
@@ -1046,6 +1049,54 @@ def _weighted_sample_without_replacement_packed(p, size, niter, rng=None):
         np.bitwise_or.at(row_mask, byte_indices, bit_values)
         packed[:, :] = row_mask[None, :]
         return packed
+    sampling_model = str(sampling_model).strip().lower()
+    if sampling_model == 'fisher':
+        weights = p[positive_sites].astype(np.float64, copy=False)
+        weights = weights / weights.max()
+        num_positive = int(weights.shape[0])
+        log_dp = np.full((num_positive + 1, size + 1), -np.inf, dtype=np.float64)
+        log_dp[num_positive, 0] = 0.0
+        for item_index in range(num_positive - 1, -1, -1):
+            log_dp[item_index, 0] = 0.0
+            max_pick = min(size, num_positive - item_index)
+            log_weight = math.log(float(weights[item_index]))
+            for pick in range(1, max_pick + 1):
+                log_dp[item_index, pick] = np.logaddexp(
+                    log_dp[item_index + 1, pick],
+                    log_weight + log_dp[item_index + 1, pick - 1],
+                )
+        selected = np.zeros((niter, size), dtype=np.int64)
+        remaining = np.full(niter, size, dtype=np.int64)
+        write_index = np.zeros(niter, dtype=np.int64)
+        for item_index in range(num_positive):
+            active = np.flatnonzero(remaining > 0)
+            if active.shape[0] == 0:
+                break
+            items_left = num_positive - item_index
+            forced = remaining[active] >= items_left
+            probability = np.ones(active.shape[0], dtype=np.float64)
+            optional = ~forced
+            if optional.any():
+                r = remaining[active[optional]]
+                log_numerator = (
+                    math.log(float(weights[item_index]))
+                    + log_dp[item_index + 1, r - 1]
+                )
+                log_denominator = log_dp[item_index, r]
+                probability[optional] = np.exp(log_numerator - log_denominator)
+            choose = forced | (rng.random(active.shape[0]) < probability)
+            chosen_rows = active[choose]
+            selected[chosen_rows, write_index[chosen_rows]] = positive_sites[item_index]
+            write_index[chosen_rows] += 1
+            remaining[chosen_rows] -= 1
+        if (remaining != 0).any():
+            raise RuntimeError('Fisher weighted sampling did not select the requested sample size.')
+        return _pack_sampled_site_indices_to_uint8(
+            sampled_site_indices=selected,
+            num_site=num_site,
+        )
+    if sampling_model not in ['wallenius', 'factorized_approx']:
+        raise ValueError('Unsupported weighted sampling model: {}'.format(sampling_model))
     # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
     positive_weights = p[positive_sites].astype(np.float32, copy=False)
     keys = rng.random((niter, num_positive_sites)).astype(np.float32, copy=False)
@@ -1299,7 +1350,9 @@ def _calc_tmp_E_sum(cb_ids, sub_sites, sub_branches, float_type, cb_site_overlap
     return tmp_E.sum(axis=1) * branch_factor
 
 
-def _weighted_sample_without_replacement_masks(p, size, niter, rng=None):
+def _weighted_sample_without_replacement_masks(
+    p, size, niter, rng=None, sampling_model='wallenius'
+):
     if rng is None:
         rng = np.random.default_rng()
     p = np.asarray(p, dtype=np.float64)
@@ -1318,6 +1371,15 @@ def _weighted_sample_without_replacement_masks(p, size, niter, rng=None):
     if size == num_positive_sites:
         masks[:, positive_sites] = True
         return masks
+    if str(sampling_model).strip().lower() == 'fisher':
+        packed = _weighted_sample_without_replacement_packed(
+            p=p,
+            size=size,
+            niter=niter,
+            rng=rng,
+            sampling_model='fisher',
+        )
+        return np.unpackbits(packed, axis=1)[:, :p.shape[0]].astype(bool, copy=False)
     # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
     positive_weights = p[positive_sites].astype(np.float32, copy=False)
     keys = rng.random((niter, num_positive_sites)).astype(np.float32, copy=False)
@@ -1424,6 +1486,37 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
     if draw_size >= num_positive:
         out[positive_mask] = 1.0
         return out.astype(float_type, copy=False)
+    if draw_size == 1:
+        out[positive_mask] = positive_weights / positive_weights.sum(dtype=np.float64)
+        return out.astype(float_type, copy=False)
+    if num_positive <= 20 and math.comb(num_positive, draw_size) <= 250000:
+        distribution = {0: 1.0}
+        total_weight = float(positive_weights.sum(dtype=np.float64))
+        for _ in range(draw_size):
+            next_distribution = {}
+            for mask, probability in distribution.items():
+                selected_weight = sum(
+                    positive_weights[index]
+                    for index in range(num_positive)
+                    if mask & (1 << index)
+                )
+                remaining_weight = total_weight - float(selected_weight)
+                for index, weight in enumerate(positive_weights):
+                    bit = 1 << index
+                    if mask & bit:
+                        continue
+                    next_mask = mask | bit
+                    next_distribution[next_mask] = next_distribution.get(next_mask, 0.0) + (
+                        probability * float(weight) / remaining_weight
+                    )
+            distribution = next_distribution
+        inclusion = np.zeros(num_positive, dtype=np.float64)
+        for mask, probability in distribution.items():
+            for index in range(num_positive):
+                if mask & (1 << index):
+                    inclusion[index] += probability
+        out[positive_mask] = inclusion
+        return out.astype(float_type, copy=False)
 
     target = float(draw_size)
     lo = 0.0
@@ -1464,28 +1557,40 @@ def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.
     if draw_size >= num_positive:
         out[positive_mask] = 1.0
         return out.astype(float_type, copy=False)
-
-    target = float(draw_size)
-    lo = 0.0
-    hi = 1.0
-    for _ in range(128):
-        scaled = hi * positive_weights
-        current = (1.0 - (1.0 / (1.0 + scaled))).sum(dtype=np.float64)
-        if current >= target:
-            break
-        hi *= 2.0
-    for _ in range(96):
-        mid = (lo + hi) / 2.0
-        scaled = mid * positive_weights
-        current = (1.0 - (1.0 / (1.0 + scaled))).sum(dtype=np.float64)
-        if current < target:
-            lo = mid
-        else:
-            hi = mid
-    lam = (lo + hi) / 2.0
-    scaled = lam * positive_weights
-    out_positive = 1.0 - (1.0 / (1.0 + scaled))
-    out[positive_mask] = np.clip(out_positive, a_min=0.0, a_max=1.0)
+    weights = positive_weights / positive_weights.max()
+    log_weights = np.log(weights)
+    prefix = np.full((num_positive + 1, draw_size + 1), -np.inf, dtype=np.float64)
+    suffix = np.full((num_positive + 1, draw_size + 1), -np.inf, dtype=np.float64)
+    prefix[0, 0] = 0.0
+    suffix[num_positive, 0] = 0.0
+    for index in range(num_positive):
+        prefix[index + 1, :] = prefix[index, :]
+        prefix[index + 1, 1:] = np.logaddexp(
+            prefix[index + 1, 1:],
+            log_weights[index] + prefix[index, :-1],
+        )
+    for index in range(num_positive - 1, -1, -1):
+        suffix[index, :] = suffix[index + 1, :]
+        suffix[index, 1:] = np.logaddexp(
+            suffix[index, 1:],
+            log_weights[index] + suffix[index + 1, :-1],
+        )
+    log_denominator = prefix[num_positive, draw_size]
+    if not np.isfinite(log_denominator):
+        raise ValueError('Unable to normalize Fisher weighted-urn probabilities.')
+    inclusion = np.zeros(num_positive, dtype=np.float64)
+    for index in range(num_positive):
+        log_excluded_poly = -np.inf
+        for left_pick in range(draw_size):
+            right_pick = draw_size - 1 - left_pick
+            log_excluded_poly = np.logaddexp(
+                log_excluded_poly,
+                prefix[index, left_pick] + suffix[index + 1, right_pick],
+            )
+        inclusion[index] = np.exp(
+            log_weights[index] + log_excluded_poly - log_denominator
+        )
+    out[positive_mask] = np.clip(inclusion, a_min=0.0, a_max=1.0)
     return out.astype(float_type, copy=False)
 
 
@@ -1640,7 +1745,9 @@ def _calc_urn_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
     raise ValueError('Unsupported urn_model: {}'.format(urn_model))
 
 
-def _fill_packed_masks_for_sizes(packed_masks_branch, site_p, size_values, rng=None):
+def _fill_packed_masks_for_sizes(
+    packed_masks_branch, site_p, size_values, rng=None, sampling_model='wallenius'
+):
     if rng is None:
         rng = np.random.default_rng()
     size_values = np.asarray(size_values, dtype=np.int64).reshape(-1)
@@ -1668,11 +1775,14 @@ def _fill_packed_masks_for_sizes(packed_masks_branch, site_p, size_values, rng=N
             size=capped_size,
             niter=iter_indices.shape[0],
             rng=rng,
+            sampling_model=sampling_model,
         )
     return None
 
 
-def _get_permutations_fast(cb_ids, sub_branches, p, niter, rng=None):
+def _get_permutations_fast(
+    cb_ids, sub_branches, p, niter, rng=None, sampling_model='wallenius'
+):
     if rng is None:
         rng = np.random.default_rng()
     niter = int(niter)
@@ -1734,6 +1844,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter, rng=None):
                     site_p=shared_site_p,
                     size_values=size_values,
                     rng=rng,
+                    sampling_model=sampling_model,
                 )
         else:
             active_site_p = branch_site_p[active_branch_ids, :]
@@ -1752,6 +1863,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter, rng=None):
                         site_p=first_site_p,
                         size_values=size_values,
                         rng=rng,
+                        sampling_model=sampling_model,
                     )
             else:
                 for branch_id in range(num_branch):
@@ -1763,6 +1875,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter, rng=None):
                         site_p=active_site_p[branch_id, :],
                         size_values=size_values,
                         rng=rng,
+                        sampling_model=sampling_model,
                     )
         return _calc_shared_counts_from_packed_masks(
             packed_masks=packed_masks,
@@ -1804,6 +1917,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter, rng=None):
                 size=size,
                 niter=niter,
                 rng=rng,
+                sampling_model=sampling_model,
             )
     else:
         active_site_p = branch_site_p[active_branch_ids, :]
@@ -1830,6 +1944,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter, rng=None):
                     size=size,
                     niter=niter,
                     rng=rng,
+                    sampling_model=sampling_model,
                 )
         else:
             for branch_id in range(num_branch):
@@ -1847,6 +1962,7 @@ def _get_permutations_fast(cb_ids, sub_branches, p, niter, rng=None):
                     size=size,
                     niter=niter,
                     rng=rng,
+                    sampling_model=sampling_model,
                 )
 
     active_out = _calc_shared_counts_from_packed_masks(
@@ -2604,6 +2720,7 @@ def joblib_calc_hypergeom(
             p,
             niter,
             rng=category_rng,
+            sampling_model=_resolve_urn_model(g=g),
         )
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
@@ -3050,7 +3167,7 @@ def _calibrate_dsc_vector(dNc_values, dSc_values, transformation='quantile'):
     dNc_values_wo_na = dNc_values[fit_mask]
     dSc_values_wo_na = dSc_values[fit_mask]
     ranks = stats.rankdata(dSc_values_wo_na)
-    quantiles = ranks / ranks.max()
+    quantiles = (ranks - 0.5) / float(ranks.shape[0])
     if transformation == 'gamma':
         alpha, loc, beta = stats.gamma.fit(dNc_values_wo_na)
         calibrated_dSc[fit_mask] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
@@ -3385,7 +3502,10 @@ def _calc_dif_count_matrix(any_count, spe_count, tol):
     out = any_count - spe_count
     is_negative = (out < (-float(tol)))
     is_almost_zero = (~is_negative) & (out < float(tol))
-    out[is_negative] = np.nan
+    # Independent floating-point aggregation can produce tiny or occasional
+    # larger violations of the required spe <= any nesting.  Difference counts
+    # are non-negative by definition.
+    out[is_negative] = 0
     out[is_almost_zero] = 0
     return out
 
@@ -3634,11 +3754,18 @@ def _calc_nbinom_count_matrix(
         return out
     if obs_count is None:
         obs_count = mean_total
-    alpha, alpha_source = _resolve_nbinom_alpha(
-        g=g,
-        obs_count=obs_count,
-        mean_count=mean_total,
-    )
+    alpha_cache = g.setdefault('_omega_nbinom_alpha_cache', {})
+    alpha_key = str(obs_col)
+    if alpha_key in alpha_cache:
+        alpha, alpha_source = alpha_cache[alpha_key]
+        alpha_source = str(alpha_source) + '_cached'
+    else:
+        alpha, alpha_source = _resolve_nbinom_alpha(
+            g=g,
+            obs_count=obs_count,
+            mean_count=mean_total,
+        )
+        alpha_cache[alpha_key] = (float(alpha), str(alpha_source))
     pm_start = time.time()
     operation_seed = g.get('_omega_operation_seed', None)
     if operation_seed is None:
@@ -4074,6 +4201,8 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
     print(txt.format(null_model), flush=True)
     pvalue_schedule = _resolve_omega_pvalue_niter_schedule(g=g)
     pvalue_refine_upper_edge_bins = _resolve_omega_pvalue_refine_upper_edge_bins(g=g)
+    if null_model == 'nbinom':
+        g['_omega_nbinom_alpha_cache'] = {}
     txt = 'omega_C empirical p-value staged schedule ({}): {}'
     print(txt.format(null_model, ','.join([str(int(v)) for v in pvalue_schedule])), flush=True)
     cb_ids = _get_cb_ids(cb)
@@ -4178,6 +4307,11 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
                 valid_niter=valid_niter[active_rows],
                 edge_bins=pvalue_refine_upper_edge_bins,
             )
+            if calibrate_dsc_transformation is not None:
+                # Rank-based dS calibration must use a stable row population at
+                # every stage; otherwise the null distribution changes as rows
+                # are refined.
+                refine_mask[:] = True
             next_rows = active_rows[refine_mask]
             txt = 'pomegaC {} refinement after stage {}: rows {} -> {} (upper_edge_bins={})'
             print(

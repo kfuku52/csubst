@@ -2473,6 +2473,7 @@ def _run_clade_permutation_candidate_batch(
     backend,
     OS_tensor_reducer=None,
     ON_tensor_reducer=None,
+    starmap_runner=None,
 ):
     tasks = [
         (
@@ -2485,6 +2486,8 @@ def _run_clade_permutation_candidate_batch(
         )
         for request in requests
     ]
+    if starmap_runner is not None:
+        return starmap_runner(_evaluate_clade_permutation_candidate, tasks)
     return parallel.run_starmap(
         _evaluate_clade_permutation_candidate,
         tasks,
@@ -2606,52 +2609,54 @@ def _run_clade_permutation_for_trait_parallel(
     trial_no = 0
     sample_original_foreground = False
     accepted_rows = []
-    while (trial_no < max_trials) and (iteration <= int(g['fg_clade_permutation'])):
-        remaining = int(g['fg_clade_permutation']) - iteration + 1
-        batch_size = max(1, min(int(n_jobs), remaining))
-        g, requests, sample_original_foreground, trial_no, break_trait = _collect_clade_permutation_candidate_batch(
-            g=g,
-            trait_name=trait_name,
-            trial_no=trial_no,
-            max_trials=max_trials,
-            sample_original_foreground=sample_original_foreground,
-            batch_size=batch_size,
-        )
-        if len(requests) == 0:
-            if break_trait:
-                break
-            continue
-        for request in requests:
-            txt = 'Queued foreground clade permutation candidate after trial {:,} for trait "{}"'
-            print(txt.format(request['trial_no'] + 1, trait_name), flush=True)
-        results = _run_clade_permutation_candidate_batch(
-            cb=cb,
-            g=g,
-            trait_name=trait_name,
-            requests=requests,
-            n_jobs=min(int(n_jobs), len(requests)),
-            backend=backend,
-            OS_tensor_reducer=OS_tensor_reducer,
-            ON_tensor_reducer=ON_tensor_reducer,
-        )
-        for request, result in zip(requests, results):
-            g, accepted, row = _append_parallel_clade_permutation_row(
+    with parallel.persistent_starmap_runner(n_jobs=n_jobs, backend=backend) as starmap_runner:
+        while (trial_no < max_trials) and (iteration <= int(g['fg_clade_permutation'])):
+            remaining = int(g['fg_clade_permutation']) - iteration + 1
+            batch_size = max(1, min(int(n_jobs), remaining))
+            g, requests, sample_original_foreground, trial_no, break_trait = _collect_clade_permutation_candidate_batch(
                 g=g,
                 trait_name=trait_name,
-                iteration=iteration,
-                request=request,
-                result=result,
+                trial_no=trial_no,
+                max_trials=max_trials,
+                sample_original_foreground=sample_original_foreground,
+                batch_size=batch_size,
+            )
+            if len(requests) == 0:
+                if break_trait:
+                    break
+                continue
+            for request in requests:
+                txt = 'Queued foreground clade permutation candidate after trial {:,} for trait "{}"'
+                print(txt.format(request['trial_no'] + 1, trait_name), flush=True)
+            results = _run_clade_permutation_candidate_batch(
+                cb=cb,
+                g=g,
+                trait_name=trait_name,
+                requests=requests,
                 n_jobs=min(int(n_jobs), len(requests)),
                 backend=backend,
+                OS_tensor_reducer=OS_tensor_reducer,
+                ON_tensor_reducer=ON_tensor_reducer,
+                starmap_runner=starmap_runner,
             )
-            if accepted:
-                accepted_rows.append(row)
-                iteration += 1
-                print('')
-            if iteration > int(g['fg_clade_permutation']):
+            for request, result in zip(requests, results):
+                g, accepted, row = _append_parallel_clade_permutation_row(
+                    g=g,
+                    trait_name=trait_name,
+                    iteration=iteration,
+                    request=request,
+                    result=result,
+                    n_jobs=min(int(n_jobs), len(requests)),
+                    backend=backend,
+                )
+                if accepted:
+                    accepted_rows.append(row)
+                    iteration += 1
+                    print('')
+                if iteration > int(g['fg_clade_permutation']):
+                    break
+            if break_trait:
                 break
-        if break_trait:
-            break
     if iteration > int(g['fg_clade_permutation']):
         txt = 'Clade permutation successfully found {:,} new branch combinations for trait "{}" after {:,} trials.'
         print(txt.format(g['fg_clade_permutation'], trait_name, trial_no))

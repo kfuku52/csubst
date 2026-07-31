@@ -101,6 +101,19 @@ def test_acquire_exclusive_lock_reclaims_dead_same_host_owner(tmp_path, monkeypa
     assert not lock_path.exists()
 
 
+def test_validate_required_files_rejects_symlinked_resource_root(tmp_path):
+    real_root = tmp_path / "real"
+    real_root.mkdir()
+    (real_root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    linked_root = tmp_path / "linked"
+    os.symlink(real_root, linked_root)
+    with pytest.raises(FileNotFoundError, match="symbolic link"):
+        resource_cache.validate_required_files(
+            root_dir=linked_root,
+            required_files=["payload.txt"],
+        )
+
+
 def test_acquire_exclusive_lock_heartbeat_keeps_lock_fresh(tmp_path):
     lock_path = tmp_path / "resource.lock"
     with resource_cache.acquire_exclusive_lock(
@@ -317,3 +330,19 @@ def test_ensure_vesm35m_downloads_only_required_pinned_files(tmp_path, monkeypat
         download_file=fake_download_file,
     )
     assert calls == []
+
+
+def test_resource_lock_rejects_non_finite_timing_values(tmp_path):
+    lock_path = tmp_path / "resource.lock"
+    with pytest.raises(ValueError, match="poll_seconds"):
+        with resource_cache.acquire_exclusive_lock(
+            lock_path,
+            poll_seconds=float("nan"),
+        ):
+            pass
+    with pytest.raises(ValueError, match="timeout_seconds"):
+        with resource_cache.acquire_exclusive_lock(
+            lock_path,
+            timeout_seconds=float("inf"),
+        ):
+            pass

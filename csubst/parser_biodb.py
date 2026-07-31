@@ -6,6 +6,7 @@ import json
 import os
 import re
 import requests
+import socket
 import time
 import urllib
 
@@ -34,11 +35,24 @@ def get_top_hit_ids(my_hits):
             top_hit_ids.append(top_hit_id)
     return top_hit_ids
 
-def run_qblast(aa_query, num_display=10, evalue_cutoff=10):
+def run_qblast(aa_query, num_display=10, evalue_cutoff=10, timeout=30):
     print('Running NCBI BLAST against UniProtKB/SwissProt. '
           'This step should finish within minutes but may take hours depending on the NCBI QBLAST server conditions.')
     start = time.time()
-    my_search = NCBIWWW.qblast(program='blastp', database='swissprot', sequence=aa_query, expect=evalue_cutoff)
+    timeout = float(timeout)
+    if (not np.isfinite(timeout)) or timeout <= 0:
+        raise ValueError('QBLAST timeout should be a finite value > 0.')
+    previous_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(timeout)
+    try:
+        my_search = NCBIWWW.qblast(
+            program='blastp',
+            database='swissprot',
+            sequence=aa_query,
+            expect=evalue_cutoff,
+        )
+    finally:
+        socket.setdefaulttimeout(previous_timeout)
     try:
         my_hits = NCBIXML.read(my_search)
     finally:
@@ -280,7 +294,12 @@ def pdb_sequence_search(g):
         elif database_name in ['swissmodel', 'alphafill', 'alphafold']:
             if len(top_hit_ids)==0:
                 try:
-                    top_hit_ids = run_qblast(aa_query, num_display=10, evalue_cutoff=g['database_evalue_cutoff'])
+                    top_hit_ids = run_qblast(
+                        aa_query,
+                        num_display=10,
+                        evalue_cutoff=g['database_evalue_cutoff'],
+                        timeout=network_timeout,
+                    )
                 except Exception as e:
                     print(e)
                     print('QBLAST search was unsuccessful.')

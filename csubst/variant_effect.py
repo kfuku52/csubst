@@ -63,6 +63,11 @@ def _validate_full_codon_alignment(g, state_pep):
         missing_txt = ",".join(missing[:10]) + (",..." if len(missing) > 10 else "")
         raise ValueError("Tree tip sequence(s) missing in VEP alignment: {}".format(missing_txt))
     presence_by_tip = {}
+    stop_codons = {
+        str(codon).upper().replace("U", "T")
+        for aa, codon in g.get("codon_table", [])
+        if str(aa) == "*"
+    }
     for name in tip_names:
         seq_txt = str(seq_by_name[name]).strip().upper()
         presence = np.zeros(num_site, dtype=bool)
@@ -71,7 +76,8 @@ def _validate_full_codon_alignment(g, state_pep):
             if ("-" in codon) and (codon != "---"):
                 txt = "Partial codon gap in VEP alignment: sequence={}, codon_site_alignment={}."
                 raise ValueError(txt.format(name, site + 1))
-            presence[site] = codon != "---"
+            is_terminal_stop = (site == num_site - 1) and (codon in stop_codons)
+            presence[site] = (codon != "---") and (not is_terminal_stop)
         presence_by_tip[name] = presence
     return presence_by_tip, num_site
 
@@ -98,12 +104,15 @@ def infer_ancestral_gap_presence(tree_obj, presence_by_tip, num_node, num_site):
         for child in children:
             postorder(child)
         child_masks = [fitch_mask[id(child)] for child in children]
-        intersection = child_masks[0].copy()
-        union = child_masks[0].copy()
+        combined = child_masks[0].copy()
         for child_mask in child_masks[1:]:
-            intersection = np.bitwise_and(intersection, child_mask)
-            union = np.bitwise_or(union, child_mask)
-        fitch_mask[node_key] = np.where(intersection != 0, intersection, union).astype(np.uint8, copy=False)
+            intersection = np.bitwise_and(combined, child_mask)
+            combined = np.where(
+                intersection != 0,
+                intersection,
+                np.bitwise_or(combined, child_mask),
+            ).astype(np.uint8, copy=False)
+        fitch_mask[node_key] = combined
         present_count[node_key] = sum((present_count[id(child)] for child in children), np.zeros(num_site, dtype=np.int32))
         tip_count[node_key] = sum((tip_count[id(child)] for child in children), np.zeros(num_site, dtype=np.int32))
 

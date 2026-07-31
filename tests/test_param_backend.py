@@ -778,11 +778,14 @@ def test_get_global_parameters_infers_iqtree_paths_from_gz_alignment(tmp_path, m
             iqtree_iqtree="infer",
         )
     )
-    prefix = (tmp_path / "csubst_iqtree" / "input.fa").resolve()
-    assert g["iqtree_treefile"] == str(prefix) + ".treefile"
-    assert g["iqtree_state"] == str(prefix) + ".state"
-    assert g["iqtree_rate"] == str(prefix) + ".rate"
-    assert g["iqtree_iqtree"] == str(prefix) + ".iqtree"
+    prefix = runtime.infer_iqtree_output_prefix(
+        alignment_file="input.fa.gz",
+        iqtree_outdir=str(tmp_path / "csubst_iqtree"),
+    )
+    assert g["iqtree_treefile"] == prefix + ".treefile"
+    assert g["iqtree_state"] == prefix + ".state"
+    assert g["iqtree_rate"] == prefix + ".rate"
+    assert g["iqtree_iqtree"] == prefix + ".iqtree"
 
 
 def test_get_global_parameters_validates_database_timeout():

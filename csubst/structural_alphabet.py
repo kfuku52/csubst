@@ -1,6 +1,6 @@
 from collections import OrderedDict
+import hashlib
 import os
-import subprocess
 import sys
 
 import numpy as np
@@ -22,6 +22,7 @@ _THREEDI_TO_MORPH_SYMBOL = {
 }
 _MORPH_TO_THREEDI_SYMBOL = {v: k for k, v in _THREEDI_TO_MORPH_SYMBOL.items()}
 _ASCII_CODE_SIZE = 256
+_DEFAULT_PROSTT5_REVISION = "d7d097d5bf9a993ab8f68488b4681d6ca70db9e5"
 _THREEDI_ASCII_VALID_MASK = np.zeros(shape=(_ASCII_CODE_SIZE,), dtype=bool)
 for _state_symbol in _THREEDI_STATE_ORDERS.tolist():
     _THREEDI_ASCII_VALID_MASK[ord(str(_state_symbol).strip().upper())] = True
@@ -222,27 +223,40 @@ def _resolve_prostt5_model_options(g):
     return model_name, local_dir, no_download
 
 
-def _load_prostt5_from_local_only(source, tokenizer_cls, model_cls):
+def _resolve_prostt5_revision(g):
+    revision = str(g.get("prostt5_revision", _DEFAULT_PROSTT5_REVISION)).strip()
+    if revision == "":
+        raise ValueError("--prostt5_revision should be non-empty.")
+    return revision
+
+
+def _load_prostt5_from_local_only(source, tokenizer_cls, model_cls, revision=None):
+    revision_kwargs = {} if revision is None else {"revision": revision}
     tokenizer = tokenizer_cls.from_pretrained(
         source,
         do_lower_case=False,
         local_files_only=True,
+        **revision_kwargs,
     )
     model = model_cls.from_pretrained(
         source,
         local_files_only=True,
+        **revision_kwargs,
     )
     return tokenizer, model
 
 
 def _load_or_download_prostt5(g, tokenizer_cls, model_cls):
     model_name, local_dir, no_download = _resolve_prostt5_model_options(g=g)
+    revision = _resolve_prostt5_revision(g=g)
     model_source = local_dir if local_dir != "" else model_name
+    source_revision = None if local_dir != "" else revision
     try:
         tokenizer, model = _load_prostt5_from_local_only(
             source=model_source,
             tokenizer_cls=tokenizer_cls,
             model_cls=model_cls,
+            revision=source_revision,
         )
         return tokenizer, model, model_source
     except Exception as local_exc:
@@ -280,6 +294,7 @@ def _load_or_download_prostt5(g, tokenizer_cls, model_cls):
                 source=model_source,
                 tokenizer_cls=tokenizer_cls,
                 model_cls=model_cls,
+                revision=source_revision,
             )
             return tokenizer, model, model_source
         except Exception:
@@ -294,8 +309,10 @@ def _load_or_download_prostt5(g, tokenizer_cls, model_cls):
                 "ProstT5 local cache was not found; downloading model files (first run only).",
                 flush=True,
             )
-        tokenizer = tokenizer_cls.from_pretrained(model_name, do_lower_case=False)
-        model = model_cls.from_pretrained(model_name)
+        tokenizer = tokenizer_cls.from_pretrained(
+            model_name, do_lower_case=False, revision=revision
+        )
+        model = model_cls.from_pretrained(model_name, revision=revision)
         if local_dir == "":
             return tokenizer, model, model_name
         tokenizer.save_pretrained(local_dir)
@@ -304,6 +321,7 @@ def _load_or_download_prostt5(g, tokenizer_cls, model_cls):
             source=local_dir,
             tokenizer_cls=tokenizer_cls,
             model_cls=model_cls,
+            revision=None,
         )
         return tokenizer, model, local_dir
 
@@ -423,11 +441,36 @@ def _resolve_prostt5_model_source(g):
     return model_source, no_download
 
 
-def _normalize_prostt5_model_cache_key(model_source):
+def _normalize_prostt5_model_cache_key(model_source, revision=None):
     model_source = str(model_source).strip()
     if os.path.isdir(model_source):
-        return os.path.abspath(model_source)
-    return model_source
+        root = os.path.abspath(model_source)
+        digest = hashlib.sha256()
+        for current_root, dir_names, file_names in os.walk(root):
+            dir_names[:] = sorted(
+                name for name in dir_names if name not in {".git", ".csubst-locks"}
+            )
+            for file_name in sorted(file_names):
+                path = os.path.join(current_root, file_name)
+                if not os.path.isfile(path):
+                    continue
+                relative = os.path.relpath(path, root).replace(os.sep, "/")
+                digest.update(relative.encode("utf-8"))
+                digest.update(b"\0")
+                digest.update(resource_cache.sha256_file(path).encode("ascii"))
+                digest.update(b"\0")
+        return "{}@sha256:{}".format(root, digest.hexdigest())
+    revision_txt = "" if revision is None else str(revision).strip()
+    return "{}@{}".format(model_source, revision_txt)
+
+
+def get_prostt5_model_cache_key(g):
+    model_source, _ = _resolve_prostt5_model_source(g=g)
+    revision = None if os.path.isdir(model_source) else _resolve_prostt5_revision(g=g)
+    return _normalize_prostt5_model_cache_key(
+        model_source=model_source,
+        revision=revision,
+    )
 
 
 def _load_prostt5_sequence_cache(cache_file, model_key):
@@ -568,8 +611,7 @@ def predict_3di_with_prostt5(aa_sequences, g):
         if seq_len not in length_to_unique_sequences:
             length_to_unique_sequences[seq_len] = list()
         length_to_unique_sequences[seq_len].append(seq)
-    model_source, _ = _resolve_prostt5_model_source(g=g)
-    model_key = _normalize_prostt5_model_cache_key(model_source=model_source)
+    model_key = get_prostt5_model_cache_key(g=g)
     use_cache = bool(g.get("prostt5_cache", True))
     cache_file = str(g.get("prostt5_cache_file", _default_prostt5_cache_file())).strip()
     cache_hit_count = 0
@@ -902,17 +944,6 @@ def _run_iqtree_direct_3di(g, tip_alignment_path):
     path_state = output_prefix + ".state"
     path_iqtree = output_prefix + ".iqtree"
     path_log = output_prefix + ".log"
-    required = [path_treefile, path_state, path_iqtree, path_log]
-    all_exist = all([os.path.exists(path) for path in required])
-    redo = bool(g.get("iqtree_redo", False))
-    if all_exist and (not redo):
-        print("Direct 3Di IQ-TREE intermediate files exist. Skipping rerun.", flush=True)
-        return {
-            "treefile": path_treefile,
-            "state": path_state,
-            "iqtree": path_iqtree,
-            "log": path_log,
-        }
     file_tree = runtime.temp_path("tmp.csubst.3di.nwk")
     tree.write_tree(g["rooted_tree"], outfile=file_tree, add_numerical_label=False)
     try:
@@ -940,10 +971,10 @@ def _run_iqtree_direct_3di(g, tip_alignment_path):
             "--redo",
         ]
         print("Starting direct 3Di IQ-TREE ancestral reconstruction.", flush=True)
-        run_iqtree = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr)
-        if run_iqtree.returncode != 0:
+        returncode = runtime.run_subprocess_tee(command)
+        if returncode != 0:
             txt = "Direct 3Di IQ-TREE did not finish safely (exit code {})."
-            raise AssertionError(txt.format(run_iqtree.returncode))
+            raise AssertionError(txt.format(returncode))
     finally:
         if os.path.exists(file_tree):
             os.remove(file_tree)
@@ -994,24 +1025,61 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
         symbol_3di = _convert_state_symbol_to_3di(raw_symbol, symbol_mode=state_symbol_mode)
         if symbol_3di in state_lookup:
             col_to_state[str(col)] = int(state_lookup[symbol_3di])
-    if len(col_to_state) == 0:
-        raise ValueError("No recognized 3Di state columns were found in direct .state file.")
+    if len(col_to_state) != state_orders.shape[0]:
+        raise ValueError(
+            "Direct .state file should contain exactly {} recognized 3Di probability columns; found {}.".format(
+                state_orders.shape[0], len(col_to_state)
+            )
+        )
+    if len(set(col_to_state.values())) != state_orders.shape[0]:
+        raise ValueError("Duplicate 3Di probability-state columns were found in direct .state file.")
     site_values = pd.to_numeric(state_table.loc[:, "Site"], errors="coerce")
     site_values_arr = site_values.to_numpy(dtype=float)
     if not np.isfinite(site_values_arr).all():
         raise ValueError("Non-numeric Site value(s) were found in direct .state file.")
-    rounded = np.round(site_values_arr).astype(np.int64)
+    rounded_float = np.round(site_values_arr)
+    if not np.isclose(site_values_arr, rounded_float, rtol=0.0, atol=1e-12).all():
+        raise ValueError("Non-integer Site value(s) were found in direct .state file.")
+    rounded = rounded_float.astype(np.int64)
     state_table = state_table.copy()
     state_table.loc[:, "Site"] = rounded
+    duplicate_keys = state_table.loc[:, ["Node", "Site"]].duplicated(keep=False)
+    if duplicate_keys.any():
+        raise ValueError("Duplicate Node/Site row(s) were found in direct .state file.")
     unique_sites = np.sort(state_table.loc[:, "Site"].unique())
     num_site = int(state_tensor.shape[1])
     if unique_sites.shape[0] != num_site:
         txt = "Direct 3Di site count mismatch: expected {}, observed {}."
         raise ValueError(txt.format(num_site, unique_sites.shape[0]))
+    if not np.array_equal(unique_sites, np.arange(1, num_site + 1, dtype=np.int64)):
+        raise ValueError(
+            "Unexpected Site labels in direct .state file. Expected the contiguous range 1..{}.".format(
+                num_site
+            )
+        )
     site_index_by_label = {int(site_label): i for i, site_label in enumerate(unique_sites.tolist())}
     node_name_to_id = dict()
     for node in direct_tree.traverse():
         node_name_to_id[str(node.name)] = int(ete.get_prop(node, "numerical_label"))
+    expected_internal_names = {
+        str(node.name) for node in direct_tree.traverse() if not ete.is_leaf(node)
+    }
+    observed_node_names = set(state_table.loc[:, "Node"].astype(str).tolist())
+    missing_internal_names = sorted(expected_internal_names.difference(observed_node_names))
+    if missing_internal_names:
+        raise ValueError(
+            "Internal node(s) were missing from direct .state file: {}".format(
+                ", ".join(missing_internal_names[:10])
+            )
+        )
+    site_count_by_node = state_table.groupby("Node", sort=False)["Site"].nunique()
+    invalid_counts = site_count_by_node[site_count_by_node != num_site]
+    if invalid_counts.shape[0] > 0:
+        raise ValueError(
+            "Unexpected number of Site rows for node(s) in direct .state file: {}".format(
+                ", ".join(str(name) for name in invalid_counts.index.tolist()[:10])
+            )
+        )
     row_site_labels = state_table.loc[:, "Site"].to_numpy(dtype=np.int64, copy=False)
     row_site_index = np.fromiter(
         (site_index_by_label[int(v)] for v in row_site_labels),
@@ -1027,7 +1095,15 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
     is_valid_row = row_node_ids >= 0
     state_col_names = list(col_to_state.keys())
     state_matrix = state_table.loc[:, state_col_names].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
-    state_matrix = np.nan_to_num(state_matrix, nan=0.0)
+    if (not np.isfinite(state_matrix).all()) or np.any(state_matrix < 0):
+        raise ValueError("Invalid probability value(s) were found in direct .state file.")
+    missing_state_rows = state_table.loc[:, "State"].astype(str).isin(["?", "???"]).to_numpy()
+    probability_sums = state_matrix.sum(axis=1)
+    bad_sums = (~missing_state_rows) & (np.abs(probability_sums - 1.0) > 1e-3)
+    if bad_sums.any():
+        raise ValueError("Direct .state probability rows should sum to 1.")
+    if missing_state_rows.any():
+        state_matrix[missing_state_rows, :] = 0
     for col_idx, col in enumerate(state_col_names):
         values = state_matrix[:, col_idx]
         if not np.any(values):
@@ -1082,11 +1158,12 @@ def build_3di_state_direct(g, selected_branch_ids=None, predictor=None):
                 g["_precomputed_tip_invariant_site_mask"] = np.asarray(is_drop_site, dtype=bool)
                 txt = "Direct 3Di prefilter: dropping {:,} tip-invariant 3Di site(s) before IQ-TREE."
                 print(txt.format(int(is_drop_site.sum())), flush=True)
+    morph_alignment_path = runtime.temp_path("csubst_alignment_3di_tip_morph.fa")
     _encode_tip_3di_alignment_for_morph(
         tip_3di_by_name=tip_3di_by_name_direct,
-        output_path=runtime.temp_path("csubst_alignment_3di_tip_morph.fa"),
+        output_path=morph_alignment_path,
     )
-    iqtree_paths = _run_iqtree_direct_3di(g=g, tip_alignment_path="csubst_alignment_3di_tip_morph.fa")
+    iqtree_paths = _run_iqtree_direct_3di(g=g, tip_alignment_path=morph_alignment_path)
     state_tensor_direct, state_orders = _read_direct_3di_state_tensor(
         g=g,
         paths=iqtree_paths,

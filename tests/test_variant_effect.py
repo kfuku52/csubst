@@ -91,6 +91,28 @@ def test_infer_ancestral_gap_presence_uses_parent_state_for_internal_ties():
     assert presence[node_id["A"], 0] == np.bool_(True)
 
 
+def test_infer_ancestral_gap_presence_reduces_polytomies_pairwise():
+    tree_obj = tree.add_numerical_node_labels(
+        ete.PhyloNode("((A:1,B:1,C:1)N:1,D:1)R;", format=1)
+    )
+    node_id = {
+        str(node.name): int(ete.get_prop(node, "numerical_label"))
+        for node in tree_obj.traverse()
+    }
+    presence = variant_effect.infer_ancestral_gap_presence(
+        tree_obj=tree_obj,
+        presence_by_tip={
+            "A": np.array([False]),
+            "B": np.array([True]),
+            "C": np.array([True]),
+            "D": np.array([False]),
+        },
+        num_node=len(node_id),
+        num_site=1,
+    )
+    assert presence[node_id["N"], 0] == np.bool_(True)
+
+
 def _scored_events():
     rows = [
         {

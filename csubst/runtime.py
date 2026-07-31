@@ -1,6 +1,7 @@
 import hashlib
 import os
 import shutil
+import subprocess
 import tempfile
 from collections.abc import MutableMapping
 from contextlib import contextmanager
@@ -162,23 +163,16 @@ def _strip_gzip_suffix(path):
 
 
 def _get_iqtree_prefix_key(alignment_file, base_dir=None):
-    stripped_alignment = _strip_gzip_suffix(alignment_file)
-    if stripped_alignment == "":
+    alignment_txt = str(alignment_file).strip()
+    if alignment_txt == "":
         raise ValueError("--alignment_file should be non-empty to infer IQ-TREE outputs.")
-    alignment_abs = os.path.abspath(stripped_alignment)
-    if base_dir is None:
-        base_dir = os.getcwd()
-    base_dir_abs = os.path.abspath(base_dir)
-    try:
-        relative_alignment = os.path.relpath(alignment_abs, start=base_dir_abs)
-    except ValueError:
-        relative_alignment = os.path.basename(alignment_abs)
-    if relative_alignment in [".", ""]:
-        relative_alignment = os.path.basename(alignment_abs)
-    if (relative_alignment == os.pardir) or relative_alignment.startswith(os.pardir + os.sep):
-        digest = hashlib.sha1(alignment_abs.encode("utf-8")).hexdigest()[:10]
-        relative_alignment = "{}.{}".format(os.path.basename(alignment_abs), digest)
-    return relative_alignment.replace(os.sep, "__")
+    alignment_abs = os.path.abspath(os.path.expanduser(alignment_txt))
+    base_name = os.path.basename(alignment_abs)
+    safe_base = "".join(ch if (ch.isalnum() or ch in "._-") else "_" for ch in base_name)
+    if safe_base == "":
+        safe_base = "alignment"
+    digest = hashlib.sha256(os.path.normcase(alignment_abs).encode("utf-8")).hexdigest()[:16]
+    return "{}.{}".format(safe_base, digest)
 
 
 def infer_iqtree_output_prefix(
@@ -262,7 +256,10 @@ def get_run_tempdir(create=False, base_dir=None):
     if not create:
         return None
     if base_dir is None:
-        base_dir = os.getcwd()
+        configured_tmpdir = str(os.environ.get("CSUBST_TMPDIR", "")).strip()
+        base_dir = os.path.abspath(os.path.expanduser(configured_tmpdir)) if configured_tmpdir else None
+    if base_dir is not None:
+        os.makedirs(base_dir, exist_ok=True)
     path = tempfile.mkdtemp(prefix=_RUN_TMPDIR_PREFIX, dir=base_dir)
     os.environ[_RUN_TMPDIR_ENV] = path
     return path
@@ -288,16 +285,13 @@ def cleanup_run_tempdir():
 
 
 def cleanup_legacy_temp_artifacts(base_dir=None, prefix="tmp.csubst."):
-    if base_dir is None:
-        base_dir = os.getcwd()
-    for name in os.listdir(base_dir):
-        if not str(name).startswith(prefix):
-            continue
-        path = os.path.join(base_dir, name)
-        if os.path.isdir(path):
-            shutil.rmtree(path, ignore_errors=True)
-        elif os.path.exists(path):
-            os.remove(path)
+    """Retained as a compatibility no-op.
+
+    Prefix-based cleanup cannot establish file ownership and may delete user
+    data or another CSUBST process's files. Current runs are cleaned exclusively
+    through ``run_tempdir_context``.
+    """
+    return []
 
 
 @contextmanager
@@ -311,3 +305,46 @@ def run_tempdir_context(base_dir=None):
     finally:
         if created:
             cleanup_run_tempdir()
+
+
+def replace_file_cross_device(source, destination):
+    """Atomically materialize ``source`` at ``destination`` across filesystems."""
+    source = os.path.abspath(str(source))
+    destination = os.path.abspath(str(destination))
+    if source == destination:
+        return destination
+    parent = os.path.dirname(destination) or "."
+    os.makedirs(parent, exist_ok=True)
+    fd, staged = tempfile.mkstemp(prefix=".{}.tmp.".format(os.path.basename(destination)), dir=parent)
+    os.close(fd)
+    try:
+        shutil.copy2(source, staged)
+        with open(staged, mode="rb") as handle:
+            os.fsync(handle.fileno())
+        os.replace(staged, destination)
+        os.remove(source)
+    except Exception:
+        try:
+            os.remove(staged)
+        except FileNotFoundError:
+            pass
+        raise
+    return destination
+
+
+def run_subprocess_tee(command, cwd=None):
+    """Run a child process while forwarding combined output through Python stdout."""
+    process = subprocess.Popen(
+        list(command),
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        errors="replace",
+        bufsize=1,
+    )
+    if process.stdout is not None:
+        for line in process.stdout:
+            print(line, end="", flush=True)
+        process.stdout.close()
+    return int(process.wait())

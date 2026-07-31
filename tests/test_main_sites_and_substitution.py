@@ -608,7 +608,7 @@ def test_resolve_site_jobs_rejects_duplicate_branch_ids(tiny_tree):
         main_sites.resolve_site_jobs(g)
 
 
-def test_maybe_relocate_site_log_file_moves_default_log_into_single_job_outdir(tmp_path, monkeypatch):
+def test_maybe_relocate_site_log_file_keeps_open_log_at_original_path(tmp_path, monkeypatch):
     default_log = Path(runtime.default_site_log_path(base_dir=tmp_path, create_dir=True))
     default_log.write_text("hello\n", encoding="utf-8")
     site_outdir = tmp_path / "csubst_sites.branch_id1,2"
@@ -621,10 +621,9 @@ def test_maybe_relocate_site_log_file_moves_default_log_into_single_job_outdir(t
     out = main_sites._maybe_relocate_site_log_file(g)
 
     relocated_log = site_outdir / "csubst.log"
-    assert out["log_file"] == str(relocated_log.resolve())
-    assert relocated_log.exists()
-    assert relocated_log.read_text(encoding="utf-8") == "hello\n"
-    assert not default_log.exists()
+    assert out["log_file"] == str(default_log.resolve())
+    assert not relocated_log.exists()
+    assert default_log.read_text(encoding="utf-8") == "hello\n"
 
 
 def test_normalize_branch_ids_rejects_non_integer_like_values():

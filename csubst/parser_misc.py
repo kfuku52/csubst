@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 import itertools
+import hashlib
 import json
 import os
 import pkgutil
@@ -10,6 +11,7 @@ import sys
 import tempfile
 from collections import OrderedDict
 
+from csubst import __version__
 from csubst import genetic_code
 from csubst import foreground
 from csubst import sequence
@@ -22,7 +24,7 @@ from csubst import tree
 from csubst import ete
 from csubst import tsv
 
-_THREEDI_STATE_CACHE_FORMAT_VERSION = 2
+_THREEDI_STATE_CACHE_FORMAT_VERSION = 3
 
 
 def _initialize_and_report_nonsyn_recode(g):
@@ -149,6 +151,7 @@ def _get_file_signature(path):
             'path': '',
             'size': -1,
             'mtime_ns': -1,
+            'sha256': '',
         }
     abs_path = os.path.abspath(path_txt)
     if not os.path.isfile(abs_path):
@@ -156,12 +159,14 @@ def _get_file_signature(path):
             'path': abs_path,
             'size': -1,
             'mtime_ns': -1,
+            'sha256': '',
         }
     stat = os.stat(abs_path)
     return {
         'path': abs_path,
         'size': int(stat.st_size),
         'mtime_ns': int(getattr(stat, 'st_mtime_ns', int(stat.st_mtime * 1e9))),
+        'sha256': resource_cache.sha256_file(abs_path),
     }
 
 
@@ -185,13 +190,26 @@ def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
         'drop_invariant_tip_sites': drop_mode != 'no',
         'drop_invariant_tip_sites_mode': drop_mode,
         'prostt5_model': str(g.get('prostt5_model', 'Rostlab/ProstT5')).strip(),
+        'prostt5_revision': structural_alphabet._resolve_prostt5_revision(g),
         'prostt5_local_dir': str(g.get('prostt5_local_dir', '')).strip(),
+        'prostt5_model_cache_key': structural_alphabet.get_prostt5_model_cache_key(g),
         'sa_iqtree_model': str(g.get('sa_iqtree_model', 'GTR')).strip(),
+        'iqtree_exe': os.path.realpath(str(g.get('iqtree_exe', ''))),
+        'iqtree_version': str(
+            g.get('iqtree_version', g.get('iqtree_output_version', ''))
+        ),
+        'csubst_version': str(__version__),
         'selected_branch_ids': _normalize_branch_ids_for_3di_cache(selected_branch_ids),
         'state_cdn_shape': [int(v) for v in list(state_cdn_shape)],
         'full_cds_alignment': _get_file_signature(full_cds_path),
         'iqtree_state': _get_file_signature(g.get('path_iqtree_state', '')),
     }
+    rooted_tree = g.get('rooted_tree', None)
+    if rooted_tree is not None:
+        tree_payload = repr(tree.get_tree_cache_signature(rooted_tree)).encode('utf-8')
+        context['rooted_tree_sha256'] = hashlib.sha256(tree_payload).hexdigest()
+    else:
+        context['rooted_tree_sha256'] = ''
     return context
 
 
@@ -280,22 +298,29 @@ def _read_package_text(file):
 def generate_intermediate_files(g, force_notree_run=False):
     if g['infile_type'] == 'iqtree':
         g,all_exist = parser_iqtree.check_intermediate_files(g)
+        dependency_checked = False
         if (all_exist)&(not g['iqtree_redo']):
-            print('IQ-TREE\'s intermediate files exist.')
-            g = parser_iqtree.read_iqtree(g, eq=False)
-            iqtree_model = g['substitution_model']
-            g['substitution_model'] = None
-            if (iqtree_model==g['iqtree_model']):
-                txt = 'The model in the IQ-TREE\'s output ({}) matched --iqtree_model ({}). Skipping IQ-TREE.'
-                print(txt.format(iqtree_model, g['iqtree_model']))
-                return g
-            else:
+            parser_iqtree.check_iqtree_dependency(g)
+            dependency_checked = True
+            compatible, reason = parser_iqtree.is_iqtree_manifest_compatible(g)
+            if compatible:
+                print('IQ-TREE\'s intermediate files and provenance manifest are compatible.')
+                g = parser_iqtree.read_iqtree(g, eq=False)
+                iqtree_model = g['substitution_model']
+                g['substitution_model'] = None
+                if iqtree_model == g['iqtree_model']:
+                    txt = 'The model in the IQ-TREE\'s output ({}) matched --iqtree_model ({}). Skipping IQ-TREE.'
+                    print(txt.format(iqtree_model, g['iqtree_model']))
+                    return g
                 txt = 'The model in the IQ-TREE\'s output ({}) did not match --iqtree_model ({}). Redoing IQ-TREE.'
                 print(txt.format(iqtree_model, g['iqtree_model']))
+            else:
+                print('IQ-TREE intermediate files will be regenerated because {}.'.format(reason))
         if (all_exist)&(g['iqtree_redo']):
             print('--iqtree_redo is set.')
         print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)
-        parser_iqtree.check_iqtree_dependency(g)
+        if not dependency_checked:
+            parser_iqtree.check_iqtree_dependency(g)
         parser_iqtree.run_iqtree_ancestral(g, force_notree_run=force_notree_run)
     else:
         raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))

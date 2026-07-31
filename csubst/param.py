@@ -827,6 +827,9 @@ def get_global_parameters(args):
         if g['pymol_max_num_chain'] < 1:
             raise ValueError('--pymol_max_num_chain should be >= 1.')
     if 'float_digit' in g.keys():
+        g['float_digit'] = int(g['float_digit'])
+        if (g['float_digit'] < 0) or (g['float_digit'] > 17):
+            raise ValueError('--float_digit should satisfy 0 <= value <= 17.')
         g['float_format'] = '%.'+str(g['float_digit'])+'f'
     if 'threads' in g.keys():
         g['threads'] = int(g['threads'])
@@ -864,12 +867,18 @@ def get_global_parameters(args):
     g['resource_cache_dir'] = str(g['resource_cache_dir']).strip()
     if 'resource_lock_poll' not in g.keys():
         g['resource_lock_poll'] = 5.0
-    g['resource_lock_poll'] = float(g['resource_lock_poll'])
+    g['resource_lock_poll'] = _require_finite_float(
+        value=float(g['resource_lock_poll']),
+        param_name='--resource_lock_poll',
+    )
     if g['resource_lock_poll'] <= 0:
         raise ValueError('--resource_lock_poll should be > 0.')
     if 'resource_lock_timeout' not in g.keys():
         g['resource_lock_timeout'] = 3600.0
-    g['resource_lock_timeout'] = float(g['resource_lock_timeout'])
+    g['resource_lock_timeout'] = _require_finite_float(
+        value=float(g['resource_lock_timeout']),
+        param_name='--resource_lock_timeout',
+    )
     if g['resource_lock_timeout'] <= 0:
         raise ValueError('--resource_lock_timeout should be > 0.')
     if 'download_prostt5' not in g.keys():

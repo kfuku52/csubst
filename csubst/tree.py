@@ -144,8 +144,47 @@ def add_numerical_node_labels(tree):
     return tree
 
 def is_consistent_tree(tree1, tree2):
-    is_consistent_tree = set(ete.get_leaf_names(tree1)) == set(ete.get_leaf_names(tree2))
-    return is_consistent_tree
+    leaf_name_list1 = [str(name) for name in ete.get_leaf_names(tree1)]
+    leaf_name_list2 = [str(name) for name in ete.get_leaf_names(tree2)]
+    if len(set(leaf_name_list1)) != len(leaf_name_list1):
+        return False
+    if len(set(leaf_name_list2)) != len(leaf_name_list2):
+        return False
+    leaf_names1 = set(leaf_name_list1)
+    leaf_names2 = set(leaf_name_list2)
+    if leaf_names1 != leaf_names2:
+        return False
+    return get_tree_topology_signature(tree1, rooted=False) == get_tree_topology_signature(
+        tree2, rooted=False
+    )
+
+
+def get_tree_topology_signature(tree_obj, rooted=False):
+    """Return a deterministic topology signature independent of child order."""
+    all_leaves = frozenset(str(name) for name in ete.get_leaf_names(tree_obj))
+    signatures = set()
+    for node in tree_obj.traverse():
+        if ete.is_root(node):
+            continue
+        descendants = frozenset(str(name) for name in ete.get_leaf_names(node))
+        if rooted:
+            signatures.add(tuple(sorted(descendants)))
+            continue
+        complement = all_leaves.difference(descendants)
+        left = tuple(sorted(descendants))
+        right = tuple(sorted(complement))
+        signatures.add(min(left, right))
+    return tuple(sorted(signatures))
+
+
+def get_tree_cache_signature(tree_obj):
+    """Return rooted topology and branch-length data suitable for cache keys."""
+    records = []
+    for node in tree_obj.traverse():
+        descendants = tuple(sorted(str(name) for name in ete.get_leaf_names(node)))
+        distance = 0.0 if node.dist is None else float(node.dist)
+        records.append((descendants, format(distance, ".17g")))
+    return tuple(sorted(records))
 
 def transfer_root(tree_to, tree_from, verbose=False):
     for node in tree_to.traverse():
@@ -1767,10 +1806,10 @@ def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, sta
                               output_dir=None, node_type_by_id=None, site_number_labels=None,
                               tip_label_color_by_node_id=None, highlighted_node_ids=None,
                               highlight_color=None, tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
-                              tree_fig_max_height=TREE_FIG_MAX_HEIGHT):
+                              tree_fig_max_height=TREE_FIG_MAX_HEIGHT, file_prefix='csubst'):
     from matplotlib.backends.backend_pdf import PdfPages
 
-    file_name = 'csubst_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
+    file_name = str(file_prefix) + '_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
     file_name = file_name.replace('_PLACEHOLDER', '')
     if output_dir is not None:
         file_name = os.path.join(output_dir, file_name)
@@ -1812,8 +1851,8 @@ def _render_state_tree_concatenated(tree, trait_name, mode, orders, missing_stat
                                     output_dir=None, node_type_by_id=None, tip_label_color_by_node_id=None,
                                     highlighted_node_ids=None, highlight_color=None,
                                     tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
-                                    tree_fig_max_height=TREE_FIG_MAX_HEIGHT):
-    file_name = 'csubst_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
+                                    tree_fig_max_height=TREE_FIG_MAX_HEIGHT, file_prefix='csubst'):
+    file_name = str(file_prefix) + '_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
     file_name = file_name.replace('_PLACEHOLDER', '')
     if output_dir is not None:
         file_name = os.path.join(output_dir, file_name)
@@ -1935,6 +1974,7 @@ def plot_state_tree(state, orders, mode, g, output_dir=None, plot_request='all',
                     highlight_color=highlight_color,
                     tip_label_spacing_factor=tip_label_spacing_factor,
                     tree_fig_max_height=tree_fig_max_height,
+                    file_prefix=g.get('output_prefix', 'csubst'),
                 )
             )
             continue
@@ -1955,6 +1995,7 @@ def plot_state_tree(state, orders, mode, g, output_dir=None, plot_request='all',
                 highlight_color=highlight_color,
                 tip_label_spacing_factor=tip_label_spacing_factor,
                 tree_fig_max_height=tree_fig_max_height,
+                file_prefix=g.get('output_prefix', 'csubst'),
             )
         )
     return out_files
@@ -2074,6 +2115,7 @@ def plot_state_tree_selected_sites(state, orders, mode, g, site_numbers, output_
                     highlight_color=highlight_color,
                     tip_label_spacing_factor=tip_label_spacing_factor,
                     tree_fig_max_height=tree_fig_max_height,
+                    file_prefix=g.get('output_prefix', 'csubst'),
                 )
             )
             continue
@@ -2094,6 +2136,7 @@ def plot_state_tree_selected_sites(state, orders, mode, g, site_numbers, output_
                 highlight_color=highlight_color,
                 tip_label_spacing_factor=tip_label_spacing_factor,
                 tree_fig_max_height=tree_fig_max_height,
+                file_prefix=g.get('output_prefix', 'csubst'),
             )
         )
     return out_files

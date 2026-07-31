@@ -837,9 +837,13 @@ def _materialize_simulated_alignment(g, file_conv, file_noconv):
     file_out = g['simulate_alignment_file']
     file_all = runtime.temp_path('tmp.csubst.simulate_all.fa')
     if (os.path.exists(file_conv)) and (not os.path.exists(file_noconv)):
-        os.rename(file_conv, file_out if (not g['export_true_asr']) else file_all)
+        runtime.replace_file_cross_device(
+            file_conv, file_out if (not g['export_true_asr']) else file_all
+        )
     elif (not os.path.exists(file_conv)) and (os.path.exists(file_noconv)):
-        os.rename(file_noconv, file_out if (not g['export_true_asr']) else file_all)
+        runtime.replace_file_cross_device(
+            file_noconv, file_out if (not g['export_true_asr']) else file_all
+        )
     else:
         concatenate_alignment(
             in1=file_conv,

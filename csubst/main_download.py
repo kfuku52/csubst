@@ -24,7 +24,7 @@ def main_download(g):
             paths = model_resources.ensure_vesm35m_resource(
                 cache_dir=g.get("resource_cache_dir", ""),
                 no_download=bool(g.get("no_download", False)),
-                verify_existing=bool(g.get("verify", False)),
+                verify_existing=True,
                 poll_seconds=poll_seconds,
                 timeout_seconds=timeout_seconds,
             )

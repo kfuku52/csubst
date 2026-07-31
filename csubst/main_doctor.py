@@ -266,6 +266,12 @@ def _summarize_foreground(rows, g, tree_summary):
 
 
 def _summarize_iqtree_paths(rows, g):
+    iqtree_layout = dict(g)
+    runtime.ensure_iqtree_layout(iqtree_layout, create_dir=False)
+    inferred_prefix = runtime.infer_iqtree_output_prefix(
+        alignment_file=iqtree_layout.get("alignment_file", ""),
+        iqtree_outdir=iqtree_layout.get("iqtree_outdir", "csubst_iqtree"),
+    )
     files = {
         "iqtree_treefile": g.get("iqtree_treefile", ""),
         "iqtree_state": g.get("iqtree_state", ""),
@@ -273,6 +279,10 @@ def _summarize_iqtree_paths(rows, g):
         "iqtree_iqtree": g.get("iqtree_iqtree", ""),
         "iqtree_log": g.get("iqtree_log", ""),
     }
+    for key in list(files):
+        if str(files[key]).strip().lower() == "infer":
+            extension = key.replace("iqtree_", "", 1)
+            files[key] = inferred_prefix + "." + extension
     missing = list()
     for key, path in files.items():
         path_txt = _normalize_path(path)
