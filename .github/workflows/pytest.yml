@@ -204,16 +204,18 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-          cache: pip
+
+      - name: Install dependencies without sanitizer flags
+        run: |
+          python -m pip install --upgrade pip setuptools wheel Cython numpy pytest
+          python -m pip install --no-build-isolation -e .
 
       - name: Build extensions with address and undefined-behavior sanitizers
         env:
           CFLAGS: -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
           LDFLAGS: -fsanitize=address,undefined
           CSUBST_USE_CYTHON: "1"
-        run: |
-          python -m pip install --upgrade pip setuptools wheel Cython numpy pytest
-          python -m pip install --no-build-isolation -e .
+        run: python setup.py build_ext --inplace --force
 
       - name: Run randomized sparse parity tests under sanitizers
         env:
