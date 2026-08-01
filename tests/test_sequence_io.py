@@ -38,6 +38,13 @@ def test_read_fasta_records_preserves_descriptions_and_uses_first_token_as_id():
     ]
 
 
+def test_read_fasta_records_removes_sequence_whitespace_like_biopython():
+    records = sequence_io.read_fasta_records(
+        io.StringIO(">seq1\nAC GT\tAA\n C G \n")
+    )
+    assert records[0].sequence == "ACGTAACG"
+
+
 def test_read_fasta_records_rejects_sequence_before_header():
     with pytest.raises(ValueError, match="sequence line appeared before header"):
         sequence_io.read_fasta_records(io.StringIO("AAAA\n>seq1\nTTTT\n"))

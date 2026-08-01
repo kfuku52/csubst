@@ -68,7 +68,9 @@ def read_fasta_records(source):
             if description is None:
                 txt = 'Invalid FASTA format in {} at line {}: sequence line appeared before header.'
                 raise ValueError(txt.format(source_label, line_no))
-            sequence_parts.append(line.strip())
+            # Match Biopython's FASTA behavior: whitespace is formatting, not
+            # part of the biological sequence (including spaces and tabs).
+            sequence_parts.append(''.join(line.split()))
     if description is not None:
         records.append(FastaRecord(description, ''.join(sequence_parts)))
     return records

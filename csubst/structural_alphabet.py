@@ -444,8 +444,12 @@ def _resolve_prostt5_model_source(g):
 def _normalize_prostt5_model_cache_key(model_source, revision=None):
     model_source = str(model_source).strip()
     if os.path.isdir(model_source):
-        root = os.path.abspath(model_source)
+        root = os.path.realpath(os.path.abspath(model_source))
         digest = hashlib.sha256()
+        # Directory identity prevents distinct local models with identical
+        # file names, sizes, and mtimes from sharing cached predictions.
+        digest.update(os.path.normcase(root).encode("utf-8"))
+        digest.update(b"\0")
         for current_root, dir_names, file_names in os.walk(root):
             dir_names[:] = sorted(
                 name for name in dir_names if name not in {".git", ".csubst-locks"}

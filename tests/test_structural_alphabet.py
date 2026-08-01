@@ -653,6 +653,29 @@ def test_local_prostt5_cache_key_does_not_hash_model_contents(tmp_path, monkeypa
     assert first != second
 
 
+def test_local_prostt5_cache_key_distinguishes_model_directories(tmp_path):
+    first_dir = tmp_path / "model-a"
+    second_dir = tmp_path / "model-b"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    first_weight = first_dir / "model.safetensors"
+    second_weight = second_dir / "model.safetensors"
+    first_weight.write_bytes(b"AAAA")
+    second_weight.write_bytes(b"BBBB")
+    shared_mtime_ns = 1_700_000_000_000_000_000
+    os.utime(first_weight, ns=(shared_mtime_ns, shared_mtime_ns))
+    os.utime(second_weight, ns=(shared_mtime_ns, shared_mtime_ns))
+
+    first = structural_alphabet.get_prostt5_model_cache_key(
+        {"prostt5_local_dir": str(first_dir)}
+    )
+    second = structural_alphabet.get_prostt5_model_cache_key(
+        {"prostt5_local_dir": str(second_dir)}
+    )
+
+    assert first != second
+
+
 def test_predict_3di_with_prostt5_uses_cache_without_loading_model(tmp_path, monkeypatch):
     cache_path = tmp_path / "prostt5_cache.tsv"
     model_key = structural_alphabet.get_prostt5_model_cache_key({})
