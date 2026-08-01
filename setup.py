@@ -106,12 +106,12 @@ setup(
     python_requires  = '>=3.10',
     packages         = find_packages(),
     install_requires = [
-                            'ete4>=4.3.0,<4.4',
+                            'ete4>=4.3.0',
                             'numpy',
                             'scipy',
                             'pandas',
                             'matplotlib<3.11',
-                            'biopython>=1.80,<1.87',
+                            'biopython>=1.80',
                             'requests',
     ],
     extras_require   = {
