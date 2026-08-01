@@ -183,22 +183,41 @@ def _make_output_parent_parser(default_outdir='.', default_prefix='csubst'):
 
 
 def _resolve_log_file_from_argv(argv):
-    parser = argparse.ArgumentParser(add_help=False)
     defaults = _resolve_output_namespace_defaults(argv)
-    _add_output_namespace_args(
-        parser,
-        default_outdir=defaults['outdir'],
-        default_prefix=defaults['output_prefix'],
-        include_outdir=True,
-        include_output_prefix=True,
-        include_log_file=True,
-    )
+    values = {
+        'outdir': defaults['outdir'],
+        'output_prefix': defaults['output_prefix'],
+        'log_file': '',
+    }
+    option_to_key = {
+        '--outdir': 'outdir',
+        '--output_prefix': 'output_prefix',
+        '--log_file': 'log_file',
+    }
+    i = 0
+    argv = list(argv)
+    while i < len(argv):
+        token = str(argv[i])
+        matched = False
+        for option, key in option_to_key.items():
+            if token.startswith(option + '='):
+                values[key] = token.split('=', 1)[1]
+                matched = True
+                break
+            if token == option:
+                if (i + 1 < len(argv)) and (not str(argv[i + 1]).startswith('-')):
+                    values[key] = str(argv[i + 1])
+                    i += 1
+                matched = True
+                break
+        i += 1
+        if matched:
+            continue
     try:
-        args, _ = parser.parse_known_args(argv)
         layout = {
-            'outdir': args.outdir,
-            'output_prefix': args.output_prefix,
-            'log_file': args.log_file,
+            'outdir': values['outdir'],
+            'output_prefix': values['output_prefix'],
+            'log_file': values['log_file'],
         }
         runtime.ensure_output_layout(layout, create_dir=True)
         return layout['log_file']

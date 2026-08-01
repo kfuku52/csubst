@@ -90,9 +90,11 @@ with zipfile.ZipFile(wheel_path) as archive:
 
 requirements = metadata.get_all("Requires-Dist", [])
 normalized_requirements = [requirement.lower().replace("_", "-") for requirement in requirements]
-for distribution in ("ete4", "numpy", "scipy", "pandas", "matplotlib", "biopython", "requests"):
+for distribution in ("ete4", "numpy", "scipy", "pandas", "matplotlib", "requests"):
     if not any(requirement.startswith(distribution) for requirement in normalized_requirements):
         raise RuntimeError("Wheel metadata is missing dependency {!r}.".format(distribution))
+if any(requirement.startswith("biopython") for requirement in normalized_requirements):
+    raise RuntimeError("Wheel metadata unexpectedly depends on Biopython.")
 if not any(
     requirement.startswith("matplotlib") and "<3.11" in requirement
     for requirement in normalized_requirements

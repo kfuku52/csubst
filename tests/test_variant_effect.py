@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -91,7 +93,34 @@ def test_infer_ancestral_gap_presence_uses_parent_state_for_internal_ties():
     assert presence[node_id["A"], 0] == np.bool_(True)
 
 
-def test_infer_ancestral_gap_presence_reduces_polytomies_pairwise():
+def test_infer_ancestral_gap_presence_is_invariant_to_polytomy_child_order():
+    presence_by_tip = {
+        "A": np.array([False]),
+        "B": np.array([True]),
+        "C": np.array([False]),
+        "D": np.array([True]),
+    }
+    observed = set()
+    for child_order in itertools.permutations(["A", "B", "C"]):
+        children = ",".join("{}:1".format(name) for name in child_order)
+        tree_obj = tree.add_numerical_node_labels(
+            ete.PhyloNode("(({})N:1,D:1)R;".format(children), format=1)
+        )
+        node_id = {
+            str(node.name): int(ete.get_prop(node, "numerical_label"))
+            for node in tree_obj.traverse()
+        }
+        presence = variant_effect.infer_ancestral_gap_presence(
+            tree_obj=tree_obj,
+            presence_by_tip=presence_by_tip,
+            num_node=len(node_id),
+            num_site=1,
+        )
+        observed.add((bool(presence[node_id["N"], 0]), bool(presence[node_id["R"], 0])))
+    assert observed == {(False, True)}
+
+
+def test_infer_ancestral_gap_presence_uses_minimum_cost_state_for_polytomy():
     tree_obj = tree.add_numerical_node_labels(
         ete.PhyloNode("((A:1,B:1,C:1)N:1,D:1)R;", format=1)
     )

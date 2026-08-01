@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from csubst import parser_iqtree
+from csubst import runtime
 from csubst import tree
 from csubst import ete
 
@@ -17,6 +18,24 @@ def test_infer_iqtree_output_prefix_from_alignment_uses_shared_dir(tmp_path, mon
     uncompressed = parser_iqtree._infer_iqtree_output_prefix_from_alignment("input.fa")
     assert os.path.basename(uncompressed).startswith("input.fa.")
     assert uncompressed != observed
+
+
+def test_infer_iqtree_output_prefix_is_stable_when_work_directory_moves(tmp_path):
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+    first_root.mkdir()
+    second_root.mkdir()
+    first = runtime.infer_iqtree_output_prefix(
+        alignment_file=first_root / "inputs" / "alignment.fa.gz",
+        iqtree_outdir=first_root / "csubst_iqtree",
+        base_dir=first_root,
+    )
+    second = runtime.infer_iqtree_output_prefix(
+        alignment_file=second_root / "inputs" / "alignment.fa.gz",
+        iqtree_outdir=second_root / "csubst_iqtree",
+        base_dir=second_root,
+    )
+    assert os.path.basename(first) == os.path.basename(second)
 
 
 def test_check_intermediate_files_infer_uses_shared_iqtree_dir_for_gz_alignment(tmp_path, monkeypatch):
@@ -64,6 +83,44 @@ def test_iqtree_manifest_invalidates_reuse_when_alignment_changes(tmp_path):
     compatible, reason = parser_iqtree.is_iqtree_manifest_compatible(g)
     assert compatible is False
     assert "changed" in reason
+
+
+def test_iqtree_manifest_ignores_location_runtime_version_and_threads(tmp_path):
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    alignment = first_dir / "alignment.fa"
+    alignment.write_text(">A\nAAA\n>B\nAAA\n", encoding="utf-8")
+    state_path = first_dir / "alignment.state"
+    rooted_tree = ete.PhyloNode("(A:1,B:1)R;", format=1)
+    g = {
+        "alignment_file": str(alignment),
+        "path_iqtree_state": str(state_path),
+        "rooted_tree": rooted_tree,
+        "iqtree_exe": "/first/iqtree",
+        "iqtree_version": "2.3.6",
+        "iqtree_model": "MG",
+        "genetic_code": 1,
+        "threads": 2,
+    }
+    parser_iqtree._write_iqtree_manifest(g)
+    moved_alignment = second_dir / alignment.name
+    moved_alignment.write_bytes(alignment.read_bytes())
+    moved_state = second_dir / state_path.name
+    moved_manifest = second_dir / (state_path.name + ".csubst-manifest.json")
+    moved_manifest.write_bytes((first_dir / moved_manifest.name).read_bytes())
+    moved_g = dict(g)
+    moved_g.update({
+        "alignment_file": str(moved_alignment),
+        "path_iqtree_state": str(moved_state),
+        "iqtree_exe": "/second/iqtree",
+        "iqtree_version": "3.0.1",
+        "threads": 16,
+    })
+    compatible, reason = parser_iqtree.is_iqtree_manifest_compatible(moved_g)
+    assert compatible is True
+    assert reason == ""
 
 
 def _get_base_g(tmp_path, iqtree_text, log_text):

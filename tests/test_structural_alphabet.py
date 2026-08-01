@@ -632,6 +632,27 @@ def test_resolve_prostt5_auto_batch_size_can_expand_on_mps():
     assert batch_size == 16
 
 
+def test_local_prostt5_cache_key_does_not_hash_model_contents(tmp_path, monkeypatch):
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    weight_path = model_dir / "model.safetensors"
+    weight_path.write_bytes(b"model-v1")
+    monkeypatch.setattr(
+        structural_alphabet.resource_cache,
+        "sha256_file",
+        lambda _path: (_ for _ in ()).throw(AssertionError("model contents should not be read")),
+    )
+    first = structural_alphabet.get_prostt5_model_cache_key(
+        {"prostt5_local_dir": str(model_dir)}
+    )
+    weight_path.write_bytes(b"model-version-2")
+    second = structural_alphabet.get_prostt5_model_cache_key(
+        {"prostt5_local_dir": str(model_dir)}
+    )
+    assert first.startswith("local-model@metadata-sha256:")
+    assert first != second
+
+
 def test_predict_3di_with_prostt5_uses_cache_without_loading_model(tmp_path, monkeypatch):
     cache_path = tmp_path / "prostt5_cache.tsv"
     model_key = structural_alphabet.get_prostt5_model_cache_key({})

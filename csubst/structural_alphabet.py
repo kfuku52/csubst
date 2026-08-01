@@ -455,11 +455,14 @@ def _normalize_prostt5_model_cache_key(model_source, revision=None):
                 if not os.path.isfile(path):
                     continue
                 relative = os.path.relpath(path, root).replace(os.sep, "/")
+                file_stat = os.stat(path, follow_symlinks=False)
                 digest.update(relative.encode("utf-8"))
                 digest.update(b"\0")
-                digest.update(resource_cache.sha256_file(path).encode("ascii"))
+                digest.update(str(int(file_stat.st_size)).encode("ascii"))
                 digest.update(b"\0")
-        return "{}@sha256:{}".format(root, digest.hexdigest())
+                digest.update(str(int(file_stat.st_mtime_ns)).encode("ascii"))
+                digest.update(b"\0")
+        return "local-model@metadata-sha256:{}".format(digest.hexdigest())
     revision_txt = "" if revision is None else str(revision).strip()
     return "{}@{}".format(model_source, revision_txt)
 

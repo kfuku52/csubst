@@ -83,8 +83,9 @@ def _validate_full_codon_alignment(g, state_pep):
 
 
 def infer_ancestral_gap_presence(tree_obj, presence_by_tip, num_node, num_site):
-    """Infer codon presence/absence with Fitch parsimony and deterministic tie breaking."""
+    """Infer codon presence/absence with parsimony and deterministic tie breaking."""
     fitch_mask = {}
+    state_cost = {}
     present_count = {}
     tip_count = {}
 
@@ -95,6 +96,14 @@ def infer_ancestral_gap_presence(tree_obj, presence_by_tip, num_node, num_site):
                 raise ValueError("Missing tip gap mask: {}".format(node.name))
             present = np.asarray(presence_by_tip[str(node.name)], dtype=bool)
             fitch_mask[node_key] = np.where(present, 2, 1).astype(np.uint8, copy=False)
+            impossible = np.full(num_site, int(num_node) + 1, dtype=np.int32)
+            state_cost[node_key] = np.stack(
+                [
+                    np.where(present, impossible, 0),
+                    np.where(present, 0, impossible),
+                ],
+                axis=0,
+            ).astype(np.int32, copy=False)
             present_count[node_key] = present.astype(np.int32, copy=False)
             tip_count[node_key] = np.ones(num_site, dtype=np.int32)
             return
@@ -103,16 +112,19 @@ def infer_ancestral_gap_presence(tree_obj, presence_by_tip, num_node, num_site):
             raise ValueError("Internal VEP gap-reconstruction node had no children.")
         for child in children:
             postorder(child)
-        child_masks = [fitch_mask[id(child)] for child in children]
-        combined = child_masks[0].copy()
-        for child_mask in child_masks[1:]:
-            intersection = np.bitwise_and(combined, child_mask)
-            combined = np.where(
-                intersection != 0,
-                intersection,
-                np.bitwise_or(combined, child_mask),
-            ).astype(np.uint8, copy=False)
-        fitch_mask[node_key] = combined
+        absent_cost = np.zeros(num_site, dtype=np.int32)
+        present_cost_for_node = np.zeros(num_site, dtype=np.int32)
+        for child in children:
+            child_cost = state_cost.pop(id(child))
+            absent_cost += np.minimum(child_cost[0], child_cost[1] + 1)
+            present_cost_for_node += np.minimum(child_cost[0] + 1, child_cost[1])
+        state_cost[node_key] = np.stack(
+            [absent_cost, present_cost_for_node], axis=0
+        )
+        mask = np.full(num_site, 3, dtype=np.uint8)
+        mask[absent_cost < present_cost_for_node] = 1
+        mask[present_cost_for_node < absent_cost] = 2
+        fitch_mask[node_key] = mask
         present_count[node_key] = sum((present_count[id(child)] for child in children), np.zeros(num_site, dtype=np.int32))
         tip_count[node_key] = sum((tip_count[id(child)] for child in children), np.zeros(num_site, dtype=np.int32))
 

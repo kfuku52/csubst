@@ -9,6 +9,7 @@ from collections import OrderedDict
 from csubst import foreground
 from csubst import parser_misc
 from csubst import runtime
+from csubst import sequence_io
 from csubst import tree
 from csubst import ete
 
@@ -19,12 +20,7 @@ def _require_pyvolve():
     global _PYVOLVE
     if _PYVOLVE is not None:
         return _PYVOLVE
-    try:
-        from csubst._vendor import pyvolve as _pyvolve
-    except ImportError:
-        # Backward-compatible fallback for legacy environments where the
-        # vendored backend is unavailable.
-        import pyvolve as _pyvolve
+    from csubst._vendor import pyvolve as _pyvolve
     _PYVOLVE = _pyvolve
     return _PYVOLVE
 
@@ -664,31 +660,19 @@ def concatenate_alignment(in1, in2, out):
 
 
 def read_fasta(path):
-    seqs = OrderedDict()
-    current_name = None
-    with open(path, 'r') as f:
-        for raw_line in f:
-            line = raw_line.strip()
-            if line == '':
-                continue
-            if line.startswith('>'):
-                current_name = line[1:].strip()
-                if current_name == '':
-                    raise ValueError('Invalid FASTA header in {}.'.format(path))
-                if current_name in seqs:
-                    raise ValueError('Duplicate FASTA header in {}: {}'.format(path, current_name))
-                seqs[current_name] = ''
-                continue
-            if current_name is None:
-                raise ValueError('Invalid FASTA format in {}: sequence line appeared before header.'.format(path))
-            seqs[current_name] += line.upper().replace('U', 'T')
-    return seqs
+    records = sequence_io.read_fasta_records(path)
+    try:
+        seqs = sequence_io.records_to_dict(records, key='description')
+    except ValueError as exc:
+        raise ValueError('Invalid or duplicate FASTA header in {}: {}'.format(path, exc)) from exc
+    return OrderedDict([
+        (name, seq.upper().replace('U', 'T'))
+        for name, seq in seqs.items()
+    ])
 
 
 def write_fasta(seqs, path):
-    with open(path, 'w') as f:
-        for name, seq in seqs.items():
-            f.write('>{}\n{}\n'.format(name, seq))
+    sequence_io.write_fasta_dict(seqs, path)
     return None
 
 

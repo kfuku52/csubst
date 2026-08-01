@@ -20,7 +20,6 @@ from csubst import table
 
 DEPENDENCY_DISTRIBUTIONS = (
     'ete4',
-    'biopython',
     'requests',
     'numpy',
     'scipy',

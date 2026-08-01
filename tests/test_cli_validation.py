@@ -78,6 +78,14 @@ def test_simulate_invalid_percent_biased_sub_fails_cleanly():
     assert "Traceback" not in log_text
 
 
+def test_missing_output_option_value_is_reported_once_and_written_to_log():
+    proc, log_text = _run_cli("search", "--outdir")
+    expected = "argument --outdir: expected one argument"
+    assert proc.returncode == 2
+    assert proc.stderr.count(expected) == 1
+    assert expected in log_text
+
+
 def test_simulate_invalid_seed_fails_cleanly():
     proc, log_text = _run_cli("simulate", "--simulate_seed", "-2")
     assert proc.returncode == 2

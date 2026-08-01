@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import pymol
 
-from Bio import SeqIO
-
 from io import StringIO
 import copy
 import os
@@ -13,6 +11,7 @@ import subprocess
 import time
 
 from csubst import sequence
+from csubst import sequence_io
 from csubst import resource_cache
 from csubst import runtime
 from csubst import structure_resources
@@ -510,18 +509,16 @@ def add_coordinate_from_user_alignment(df, user_alignment):
     tmp_pdb_fasta = runtime.temp_path('tmp.csubst.pdb_seq.fa')
     with open(tmp_pdb_fasta, 'w') as f:
         f.write(pdb_fasta)
-    with open(tmp_pdb_fasta, 'r') as f:
-        pdb_seqs = list(SeqIO.parse(f, 'fasta'))
-    with open(user_alignment, 'r') as f:
-        user_seqs = list(SeqIO.parse(f, 'fasta'))
+    pdb_seqs = sequence_io.read_fasta_records(tmp_pdb_fasta)
+    user_seqs = sequence_io.read_fasta_records(user_alignment)
     num_matched_sequences = 0
     for user_seq in user_seqs:
         for pdb_seq in pdb_seqs:
             if user_seq.name!=pdb_seq.name:
                 continue
             num_matched_sequences += 1
-            user_seq_str = str(user_seq.seq).replace('\n', '').upper()
-            pdb_seq_str = str(pdb_seq.seq).replace('\n', '').upper()
+            user_seq_str = user_seq.sequence.upper()
+            pdb_seq_str = pdb_seq.sequence.upper()
             user_seq_counter = 0
             pdb_seq_counter = 0
             row_labels = df.index.to_list()

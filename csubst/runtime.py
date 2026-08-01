@@ -166,12 +166,27 @@ def _get_iqtree_prefix_key(alignment_file, base_dir=None):
     alignment_txt = str(alignment_file).strip()
     if alignment_txt == "":
         raise ValueError("--alignment_file should be non-empty to infer IQ-TREE outputs.")
-    alignment_abs = os.path.abspath(os.path.expanduser(alignment_txt))
+    if base_dir is None:
+        base_dir = os.getcwd()
+    base_dir_abs = os.path.abspath(os.path.expanduser(str(base_dir)))
+    expanded_alignment = os.path.expanduser(alignment_txt)
+    if os.path.isabs(expanded_alignment):
+        alignment_abs = os.path.abspath(expanded_alignment)
+    else:
+        alignment_abs = os.path.abspath(os.path.join(base_dir_abs, expanded_alignment))
     base_name = os.path.basename(alignment_abs)
     safe_base = "".join(ch if (ch.isalnum() or ch in "._-") else "_" for ch in base_name)
     if safe_base == "":
         safe_base = "alignment"
-    digest = hashlib.sha256(os.path.normcase(alignment_abs).encode("utf-8")).hexdigest()[:16]
+    try:
+        relative_alignment = os.path.relpath(alignment_abs, start=base_dir_abs)
+    except ValueError:
+        relative_alignment = alignment_abs
+    if (relative_alignment == os.pardir) or relative_alignment.startswith(os.pardir + os.sep):
+        identity = os.path.normcase(alignment_abs)
+    else:
+        identity = os.path.normcase(relative_alignment)
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
     return "{}.{}".format(safe_base, digest)
 
 

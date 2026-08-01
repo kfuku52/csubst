@@ -1,4 +1,3 @@
-import gzip
 import os
 import itertools
 import re
@@ -8,6 +7,7 @@ import numpy as np
 
 from csubst import ete
 from csubst import runtime
+from csubst import sequence_io
 
 _NSY_ALIGNMENT_SYMBOLS = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz")
 _GROUP_SUM_MATRIX_CACHE = dict()
@@ -338,39 +338,8 @@ def get_state_index(state, input_state, ambiguous_table, state_lookup=None):
 
 
 def read_fasta(path):
-    seq_dict = dict()
-    seq_name = None
-    seq_parts = list()
-    seen_names = set()
-    path_txt = str(path)
-    open_fn = gzip.open if path_txt.lower().endswith('.gz') else open
-    with open_fn(path_txt, mode='rt', encoding='utf-8') as f:
-        for line_no, line in enumerate(f, start=1):
-            line = line.rstrip('\n')
-            if line.startswith('>'):
-                if seq_name is not None:
-                    seq_dict[seq_name] = ''.join(seq_parts)
-                seq_name = line[1:].strip()
-                if seq_name == '':
-                    txt = 'Invalid FASTA header in {} at line {}: sequence name is empty.'
-                    raise ValueError(txt.format(path, line_no))
-                if seq_name in seen_names:
-                    txt = 'Duplicate FASTA header "{}" found in {} at line {}.'
-                    raise ValueError(txt.format(seq_name, path, line_no))
-                seen_names.add(seq_name)
-                seq_parts = list()
-                continue
-            if seq_name is None:
-                if line.strip() == '':
-                    continue
-                txt = 'Invalid FASTA format in {} at line {}: sequence line appeared before header.'
-                raise ValueError(txt.format(path, line_no))
-            if line.strip() == '':
-                continue
-            seq_parts.append(line.strip())
-    if seq_name is not None:
-        seq_dict[seq_name] = ''.join(seq_parts)
-    return seq_dict
+    records = sequence_io.read_fasta_records(path)
+    return sequence_io.records_to_dict(records, key='description')
 
 
 def _build_codon_to_aa_lookup(codon_table):

@@ -3,6 +3,7 @@ import os
 import shutil
 
 from csubst import runtime
+from csubst import parser_iqtree
 
 
 _FASTA_SUFFIXES = ('.fa', '.fasta', '.faa', '.fna')
@@ -39,6 +40,7 @@ def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, f
     iqtree_prefix = runtime.infer_iqtree_output_prefix(
         alignment_file=alignment_target,
         iqtree_outdir=iqtree_outdir,
+        base_dir=output_dir,
     )
     files = sorted([f for f in os.listdir(dir_dataset) if f.startswith(name + '.')])
     copy_plan = []
@@ -86,6 +88,25 @@ def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, f
             _copy_file_as_gzip(path_from=path_from, path_to_gz=path_to)
         else:
             shutil.copy(path_from, path_to)
+    rooted_tree_target = os.path.join(output_dir, 'tree.nwk')
+    iqtree_report_target = iqtree_prefix + '.iqtree'
+    state_target = iqtree_prefix + '.state'
+    if all(
+        os.path.isfile(path)
+        for path in [alignment_target, rooted_tree_target, iqtree_report_target, state_target]
+    ):
+        manifest_path = parser_iqtree.write_dataset_iqtree_manifest(
+            alignment_path=alignment_target,
+            rooted_tree_path=rooted_tree_target,
+            iqtree_report_path=iqtree_report_target,
+            state_path=state_target,
+        )
+        print(
+            'Writing {} IQ-TREE provenance manifest: {}'.format(
+                name,
+                os.path.relpath(manifest_path, start=output_dir),
+            )
+        )
 
 
 def main_dataset(g):

@@ -163,6 +163,19 @@ def test_add_coordinate_from_user_alignment_is_case_insensitive(tmp_path, monkey
     assert out["aa_x_A"].tolist() == ["A", "A", "A", "A"]
 
 
+def test_add_coordinate_from_user_alignment_matches_first_header_token(tmp_path, monkeypatch):
+    parser_pymol = _import_parser_pymol_with_fake_pymol(
+        monkeypatch=monkeypatch,
+        pdb_fasta=">x_A structure chain description\nAAAA\n",
+    )
+    user_alignment = tmp_path / "user.fa"
+    user_alignment.write_text(">x_A user sequence description\nAAAA\n", encoding="utf-8")
+    df = pd.DataFrame({"codon_site_alignment": [1, 2, 3, 4]})
+    monkeypatch.chdir(tmp_path)
+    out = parser_pymol.add_coordinate_from_user_alignment(df=df, user_alignment=str(user_alignment))
+    assert out["codon_site_x_A"].tolist() == [1, 2, 3, 4]
+
+
 def test_add_coordinate_from_user_alignment_handles_non_default_dataframe_index(tmp_path, monkeypatch):
     parser_pymol = _import_parser_pymol_with_fake_pymol(
         monkeypatch=monkeypatch,

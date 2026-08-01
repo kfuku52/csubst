@@ -1,39 +1,18 @@
 import numpy as np
-from Bio.Blast import NCBIWWW
-from Bio.Blast import NCBIXML
 
 import json
 import os
 import re
 import requests
-import socket
 import time
 import urllib
 
 from csubst import sequence
+from csubst import ncbi_blast
 from csubst import parser_pymol
 from csubst import resource_cache
 from csubst import structure_resources
 from csubst import ete
-
-def get_top_hit_ids(my_hits):
-    descriptions = getattr(my_hits, 'descriptions', None)
-    if not descriptions:
-        return []
-    top_hit_ids = []
-    for description in descriptions:
-        top_hit_title = str(getattr(description, 'title', '') or '')
-        hit_id_match = re.search(r'\|([^|]+)\|', top_hit_title)
-        if hit_id_match is not None:
-            top_hit_id = hit_id_match.group(1)
-        else:
-            tokens = top_hit_title.split()
-            top_hit_id = tokens[0] if len(tokens) > 0 else ''
-        top_hit_id = re.sub(r'\..*', '', top_hit_id)
-        top_hit_id = top_hit_id.strip()
-        if top_hit_id != '':
-            top_hit_ids.append(top_hit_id)
-    return top_hit_ids
 
 def run_qblast(aa_query, num_display=10, evalue_cutoff=10, timeout=30):
     print('Running NCBI BLAST against UniProtKB/SwissProt. '
@@ -42,32 +21,21 @@ def run_qblast(aa_query, num_display=10, evalue_cutoff=10, timeout=30):
     timeout = float(timeout)
     if (not np.isfinite(timeout)) or timeout <= 0:
         raise ValueError('QBLAST timeout should be a finite value > 0.')
-    previous_timeout = socket.getdefaulttimeout()
-    socket.setdefaulttimeout(timeout)
-    try:
-        my_search = NCBIWWW.qblast(
-            program='blastp',
-            database='swissprot',
-            sequence=aa_query,
-            expect=evalue_cutoff,
-        )
-    finally:
-        socket.setdefaulttimeout(previous_timeout)
-    try:
-        my_hits = NCBIXML.read(my_search)
-    finally:
-        my_search.close()
+    hits = ncbi_blast.search_blastp_swissprot(
+        sequence=aa_query,
+        expect=evalue_cutoff,
+        timeout=timeout,
+    )
     print('Time elapsed for NCBI QBLAST: {:,} sec'.format(int(time.time() - start)))
-    if (my_hits.descriptions is None) or (len(my_hits.descriptions) == 0):
+    if len(hits) == 0:
         print('No hit found.')
         return []
     print('Top hits (up to {:,} displayed)'.format(num_display))
-    for i, description in enumerate(my_hits.descriptions):
+    for i, hit in enumerate(hits):
         if i >= num_display:
             break
-        print(description.title)
-    top_hit_ids = get_top_hit_ids(my_hits)
-    return top_hit_ids
+        print(hit.title)
+    return [hit.accession for hit in hits]
 
 def _resolve_network_timeout(g, default=30):
     timeout = g.get('database_timeout', default)

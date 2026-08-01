@@ -510,12 +510,12 @@ def test_get_cod_maps_zero_over_zero_to_zero_and_keeps_positive_over_zero_infini
     np.testing.assert_allclose(out.loc[:, "OCSCoD"].to_numpy(dtype=np.float64), np.array([0.0, 0.5]))
 
 
-def test_calc_dif_count_matrix_clips_impossible_negative_counts_to_zero():
+def test_calc_dif_count_matrix_marks_impossible_negative_counts_as_undefined():
     any_count = np.array([[4.0, 1.0], [0.0, 2.0]], dtype=np.float64)
     spe_count = np.array([[2.0, 2.0], [1.0, 2.0]], dtype=np.float64)
     out = omega._calc_dif_count_matrix(any_count=any_count, spe_count=spe_count, tol=1e-9)
-    expected = np.array([[2.0, 0.0], [0.0, 0.0]], dtype=np.float64)
-    np.testing.assert_allclose(out, expected)
+    expected = np.array([[2.0, np.nan], [np.nan, 0.0]], dtype=np.float64)
+    np.testing.assert_allclose(out, expected, equal_nan=True)
 
 
 def test_calc_omega_empirical_upper_tail_pvalues_uses_upper_tail_mid_p():

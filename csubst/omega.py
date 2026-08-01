@@ -3502,10 +3502,10 @@ def _calc_dif_count_matrix(any_count, spe_count, tol):
     out = any_count - spe_count
     is_negative = (out < (-float(tol)))
     is_almost_zero = (~is_negative) & (out < float(tol))
-    # Independent floating-point aggregation can produce tiny or occasional
-    # larger violations of the required spe <= any nesting.  Difference counts
-    # are non-negative by definition.
-    out[is_negative] = 0
+    # Values below -tol violate the required spe <= any nesting and cannot be
+    # explained by floating-point rounding.  Preserve them as undefined rather
+    # than adding artificial zero mass to a permutation null distribution.
+    out[is_negative] = np.nan
     out[is_almost_zero] = 0
     return out
 

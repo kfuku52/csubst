@@ -14,6 +14,7 @@ import itertools
 from copy import deepcopy
 import numpy as np
 from scipy import linalg
+from csubst import sequence_io
 from .model import *
 from .newick import *
 from .genetics import *
@@ -124,7 +125,7 @@ class Evolver(object):
  
             Optional keyword arguments:
                 1. **seqfile** is a custom name for the output simulated alignment. Provide None or False to suppress file creation.
-                2. **seqfmt**  is the format for seqfile (either fasta, nexus, phylip, phylip-relaxed, stockholm, etc. Anything that Biopython can accept!!) Default is FASTA.
+                2. **seqfmt** is the format for seqfile. CSUBST's vendored backend supports FASTA.
                 3. **ratefile** is a custom name for the "site_rates.txt" file. Provide None or False to suppress file creation.
                 4. **infofile** is a custom name for the "site_rates_info.txt" file. Provide None or False to suppress file creation.
                 5. **write_anc** is a boolean argument (True or False) for whether ancestral sequences should be output along with the tip sequences. Default is False.
@@ -145,8 +146,8 @@ class Evolver(object):
                    >>> # Include ancestral sequences in output file
                    >>> evolve(write_anc = True)
 
-                   >>> # Custom sequence file name and format, and suppress rate information
-                   >>> evolve(seqfile = "my_seqs.phy", seqfmt = "phylip", ratefile = None, infofile = None)
+                   >>> # Custom FASTA file name, and suppress rate information
+                   >>> evolve(seqfile = "my_seqs.fa", seqfmt = "fasta", ratefile = None, infofile = None)
       
         '''
         # Input arguments
@@ -274,35 +275,9 @@ class Evolver(object):
         ''' 
             Write resulting sequences to a file in specified format.
         '''
-        
-        
-        
-        from Bio.Seq import Seq
-        from Bio.SeqRecord import SeqRecord
-        from Bio import SeqIO
-      
-        alignment = [] # list of seqobjects
-        ## Biopython 1.77 --> 1.78 deprecated the alphabet module. See pyvolve issue #21
-        ## Hell hack ensues:
-        from Bio import __version__ as bio_version
-        bio_version = float(bio_version)
-        if bio_version >= 1.77:
-            for entry in seqdict:
-                seq_entry = Seq( seqdict[entry])
-                seq_object = SeqRecord(seq_entry, id = entry, description = "", annotations={"molecule_type": "DNA"}) 
-                # It truly doesn't matter what type since will be written to file. molecule_type is only one of DNA, RNA, protein.
-                alignment.append(seq_object)  
-        else:
-            from Bio.Alphabet import generic_alphabet
-            for entry in seqdict:
-                seq_entry = Seq( seqdict[entry] , generic_alphabet )
-                seq_object = SeqRecord(seq_entry, id = entry, description = "")
-                alignment.append(seq_object)   
-  
-        try:
-            SeqIO.write(alignment, self.seqfile, self.seqfmt)
-        except:
-            raise TypeError("\n Output file format is unknown. Consult with Biopython manual to see which I/O formats are accepted.\n NOTE: If you are attempting to save as phylip and are receiving this error, try seqfmt = 'phylip-relaxed' instead.")
+        if self.seqfmt != 'fasta':
+            raise TypeError("\n Only FASTA output is supported by CSUBST's vendored pyvolve backend.")
+        sequence_io.write_fasta_dict(seqdict, self.seqfile)
 
 
 

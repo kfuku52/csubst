@@ -80,6 +80,11 @@ CSUBST provides ten main subcommands:
 - [`csubst benchmark`](https://github.com/kfuku52/csubst/wiki/csubst-benchmark): run `csubst search` over parameter grids on the same input data and summarize runtime and output metrics.
 - [`csubst benchmark-plot`](https://github.com/kfuku52/csubst/wiki/csubst-benchmark-plot): collect existing benchmark outputs, compare performance across parameter settings, and write an overview figure.
 
+The vendored simulation backend uses FASTA for sequence input and output. Other
+Pyvolve sequence formats such as PHYLIP or NEXUS are not exposed by CSUBST.
+Online Swiss-Prot similarity searches identify requests as CSUBST and include
+the maintainer contact address required by NCBI. Set `NCBI_EMAIL` to override it.
+
 Display available commands and options:
 
 ```bash

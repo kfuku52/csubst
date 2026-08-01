@@ -307,7 +307,6 @@ def _all_iqtree_intermediate_paths_are_explicit(g):
 def generate_intermediate_files(g, force_notree_run=False):
     if g['infile_type'] == 'iqtree':
         g,all_exist = parser_iqtree.check_intermediate_files(g)
-        dependency_checked = False
         if (all_exist)&(not g['iqtree_redo']):
             explicit_paths = _all_iqtree_intermediate_paths_are_explicit(g)
             compatible = explicit_paths
@@ -317,8 +316,6 @@ def generate_intermediate_files(g, force_notree_run=False):
                     'A provenance manifest is not required.'
                 )
             else:
-                parser_iqtree.check_iqtree_dependency(g)
-                dependency_checked = True
                 compatible, reason = parser_iqtree.is_iqtree_manifest_compatible(g)
                 if compatible:
                     print('IQ-TREE\'s inferred intermediate files and provenance manifest are compatible.')
@@ -337,8 +334,7 @@ def generate_intermediate_files(g, force_notree_run=False):
         if (all_exist)&(g['iqtree_redo']):
             print('--iqtree_redo is set.')
         print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)
-        if not dependency_checked:
-            parser_iqtree.check_iqtree_dependency(g)
+        parser_iqtree.check_iqtree_dependency(g)
         parser_iqtree.run_iqtree_ancestral(g, force_notree_run=force_notree_run)
     else:
         raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))

@@ -384,7 +384,9 @@ def _get_logo_modules():
 
 
 def _get_logo_glyph(mpl_textpath, font_properties, char):
-    cache_key = (id(mpl_textpath), str(char))
+    # Keep the module object in the key so a recycled object id cannot return a
+    # glyph created by an earlier temporary module (notably in long test runs).
+    cache_key = (mpl_textpath, str(char))
     glyph = _AA_LOGO_GLYPH_CACHE.get(cache_key, None)
     if glyph is None:
         glyph = mpl_textpath.TextPath((0, 0), char, size=1.0, prop=font_properties)

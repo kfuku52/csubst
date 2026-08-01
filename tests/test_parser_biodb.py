@@ -24,74 +24,43 @@ def _import_parser_biodb_with_fake_pymol(monkeypatch):
     return importlib.import_module("csubst.parser_biodb")
 
 
-def test_get_top_hit_ids_parses_pipe_and_fallback_titles(monkeypatch):
+def test_run_qblast_returns_empty_list_when_no_hits(monkeypatch):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
+    observed = {}
 
-    class _Desc:
-        def __init__(self, title):
-            self.title = title
+    def _search(**kwargs):
+        observed.update(kwargs)
+        return []
 
-    class _Hits:
-        descriptions = [
-            _Desc("sp|P12345.7|SOME_PROTEIN"),
-            _Desc("Q8XYZ1 hypothetical_protein"),
-            _Desc(""),
-        ]
-
-    out = parser_biodb.get_top_hit_ids(_Hits())
-    assert out == ["P12345", "Q8XYZ1"]
-
-
-def test_run_qblast_returns_empty_list_when_no_descriptions(monkeypatch):
-    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
-
-    class _FakeSearch:
-        def __init__(self):
-            self.closed = False
-
-        def close(self):
-            self.closed = True
-
-    class _Hits:
-        descriptions = None
-
-    fake_search = _FakeSearch()
-
-    def _fake_qblast(**kwargs):
-        return fake_search
-
-    def _fake_read(search_obj):
-        assert search_obj is fake_search
-        return _Hits()
-
-    monkeypatch.setattr(parser_biodb.NCBIWWW, "qblast", _fake_qblast)
-    monkeypatch.setattr(parser_biodb.NCBIXML, "read", _fake_read)
-
-    out = parser_biodb.run_qblast(aa_query="AAAA", num_display=1, evalue_cutoff=10)
+    monkeypatch.setattr(parser_biodb.ncbi_blast, "search_blastp_swissprot", _search)
+    out = parser_biodb.run_qblast(aa_query="AAAA", num_display=1, evalue_cutoff=10, timeout=12)
     assert out == []
-    assert fake_search.closed
+    assert observed == {"sequence": "AAAA", "expect": 10, "timeout": 12.0}
 
 
-def test_run_qblast_closes_handle_when_xml_parse_fails(monkeypatch):
+def test_run_qblast_displays_requested_hits_and_returns_all_accessions(monkeypatch, capsys):
+    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
+    hits = [
+        parser_biodb.ncbi_blast.BlastHit("P12345", "sp|P12345| Protein one"),
+        parser_biodb.ncbi_blast.BlastHit("Q8XYZ1", "sp|Q8XYZ1| Protein two"),
+    ]
+    monkeypatch.setattr(parser_biodb.ncbi_blast, "search_blastp_swissprot", lambda **_kwargs: hits)
+    out = parser_biodb.run_qblast(aa_query="AAAA", num_display=1, evalue_cutoff=10)
+    captured = capsys.readouterr()
+    assert out == ["P12345", "Q8XYZ1"]
+    assert "Protein one" in captured.out
+    assert "Protein two" not in captured.out
+
+
+def test_run_qblast_propagates_xml_parse_failure(monkeypatch):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
 
-    class _FakeSearch:
-        def __init__(self):
-            self.closed = False
+    def _raise_parse(**_kwargs):
+        raise ValueError("xml parse failed")
 
-        def close(self):
-            self.closed = True
-
-    fake_search = _FakeSearch()
-    monkeypatch.setattr(parser_biodb.NCBIWWW, "qblast", lambda **kwargs: fake_search)
-
-    def _raise_read(_search_obj):
-        raise RuntimeError("xml parse failed")
-
-    monkeypatch.setattr(parser_biodb.NCBIXML, "read", _raise_read)
-    with pytest.raises(RuntimeError, match="xml parse failed"):
+    monkeypatch.setattr(parser_biodb.ncbi_blast, "search_blastp_swissprot", _raise_parse)
+    with pytest.raises(ValueError, match="xml parse failed"):
         parser_biodb.run_qblast(aa_query="AAAA", num_display=1, evalue_cutoff=10)
-    assert fake_search.closed
 
 
 def test_is_url_valid_returns_false_on_urlerror(monkeypatch):

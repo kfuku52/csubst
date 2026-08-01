@@ -17,7 +17,7 @@ import sys
 import time
 import numpy as np
 import random as rn
-from Bio import SeqIO, AlignIO
+from csubst import sequence_io
 from .genetics import *
 ZERO      = 1e-8
 MOLECULES = Genetics()
@@ -380,10 +380,10 @@ class ReadFrequencies(StateFrequencies):
             1. **by**. See parent class StateFrequencies for details.
         
         Required keyword arguments include, 
-            1. **file** is the file containing sequences from which frequencies will be computed. By default, this file is assumed to be in FASTA format, although you can specify a different format with the optional argument **format**
+            1. **file** is the FASTA file containing sequences from which frequencies will be computed.
         
         Optional keyword arguments include, 
-            1. **format** is the sequence file format (case-insensitive). Sequence files are parsed using Biopython, so any format they accept is accepted here (e.g. fasta, phylip, phylip-relaxed, nexus, clustal...)
+            1. **format** is the sequence file format (case-insensitive). CSUBST's vendored backend supports FASTA.
             2. **columns** is a list of integers giving the column(s) which should be considered in frequency calculations. This list should be indexed *from 1*. If this argument is not provided, all positions in sequence file will be considered. Note that this argument is only possible for alignments!
      
      
@@ -399,7 +399,7 @@ class ReadFrequencies(StateFrequencies):
            >>> frequencies = f.compute_frequencies(type = "codon")
            
            >>> # Compute nucleotide frequencies from a specific range of columns (1-10, inclusive) from a nucleotide alignment file 
-           >>> f = ReadFrequencies("nucleotide", file = "my_nucleotide_alignment.phy", format = "phylip", columns = range(1,11))
+           >>> f = ReadFrequencies("nucleotide", file = "my_nucleotide_alignment.fa", columns = list(range(1,11)))
            >>> frequencies = f.compute_frequencies()
            
     
@@ -411,7 +411,7 @@ class ReadFrequencies(StateFrequencies):
         
         # Input variables, options
         self.seqfile          = kwargs.get('file', None)
-        self.format           = kwargs.get('format', 'fasta').lower()   # Biopython requires that this flag is lowercase.
+        self.format           = kwargs.get('format', 'fasta').lower()
         self.which_columns    = kwargs.get('columns', None)
         self._seqs            = []                                      # Sequence records obtained from sequence file
         self._make_seq_list()
@@ -424,9 +424,7 @@ class ReadFrequencies(StateFrequencies):
                 2. Should not include columns outside of the length of the alignment [1,alnlen]
                 3. Should be converted to a numpy array
         '''
-        try:    
-            AlignIO.read(self.seqfile, self.format)
-        except:
+        if any([len(sequence) != self._alnlen for sequence in self._seqs]):
             raise TypeError("\n\nYour sequence file does not appear to be an *alignment.* If you would like to get frequencies from specific columns only, it must be an alignment!") 
         assert( type(self.which_columns) is list), "\n\nArgument *columns* must be a list of integers giving the column(s) (indexed from 1!) which should be considered for frequency calculations."
         self.which_columns = np.array(self.which_columns) - 1
@@ -434,7 +432,7 @@ class ReadFrequencies(StateFrequencies):
             which_check = self._alnlen / 3
         else:
             which_check = self._alnlen
-        assert( (self.which_columns >= 0).all() and (self.which_columns <= which_check).all() ), "\n\nYour column indices specified in *which_columns* do not play well with alignment! Remember that column indexing starts at *1*, and you cannot specify columns that don't exist."
+        assert( (self.which_columns >= 0).all() and (self.which_columns < which_check).all() ), "\n\nYour column indices specified in *which_columns* do not play well with alignment! Remember that column indexing starts at *1*, and you cannot specify columns that don't exist."
         
         
         
@@ -447,18 +445,21 @@ class ReadFrequencies(StateFrequencies):
          
         assert(self.seqfile is not None), "\n\n You must provide a sequence/alignment file with the argument file=<my_file_name> to use the ReadFrequencies class."
         assert(os.path.exists(self.seqfile)), "\n\n Your input file does not exist! Check the path?"
+        if self.format != 'fasta':
+            raise TypeError("\n\nOnly FASTA input is supported by CSUBST's vendored pyvolve backend.")
         try:
-            raw = list(SeqIO.parse(self.seqfile, self.format))
-        except:
-            raise TypeError("\n\nYour sequence file could not be parsed. Note that if your sequence file is not in FASTA format, you must specify its format with the argument *format*.")  
+            raw = sequence_io.read_fasta_records(self.seqfile)
+        except (OSError, UnicodeError, ValueError) as exc:
+            raise TypeError("\n\nYour FASTA sequence file could not be parsed.") from exc
+        if len(raw) == 0:
+            raise TypeError("\n\nYour FASTA sequence file did not contain any records.")
         self._numseq = len(raw)
-        self._alnlen = len(raw[0]) # This will only come into play if we're collecting columns.
+        self._alnlen = len(raw[0].sequence) # This will only come into play if we're collecting columns.
+        self._seqs = [entry.sequence for entry in raw]
         if self._by == 'codon':
              assert( self._alnlen%3 == 0), "\n\nThe length of your sequence alignment is not a multiple of three, so you don't seem to actually have codons."
         if self.which_columns is not None:
             self._sanity_which_columns()
-        for entry in raw:
-            self._seqs.append(str(entry.seq))  
 
     
     
@@ -536,7 +537,3 @@ class EmpiricalModelFrequencies():
             print("Amino acid: JTT, WAG, LG, mtmam, mtREV24, or DAYHOFF.")
             print("Codon: ECM restricted or unrestricted, which can be specified respectively as ECMrest and ECMunrest (case insensitive).")
             sys.exit()
-
-
-
-

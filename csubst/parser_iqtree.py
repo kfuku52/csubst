@@ -4,7 +4,6 @@ import json
 import math
 import os
 import re
-import shutil
 import subprocess
 import sys
 from collections import OrderedDict
@@ -14,7 +13,6 @@ import numpy as np
 import pandas as pd
 
 from csubst import genetic_code
-from csubst import __version__
 from csubst import resource_cache
 from csubst import runtime
 from csubst import sequence
@@ -401,26 +399,40 @@ def _get_iqtree_manifest_path(g):
     return os.path.abspath(state_path) + '.csubst-manifest.json'
 
 
-def _build_iqtree_manifest_context(g):
-    alignment_path = os.path.abspath(os.path.expanduser(str(g.get('alignment_file', ''))))
+def _sha256_alignment_content(alignment_path):
+    alignment_path = os.path.abspath(os.path.expanduser(str(alignment_path)))
+    open_fn = gzip.open if alignment_path.lower().endswith('.gz') else open
+    digest = hashlib.sha256()
+    with open_fn(alignment_path, mode='rb') as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _build_portable_iqtree_manifest_context(alignment_path, rooted_tree, iqtree_model, genetic_code):
+    alignment_path = os.path.abspath(os.path.expanduser(str(alignment_path)))
     if not os.path.isfile(alignment_path):
         raise FileNotFoundError('Alignment file not found: {}'.format(alignment_path))
-    tree_payload = repr(tree.get_tree_cache_signature(g['rooted_tree'])).encode('utf-8')
-    executable = shutil.which(str(g.get('iqtree_exe', ''))) or str(g.get('iqtree_exe', ''))
+    tree_payload = repr(tree.get_tree_cache_signature(rooted_tree)).encode('utf-8')
     return {
-        'format': 'csubst-iqtree-v1',
-        'csubst_version': str(__version__),
-        'alignment': {
-            'path': alignment_path,
-            'sha256': resource_cache.sha256_file(alignment_path),
-        },
+        'format': 'csubst-iqtree-v2',
+        'alignment_sha256': _sha256_alignment_content(alignment_path),
         'rooted_tree_sha256': hashlib.sha256(tree_payload).hexdigest(),
-        'iqtree_executable': os.path.realpath(executable) if executable else '',
-        'iqtree_version': str(g.get('iqtree_version', '')),
-        'iqtree_model': str(g.get('iqtree_model', '')),
-        'genetic_code': int(g.get('genetic_code', 1)),
-        'threads': int(g.get('threads', 1)),
+        'iqtree_model': str(iqtree_model),
+        'genetic_code': int(genetic_code),
     }
+
+
+def _build_iqtree_manifest_context(g):
+    return _build_portable_iqtree_manifest_context(
+        alignment_path=g.get('alignment_file', ''),
+        rooted_tree=g['rooted_tree'],
+        iqtree_model=g.get('iqtree_model', ''),
+        genetic_code=g.get('genetic_code', 1),
+    )
 
 
 def is_iqtree_manifest_compatible(g):
@@ -434,7 +446,7 @@ def is_iqtree_manifest_compatible(g):
     except (OSError, TypeError, ValueError) as exc:
         return False, 'provenance manifest could not be validated: {}'.format(exc)
     if observed != expected:
-        return False, 'alignment, tree, IQ-TREE version, or reconstruction options changed'
+        return False, 'alignment, tree, IQ-TREE model, or genetic code changed'
     return True, ''
 
 
@@ -445,6 +457,40 @@ def _write_iqtree_manifest(g):
         sort_keys=True,
         indent=2,
     ) + '\n'
+    resource_cache.atomic_write_text(manifest_path, payload)
+    return manifest_path
+
+
+def write_dataset_iqtree_manifest(
+    alignment_path,
+    rooted_tree_path,
+    iqtree_report_path,
+    state_path,
+    genetic_code=1,
+):
+    with open(rooted_tree_path, encoding='utf-8') as handle:
+        rooted_tree = ete.PhyloNode(handle.read(), format=1)
+    model_pattern = re.compile(r'^\s*Model of substitution:\s*(.+?)\s*$')
+    iqtree_model = ''
+    with open(iqtree_report_path, encoding='utf-8', errors='replace') as handle:
+        for line in handle:
+            match = model_pattern.match(line)
+            if match is not None:
+                iqtree_model = match.group(1).strip()
+                break
+    if iqtree_model == '':
+        raise ValueError('Unable to read IQ-TREE model from {}.'.format(iqtree_report_path))
+    payload = json.dumps(
+        _build_portable_iqtree_manifest_context(
+            alignment_path=alignment_path,
+            rooted_tree=rooted_tree,
+            iqtree_model=iqtree_model,
+            genetic_code=genetic_code,
+        ),
+        sort_keys=True,
+        indent=2,
+    ) + '\n'
+    manifest_path = os.path.abspath(str(state_path)) + '.csubst-manifest.json'
     resource_cache.atomic_write_text(manifest_path, payload)
     return manifest_path
 

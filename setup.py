@@ -111,7 +111,6 @@ setup(
                             'scipy',
                             'pandas',
                             'matplotlib<3.11',
-                            'biopython>=1.80',
                             'requests',
     ],
     extras_require   = {
