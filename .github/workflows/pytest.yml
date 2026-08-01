@@ -6,6 +6,7 @@ on:
 
 jobs:
   test:
+    name: Fast tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -48,7 +49,50 @@ jobs:
           python -c "import csubst.substitution_cy"
           python -c "import csubst.substitution_sparse_cy"
 
-      - name: Run tests
+      - name: Run fast tests
+        run: pytest -q tests/unit tests/cli -m "not slow and not parity"
+
+  full-test:
+    name: Full test suite (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            setup.py
+            MANIFEST.in
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          for i in 1 2 3; do
+            python -m pip install -e . pytest && break
+            echo "Dependency install failed (attempt $i). Retrying in 15s..."
+            sleep 15
+            if [ "$i" = "3" ]; then
+              echo "Dependency install failed after 3 attempts."
+              exit 1
+            fi
+          done
+
+      - name: Verify compiled extensions
+        run: |
+          python -c "import csubst.combination_cy"
+          python -c "import csubst.omega_cy"
+          python -c "import csubst.parser_iqtree_cy"
+          python -c "import csubst.recoding_cy"
+          python -c "import csubst.substitution_cy"
+          python -c "import csubst.substitution_sparse_cy"
+
+      - name: Run full test suite
         run: pytest -q
 
   parity:
@@ -223,4 +267,7 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
           export LD_PRELOAD="$(gcc -print-file-name=libasan.so)"
-          pytest -q tests/test_expected_sparse.py tests/test_substitution_sparse.py tests/test_omega_sparse.py
+          pytest -q \
+            tests/parity/test_expected_sparse.py \
+            tests/parity/test_omega_*.py \
+            tests/unit/test_sparse_*.py

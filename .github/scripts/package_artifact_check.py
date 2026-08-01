@@ -46,6 +46,7 @@ required_notices = [
 ]
 required_test_support = [
     "/pytest.ini",
+    "/TESTING.md",
     "/tests/conftest.py",
     "/tools/evaluate_epistasis_simulation.py",
 ]

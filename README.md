@@ -85,6 +85,8 @@ Pyvolve sequence formats such as PHYLIP or NEXUS are not exposed by CSUBST.
 Online Swiss-Prot similarity searches identify requests as CSUBST and include
 the maintainer contact address required by NCBI. Set `NCBI_EMAIL` to override it.
 
+Development and test-suite conventions are documented in [TESTING.md](TESTING.md).
+
 Display available commands and options:
 
 ```bash
