@@ -1,4 +1,4 @@
-<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=2; sha256=9361b6d2342940b167ec77884d09c9ae337e5964b9fc94a80386fac5f1fa7e95 -->
+<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=3; sha256=361e91830b2e55ec00baa462f4915dbb6732649962859691aee58d3f94cc86a4 -->
 # Common agent policy
 
 Repository-specific instructions override these defaults.
@@ -15,4 +15,7 @@ Repository-specific instructions override these defaults.
 - Before adding or removing a direct dependency, confirm direct use in code,
   configuration, tests, or documentation. Validate removals in a clean
   environment.
+- Before pushing changes to GitHub, ensure the project version is bumped even
+  if the user did not request it. Use the repository's versioning scheme, or
+  Semantic Versioning (`MAJOR.MINOR.PATCH`) if none is defined.
 <!-- END KF AGENT POLICY -->
