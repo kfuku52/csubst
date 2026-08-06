@@ -1,51 +1,84 @@
-name: Create GitHub Tag from __version__
+name: Create major/minor release from __version__
 
 on:
-  push:
-    branches:
-      - master
+  workflow_run:
+    workflows: [Pytest]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  create_tag:
+  create_release:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'master')
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout tested commit
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Detect version using AST
-        id: get_version
+      - name: Read and classify version
+        id: version
+        shell: bash
         run: |
-          INIT_PATH=csubst/__init__.py
-          echo "Reading version from: $INIT_PATH"
-
           VERSION=$(python3 -c 'import ast, pathlib; tree=ast.parse(pathlib.Path("csubst/__init__.py").read_text()); values=[ast.literal_eval(node.value) for node in ast.walk(tree) if isinstance(node, ast.Assign) and any(getattr(target, "id", None) == "__version__" for target in node.targets)]; print(values[0] if len(values) == 1 else "")')
-          PACKAGE=csubst
-
-          if [ -z "$VERSION" ]; then
-            echo "❌ __version__ not found in $INIT_PATH"
+          if [[ ! "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Expected a semantic version in csubst/__init__.py, got: $VERSION"
             exit 1
           fi
 
-          echo "📦 PACKAGE: $PACKAGE"
-          echo "📌 VERSION: $VERSION"
+          SHOULD_RELEASE=false
+          if (( 10#${BASH_REMATCH[3]} == 0 )); then
+            SHOULD_RELEASE=true
+          fi
 
-          echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          {
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+            echo "should_release=$SHOULD_RELEASE"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Create tag if not exists
+      - name: Skip patch-only version
+        if: steps.version.outputs.should_release != 'true'
+        run: echo "${{ steps.version.outputs.version }} is a patch-only version; no tag or GitHub Release will be created."
+
+      - name: Create annotated tag
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          git fetch --tags
-          if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
-            echo "✅ Tag v$VERSION already exists. Skipping."
+          EXPECTED=$(git rev-parse HEAD)
+          if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+            ACTUAL=$(git rev-list -n 1 "$TAG")
+            if [ "$ACTUAL" != "$EXPECTED" ]; then
+              echo "Tag $TAG already points to $ACTUAL, expected $EXPECTED."
+              exit 1
+            fi
+            echo "Tag $TAG already points to the tested commit."
           else
-            echo "🏷 Creating new tag v$VERSION"
             git config user.name "github-actions"
             git config user.email "actions@github.com"
-            git tag "v$VERSION"
-            git push origin "v$VERSION"
+            git tag -a "$TAG" "$EXPECTED" -m "$TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release $TAG already exists."
+          else
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
           fi
