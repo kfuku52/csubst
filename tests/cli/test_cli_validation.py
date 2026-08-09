@@ -1,8 +1,12 @@
+import contextlib
+import io
 import subprocess
 import sys
 import os
 import re
+import runpy
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -39,7 +43,52 @@ def _resolve_log_path(repo_root, args):
     return repo_root / "csubst.log"
 
 
+_CLI_NAMESPACE = None
+_CLI_PARSERS = {}
+
+
+def _get_cli_namespace():
+    global _CLI_NAMESPACE
+    if _CLI_NAMESPACE is None:
+        repo_root = Path(__file__).resolve().parents[2]
+        _CLI_NAMESPACE = runpy.run_path(str(repo_root / "csubst" / "csubst"))
+    return _CLI_NAMESPACE
+
+
+def _get_cli_parser(show_advanced):
+    show_advanced = bool(show_advanced)
+    if show_advanced not in _CLI_PARSERS:
+        namespace = _get_cli_namespace()
+        _CLI_PARSERS[show_advanced] = namespace["_build_parser"](
+            show_advanced=show_advanced
+        )
+    return _CLI_PARSERS[show_advanced]
+
+
 def _run_cli(*args):
+    """Exercise parser/handler behavior without starting another Python."""
+    namespace = _get_cli_namespace()
+    normalized_args, show_advanced = namespace["_normalize_help_argv"](list(args))
+    parser = _get_cli_parser(show_advanced)
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    returncode = 0
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        try:
+            parsed_args = parser.parse_args(normalized_args)
+            namespace["_main"](argv=normalized_args, parsed_args=parsed_args)
+        except SystemExit as exc:
+            returncode = int(exc.code or 0)
+    result = SimpleNamespace(
+        returncode=returncode,
+        stdout=stdout.getvalue(),
+        stderr=stderr.getvalue(),
+    )
+    return result, result.stderr
+
+
+def _run_cli_subprocess(*args):
+    """Exercise entrypoint/log-file integration in an isolated process."""
     repo_root = Path(__file__).resolve().parents[2]
     log_path = _resolve_log_path(repo_root, args)
     log_mtime_before = log_path.stat().st_mtime_ns if log_path.exists() else None
@@ -63,7 +112,6 @@ def _run_cli(*args):
     return proc, log_text
 
 
-@pytest.mark.slow
 def test_sites_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects():
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--tree_site_plot_max_sites", "0")
     assert proc.returncode == 2
@@ -72,7 +120,6 @@ def test_sites_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects()
     assert "Matplotlib" not in log_text
 
 
-@pytest.mark.slow
 def test_simulate_invalid_percent_biased_sub_fails_cleanly():
     proc, log_text = _run_cli("simulate", "--percent_biased_sub", "-1")
     assert proc.returncode == 2
@@ -81,14 +128,13 @@ def test_simulate_invalid_percent_biased_sub_fails_cleanly():
 
 
 def test_missing_output_option_value_is_reported_once_and_written_to_log():
-    proc, log_text = _run_cli("search", "--outdir")
+    proc, log_text = _run_cli_subprocess("search", "--outdir")
     expected = "argument --outdir: expected one argument"
     assert proc.returncode == 2
     assert proc.stderr.count(expected) == 1
     assert expected in log_text
 
 
-@pytest.mark.slow
 def test_simulate_invalid_seed_fails_cleanly():
     proc, log_text = _run_cli("simulate", "--simulate_seed", "-2")
     assert proc.returncode == 2
@@ -96,7 +142,6 @@ def test_simulate_invalid_seed_fails_cleanly():
     assert "Traceback" not in log_text
 
 
-@pytest.mark.slow
 def test_invalid_common_random_seed_fails_cleanly():
     proc, log_text = _run_cli("scan", "--random_seed", "-2")
     assert proc.returncode == 2
@@ -110,7 +155,6 @@ def test_sites_deprecated_probability_options_are_rejected():
     assert "unrecognized arguments: --tree_site_plot_min_prob 0.5" in log_text
 
 
-@pytest.mark.slow
 def test_sites_invalid_species_regex_fails_cleanly():
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--species_regex", "(")
     assert proc.returncode == 2
@@ -118,7 +162,6 @@ def test_sites_invalid_species_regex_fails_cleanly():
     assert "Traceback" not in log_text
 
 
-@pytest.mark.slow
 def test_sites_invalid_species_overlap_node_plot_fails_cleanly():
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--species_overlap_node_plot", "maybe")
     assert proc.returncode == 2
@@ -135,7 +178,6 @@ def test_inspect_help_includes_species_overlap_node_plot_option():
     assert "--combination_count_max_arity" in help_text
 
 
-@pytest.mark.slow
 def test_inspect_rejects_invalid_combination_count_max_arity():
     proc, log_text = _run_cli("inspect", "--combination_count_max_arity", "0")
     assert proc.returncode == 2
@@ -349,7 +391,6 @@ def test_benchmark_plot_help_is_available():
     assert "--output_manifest" in help_text
 
 
-@pytest.mark.slow
 def test_benchmark_plot_missing_directory_fails_cleanly():
     proc, log_text = _run_cli(
         "benchmark-plot",
@@ -388,7 +429,6 @@ def test_inspect_help_includes_nonsyn_recode_pca_option():
     assert "--sa_smoke_max_branches" in advanced_help
 
 
-@pytest.mark.slow
 def test_inspect_rejects_legacy_yes_state_plot_option():
     proc, log_text = _run_cli("inspect", "--plot_state_aa", "yes")
     assert proc.returncode == 2

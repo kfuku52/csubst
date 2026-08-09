@@ -1,11 +1,24 @@
 import json
 import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from csubst import main_benchmark_plot
 from csubst import runtime
+
+
+@pytest.fixture
+def stub_benchmark_renderer(monkeypatch):
+    def _write_placeholder(**kwargs):
+        Path(kwargs["out_path"]).write_bytes(b"benchmark-plot-placeholder\n")
+
+    monkeypatch.setattr(
+        main_benchmark_plot,
+        "_plot_parameter_overview",
+        _write_placeholder,
+    )
 
 
 def _write_benchmark_summary(dir_path, rows):
@@ -148,8 +161,11 @@ def test_main_benchmark_plot_collects_manifest_and_fallback_outputs(tmp_path):
     assert (manifest.loc[:, "output_kind"] == "output_manifest").any()
 
 
-@pytest.mark.slow
-def test_main_benchmark_plot_skips_unreadable_summaries(tmp_path, capsys):
+def test_main_benchmark_plot_skips_unreadable_summaries(
+    tmp_path,
+    capsys,
+    stub_benchmark_renderer,
+):
     good_dir = tmp_path / "good"
     bad_dir = tmp_path / "bad"
     _write_benchmark_summary(
@@ -258,8 +274,11 @@ def test_main_benchmark_plot_rejects_unknown_metrics(tmp_path):
         main_benchmark_plot.main_benchmark_plot(g)
 
 
-@pytest.mark.slow
-def test_main_benchmark_plot_skips_structurally_invalid_summaries(tmp_path, capsys):
+def test_main_benchmark_plot_skips_structurally_invalid_summaries(
+    tmp_path,
+    capsys,
+    stub_benchmark_renderer,
+):
     good_dir = tmp_path / "good"
     invalid_dir = tmp_path / "invalid"
     _write_benchmark_summary(
@@ -316,8 +335,11 @@ def test_main_benchmark_plot_skips_structurally_invalid_summaries(tmp_path, caps
     assert payload["skipped_summary_files"] == [str((invalid_dir / "csubst_benchmark_summary.tsv").resolve())]
 
 
-@pytest.mark.slow
-def test_main_benchmark_plot_skips_summaries_with_blank_required_fields(tmp_path, capsys):
+def test_main_benchmark_plot_skips_summaries_with_blank_required_fields(
+    tmp_path,
+    capsys,
+    stub_benchmark_renderer,
+):
     good_dir = tmp_path / "good"
     blank_dir = tmp_path / "blank"
     _write_benchmark_summary(

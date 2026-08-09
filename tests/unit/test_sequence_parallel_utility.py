@@ -123,6 +123,7 @@ def test_run_starmap_single_process_matches_direct_evaluation():
 
 
 @pytest.mark.slow
+@pytest.mark.process
 def test_run_starmap_process_backend_preserves_order():
     args = [(1, 2), (3, 4), (5, 6), (7, 8)]
     out = parallel.run_starmap(_starmap_add_mul, args, n_jobs=2, backend="multiprocessing")

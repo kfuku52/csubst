@@ -11,7 +11,13 @@ from csubst import resource_cache
 from csubst import structural_alphabet
 
 
-def _concurrent_resource_worker(cache_dir, start_event, result_queue):
+def _concurrent_resource_worker(
+    cache_dir,
+    start_event,
+    populate_started_event,
+    release_populate_event,
+    result_queue,
+):
     resource_dir = os.path.join(cache_dir, "models", "demo", "v1")
     counter_path = os.path.join(cache_dir, "populate-count.txt")
 
@@ -20,7 +26,9 @@ def _concurrent_resource_worker(cache_dir, start_event, result_queue):
             handle.write("populate\n")
             handle.flush()
             os.fsync(handle.fileno())
-        time.sleep(0.25)
+        populate_started_event.set()
+        if not release_populate_event.wait(timeout=5):
+            raise TimeoutError("Timed out waiting to release test resource population.")
         with open(os.path.join(stage_dir, "payload.txt"), mode="w", encoding="utf-8") as handle:
             handle.write("ready\n")
 
@@ -256,20 +264,33 @@ def test_failed_population_leaves_no_partial_resource_and_can_retry(tmp_path):
 
 
 @pytest.mark.slow
+@pytest.mark.process
 def test_independent_processes_populate_shared_resource_once(tmp_path):
     ctx = multiprocessing.get_context("spawn")
     start_event = ctx.Event()
+    populate_started_event = ctx.Event()
+    release_populate_event = ctx.Event()
     result_queue = ctx.Queue()
     processes = [
         ctx.Process(
             target=_concurrent_resource_worker,
-            args=(str(tmp_path / "cache"), start_event, result_queue),
+            args=(
+                str(tmp_path / "cache"),
+                start_event,
+                populate_started_event,
+                release_populate_event,
+                result_queue,
+            ),
         )
         for _ in range(2)
     ]
     for process in processes:
         process.start()
     start_event.set()
+    try:
+        assert populate_started_event.wait(timeout=10)
+    finally:
+        release_populate_event.set()
     results = [result_queue.get(timeout=15) for _ in processes]
     for process in processes:
         process.join(timeout=15)
@@ -280,6 +301,7 @@ def test_independent_processes_populate_shared_resource_once(tmp_path):
 
 
 @pytest.mark.slow
+@pytest.mark.process
 def test_independent_processes_merge_prostt5_sequence_cache_updates(tmp_path):
     ctx = multiprocessing.get_context("spawn")
     start_event = ctx.Event()

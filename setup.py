@@ -115,9 +115,10 @@ setup(
     ],
     extras_require   = {
                             'simulate': [],
+                            'test': ['pytest', 'pytest-xdist'],
                             'structure': ['pymol-open-source>=3.2.0a0,<3.3'],
                             'vep': ['huggingface-hub', 'sentencepiece', 'torch>=2.0', 'transformers'],
-    },
+                        },
     scripts          = ['csubst/csubst',],
     ext_modules      = build_extensions(),
     cmdclass         = {'build_ext': CSubstBuildExt},

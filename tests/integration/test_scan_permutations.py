@@ -193,6 +193,7 @@ def test_scan_permutations_use_parallel_backend_and_chunks(monkeypatch):
 
 
 @pytest.mark.slow
+@pytest.mark.process
 def test_scan_parallel_permutation_matches_single_thread_result():
     serial_g, serial_tensor = _toy_scan_context()
     serial_g["scan_pvalue_calibration"] = "full_scan"

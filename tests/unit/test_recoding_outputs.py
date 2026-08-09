@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from matplotlib import image as mpimg
 
 from csubst import recoding
 
@@ -79,6 +78,8 @@ def test_write_nonsyn_recoding_table_skips_no(tmp_path):
 
 
 def test_write_nonsyn_recoding_pca_plot_writes_png_for_fixed_recode(tmp_path):
+    from matplotlib import image as mpimg
+
     g = _toy_grouping_g()
     g["nonsyn_recode"] = "dayhoff6"
     g = recoding.initialize_nonsyn_groups(g)

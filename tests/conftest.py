@@ -1,7 +1,6 @@
 import os
 import pathlib
 import sys
-import tempfile
 import importlib.util
 
 import numpy as np
@@ -28,13 +27,41 @@ sys.modules["csubst"] = module
 assert spec.loader is not None
 spec.loader.exec_module(module)
 
-# main_sites imports matplotlib at module import time; ensure cache is writable.
-os.environ.setdefault("MPLCONFIGDIR", tempfile.mkdtemp(prefix="mplconfig-"))
+# Keep Matplotlib's font cache writable without forcing an expensive rebuild on
+# every pytest invocation.  The cache is ignored by git and reused by local
+# sequential/xdist runs; an explicit caller-provided MPLCONFIGDIR still wins.
+if "MPLCONFIGDIR" not in os.environ:
+    matplotlib_cache = (
+        ROOT
+        / ".pytest_cache"
+        / "matplotlib"
+        / "py{}{}".format(sys.version_info.major, sys.version_info.minor)
+    )
+    matplotlib_cache.mkdir(parents=True, exist_ok=True)
+    os.environ["MPLCONFIGDIR"] = str(matplotlib_cache)
 
 
 @pytest.fixture(autouse=True)
 def _set_random_seed():
     np.random.seed(0)
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_xdist_auto_num_workers(config):
+    """Cap auto workers to avoid collection overhead and memory contention."""
+    if hasattr(os, "sched_getaffinity"):
+        available_cpus = len(os.sched_getaffinity(0))
+    else:
+        available_cpus = os.cpu_count() or 1
+    return max(1, min(4, int(available_cpus)))
+
+
+def pytest_configure(config):
+    """Build a cold font cache once in the xdist controller, not per worker."""
+    is_worker = hasattr(config, "workerinput")
+    uses_xdist = getattr(config.option, "numprocesses", None) is not None
+    if uses_xdist and not is_worker:
+        from matplotlib import font_manager  # noqa: F401
 
 
 def pytest_collection_modifyitems(items):
