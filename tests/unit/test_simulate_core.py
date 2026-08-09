@@ -1,10 +1,13 @@
+from collections import OrderedDict
+import warnings
+
 import numpy as np
 import pytest
-import warnings
 
 from csubst import main_simulate
 from csubst import tree
 from csubst import ete
+from csubst._vendor.pyvolve import evolver as pyvolve_evolver
 
 
 def test_get_num_adjusted_sites_does_not_mutate_parent_state_tensor():
@@ -91,6 +94,75 @@ def test_get_total_Q_sums_requested_entries():
     mat = np.array([[0.0, 1.0], [2.0, 0.0]])
     idx = np.array([[0, 1], [1, 0]])
     assert main_simulate.get_total_Q(mat, idx) == 3.0
+
+
+def test_vendored_evolver_caches_transition_matrix_by_q_identity_and_branch_length(monkeypatch):
+    instance = object.__new__(pyvolve_evolver.Evolver)
+    instance._transition_matrix_cache = {}
+    instance._code = ["A", "B"]
+    calls = {"count": 0}
+
+    def fake_expm(matrix):
+        calls["count"] += 1
+        return np.eye(matrix.shape[0], dtype=np.float64)
+
+    monkeypatch.setattr(pyvolve_evolver.linalg, "expm", fake_expm)
+    q_matrix = np.zeros((2, 2), dtype=np.float64)
+    first = instance._exponentiate_matrix(q_matrix, 0.5)
+    second = instance._exponentiate_matrix(q_matrix, 0.5)
+    third = instance._exponentiate_matrix(q_matrix, 1.0)
+
+    assert second is first
+    assert third is not first
+    assert calls["count"] == 2
+
+
+def test_vendored_evolver_skips_unshared_q_matrices(monkeypatch):
+    instance = object.__new__(pyvolve_evolver.Evolver)
+    instance._transition_matrix_cache = OrderedDict()
+    instance._transition_matrix_cache_nbytes = 0
+    instance._transition_matrix_cache_max_bytes = 1024
+    instance._transition_cacheable_q_ids = set()
+    instance._code = ["A", "B"]
+    calls = {"count": 0}
+
+    def fake_expm(matrix):
+        calls["count"] += 1
+        return np.eye(matrix.shape[0], dtype=np.float64)
+
+    monkeypatch.setattr(pyvolve_evolver.linalg, "expm", fake_expm)
+    q_matrix = np.zeros((2, 2), dtype=np.float64)
+    first = instance._exponentiate_matrix(q_matrix, 0.5)
+    second = instance._exponentiate_matrix(q_matrix, 0.5)
+
+    assert second is not first
+    assert calls["count"] == 2
+    assert len(instance._transition_matrix_cache) == 0
+
+
+def test_vendored_evolver_bounds_transition_cache_bytes(monkeypatch):
+    instance = object.__new__(pyvolve_evolver.Evolver)
+    instance._transition_matrix_cache = OrderedDict()
+    instance._transition_matrix_cache_nbytes = 0
+    instance._transition_matrix_cache_max_bytes = 40
+    instance._transition_cacheable_q_ids = None
+    instance._code = ["A", "B"]
+    calls = {"count": 0}
+
+    def fake_expm(matrix):
+        calls["count"] += 1
+        return np.eye(matrix.shape[0], dtype=np.float64)
+
+    monkeypatch.setattr(pyvolve_evolver.linalg, "expm", fake_expm)
+    q_matrix = np.zeros((2, 2), dtype=np.float64)
+    first = instance._exponentiate_matrix(q_matrix, 0.5)
+    instance._exponentiate_matrix(q_matrix, 1.0)
+    repeated = instance._exponentiate_matrix(q_matrix, 0.5)
+
+    assert repeated is not first
+    assert calls["count"] == 3
+    assert instance._transition_matrix_cache_nbytes == 32
+    assert len(instance._transition_matrix_cache) == 1
 
 
 def test_rescale_substitution_matrix_preserves_total_and_zero_row_sum():

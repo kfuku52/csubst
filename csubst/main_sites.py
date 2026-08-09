@@ -1,8 +1,7 @@
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
 import pandas as pd
 
+import importlib
 import itertools
 import os
 import re
@@ -23,19 +22,45 @@ from csubst import variant_effect
 font_size = 8
 TREE_LINE_CAPSTYLE = 'round'
 VESM_XTICK_LABEL_GAP_POINTS = 1.0
-matplotlib.rcParams['font.size'] = font_size
-matplotlib.rcParams['font.family'] = 'sans-serif'
-matplotlib.rcParams['font.sans-serif'] = ['Helvetica', 'Arial', 'Nimbus Sans', 'DejaVu Sans']
-matplotlib.rcParams['svg.fonttype'] = 'none' # none, path, or svgfont
-matplotlib.rc('xtick', labelsize=font_size)
-matplotlib.rc('ytick', labelsize=font_size)
-matplotlib.rc('font', size=font_size)
-matplotlib.rc('axes', titlesize=font_size)
-matplotlib.rc('axes', labelsize=font_size)
-matplotlib.rc('xtick', labelsize=font_size)
-matplotlib.rc('ytick', labelsize=font_size)
-matplotlib.rc('legend', fontsize=font_size)
-matplotlib.rc('figure', titlesize=font_size)
+_matplotlib_module = None
+_pyplot_module = None
+
+
+def _load_matplotlib_modules():
+    global _matplotlib_module, _pyplot_module
+    if _matplotlib_module is None:
+        module = importlib.import_module('matplotlib')
+        pyplot = importlib.import_module('matplotlib.pyplot')
+        module.rcParams['font.size'] = font_size
+        module.rcParams['font.family'] = 'sans-serif'
+        module.rcParams['font.sans-serif'] = ['Helvetica', 'Arial', 'Nimbus Sans', 'DejaVu Sans']
+        module.rcParams['svg.fonttype'] = 'none'
+        module.rc('xtick', labelsize=font_size)
+        module.rc('ytick', labelsize=font_size)
+        module.rc('font', size=font_size)
+        module.rc('axes', titlesize=font_size)
+        module.rc('axes', labelsize=font_size)
+        module.rc('legend', fontsize=font_size)
+        module.rc('figure', titlesize=font_size)
+        _matplotlib_module = module
+        _pyplot_module = pyplot
+    return _matplotlib_module, _pyplot_module
+
+
+class _LazyMatplotlibProxy:
+    def __getattr__(self, name):
+        module, _ = _load_matplotlib_modules()
+        return getattr(module, name)
+
+
+class _LazyPyplotProxy:
+    def __getattr__(self, name):
+        _, pyplot = _load_matplotlib_modules()
+        return getattr(pyplot, name)
+
+
+matplotlib = _LazyMatplotlibProxy()
+plt = _LazyPyplotProxy()
 
 def bool2yn(flag):
     return 'Y' if bool(flag) else 'N'
@@ -90,6 +115,7 @@ def _get_site_output_manifest_metadata(g):
         'single_branch_mode': bool2yn(g.get('single_branch_mode', False)),
         'tree_site_plot': bool2yn(g.get('tree_site_plot', True)),
         'site_state_plot': bool2yn(g.get('site_state_plot', True)),
+        'site_summary_plot': bool2yn(g.get('site_summary_plot', True)),
         'tree_site_plot_format': str(g.get('tree_site_plot_format', 'pdf')).lower(),
         'min_prob_effective': effective_min_prob,
         # Backward-compatible alias for downstream consumers.
@@ -3878,14 +3904,24 @@ def main_sites(g):
                     g=g,
                     branch_ids=g['branch_ids'],
                 )
-        barchart_path = plot_barchart(df, g)
-        add_site_output_manifest_row(
-            manifest_rows=manifest_rows,
-            output_path=barchart_path,
-            output_kind='site_summary_pdf',
-            g=g,
-            branch_ids=g['branch_ids'],
-        )
+        if bool(g.get('site_summary_plot', True)):
+            barchart_path = plot_barchart(df, g)
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=barchart_path,
+                output_kind='site_summary_pdf',
+                g=g,
+                branch_ids=g['branch_ids'],
+            )
+        else:
+            add_site_output_manifest_row(
+                manifest_rows=manifest_rows,
+                output_path=_resolve_barchart_output_base(g) + '.pdf',
+                output_kind='site_summary_pdf',
+                g=g,
+                branch_ids=g['branch_ids'],
+                note='skipped_by_site_summary_plot',
+            )
         if should_plot_state(g):
             state_paths = plot_state(ON_tensor, OS_tensor, g['branch_ids'], g)
             if len(state_paths):

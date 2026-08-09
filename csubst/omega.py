@@ -3172,7 +3172,32 @@ def _calibrate_dsc_vector(dNc_values, dSc_values, transformation='quantile'):
         alpha, loc, beta = stats.gamma.fit(dNc_values_wo_na)
         calibrated_dSc[fit_mask] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
     elif transformation == 'quantile':
-        calibrated_dSc[fit_mask] = np.quantile(dNc_values_wo_na, quantiles)
+        # ``np.quantile(values, q)`` partitions once for every requested q.
+        # Here q has the same length as values, so that otherwise becomes
+        # quadratic for exhaustive branch-combination tables. Sorting once
+        # and applying NumPy's default linear interpolation is equivalent.
+        sorted_dNc = np.sort(dNc_values_wo_na)
+        if sorted_dNc.shape[0] == 1:
+            calibrated = np.full(quantiles.shape, sorted_dNc[0], dtype=np.float64)
+        else:
+            virtual_indexes = quantiles * float(sorted_dNc.shape[0] - 1)
+            previous_indexes = np.floor(virtual_indexes).astype(np.intp)
+            next_indexes = np.ceil(virtual_indexes).astype(np.intp)
+            gamma = virtual_indexes - previous_indexes
+            previous = sorted_dNc[previous_indexes]
+            following = sorted_dNc[next_indexes]
+            interval = following - previous
+            calibrated = previous + interval * gamma
+            # Match NumPy's private _lerp rounding order exactly: interpolate
+            # from the upper endpoint when its weight is at least one half.
+            # This retains the sort-once complexity without introducing the
+            # former one-to-two ULP output difference from np.quantile.
+            use_upper = gamma >= 0.5
+            calibrated[use_upper] = (
+                following[use_upper]
+                - interval[use_upper] * (1.0 - gamma[use_upper])
+            )
+        calibrated_dSc[fit_mask] = calibrated
     else:
         raise ValueError('Unsupported transformation: {}'.format(transformation))
     is_nocalib_higher = (

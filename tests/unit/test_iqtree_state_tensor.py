@@ -80,6 +80,28 @@ def test_get_state_tensor_reads_leaf_sequences_via_ete_compat(tmp_path):
     np.testing.assert_allclose(out[labels["B"], 1, :], [0.0, 0.0, 1.0], atol=1e-12)
 
 
+def test_get_state_tensor_reuses_immutable_parse_cache(tmp_path, monkeypatch):
+    g = _make_state_tensor_g(
+        tmp_path=tmp_path,
+        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
+    )
+    g["_cache_state_tensor"] = True
+    original_iter = parser_iqtree._iter_state_rows
+    calls = {"count": 0}
+
+    def counted_iter(path):
+        calls["count"] += 1
+        yield from original_iter(path)
+
+    monkeypatch.setattr(parser_iqtree, "_iter_state_rows", counted_iter)
+    first = parser_iqtree.get_state_tensor(g)
+    second = parser_iqtree.get_state_tensor(g)
+
+    assert calls["count"] == 1
+    assert second is first
+    assert not first.flags.writeable
+
+
 def test_get_state_tensor_reads_root_rows_from_state_file(tmp_path):
     g = _make_state_tensor_g(
         tmp_path=tmp_path,

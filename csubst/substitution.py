@@ -2225,6 +2225,18 @@ def _resolve_cb_n_jobs(id_combinations, sub_tensor, g, writer, selected):
             # The dense kernel computes every branch-pair Gram for each third
             # branch. Chunking would repeat that full calculation per worker.
             n_jobs = 1
+    if (
+        (writer is sub_tensor2cb_sparse)
+        and (id_combinations.shape[1] >= 3)
+        and _can_use_sparse_projection_product(id_combinations=id_combinations, sub_tensor=sub_tensor)
+        and n_jobs != 1
+    ):
+        txt = 'Sparse higher-order projection scheduler: combinations={}, workers {} -> 1'
+        print(txt.format(id_combinations.shape[0], n_jobs), flush=True)
+        # Projection construction and tensor pickling are otherwise repeated
+        # for every process. Representative exhaustive arity-3 runs spent
+        # more CPU without reducing wall time.
+        n_jobs = 1
     if (writer is sub_tensor2cb) and _can_use_cython_dense_cb(
         id_combinations=id_combinations,
         sub_tensor=sub_tensor,

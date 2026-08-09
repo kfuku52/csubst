@@ -8,7 +8,6 @@ import time
 from importlib import import_module
 
 from csubst import sequence
-from csubst import parallel
 from csubst import ete
 
 
@@ -264,7 +263,8 @@ def calc_node_dist_chunk(chunk, start, tree_dict, float_type):
         node_nums = list()
         for nds in list(itertools.combinations(nodes, 2)):
             node_dist = ete.get_distance(nds[0], nds[1], topology_only=False)
-            node_dists.append(node_dist - nds[1].dist)
+            right_dist = 0.0 if nds[1].dist is None else float(nds[1].dist)
+            node_dists.append(node_dist - right_dist)
             node_nums.append(ete.get_distance(nds[0], nds[1], topology_only=True))
         node_dist = max(node_dists) # Maximum value among pairwise distances
         node_num = max(node_nums) # Maximum value among pairwise distances
@@ -275,6 +275,80 @@ def calc_node_dist_chunk(chunk, start, tree_dict, float_type):
             txt = 'Inter-branch distance: {:,}th in the id range {:,}-{:,}: {:,} sec'
             print(txt.format(i, start, end, int(time.time() - start_time)), flush=True)
     return arr_dist
+
+
+def _build_node_distance_matrices(tree_dict, node_labels=None):
+    """Precompute ordered distances for the numerical labels actually used."""
+    if node_labels is None:
+        labels = np.array(sorted(int(label) for label in tree_dict), dtype=np.int64)
+    else:
+        labels = np.unique(np.asarray(node_labels, dtype=np.int64).reshape(-1))
+    if labels.shape[0] == 0:
+        return (
+            np.zeros((0, 0), dtype=np.int64),
+            np.zeros((0, 0), dtype=np.float64),
+            labels,
+        )
+    missing_labels = [int(label) for label in labels if int(label) not in tree_dict]
+    if missing_labels:
+        raise ValueError(
+            'Branch ID(s) were missing from the tree: {}'.format(
+                ','.join(str(label) for label in missing_labels[:10])
+            )
+        )
+    num_label = int(labels.shape[0])
+    node_num = np.zeros((num_label, num_label), dtype=np.int64)
+    branch_length = np.zeros((num_label, num_label), dtype=np.float64)
+    for left_index, left_label in enumerate(labels.tolist()):
+        left = tree_dict[int(left_label)]
+        for right_index, right_label in enumerate(labels.tolist()):
+            right = tree_dict[int(right_label)]
+            right_dist = 0.0 if right.dist is None else float(right.dist)
+            if left_index == right_index:
+                # Match calc_node_dist_chunk even for malformed/redundant
+                # combinations containing the same branch more than once.
+                branch_length[left_index, right_index] = -right_dist
+                continue
+            node_num[left_index, right_index] = ete.get_distance(
+                left, right, topology_only=True
+            )
+            branch_length[left_index, right_index] = (
+                ete.get_distance(left, right, topology_only=False) - right_dist
+            )
+    return node_num, branch_length, labels
+
+
+def _map_node_labels_to_distance_indices(id_combinations, matrix_labels):
+    ids = np.asarray(id_combinations, dtype=np.int64)
+    matrix_labels = np.asarray(matrix_labels, dtype=np.int64).reshape(-1)
+    if ids.size == 0:
+        return np.zeros(ids.shape, dtype=np.int64)
+    mapped = np.searchsorted(matrix_labels, ids)
+    if (
+        np.any(mapped < 0)
+        or np.any(mapped >= matrix_labels.shape[0])
+        or not np.array_equal(matrix_labels[mapped], ids)
+    ):
+        raise ValueError('Branch IDs could not be mapped to the distance matrices.')
+    return mapped.astype(np.int64, copy=False)
+
+
+def _max_pairwise_node_distances(id_combinations, node_num, branch_length, float_type):
+    ids = np.asarray(id_combinations, dtype=np.int64)
+    if ids.ndim != 2 or ids.shape[1] < 2:
+        raise ValueError('id_combinations should contain at least two branch columns.')
+    max_node_num = np.zeros(ids.shape[0], dtype=np.int64)
+    max_branch_length = np.full(ids.shape[0], -np.inf, dtype=np.float64)
+    for left_col, right_col in itertools.combinations(range(ids.shape[1]), 2):
+        left = ids[:, left_col]
+        right = ids[:, right_col]
+        np.maximum(max_node_num, node_num[left, right], out=max_node_num)
+        np.maximum(max_branch_length, branch_length[left, right], out=max_branch_length)
+    return (
+        max_node_num,
+        max_branch_length.astype(float_type, copy=False),
+    )
+
 
 def get_node_distance(
     tree,
@@ -291,32 +365,42 @@ def get_node_distance(
     for node in tree.traverse():
         tree_dict[ete.get_prop(node, "numerical_label")] = node
     cn1 = cb.columns[cb.columns.str.startswith('branch_id_')]
-    id_combinations = cb.loc[:,cn1].values
-    n_jobs = parallel.resolve_task_n_jobs(
-        num_items=id_combinations.shape[0],
-        threads=ncpu,
-        task='branch_dist',
-    )
-    txt = 'Branch-distance scheduler: combinations={}, workers={} (threads={})'
-    print(txt.format(id_combinations.shape[0], n_jobs, ncpu), flush=True)
-    if n_jobs == 1:
-        out_list = [calc_node_dist_chunk(id_combinations, 0, tree_dict, float_type)]
-    else:
-        chunks, starts = parallel.get_chunks(id_combinations, n_jobs)
-        tasks = [(chunk, start, tree_dict, float_type) for chunk, start in zip(chunks, starts)]
-        out_list = parallel.run_starmap(
-            func=calc_node_dist_chunk,
-            args_iterable=tasks,
-            n_jobs=n_jobs,
-            backend='threading',
+    id_combinations = cb.loc[:,cn1].to_numpy(dtype=np.int64, copy=False)
+    arity = int(id_combinations.shape[1])
+    num_pair_per_combination = arity * (arity - 1) // 2
+    direct_work = int(id_combinations.shape[0]) * num_pair_per_combination
+    used_labels = np.unique(id_combinations) if id_combinations.size else np.array([], dtype=np.int64)
+    matrix_work = int(used_labels.shape[0]) * max(0, int(used_labels.shape[0]) - 1)
+    if direct_work <= matrix_work:
+        txt = 'Branch-distance scheduler: combinations={}, workers=1 (threads={}, direct)'
+        print(txt.format(id_combinations.shape[0], ncpu), flush=True)
+        legacy = calc_node_dist_chunk(
+            chunk=id_combinations,
+            start=0,
+            tree_dict=tree_dict,
+            float_type=np.float64,
         )
-    cb.loc[:, 'dist_node_num'] = -1
-    cb.loc[:, 'dist_bl'] = np.nan
-    for arr_dist in out_list:
-        ind = arr_dist[:,0].astype(int)
-        cb.loc[ind,'dist_node_num'] = arr_dist[:,1] # This line causes the warning when arr_dist.shape[0] == 1: FutureWarning: In a future version, `df.iloc[:, i] = newvals` will attempt to set the values inplace instead of always setting a new array. To retain the old behavior, use either `df[df.columns[i]] = newvals` or, if columns are non-unique, `df.isetitem(i, newvals)`
-        cb.loc[ind,'dist_node_num'] = arr_dist[:,1]
-        cb.loc[ind,'dist_bl'] = arr_dist[:,2]
+        max_node_num = legacy[:, 1].astype(np.int64, copy=False)
+        max_branch_length = legacy[:, 2].astype(float_type, copy=False)
+    else:
+        txt = 'Branch-distance scheduler: combinations={}, workers=1 (threads={}, vectorized, nodes={})'
+        print(txt.format(id_combinations.shape[0], ncpu, used_labels.shape[0]), flush=True)
+        node_num, branch_length, matrix_labels = _build_node_distance_matrices(
+            tree_dict=tree_dict,
+            node_labels=used_labels,
+        )
+        matrix_ids = _map_node_labels_to_distance_indices(
+            id_combinations=id_combinations,
+            matrix_labels=matrix_labels,
+        )
+        max_node_num, max_branch_length = _max_pairwise_node_distances(
+            id_combinations=matrix_ids,
+            node_num=node_num,
+            branch_length=branch_length,
+            float_type=float_type,
+        )
+    cb['dist_node_num'] = np.asarray(max_node_num, dtype=np.int64)
+    cb['dist_bl'] = np.asarray(max_branch_length, dtype=float_type)
     print('Time elapsed for calculating inter-branch distances: {:,} sec'.format(int(time.time() - start_time)))
     return(cb)
 

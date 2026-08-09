@@ -1075,6 +1075,104 @@ def _fill_internal_state_rows(
     return loaded_names
 
 
+def _load_internal_state_rows_one_pass(
+    state_tensor,
+    state_path,
+    state_columns,
+    expected_num_site,
+    internal_id_by_name,
+    target_node_names,
+    required_node_names,
+    dtype,
+):
+    """Validate and load selected internal-state rows in one file pass."""
+    target_node_names = set(target_node_names or [])
+    required_node_names = set(required_node_names or [])
+    expected_num_site = int(expected_num_site)
+    expected_site_set = set(range(1, expected_num_site + 1))
+    num_state = len(state_columns)
+    sites_by_node = OrderedDict()
+    loaded_names = set()
+    for node_name, site_text, state_text, probabilities, line_number in _iter_state_rows(state_path):
+        if node_name not in target_node_names:
+            continue
+        site_label = _parse_state_site_label(site_text)
+        if site_label < 1 or site_label > expected_num_site:
+            raise ValueError(
+                'Unexpected Site labels in .state file. Expected the contiguous range 1..{}.'.format(
+                    expected_num_site
+                )
+            )
+        node_sites = sites_by_node.setdefault(node_name, set())
+        if site_label in node_sites:
+            raise ValueError(
+                'Duplicate Node/Site row(s) were found in .state file: {}:{}'.format(
+                    node_name, site_label
+                )
+            )
+        node_sites.add(site_label)
+        values = np.fromstring(probabilities, sep='\t', dtype=dtype)
+        if values.shape[0] != num_state:
+            raise ValueError(
+                'Malformed .state probabilities at line {}: expected {}, observed {}.'.format(
+                    line_number, num_state, values.shape[0]
+                )
+            )
+        if state_text in ('?', '???'):
+            values.fill(0)
+        else:
+            if (not np.isfinite(values).all()) or np.any(values < 0):
+                raise ValueError(
+                    'Invalid probability value(s) in .state file at line {}.'.format(line_number)
+                )
+            probability_sum = float(values.sum())
+            if (not math.isfinite(probability_sum)) or (abs(probability_sum - 1.0) > 1e-3):
+                raise ValueError(
+                    '.state probabilities at line {} sum to {:.8g}; expected 1.'.format(
+                        line_number, probability_sum
+                    )
+                )
+        state_tensor[int(internal_id_by_name[node_name]), site_label - 1, :] = values
+        loaded_names.add(node_name)
+
+    invalid_nodes = [
+        (node_name, len(node_sites))
+        for node_name, node_sites in sites_by_node.items()
+        if len(node_sites) != expected_num_site
+    ]
+    if invalid_nodes:
+        invalid_txt = ', '.join(
+            ['{}:{}'.format(node_name, count) for node_name, count in invalid_nodes[:10]]
+        )
+        if len(invalid_nodes) > 10:
+            invalid_txt += ',...'
+        txt = 'Unexpected number of unique Site rows in .state file. '
+        txt += 'Expected {} sites per node; observed {}'
+        raise ValueError(txt.format(expected_num_site, invalid_txt))
+    mismatched_nodes = [
+        node_name for node_name, node_sites in sites_by_node.items()
+        if node_sites != expected_site_set
+    ]
+    if mismatched_nodes:
+        mismatch_txt = ', '.join(mismatched_nodes[:10])
+        if len(mismatched_nodes) > 10:
+            mismatch_txt += ',...'
+        raise ValueError(
+            'Inconsistent Site label sets were found among nodes in .state file: {}'.format(
+                mismatch_txt
+            )
+        )
+    missing_nodes = sorted(required_node_names.difference(sites_by_node))
+    if missing_nodes:
+        missing_txt = ', '.join(missing_nodes[:10])
+        if len(missing_nodes) > 10:
+            missing_txt += ',...'
+        raise ValueError(
+            'Internal node(s) were missing from .state file: {}'.format(missing_txt)
+        )
+    return loaded_names
+
+
 def get_state_tensor(g, selected_branch_ids=None):
     if g.get('input_data_type', None) != 'cdn':
         raise NotImplementedError(
@@ -1093,6 +1191,17 @@ def get_state_tensor(g, selected_branch_ids=None):
               'Delete intermediate files and rerun.'
     if num_alignment_site != g['num_input_site']:
         raise AssertionError(err_txt)
+    use_state_cache = bool(g.get('_cache_state_tensor', False))
+    state_cache_key = None
+    if use_state_cache:
+        state_cache_key = _state_tensor_cache_key(
+            g=g,
+            selected_branch_ids=selected_branch_ids,
+        )
+        cached_state_tensor = _get_cached_state_tensor(state_cache_key)
+        if cached_state_tensor is not None:
+            print('Reusing cached IQ-TREE state tensor.', flush=True)
+            return cached_state_tensor
     num_node = _get_num_node_axis(g['tree'])
     selected_set, selected_internal_ids, required_leaf_ids = _get_selected_branch_context(
         tree=g['tree'],
@@ -1135,12 +1244,6 @@ def get_state_tensor(g, selected_branch_ids=None):
         required_internal_names.intersection_update(target_internal_names)
     else:
         target_internal_names = set(internal_id_by_name)
-    site_labels, _sites_by_node = _scan_state_node_sites(
-        state_path=state_path,
-        expected_num_site=g['num_input_site'],
-        target_node_names=target_internal_names,
-        required_node_names=required_internal_names,
-    )
     axis = [num_node, g['num_input_site'], g['num_input_state']]
     state_tensor = _initialize_state_tensor(
         axis=axis,
@@ -1148,12 +1251,14 @@ def get_state_tensor(g, selected_branch_ids=None):
         selective=(selected_set is not None),
         mmap_name='tmp.csubst.state_tensor.mmap',
     )
-    loaded_internal_names = _fill_internal_state_rows(
+    loaded_internal_names = _load_internal_state_rows_one_pass(
         state_tensor=state_tensor,
         state_path=state_path,
         state_columns=state_columns,
-        site_labels=site_labels,
+        expected_num_site=g['num_input_site'],
         internal_id_by_name=internal_id_by_name,
+        target_node_names=target_internal_names,
+        required_node_names=required_internal_names,
         dtype=g['float_type'],
     )
     codon_lookup = None
@@ -1236,7 +1341,9 @@ def get_state_tensor(g, selected_branch_ids=None):
                 if is_nonmissing.any():
                     state_tensor2[b, is_nonmissing, idxmax[is_nonmissing]] = True
             state_tensor = state_tensor2
-    return(state_tensor)
+    if use_state_cache:
+        return _cache_state_tensor(state_cache_key, state_tensor)
+    return state_tensor
 
 def get_input_information(g):
     g = read_state(g)
@@ -1244,3 +1351,60 @@ def get_input_information(g):
     g = read_log(g)
     g['iqtree_rate_values'] = read_rate(g)
     return g
+
+
+_STATE_TENSOR_CACHE = OrderedDict()
+_STATE_TENSOR_CACHE_MAX_ITEMS = 2
+
+
+def _file_cache_signature(path):
+    stat = os.stat(path)
+    return (os.path.abspath(os.fspath(path)), int(stat.st_size), int(stat.st_mtime_ns))
+
+
+def _state_tensor_cache_key(g, selected_branch_ids):
+    if selected_branch_ids is None:
+        selected = None
+    else:
+        selected = tuple(
+            sorted(int(v) for v in np.asarray(selected_branch_ids, dtype=np.int64).reshape(-1))
+        )
+    tree_signature = tuple(
+        sorted(
+            (
+                int(ete.get_prop(node, 'numerical_label')),
+                '' if node.name is None else str(node.name),
+                bool(ete.is_leaf(node)),
+                -1 if ete.is_root(node) else int(ete.get_prop(node.up, 'numerical_label')),
+            )
+            for node in g['tree'].traverse()
+        )
+    )
+    return (
+        _file_cache_signature(g['path_iqtree_state']),
+        _file_cache_signature(g['alignment_file']),
+        tree_signature,
+        selected,
+        int(g['num_input_site']),
+        int(g['num_input_state']),
+        np.dtype(g['float_type']).str,
+        bool(g.get('ml_anc', False)),
+        tuple(str(value) for value in np.asarray(g.get('codon_orders', []), dtype=object)),
+    )
+
+
+def _get_cached_state_tensor(cache_key):
+    cached = _STATE_TENSOR_CACHE.get(cache_key, None)
+    if cached is not None:
+        _STATE_TENSOR_CACHE.move_to_end(cache_key)
+    return cached
+
+
+def _cache_state_tensor(cache_key, state_tensor):
+    cached = np.array(state_tensor, copy=True)
+    cached.flags.writeable = False
+    _STATE_TENSOR_CACHE[cache_key] = cached
+    _STATE_TENSOR_CACHE.move_to_end(cache_key)
+    while len(_STATE_TENSOR_CACHE) > _STATE_TENSOR_CACHE_MAX_ITEMS:
+        _STATE_TENSOR_CACHE.popitem(last=False)
+    return cached

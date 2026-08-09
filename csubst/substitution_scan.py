@@ -471,7 +471,111 @@ def extract_atomic_events(sub_tensor, min_event_pp=0.5, float_tol=1e-12):
     return out
 
 
-def extract_candidate_posterior_events(sub_tensor, site, from_ids, to_ids, float_tol=1e-12):
+def _canonicalize_scan_projection(matrix):
+    matrix = matrix.tocsc(copy=False)
+    matrix.sum_duplicates()
+    matrix.eliminate_zeros()
+    matrix.sort_indices()
+    return matrix
+
+
+def _build_scan_rate_projection(sub_tensor, scan_matches):
+    """Build reusable sparse projections for common scan candidate shapes."""
+    if not _is_sparse_sub_tensor(sub_tensor):
+        return None
+    if isinstance(scan_matches, (list, tuple, set)):
+        scan_matches = ",".join(str(value) for value in scan_matches)
+    matches = set(normalize_scan_matches(scan_matches))
+    num_site = int(sub_tensor.shape[1])
+    num_from = int(sub_tensor.shape[3])
+    num_to = int(sub_tensor.shape[4])
+    out = {
+        "num_from": num_from,
+        "num_to": num_to,
+    }
+    diagonal_blocks = tuple(
+        sub_tensor.get_block(0, state_id, state_id)
+        for state_id in range(min(num_from, num_to))
+    )
+    has_diagonal_mass = any(matrix.nnz > 0 for matrix in diagonal_blocks)
+    # Production substitution tensors have an empty diagonal.  For arbitrary
+    # caller-provided tensors with diagonal mass, use the historical block
+    # extraction path so that sum-then-subtract cancellation cannot change a
+    # float_tol boundary decision.
+    if "any2spe" in matches and not has_diagonal_mass:
+        projected = sub_tensor.project("any2spe")
+        matrices = []
+        for der in range(num_to):
+            start = der * num_site
+            matrix = projected[:, start:start + num_site]
+            matrices.append(_canonicalize_scan_projection(matrix))
+        out["any2spe"] = tuple(matrices)
+    if "spe2any" in matches and not has_diagonal_mass:
+        projected = sub_tensor.project("spe2any")
+        matrices = []
+        for anc in range(num_from):
+            start = anc * num_site
+            matrix = projected[:, start:start + num_site]
+            matrices.append(_canonicalize_scan_projection(matrix))
+        out["spe2any"] = tuple(matrices)
+    if "any2any" in matches and not has_diagonal_mass:
+        matrix = sub_tensor.project("any2any")[:, :num_site]
+        out["any2any"] = _canonicalize_scan_projection(matrix)
+    return out
+
+
+def _get_projected_candidate_branch_values(projection, site, from_ids, to_ids):
+    if projection is None:
+        return None
+    num_from = int(projection["num_from"])
+    num_to = int(projection["num_to"])
+    valid_from = np.array(
+        sorted(set(int(v) for v in from_ids if 0 <= int(v) < num_from)),
+        dtype=np.int64,
+    )
+    valid_to = np.array(
+        sorted(set(int(v) for v in to_ids if 0 <= int(v) < num_to)),
+        dtype=np.int64,
+    )
+    matrix = None
+    if (
+        valid_from.shape[0] == num_from
+        and valid_to.shape[0] == 1
+        and "any2spe" in projection
+    ):
+        matrix = projection["any2spe"][int(valid_to[0])]
+    elif (
+        valid_from.shape[0] == 1
+        and valid_to.shape[0] == num_to
+        and "spe2any" in projection
+    ):
+        matrix = projection["spe2any"][int(valid_from[0])]
+    elif (
+        valid_from.shape[0] == num_from
+        and valid_to.shape[0] == num_to
+        and "any2any" in projection
+    ):
+        matrix = projection["any2any"]
+    if matrix is None:
+        return None
+    start = int(matrix.indptr[int(site)])
+    end = int(matrix.indptr[int(site) + 1])
+    branch_values = np.zeros(shape=(matrix.shape[0],), dtype=np.float64)
+    if end > start:
+        rows = matrix.indices[start:end].astype(np.int64, copy=False)
+        values = matrix.data[start:end].astype(np.float64, copy=False)
+        np.add.at(branch_values, rows, values)
+    return branch_values
+
+
+def extract_candidate_posterior_events(
+    sub_tensor,
+    site,
+    from_ids,
+    to_ids,
+    float_tol=1e-12,
+    projection=None,
+):
     site = int(site)
     from_ids = np.array(sorted(set(np.asarray(from_ids, dtype=np.int64).reshape(-1).tolist())), dtype=np.int64)
     to_ids = np.array(sorted(set(np.asarray(to_ids, dtype=np.int64).reshape(-1).tolist())), dtype=np.int64)
@@ -490,21 +594,28 @@ def extract_candidate_posterior_events(sub_tensor, site, from_ids, to_ids, float
         raise ValueError("sub_tensor should contain at least one substitution group.")
     if (site < 0) or (site >= num_site):
         raise ValueError("site is outside the substitution tensor site axis.")
-    branch_values = np.zeros(shape=(num_branch,), dtype=np.float64)
-    for anc in from_ids.tolist():
-        if (int(anc) < 0) or (int(anc) >= num_from):
-            continue
-        for der in to_ids.tolist():
-            if (int(der) < 0) or (int(der) >= num_to) or (int(anc) == int(der)):
+    branch_values = _get_projected_candidate_branch_values(
+        projection=projection,
+        site=site,
+        from_ids=from_ids,
+        to_ids=to_ids,
+    )
+    if branch_values is None:
+        branch_values = np.zeros(shape=(num_branch,), dtype=np.float64)
+        for anc in from_ids.tolist():
+            if (int(anc) < 0) or (int(anc) >= num_from):
                 continue
-            if _is_sparse_sub_tensor(sub_tensor):
-                mat = sub_tensor.get_block(0, int(anc), int(der))
-                col = mat.getcol(site).tocoo()
-                if col.data.shape[0] == 0:
+            for der in to_ids.tolist():
+                if (int(der) < 0) or (int(der) >= num_to) or (int(anc) == int(der)):
                     continue
-                np.add.at(branch_values, col.row.astype(np.int64, copy=False), col.data.astype(np.float64, copy=False))
-            else:
-                branch_values += arr[:, site, 0, int(anc), int(der)].astype(np.float64, copy=False)
+                if _is_sparse_sub_tensor(sub_tensor):
+                    mat = sub_tensor.get_block(0, int(anc), int(der))
+                    col = mat.getcol(site).tocoo()
+                    if col.data.shape[0] == 0:
+                        continue
+                    np.add.at(branch_values, col.row.astype(np.int64, copy=False), col.data.astype(np.float64, copy=False))
+                else:
+                    branch_values += arr[:, site, 0, int(anc), int(der)].astype(np.float64, copy=False)
     keep = np.where(branch_values > float(float_tol))[0]
     if keep.shape[0] == 0:
         return pd.DataFrame(
@@ -1868,7 +1979,7 @@ def build_scan_site_plot_table(scan_df, g, ON_tensor):
     return out, branch_ids
 
 
-def _build_scan_static_context(g, ON_tensor):
+def _build_scan_static_context(g, ON_tensor, rate_ON_tensor=None):
     min_event_pp = float(g.get("scan_min_event_pp", 0.5))
     events = extract_atomic_events(
         sub_tensor=ON_tensor,
@@ -1889,6 +2000,14 @@ def _build_scan_static_context(g, ON_tensor):
             fg_leaf_names_map={},
         )
     rate_exposure = resolve_scan_rate_exposure(g)
+    if rate_ON_tensor is None:
+        rate_ON_tensor = ON_tensor
+    rate_event_projection = None
+    if str(g.get("scan_rate_event_mode", "posterior_sum")).strip().lower() == "posterior_sum":
+        rate_event_projection = _build_scan_rate_projection(
+            sub_tensor=rate_ON_tensor,
+            scan_matches=g.get("scan_match", "any2spe"),
+        )
     return {
         "events": events,
         "branch_meta": branch_meta,
@@ -1897,6 +2016,7 @@ def _build_scan_static_context(g, ON_tensor):
         "q_context": _build_scan_q_context(g=g, rate_exposure=rate_exposure),
         "observed_site_annotations": observed_site_annotations,
         "permutation_site_annotations": permutation_site_annotations,
+        "rate_event_projection": rate_event_projection,
     }
 
 
@@ -2001,6 +2121,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     from_ids=from_ids,
                     to_ids=to_ids,
                     float_tol=float(g.get("float_tol", 1e-12)),
+                    projection=scan_static.get("rate_event_projection", None),
                 )
             else:
                 txt = "--scan_rate_event_mode should be one of {}."
@@ -2540,7 +2661,11 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
 
 
 def scan_substitutions(g, ON_tensor, rate_ON_tensor=None):
-    scan_static = _build_scan_static_context(g=g, ON_tensor=ON_tensor)
+    scan_static = _build_scan_static_context(
+        g=g,
+        ON_tensor=ON_tensor,
+        rate_ON_tensor=rate_ON_tensor if rate_ON_tensor is not None else ON_tensor,
+    )
     scan_df, units = _scan_substitutions_core(
         g=g,
         ON_tensor=ON_tensor,

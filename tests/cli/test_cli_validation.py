@@ -148,6 +148,7 @@ def test_sites_help_shows_output_manifest_and_removed_site_output_manifest_is_re
     assert proc.returncode == 0
     help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
     assert "--output_manifest" in help_text
+    assert "--site_summary_plot" in help_text
     assert "--site_output_manifest" not in help_text
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--site_output_manifest", "no")
     assert proc.returncode == 2

@@ -4,9 +4,6 @@ import pandas as pd
 import re
 import time
 
-from scipy.stats import chi2_contingency
-
-
 def _normalize_integer_like(values, column_name):
     arr = np.asarray(values, dtype=object).reshape(-1)
     normalized = []
@@ -141,6 +138,8 @@ def get_linear_regression(cb):
     return cb
 
 def chisq_test(x, total_S, total_N):
+    from scipy.stats import chi2_contingency
+
     obs = x.loc[['OCSany2spe','OCNany2spe']].values
     if obs.sum()==0:
         return 1

@@ -218,11 +218,17 @@ def get_nonsynonymous_codon_substitution_index(all_syn_cdn_index):
     return nsy_index
 
 def get_total_Q(mat, cdn_index):
+    indexes = np.asarray(cdn_index, dtype=np.int64)
+    if indexes.size == 0:
+        return 0.0
+    if indexes.ndim != 2 or indexes.shape[1] != 2:
+        raise ValueError('cdn_index should have shape (N, 2).')
+    # Keep the historical addition order for bitwise-reproducible simulated
+    # matrices. The caller now caches repeated index/Q combinations, which
+    # removes the former performance cost without changing rounding.
     total = 0
-    for ci in np.arange(cdn_index.shape[0]):
-        row = cdn_index[ci,0]
-        col = cdn_index[ci,1]
-        total += mat[row,col]
+    for row, col in indexes:
+        total += mat[row, col]
     return total
 
 def _normalize_matrix_by_expected_rate(mat, eq_freq):
@@ -289,10 +295,7 @@ def bias_eq_freq(eq_freq, biased_cdn_index, convergence_intensity_factor):
 
 def get_total_biased_Q(mat, biased_aas, codon_table, codon_order):
     biased_nsy_cdn_index = get_biased_nonsynonymous_substitution_index(biased_aas, codon_table, codon_order)
-    total_biased_Q = 0
-    for i in np.arange(biased_nsy_cdn_index.shape[0]):
-        total_biased_Q += mat[biased_nsy_cdn_index[i,0],biased_nsy_cdn_index[i,1]]
-    return total_biased_Q
+    return get_total_Q(mat=mat, cdn_index=biased_nsy_cdn_index)
 
 def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, codon_table, codon_orders,
                              all_nsy_cdn_index, all_syn_cdn_index, foreground_omega, eq_freq=None):
@@ -376,6 +379,9 @@ def evolve_convergent_partitions(g):
         raise ValueError(txt.format(site_rates.shape[0], num_convergent_partition))
     convergent_partitions = list()
     biased_substitution_fractions = list()
+    biased_context_cache = dict()
+    model_cache = dict()
+    bg_total_nsy_Q = get_total_Q(g['background_Q'], g['all_nsy_cdn_index'])
     current_site = 0
     for partition_index in np.arange(num_convergent_partition):
         current_site += 1
@@ -386,25 +392,41 @@ def evolve_convergent_partitions(g):
             rng=g.get('simulate_rng', None),
         )
         print('Codon site {}; Biased amino acids = {}; '.format(current_site, ''.join(biased_aas)), end='')
-        biased_nsy_sub_index = get_biased_nonsynonymous_substitution_index(biased_aas,
-                                                                           g['codon_table'],
-                                                                           g['pyvolve_codon_orders'])
-        biased_Q = apply_percent_biased_sub(mat=g['background_Q'],
-                                            percent_biased_sub=g['percent_biased_sub'],
-                                            target_index=biased_nsy_sub_index,
-                                            biased_aas=biased_aas,
-                                            codon_table=g['codon_table'],
-                                            codon_orders=g['pyvolve_codon_orders'],
-                                            all_nsy_cdn_index=g['all_nsy_cdn_index'],
-                                            all_syn_cdn_index=g['all_syn_cdn_index'],
-                                            foreground_omega=g['foreground_omega'],
-                                            eq_freq=g['eq_freq'],
-                                            )
-        total_nsy_Q = get_total_Q(biased_Q, g['all_nsy_cdn_index'])
-        total_biased_Q = get_total_biased_Q(biased_Q, biased_aas, g['codon_table'], g['pyvolve_codon_orders'])
+        biased_key = tuple(str(aa) for aa in biased_aas.tolist())
+        biased_context = biased_context_cache.get(biased_key, None)
+        if biased_context is None:
+            biased_nsy_sub_index = get_biased_nonsynonymous_substitution_index(
+                biased_aas,
+                g['codon_table'],
+                g['pyvolve_codon_orders'],
+            )
+            biased_Q = apply_percent_biased_sub(
+                mat=g['background_Q'],
+                percent_biased_sub=g['percent_biased_sub'],
+                target_index=biased_nsy_sub_index,
+                biased_aas=biased_aas,
+                codon_table=g['codon_table'],
+                codon_orders=g['pyvolve_codon_orders'],
+                all_nsy_cdn_index=g['all_nsy_cdn_index'],
+                all_syn_cdn_index=g['all_syn_cdn_index'],
+                foreground_omega=g['foreground_omega'],
+                eq_freq=g['eq_freq'],
+            )
+            total_nsy_Q = get_total_Q(biased_Q, g['all_nsy_cdn_index'])
+            total_biased_Q = get_total_Q(biased_Q, biased_nsy_sub_index)
+            bg_total_biased_Q = get_total_Q(g['background_Q'], biased_nsy_sub_index)
+            biased_context = {
+                'biased_Q': biased_Q,
+                'total_nsy_Q': total_nsy_Q,
+                'total_biased_Q': total_biased_Q,
+                'bg_total_biased_Q': bg_total_biased_Q,
+            }
+            biased_context_cache[biased_key] = biased_context
+        biased_Q = biased_context['biased_Q']
+        total_nsy_Q = biased_context['total_nsy_Q']
+        total_biased_Q = biased_context['total_biased_Q']
+        bg_total_biased_Q = biased_context['bg_total_biased_Q']
         fraction_biased_Q = total_biased_Q / total_nsy_Q
-        bg_total_nsy_Q = get_total_Q(g['background_Q'], g['all_nsy_cdn_index'])
-        bg_total_biased_Q = get_total_biased_Q(g['background_Q'], biased_aas, g['codon_table'], g['pyvolve_codon_orders'])
         bg_fraction_biased_Q = bg_total_biased_Q / bg_total_nsy_Q
         txt = 'Total in Q toward the codons before and after the bias introduction = ' \
               '{:,.1f}% ({:,.1f}/{:,.1f}) and {:,.1f}% ({:,.1f}/{:,.1f})'
@@ -414,14 +436,33 @@ def evolve_convergent_partitions(g):
         models = list()
         for model_name in model_names:
             is_nonroot_model = (model_name!='root')
-            if (is_nonroot_model):
-                q_matrix = _scale_rate_matrix(biased_Q, site_rate)
-            else:
-                q_matrix = _scale_rate_matrix(g['background_Q'], site_rate)
-            model = _make_pyvolve_custom_model(pyvolve=pyvolve, g=g, name=model_name, q_matrix=q_matrix)
+            model_key = (
+                model_name,
+                biased_key if is_nonroot_model else ('background',),
+                site_rate,
+            )
+            model = model_cache.get(model_key, None)
+            if model is None:
+                if is_nonroot_model:
+                    q_matrix = _scale_rate_matrix(biased_Q, site_rate)
+                else:
+                    q_matrix = _scale_rate_matrix(g['background_Q'], site_rate)
+                model = _make_pyvolve_custom_model(
+                    pyvolve=pyvolve,
+                    g=g,
+                    name=model_name,
+                    q_matrix=q_matrix,
+                )
+                model_cache[model_key] = model
             models.append(model)
         partition = pyvolve.Partition(models=models, size=1,  root_model_name='root')
         convergent_partitions.append(partition)
+    save_path = str(g.get('simulate_custom_frequency_file', '')).strip()
+    if save_path != '' and len(convergent_partitions) > 0:
+        # Cached models may have been constructed before the final simulated
+        # site. Preserve Pyvolve's historical side effect: the frequency file
+        # describes the foreground model of that final site.
+        np.savetxt(save_path, models[-1].params['state_freqs'])
     if len(biased_substitution_fractions):
         mean_biased_substitution_fraction = np.array(biased_substitution_fractions).mean()
     else:

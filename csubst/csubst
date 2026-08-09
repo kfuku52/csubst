@@ -1071,6 +1071,8 @@ def _build_parser(show_advanced=False):
     site.add_argument('--site_state_plot', metavar='yes|no', default='yes', type=strtobool,
                       help='default=%(default)s: Generate substitution-pattern summary outputs '
                            '(<output_prefix>.state.pdf and corresponding N/S TSV files).')
+    site.add_argument('--site_summary_plot', metavar='yes|no', default='yes', type=strtobool,
+                      help='default=%(default)s: Generate the site-wise substitution summary bar chart.')
     site.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,
                       choices=['pdf', 'png', 'svg'],
                       help='default=%(default)s: Output format for --tree_site_plot.')

@@ -11,6 +11,7 @@ The module will evolve sequences along a phylogeny.
 '''
 
 import itertools
+from collections import Counter, OrderedDict
 from copy import deepcopy
 import numpy as np
 from scipy import linalg
@@ -69,6 +70,27 @@ class Evolver(object):
         self._root_seq_length = 0
         self._setup_partitions()
         self._code = self.partitions[0]._root_model.code
+        # Model objects shared by multiple partitions benefit from transition
+        # caching.  Unique site-rate matrices do not, and retaining every one
+        # of them makes ASRV simulations grow by several GB.
+        matrix_counts = Counter()
+        for partition in self.partitions:
+            for model in partition.models:
+                matrix = model.matrix
+                if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
+                    matrix_counts[id(matrix)] += 1
+                elif isinstance(matrix, (list, tuple)):
+                    for q_matrix in matrix:
+                        if isinstance(q_matrix, np.ndarray) and q_matrix.ndim == 2:
+                            matrix_counts[id(q_matrix)] += 1
+        self._transition_cacheable_q_ids = {
+            matrix_id for matrix_id, count in matrix_counts.items() if count > 1
+        }
+        self._transition_matrix_cache = OrderedDict()
+        self._transition_matrix_cache_nbytes = 0
+        self._transition_matrix_cache_max_bytes = int(
+            kwargs.get('_transition_cache_max_bytes', 128 * 1024 * 1024)
+        )
 
         ######### In-house projects #######
         # start root with certain fitness #
@@ -410,8 +432,35 @@ class Evolver(object):
             Assert that all rows sum to 1.
             Return P
         '''
+        q_id = id(Q)
+        cacheable_q_ids = getattr(self, '_transition_cacheable_q_ids', None)
+        should_cache = (cacheable_q_ids is None) or (q_id in cacheable_q_ids)
+        cache_key = (q_id, float(t))
+        if should_cache:
+            cached = self._transition_matrix_cache.get(cache_key, None)
+            if cached is not None and cached[0] is Q:
+                if hasattr(self._transition_matrix_cache, 'move_to_end'):
+                    self._transition_matrix_cache.move_to_end(cache_key)
+                return cached[1]
+            if cached is not None:
+                self._transition_matrix_cache.pop(cache_key, None)
+                self._transition_matrix_cache_nbytes = max(
+                    0,
+                    int(getattr(self, '_transition_matrix_cache_nbytes', 0))
+                    - int(cached[1].nbytes),
+                )
         P = linalg.expm( np.multiply(Q, float(t) ) )
         assert( np.allclose( np.sum(P, axis = 1), np.ones(len(self._code))) ), "Rows in transition matrix do not each sum to 1."
+        max_cache_bytes = int(
+            getattr(self, '_transition_matrix_cache_max_bytes', 128 * 1024 * 1024)
+        )
+        if should_cache and (max_cache_bytes > 0) and (P.nbytes <= max_cache_bytes):
+            cache_nbytes = int(getattr(self, '_transition_matrix_cache_nbytes', 0))
+            while self._transition_matrix_cache and (cache_nbytes + P.nbytes > max_cache_bytes):
+                _old_key, (_old_q, old_p) = self._transition_matrix_cache.popitem(last=False)
+                cache_nbytes -= int(old_p.nbytes)
+            self._transition_matrix_cache[cache_key] = (Q, P)
+            self._transition_matrix_cache_nbytes = cache_nbytes + int(P.nbytes)
         return P
                         
     
@@ -629,7 +678,11 @@ class Evolver(object):
                     if current_model.is_hetcodon_model():
                         Q_matrix = current_model.matrix[i]
                     else:
-                        Q_matrix = current_model.matrix * current_model.rate_factors[i] # note that rate_factors = [1.] if no site heterogeneity, so matrix unchanged
+                        rate_factor = current_model.rate_factors[i]
+                        if rate_factor == 1.:
+                            Q_matrix = current_model.matrix
+                        else:
+                            Q_matrix = current_model.matrix * rate_factor
                     assert( Q_matrix is not None ), "\n\nCouldn't retrieve instantaneous rate matrix."
                     
                     

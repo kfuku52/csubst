@@ -249,6 +249,9 @@ def _prepare_run_context(base_g, config, run_dir):
     local_g["nonsyn_recode"] = recoding.normalize_nonsyn_recode(config["nonsyn_recode"])
     local_g["sa_asr_mode"] = config["sa_asr_mode"]
     local_g["pseudocount_mode"] = config["pseudocount_mode"]
+    # Benchmark configurations share immutable IQ-TREE codon states within
+    # this process. Normal one-shot commands avoid retaining the extra array.
+    local_g["_cache_state_tensor"] = True
     local_g["pseudocount_alpha"] = str(local_g.get("pseudocount_alpha", "0.0"))
     if local_g["nonsyn_recode"] == "3di20":
         full_cds = str(local_g.get("full_cds_alignment_file", "")).strip()

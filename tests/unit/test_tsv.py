@@ -34,3 +34,21 @@ def test_write_dataframe_supports_append_without_duplicate_header(tmp_path):
         mode="a",
     )
     assert output_path.read_text(encoding="utf-8") == "x\tname\n1.00\ta\n2.00\tb\n"
+
+
+def test_write_dataframe_preserves_zero_column_legacy_output(tmp_path):
+    frame = pd.DataFrame(index=np.arange(3))
+    output_path = tmp_path / "zero_columns.tsv"
+
+    tsv.write_dataframe(frame, output_path)
+
+    assert output_path.read_bytes() == b"\n"
+
+
+def test_write_dataframe_zero_columns_without_header_is_empty(tmp_path):
+    frame = pd.DataFrame(index=np.arange(3))
+    output_path = tmp_path / "zero_columns_no_header.tsv"
+
+    tsv.write_dataframe(frame, output_path, header=False)
+
+    assert output_path.read_bytes() == b""

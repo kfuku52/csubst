@@ -76,6 +76,30 @@ def test_dense_arity3_projection_scheduler_uses_one_worker(monkeypatch):
     assert observed == 1
 
 
+def test_sparse_arity3_projection_scheduler_avoids_duplicate_worker_work(monkeypatch):
+    dense = np.zeros((6, 5, 1, 2, 2), dtype=np.float64)
+    dense[:, :, 0, 0, 1] = 1.0
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.tile(np.array([[0, 1, 2]], dtype=np.int64), (20, 1))
+    g = {"threads": 8}
+    monkeypatch.setattr(substitution.parallel, "resolve_task_n_jobs", lambda **_kwargs: 8)
+    monkeypatch.setattr(
+        substitution,
+        "_can_use_dense_arity3_projection_product",
+        lambda **_kwargs: False,
+    )
+
+    observed = substitution._resolve_cb_n_jobs(
+        id_combinations=ids,
+        sub_tensor=sparse_tensor,
+        g=g,
+        writer=substitution.sub_tensor2cb_sparse,
+        selected=["any2any"],
+    )
+
+    assert observed == 1
+
+
 def test_resolve_dense_cython_n_jobs_prefers_single_for_small_workload():
     ids = np.zeros((1200, 2), dtype=np.int64)
     sub = np.zeros((10, 100, 1, 4, 4), dtype=np.float64)

@@ -7,12 +7,82 @@ from csubst import ete
 from csubst import foreground
 from csubst import main_scan
 from csubst import substitution_scan
+from csubst import substitution
 from csubst import tree
 
 
 def _set_state(state, branch_id, site, state_id):
     state[int(branch_id), int(site), :] = 0.0
     state[int(branch_id), int(site), int(state_id)] = 1.0
+
+
+@pytest.mark.parametrize(
+    ("match", "from_ids", "to_ids"),
+    [
+        ("any2spe", [0, 1, 2], [2]),
+        ("spe2any", [0], [0, 1, 2]),
+        ("any2any", [0, 1, 2], [0, 1, 2]),
+    ],
+)
+def test_scan_sparse_rate_projection_matches_block_extraction(match, from_ids, to_ids):
+    dense = np.zeros((3, 2, 1, 3, 3), dtype=np.float64)
+    dense[0, 1, 0, 0, 2] = 0.2
+    dense[0, 1, 0, 1, 2] = 0.3
+    dense[1, 1, 0, 0, 1] = 0.4
+    dense[2, 1, 0, 0, 0] = 0.9  # Diagonal mass must be excluded.
+    sparse = substitution.dense_to_sparse_sub_tensor(dense)
+    projection = substitution_scan._build_scan_rate_projection(sparse, [match])
+    assert match not in projection
+
+    expected = substitution_scan.extract_candidate_posterior_events(
+        sub_tensor=sparse,
+        site=1,
+        from_ids=from_ids,
+        to_ids=to_ids,
+    )
+    observed = substitution_scan.extract_candidate_posterior_events(
+        sub_tensor=sparse,
+        site=1,
+        from_ids=from_ids,
+        to_ids=to_ids,
+        projection=projection,
+    )
+
+    pd.testing.assert_frame_equal(observed, expected, check_exact=True)
+
+
+@pytest.mark.parametrize(
+    ("match", "from_ids", "to_ids"),
+    [
+        ("any2spe", [0, 1, 2], [2]),
+        ("spe2any", [0], [0, 1, 2]),
+        ("any2any", [0, 1, 2], [0, 1, 2]),
+    ],
+)
+def test_scan_sparse_rate_projection_uses_fast_path_for_zero_diagonal(match, from_ids, to_ids):
+    dense = np.zeros((3, 2, 1, 3, 3), dtype=np.float64)
+    dense[0, 1, 0, 0, 2] = 0.2
+    dense[0, 1, 0, 1, 2] = 0.3
+    dense[1, 1, 0, 0, 1] = 0.4
+    sparse = substitution.dense_to_sparse_sub_tensor(dense)
+    projection = substitution_scan._build_scan_rate_projection(sparse, [match])
+    assert match in projection
+
+    expected = substitution_scan.extract_candidate_posterior_events(
+        sub_tensor=sparse,
+        site=1,
+        from_ids=from_ids,
+        to_ids=to_ids,
+    )
+    observed = substitution_scan.extract_candidate_posterior_events(
+        sub_tensor=sparse,
+        site=1,
+        from_ids=from_ids,
+        to_ids=to_ids,
+        projection=projection,
+    )
+
+    pd.testing.assert_frame_equal(observed, expected, check_exact=True)
 
 
 def _toy_scan_context():
@@ -76,6 +146,24 @@ def _toy_scan_context():
         "min_clade_bin_count": 1,
     }
     return g, on_tensor
+
+
+def test_scan_called_rate_mode_does_not_build_unused_projection(monkeypatch):
+    g, on_tensor = _toy_scan_context()
+    g["scan_rate_event_mode"] = "called"
+    monkeypatch.setattr(
+        substitution_scan,
+        "_build_scan_rate_projection",
+        lambda *args, **kwargs: pytest.fail("called mode should not build a rate projection"),
+    )
+
+    context = substitution_scan._build_scan_static_context(
+        g=g,
+        ON_tensor=on_tensor,
+        rate_ON_tensor=on_tensor,
+    )
+
+    assert context["rate_event_projection"] is None
 
 
 def _toy_clade_scan_context():

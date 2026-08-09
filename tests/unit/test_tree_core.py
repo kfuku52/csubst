@@ -75,6 +75,109 @@ def test_transfer_internal_node_names_rejects_different_topologies():
         tree.transfer_internal_node_names(tree_to, tree_from)
 
 
+def test_vectorized_node_distances_match_legacy_chunk():
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("((A:0.1,B:0.2)X:0.3,(C:0.4,D:0.5)Y:0.6)R;", format=1)
+    )
+    tree_dict = {
+        int(ete.get_prop(node, "numerical_label")): node
+        for node in tr.traverse()
+    }
+    labels = sorted(
+        label for label, node in tree_dict.items()
+        if not ete.is_root(node)
+    )
+    combinations = np.array(
+        [labels[:3], labels[1:4], labels[-3:], [labels[0], labels[0], labels[0]]],
+        dtype=np.int64,
+    )
+    legacy = tree.calc_node_dist_chunk(
+        chunk=combinations,
+        start=0,
+        tree_dict=tree_dict,
+        float_type=np.float64,
+    )
+    node_num, branch_length, matrix_labels = tree._build_node_distance_matrices(
+        tree_dict,
+        node_labels=combinations,
+    )
+    matrix_combinations = tree._map_node_labels_to_distance_indices(
+        id_combinations=combinations,
+        matrix_labels=matrix_labels,
+    )
+    observed_num, observed_bl = tree._max_pairwise_node_distances(
+        id_combinations=matrix_combinations,
+        node_num=node_num,
+        branch_length=branch_length,
+        float_type=np.float64,
+    )
+    np.testing.assert_array_equal(observed_num, legacy[:, 1])
+    np.testing.assert_allclose(observed_bl, legacy[:, 2], rtol=0.0, atol=0.0)
+    assert np.issubdtype(observed_num.dtype, np.integer)
+
+
+def test_node_distance_matrices_only_allocate_requested_labels():
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("(((A:1,B:1)X:1,C:1)Y:1,(D:1,E:1)Z:1)R;", format=1)
+    )
+    tree_dict = {
+        int(ete.get_prop(node, "numerical_label")): node
+        for node in tr.traverse()
+    }
+    requested = np.array(sorted(tree_dict)[:2], dtype=np.int64)
+
+    node_num, branch_length, matrix_labels = tree._build_node_distance_matrices(
+        tree_dict=tree_dict,
+        node_labels=requested,
+    )
+
+    assert node_num.shape == (2, 2)
+    assert branch_length.shape == (2, 2)
+    np.testing.assert_array_equal(matrix_labels, requested)
+
+
+def test_get_node_distance_uses_direct_path_for_small_workload_and_keeps_integer_dtype(monkeypatch):
+    tr = tree.add_numerical_node_labels(
+        ete.PhyloNode("((A:1,B:1)X:1,(C:1,D:1)Y:1)R;", format=1)
+    )
+    labels = [
+        int(ete.get_prop(node, "numerical_label"))
+        for node in tr.traverse()
+        if ete.is_leaf(node)
+    ]
+    cb = pd.DataFrame({"branch_id_1": [labels[0]], "branch_id_2": [labels[-1]]})
+    monkeypatch.setattr(
+        tree,
+        "_build_node_distance_matrices",
+        lambda *args, **kwargs: pytest.fail("small workloads should use direct distances"),
+    )
+
+    out = tree.get_node_distance(
+        tree=tr,
+        cb=cb,
+        ncpu=8,
+        float_type=np.float64,
+    )
+
+    assert np.issubdtype(out["dist_node_num"].dtype, np.integer)
+    assert out.at[0, "dist_node_num"] > 0
+
+
+def test_max_pairwise_node_distances_preserves_negative_branch_values():
+    node_num = np.array([[0, 1], [1, 0]], dtype=np.int64)
+    branch_length = np.array([[0.0, -0.2], [-0.3, 0.0]], dtype=np.float64)
+
+    observed_num, observed_bl = tree._max_pairwise_node_distances(
+        id_combinations=np.array([[0, 1]], dtype=np.int64),
+        node_num=node_num,
+        branch_length=branch_length,
+        float_type=np.float64,
+    )
+
+    np.testing.assert_array_equal(observed_num, [1])
+    np.testing.assert_array_equal(observed_bl, [-0.2])
+
+
 def test_transfer_root_rejects_missing_root_bipartition():
     tree_to = ete.PhyloNode("((A:1,C:1):1,(B:1,D:1):1);", format=1)
     tree_from = ete.PhyloNode("((A:1,B:1):1,(C:1,D:1):1);", format=1)

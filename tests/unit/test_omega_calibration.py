@@ -5,6 +5,57 @@ import pytest
 from csubst import omega
 
 
+def test_calibrate_dsc_quantile_fast_path_matches_numpy_quantile():
+    rng = np.random.default_rng(13)
+    dnc = rng.lognormal(size=2000)
+    dsc = np.round(rng.lognormal(size=2000), decimals=2)
+    dnc[[5, 19]] = np.nan
+    dsc[[7, 23]] = np.inf
+    fit = np.isfinite(dnc) & np.isfinite(dsc)
+    scipy_stats = pytest.importorskip("scipy.stats")
+    ranks = scipy_stats.rankdata(dsc[fit])
+    quantiles = (ranks - 0.5) / float(ranks.shape[0])
+    expected = np.array(dsc, copy=True)
+    expected[fit] = np.quantile(dnc[fit], quantiles)
+    replace = np.isfinite(dsc) & np.isfinite(expected) & (dsc > expected)
+    expected[replace] = dsc[replace]
+
+    observed, observed_fit, observed_replace = omega._calibrate_dsc_vector(
+        dNc_values=dnc,
+        dSc_values=dsc,
+        transformation="quantile",
+    )
+
+    np.testing.assert_array_equal(observed_fit, fit)
+    np.testing.assert_array_equal(observed_replace, replace)
+    np.testing.assert_allclose(observed, expected, rtol=0.0, atol=0.0, equal_nan=True)
+
+
+def test_calibrate_dsc_quantile_matches_numpy_bitwise_for_small_samples():
+    rng = np.random.default_rng(20260809)
+    scipy_stats = pytest.importorskip("scipy.stats")
+    for size in range(1, 80):
+        for replicate in range(10):
+            if replicate % 2 == 0:
+                dnc = rng.lognormal(mean=0.0, sigma=3.0, size=size)
+            else:
+                dnc = rng.integers(0, 8, size=size).astype(np.float64)
+            dsc = rng.lognormal(mean=0.0, sigma=2.0, size=size)
+            ranks = scipy_stats.rankdata(dsc)
+            quantiles = (ranks - 0.5) / float(size)
+            expected = np.quantile(dnc, quantiles)
+            replace = dsc > expected
+            expected[replace] = dsc[replace]
+
+            observed, _fit, _replace = omega._calibrate_dsc_vector(
+                dNc_values=dnc,
+                dSc_values=dsc,
+                transformation="quantile",
+            )
+
+            np.testing.assert_array_equal(observed, expected)
+
+
 def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
     cb = pd.DataFrame(
         {
