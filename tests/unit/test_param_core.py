@@ -20,6 +20,7 @@ def test_get_global_parameters_sets_fixed_numerical_defaults():
     assert g["expected_state_backend"] == "auto"
     assert g["float_type"] is np.float64
     assert g["float_tol"] == pytest.approx(1e-9)
+    assert g["blas_threads"] == 1
     assert "sub_tensor_backend" not in g
     assert "parallel_backend" not in g
 
@@ -75,6 +76,11 @@ def test_get_global_parameters_builds_run_context_and_output_namespace(tmp_path,
 def test_get_global_parameters_rejects_invalid_random_seed(seed):
     with pytest.raises(ValueError, match="random_seed"):
         param.get_global_parameters(_args(random_seed=seed))
+
+
+def test_get_global_parameters_validates_blas_threads():
+    with pytest.raises(ValueError, match="blas_threads"):
+        param.get_global_parameters(_args(blas_threads=0))
 
 
 def test_get_global_parameters_rejects_output_prefix_paths():

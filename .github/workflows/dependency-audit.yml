@@ -1,0 +1,45 @@
+name: Dependency audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+concurrency:
+  group: dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: ${{ matrix.profile }} dependencies
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: core
+            package: "."
+          - profile: structure
+            package: ".[structure]"
+          - profile: vep
+            package: ".[vep]"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install profile in a clean environment
+        env:
+          CSUBST_SKIP_EXTENSIONS: "1"
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          python -m pip install '${{ matrix.package }}'
+          python -m pip check
+
+      - name: Audit installed dependencies
+        run: python -m pip_audit --local --skip-editable

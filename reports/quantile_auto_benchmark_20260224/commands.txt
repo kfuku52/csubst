@@ -2,10 +2,11 @@
 /tmp/csubst_quantile_cmp_20260224_151443
 
 # Environment
-PYTHONPATH="/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst${PYTHONPATH:+:$PYTHONPATH}"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
 # auto edge=2 (after optimization)
-/usr/bin/time -l -p python /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My\ Drive/psnl/repos/csubst/csubst/csubst \
+/usr/bin/time -l -p python -m csubst \
   analyze \
   --alignment_file PGK.alignment.fa \
   --rooted_tree_file PGK.tree.nwk \
@@ -18,7 +19,7 @@ PYTHONPATH="/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp
   --quantile_niter_schedule 0
 
 # fixed 1000
-/usr/bin/time -l -p python /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My\ Drive/psnl/repos/csubst/csubst/csubst \
+/usr/bin/time -l -p python -m csubst \
   analyze \
   --alignment_file PGK.alignment.fa \
   --rooted_tree_file PGK.tree.nwk \
@@ -31,7 +32,7 @@ PYTHONPATH="/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp
   --quantile_niter_schedule 1000
 
 # auto edge=1 reference
-/usr/bin/time -l -p python /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My\ Drive/psnl/repos/csubst/csubst/csubst \
+/usr/bin/time -l -p python -m csubst \
   analyze \
   --alignment_file PGK.alignment.fa \
   --rooted_tree_file PGK.tree.nwk \

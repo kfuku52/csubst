@@ -6,7 +6,7 @@ for stat in "${stats[@]}"; do
   for model in "${models[@]}"; do
     echo "== stat=$stat model=$model =="
     /usr/bin/time -l -p \
-    python "/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/csubst" analyze \
+    python -m csubst analyze \
       --alignment_file simulate.fa \
       --rooted_tree_file tree.nwk \
       --foreground foreground.txt \

@@ -3,8 +3,9 @@ import math
 import os
 import re
 import time
-import xml.etree.ElementTree as ET
 
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 import requests
 
 from csubst import __version__
@@ -13,6 +14,8 @@ from csubst import __version__
 BLAST_URL = 'https://blast.ncbi.nlm.nih.gov/Blast.cgi'
 DEFAULT_HITLIST_SIZE = 50
 DEFAULT_POLL_INTERVAL = 60.0
+DEFAULT_MAX_WAIT_SECONDS = 3600.0
+MAX_RESPONSE_BYTES = 20_000_000
 DEFAULT_CONTACT_EMAIL = 'kfuku52@gmail.com'
 
 
@@ -65,9 +68,11 @@ def _accession_from_identifier(identifier):
 def parse_xml2_hits(response_text):
     """Extract ordered primary hit accessions and display titles from BLAST XML2."""
 
+    if len(response_text.encode('utf-8')) > MAX_RESPONSE_BYTES:
+        raise ValueError('NCBI BLAST XML2 output exceeded the response size limit.')
     try:
         root = ET.fromstring(response_text)
-    except ET.ParseError as exc:
+    except (ET.ParseError, DefusedXmlException) as exc:
         raise ValueError('NCBI BLAST returned malformed XML2 output.') from exc
 
     hits = list()
@@ -105,12 +110,41 @@ def _post_text(session, data, timeout, url):
         data=data,
         headers={'User-Agent': 'csubst/{}'.format(__version__)},
         timeout=timeout,
+        stream=True,
     )
     try:
         response.raise_for_status()
-        return response.text
+        content_length = response.headers.get('Content-Length')
+        if content_length is not None and int(content_length) > MAX_RESPONSE_BYTES:
+            raise RuntimeError('NCBI BLAST response exceeded the response size limit.')
+        payload = bytearray()
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if not chunk:
+                continue
+            payload.extend(chunk)
+            if len(payload) > MAX_RESPONSE_BYTES:
+                raise RuntimeError('NCBI BLAST response exceeded the response size limit.')
+        return payload.decode(response.encoding or 'utf-8', errors='replace')
     finally:
         response.close()
+
+
+def _sleep_until_next_poll(seconds, *, deadline, monotonic, sleep, rid):
+    remaining = deadline - monotonic()
+    if remaining <= 0 or seconds > remaining:
+        raise TimeoutError(
+            'NCBI BLAST search {} exceeded the overall wait limit.'.format(rid)
+        )
+    sleep(seconds)
+
+
+def _remaining_request_timeout(timeout, *, deadline, monotonic, rid):
+    remaining = deadline - monotonic()
+    if remaining <= 0:
+        raise TimeoutError(
+            'NCBI BLAST search {} exceeded the overall wait limit.'.format(rid)
+        )
+    return min(float(timeout), remaining)
 
 
 def search_blastp_swissprot(
@@ -119,9 +153,11 @@ def search_blastp_swissprot(
     timeout=30,
     hitlist_size=DEFAULT_HITLIST_SIZE,
     poll_interval=DEFAULT_POLL_INTERVAL,
+    max_wait=DEFAULT_MAX_WAIT_SECONDS,
     email=None,
     session=None,
     sleep=time.sleep,
+    monotonic=time.monotonic,
     url=BLAST_URL,
 ):
     """Submit and retrieve one blastp search against NCBI Swiss-Prot."""
@@ -141,6 +177,10 @@ def search_blastp_swissprot(
     poll_interval = float(poll_interval)
     if (not math.isfinite(poll_interval)) or poll_interval < DEFAULT_POLL_INTERVAL:
         raise ValueError('NCBI BLAST poll_interval should be finite and at least 60 seconds.')
+    max_wait = float(max_wait)
+    if (not math.isfinite(max_wait)) or max_wait <= 0:
+        raise ValueError('NCBI BLAST max_wait should be finite and > 0.')
+    deadline = monotonic() + max_wait
 
     owns_session = session is None
     if session is None:
@@ -162,7 +202,14 @@ def search_blastp_swissprot(
             'FORMAT_TYPE': 'XML2_S',
         }
         submission_parameters.update(common_parameters)
-        submission_text = _post_text(session, submission_parameters, timeout, url)
+        submission_text = _post_text(
+            session,
+            submission_parameters,
+            _remaining_request_timeout(
+                timeout, deadline=deadline, monotonic=monotonic, rid='submission'
+            ),
+            url,
+        )
         rid, rtoe = _parse_submission_response(submission_text)
 
         retrieval_parameters = {
@@ -171,15 +218,38 @@ def search_blastp_swissprot(
             'FORMAT_TYPE': 'XML2_S',
         }
         retrieval_parameters.update(common_parameters)
-        sleep(max(poll_interval, float(rtoe)))
+        _sleep_until_next_poll(
+            max(poll_interval, float(rtoe)),
+            deadline=deadline,
+            monotonic=monotonic,
+            sleep=sleep,
+            rid=rid,
+        )
         ready_status_seen = False
         while True:
-            result_text = _post_text(session, retrieval_parameters, timeout, url)
+            if monotonic() >= deadline:
+                raise TimeoutError(
+                    'NCBI BLAST search {} exceeded the overall wait limit.'.format(rid)
+                )
+            result_text = _post_text(
+                session,
+                retrieval_parameters,
+                _remaining_request_timeout(
+                    timeout, deadline=deadline, monotonic=monotonic, rid=rid
+                ),
+                url,
+            )
             status = _parse_status(result_text)
             if status is None:
                 return parse_xml2_hits(result_text)
             if status == 'WAITING':
-                sleep(poll_interval)
+                _sleep_until_next_poll(
+                    poll_interval,
+                    deadline=deadline,
+                    monotonic=monotonic,
+                    sleep=sleep,
+                    rid=rid,
+                )
                 continue
             if status in {'FAILED', 'UNKNOWN'}:
                 raise RuntimeError('NCBI BLAST search {} returned status {}.'.format(rid, status))
@@ -187,7 +257,13 @@ def search_blastp_swissprot(
                 if ready_status_seen:
                     raise RuntimeError('NCBI BLAST search {} repeatedly returned READY without results.'.format(rid))
                 ready_status_seen = True
-                sleep(poll_interval)
+                _sleep_until_next_poll(
+                    poll_interval,
+                    deadline=deadline,
+                    monotonic=monotonic,
+                    sleep=sleep,
+                    rid=rid,
+                )
                 continue
             raise RuntimeError('NCBI BLAST search {} returned unsupported status {}.'.format(rid, status))
     finally:

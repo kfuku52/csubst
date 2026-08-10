@@ -3,13 +3,14 @@
 import argparse
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from _safe_workdir import prepare_owned_workdir
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -418,10 +419,7 @@ def main():
     repo_root = REPO_ROOT
     ensure_precomputed_iqtree_outputs(repo_root=repo_root, dataset_name=DATASET_NAME)
 
-    run_root = Path(args.workdir).resolve()
-    if run_root.exists():
-        shutil.rmtree(run_root)
-    run_root.mkdir(parents=True, exist_ok=True)
+    run_root = prepare_owned_workdir(args.workdir, repo_root=repo_root)
 
     summary_rows = []
     runtime_rows = []

@@ -3,10 +3,13 @@
 ## pyvolve (vendored under `csubst/_vendor/pyvolve`)
 
 - Upstream project: https://github.com/sjspielman/pyvolve
+- Vendored release: 1.1.0 (`6145db82049941d559c9d7ba9756525fa6419ea1`)
 - Copyright: (c) 2015 Stephanie J. Spielman
 - License: BSD-2-Clause-style terms (see `csubst/_vendor/pyvolve/LICENSE.txt`)
 
 CSUBST vendors pyvolve source code for the simulation backend.
+Local integration notes and the update procedure are documented in
+`csubst/_vendor/pyvolve/README.csubst.md`.
 
 ## Biopython codon-table material
 

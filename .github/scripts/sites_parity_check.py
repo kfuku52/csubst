@@ -5,7 +5,6 @@ import itertools
 import math
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +18,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from csubst import ete  # noqa: E402 - repository path is inserted above
 from csubst import tree  # noqa: E402 - repository path is inserted above
+from _safe_workdir import prepare_owned_workdir  # noqa: E402
 
 
 EXPECTED = {
@@ -56,6 +56,8 @@ PERFORMANCE_LIMITS = {
         "site_max_rss_kb": 1_200_000,
     },
 }
+ELAPSED_BASELINE_MULTIPLIER = 2.0
+RSS_BASELINE_MULTIPLIER = 1.75
 
 
 def parse_args():
@@ -71,6 +73,11 @@ def parse_args():
         "--workdir",
         default="parity_runs",
         help="Temporary working directory for generated analysis files.",
+    )
+    parser.add_argument(
+        "--baseline",
+        default=str(REPO_ROOT / ".github" / "performance_baseline.tsv"),
+        help="Versioned Linux performance baseline TSV.",
     )
     return parser.parse_args()
 
@@ -206,7 +213,6 @@ def run_dataset(repo_root, run_root, dataset_name):
     run_dir = Path(run_root) / dataset_name
     run_dir.mkdir(parents=True, exist_ok=True)
     python_exe = sys.executable
-    csubst_exe = repo_root / "csubst" / "csubst"
     dataset_dir = repo_root / "csubst" / "dataset"
     env = os.environ.copy()
     env["PYTHONPATH"] = str(repo_root) + (
@@ -224,7 +230,8 @@ def run_dataset(repo_root, run_root, dataset_name):
 
     analyze_cmd = [
         python_exe,
-        str(csubst_exe),
+        "-m",
+        "csubst",
         "analyze",
         "--outdir",
         ".",
@@ -279,7 +286,8 @@ def run_dataset(repo_root, run_root, dataset_name):
     site_output_prefix = "csubst"
     site_cmd = [
         python_exe,
-        str(csubst_exe),
+        "-m",
+        "csubst",
         "site",
         "--outdir",
         site_outdir,
@@ -356,8 +364,9 @@ def run_dataset(repo_root, run_root, dataset_name):
     }
 
 
-def validate_metrics(rows):
+def validate_metrics(rows, baseline_path):
     errors = []
+    baseline = pandas.read_csv(baseline_path, sep="\t").set_index("dataset")
     for row in rows:
         dataset = row["dataset"]
         expected = EXPECTED[dataset]
@@ -385,6 +394,27 @@ def validate_metrics(rows):
                         dataset, key, value, float(limits[key])
                     )
                 )
+        if dataset not in baseline.index:
+            errors.append("{}: missing versioned performance baseline".format(dataset))
+            continue
+        baseline_row = baseline.loc[dataset]
+        for key in ["analyze_elapsed_sec", "site_elapsed_sec"]:
+            baseline_limit = float(baseline_row[key]) * ELAPSED_BASELINE_MULTIPLIER
+            if float(row[key]) > baseline_limit:
+                errors.append(
+                    "{}: {} {:.3f} exceeded baseline-relative limit {:.3f}".format(
+                        dataset, key, float(row[key]), baseline_limit
+                    )
+                )
+        for key in ["analyze_max_rss_kb", "site_max_rss_kb"]:
+            value = int(row[key])
+            baseline_limit = int(float(baseline_row[key]) * RSS_BASELINE_MULTIPLIER)
+            if value >= 0 and value > baseline_limit:
+                errors.append(
+                    "{}: {} {:,} exceeded baseline-relative limit {:,}".format(
+                        dataset, key, value, baseline_limit
+                    )
+                )
         for key in ["analyze_max_rss_kb", "site_max_rss_kb"]:
             value = int(row[key])
             if value >= 0 and value > int(limits[key]):
@@ -400,10 +430,7 @@ def validate_metrics(rows):
 def main():
     args = parse_args()
     repo_root = REPO_ROOT
-    run_root = Path(args.workdir).resolve()
-    if run_root.exists():
-        shutil.rmtree(run_root)
-    run_root.mkdir(parents=True, exist_ok=True)
+    run_root = prepare_owned_workdir(args.workdir, repo_root=repo_root)
 
     rows = []
     for dataset_name in ["PGK", "PEPC"]:
@@ -415,7 +442,7 @@ def main():
             )
         )
 
-    validate_metrics(rows)
+    validate_metrics(rows, baseline_path=Path(args.baseline).resolve())
 
     out_df = pandas.DataFrame(rows)
     out_df = out_df.sort_values(by=["dataset"]).reset_index(drop=True)

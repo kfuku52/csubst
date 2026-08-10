@@ -1,6 +1,6 @@
 # Site-specific subtitution rates determined by empirical Bayesian method
 # This file can be read in MS Excel or in R with command:
-#   tab=read.table('/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.rate',header=TRUE)
+#   tab=read.table('PGK.alignment.fa.rate',header=TRUE)
 # Columns are tab-separated with following meaning:
 #   Site:   Alignment site ID
 #   Rate:   Posterior mean site rate weighted by posterior probability

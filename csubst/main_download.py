@@ -1,8 +1,9 @@
 from csubst import model_resources
 from csubst import structural_alphabet
+from csubst.config_types import AnalysisConfig
 
 
-def _normalize_resources(value):
+def _normalize_resources(value: object) -> list[str]:
     normalized = str(value).strip().lower().replace("_", "-")
     if normalized == "all":
         return ["vesm-35m", "prostt5"]
@@ -11,7 +12,7 @@ def _normalize_resources(value):
     raise ValueError("--resource should be one of vesm-35m, prostt5, all.")
 
 
-def main_download(g):
+def main_download(g: AnalysisConfig) -> None:
     resources = _normalize_resources(g.get("resource", "vesm-35m"))
     poll_seconds = float(g.get("resource_lock_poll", 5.0))
     timeout_seconds = float(g.get("resource_lock_timeout", 3600.0))

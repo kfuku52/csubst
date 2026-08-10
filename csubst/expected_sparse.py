@@ -5,12 +5,10 @@ owns projection packing and incremental CSR construction so the large analysis
 module does not also have to implement sparse storage mechanics.
 """
 
-import warnings
-
 import numpy as np
 from scipy import sparse as sp
 
-from csubst._extensions import load_optional_extension
+from csubst._extensions import load_optional_extension, warn_extension_fallback
 
 
 omega_cy = load_optional_extension('omega_cy')
@@ -18,13 +16,8 @@ _WARNED_CYTHON_FALLBACKS: set[str] = set()
 
 
 def _warn_cython_fallback(operation, exc):
-    if operation in _WARNED_CYTHON_FALLBACKS:
-        return
-    _WARNED_CYTHON_FALLBACKS.add(operation)
-    warnings.warn(
-        'Cython {} fast path failed; using NumPy fallback: {}'.format(operation, exc),
-        RuntimeWarning,
-        stacklevel=3,
+    warn_extension_fallback(
+        operation, exc, _WARNED_CYTHON_FALLBACKS, fallback_name='NumPy'
     )
 
 
@@ -150,7 +143,7 @@ def branch_projection_payloads(
         syn_indices_list=syn_indices_list,
         selected=selected,
     )
-    payloads = {}
+    payloads: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for stat, values in branch_values.items():
         flat = values.T.reshape(-1)
         nonzero = np.flatnonzero(flat != 0)
@@ -168,10 +161,10 @@ class CSRRowBuilder:
     def __init__(self, num_row, num_column, initial_capacity=1024):
         self.num_row = int(num_row)
         self.num_column = int(num_column)
-        self.indptr = np.zeros(self.num_row + 1, dtype=np.int64)
+        self.indptr: np.ndarray = np.zeros(self.num_row + 1, dtype=np.int64)
         capacity = max(1, int(initial_capacity))
-        self.indices = np.empty(capacity, dtype=np.int32)
-        self.data = np.empty(capacity, dtype=np.float64)
+        self.indices: np.ndarray = np.empty(capacity, dtype=np.int32)
+        self.data: np.ndarray = np.empty(capacity, dtype=np.float64)
         self.nnz = 0
         self.next_row = 0
 

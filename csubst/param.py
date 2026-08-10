@@ -10,7 +10,7 @@ try:
 except ImportError:  # pragma: no cover
     import importlib_metadata
 
-from csubst.__init__ import __version__
+from csubst import __version__
 from csubst import output_stat
 from csubst import pseudocount
 from csubst import randomness
@@ -834,7 +834,12 @@ def get_global_parameters(args):
         g['threads'] = int(g['threads'])
         if g['threads'] < 1:
             raise ValueError('--threads should be >= 1.')
-        set_num_thread_variables(num_thread=g['threads'])
+    if 'blas_threads' not in g.keys():
+        g['blas_threads'] = 1
+    g['blas_threads'] = int(g['blas_threads'])
+    if g['blas_threads'] < 1:
+        raise ValueError('--blas_threads should be >= 1.')
+    set_num_thread_variables(num_thread=g['blas_threads'])
     if 'nonsyn_recode' in g.keys():
         g['nonsyn_recode'] = recoding_config.normalize_nonsyn_recode(g['nonsyn_recode'])
     else:
@@ -975,10 +980,5 @@ def initialize_df_cb_stats(g):
     return(g)
 
 def set_num_thread_variables(num_thread=1):
-    # https://stackoverflow.com/questions/30791550/limit-number-of-threads-in-numpy
-    os.environ["OMP_NUM_THREADS"] = str(num_thread)
-    os.environ["OPENBLAS_NUM_THREADS"] = str(num_thread)
-    os.environ["MKL_NUM_THREADS"] = str(num_thread)
-    os.environ["VECLIB_NUM_THREADS"] = str(num_thread)
-    os.environ["NUMEXPR_NUM_THREADS"] = str(num_thread)
+    runtime.configure_native_threads(num_threads=num_thread)
     return None

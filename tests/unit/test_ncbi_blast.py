@@ -23,9 +23,11 @@ XML2_RESULT = """<?xml version="1.0"?>
 
 
 class _FakeResponse:
-    def __init__(self, text, error=None):
+    def __init__(self, text, error=None, headers=None):
         self.text = text
         self.error = error
+        self.headers = dict(headers or {})
+        self.encoding = 'utf-8'
         self.closed = False
 
     def raise_for_status(self):
@@ -35,6 +37,11 @@ class _FakeResponse:
     def close(self):
         self.closed = True
 
+    def iter_content(self, chunk_size):
+        payload = self.text.encode(self.encoding)
+        for start in range(0, len(payload), chunk_size):
+            yield payload[start:start + chunk_size]
+
 
 class _FakeSession:
     def __init__(self, responses):
@@ -42,8 +49,16 @@ class _FakeSession:
         self.calls = []
         self.closed = False
 
-    def post(self, url, data, headers, timeout):
-        self.calls.append({"url": url, "data": dict(data), "headers": dict(headers), "timeout": timeout})
+    def post(self, url, data, headers, timeout, stream):
+        self.calls.append(
+            {
+                "url": url,
+                "data": dict(data),
+                "headers": dict(headers),
+                "timeout": timeout,
+                "stream": stream,
+            }
+        )
         return self.responses.pop(0)
 
     def close(self):
@@ -60,6 +75,36 @@ def test_parse_xml2_hits_uses_accessions_fallbacks_and_deduplicates():
 def test_parse_xml2_hits_rejects_malformed_xml():
     with pytest.raises(ValueError, match="malformed XML2"):
         ncbi_blast.parse_xml2_hits("<BlastXML2>")
+
+
+def test_parse_xml2_hits_rejects_unsafe_xml_entity():
+    unsafe_xml = '<!DOCTYPE x [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><x>&xxe;</x>'
+    with pytest.raises(ValueError, match="malformed XML2"):
+        ncbi_blast.parse_xml2_hits(unsafe_xml)
+
+
+def test_parse_xml2_hits_rejects_oversized_response(monkeypatch):
+    monkeypatch.setattr(ncbi_blast, "MAX_RESPONSE_BYTES", 10)
+    with pytest.raises(ValueError, match="size limit"):
+        ncbi_blast.parse_xml2_hits(XML2_RESULT)
+
+
+def test_post_text_rejects_declared_oversized_response(monkeypatch):
+    monkeypatch.setattr(ncbi_blast, 'MAX_RESPONSE_BYTES', 10)
+    response = _FakeResponse('small', headers={'Content-Length': '11'})
+    session = _FakeSession([response])
+    with pytest.raises(RuntimeError, match='size limit'):
+        ncbi_blast._post_text(session, {}, 1, ncbi_blast.BLAST_URL)
+    assert response.closed is True
+
+
+def test_post_text_rejects_stream_that_exceeds_size_limit(monkeypatch):
+    monkeypatch.setattr(ncbi_blast, 'MAX_RESPONSE_BYTES', 10)
+    response = _FakeResponse('12345678901')
+    session = _FakeSession([response])
+    with pytest.raises(RuntimeError, match='size limit'):
+        ncbi_blast._post_text(session, {}, 1, ncbi_blast.BLAST_URL)
+    assert response.closed is True
 
 
 def test_search_blastp_swissprot_submits_polls_and_closes_responses():
@@ -145,12 +190,27 @@ def test_search_blastp_swissprot_rejects_too_frequent_polling():
         ncbi_blast.search_blastp_swissprot("AAAA", poll_interval=10)
 
 
+def test_search_blastp_swissprot_stops_at_overall_deadline():
+    responses = [_FakeResponse("RID = RID123\nRTOE = 60\n")]
+    session = _FakeSession(responses)
+    with pytest.raises(TimeoutError, match="overall wait limit"):
+        ncbi_blast.search_blastp_swissprot(
+            "AAAA",
+            session=session,
+            max_wait=59,
+            sleep=lambda _seconds: None,
+            monotonic=lambda: 100.0,
+        )
+    assert len(session.calls) == 1
+
+
 @pytest.mark.parametrize(
     "kwargs, expected",
     [
         ({"timeout": float("nan")}, "request timeout"),
         ({"expect": float("inf")}, "expect value"),
         ({"poll_interval": float("inf")}, "poll_interval"),
+        ({"max_wait": float("nan")}, "max_wait"),
     ],
 )
 def test_search_blastp_swissprot_rejects_non_finite_parameters(kwargs, expected):

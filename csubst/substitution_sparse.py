@@ -337,9 +337,3 @@ def summarize_sparse_sub_tensor(sparse_tensor, mode):
     else:
         raise ValueError('Unsupported mode: {}'.format(mode))
     return sub_bg, sub_sg
-
-
-# Retained as a monkeypatch seam for downstream tests/extensions that used the
-# former block-by-block converter.  Dense conversion is now packed directly.
-def _can_use_cython_dense_block_to_csr(*_args, **_kwargs):
-    return False

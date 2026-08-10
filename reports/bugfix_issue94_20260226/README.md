@@ -4,9 +4,9 @@ Dataset: PGK
 Seed: 20260226
 
 Commands:
-- before_default: `python csubst/csubst simulate --alignment_file csubst/dataset/PGK.alignment.fa --rooted_tree_file csubst/dataset/PGK.tree.nwk --foreground csubst/dataset/PGK.foreground.txt --simulate_seed 20260226 --threads 1`
-- after_omega0.2: `python csubst/csubst simulate --alignment_file csubst/dataset/PGK.alignment.fa --rooted_tree_file csubst/dataset/PGK.tree.nwk --foreground csubst/dataset/PGK.foreground.txt --simulate_seed 20260226 --background_omega 0.2 --threads 1`
-- after_default: `python csubst/csubst simulate --alignment_file csubst/dataset/PGK.alignment.fa --rooted_tree_file csubst/dataset/PGK.tree.nwk --foreground csubst/dataset/PGK.foreground.txt --simulate_seed 20260226 --threads 1`
+- before_default: `python -m csubst simulate --alignment_file csubst/dataset/PGK.alignment.fa --rooted_tree_file csubst/dataset/PGK.tree.nwk --foreground csubst/dataset/PGK.foreground.txt --simulate_seed 20260226 --threads 1`
+- after_omega0.2: `python -m csubst simulate --alignment_file csubst/dataset/PGK.alignment.fa --rooted_tree_file csubst/dataset/PGK.tree.nwk --foreground csubst/dataset/PGK.foreground.txt --simulate_seed 20260226 --background_omega 0.2 --threads 1`
+- after_default: `python -m csubst simulate --alignment_file csubst/dataset/PGK.alignment.fa --rooted_tree_file csubst/dataset/PGK.tree.nwk --foreground csubst/dataset/PGK.foreground.txt --simulate_seed 20260226 --threads 1`
 
 Artifacts and SHA256:
 - `reports/bugfix_issue94_20260226/simulate_diff_vs_before.png`: `d898db7feabf0b9c154b95730996d6216f59d7fa878cbb0991edf9011055b06f`

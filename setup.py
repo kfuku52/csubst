@@ -1,9 +1,7 @@
-import ast
 import os
 import platform
-import re
 from numpy import get_include
-from setuptools import Extension, find_packages, setup
+from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 
 try:
@@ -50,6 +48,8 @@ def normalize_extension_sources(extensions):
 
 
 def build_extensions():
+    if os.environ.get('CSUBST_SKIP_EXTENSIONS', '').strip().lower() in {'1', 'true', 'yes', 'on'}:
+        return []
     use_cython_token = os.environ.get('CSUBST_USE_CYTHON', 'auto').lower()
     pyx_sources_available = all(
         os.path.exists(os.path.join(ROOT, 'csubst', module_name + '.pyx'))
@@ -82,75 +82,8 @@ def build_extensions():
         )
     return extensions
 
-with open(os.path.join(ROOT, 'csubst', '__init__.py')) as f:
-    match = re.search(r'__version__\s+=\s+(.*)', f.read())
-version = str(ast.literal_eval(match.group(1)))
-with open(os.path.join(ROOT, 'README.md'), encoding='utf-8') as f:
-    long_description = f.read()
-
 setup(
-    name             = 'csubst',
-    version          = version,
-    description      = 'Tools for molecular convergence detection in coding sequences',
-    long_description = long_description,
-    long_description_content_type = 'text/markdown',
-    license          = "MIT License",
-    author           = "Kenji Fukushima",
-    author_email     = 'kfuku52@gmail.com',
-    url              = 'https://github.com/kfuku52/csubst.git',
-    project_urls     = {
-                            'Documentation': 'https://github.com/kfuku52/csubst/wiki',
-                            'Issues': 'https://github.com/kfuku52/csubst/issues',
-    },
-    keywords         = 'molecular convergence',
-    python_requires  = '>=3.10',
-    packages         = find_packages(),
-    install_requires = [
-                            'ete4>=4.3.0',
-                            'numpy',
-                            'scipy',
-                            'pandas',
-                            'matplotlib<3.11',
-                            'requests',
-    ],
-    extras_require   = {
-                            'simulate': [],
-                            'test': ['pytest', 'pytest-xdist'],
-                            'structure': ['pymol-open-source>=3.2.0a0,<3.3'],
-                            'vep': ['huggingface-hub', 'sentencepiece', 'torch>=2.0', 'transformers'],
-                        },
-    scripts          = ['csubst/csubst',],
     ext_modules      = build_extensions(),
     cmdclass         = {'build_ext': CSubstBuildExt},
     include_dirs     = [NUMPY_INCLUDE],
-    include_package_data = True,
-    exclude_package_data = {
-                            'csubst': ['*.c', '*.pyx', 'csubst'],
-    },
-    package_data     = {
-                            '':['substitution_matrix/*.dat',
-                                'dataset/*',
-                                ],
-                            'csubst':['py.typed'],
-                            'csubst._vendor.pyvolve':['LICENSE.txt'],
-    },
-    license_files    = [
-                            'LICENSE',
-                            'THIRD_PARTY_NOTICES.md',
-                            'licenses/BIOPYTHON_LICENSE.rst',
-                            'csubst/_vendor/pyvolve/LICENSE.txt',
-    ],
-    classifiers      = [
-                            'Development Status :: 5 - Production/Stable',
-                            'Environment :: Console',
-                            'Intended Audience :: Science/Research',
-                            'Programming Language :: Python :: 3',
-                            'Programming Language :: Python :: 3.10',
-                            'Programming Language :: Python :: 3.11',
-                            'Programming Language :: Python :: 3.12',
-                            'Programming Language :: Python :: 3.13',
-                            'Programming Language :: Python :: 3.14',
-                            'Topic :: Scientific/Engineering :: Bio-Informatics',
-    ],
-    zip_safe         = False,
 )

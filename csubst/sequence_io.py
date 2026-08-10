@@ -2,6 +2,7 @@ import gzip
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Iterable, Mapping
 
 
 @dataclass(frozen=True)
@@ -12,15 +13,15 @@ class FastaRecord:
     sequence: str
 
     @property
-    def id(self):
+    def id(self) -> str:
         return self.description.split(None, 1)[0]
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.id
 
 
-def _open_text_source(source):
+def _open_text_source(source: Any) -> Any:
     if hasattr(source, 'read'):
         return nullcontext(source)
     path = str(source)
@@ -29,7 +30,7 @@ def _open_text_source(source):
     return open(path, mode='rt', encoding='utf-8')
 
 
-def _open_text_destination(destination):
+def _open_text_destination(destination: Any) -> Any:
     if hasattr(destination, 'write'):
         return nullcontext(destination)
     path = str(destination)
@@ -38,18 +39,18 @@ def _open_text_destination(destination):
     return open(path, mode='w', encoding='utf-8', newline='\n')
 
 
-def _source_label(source):
+def _source_label(source: Any) -> str:
     if isinstance(source, (str, Path)):
         return str(source)
     return str(getattr(source, 'name', '<stream>'))
 
 
-def read_fasta_records(source):
+def read_fasta_records(source: Any) -> list[FastaRecord]:
     """Read FASTA records from a path or text stream, preserving input order."""
 
-    records = list()
-    description = None
-    sequence_parts = list()
+    records: list[FastaRecord] = []
+    description: str | None = None
+    sequence_parts: list[str] = []
     source_label = _source_label(source)
     with _open_text_source(source) as handle:
         for line_no, raw_line in enumerate(handle, start=1):
@@ -76,12 +77,12 @@ def read_fasta_records(source):
     return records
 
 
-def records_to_dict(records, key='description'):
+def records_to_dict(records: Iterable[FastaRecord], key: str = 'description') -> dict[str, str]:
     """Convert records to a dict and reject duplicate selected keys."""
 
     if key not in {'description', 'id'}:
         raise ValueError("FASTA record key should be 'description' or 'id'.")
-    seq_dict = dict()
+    seq_dict: dict[str, str] = {}
     for record in records:
         record_key = record.description if key == 'description' else record.id
         if record_key in seq_dict:
@@ -90,7 +91,9 @@ def records_to_dict(records, key='description'):
     return seq_dict
 
 
-def write_fasta_records(records, destination, line_width=60):
+def write_fasta_records(
+    records: Iterable[FastaRecord], destination: Any, line_width: int = 60
+) -> int:
     """Write FASTA records using deterministic Unix newlines and wrapping."""
 
     line_width = int(line_width)
@@ -113,6 +116,8 @@ def write_fasta_records(records, destination, line_width=60):
     return count
 
 
-def write_fasta_dict(sequences, destination, line_width=60):
+def write_fasta_dict(
+    sequences: Mapping[str, str], destination: Any, line_width: int = 60
+) -> int:
     records = [FastaRecord(str(name), str(seq)) for name, seq in sequences.items()]
     return write_fasta_records(records, destination, line_width=line_width)

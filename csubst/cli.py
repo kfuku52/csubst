@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+"""Command-line interface for :mod:`csubst`."""
 
 import argparse
 import contextlib
@@ -8,12 +8,7 @@ import os
 import sys
 import time
 
-if (__package__ is None) or (__package__ == ''):
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    if repo_root not in sys.path:
-        sys.path.insert(0, repo_root)
-
-from csubst.__init__ import __version__
+from csubst import __version__
 from csubst import runtime
 
 
@@ -232,9 +227,10 @@ def _is_informational_invocation(argv):
 
 
 def get_global_parameters_or_exit(args):
-    from csubst import param
-
     try:
+        runtime.configure_native_threads(getattr(args, 'blas_threads', 1))
+        from csubst import param
+
         return param.get_global_parameters(args)
     except (ValueError, AssertionError) as e:
         sys.stderr.write(str(e).strip() + '\n')
@@ -684,6 +680,9 @@ def _build_parser(show_advanced=False):
                             'https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi')
     psr_co.add_argument('--threads', metavar='INTEGER', default=1, type=int, required=False,
                        help='default=%(default)s: The number of CPUs for parallel computations.')
+    psr_co.add_argument('--blas_threads', metavar='INTEGER', default=1, type=int, required=False,
+                       help='default=%(default)s: Native BLAS/OpenMP threads per process. Keep at 1 when '
+                            'using --threads to avoid CPU oversubscription.')
     psr_co.add_argument('--random_seed', metavar='INT', default=1, type=int, required=False,
                         help='default=%(default)s: Reproducible seed for stochastic search, omega p-value, '
                              'and foreground-clade permutation operations. Set -1 for a non-deterministic seed.')
@@ -1285,26 +1284,34 @@ def _main(argv=None, parsed_args=None):
     print(txt.format(datetime.datetime.now(datetime.timezone.utc), int(time.time()-csubst_start)), flush=True)
 
 
+def main(argv=None):
+    """Run the CLI and return its exit status when execution completes."""
+
+    if argv is None:
+        argv = sys.argv[1:]
+    argv = list(argv)
+    if _is_informational_invocation(argv):
+        return _main(argv=argv)
+    normalized_argv, show_advanced = _normalize_help_argv(argv)
+    preflight_parser = _build_parser(show_advanced=show_advanced)
+    parse_error = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(
+            _TeeTextStream(sys.stderr, parse_error)
+        ):
+            preflight_args = preflight_parser.parse_args(normalized_argv)
+    except SystemExit:
+        log_path = _resolve_log_file_from_argv(argv)
+        with open(log_path, 'a', buffering=1, encoding='utf-8') as log_file:
+            log_file.write(parse_error.getvalue())
+        raise
+    log_path = _resolve_log_file_from_argv(argv)
+    with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
+        stdout_tee = _TeeTextStream(sys.stdout, log_file)
+        stderr_tee = _TeeTextStream(sys.stderr, log_file)
+        with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):
+            return _main(argv=normalized_argv, parsed_args=preflight_args)
+
+
 if __name__ == "__main__":
-    if _is_informational_invocation(sys.argv[1:]):
-        _main()
-    else:
-        normalized_argv, show_advanced = _normalize_help_argv(list(sys.argv[1:]))
-        preflight_parser = _build_parser(show_advanced=show_advanced)
-        parse_error = io.StringIO()
-        try:
-            with contextlib.redirect_stderr(
-                _TeeTextStream(sys.stderr, parse_error)
-            ):
-                preflight_args = preflight_parser.parse_args(normalized_argv)
-        except SystemExit:
-            log_path = _resolve_log_file_from_argv(sys.argv[1:])
-            with open(log_path, 'a', buffering=1, encoding='utf-8') as log_file:
-                log_file.write(parse_error.getvalue())
-            raise
-        log_path = _resolve_log_file_from_argv(sys.argv[1:])
-        with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
-            stdout_tee = _TeeTextStream(sys.stdout, log_file)
-            stderr_tee = _TeeTextStream(sys.stderr, log_file)
-            with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):
-                _main(argv=normalized_argv, parsed_args=preflight_args)
+    main()

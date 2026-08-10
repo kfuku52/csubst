@@ -32,3 +32,4 @@ tmp.csubst.*
 /tests/cython_test.py
 /tests/equation_parser.ipynb
 /tests/.ipynb_checkpoints/
+/reports/generated/

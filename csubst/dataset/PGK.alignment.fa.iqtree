@@ -1,6 +1,6 @@
 IQ-TREE 2.3.6 built Aug  4 2024
 
-Input file name: /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa
+Input file name: PGK.alignment.fa
 User tree file name: tmp.csubst.nwk
 Type of analysis: tree reconstruction
 Random seed number: 693358
@@ -157,4 +157,3 @@ TIME STAMP
 Date and time: Wed Mar  4 11:11:49 2026
 Total CPU time used: 17.1126 seconds (0h:0m:17s)
 Total wall-clock time used: 17.2697 seconds (0h:0m:17s)
-

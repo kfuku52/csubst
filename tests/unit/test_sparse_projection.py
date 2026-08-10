@@ -7,43 +7,12 @@ import scipy.sparse as sp
 import pytest
 
 from csubst import substitution
-from csubst import substitution_cy
 
 
 
 
 
 
-def test_sub_tensor2cb_sparse_cython_fastpath_matches_python_fallback(monkeypatch):
-    if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
-        pytest.skip("Cython sparse-summary reducer fast path is unavailable")
-    dense = _toy_reducer_tensor()
-    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
-    ids = np.array([[2, 0], [1, 2], [0, 1]], dtype=np.int64)
-    selected = ["any2any", "spe2any", "any2spe"]
-
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
-    expected = substitution.sub_tensor2cb_sparse(
-        ids,
-        sparse_tensor,
-        mmap=False,
-        df_mmap=None,
-        mmap_start=0,
-        float_type=np.float64,
-        selected_base_stats=selected,
-    )
-
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: True)
-    observed = substitution.sub_tensor2cb_sparse(
-        ids,
-        sparse_tensor,
-        mmap=False,
-        df_mmap=None,
-        mmap_start=0,
-        float_type=np.float64,
-        selected_base_stats=selected,
-    )
-    np.testing.assert_allclose(observed, expected, atol=1e-12)
 
 
 def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback(monkeypatch):
@@ -53,7 +22,6 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback(monkeypatch)
 
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: False)
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     expected = substitution.sub_tensor2cb_sparse(
         ids,
         sparse_tensor,
@@ -66,7 +34,6 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback(monkeypatch)
 
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: True)
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     observed = substitution.sub_tensor2cb_sparse(
         ids,
         sparse_tensor,
@@ -88,7 +55,6 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback_with_unsorte
 
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: False)
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     expected = substitution.sub_tensor2cb_sparse(
         ids_unsorted,
         sparse_tensor,
@@ -101,7 +67,6 @@ def test_sub_tensor2cb_sparse_gram_fastpath_matches_python_fallback_with_unsorte
 
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: True)
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     observed = substitution.sub_tensor2cb_sparse(
         ids_unsorted,
         sparse_tensor,
@@ -122,7 +87,6 @@ def test_sub_tensor2cb_sparse_projection_gram_matches_fallback_all_stats(monkeyp
 
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_projection_gram", lambda *args, **kwargs: False)
     monkeypatch.setattr(substitution, "_can_use_sparse_cb_summary_gram", lambda *args, **kwargs: False)
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
     expected = substitution.sub_tensor2cb_sparse(
         ids,
         sparse_tensor,
@@ -227,36 +191,6 @@ def test_sparse_projection_gram_is_disabled_for_nonfinite_values():
     assert not substitution._can_use_sparse_cb_projection_gram(ids, sparse_tensor)
 
 
-def test_sub_tensor2cb_sparse_cython_fastpath_supports_spe2spe(monkeypatch):
-    if not hasattr(substitution_cy, "calc_combinatorial_sub_sparse_summary_double_arity2"):
-        pytest.skip("Cython sparse-summary reducer fast path is unavailable")
-    dense = _toy_reducer_tensor()
-    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
-    ids = np.array([[2, 0], [1, 2], [0, 1]], dtype=np.int64)
-    selected = ["any2any", "spe2any", "any2spe", "spe2spe"]
-
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: False)
-    expected = substitution.sub_tensor2cb_sparse(
-        ids,
-        sparse_tensor,
-        mmap=False,
-        df_mmap=None,
-        mmap_start=0,
-        float_type=np.float64,
-        selected_base_stats=selected,
-    )
-
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_cb_summary", lambda *args, **kwargs: True)
-    observed = substitution.sub_tensor2cb_sparse(
-        ids,
-        sparse_tensor,
-        mmap=False,
-        df_mmap=None,
-        mmap_start=0,
-        float_type=np.float64,
-        selected_base_stats=selected,
-    )
-    np.testing.assert_allclose(observed, expected, atol=1e-12)
 
 
 def test_sub_tensor2cb_sparse_projection_failure_warns_and_uses_bounded_fallback(monkeypatch):

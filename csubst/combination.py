@@ -6,13 +6,12 @@ import math
 import re
 import sys
 import time
-import warnings
 from collections import defaultdict
 
 from csubst import parallel
 from csubst import ete
 from csubst import randomness
-from csubst._extensions import load_optional_extension
+from csubst._extensions import load_optional_extension, warn_extension_fallback
 
 combination_cy = load_optional_extension('combination_cy')
 
@@ -23,17 +22,9 @@ _CYTHON_FALLBACK_WARNED = set()
 
 
 def _warn_cython_fallback(fastpath_name, exc):
-    if fastpath_name in _CYTHON_FALLBACK_WARNED:
-        return
-    warnings.warn(
-        'Cython fast path "{}" failed; using the Python implementation instead: {}'.format(
-            fastpath_name,
-            exc,
-        ),
-        RuntimeWarning,
-        stacklevel=2,
+    warn_extension_fallback(
+        fastpath_name, exc, _CYTHON_FALLBACK_WARNED, fallback_name='Python'
     )
-    _CYTHON_FALLBACK_WARNED.add(fastpath_name)
 
 
 def _unique_rows_int64(values, hash_threshold=2048):
@@ -756,42 +747,6 @@ def _map_node_combination_chunk_to_matrix_indices(node_chunk, start_col, sorted_
     return row_ids, col_ids
 
 
-def _populate_nc_matrix(nc_matrix, node_combinations, all_node_ids, g):
-    num_combinations = int(node_combinations.shape[0])
-    if num_combinations == 0:
-        return None
-    all_node_ids = np.asarray(all_node_ids, dtype=np.int64).reshape(-1)
-    sorted_order = np.argsort(all_node_ids)
-    sorted_node_ids = all_node_ids[sorted_order]
-    sorted_row_ids = sorted_order.astype(np.int64, copy=False)
-    n_jobs = _resolve_combination_step_n_jobs(
-        g=g,
-        num_items=num_combinations,
-        task='nc_matrix',
-    )
-    if n_jobs == 1:
-        row_ids, col_ids = _map_node_combination_chunk_to_matrix_indices(
-            node_chunk=node_combinations,
-            start_col=0,
-            sorted_node_ids=sorted_node_ids,
-            sorted_row_ids=sorted_row_ids,
-        )
-        nc_matrix[row_ids, col_ids] = True
-        return None
-    chunk_factor = parallel.resolve_chunk_factor(task='general')
-    chunks, starts = parallel.get_chunks(node_combinations, n_jobs, chunk_factor=chunk_factor)
-    tasks = [(chunk, start, sorted_node_ids, sorted_row_ids) for chunk, start in zip(chunks, starts)]
-    out = parallel.run_starmap(
-        func=_map_node_combination_chunk_to_matrix_indices,
-        args_iterable=tasks,
-        n_jobs=n_jobs,
-        backend='threading',
-    )
-    for row_ids, col_ids in out:
-        if row_ids.shape[0] == 0:
-            continue
-        nc_matrix[row_ids, col_ids] = True
-    return None
 
 
 def _mark_dependent_row_combinations_python(row_combinations, dep_row_groups):

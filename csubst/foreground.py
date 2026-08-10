@@ -388,18 +388,6 @@ def _randomize_foreground_flags(before_randomization, sample_original_foreground
     return after_randomization
 
 
-def _block_randomized_foreground_descendants(df_clade_size, is_bin, node_by_id):
-    is_blocked = df_clade_size.loc[:, 'is_blocked'].values
-    is_randomized = df_clade_size.loc[:, 'is_fg_stem_randomized'].to_numpy(dtype=bool, copy=False)
-    is_new_fg = is_bin & ~is_blocked & is_randomized
-    new_fg_bids = df_clade_size.loc[is_new_fg, 'branch_id'].values
-    for new_fg_bid in new_fg_bids:
-        node = node_by_id.get(int(new_fg_bid), None)
-        if node is None:
-            continue
-        des_bids = [ete.get_prop(d, "numerical_label") for d in node.traverse()]
-        df_clade_size.loc[des_bids, 'is_blocked'] = True
-    return df_clade_size
 
 
 def foreground_clade_randomization(df_clade_size, g, trait_name, sample_original_foreground=False):

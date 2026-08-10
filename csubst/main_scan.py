@@ -10,9 +10,10 @@ from csubst import substitution_scan
 from csubst import tree
 from csubst import main_sites
 from csubst import tsv
+from csubst.config_types import AnalysisConfig
 
 
-def _require_foreground(g):
+def _require_foreground(g: AnalysisConfig) -> None:
     if g.get("foreground", None) is None:
         raise ValueError("csubst scan requires --foreground.")
     return None
@@ -116,7 +117,7 @@ def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
     return main_sites.plot_tree_site(df=site_df, g=plot_g)
 
 
-def main_scan(g):
+def main_scan(g: AnalysisConfig) -> None:
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
     _require_foreground(g)

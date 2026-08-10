@@ -1,6 +1,6 @@
-# Ancestral state reconstruction for all nodes in /Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.treefile
+# Ancestral state reconstruction for all nodes in PGK.alignment.fa.treefile
 # This file can be read in MS Excel or in R with command:
-#   tab=read.table('/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/dataset/PGK.alignment.fa.state',header=TRUE)
+#   tab=read.table('PGK.alignment.fa.state',header=TRUE)
 # Columns are tab-separated with following meaning:
 #   Node:  Node name in the tree
 #   Site:  Alignment site ID

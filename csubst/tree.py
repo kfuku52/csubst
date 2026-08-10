@@ -1849,43 +1849,6 @@ def _build_state_maps_for_concatenated_sites(tree, state, site_indices, orders, 
     return state_by_node,state_prob_by_node
 
 
-def _render_state_tree_chunk(tree, trait_name, mode, orders, missing_state, state_chunk, site_indices, ndigit,
-                             output_dir=None, node_type_by_id=None, site_number_labels=None,
-                             tip_label_color_by_node_id=None, highlighted_node_ids=None,
-                             highlight_color=None, tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
-                             tree_fig_max_height=TREE_FIG_MAX_HEIGHT):
-    for local_idx,site_index in enumerate(site_indices):
-        site_state = state_chunk[:, local_idx, :]
-        state_by_node,state_prob_by_node = _build_state_maps_for_site(
-            tree=tree,
-            site_state=site_state,
-            orders=orders,
-            mode=mode,
-            missing_state=missing_state,
-        )
-        site_number = int(site_index) + 1
-        if site_number_labels is not None:
-            site_number = int(site_number_labels[local_idx])
-        file_name = 'csubst_state_'+trait_name+'_'+mode+'_'+str(site_number).zfill(ndigit)+'.pdf'
-        file_name = file_name.replace('_PLACEHOLDER', '')
-        if output_dir is not None:
-            file_name = os.path.join(output_dir, file_name)
-        _render_tree_matplotlib_with_optional_node_types(
-            tree=tree,
-            trait_name=trait_name,
-            file_name=file_name,
-            label='all',
-            state_by_node=state_by_node,
-            state_prob_by_node=state_prob_by_node,
-            state_orders=orders if mode=='aa' else None,
-            state_mode=mode,
-            node_type_by_id=node_type_by_id,
-            tip_label_color_by_node_id=tip_label_color_by_node_id,
-            highlighted_node_ids=highlighted_node_ids,
-            highlight_color=highlight_color,
-            tip_label_spacing_factor=tip_label_spacing_factor,
-            tree_fig_max_height=tree_fig_max_height,
-        )
 
 
 def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, state, site_indices, output_token,

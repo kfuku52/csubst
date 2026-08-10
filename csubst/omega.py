@@ -24,7 +24,7 @@ from csubst import ete
 from csubst import expected_sparse
 from csubst import output_stat
 from csubst import pseudocount
-from csubst._extensions import load_optional_extension
+from csubst._extensions import load_optional_extension, warn_extension_fallback
 
 omega_cy = load_optional_extension('omega_cy')
 
@@ -44,17 +44,9 @@ _CYTHON_FALLBACK_WARNED = set()
 
 
 def _warn_cython_fallback(fastpath_name, exc):
-    if fastpath_name in _CYTHON_FALLBACK_WARNED:
-        return
-    warnings.warn(
-        'Cython fast path "{}" failed; using the NumPy implementation instead: {}'.format(
-            fastpath_name,
-            exc,
-        ),
-        RuntimeWarning,
-        stacklevel=2,
+    warn_extension_fallback(
+        fastpath_name, exc, _CYTHON_FALLBACK_WARNED, fallback_name='NumPy'
     )
-    _CYTHON_FALLBACK_WARNED.add(fastpath_name)
 _EPI_AUTO_CLIP_MAX = 5.0
 _EPI_CV_FOLDS = 5
 _OMEGA_PVALUE_REFINE_UPPER_EDGE_BINS = 2

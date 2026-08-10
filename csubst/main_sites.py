@@ -3145,16 +3145,6 @@ def _validate_set_expression_syntax(mode_expression):
     return None
 
 
-def _get_set_stat_channels_from_branch_tensor(branch_tensor, set_stat_type):
-    arr = np.nan_to_num(np.asarray(branch_tensor, dtype=float), nan=0.0)
-    if arr.ndim != 4:
-        raise ValueError('Branch substitution tensor should be 4D [site,group,anc,des].')
-    if set_stat_type == 'any':
-        out = arr.sum(axis=(1, 2, 3))
-        return out[:, np.newaxis]
-    if set_stat_type == 'spe':
-        return arr.sum(axis=(1, 2))
-    raise ValueError('Unsupported set substitution type: {}'.format(set_stat_type))
 
 
 def _get_empty_set_channel_prob(n_site, set_stat_type, ON_tensor=None):

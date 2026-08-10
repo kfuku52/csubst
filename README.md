@@ -85,7 +85,9 @@ Pyvolve sequence formats such as PHYLIP or NEXUS are not exposed by CSUBST.
 Online Swiss-Prot similarity searches identify requests as CSUBST and include
 the maintainer contact address required by NCBI. Set `NCBI_EMAIL` to override it.
 
-Development and test-suite conventions are documented in [TESTING.md](TESTING.md).
+Development setup, architecture, and test-suite conventions are documented in
+[CONTRIBUTING.md](CONTRIBUTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
+and [TESTING.md](TESTING.md).
 
 Display available commands and options:
 
@@ -94,6 +96,12 @@ csubst -h
 csubst SUBCOMMAND -h
 csubst SUBCOMMAND --help-advanced  # include expert tuning options
 ```
+
+`--threads` controls CSUBST task/process parallelism. Native BLAS/OpenMP work is
+limited separately by `--blas_threads` (default 1) to prevent every worker from
+starting another full thread pool. Developers and diagnostic runs can set
+`CSUBST_DISABLE_EXTENSIONS=1` to force the Python implementations or
+`CSUBST_STRICT_EXTENSIONS=1` to fail immediately if a Cython fast path breaks.
 
 Shared model resources are downloaded by the resource manager when requested
 and can be prefetched for an offline or batch-compute environment. The default cache is

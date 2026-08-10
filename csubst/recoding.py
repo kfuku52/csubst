@@ -10,7 +10,7 @@ from csubst.recoding_config import (
     RECODING_SCHEMES,
     normalize_nonsyn_recode,
 )
-from csubst._extensions import load_optional_extension
+from csubst._extensions import load_optional_extension, warn_extension_fallback
 
 recoding_cy = load_optional_extension('recoding_cy')
 
@@ -28,17 +28,9 @@ _AUTO_RECODE_MIN_STARTS_PER_JOB = 5000
 
 
 def _warn_cython_fallback(fastpath_name, exc):
-    if fastpath_name in _CYTHON_FALLBACK_WARNED:
-        return
-    warnings.warn(
-        'Cython fast path "{}" failed; using the Python implementation instead: {}'.format(
-            fastpath_name,
-            exc,
-        ),
-        RuntimeWarning,
-        stacklevel=2,
+    warn_extension_fallback(
+        fastpath_name, exc, _CYTHON_FALLBACK_WARNED, fallback_name='Python'
     )
-    _CYTHON_FALLBACK_WARNED.add(fastpath_name)
 
 def _validate_scheme(name, groups):
     seen = set()
@@ -284,20 +276,6 @@ def _hill_climb_bins(initial_bins, num_bin, objective_fn):
     return bins, crit
 
 
-def _optimize_bins_random_start(num_item, num_bin, objective_fn, rng, n_random):
-    best_bins = None
-    best_crit = np.inf
-    for _ in range(int(n_random)):
-        initial_bins = _random_bin_assignment(num_item=num_item, num_bin=num_bin, rng=rng)
-        bins, crit = _hill_climb_bins(initial_bins=initial_bins, num_bin=num_bin, objective_fn=objective_fn)
-        if crit < best_crit:
-            best_bins = bins.copy()
-            best_crit = float(crit)
-            if best_crit <= 0.0:
-                break
-    if best_bins is None:
-        raise ValueError("Failed to optimize auto recoding bins.")
-    return best_bins, best_crit
 
 
 def _hill_climb_bins_chisq(initial_bins, num_bin, fmat, fr, nsitev):

@@ -50,15 +50,14 @@ IFS=',' read -r -a MODE_LIST <<< "$MODES"
 mkdir -p "$OUT_DIR"
 
 cat > "$OUT_DIR/run_local_csubst.py" <<PY
-import runpy
 import sys
 ROOT = r"$REPO_ROOT"
 while ROOT in sys.path:
     sys.path.remove(ROOT)
 sys.path.insert(0, ROOT)
-ns = runpy.run_path(ROOT + '/csubst/csubst', run_name='csubst_cli')
 sys.argv[0] = 'csubst'
-ns['_main']()
+from csubst.cli import main
+main()
 PY
 
 link_common_inputs() {

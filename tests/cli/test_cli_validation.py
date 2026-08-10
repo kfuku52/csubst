@@ -4,7 +4,6 @@ import subprocess
 import sys
 import os
 import re
-import runpy
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -50,8 +49,9 @@ _CLI_PARSERS = {}
 def _get_cli_namespace():
     global _CLI_NAMESPACE
     if _CLI_NAMESPACE is None:
-        repo_root = Path(__file__).resolve().parents[2]
-        _CLI_NAMESPACE = runpy.run_path(str(repo_root / "csubst" / "csubst"))
+        from csubst import cli
+
+        _CLI_NAMESPACE = vars(cli)
     return _CLI_NAMESPACE
 
 
@@ -92,7 +92,7 @@ def _run_cli_subprocess(*args):
     repo_root = Path(__file__).resolve().parents[2]
     log_path = _resolve_log_path(repo_root, args)
     log_mtime_before = log_path.stat().st_mtime_ns if log_path.exists() else None
-    cmd = [sys.executable, str(repo_root / "csubst" / "csubst")]
+    cmd = [sys.executable, "-m", "csubst"]
     cmd.extend(args)
     env = os.environ.copy()
     env["PYTHONPATH"] = str(repo_root) + (
@@ -265,6 +265,7 @@ def test_removed_performance_options_are_absent_from_shared_help(subcommand):
     assert proc.returncode == 0
     normal_help = (proc.stdout or "") + (proc.stderr or "")
     assert "--threads" in normal_help
+    assert "--blas_threads" in normal_help
     assert "--parallel_" not in normal_help
     assert "--sub_tensor_backend" not in normal_help
     assert "--float_type" not in normal_help
@@ -274,6 +275,7 @@ def test_removed_performance_options_are_absent_from_shared_help(subcommand):
     assert proc.returncode == 0
     advanced_help = (proc.stdout or "") + (proc.stderr or "")
     assert "--threads" in advanced_help
+    assert "--blas_threads" in advanced_help
     assert "--parallel_" not in advanced_help
     assert "--sub_tensor_backend" not in advanced_help
     assert "--float_type" not in advanced_help
@@ -437,7 +439,7 @@ def test_inspect_rejects_legacy_yes_state_plot_option():
 
 def test_cli_entrypoint_runs_from_repo_root_without_pythonpath():
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, str(repo_root / "csubst" / "csubst"), "--help"]
+    cmd = [sys.executable, "-m", "csubst", "--help"]
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)
     proc = subprocess.run(

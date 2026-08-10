@@ -135,20 +135,6 @@ def test_sparse_sum_bool_tensor_matches_numpy_count_dtype():
     np.testing.assert_array_equal(observed, expected)
 
 
-def test_dense_to_sparse_cython_path_matches_python_fallback(monkeypatch):
-    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "dense_block_to_csr_arrays_double")):
-        pytest.skip("Cython substitution_sparse fast path is unavailable")
-    dense = _toy_dense_tensor()
-    dense[0, 0, 0, 2, 2] = 1e-12
-
-    monkeypatch.setattr(substitution_sparse, "_can_use_cython_dense_block_to_csr", lambda *args, **kwargs: False)
-    expected = substitution_sparse.dense_to_sparse_substitution_tensor(dense, tol=1e-9)
-
-    monkeypatch.setattr(substitution_sparse, "_can_use_cython_dense_block_to_csr", lambda *args, **kwargs: True)
-    observed = substitution_sparse.dense_to_sparse_substitution_tensor(dense, tol=1e-9)
-
-    np.testing.assert_allclose(observed.to_dense(), expected.to_dense(), atol=1e-12)
-    assert observed.nnz == expected.nnz
 
 
 def test_sparse_projections_match_dense_reductions():

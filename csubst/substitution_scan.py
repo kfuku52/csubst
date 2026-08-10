@@ -1344,13 +1344,6 @@ def _target_branch_ids_from_maps(fg_ids_map, trait_name, target_class, valid_bra
     return np.array(sorted(fg_ids.intersection(valid)), dtype=np.int64)
 
 
-def _target_branch_ids(g, trait_name, target_class, valid_branch_ids):
-    return _target_branch_ids_from_maps(
-        fg_ids_map=g.get("fg_ids", {}),
-        trait_name=trait_name,
-        target_class=target_class,
-        valid_branch_ids=valid_branch_ids,
-    )
 
 
 def _union_unit_branch_ids(units_df, column):
@@ -1418,15 +1411,6 @@ def _other_branch_ids_from_maps(
     return np.array(sorted(out.intersection(valid).difference(target)), dtype=np.int64)
 
 
-def _other_branch_ids(g, trait_name, target_class, valid_branch_ids, scan_other_scope, units_df):
-    return _other_branch_ids_from_maps(
-        fg_ids_map=g.get("fg_ids", {}),
-        trait_name=trait_name,
-        target_class=target_class,
-        valid_branch_ids=valid_branch_ids,
-        scan_other_scope=scan_other_scope,
-        units_df=units_df,
-    )
 
 
 def _opportunity_states(from_ids, to_ids):

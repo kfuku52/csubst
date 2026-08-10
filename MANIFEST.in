@@ -1,6 +1,7 @@
 include LICENSE
 include README.md
 include TESTING.md
+include CONTRIBUTING.md
 include THIRD_PARTY_NOTICES.md
 include pyproject.toml
 include setup.py
@@ -12,3 +13,6 @@ recursive-include csubst/substitution_matrix *.dat
 recursive-include tests *.py
 include tools/evaluate_epistasis_simulation.py
 include csubst/_vendor/pyvolve/LICENSE.txt
+include csubst/_vendor/pyvolve/README.csubst.md
+recursive-include docs *.md
+recursive-include .github/scripts *.py

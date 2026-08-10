@@ -1,5 +1,4 @@
 import os
-import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -9,14 +8,13 @@ import pytest
 
 def _run_csubst(args, cwd):
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "csubst" / "csubst"
     env = os.environ.copy()
     old_pythonpath = env.get("PYTHONPATH", "")
     if old_pythonpath:
         env["PYTHONPATH"] = str(repo_root) + os.pathsep + old_pythonpath
     else:
         env["PYTHONPATH"] = str(repo_root)
-    cmd = [sys.executable, str(script_path)] + args
+    cmd = [sys.executable, "-m", "csubst"] + args
     return subprocess.run(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 
@@ -147,10 +145,9 @@ def test_legacy_site_help_has_no_log_side_effect(tmp_path):
 
 
 def test_subcommand_output_namespace_defaults_are_command_specific():
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "csubst" / "csubst"
-    ns = runpy.run_path(str(script_path), run_name="not_main")
-    parser = ns["_build_parser"]()
+    from csubst import cli
+
+    parser = cli._build_parser()
 
     search = parser.parse_args(["search"])
     assert search.outdir == "csubst_search"
@@ -187,10 +184,9 @@ def test_subcommand_output_namespace_defaults_are_command_specific():
 
 
 def test_advanced_options_remain_parseable_in_normal_execution_mode():
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "csubst" / "csubst"
-    ns = runpy.run_path(str(script_path), run_name="not_main")
-    parser = ns["_build_parser"]()
+    from csubst import cli
+
+    parser = cli._build_parser()
 
     sites = parser.parse_args(
         ["sites", "--expected_state_backend", "eigen", "--database_timeout", "45"]

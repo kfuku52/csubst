@@ -15,6 +15,24 @@ _DEFAULT_OUTPUT_PREFIX = "csubst"
 _DEFAULT_IQTREE_OUTDIR = "csubst_iqtree"
 _DEFAULT_SITE_LOG_DIR = "csubst_sites"
 _MISSING = object()
+_NATIVE_THREAD_ENV_VARS = (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "VECLIB_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
+
+
+def configure_native_threads(num_threads=1):
+    """Set native-library thread limits before NumPy/SciPy are imported."""
+
+    num_threads = int(num_threads)
+    if num_threads < 1:
+        raise ValueError("--blas_threads should be >= 1.")
+    for variable_name in _NATIVE_THREAD_ENV_VARS:
+        os.environ[variable_name] = str(num_threads)
+    return num_threads
 
 
 class RunContext(MutableMapping):
@@ -155,11 +173,6 @@ def default_site_log_path(base_dir=None, create_dir=False):
     return os.path.join(site_log_dir, _DEFAULT_OUTPUT_PREFIX + ".log")
 
 
-def _strip_gzip_suffix(path):
-    path_txt = str(path).strip()
-    if path_txt.lower().endswith(".gz"):
-        return path_txt[:-3]
-    return path_txt
 
 
 def _get_iqtree_prefix_key(alignment_file, base_dir=None):

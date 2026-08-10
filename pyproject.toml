@@ -1,11 +1,82 @@
 [build-system]
 requires = [
-    "setuptools>=68",
+    "setuptools>=77",
     "wheel",
     "numpy",
     "Cython>=3",
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "csubst"
+dynamic = ["version"]
+description = "Tools for molecular convergence detection in coding sequences"
+readme = { file = "README.md", content-type = "text/markdown" }
+license = "MIT"
+license-files = [
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "licenses/BIOPYTHON_LICENSE.rst",
+    "csubst/_vendor/pyvolve/LICENSE.txt",
+]
+authors = [
+    { name = "Kenji Fukushima", email = "kfuku52@gmail.com" },
+]
+requires-python = ">=3.10"
+keywords = ["molecular convergence"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "ete4>=4.3.0",
+    "numpy",
+    "scipy",
+    "pandas",
+    "matplotlib<3.11",
+    "defusedxml",
+    "requests",
+]
+
+[project.optional-dependencies]
+simulate = []
+test = ["pytest", "pytest-cov", "pytest-xdist"]
+structure = ["pymol-open-source>=3.2.0a0,<3.3"]
+vep = ["huggingface-hub", "sentencepiece", "torch>=2.0", "transformers"]
+
+[project.scripts]
+csubst = "csubst.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/kfuku52/csubst"
+Documentation = "https://github.com/kfuku52/csubst/wiki"
+Issues = "https://github.com/kfuku52/csubst/issues"
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = { attr = "csubst.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["csubst*"]
+
+[tool.setuptools.package-data]
+"*" = ["substitution_matrix/*.dat", "dataset/*"]
+csubst = ["py.typed"]
+"csubst._vendor.pyvolve" = ["LICENSE.txt", "README.csubst.md"]
+
+[tool.setuptools.exclude-package-data]
+csubst = ["*.c", "*.pyx"]
 
 [tool.ruff]
 extend-exclude = [
@@ -16,3 +87,24 @@ extend-exclude = [
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+check_untyped_defs = true
+exclude = ["^csubst/_vendor/"]
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[tool.coverage.run]
+branch = true
+source = ["csubst"]
+omit = ["csubst/_vendor/*"]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+skip_covered = true

@@ -49,6 +49,7 @@ required_test_support = [
     "/TESTING.md",
     "/tests/conftest.py",
     "/tools/evaluate_epistasis_simulation.py",
+    "/.github/scripts/_safe_workdir.py",
 ]
 required_typed_package_files = [
     "csubst/config_types.py",
@@ -91,11 +92,18 @@ with zipfile.ZipFile(wheel_path) as archive:
 
 requirements = metadata.get_all("Requires-Dist", [])
 normalized_requirements = [requirement.lower().replace("_", "-") for requirement in requirements]
-for distribution in ("ete4", "numpy", "scipy", "pandas", "matplotlib", "requests"):
+for distribution in ("ete4", "numpy", "scipy", "pandas", "matplotlib", "defusedxml", "requests"):
     if not any(requirement.startswith(distribution) for requirement in normalized_requirements):
         raise RuntimeError("Wheel metadata is missing dependency {!r}.".format(distribution))
 if any(requirement.startswith("biopython") for requirement in normalized_requirements):
     raise RuntimeError("Wheel metadata unexpectedly depends on Biopython.")
+with zipfile.ZipFile(wheel_path) as archive:
+    entry_points = [name for name in archive.namelist() if name.endswith('.dist-info/entry_points.txt')]
+    if len(entry_points) != 1:
+        raise RuntimeError("Wheel should contain exactly one console entry-point file.")
+    entry_point_text = archive.read(entry_points[0]).decode('utf-8')
+    if 'csubst = csubst.cli:main' not in entry_point_text:
+        raise RuntimeError("Wheel metadata is missing the csubst console entry point.")
 if not any(
     requirement.startswith("matplotlib") and "<3.11" in requirement
     for requirement in normalized_requirements

@@ -7,7 +7,7 @@ for stat in "${stats[@]}"; do
     tag=$(echo "$min_sub_pp" | tr '.' '_')
     echo "== stat=$stat min_sub_pp=$min_sub_pp =="
     /usr/bin/time -l -p \
-    python "/Users/kf/Library/CloudStorage/GoogleDrive-kenji.fukushima@nig.ac.jp/My Drive/psnl/repos/csubst/csubst/csubst" analyze \
+    python -m csubst analyze \
       --alignment_file simulate.fa \
       --rooted_tree_file tree.nwk \
       --foreground foreground.txt \

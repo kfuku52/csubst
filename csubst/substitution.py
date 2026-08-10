@@ -6,14 +6,12 @@ from scipy.linalg import blas as scipy_blas
 import os
 import re
 import time
-import warnings
-import inspect
 from collections import OrderedDict, defaultdict
 
 from csubst import table
 from csubst import parallel
 from csubst import runtime
-from csubst._extensions import load_optional_extension
+from csubst._extensions import load_optional_extension, warn_extension_fallback
 from csubst import substitution_sparse
 from csubst import ete
 from csubst import output_stat
@@ -46,20 +44,21 @@ _SPARSE_PROJECTION_CACHE_MAX_BYTES = 64 * 1024 * 1024
 
 
 def _warn_cython_fallback(fastpath_name, exc):
-    if fastpath_name in _CYTHON_FALLBACK_WARNED:
-        return
-    _CYTHON_FALLBACK_WARNED.add(fastpath_name)
-    txt = 'Cython fast path "{}" failed ({}: {}). Falling back to Python implementation.'
-    warnings.warn(txt.format(fastpath_name, type(exc).__name__, exc), RuntimeWarning, stacklevel=2)
+    warn_extension_fallback(
+        fastpath_name, exc, _CYTHON_FALLBACK_WARNED, fallback_name='Python'
+    )
 
 
 def _warn_sparse_fallback(fastpath_name, exc):
     warning_key = 'sparse:' + fastpath_name
-    if warning_key in _CYTHON_FALLBACK_WARNED:
-        return
-    _CYTHON_FALLBACK_WARNED.add(warning_key)
-    txt = 'Sparse fast path "{}" failed ({}: {}). Falling back to the compatibility implementation.'
-    warnings.warn(txt.format(fastpath_name, type(exc).__name__, exc), RuntimeWarning, stacklevel=2)
+    warn_extension_fallback(
+        fastpath_name,
+        exc,
+        _CYTHON_FALLBACK_WARNED,
+        fallback_name='compatibility',
+        warning_key=warning_key,
+        accelerator_name='Sparse fast path',
+    )
 
 
 def _resolve_cb_base_substitutions(selected_base_stats=None):
@@ -203,10 +202,6 @@ def _resolve_cb_stat_columns(selected, arity):
     )
 
 
-def _get_combo_row_bounds(combo_index, num_site, mmap_start):
-    row_start = (combo_index * num_site) + (mmap_start * num_site)
-    row_end = row_start + num_site
-    return row_start, row_end
 
 
 def _remove_file_if_exists(path):
@@ -314,20 +309,6 @@ def _get_sparse_group_block_index(sub_tensor):
     return cache
 
 
-def _get_sparse_row_indices_and_data(mat, branch_id, row_cache=None):
-    branch_id = int(branch_id)
-    if row_cache is not None:
-        key = (id(mat), branch_id)
-        cached = row_cache.get(key)
-        if cached is not None:
-            return cached
-    start = mat.indptr[branch_id]
-    end = mat.indptr[branch_id + 1]
-    indices = mat.indices[start:end]
-    data = mat.data[start:end]
-    if row_cache is not None:
-        row_cache[key] = (indices, data)
-    return indices, data
 
 
 def _get_sparse_combination_group_tensor(sub_tensor, branch_ids, sg, data_type=None, group_block_index=None, row_cache=None):
@@ -670,18 +651,6 @@ def _build_sparse_substitution_tensor(state_tensor, state_tensor_anc, mode, g):
     )
 
 
-def _is_sparse_csr_cython_compatible(mat):
-    if substitution_sparse_cy is None:
-        return False
-    if not sp.isspmatrix_csr(mat):
-        return False
-    if mat.data.dtype != np.float64:
-        return False
-    if mat.indices.dtype not in [np.int32, np.int64]:
-        return False
-    if mat.indptr.dtype not in [np.int32, np.int64]:
-        return False
-    return True
 
 
 def _can_use_cython_sitewise_max_scan(branch_tensor):
@@ -883,39 +852,8 @@ def get_branches_sub_tensor(sub_tensor, branch_ids):
     return sub_tensor[branch_ids, :, :, :, :]
 
 
-def _get_sorted_sparse_block_items(sub_tensor):
-    cache = getattr(sub_tensor, '_sorted_block_items', None)
-    if cache is None:
-        cache = tuple(sorted(sub_tensor.blocks.items(), key=lambda kv: kv[0]))
-        setattr(sub_tensor, '_sorted_block_items', cache)
-    return cache
 
 
-def _can_use_cython_sparse_sitewise_row_update(mat, max_prob, max_a, max_d, seen):
-    if substitution_sparse_cy is None:
-        return False
-    if not sp.isspmatrix_csr(mat):
-        return False
-    if mat.data.dtype != np.float64:
-        return False
-    if mat.indices.dtype not in [np.int32, np.int64]:
-        return False
-    if mat.indptr.dtype not in [np.int32, np.int64]:
-        return False
-    if (
-        (not isinstance(max_prob, np.ndarray))
-        or (not isinstance(max_a, np.ndarray))
-        or (not isinstance(max_d, np.ndarray))
-        or (not isinstance(seen, np.ndarray))
-    ):
-        return False
-    if max_prob.dtype != np.float64 or max_a.dtype != np.int64 or max_d.dtype != np.int64 or seen.dtype != np.uint8:
-        return False
-    if max_prob.ndim != 1 or max_a.ndim != 1 or max_d.ndim != 1 or seen.ndim != 1:
-        return False
-    if max_prob.shape[0] != max_a.shape[0] or max_prob.shape[0] != max_d.shape[0] or max_prob.shape[0] != seen.shape[0]:
-        return False
-    return hasattr(substitution_sparse_cy, 'update_sitewise_max_from_csr_row_double')
 
 
 def _get_sparse_branch_sitewise_max_indices(sub_tensor, branch_id, min_sitewise_pp):
@@ -1275,33 +1213,10 @@ def _extract_selected_stats_from_full_cb(full_df, selected, arity):
     return out
 
 
-def _can_use_cython_sparse_cb_summary(id_combinations, sub_tensor, selected):
-    if not _is_sparse_sub_tensor(sub_tensor):
-        return False
-    if not hasattr(substitution_cy, 'calc_combinatorial_sub_sparse_summary_double_arity2'):
-        return False
-    if id_combinations.shape[1] != 2:
-        return False
-    if id_combinations.dtype.kind not in ['i', 'u']:
-        return False
-    if ('spe2spe' in selected) and (not _sparse_summary_fastpath_supports_spe2spe()):
-        return False
-    return True
 
 
-def _get_sparse_summary_fastpath_param_names():
-    func = getattr(substitution_cy, 'calc_combinatorial_sub_sparse_summary_double_arity2', None)
-    if func is None:
-        return tuple()
-    try:
-        return tuple(inspect.signature(func).parameters.keys())
-    except (TypeError, ValueError):
-        return tuple()
 
 
-def _sparse_summary_fastpath_supports_spe2spe():
-    params = _get_sparse_summary_fastpath_param_names()
-    return ('branch_group_pair_site_obj' in params) and ('calc_spe2spe' in params)
 
 
 def _can_use_cython_sparse_summary_accumulator(rows, cols, vals):
@@ -1907,102 +1822,8 @@ def get_cb_from_sparse_projections(
     return table.set_substitution_dtype(df)
 
 
-def _run_sparse_cb_summary_gram(
-    id_combinations,
-    selected,
-    mmap,
-    df_mmap,
-    mmap_start,
-    float_type,
-    branch_group_site_total,
-    branch_group_from_site,
-    branch_group_to_site,
-    branch_group_pair_site,
-):
-    arity = id_combinations.shape[1]
-    ids = np.asarray(id_combinations, dtype=np.int64)
-    b0 = ids[:, 0]
-    b1 = ids[:, 1]
-    upper_rows = np.minimum(b0, b1)
-    upper_cols = np.maximum(b0, b1)
-    selected_df = np.zeros(shape=(ids.shape[0], arity + len(selected)), dtype=np.float64)
-    selected_df[:, 0] = b0
-    selected_df[:, 1] = b1
-    selected_col_map = {stat: (arity + i) for i, stat in enumerate(selected)}
-    if 'any2any' in selected:
-        total2d = np.asarray(branch_group_site_total, dtype=np.float64).reshape((branch_group_site_total.shape[0], -1))
-        selected_df[:, selected_col_map['any2any']] = _calc_dense_gram_pair_values(
-            matrix_2d=total2d,
-            row_ids=upper_rows,
-            col_ids=upper_cols,
-        )
-    if 'spe2any' in selected:
-        from2d = np.asarray(branch_group_from_site, dtype=np.float64).reshape((branch_group_from_site.shape[0], -1))
-        selected_df[:, selected_col_map['spe2any']] = _calc_dense_gram_pair_values(
-            matrix_2d=from2d,
-            row_ids=upper_rows,
-            col_ids=upper_cols,
-        )
-    if 'any2spe' in selected:
-        to2d = np.asarray(branch_group_to_site, dtype=np.float64).reshape((branch_group_to_site.shape[0], -1))
-        selected_df[:, selected_col_map['any2spe']] = _calc_dense_gram_pair_values(
-            matrix_2d=to2d,
-            row_ids=upper_rows,
-            col_ids=upper_cols,
-        )
-    if 'spe2spe' in selected:
-        pair2d = np.asarray(branch_group_pair_site, dtype=np.float64).reshape((branch_group_pair_site.shape[0], -1))
-        selected_df[:, selected_col_map['spe2spe']] = _calc_dense_gram_pair_values(
-            matrix_2d=pair2d,
-            row_ids=upper_rows,
-            col_ids=upper_cols,
-        )
-    if mmap:
-        row_start, row_end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
-        df_mmap[row_start:row_end, :] = selected_df.astype(df_mmap.dtype, copy=False)
-        return None
-    return selected_df.astype(float_type, copy=False)
 
 
-def _run_sparse_cb_summary_cython(
-    id_combinations,
-    selected,
-    mmap,
-    df_mmap,
-    mmap_start,
-    float_type,
-    branch_group_site_total,
-    branch_group_from_site,
-    branch_group_to_site,
-    branch_group_pair_site,
-):
-    arity = id_combinations.shape[1]
-    kwargs = dict(
-        id_combinations=np.asarray(id_combinations, dtype=np.int64),
-        mmap_start=0,
-        branch_group_site_total_obj=branch_group_site_total,
-        branch_group_from_site_obj=branch_group_from_site,
-        branch_group_to_site_obj=branch_group_to_site,
-        mmap=False,
-        df_mmap=None,
-        calc_any2any=('any2any' in selected),
-        calc_spe2any=('spe2any' in selected),
-        calc_any2spe=('any2spe' in selected),
-    )
-    if _sparse_summary_fastpath_supports_spe2spe():
-        kwargs['branch_group_pair_site_obj'] = branch_group_pair_site
-        kwargs['calc_spe2spe'] = ('spe2spe' in selected)
-    out_full = substitution_cy.calc_combinatorial_sub_sparse_summary_double_arity2(**kwargs)
-    selected_df = _extract_selected_stats_from_full_cb(
-        full_df=np.asarray(out_full, dtype=np.float64),
-        selected=selected,
-        arity=arity,
-    )
-    if mmap:
-        row_start, row_end = _get_combo_index_range(mmap_start=mmap_start, num_combinations=id_combinations.shape[0])
-        df_mmap[row_start:row_end, :] = selected_df.astype(df_mmap.dtype, copy=False)
-        return None
-    return selected_df.astype(float_type, copy=False)
 
 
 def sub_tensor2cb(

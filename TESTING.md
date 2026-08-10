@@ -35,6 +35,13 @@ pytest -q -m process
 The repository caps `-n auto` at four workers to avoid collection overhead,
 memory pressure, and nested scheduling contention.
 
+To verify the source-only fallback locally:
+
+```bash
+CSUBST_SKIP_EXTENSIONS=1 python -m pip install -e '.[test]'
+CSUBST_DISABLE_EXTENSIONS=1 pytest -q -m "not process"
+```
+
 For a shorter local feedback loop matching the Python-version CI matrix, run:
 
 ```bash
@@ -69,3 +76,8 @@ clearer.
 When moving or consolidating tests, compare collection counts before and after
 the change, run the affected suite, and then run the full suite. The Cython
 sanitizer job separately exercises sparse and expected-state parity tests.
+
+Performance parity uses `.github/performance_baseline.tsv`. Update it only from
+a successful, representative Linux hosted-runner result and review numerical
+parity at the same time. Absolute ceilings remain as a safety net; baseline
+ratios catch smaller regressions.

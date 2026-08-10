@@ -9,7 +9,7 @@ This report records a smoke/example analysis for the new `csubst scan` command o
 The bundled PEPC foreground file encodes all C4 taxa as a single lineage value. This is correct for ordinary foreground/background analysis, but `csubst scan --scan_min_support 2` asks how many foreground units share a substitution; therefore the bundled file yields one foreground unit and no candidate can pass support >= 2.
 
 ```bash
-python csubst/csubst scan \
+python -m csubst scan \
   --alignment_file csubst/dataset/PEPC.alignment.fa \
   --rooted_tree_file csubst/dataset/PEPC.tree.nwk \
   --foreground csubst/dataset/PEPC.foreground.txt \
@@ -30,7 +30,7 @@ python csubst/csubst scan \
 For recurrent substitutions among the C4 lineages, I used `PEPC.foreground.independent.txt`, which keeps most C4 leaves as independent foreground units but groups the Setaria/Zea/Sorghum PEPC clade as one foreground unit. Candidate discovery/support uses its stem branch, while rate event/exposure accounting includes the whole descendant foreground clade and lets state-aware exposure remove post-hit opportunity.
 
 ```bash
-python csubst/csubst scan \
+python -m csubst scan \
   --alignment_file csubst/dataset/PEPC.alignment.fa \
   --rooted_tree_file csubst/dataset/PEPC.tree.nwk \
   --foreground reports/csubst_scan_pepc_20260625/PEPC.foreground.independent.txt \
@@ -52,7 +52,7 @@ python csubst/csubst scan \
 The same independent-foreground run with all nine pattern classes:
 
 ```bash
-python csubst/csubst scan \
+python -m csubst scan \
   --alignment_file csubst/dataset/PEPC.alignment.fa \
   --rooted_tree_file csubst/dataset/PEPC.tree.nwk \
   --foreground reports/csubst_scan_pepc_20260625/PEPC.foreground.independent.txt \

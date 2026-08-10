@@ -1,4 +1,3 @@
-from sparse_fixtures import toy_dense_tensor as _toy_dense_tensor
 from sparse_fixtures import toy_reducer_tensor as _toy_reducer_tensor
 
 import numpy as np
@@ -187,29 +186,6 @@ def test_sparse_cb_summary_arrays_csr_cython_accumulator_matches_existing_cython
         np.testing.assert_allclose(obs_arr, exp_arr, atol=1e-12)
 
 
-def test_sparse_csr_count_and_scatter_cython_kernels_match_python_fallback(monkeypatch):
-    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "accumulate_branch_sub_counts_csr_double")):
-        pytest.skip("Cython sparse CSR helper kernels are unavailable")
-    dense = _toy_dense_tensor()
-    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
-    branch_id = 1
-
-    monkeypatch.setattr(substitution, "_is_sparse_csr_cython_compatible", lambda mat: False)
-    expected_branch = substitution.get_branch_sub_counts(sparse_tensor)
-    expected_site = substitution.get_site_sub_counts(sparse_tensor)
-    expected_branch_site = substitution.get_branch_site_sub_counts(sparse_tensor, branch_id=branch_id)
-    expected_branch_tensor = substitution._get_sparse_branch_tensor(sparse_tensor, branch_id=branch_id)
-
-    monkeypatch.setattr(substitution, "_is_sparse_csr_cython_compatible", lambda mat: True)
-    observed_branch = substitution.get_branch_sub_counts(sparse_tensor)
-    observed_site = substitution.get_site_sub_counts(sparse_tensor)
-    observed_branch_site = substitution.get_branch_site_sub_counts(sparse_tensor, branch_id=branch_id)
-    observed_branch_tensor = substitution._get_sparse_branch_tensor(sparse_tensor, branch_id=branch_id)
-
-    np.testing.assert_allclose(observed_branch, expected_branch, atol=1e-12)
-    np.testing.assert_allclose(observed_site, expected_site, atol=1e-12)
-    np.testing.assert_allclose(observed_branch_site, expected_branch_site, atol=1e-12)
-    np.testing.assert_allclose(observed_branch_tensor, expected_branch_tensor, atol=1e-12)
 
 
 def test_get_b_sitewise_cython_scan_matches_python_fallback(monkeypatch):
@@ -294,29 +270,3 @@ def test_get_b_sitewise_sparse_path_uses_nonsyn_state_orders():
     out = substitution.get_b(g=g, sub_tensor=sparse_tensor, attr="N", sitewise=True, min_sitewise_pp=0.5)
 
     assert out.loc[out["branch_id"] == labels["A"], "N_sitewise"].iloc[0] == "AGPST1C"
-
-
-def test_sparse_branch_sitewise_max_indices_cython_row_update_matches_python_fallback(monkeypatch):
-    if (substitution_sparse_cy is None) or (not hasattr(substitution_sparse_cy, "update_sitewise_max_from_csr_row_double")):
-        pytest.skip("Cython sitewise CSR row-update kernel is unavailable")
-    dense = _toy_reducer_tensor()
-    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
-    branch_id = 1
-    min_pp = 0.1
-
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_sitewise_row_update", lambda *args, **kwargs: False)
-    expected = substitution._get_sparse_branch_sitewise_max_indices(
-        sub_tensor=sparse_tensor,
-        branch_id=branch_id,
-        min_sitewise_pp=min_pp,
-    )
-
-    monkeypatch.setattr(substitution, "_can_use_cython_sparse_sitewise_row_update", lambda *args, **kwargs: True)
-    observed = substitution._get_sparse_branch_sitewise_max_indices(
-        sub_tensor=sparse_tensor,
-        branch_id=branch_id,
-        min_sitewise_pp=min_pp,
-    )
-
-    for exp_arr, obs_arr in zip(expected, observed):
-        np.testing.assert_array_equal(obs_arr, exp_arr)
