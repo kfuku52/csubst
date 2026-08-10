@@ -202,12 +202,12 @@ def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter):
     run_dir.mkdir(parents=True, exist_ok=True)
     dataset_dir = repo_root / "csubst" / "dataset"
     python_exe = sys.executable
-    csubst_exe = repo_root / "csubst" / "csubst"
     iqtree_model = read_iqtree_model(dataset_dir / "{}.alignment.fa.iqtree".format(DATASET_NAME))
 
     cmd = [
         python_exe,
-        str(csubst_exe),
+        "-m",
+        "csubst",
         "analyze",
         "--outdir",
         ".",
