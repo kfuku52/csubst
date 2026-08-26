@@ -1,4 +1,4 @@
-<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=4; sha256=11a1845c9b264e77b89c121a78f05af06a1900fcdba614d8476ec57aa282e6f6 -->
+<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=5; sha256=6514955d4b37e0fc3fda64cff2d9be83e0672f43ab38d0f49ae68b2de287a98b -->
 # Common agent policy
 
 Repository-specific instructions override these defaults.
@@ -17,6 +17,9 @@ Repository-specific instructions override these defaults.
   testing compatibility.
 - Interface, option, format, filename, or schema changes must update all
   producers, consumers, tests, examples, and documentation.
+- Keep each repository's top-level README concise: do not add feature-specific
+  guides or extended examples. Put them in dedicated documentation or the wiki,
+  linking from the README only when needed for discoverability.
 - Changes confined to unpushed local commits need no backward compatibility.
 - Prefer verified root-cause fixes to fallbacks or relaxed validation that only
   hide failures. Document unavoidable workarounds and their removal conditions.
