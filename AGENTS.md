@@ -1,4 +1,4 @@
-<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=5; sha256=6514955d4b37e0fc3fda64cff2d9be83e0672f43ab38d0f49ae68b2de287a98b -->
+<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=6; sha256=9a1279ed25a1782ca13ed3a1bebc74d389c35e34a52f8a8ec762bb7790d05186 -->
 # Common agent policy
 
 Repository-specific instructions override these defaults.
@@ -23,6 +23,13 @@ Repository-specific instructions override these defaults.
 - Changes confined to unpushed local commits need no backward compatibility.
 - Prefer verified root-cause fixes to fallbacks or relaxed validation that only
   hide failures. Document unavoidable workarounds and their removal conditions.
+- When changing GitHub Actions, preserve required coverage while minimizing
+  runner use: avoid duplicate push/PR runs and high-frequency polling, cancel
+  superseded CI, combine short jobs when isolation is unnecessary, and retain
+  artifacts only as long as needed.
+- Use platform-specific runners only when their coverage is required, gate them
+  by relevant paths, schedules, releases, or manual dispatch, and never execute
+  untrusted pull-request code on self-hosted runners.
 - Run focused checks and, when practical, the standard suite. Directly exercise
   affected behavior or rendered artifacts; report exactly what did and did not
   run.
