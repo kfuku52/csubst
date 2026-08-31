@@ -68,3 +68,31 @@ def test_main_download_translates_expected_vesm_errors(monkeypatch, error_type):
     monkeypatch.setattr(main_download.model_resources, 'ensure_vesm35m_resource', fail)
     with pytest.raises(ValueError, match='resource unavailable'):
         main_download.main_download({'resource': 'vesm-35m'})
+
+
+@pytest.mark.parametrize('legacy_verify', [None, False, True])
+def test_main_download_never_disables_vesm_verification(monkeypatch, capsys, legacy_verify):
+    verification_requests = []
+
+    def ensure_resource(**kwargs):
+        verification_requests.append(kwargs['verify_existing'])
+        return {'resource_dir': '/cache/vesm'}
+
+    monkeypatch.setattr(main_download.model_resources, 'ensure_vesm35m_resource', ensure_resource)
+    main_download.main_download({'resource': 'vesm-35m', 'verify': legacy_verify})
+
+    assert verification_requests == [True]
+    output = capsys.readouterr().out
+    assert ('--verify is deprecated' in output) == (legacy_verify is not None)
+
+
+@pytest.mark.parametrize('resource', ['prostt5', 'all'])
+def test_main_download_rejects_unsupported_checksums_before_preparing_any_resource(monkeypatch, resource):
+    def unexpected_call(**_kwargs):
+        pytest.fail('No resource should be loaded or downloaded for an unsupported checksum request')
+
+    monkeypatch.setattr(main_download.model_resources, 'ensure_vesm35m_resource', unexpected_call)
+    monkeypatch.setattr(main_download.structural_alphabet, 'ensure_prostt5_model_files', unexpected_call)
+
+    with pytest.raises(ValueError, match='--verify yes is not supported for ProstT5'):
+        main_download.main_download({'resource': resource, 'verify': True})

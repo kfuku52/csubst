@@ -33,6 +33,11 @@ The main features of **CSUBST** are:
 ## Installation
 **CSUBST** supports Python 3.10–3.14. Installation via [Bioconda](https://anaconda.org/bioconda/csubst) is recommended because it installs IQ-TREE and the required Python dependencies automatically. `pip` installs the core Python dependencies automatically, but [IQ-TREE](https://iqtree.github.io/) and a C compiler must be available separately.
 
+Bioconda builds can lag behind source support. For Python 3.14, use the GitHub
+source route below until a compatible Bioconda build is available. See the
+[installation guide](https://github.com/kfuku52/csubst/wiki/Installation-and-test-run)
+for the checked distribution versions and Python ranges.
+
 #### Option 1: Install with `conda`
 ```
 conda install bioconda::csubst
@@ -41,23 +46,26 @@ conda install bioconda::csubst
 #### Option 2: Install with `pip`
 ```
 # Install IQ-TREE separately: https://iqtree.github.io/
-pip install git+https://github.com/kfuku52/csubst
+python -m pip install git+https://github.com/kfuku52/csubst
 ```
 
 Protein-structure mapping additionally requires PyMOL and MAFFT. PyMOL can be
 installed with the `structure` extra; install the MAFFT executable separately:
 
 ```bash
-pip install "csubst[structure] @ git+https://github.com/kfuku52/csubst"
+python -m pip install "csubst[structure] @ git+https://github.com/kfuku52/csubst"
 ```
 
 VESM and other protein-language-model features use the optional `vep` extra:
 
 ```bash
-pip install "csubst[vep] @ git+https://github.com/kfuku52/csubst"
+python -m pip install "csubst[vep] @ git+https://github.com/kfuku52/csubst"
 ```
 
 ## Test run
+
+Run these commands in an empty working directory:
+
 ```
 # Generate a test dataset
 csubst dataset --name PGK
@@ -70,153 +78,48 @@ csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --for
 CSUBST provides ten main subcommands:
 
 - [`csubst dataset`](https://github.com/kfuku52/csubst/wiki/csubst-dataset): generate built-in example datasets such as `PGK` and `PEPC`.
-- `csubst download`: download and verify shared model resources without requiring an input alignment.
+- [`csubst download`](https://github.com/kfuku52/csubst/wiki/csubst-download): prepare model resources without an input alignment; VESM files are always SHA-256 checked.
 - [`csubst doctor`](https://github.com/kfuku52/csubst/wiki/csubst-doctor): validate input files, inferred IQ-TREE paths, and optional 3Di settings before longer runs.
 - [`csubst search`](https://github.com/kfuku52/csubst/wiki/csubst-search) (legacy alias: `csubst analyze`): run convergence analysis and report metrics such as `omegaC`, `dNC`, and `dSC`.
-- [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): list recurrent nonsynonymous-state substitutions shared by foreground clades without the omegaC branch-combination search. Foreground support units can be defined by input lineage IDs, automatically split stem branches, or their complete foreground clades. The output includes unit-level support, configurable foreground-vs-control rate-enrichment statistics, posterior-sum or called-event rate counts, site evolutionary rates, and amino-acid/state conservation.
+- [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): find foreground recurrent amino-acid/state substitutions and compare foreground and control rates.
 - [`csubst inspect`](https://github.com/kfuku52/csubst/wiki/csubst-inspect): summarize branch mappings, inspect ancestral states, and report exact topology-derived independent branch-combination counts without enumerating combinations.
 - [`csubst sites`](https://github.com/kfuku52/csubst/wiki/csubst-sites) (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree and site-summary plots, and optionally map sites to protein structures.
 - [`csubst simulate`](https://github.com/kfuku52/csubst/wiki/csubst-simulate): simulate codon sequence evolution under user-defined convergence scenarios.
 - [`csubst benchmark`](https://github.com/kfuku52/csubst/wiki/csubst-benchmark): run `csubst search` over parameter grids on the same input data and summarize runtime and output metrics.
 - [`csubst benchmark-plot`](https://github.com/kfuku52/csubst/wiki/csubst-benchmark-plot): collect existing benchmark outputs, compare performance across parameter settings, and write an overview figure.
 
-The vendored simulation backend uses FASTA for sequence input and output. Other
-Pyvolve sequence formats such as PHYLIP or NEXUS are not exposed by CSUBST.
-Online Swiss-Prot similarity searches identify requests as CSUBST and include
-the maintainer contact address required by NCBI. Set `NCBI_EMAIL` to override it.
-
-Development setup, architecture, and test-suite conventions are documented in
-[CONTRIBUTING.md](CONTRIBUTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
-and [TESTING.md](TESTING.md).
-
-Display available commands and options:
+Display commands and options:
 
 ```bash
 csubst -h
 csubst SUBCOMMAND -h
-csubst SUBCOMMAND --help-advanced  # include expert tuning options
+csubst SUBCOMMAND --help-advanced
 ```
 
-`--threads` controls CSUBST task/process parallelism. Native BLAS/OpenMP work is
-limited separately by `--blas_threads` (default 1) to prevent every worker from
-starting another full thread pool. Developers and diagnostic runs can set
-`CSUBST_DISABLE_EXTENSIONS=1` to force the Python implementations or
-`CSUBST_STRICT_EXTENSIONS=1` to fail immediately if a Cython fast path breaks.
+`--threads` controls CSUBST task/process parallelism; `--blas_threads` limits
+native BLAS/OpenMP work separately (default 1). Analysis commands support
+`--outdir`, `--output_prefix`, and `--log_file`. For a complete example, see the
+[typical workflow](https://github.com/kfuku52/csubst/wiki/Typical-workflow).
 
-Shared model resources are downloaded by the resource manager when requested
-and can be prefetched for an offline or batch-compute environment. The default cache is
-`${CSUBST_CACHE_DIR:-~/.cache/csubst}`. For example:
+<a id="vesm-35m-variant-effect-scores-in-csubst-sites"></a>
+
+Shared models can be prepared before running an offline or batch job:
 
 ```bash
 csubst download --resource vesm-35m
-csubst download --resource vesm-35m --no_download yes  # local availability check
+csubst download --resource vesm-35m --no_download yes
 ```
 
-VESM-35M consists of the pinned `ntranoslab/vesm` `VESM_35M.pth` checkpoint and
-the pinned `facebook/esm2_t12_35M_UR50D` base model. Downloads are published
-only after file-size and SHA-256 validation. Resource-specific interprocess
-locks prevent duplicate downloads when multiple CSUBST processes start at the
-same time. The same lock implementation protects ProstT5 model downloads and
-shared ProstT5/3Di cache writes.
+VESM files and structure downloads use the CSUBST cache (default
+`~/.cache/csubst`, overridable with `CSUBST_CACHE_DIR`). ProstT5 weights use
+Hugging Face's cache or `--prostt5_local_dir`, independently of that setting.
+See [model caches and offline use](https://github.com/kfuku52/csubst/wiki/csubst-download)
+and [VESM-35M scoring](https://github.com/kfuku52/csubst/wiki/csubst-sites#vesm-35m-variant-effect-scoring).
 
-Structures retrieved for `--pdb PDB_CODE` or `--pdb besthit` are also stored
-under the shared cache (`structures/`) and published atomically under the same
-interprocess lock. RCSB, SWISS-MODEL, AlphaFold, and AlphaFill downloads no
-longer create structure files in the current working directory.
-
-Typical workflow:
-
-```bash
-# 1) Prepare a toy dataset
-csubst dataset --name PGK
-
-# 2) Validate inputs and inferred IQ-TREE paths
-csubst doctor \
-  --alignment_file alignment.fa.gz \
-  --rooted_tree_file tree.nwk \
-  --foreground foreground.txt
-
-# 3) Run convergence analysis
-csubst search \
-  --alignment_file alignment.fa.gz \
-  --rooted_tree_file tree.nwk \
-  --foreground foreground.txt
-
-# 4) Scan foreground recurrent substitutions directly
-csubst scan \
-  --alignment_file alignment.fa.gz \
-  --rooted_tree_file tree.nwk \
-  --foreground foreground.txt \
-  --scan_unit_mode clade \
-  --scan_other_scope all \
-  --scan_rate_event_mode posterior_sum \
-  --scan_rate_exposure q_weighted \
-  --scan_pvalue_calibration full_scan \
-  --scan_n_permutations 1000 \
-  --threads 8
-
-# 5) Inspect site-wise convergence for a branch pair
-csubst sites \
-  --alignment_file alignment.fa.gz \
-  --rooted_tree_file tree.nwk \
-  --branch_id 23,51 \
-  --outdir csubst_sites \
-  --output_prefix csubst
-```
-
-All analysis subcommands accept `--outdir`, `--output_prefix`, and `--log_file`.
-The `sites` command creates one branch-selection directory under `--outdir` for
-each requested branch set.
-
-### VESM-35M variant-effect scores in `csubst sites`
-
-`csubst sites` can score posterior-supported amino-acid substitutions on the
-selected branches with VESM-35M. Use the **full-length, codon-aligned CDS** as
-`--alignment_file`; do not pass an alignment from which columns were removed by
-trimAl or a similar program. CSUBST reconstructs the full-length ancestral
-protein context before applying its own internal site filters.
-When `--pdb` is also requested, `besthit` searching and PDB-to-alignment MAFFT
-mapping use the tip AA alignment translated directly from this original codon
-alignment. Internal removal of tip-invariant sites therefore does not shorten
-the structure-search query or change its alignment coordinates.
-
-The bundled PEPC dataset includes a suitable full-length alignment. Its ordinary
-`alignment.fa.gz` is trimmed, so use `untrimmed_cds.fa.gz` for VESM:
-
-```bash
-csubst dataset --name PEPC
-
-# Replace ANC,DES with numerical branch IDs reported by csubst inspect/search.
-csubst sites \
-  --alignment_file untrimmed_cds.fa.gz \
-  --rooted_tree_file tree.nwk \
-  --mode lineage \
-  --branch_id ANC,DES \
-  --vep_model vesm-35m \
-  --vep_min_event_pp 0.8 \
-  --tree_site_plot_format png
-```
-
-`--mode intersection` is also supported, including multiple branch IDs and
-`--branch_id fg`. VESM support for `--mode set` and nonsynonymous recoding is
-intentionally disabled in the initial implementation. The event threshold is
-inclusive: an atomic parent-AA/child-AA event is scored when the product of the
-two marginal state probabilities is at least `--vep_min_event_pp`.
-
-The run writes a long `*.vesm.tsv` event table, VESM columns in the ordinary
-wide sites table, and `*.vesm_tree_site.tsv` plus a tree/branch-by-site figure.
-In the figure, marker size is substitution posterior probability and color is
-the raw VESM log-likelihood ratio (LLR; lower values indicate a more deleterious
-substitution). With `--pdb`, mapped residues are colored on the same continuous
-red-white-blue scale in the PyMOL session. When multiple events
-map to one residue, `--vep_site_aggregate` controls the structure score.
-
-A GPU is not required. `--vep_device auto` prefers CUDA, then Apple MPS, and
-falls back to CPU. The first scoring run downloads the pinned model unless it
-was prefetched with `csubst download --resource vesm-35m`; subsequent runs reuse
-both the model and the interprocess-locked mutation-score cache.
-
-For advanced settings, including foreground formats, higher-order search, structure mapping, and simulation parameters, see the [CSUBST Wiki](https://github.com/kfuku52/csubst/wiki).
+Foreground formats, higher-order search, site outputs, structure mapping, and
+simulation guides are available in the [Wiki](https://github.com/kfuku52/csubst/wiki).
+Developer setup and checks are documented in [CONTRIBUTING.md](CONTRIBUTING.md),
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [TESTING.md](TESTING.md).
 
 ## Citation
 Fukushima K, Pollock DD. 2023. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. Nature Ecology & Evolution 7: 155–170. [DOI: 10.1038/s41559-022-01932-7](https://doi.org/10.1038/s41559-022-01932-7)

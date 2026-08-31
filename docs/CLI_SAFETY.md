@@ -21,3 +21,20 @@ configurations after a failed run. `no` stops at the first failure. In both
 cases, the summary, per-run results, and failure logs are written before the
 command exits with status 2 if any run failed. All-success benchmarks exit 0.
 Automation should check the exit status and retain the summary for diagnosis.
+
+## Model resource checks
+
+`download --resource vesm-35m` always checks file sizes and SHA-256 hashes;
+`--no_download yes` also rejects missing or corrupt local files without a
+replacement download. ProstT5 checks that the tokenizer/model can load locally,
+which is an availability check rather than a CSUBST SHA-256 guarantee.
+
+The old `--verify` option is deprecated. VESM accepts it with a warning, and
+`--verify no` does not disable mandatory verification. Requesting
+`--verify yes` for `prostt5` or `all` exits 2 before preparing any resource.
+For local-only checks, omit `--verify` and use `--no_download yes`.
+
+VESM weights use the CSUBST cache. ProstT5 weights instead use Hugging Face's
+cache or `--prostt5_local_dir`; the CSUBST cache contains its download lock,
+not those weights. See the [download guide](https://github.com/kfuku52/csubst/wiki/csubst-download)
+for offline preparation.

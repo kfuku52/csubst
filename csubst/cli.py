@@ -743,7 +743,7 @@ def _make_ancestral_parser():
                              '(including sites with only one unambiguous tip codon). '
                              '"zero_sub_mass" drops only sites guaranteed to have zero observed substitution mass '
                              '(both N and S) across analyzed branches. '
-                             'In `inspect`, csubst_sites_index_map.tsv is written to map retained internal '
+                             'In `inspect`, csubst_site_index_map.tsv is written to map retained internal '
                              'site indices to original alignment positions.')
     return psr_as
 
@@ -777,7 +777,8 @@ def _make_recoding_parser(show_advanced):
                         help='default=%(default)s: Set "yes" to disable automatic ProstT5 download and require local files.')
     _add_advanced_argument(advanced_resources, '--resource_cache_dir', show_advanced=show_advanced,
                         metavar='PATH', default='', type=str,
-                        help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: Shared model/structure resource cache and lock directory.')
+                        help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: VESM/structure files and shared locks. '
+                             'ProstT5 weights use the Hugging Face cache or --prostt5_local_dir.')
     _add_advanced_argument(advanced_resources, '--resource_lock_poll', show_advanced=show_advanced,
                         metavar='SECONDS', default=5.0, type=float,
                         help='default=%(default)s: Polling interval while waiting for a shared-resource lock.')
@@ -899,15 +900,17 @@ def _register_dataset_parser(subparsers):
 
 def _register_download_parser(show_advanced, subparsers):
     # download
-    help_txt = 'downloads and verifies shared model resources. See `csubst download -h`'
+    help_txt = 'prepares shared model resources. See `csubst download -h`'
     download = subparsers.add_parser('download', help=help_txt, parents=[])
     download.add_argument('--resource', metavar='vesm-35m|prostt5|all', default='vesm-35m', type=str,
                           choices=['vesm-35m', 'prostt5', 'all'],
-                          help='default=%(default)s: Shared model resource to download and verify.')
+                          help='default=%(default)s: Model resource to prepare. VESM files are always '
+                               'SHA-256 verified; ProstT5 is checked by loading local files.')
     advanced_download = download.add_argument_group('advanced model resources and caches')
     _add_advanced_argument(advanced_download, '--resource_cache_dir', show_advanced=show_advanced,
                           metavar='PATH', default='', type=str,
-                          help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: Shared CSUBST resource cache.')
+                          help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: VESM files and shared resource locks. '
+                               'ProstT5 weights use the Hugging Face cache or --prostt5_local_dir.')
     _add_advanced_argument(advanced_download, '--resource_lock_poll', show_advanced=show_advanced,
                           metavar='SECONDS', default=5.0, type=float,
                           help='default=%(default)s: Polling interval while waiting for another downloader.')
@@ -916,8 +919,11 @@ def _register_download_parser(show_advanced, subparsers):
                           help='default=%(default)s: Maximum wait for a shared-resource lock.')
     download.add_argument('--no_download', metavar='yes|no', default='no', type=strtobool,
                           help='default=%(default)s: Check local availability without network access.')
-    download.add_argument('--verify', metavar='yes|no', default='no', type=strtobool,
-                          help='default=%(default)s: Recompute SHA-256 for an existing managed resource.')
+    _add_advanced_argument(advanced_download, '--verify', show_advanced=show_advanced,
+                          metavar='yes|no', default=None, type=strtobool,
+                          help='Deprecated compatibility option: VESM files are always SHA-256 verified. '
+                               '"yes" is unsupported for ProstT5 (including --resource all). '
+                               'Use --no_download yes to check local availability.')
     _add_advanced_argument(advanced_download, '--prostt5_model', show_advanced=show_advanced,
                           metavar='STR', default='Rostlab/ProstT5', type=str,
                           help='default=%(default)s: ProstT5 Hugging Face model identifier.')

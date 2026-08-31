@@ -40,7 +40,8 @@ def _import_hf_hub_download():
     except ModuleNotFoundError as exc:
         raise ImportError(
             "VESM-35M download requires huggingface-hub. "
-            "Install it with `pip install huggingface-hub` or `pip install csubst[vep]`."
+            "Install it with `python -m pip install huggingface-hub` or "
+            "`python -m pip install \"csubst[vep] @ git+https://github.com/kfuku52/csubst\"`."
         ) from exc
     return hf_hub_download
 

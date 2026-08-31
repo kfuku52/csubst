@@ -25,6 +25,7 @@ class InputConfig(TypedDict, total=False):
     resource_lock_poll: float
     resource_lock_timeout: float
     no_download: bool
+    verify: bool | None
 
 
 class OutputConfig(TypedDict, total=False):

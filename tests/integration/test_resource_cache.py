@@ -1,4 +1,5 @@
 import json
+import hashlib
 import multiprocessing
 import os
 import socket
@@ -7,6 +8,7 @@ import time
 import pytest
 
 from csubst import model_resources
+from csubst import main_download
 from csubst import resource_cache
 from process_workers import _concurrent_resource_worker, _sequence_cache_worker
 
@@ -306,6 +308,36 @@ def test_ensure_vesm35m_downloads_only_required_pinned_files(tmp_path, monkeypat
         download_file=fake_download_file,
     )
     assert calls == []
+
+
+@pytest.mark.parametrize('legacy_verify', [None, False, True])
+def test_download_rejects_same_size_corrupt_vesm_files_offline(tmp_path, monkeypatch, legacy_verify):
+    payload = b'valid model data'
+    expected = {
+        filename: {'size': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}
+        for filename in model_resources.VESM_REQUIRED_FILES
+    }
+    monkeypatch.setattr(model_resources, 'VESM_EXPECTED_FILES', expected)
+
+    def fake_download_file(repo_id, filename, revision, local_dir):
+        os.makedirs(local_dir, exist_ok=True)
+        with open(os.path.join(local_dir, filename), 'wb') as handle:
+            handle.write(payload)
+
+    monkeypatch.setattr(model_resources, '_import_hf_hub_download', lambda: fake_download_file)
+    config = {'resource': 'vesm-35m', 'resource_cache_dir': str(tmp_path / 'cache')}
+    main_download.main_download(config)
+    resource_dir = model_resources.resolve_vesm35m_resource_dir(config['resource_cache_dir'])
+    checkpoint_path = os.path.join(resource_dir, model_resources.VESM_CHECKPOINT_FILENAME)
+    with open(checkpoint_path, 'wb') as handle:
+        handle.write(b'x' * len(payload))
+
+    def unexpected_download():
+        pytest.fail('Offline validation must not download a replacement')
+
+    monkeypatch.setattr(model_resources, '_import_hf_hub_download', unexpected_download)
+    with pytest.raises(ValueError, match='not available locally'):
+        main_download.main_download({**config, 'verify': legacy_verify, 'no_download': True})
 
 
 def test_resource_lock_rejects_non_finite_timing_values(tmp_path):

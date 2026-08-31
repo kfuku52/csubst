@@ -1,0 +1,320 @@
+{
+  "version": "1.14.10",
+  "base_commit": "37868fddffeef77bb4a1403f877632ce8232e198",
+  "wiki_base_commit": "d08f84cfaf2d68dc9269b1c07adee52c02478272",
+  "cli_validation": [
+    {
+      "case": "dataset",
+      "args": [
+        "dataset",
+        "--name",
+        "PGK"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "doctor",
+      "args": [
+        "doctor",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--foreground",
+        "foreground.txt"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "search_tables",
+      "args": [
+        "search",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--foreground",
+        "foreground.txt",
+        "--s",
+        "yes",
+        "--bs",
+        "yes",
+        "--cs",
+        "yes",
+        "--cbs",
+        "yes"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "sites_intersection",
+      "args": [
+        "sites",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--branch_id",
+        "23,51"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "sites_lineage",
+      "args": [
+        "sites",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--mode",
+        "lineage",
+        "--branch_id",
+        "63,2"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "sites_set",
+      "args": [
+        "sites",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--mode",
+        "set,any,23-51"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "sites_single",
+      "args": [
+        "sites",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--branch_id",
+        "23"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "sites_custom",
+      "args": [
+        "sites",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--branch_id",
+        "23,51",
+        "--outdir",
+        "custom-sites",
+        "--output_prefix",
+        "custom"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "inspect_no",
+      "args": [
+        "inspect",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--plot_state_aa",
+        "no",
+        "--plot_state_codon",
+        "no"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0
+    },
+    {
+      "case": "unsupported_prostt5_verify",
+      "args": [
+        "download",
+        "--resource",
+        "prostt5",
+        "--verify",
+        "yes",
+        "--no_download",
+        "yes"
+      ],
+      "exit_code": 2,
+      "expected_exit_code": 2
+    },
+    {
+      "case": "unsupported_all_verify",
+      "args": [
+        "download",
+        "--resource",
+        "all",
+        "--verify",
+        "yes",
+        "--no_download",
+        "yes"
+      ],
+      "exit_code": 2,
+      "expected_exit_code": 2
+    }
+  ],
+  "site_output_layouts": [
+    {
+      "directory": "csubst_sites/csubst.branch_id23,51",
+      "files": [
+        "csubst.outputs.tsv",
+        "csubst.pdf",
+        "csubst.state.pdf",
+        "csubst.state_N.tsv",
+        "csubst.state_S.tsv",
+        "csubst.tree_site.pdf",
+        "csubst.tree_site.tsv",
+        "csubst.tsv"
+      ]
+    },
+    {
+      "directory": "csubst_sites/csubst.lineage.branch_id63,2",
+      "files": [
+        "csubst.outputs.tsv",
+        "csubst.pdf",
+        "csubst.tree.pdf",
+        "csubst.tree_site.pdf",
+        "csubst.tree_site.tsv",
+        "csubst.tsv"
+      ]
+    },
+    {
+      "directory": "csubst_sites/csubst.set.any.expr23_minus_51",
+      "files": [
+        "csubst.outputs.tsv",
+        "csubst.pdf",
+        "csubst.tree_site.pdf",
+        "csubst.tree_site.tsv",
+        "csubst.tsv"
+      ]
+    },
+    {
+      "directory": "csubst_sites/csubst.branch_id23",
+      "files": [
+        "csubst.outputs.tsv",
+        "csubst.pdf",
+        "csubst.state.pdf",
+        "csubst.state_N.tsv",
+        "csubst.state_S.tsv",
+        "csubst.tree_site.pdf",
+        "csubst.tree_site.tsv",
+        "csubst.tsv"
+      ]
+    },
+    {
+      "directory": "custom-sites/custom.branch_id23,51",
+      "files": [
+        "custom.outputs.tsv",
+        "custom.pdf",
+        "custom.state.pdf",
+        "custom.state_N.tsv",
+        "custom.state_S.tsv",
+        "custom.tree_site.pdf",
+        "custom.tree_site.tsv",
+        "custom.tsv"
+      ]
+    }
+  ],
+  "search_table_schema": {
+    "s": {
+      "rows": 417,
+      "columns": [
+        "site",
+        "S_sub",
+        "N_sub",
+        "is_site_retained"
+      ],
+      "minimum_site": 0
+    },
+    "bs": {
+      "rows": 27105,
+      "columns": [
+        "branch_id",
+        "site",
+        "S_sub",
+        "N_sub",
+        "is_site_retained"
+      ],
+      "minimum_site": 0
+    },
+    "cs": {
+      "rows": 417,
+      "columns": [
+        "site",
+        "OCSany2any",
+        "OCSspe2any",
+        "OCSany2spe",
+        "OCSspe2spe",
+        "OCNany2any",
+        "OCNspe2any",
+        "OCNany2spe",
+        "OCNspe2spe",
+        "is_site_retained"
+      ],
+      "minimum_site": 0
+    },
+    "cbs": {
+      "rows": 701394,
+      "columns": [
+        "branch_id_1",
+        "branch_id_2",
+        "site",
+        "OCSany2any",
+        "OCSspe2any",
+        "OCSany2spe",
+        "OCSspe2spe",
+        "OCNany2any",
+        "OCNspe2any",
+        "OCNany2spe",
+        "OCNspe2spe",
+        "is_site_retained"
+      ],
+      "minimum_site": 0
+    }
+  },
+  "sites_minimum_codon_site_alignment": 1,
+  "negative_documentation_checks": {
+    "bad_flag_rejected": true,
+    "missing_image_rejected": true,
+    "exit_code": 1
+  },
+  "documentation_check": {
+    "documents": 35,
+    "commands": 59,
+    "help_examples": 17,
+    "templates": 2,
+    "local_links": 127
+  },
+  "tests": {
+    "focused_passed": 73,
+    "full_passed": 1399,
+    "native_passed": 7,
+    "lint_passed": true,
+    "typecheck_passed": true
+  },
+  "scope_notes": [
+    "CLI examples used bundled PGK data; no optional model weights were downloaded.",
+    "Corrupt VESM resources were exercised using small fixture files with real SHA-256 validation.",
+    "Documentation checks do not execute shell examples or validate all remote URLs/anchors."
+  ],
+  "shell_syntax_blocks_checked": 48,
+  "deprecated_verify_only_in_advanced_help": true,
+  "wiki_commit": "748456cd5e0009f221080bee3bf5809d3af1b5e5"
+}

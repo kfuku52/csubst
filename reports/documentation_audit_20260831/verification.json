@@ -1,0 +1,848 @@
+{
+  "audit_date": "2026-08-31",
+  "repository_commit": "37868fddffeef77bb4a1403f877632ce8232e198",
+  "wiki_commit": "d08f84cfaf2d68dc9269b1c07adee52c02478272",
+  "package_version": "1.14.9",
+  "environment": {
+    "os": "macOS 26.5.2",
+    "architecture": "arm64",
+    "python": "3.12.13",
+    "dependencies": {
+      "numpy": "2.5.2",
+      "scipy": "1.18.1",
+      "pandas": "3.0.5",
+      "matplotlib": "3.10.9",
+      "ete4": "4.4.0"
+    }
+  },
+  "documents": [
+    "README.md",
+    "CONTRIBUTING.md",
+    "TESTING.md",
+    "RELEASING.md",
+    "docs/ARCHITECTURE.md",
+    "docs/CLI_SAFETY.md",
+    "wiki/Analysis-of-higher-order-convergence.md",
+    "wiki/Ancestral-state-tree-plots.md",
+    "wiki/Benchmarking-search-settings.md",
+    "wiki/Codon-frequency-estimation.md",
+    "wiki/Dependency.md",
+    "wiki/FAQ.md",
+    "wiki/Foreground-specification.md",
+    "wiki/Home.md",
+    "wiki/How-ω-and-ω_C-are-different.md",
+    "wiki/Inspecting-spurious-convergence-using-csubst-site.md",
+    "wiki/Installation-and-test-run.md",
+    "wiki/Interpreting-output-files-of-csubst-analyze.md",
+    "wiki/Interpreting-output-files-of-csubst-site.md",
+    "wiki/Mapping-convergent-substitutions-on-protein-structures.md",
+    "wiki/Parallel-processing-and-performance-tuning.md",
+    "wiki/Preparing-CSUBST-inputs.md",
+    "wiki/Simulating-molecular-convergence.md",
+    "wiki/csubst-benchmark-plot.md",
+    "wiki/csubst-benchmark.md",
+    "wiki/csubst-dataset.md",
+    "wiki/csubst-doctor.md",
+    "wiki/csubst-download.md",
+    "wiki/csubst-inspect.md",
+    "wiki/csubst-scan.md",
+    "wiki/csubst-search.md",
+    "wiki/csubst-simulate.md",
+    "wiki/csubst-site-modes.md",
+    "wiki/csubst-sites.md"
+  ],
+  "parser_checks": {
+    "counts": {
+      "parsed": 62,
+      "help_or_template": 13
+    },
+    "checks": [
+      {
+        "document": "README.md",
+        "block_line": 62,
+        "command": "csubst dataset --name PGK",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 62,
+        "command": "csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 95,
+        "command": "csubst -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "README.md",
+        "block_line": 95,
+        "command": "csubst SUBCOMMAND -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "README.md",
+        "block_line": 95,
+        "command": "csubst SUBCOMMAND --help-advanced  # include expert tuning options",
+        "status": "help_or_template"
+      },
+      {
+        "document": "README.md",
+        "block_line": 111,
+        "command": "csubst download --resource vesm-35m",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 111,
+        "command": "csubst download --resource vesm-35m --no_download yes  # local availability check",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 130,
+        "command": "csubst dataset --name PGK",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 130,
+        "command": "csubst doctor    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 130,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 130,
+        "command": "csubst scan    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --scan_unit_mode clade    --scan_other_scope all    --scan_rate_event_mode posterior_sum    --scan_rate_exposure q_weighted    --scan_pvalue_calibration full_scan    --scan_n_permutations 1000    --threads 8",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 130,
+        "command": "csubst sites    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --branch_id 23,51    --outdir csubst_sites    --output_prefix csubst",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 187,
+        "command": "csubst dataset --name PEPC",
+        "status": "parsed"
+      },
+      {
+        "document": "README.md",
+        "block_line": 187,
+        "command": "csubst sites    --alignment_file untrimmed_cds.fa.gz    --rooted_tree_file tree.nwk    --mode lineage    --branch_id ANC,DES    --vep_model vesm-35m    --vep_min_event_pp 0.8    --tree_site_plot_format png",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Analysis-of-higher-order-convergence.md",
+        "block_line": 18,
+        "command": "csubst dataset --name PEPC",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Analysis-of-higher-order-convergence.md",
+        "block_line": 18,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --fg_exclude_wg no    --cutoff_stat 'OCNany2spe,2.0|omegaCany2spe,5.0'    --max_arity 10",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Analysis-of-higher-order-convergence.md",
+        "block_line": 49,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --fg_exclude_wg no    --cutoff_stat 'OCNany2spe,2.0|omegaCany2spe,5.0'    --max_arity 10    --exhaustive_until 1",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Analysis-of-higher-order-convergence.md",
+        "block_line": 69,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --fg_exclude_wg no    --cutoff_stat 'OCNany2spe,2.0|omegaCany2spe,5.0'    --max_arity 10    --exhaustive_until 3",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Ancestral-state-tree-plots.md",
+        "block_line": 64,
+        "command": "csubst dataset --name PGK",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Ancestral-state-tree-plots.md",
+        "block_line": 64,
+        "command": "csubst inspect    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --plot_state_aa all    --plot_state_codon 417",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 38,
+        "command": "csubst download --resource vesm-35m",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst dataset -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst download -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst doctor -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst search -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst inspect -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst sites -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst simulate -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst benchmark -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 49,
+        "command": "csubst benchmark-plot -h",
+        "status": "help_or_template"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 70,
+        "command": "csubst dataset --name PGK",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Installation-and-test-run.md",
+        "block_line": 70,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Interpreting-output-files-of-csubst-site.md",
+        "block_line": 20,
+        "command": "csubst sites    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --branch_id 23,51",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Mapping-convergent-substitutions-on-protein-structures.md",
+        "block_line": 17,
+        "command": "csubst dataset --name PGK",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Mapping-convergent-substitutions-on-protein-structures.md",
+        "block_line": 17,
+        "command": "csubst search    --alignment_file untrimmed_cds.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Mapping-convergent-substitutions-on-protein-structures.md",
+        "block_line": 42,
+        "command": "csubst sites    --alignment_file untrimmed_cds.fa.gz    --rooted_tree_file tree.nwk    --branch_id 23,51    --pdb besthit",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Mapping-convergent-substitutions-on-protein-structures.md",
+        "block_line": 110,
+        "command": "csubst download --resource vesm-35m",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Mapping-convergent-substitutions-on-protein-structures.md",
+        "block_line": 110,
+        "command": "csubst sites    --alignment_file untrimmed_cds.fa.gz    --rooted_tree_file tree.nwk    --branch_id 23,51    --vep_model vesm-35m    --pdb besthit",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Mapping-convergent-substitutions-on-protein-structures.md",
+        "block_line": 132,
+        "command": "csubst sites    --alignment_file untrimmed_cds.fa.gz    --rooted_tree_file tree.nwk    --branch_id 23,51    --untrimmed_cds untrimmed_cds.fa.gz    --export2chimera yes",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Parallel-processing-and-performance-tuning.md",
+        "block_line": 34,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --threads 1    --blas_threads 1    --output_stat any2any,any2dif,any2spe    --branch_dist no    --calibrate_longtail no",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Simulating-molecular-convergence.md",
+        "block_line": 28,
+        "command": "csubst dataset --name PGK",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Simulating-molecular-convergence.md",
+        "block_line": 28,
+        "command": "csubst simulate    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --num_simulated_site 500    --percent_convergent_site 20    --percent_biased_sub 90    --background_omega 0.2    --foreground_omega 5    --foreground_scaling_factor 2    --convergent_amino_acids random1    --simulate_eq_freq auto    --simulate_asrv no    --export_true_asr yes    --outdir sim_run    --output_prefix simulate    --true_asr_prefix simulate_true_asr",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Simulating-molecular-convergence.md",
+        "block_line": 28,
+        "command": "csubst search    --alignment_file sim_run/simulate.fa    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/Simulating-molecular-convergence.md",
+        "block_line": 28,
+        "command": "csubst search    --alignment_file sim_run/simulate.fa    --rooted_tree_file tree.nwk    --foreground foreground.txt    --iqtree_state sim_run/simulate_true_asr.state    --iqtree_treefile sim_run/simulate_true_asr.treefile    --iqtree_rate sim_run/simulate_true_asr.rate    --iqtree_iqtree sim_run/simulate_true_asr.iqtree    --iqtree_log sim_run/simulate_true_asr.log",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-benchmark-plot.md",
+        "block_line": 10,
+        "command": "csubst benchmark-plot    --benchmark_dir .    --benchmark_plot_format pdf",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-benchmark.md",
+        "block_line": 10,
+        "command": "csubst benchmark    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --benchmark_expectation_methods codon_model,urn    --benchmark_asrv_modes each,file    --benchmark_pseudocount_modes none,empirical",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-dataset.md",
+        "block_line": 10,
+        "command": "csubst dataset --name PGK",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-dataset.md",
+        "block_line": 39,
+        "command": "csubst doctor    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-dataset.md",
+        "block_line": 48,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-doctor.md",
+        "block_line": 10,
+        "command": "csubst doctor    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-download.md",
+        "block_line": 17,
+        "command": "csubst download",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-download.md",
+        "block_line": 17,
+        "command": "csubst download --resource prostt5",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-download.md",
+        "block_line": 17,
+        "command": "csubst download --resource all",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-download.md",
+        "block_line": 31,
+        "command": "csubst download --resource vesm-35m --no_download yes",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-download.md",
+        "block_line": 38,
+        "command": "csubst download --resource vesm-35m --verify yes",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-download.md",
+        "block_line": 50,
+        "command": "csubst download --resource vesm-35m",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-inspect.md",
+        "block_line": 11,
+        "command": "csubst inspect    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-inspect.md",
+        "block_line": 39,
+        "command": "csubst inspect --help-advanced",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-scan.md",
+        "block_line": 15,
+        "command": "csubst scan    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-scan.md",
+        "block_line": 122,
+        "command": "csubst scan --help-advanced",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-scan.md",
+        "block_line": 197,
+        "command": "csubst scan    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --scan_unit_mode clade    --scan_match any2spe    --scan_min_support 0.8    --scan_rate_event_mode posterior_sum    --scan_rate_exposure q_weighted    --scan_rate_length n_rescaled    --scan_other_scope all    --scan_pvalue_calibration full_scan    --scan_n_permutations 1000    --threads 8",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-search.md",
+        "block_line": 13,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-search.md",
+        "block_line": 50,
+        "command": "csubst search --help-advanced",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-simulate.md",
+        "block_line": 10,
+        "command": "csubst simulate    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt    --num_simulated_site 500    --percent_convergent_site 20    --convergent_amino_acids random1",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-simulate.md",
+        "block_line": 44,
+        "command": "csubst simulate --help-advanced",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-site-modes.md",
+        "block_line": 18,
+        "command": "csubst dataset --name PGK",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-site-modes.md",
+        "block_line": 18,
+        "command": "csubst search    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --foreground foreground.txt",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-site-modes.md",
+        "block_line": 77,
+        "command": "csubst sites    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --branch_id 23,51",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-site-modes.md",
+        "block_line": 90,
+        "command": "csubst sites    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --mode lineage    --branch_id 63,2",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-site-modes.md",
+        "block_line": 102,
+        "command": "csubst sites    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --mode 'set,any,23-51'",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-sites.md",
+        "block_line": 13,
+        "command": "csubst sites    --alignment_file alignment.fa.gz    --rooted_tree_file tree.nwk    --branch_id 23,51",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-sites.md",
+        "block_line": 43,
+        "command": "csubst download --resource vesm-35m",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-sites.md",
+        "block_line": 43,
+        "command": "csubst sites    --alignment_file untrimmed_cds.fa.gz    --rooted_tree_file tree.nwk    --branch_id 23,51    --vep_model vesm-35m",
+        "status": "parsed"
+      },
+      {
+        "document": "wiki/csubst-sites.md",
+        "block_line": 62,
+        "command": "csubst sites --help-advanced",
+        "status": "parsed"
+      }
+    ],
+    "scope": "Argument parsing only; help/templates excluded from parsed count. No arbitrary documentation command executed."
+  },
+  "local_links": {
+    "count": 113,
+    "missing": [],
+    "scope": "Relative file/image paths and explicit GitHub Wiki page links. Does not check all remote URLs or heading anchors."
+  },
+  "cli_execution": [
+    {
+      "example": "dataset",
+      "args": [
+        "dataset",
+        "--name",
+        "PGK"
+      ],
+      "exit_code": 0
+    },
+    {
+      "example": "sites",
+      "args": [
+        "sites",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--branch_id",
+        "23,51"
+      ],
+      "exit_code": 0
+    },
+    {
+      "example": "search_tables",
+      "args": [
+        "search",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--foreground",
+        "foreground.txt",
+        "--exhaustive_until",
+        "1",
+        "--s",
+        "yes",
+        "--bs",
+        "yes",
+        "--cs",
+        "yes",
+        "--cbs",
+        "yes"
+      ],
+      "exit_code": 0
+    },
+    {
+      "example": "inspect_no",
+      "args": [
+        "inspect",
+        "--alignment_file",
+        "alignment.fa.gz",
+        "--rooted_tree_file",
+        "tree.nwk",
+        "--plot_state_aa",
+        "no",
+        "--plot_state_codon",
+        "no"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "actual_sites_files": [
+    "csubst_sites/csubst.branch_id23,51/csubst.outputs.tsv",
+    "csubst_sites/csubst.branch_id23,51/csubst.pdf",
+    "csubst_sites/csubst.branch_id23,51/csubst.state.pdf",
+    "csubst_sites/csubst.branch_id23,51/csubst.state_N.tsv",
+    "csubst_sites/csubst.branch_id23,51/csubst.state_S.tsv",
+    "csubst_sites/csubst.branch_id23,51/csubst.tree_site.pdf",
+    "csubst_sites/csubst.branch_id23,51/csubst.tree_site.tsv",
+    "csubst_sites/csubst.branch_id23,51/csubst.tsv",
+    "csubst_sites/csubst.log"
+  ],
+  "actual_inspect_files": [
+    "csubst_inspect/csubst.log",
+    "csubst_inspect/csubst_alignment_aa.fa",
+    "csubst_inspect/csubst_alignment_codon.fa",
+    "csubst_inspect/csubst_branch_id.pdf",
+    "csubst_inspect/csubst_branch_id_leaf.pdf",
+    "csubst_inspect/csubst_branch_id_nolabel.pdf",
+    "csubst_inspect/csubst_branch_map.tsv",
+    "csubst_inspect/csubst_combination_count.tsv",
+    "csubst_inspect/csubst_outputs.tsv",
+    "csubst_inspect/csubst_site_index_map.tsv",
+    "csubst_inspect/csubst_tree.nwk"
+  ],
+  "search_table_schema": {
+    "s": {
+      "rows": 417,
+      "columns": [
+        "site",
+        "S_sub",
+        "N_sub",
+        "is_site_retained"
+      ],
+      "first_record": [
+        {
+          "site": 0,
+          "S_sub": 0.0001,
+          "N_sub": 1.0018,
+          "is_site_retained": "Y"
+        }
+      ]
+    },
+    "bs": {
+      "rows": 27105,
+      "columns": [
+        "branch_id",
+        "site",
+        "S_sub",
+        "N_sub",
+        "is_site_retained"
+      ],
+      "first_record": [
+        {
+          "branch_id": 0,
+          "site": 0,
+          "S_sub": 0.0,
+          "N_sub": 0.0,
+          "is_site_retained": "Y"
+        }
+      ]
+    },
+    "cs": {
+      "rows": 417,
+      "columns": [
+        "site",
+        "OCSany2any",
+        "OCSspe2any",
+        "OCSany2spe",
+        "OCSspe2spe",
+        "OCNany2any",
+        "OCNspe2any",
+        "OCNany2spe",
+        "OCNspe2spe",
+        "is_site_retained"
+      ],
+      "first_record": [
+        {
+          "site": 0,
+          "OCSany2any": 0.0,
+          "OCSspe2any": 0.0,
+          "OCSany2spe": 0.0,
+          "OCSspe2spe": 0.0,
+          "OCNany2any": 0.0,
+          "OCNspe2any": 0.0,
+          "OCNany2spe": 0.0,
+          "OCNspe2spe": 0.0,
+          "is_site_retained": "Y"
+        }
+      ]
+    },
+    "cbs": {
+      "rows": 676374,
+      "columns": [
+        "branch_id_1",
+        "branch_id_2",
+        "site",
+        "OCSany2any",
+        "OCSspe2any",
+        "OCSany2spe",
+        "OCSspe2spe",
+        "OCNany2any",
+        "OCNspe2any",
+        "OCNany2spe",
+        "OCNspe2spe",
+        "is_site_retained"
+      ],
+      "first_record": [
+        {
+          "branch_id_1": 0,
+          "branch_id_2": 1,
+          "site": 0,
+          "OCSany2any": 0.0,
+          "OCSspe2any": 0.0,
+          "OCSany2spe": 0.0,
+          "OCSspe2spe": 0.0,
+          "OCNany2any": 0.0,
+          "OCNspe2any": 0.0,
+          "OCNany2spe": 0.0,
+          "OCNspe2spe": 0.0,
+          "is_site_retained": "Y"
+        }
+      ]
+    }
+  },
+  "download_contract_probe": {
+    "scope": "Recording fakes replace the model/resource loaders; no optional model weights were downloaded. Static inspection additionally covers the cache-miss loader path.",
+    "observations": [
+      {
+        "requested_verify": false,
+        "vesm_ensure_arguments": {
+          "cache_dir": "",
+          "no_download": false,
+          "verify_existing": true,
+          "poll_seconds": 5.0,
+          "timeout_seconds": 3600.0
+        }
+      },
+      {
+        "requested_verify": true,
+        "vesm_ensure_arguments": {
+          "cache_dir": "",
+          "no_download": false,
+          "verify_existing": true,
+          "poll_seconds": 5.0,
+          "timeout_seconds": 3600.0
+        }
+      },
+      {
+        "requested_verify": false,
+        "prostt5_from_pretrained_calls": [
+          {
+            "kind": "tokenizer",
+            "source": "Rostlab/ProstT5",
+            "kwargs": {
+              "do_lower_case": false,
+              "local_files_only": true,
+              "revision": "d7d097d5bf9a993ab8f68488b4681d6ca70db9e5"
+            }
+          },
+          {
+            "kind": "model",
+            "source": "Rostlab/ProstT5",
+            "kwargs": {
+              "local_files_only": true,
+              "revision": "d7d097d5bf9a993ab8f68488b4681d6ca70db9e5"
+            }
+          }
+        ]
+      },
+      {
+        "requested_verify": true,
+        "prostt5_from_pretrained_calls": [
+          {
+            "kind": "tokenizer",
+            "source": "Rostlab/ProstT5",
+            "kwargs": {
+              "do_lower_case": false,
+              "local_files_only": true,
+              "revision": "d7d097d5bf9a993ab8f68488b4681d6ca70db9e5"
+            }
+          },
+          {
+            "kind": "model",
+            "source": "Rostlab/ProstT5",
+            "kwargs": {
+              "local_files_only": true,
+              "revision": "d7d097d5bf9a993ab8f68488b4681d6ca70db9e5"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "pypi": {
+    "url": "https://pypi.org/pypi/csubst/json",
+    "status": 404,
+    "reason": "Not Found"
+  },
+  "bioconda": {
+    "url": "https://api.anaconda.org/package/bioconda/csubst",
+    "status": 200,
+    "latest_version": "1.14.4",
+    "platforms": [
+      "linux-64",
+      "osx-64",
+      "osx-arm64"
+    ],
+    "python_constraints": [
+      "python >=3.10,<3.11.0a0",
+      "python >=3.11,<3.12.0a0",
+      "python >=3.12,<3.13.0a0",
+      "python >=3.13,<3.14.0a0"
+    ]
+  },
+  "broken_install_references": [
+    {
+      "document": "wiki/Dependency.md",
+      "line": 19,
+      "text": "- Structure mapping: `pip install 'csubst[structure]'` installs the supported"
+    },
+    {
+      "document": "wiki/Dependency.md",
+      "line": 21,
+      "text": "- VESM-35M scoring: `pip install 'csubst[vep]'` installs"
+    },
+    {
+      "document": "wiki/Installation-and-test-run.md",
+      "line": 20,
+      "text": "pip install csubst"
+    },
+    {
+      "document": "wiki/Installation-and-test-run.md",
+      "line": 39,
+      "text": "pip install 'csubst[structure]'"
+    },
+    {
+      "document": "wiki/Installation-and-test-run.md",
+      "line": 42,
+      "text": "pip install 'csubst[vep]'"
+    },
+    {
+      "document": "wiki/Mapping-convergent-substitutions-on-protein-structures.md",
+      "line": 110,
+      "text": "pip install 'csubst[vep]'"
+    },
+    {
+      "document": "wiki/csubst-download.md",
+      "line": 50,
+      "text": "pip install 'csubst[vep]'"
+    },
+    {
+      "document": "wiki/csubst-sites.md",
+      "line": 43,
+      "text": "pip install 'csubst[vep]'"
+    }
+  ],
+  "external_sources": [
+    "https://huggingface.co/docs/huggingface_hub/guides/manage-cache",
+    "https://github.com/bioconda/bioconda-recipes/blob/master/recipes/csubst/meta.yaml",
+    "https://pubmed.ncbi.nlm.nih.gov/7388949/"
+  ],
+  "sites_coordinate_example": {
+    "column": "codon_site_alignment",
+    "first_values": [
+      1,
+      2
+    ]
+  }
+}

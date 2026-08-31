@@ -106,6 +106,16 @@ def test_sites_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects()
     assert "Matplotlib" not in log_text
 
 
+@pytest.mark.parametrize('resource', ['prostt5', 'all'])
+def test_download_rejects_unsupported_checksum_request_cleanly(resource):
+    proc, log_text = _run_cli_subprocess(
+        'download', '--resource', resource, '--verify', 'yes', '--no_download', 'yes'
+    )
+    assert proc.returncode == 2
+    assert '--verify yes is not supported for ProstT5' in log_text
+    assert 'Traceback' not in log_text
+
+
 def test_simulate_invalid_percent_biased_sub_fails_cleanly():
     proc, log_text = _run_cli("simulate", "--percent_biased_sub", "-1")
     assert proc.returncode == 2

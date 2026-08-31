@@ -14,6 +14,20 @@ def _normalize_resources(value: object) -> list[str]:
 
 def main_download(g: AnalysisConfig) -> None:
     resources = _normalize_resources(g.get("resource", "vesm-35m"))
+    legacy_verify = g.get("verify")
+    if legacy_verify and "prostt5" in resources:
+        raise ValueError(
+            "--verify yes is not supported for ProstT5: CSUBST does not perform "
+            "SHA-256 verification of that resource. Use --no_download yes to "
+            "check local loading only, without requesting a checksum check."
+        )
+    if legacy_verify is not None:
+        print(
+            "Warning: --verify is deprecated. VESM-35M files are always "
+            "SHA-256 verified, including with --verify no. Use --no_download yes "
+            "to check existing resources without downloading.",
+            flush=True,
+        )
     poll_seconds = float(g.get("resource_lock_poll", 5.0))
     timeout_seconds = float(g.get("resource_lock_timeout", 3600.0))
     if poll_seconds <= 0:
