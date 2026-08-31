@@ -124,7 +124,8 @@ def test_main_benchmark_writes_summary_for_pass_and_fail_runs(tmp_path, monkeypa
 
     monkeypatch.setattr(main_benchmark.main_analyze, "main_analyze", _fake_main_analyze)
 
-    main_benchmark.main_benchmark(g)
+    with pytest.raises(ValueError, match="Benchmark failed.*synthetic failure"):
+        main_benchmark.main_benchmark(g)
 
     summary_tsv = tmp_path / "benchmark" / "csubst_benchmark_summary.tsv"
     summary_json = tmp_path / "benchmark" / "csubst_benchmark_summary.json"
@@ -358,7 +359,8 @@ def test_main_benchmark_writes_logs_for_preparation_failures(tmp_path):
         output_manifest=True,
     )
 
-    main_benchmark.main_benchmark(g)
+    with pytest.raises(ValueError, match="Benchmark failed"):
+        main_benchmark.main_benchmark(g)
 
     summary = pd.read_csv(tmp_path / "benchmark" / "csubst_benchmark_summary.tsv", sep="\t")
     manifest = pd.read_csv(tmp_path / "benchmark" / "csubst_outputs.tsv", sep="\t")
@@ -394,7 +396,8 @@ def test_main_benchmark_preparation_failure_ignores_stale_cb_files(tmp_path):
         }
     ).to_csv(stale_cb, sep="\t", index=False)
 
-    main_benchmark.main_benchmark(g)
+    with pytest.raises(ValueError, match="Benchmark failed"):
+        main_benchmark.main_benchmark(g)
 
     summary = pd.read_csv(tmp_path / "benchmark" / "csubst_benchmark_summary.tsv", sep="\t")
     manifest = pd.read_csv(tmp_path / "benchmark" / "csubst_outputs.tsv", sep="\t")
@@ -405,3 +408,37 @@ def test_main_benchmark_preparation_failure_ignores_stale_cb_files(tmp_path):
     assert pd.isna(failed["score_max"])
     assert stale_cb.exists() is False
     assert (manifest["output_kind"] == "benchmark_cb_tsv").sum() == 0
+
+
+@pytest.mark.parametrize('keep_going, expected_runs', [(True, 2), (False, 1)])
+def test_benchmark_failure_controls_continuation_not_final_status(tmp_path, monkeypatch, keep_going, expected_runs):
+    g = _base_benchmark_config(tmp_path, benchmark_expectation_methods='codon_model,urn',
+                               benchmark_keep_going=keep_going)
+    called = []
+
+    def analyze(local_g):
+        called.append(local_g['expectation_method'])
+        if local_g['expectation_method'] == 'codon_model':
+            raise ValueError('first configuration fails')
+        pd.DataFrame({'OCNany2spe': [3.0], 'omegaCany2spe': [7.0]}).to_csv(
+            runtime.output_path(local_g, 'cb_2.tsv'), sep='\t', index=False)
+
+    monkeypatch.setattr(main_benchmark.main_analyze, 'main_analyze', analyze)
+    with pytest.raises(ValueError, match='Benchmark failed'):
+        main_benchmark.main_benchmark(g)
+    assert len(called) == expected_runs
+    payload = json.loads((tmp_path / 'benchmark/csubst_benchmark_summary.json').read_text())
+    assert payload['counts'] == {'pass': expected_runs - 1, 'fail': 1}
+
+
+def test_all_successful_benchmarks_return_normally(tmp_path, monkeypatch):
+    g = _base_benchmark_config(tmp_path)
+
+    def analyze(local_g):
+        pd.DataFrame({'OCNany2spe': [3.0], 'omegaCany2spe': [7.0]}).to_csv(
+            runtime.output_path(local_g, 'cb_2.tsv'), sep='\t', index=False)
+
+    monkeypatch.setattr(main_benchmark.main_analyze, 'main_analyze', analyze)
+    main_benchmark.main_benchmark(g)
+    payload = json.loads((tmp_path / 'benchmark/csubst_benchmark_summary.json').read_text())
+    assert payload['counts'] == {'pass': 1, 'fail': 0}

@@ -345,9 +345,9 @@ cpdef normalize_branch_site_weights_double(
     cdef Py_ssize_t num_branch = is_site_nonmissing.shape[0]
     cdef Py_ssize_t num_site = is_site_nonmissing.shape[1]
     cdef numpy.ndarray[numpy.float64_t, ndim=2] out = numpy.zeros((num_branch, num_site), dtype=numpy.float64)
-    cdef double[:] weight_mv = nonadjusted_sub_sites
-    cdef unsigned char[:, :] nonmissing_mv = is_site_nonmissing
-    cdef numpy.int64_t[:] branch_id_mv = branch_ids
+    cdef const double[:] weight_mv = nonadjusted_sub_sites
+    cdef const unsigned char[:, :] nonmissing_mv = is_site_nonmissing
+    cdef const numpy.int64_t[:] branch_id_mv = branch_ids
     cdef double[:, :] out_mv = out
     cdef Py_ssize_t i, nl, s
     cdef double sum_weight

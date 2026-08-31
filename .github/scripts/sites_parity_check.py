@@ -3,18 +3,16 @@
 import argparse
 import itertools
 import math
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pandas
+from _installed_package import configure_package_imports, package_subprocess_env
 
-# Ensure `csubst` is importable when this script is run directly in CI.
 REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+configure_package_imports(REPO_ROOT, installed='--installed' in sys.argv)
 
 from csubst import ete  # noqa: E402 - repository path is inserted above
 from csubst import tree  # noqa: E402 - repository path is inserted above
@@ -64,6 +62,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Run PGK/PEPC parity checks and capture runtime + peak RAM."
     )
+    parser.add_argument('--installed', action='store_true', help='Validate the installed wheel and its bundled datasets.')
+    parser.add_argument('--numerical-only', action='store_true', help='Do not apply Linux performance limits (e.g. for macOS wheels).')
     parser.add_argument(
         "--output",
         default="parity_metrics.tsv",
@@ -209,22 +209,20 @@ def write_pepc_foreground_file(repo_root, run_dir):
     return fg_path
 
 
-def run_dataset(repo_root, run_root, dataset_name):
+def run_dataset(repo_root, run_root, dataset_name, installed=False):
     run_dir = Path(run_root) / dataset_name
     run_dir.mkdir(parents=True, exist_ok=True)
     python_exe = sys.executable
-    dataset_dir = repo_root / "csubst" / "dataset"
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(repo_root) + (
-        os.pathsep + env["PYTHONPATH"] if "PYTHONPATH" in env else ""
-    )
-    ensure_precomputed_iqtree_outputs(repo_root=repo_root, dataset_name=dataset_name)
+    data_root = configure_package_imports(repo_root, installed=installed)
+    dataset_dir = data_root / "csubst" / "dataset"
+    env = package_subprocess_env(repo_root, installed=installed)
+    ensure_precomputed_iqtree_outputs(repo_root=data_root, dataset_name=dataset_name)
     iqtree_model = read_iqtree_model(dataset_dir / f"{dataset_name}.alignment.fa.iqtree")
 
     if dataset_name == "PGK":
         foreground = dataset_dir / "PGK.foreground.txt"
     elif dataset_name == "PEPC":
-        foreground = write_pepc_foreground_file(repo_root=repo_root, run_dir=run_dir)
+        foreground = write_pepc_foreground_file(repo_root=data_root, run_dir=run_dir)
     else:
         raise ValueError("Unsupported dataset: {}".format(dataset_name))
 
@@ -364,9 +362,9 @@ def run_dataset(repo_root, run_root, dataset_name):
     }
 
 
-def validate_metrics(rows, baseline_path):
+def validate_metrics(rows, baseline_path, numerical_only=False):
     errors = []
-    baseline = pandas.read_csv(baseline_path, sep="\t").set_index("dataset")
+    baseline = None if numerical_only else pandas.read_csv(baseline_path, sep="\t").set_index("dataset")
     for row in rows:
         dataset = row["dataset"]
         expected = EXPECTED[dataset]
@@ -385,6 +383,8 @@ def validate_metrics(rows, baseline_path):
                     dataset, expected["omegaCany2spe"], row["omegaCany2spe"]
                 )
             )
+        if numerical_only:
+            continue
         limits = PERFORMANCE_LIMITS[dataset]
         for key in ["analyze_elapsed_sec", "site_elapsed_sec"]:
             value = float(row[key])
@@ -439,10 +439,11 @@ def main():
                 repo_root=repo_root,
                 run_root=run_root,
                 dataset_name=dataset_name,
+                installed=args.installed,
             )
         )
 
-    validate_metrics(rows, baseline_path=Path(args.baseline).resolve())
+    validate_metrics(rows, baseline_path=Path(args.baseline).resolve(), numerical_only=args.numerical_only)
 
     out_df = pandas.DataFrame(rows)
     out_df = out_df.sort_values(by=["dataset"]).reset_index(drop=True)

@@ -1,4 +1,6 @@
 
+import gzip
+
 import numpy as np
 import pytest
 
@@ -66,11 +68,24 @@ def test_fill_leaf_state_matrix_codon_cython_matches_python_fallback(monkeypatch
     np.testing.assert_allclose(observed, expected, atol=1e-12)
 
 
-def test_get_state_tensor_reads_leaf_sequences_via_ete_compat(tmp_path):
+@pytest.mark.parametrize("compressed", [False, True], ids=["plain", "gzip"])
+@pytest.mark.parametrize("alignment_text", [
+    ">A\nAAAAAC\n>B\nAAGAAG\n",
+    ">A\tdescription\r\nAAA \tA\r\nAC\r\n>B extra\r\nAAG\t AAG\r\n",
+], ids=["unwrapped", "whitespace"])
+def test_get_state_tensor_reads_leaf_sequences_via_ete_compat(tmp_path, compressed, alignment_text):
     g = _make_state_tensor_g(
         tmp_path=tmp_path,
-        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
+        alignment_text=alignment_text,
     )
+    if compressed:
+        alignment_file = tmp_path / "toy.fa.gz"
+        alignment_file.write_bytes(gzip.compress(alignment_text.encode("utf-8")))
+        g["alignment_file"] = str(alignment_file)
+    g["num_input_site"] = parser_iqtree._infer_num_input_site_from_alignment_file(
+        g["alignment_file"],
+    )
+    assert g["num_input_site"] == 2
     out = parser_iqtree.get_state_tensor(g)
 
     labels = {n.name: ete.get_prop(n, "numerical_label") for n in g["tree"].traverse()}

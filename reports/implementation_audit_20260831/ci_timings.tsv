@@ -1,0 +1,47 @@
+run_id	job	scope	step	elapsed_seconds
+31554813225	Full test suite (Python 3.12)	job		148
+31554813225	Full test suite (Python 3.12)	step	Install dependencies	93
+31554813225	Full test suite (Python 3.12)	step	Verify compiled extensions	1
+31554813225	Full test suite (Python 3.12)	step	Run parallel-safe full test suite	32
+31554813225	Full test suite (Python 3.12)	step	Run nested-process tests serially	12
+31554813225	cython-sanitizers	job		162
+31554813225	cython-sanitizers	step	Install dependencies without sanitizer flags	74
+31554813225	cython-sanitizers	step	Build extensions with address and undefined-behavior sanitizers	78
+31554813225	cython-sanitizers	step	Run randomized sparse parity tests under sanitizers	4
+31554813225	fresh-macos-intel	job		183
+31554813225	fresh-macos-intel	step	Install from a clean environment	166
+31554813225	parity	job		145
+31554813225	parity	step	Install dependencies	95
+31554813225	parity	step	Verify compiled extensions	0
+31554813225	parity	step	Run parity and performance checks (PGK/PEPC)	22
+31554813225	parity	step	Run omega p-value calibration regression (PGK)	15
+31554813225	parity	step	Upload parity metrics artifact	1
+31554813225	parity	step	Upload omega p-value calibration artifact	2
+31554813225	Pure-Python fallback (Python 3.12)	job		58
+31554813225	Pure-Python fallback (Python 3.12)	step	Install without compiled extensions	26
+31554813225	Pure-Python fallback (Python 3.12)	step	Verify and test fallback mode	20
+31554813225	lint	job		18
+31554813225	lint	step	Run Ruff	7
+31554813225	Fast tests (Python 3.11)	job		114
+31554813225	Fast tests (Python 3.11)	step	Install dependencies	86
+31554813225	Fast tests (Python 3.11)	step	Verify compiled extensions	1
+31554813225	Fast tests (Python 3.11)	step	Run fast tests	17
+31554813225	packaging	job		131
+31554813225	packaging	step	Install packaging tools	1
+31554813225	packaging	step	Build source distribution	15
+31554813225	packaging	step	Rebuild wheel from source distribution	57
+31554813225	packaging	step	Verify package contents and dependency metadata	1
+31554813225	packaging	step	Install and smoke-test the wheel	20
+31554813225	packaging	step	Run tests from the source distribution	28
+31554813225	Fast tests (Python 3.13)	job		167
+31554813225	Fast tests (Python 3.13)	step	Install dependencies	142
+31554813225	Fast tests (Python 3.13)	step	Verify compiled extensions	1
+31554813225	Fast tests (Python 3.13)	step	Run fast tests	15
+31554813225	Fast tests (Python 3.10)	job		111
+31554813225	Fast tests (Python 3.10)	step	Install dependencies	82
+31554813225	Fast tests (Python 3.10)	step	Verify compiled extensions	1
+31554813225	Fast tests (Python 3.10)	step	Run fast tests	17
+31554813225	Fast tests (Python 3.14)	job		125
+31554813225	Fast tests (Python 3.14)	step	Install dependencies	96
+31554813225	Fast tests (Python 3.14)	step	Verify compiled extensions	0
+31554813225	Fast tests (Python 3.14)	step	Run fast tests	18

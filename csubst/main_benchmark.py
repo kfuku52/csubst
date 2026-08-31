@@ -632,7 +632,7 @@ def main_benchmark(g):
     num_pass = int((summary["status"] == "pass").sum()) if summary.shape[0] > 0 else 0
     num_fail = int((summary["status"] != "pass").sum()) if summary.shape[0] > 0 else 0
     print("Benchmark summary: pass={}, fail={}".format(num_pass, num_fail), flush=True)
-    if (num_fail > 0) and (not _as_bool(g.get("benchmark_keep_going", True))):
+    if num_fail > 0:
         failing = summary.loc[summary["status"] != "pass", :]
         if failing.shape[0] > 0:
             first = failing.iloc[0]

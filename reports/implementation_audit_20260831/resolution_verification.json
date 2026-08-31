@@ -1,0 +1,456 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-31",
+  "version": "1.14.9",
+  "baseline_commit": "8e80176135cb57ac80dbc40241f1f8bc15d59433",
+  "platform": {
+    "system": "Darwin",
+    "macos": "26.5.2",
+    "architecture": "arm64"
+  },
+  "artifact_verification": {
+    "version": "1.14.9",
+    "matching_package_python_files": 66,
+    "matching_sdist_test_python_files": 104,
+    "artifacts": [
+      {
+        "filename": "csubst-1.14.9.tar.gz",
+        "sha256": "70b734fd68987f69f4222987d894bf8d7e18c49fc9b9618883f0f13bd288c57e"
+      },
+      {
+        "filename": "csubst-1.14.9-cp312-cp312-macosx_11_0_arm64.whl",
+        "sha256": "949b9211218fb216944e5825caaf73cf673a1b85391a2dbe56e0578811eab8ef"
+      }
+    ]
+  },
+  "artifact_guard": {
+    "source_import_rejected": true,
+    "missing_native_extension_rejected": true,
+    "native_modules_restored_and_verified": 6
+  },
+  "pytest": [
+    {
+      "check": "source_python314_parallel",
+      "result": [
+        "1385 passed in 23.41s"
+      ]
+    },
+    {
+      "check": "source_python314_process",
+      "result": [
+        "4 passed, 1385 deselected in 4.52s"
+      ]
+    },
+    {
+      "check": "source_python314_native",
+      "result": [
+        "7 passed, 1382 deselected in 1.46s"
+      ]
+    },
+    {
+      "check": "wheel_python312_parallel",
+      "result": [
+        "1385 passed in 15.88s"
+      ]
+    },
+    {
+      "check": "wheel_python312_process",
+      "result": [
+        "4 passed, 1385 deselected in 9.44s"
+      ]
+    },
+    {
+      "check": "wheel_python312_native",
+      "result": [
+        "7 passed, 1382 deselected in 2.42s"
+      ]
+    },
+    {
+      "check": "sdist_pure_python312",
+      "result": [
+        "1353 passed, 32 skipped in 15.31s",
+        "4 passed, 1385 deselected in 4.07s"
+      ]
+    }
+  ],
+  "wheel_coverage": {
+    "covered_lines": 20013,
+    "num_statements": 26185,
+    "percent_covered": 72.64780801716047,
+    "percent_covered_display": "73",
+    "missing_lines": 6172,
+    "excluded_lines": 16,
+    "percent_statements_covered": 76.42925338934505,
+    "percent_statements_covered_display": "76",
+    "num_branches": 11110,
+    "num_partial_branches": 2475,
+    "covered_branches": 7081,
+    "missing_branches": 4029,
+    "percent_branches_covered": 63.73537353735374,
+    "percent_branches_covered_display": "64"
+  },
+  "static_checks": {
+    "ruff": "passed",
+    "repository_hygiene": "passed",
+    "mypy_modules": 13,
+    "mypy_without_scientific_site_packages": "passed",
+    "actionlint": "passed",
+    "git_diff_check": "passed",
+    "clean_environment_pip_check": [
+      "dev",
+      "wheel",
+      "pure_python"
+    ]
+  },
+  "performance": {
+    "versions": {
+      "before": {
+        "python": "3.12.13 (main, Aug  7 2026, 02:15:23) [Clang 22.1.3 ]",
+        "csubst": "1.14.8",
+        "numpy": "2.5.2",
+        "scipy": "1.18.1",
+        "pandas": "3.0.5",
+        "matplotlib": "3.10.9",
+        "ete4": "4.4.0"
+      },
+      "after": {
+        "python": "3.12.13 (main, Aug  7 2026, 02:15:23) [Clang 22.1.3 ]",
+        "csubst": "1.14.9",
+        "numpy": "2.5.2",
+        "scipy": "1.18.1",
+        "pandas": "3.0.5",
+        "matplotlib": "3.10.9",
+        "ete4": "4.4.0"
+      }
+    },
+    "conditions": {
+      "non_editable_wheels": true,
+      "threads": 1,
+      "VECLIB_MAXIMUM_THREADS": "1 for both before and after",
+      "warmup_runs_per_version": 1,
+      "timed_runs_per_version": 3,
+      "order": "alternating before/after within each repetition",
+      "matplotlib_cache": "shared and prewarmed",
+      "input": "bundled PGK and PEPC with precomputed IQ-TREE outputs",
+      "strict_native": true,
+      "other_work_on_shared_host": true
+    },
+    "summary": [
+      {
+        "dataset": "PGK",
+        "phase": "before",
+        "samples": 3,
+        "analyze_elapsed_sec": {
+          "median": 2.51,
+          "min": 1.71,
+          "max": 2.67
+        },
+        "site_elapsed_sec": {
+          "median": 4.41,
+          "min": 4.26,
+          "max": 4.47
+        },
+        "analyze_max_rss_kb": {
+          "median": 196784.0,
+          "min": 192144.0,
+          "max": 197616.0
+        },
+        "site_max_rss_kb": {
+          "median": 273712.0,
+          "min": 272496.0,
+          "max": 275120.0
+        }
+      },
+      {
+        "dataset": "PGK",
+        "phase": "after",
+        "samples": 3,
+        "analyze_elapsed_sec": {
+          "median": 2.0,
+          "min": 1.92,
+          "max": 2.6
+        },
+        "site_elapsed_sec": {
+          "median": 4.01,
+          "min": 3.68,
+          "max": 4.92
+        },
+        "analyze_max_rss_kb": {
+          "median": 193824.0,
+          "min": 192992.0,
+          "max": 196688.0
+        },
+        "site_max_rss_kb": {
+          "median": 286080.0,
+          "min": 257968.0,
+          "max": 297856.0
+        }
+      },
+      {
+        "dataset": "PEPC",
+        "phase": "before",
+        "samples": 3,
+        "analyze_elapsed_sec": {
+          "median": 4.03,
+          "min": 3.52,
+          "max": 4.42
+        },
+        "site_elapsed_sec": {
+          "median": 6.18,
+          "min": 5.31,
+          "max": 6.47
+        },
+        "analyze_max_rss_kb": {
+          "median": 419728.0,
+          "min": 383488.0,
+          "max": 433632.0
+        },
+        "site_max_rss_kb": {
+          "median": 485296.0,
+          "min": 406944.0,
+          "max": 498432.0
+        }
+      },
+      {
+        "dataset": "PEPC",
+        "phase": "after",
+        "samples": 3,
+        "analyze_elapsed_sec": {
+          "median": 4.19,
+          "min": 2.87,
+          "max": 4.92
+        },
+        "site_elapsed_sec": {
+          "median": 6.34,
+          "min": 6.14,
+          "max": 8.76
+        },
+        "analyze_max_rss_kb": {
+          "median": 356224.0,
+          "min": 342624.0,
+          "max": 455920.0
+        },
+        "site_max_rss_kb": {
+          "median": 506224.0,
+          "min": 422016.0,
+          "max": 522112.0
+        }
+      }
+    ],
+    "raw_metrics": "performance_comparison.tsv",
+    "interpretation": "Mixed timing and peak-RSS changes; this is not evidence of a universal speedup. Linux CI thresholds remain unchanged."
+  },
+  "thread_probe": [
+    {
+      "phase": "before",
+      "max_process_threads": 3,
+      "configured_limit": null,
+      "blas": "accelerate",
+      "counting": "ps -M data rows, excluding the header"
+    },
+    {
+      "phase": "after",
+      "max_process_threads": 1,
+      "configured_limit": "1",
+      "blas": "accelerate",
+      "counting": "ps -M data rows, excluding the header"
+    }
+  ],
+  "sn_regression": {
+    "baseline_strict_exit_code": 2,
+    "baseline_error": "read-only buffer",
+    "after_strict_exit_code": 0,
+    "baseline_fallback_and_after_native_tables_byte_identical": true,
+    "formatted_gzip_exit_code": 0,
+    "formatted_gzip_table_byte_identical": true,
+    "result_table_sha256": "04af0a20b263b26dfebfbb4d2fc19c424ba460d3db9fcc3e08d5e192b7e82d2a",
+    "metrics": "sn_comparison.tsv"
+  },
+  "numerical_and_rendered_output_comparisons": [
+    {
+      "dataset": "PGK",
+      "file": "csubst_b.tsv",
+      "type": "table",
+      "identical": true,
+      "before_sha256": "869f950016374a942fa4bbe713f320d1e502f01653cb893ff2567fb92ae9055e",
+      "after_sha256": "869f950016374a942fa4bbe713f320d1e502f01653cb893ff2567fb92ae9055e"
+    },
+    {
+      "dataset": "PGK",
+      "file": "csubst_cb_2.tsv",
+      "type": "table",
+      "identical": true,
+      "before_sha256": "d83b8a0fc1529942a2eabbf6a725188a2ac6345035e27817c478131daa26c836",
+      "after_sha256": "d83b8a0fc1529942a2eabbf6a725188a2ac6345035e27817c478131daa26c836"
+    },
+    {
+      "dataset": "PGK",
+      "file": "csubst_sites/csubst.branch_id23,51/csubst.tree_site.tsv",
+      "type": "table",
+      "identical": true,
+      "before_sha256": "570930944e523e813c1c5b79777f32b704bda09cbd5d3aff8524cd548335d546",
+      "after_sha256": "570930944e523e813c1c5b79777f32b704bda09cbd5d3aff8524cd548335d546"
+    },
+    {
+      "dataset": "PGK",
+      "file": "csubst_sites/csubst.branch_id23,51/csubst.tsv",
+      "type": "table",
+      "identical": true,
+      "before_sha256": "bd0201fa041c2cfeca1b405f084b643340edaac863f0359fb1699a0e1f37f85e",
+      "after_sha256": "bd0201fa041c2cfeca1b405f084b643340edaac863f0359fb1699a0e1f37f85e"
+    },
+    {
+      "dataset": "PGK",
+      "file": "csubst_sites/csubst.branch_id23,51/csubst.pdf",
+      "type": "pdf",
+      "pages": 1,
+      "text_equal": true,
+      "identical": true
+    },
+    {
+      "dataset": "PGK",
+      "file": "csubst_sites/csubst.branch_id23,51/csubst.tree_site.pdf",
+      "type": "pdf",
+      "pages": 1,
+      "text_equal": true,
+      "identical": true
+    },
+    {
+      "dataset": "PEPC",
+      "file": "csubst_b.tsv",
+      "type": "table",
+      "identical": true,
+      "before_sha256": "24881722ad6b10380b0cf64244df1b566d92c4559df6a94fa7b77e665bc134c5",
+      "after_sha256": "24881722ad6b10380b0cf64244df1b566d92c4559df6a94fa7b77e665bc134c5"
+    },
+    {
+      "dataset": "PEPC",
+      "file": "csubst_cb_2.tsv",
+      "type": "table",
+      "identical": true,
+      "before_sha256": "fb53ca0a756e714650fed462f1ba89db299f2bfca347ced54069e93ce98bd180",
+      "after_sha256": "fb53ca0a756e714650fed462f1ba89db299f2bfca347ced54069e93ce98bd180"
+    },
+    {
+      "dataset": "PEPC",
+      "file": "csubst_sites/csubst.branch_id9,108/csubst.tree_site.tsv",
+      "type": "table",
+      "identical": true,
+      "before_sha256": "32799798ea8f4c75d113abcc9cde057e00e478d94e53bc80cf3a403c7f0a8c3d",
+      "after_sha256": "32799798ea8f4c75d113abcc9cde057e00e478d94e53bc80cf3a403c7f0a8c3d"
+    },
+    {
+      "dataset": "PEPC",
+      "file": "csubst_sites/csubst.branch_id9,108/csubst.tsv",
+      "type": "table",
+      "identical": true,
+      "before_sha256": "22e76a002f294159875b2adaa3f6c68d83b8e0901011a3ece2102e62f79ecf51",
+      "after_sha256": "22e76a002f294159875b2adaa3f6c68d83b8e0901011a3ece2102e62f79ecf51"
+    },
+    {
+      "dataset": "PEPC",
+      "file": "csubst_sites/csubst.branch_id9,108/csubst.pdf",
+      "type": "pdf",
+      "pages": 1,
+      "text_equal": true,
+      "identical": true
+    },
+    {
+      "dataset": "PEPC",
+      "file": "csubst_sites/csubst.branch_id9,108/csubst.tree_site.pdf",
+      "type": "pdf",
+      "pages": 1,
+      "text_equal": true,
+      "identical": true
+    }
+  ],
+  "pdf_review": {
+    "all_four_output_pages_visually_inspected": true,
+    "render_dpi": 100,
+    "comparison": "identical rendered pixels and extracted text; existing layout preserved"
+  },
+  "calibration": {
+    "settings": 4,
+    "niter": 100,
+    "existing_regression_checks": "passed",
+    "summary": [
+      {
+        "output_stat": "any2any",
+        "min_sub_pp": "0.0",
+        "kind": "calib",
+        "n": "1592",
+        "frac_p_le_0_05": "0.22487437185929648",
+        "mean_p": "0.3715764447236181",
+        "median_p": "0.2871"
+      },
+      {
+        "output_stat": "any2any",
+        "min_sub_pp": "0.05",
+        "kind": "calib",
+        "n": "1620",
+        "frac_p_le_0_05": "0.03148148148148148",
+        "mean_p": "0.7093930864197531",
+        "median_p": "0.8812"
+      },
+      {
+        "output_stat": "any2any",
+        "min_sub_pp": "0.0",
+        "kind": "nocalib",
+        "n": "1592",
+        "frac_p_le_0_05": "0.21419597989949749",
+        "mean_p": "0.37349849246231154",
+        "median_p": "0.2871"
+      },
+      {
+        "output_stat": "any2any",
+        "min_sub_pp": "0.05",
+        "kind": "nocalib",
+        "n": "1620",
+        "frac_p_le_0_05": "0.027777777777777776",
+        "mean_p": "0.7095270370370372",
+        "median_p": "0.88615"
+      },
+      {
+        "output_stat": "any2spe",
+        "min_sub_pp": "0.0",
+        "kind": "calib",
+        "n": "1563",
+        "frac_p_le_0_05": "0.6564299424184261",
+        "mean_p": "0.20217869481765838",
+        "median_p": "0.0297"
+      },
+      {
+        "output_stat": "any2spe",
+        "min_sub_pp": "0.05",
+        "kind": "calib",
+        "n": "1619",
+        "frac_p_le_0_05": "0.21556516368128475",
+        "mean_p": "0.6907743051266214",
+        "median_p": "1.0"
+      },
+      {
+        "output_stat": "any2spe",
+        "min_sub_pp": "0.0",
+        "kind": "nocalib",
+        "n": "1563",
+        "frac_p_le_0_05": "0.6660268714011516",
+        "mean_p": "0.20214702495201536",
+        "median_p": "0.0297"
+      },
+      {
+        "output_stat": "any2spe",
+        "min_sub_pp": "0.05",
+        "kind": "nocalib",
+        "n": "1619",
+        "frac_p_le_0_05": "0.21371216800494133",
+        "mean_p": "0.6906764669549105",
+        "median_p": "1.0"
+      }
+    ]
+  },
+  "limits": [
+    "Linux sanitizer, compatibility matrix, and macOS Intel are checked by the post-push GitHub workflow, not by this local record.",
+    "The major/minor workflow_call path is statically checked; this patch does not create a release tag.",
+    "External API/model downloads and every optional dependency were not exhaustively exercised."
+  ]
+}

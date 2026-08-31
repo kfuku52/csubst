@@ -1,0 +1,457 @@
+{
+  "audit_date": "2026-08-31",
+  "source_commit": "8e80176135cb57ac80dbc40241f1f8bc15d59433",
+  "previous_commit": "85d6e6b",
+  "version": "1.14.8",
+  "branch": "master",
+  "pull_command": "git pull --ff-only origin master",
+  "platform": {
+    "os": "macOS",
+    "version": "26.5.2",
+    "architecture": "arm64"
+  },
+  "environments": {
+    "existing_python314": {
+      "python": "3.14.0",
+      "dependencies": {
+        "numpy": "2.4.2",
+        "scipy": "1.17.1",
+        "pandas": "2.3.3",
+        "matplotlib": "3.10.8",
+        "ete4": "4.4.0",
+        "pytest": "9.0.2",
+        "Cython": "3.2.4"
+      }
+    },
+    "fresh_python312": {
+      "python": "3.12.13",
+      "dependencies": {
+        "numpy": "2.5.2",
+        "scipy": "1.18.1",
+        "pandas": "3.0.5",
+        "matplotlib": "3.10.9",
+        "ete4": "4.4.0",
+        "pytest": "9.1.1",
+        "pytest-xdist": "3.8.0",
+        "pytest-cov": "7.1.0"
+      },
+      "blas": "accelerate",
+      "install": "uv venv --python 3.12; uv pip install -e \".[test]\" in an isolated git archive snapshot",
+      "missing_development_tools": [
+        "ruff",
+        "mypy",
+        "build",
+        "twine"
+      ]
+    }
+  },
+  "test_runs": [
+    {
+      "environment": "existing_python314",
+      "selection": "not process with coverage",
+      "tests_run": 1295,
+      "passed": 1295,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "warnings": 0,
+      "pytest_seconds": 93.64,
+      "wall_seconds": 104.79
+    },
+    {
+      "environment": "existing_python314",
+      "selection": "process serial with coverage append",
+      "tests_run": 4,
+      "passed": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "warnings": 0,
+      "pytest_seconds": 82.08,
+      "wall_seconds": 91.28
+    },
+    {
+      "environment": "fresh_python312",
+      "selection": "not process",
+      "tests_run": 1295,
+      "passed": 1295,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "warnings": 39,
+      "pytest_seconds": 63.68,
+      "wall_seconds": 105.41
+    },
+    {
+      "environment": "fresh_python312",
+      "selection": "process serial",
+      "tests_run": 4,
+      "passed": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "warnings": 4,
+      "pytest_seconds": 30.83,
+      "wall_seconds": 32.48
+    },
+    {
+      "environment": "fresh_python312",
+      "selection": "not process and not parity; extensions disabled",
+      "tests_run": 1254,
+      "passed": 1229,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 25,
+      "warnings": 38,
+      "pytest_seconds": 15.5,
+      "wall_seconds": 16.51
+    }
+  ],
+  "static_checks": {
+    "make_lint_typecheck": "pass in existing environment",
+    "extra_mypy_targets": [
+      "csubst/main_scan.py",
+      "csubst/main_analyze.py",
+      "csubst/main_download.py"
+    ],
+    "extra_mypy_errors": [
+      {
+        "file": "csubst/main_scan.py",
+        "line": 23,
+        "message": "Need type annotation for fg_ids"
+      },
+      {
+        "file": "csubst/main_scan.py",
+        "line": 208,
+        "message": "No return value expected"
+      }
+    ]
+  },
+  "coverage": {
+    "scope": "Combined existing_python314 parallel-safe + serial process suite, vendor omitted; subprocess measurement is not comprehensive",
+    "totals": {
+      "covered_lines": 19836,
+      "num_statements": 25961,
+      "percent_covered": 72.69094737978887,
+      "percent_covered_display": "73",
+      "missing_lines": 6125,
+      "excluded_lines": 18,
+      "percent_statements_covered": 76.40691806941182,
+      "percent_statements_covered_display": "76",
+      "num_branches": 11078,
+      "num_partial_branches": 2472,
+      "covered_branches": 7088,
+      "missing_branches": 3990,
+      "percent_branches_covered": 63.982668351688034,
+      "percent_branches_covered_display": "64"
+    },
+    "selected_modules": {
+      "csubst/foreground.py": {
+        "covered_lines": 1100,
+        "num_statements": 1829,
+        "percent_covered": 55.82542694497154,
+        "percent_covered_display": "56",
+        "missing_lines": 729,
+        "excluded_lines": 0,
+        "percent_statements_covered": 60.14215418261345,
+        "percent_statements_covered_display": "60",
+        "num_branches": 806,
+        "num_partial_branches": 137,
+        "covered_branches": 371,
+        "missing_branches": 435,
+        "percent_branches_covered": 46.02977667493796,
+        "percent_branches_covered_display": "46"
+      },
+      "csubst/main_analyze.py": {
+        "covered_lines": 270,
+        "num_statements": 559,
+        "percent_covered": 45.895020188425306,
+        "percent_covered_display": "46",
+        "missing_lines": 289,
+        "excluded_lines": 0,
+        "percent_statements_covered": 48.3005366726297,
+        "percent_statements_covered_display": "48",
+        "num_branches": 184,
+        "num_partial_branches": 31,
+        "covered_branches": 71,
+        "missing_branches": 113,
+        "percent_branches_covered": 38.58695652173913,
+        "percent_branches_covered_display": "39"
+      },
+      "csubst/main_scan.py": {
+        "covered_lines": 45,
+        "num_statements": 115,
+        "percent_covered": 37.908496732026144,
+        "percent_covered_display": "38",
+        "missing_lines": 70,
+        "excluded_lines": 0,
+        "percent_statements_covered": 39.130434782608695,
+        "percent_statements_covered_display": "39",
+        "num_branches": 38,
+        "num_partial_branches": 9,
+        "covered_branches": 13,
+        "missing_branches": 25,
+        "percent_branches_covered": 34.21052631578947,
+        "percent_branches_covered_display": "34"
+      },
+      "csubst/main_sites.py": {
+        "covered_lines": 2214,
+        "num_statements": 2863,
+        "percent_covered": 74.57164142041222,
+        "percent_covered_display": "75",
+        "missing_lines": 649,
+        "excluded_lines": 0,
+        "percent_statements_covered": 77.33147048550471,
+        "percent_statements_covered_display": "77",
+        "num_branches": 1164,
+        "num_partial_branches": 193,
+        "covered_branches": 789,
+        "missing_branches": 375,
+        "percent_branches_covered": 67.78350515463917,
+        "percent_branches_covered_display": "68"
+      },
+      "csubst/omega.py": {
+        "covered_lines": 2065,
+        "num_statements": 2783,
+        "percent_covered": 69.76347232382346,
+        "percent_covered_display": "70",
+        "missing_lines": 718,
+        "excluded_lines": 1,
+        "percent_statements_covered": 74.200503054258,
+        "percent_statements_covered_display": "74",
+        "num_branches": 1318,
+        "num_partial_branches": 384,
+        "covered_branches": 796,
+        "missing_branches": 522,
+        "percent_branches_covered": 60.39453717754173,
+        "percent_branches_covered_display": "60"
+      },
+      "csubst/runtime.py": {
+        "covered_lines": 205,
+        "num_statements": 281,
+        "percent_covered": 66.83291770573567,
+        "percent_covered_display": "67",
+        "missing_lines": 76,
+        "excluded_lines": 0,
+        "percent_statements_covered": 72.95373665480427,
+        "percent_statements_covered_display": "73",
+        "num_branches": 120,
+        "num_partial_branches": 23,
+        "covered_branches": 63,
+        "missing_branches": 57,
+        "percent_branches_covered": 52.5,
+        "percent_branches_covered_display": "52"
+      }
+    }
+  },
+  "reproductions": {
+    "boundary_cases": {
+      "fasta_reader_bases": 6,
+      "header_reader_error": "AssertionError: Sequence length is not multiple of 3 in alignment file.",
+      "benchmark_returncode": 0,
+      "benchmark_counts": {
+        "pass": 0,
+        "fail": 1
+      },
+      "log_collision_returncode": 2,
+      "log_collision_input_unchanged": false
+    },
+    "real_cli_cases": [
+      {
+        "case": "strict-asrv-sn",
+        "exit": 2,
+        "last_error": "buffer source array is read-only"
+      },
+      {
+        "case": "spaced-fasta",
+        "exit": 2,
+        "last_error": "Sequence length is not multiple of 3 in alignment file."
+      }
+    ],
+    "strict_existing_test": {
+      "nodeid": "tests/unit/test_substitution_dense_tensor.py::test_get_sub_sites_sn_applies_dirichlet_pseudocount",
+      "CSUBST_STRICT_EXTENSIONS": "1",
+      "result": "failed",
+      "error": "buffer source array is read-only"
+    },
+    "thread_environment_after_configure_one": {
+      "VECLIB_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": null
+    },
+    "wheel_source_selection": {
+      "before_conftest": {
+        "python_file": "venv-wheel/lib/python3.12/site-packages/csubst/__init__.py",
+        "extensions": {
+          "combination_cy": true,
+          "omega_cy": true,
+          "parser_iqtree_cy": true,
+          "recoding_cy": true,
+          "substitution_cy": true,
+          "substitution_sparse_cy": true
+        }
+      },
+      "after_conftest": {
+        "python_file": "conftest-probe/csubst/__init__.py",
+        "extensions": {
+          "combination_cy": false,
+          "omega_cy": false,
+          "parser_iqtree_cy": false,
+          "recoding_cy": false,
+          "substitution_cy": false,
+          "substitution_sparse_cy": false
+        }
+      }
+    },
+    "clean_development_lint": {
+      "exit": 2,
+      "error": "ruff: No such file or directory"
+    },
+    "normal_wheel_native_imports_passed": 6
+  },
+  "parity": {
+    "strict_extensions": true,
+    "datasets": [
+      {
+        "dataset": "PGK",
+        "branch_id_1": 23,
+        "branch_id_2": 51,
+        "omegaCany2spe": 1.97505,
+        "convergent": 5,
+        "divergent": 7,
+        "blank": 390,
+        "analyze_elapsed_sec": 2.28,
+        "analyze_max_rss_kb": 201056,
+        "site_elapsed_sec": 6.18,
+        "site_max_rss_kb": 290688
+      },
+      {
+        "dataset": "PEPC",
+        "branch_id_1": 9,
+        "branch_id_2": 108,
+        "omegaCany2spe": 0.049466,
+        "convergent": 0,
+        "divergent": 2,
+        "blank": 954,
+        "analyze_elapsed_sec": 5.39,
+        "analyze_max_rss_kb": 412080,
+        "site_elapsed_sec": 7.56,
+        "site_max_rss_kb": 426288
+      }
+    ],
+    "omega_absolute_tolerance": 1e-06,
+    "result": "pass for all EXPECTED values",
+    "repetitions": 1,
+    "linux_performance_thresholds_applied": false,
+    "iqtree_outputs": "bundled precomputed outputs"
+  },
+  "omega_calibration": {
+    "result": "existing regression passed",
+    "dataset": "PGK",
+    "niter": 100,
+    "min_sub_pp": [
+      0,
+      0.05
+    ],
+    "output_stat": [
+      "any2any",
+      "any2spe"
+    ],
+    "strict_extensions": true,
+    "runtime": [
+      {
+        "output_stat": "any2any",
+        "min_sub_pp": 0.0,
+        "wall_seconds": 9.13,
+        "max_rss_bytes": 201080832,
+        "peak_mem_bytes": 183091848
+      },
+      {
+        "output_stat": "any2any",
+        "min_sub_pp": 0.05,
+        "wall_seconds": 5.26,
+        "max_rss_bytes": 199999488,
+        "peak_mem_bytes": 184074936
+      },
+      {
+        "output_stat": "any2spe",
+        "min_sub_pp": 0.0,
+        "wall_seconds": 11.47,
+        "max_rss_bytes": 182829056,
+        "peak_mem_bytes": 177537672
+      },
+      {
+        "output_stat": "any2spe",
+        "min_sub_pp": 0.05,
+        "wall_seconds": 9.2,
+        "max_rss_bytes": 172441600,
+        "peak_mem_bytes": 172655216
+      }
+    ],
+    "scope": "regression only, not an independent validation of statistical methodology"
+  },
+  "code_shape": {
+    "production_py_files": 51,
+    "production_py_lines": 40089,
+    "test_py_files": 99,
+    "test_py_lines": 25646,
+    "g_subscript_literal_keys": 345,
+    "g_literal_keys_including_get_setdefault_pop": 404,
+    "typed_config_fields": 68,
+    "largest_functions": [
+      {
+        "file": "csubst/param.py",
+        "function": "get_global_parameters",
+        "lines": 790
+      },
+      {
+        "file": "csubst/cli.py",
+        "function": "_build_parser",
+        "lines": 600
+      },
+      {
+        "file": "csubst/main_sites.py",
+        "function": "plot_tree_site",
+        "lines": 563
+      },
+      {
+        "file": "csubst/tree.py",
+        "function": "_render_tree_matplotlib",
+        "lines": 488
+      },
+      {
+        "file": "csubst/genetic_code.py",
+        "function": "get_codon_table",
+        "lines": 415
+      },
+      {
+        "file": "csubst/main_sites.py",
+        "function": "main_sites",
+        "lines": 323
+      }
+    ]
+  },
+  "ci_sample": {
+    "run_id": 31554813225,
+    "url": "https://github.com/kfuku52/csubst/actions/runs/31554813225",
+    "date": "2026-08-12",
+    "commit": "fe055f080e27c83085cd03ee10a2547c90b12eef",
+    "result": "success",
+    "jobs": 11,
+    "sum_job_elapsed_seconds": 1362.0,
+    "timings_file": "ci_timings.tsv",
+    "note": "One previous successful run; raw job elapsed sum is neither wall-clock wait nor billable minutes."
+  },
+  "not_run": [
+    "local Linux sanitizers",
+    "local Python 3.10/3.11/3.13 suites",
+    "all optional dependencies and external services",
+    "release creation or workflow dispatch",
+    "before/after performance comparison of proposed fixes"
+  ],
+  "production_changes": false,
+  "report_validation": {
+    "inline_python_reproduction": "executed successfully; A/B/D/E findings reconfirmed",
+    "local_links": "all resolved",
+    "personal_absolute_paths": "none in report artifacts"
+  }
+}

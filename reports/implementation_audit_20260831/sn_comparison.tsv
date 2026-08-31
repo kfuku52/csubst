@@ -1,0 +1,9 @@
+phase	run	strict	exit_code	elapsed_sec	max_rss_kb
+before	before-strict	True	2	1.61	189648
+before	before-1	False	0	3.04	191424
+after	after-1	True	0	4.25	184272
+after	after-2	True	0	3.24	196304
+before	before-2	False	0	6.65	165808
+before	before-3	False	0	4.87	188256
+after	after-3	True	0	3.84	198160
+after	after-formatted-gzip	True	0	3.65	195408

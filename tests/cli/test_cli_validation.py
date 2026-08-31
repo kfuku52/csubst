@@ -4,10 +4,12 @@ import subprocess
 import sys
 import os
 import re
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from cli_runner import run_csubst
 
 
 def _resolve_log_path(repo_root, args):
@@ -89,26 +91,10 @@ def _run_cli(*args):
 
 def _run_cli_subprocess(*args):
     """Exercise entrypoint/log-file integration in an isolated process."""
-    repo_root = Path(__file__).resolve().parents[2]
-    log_path = _resolve_log_path(repo_root, args)
-    log_mtime_before = log_path.stat().st_mtime_ns if log_path.exists() else None
-    cmd = [sys.executable, "-m", "csubst"]
-    cmd.extend(args)
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(repo_root) + (
-        os.pathsep + env["PYTHONPATH"] if "PYTHONPATH" in env else ""
-    )
-    proc = subprocess.run(
-        cmd, cwd=str(repo_root), env=env, capture_output=True, text=True
-    )
-    log_was_written = log_path.exists() and (
-        log_mtime_before is None or log_path.stat().st_mtime_ns != log_mtime_before
-    )
-    log_text = (
-        log_path.read_text(encoding="utf-8")
-        if log_was_written
-        else (proc.stderr or "")
-    )
+    with tempfile.TemporaryDirectory(prefix='csubst-cli-') as workdir:
+        log_path = _resolve_log_path(Path(workdir), args)
+        proc = run_csubst(list(args), cwd=workdir)
+        log_text = log_path.read_text(encoding='utf-8') if log_path.exists() else proc.stderr
     return proc, log_text
 
 

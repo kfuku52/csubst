@@ -4,7 +4,7 @@ Use Python 3.12 for the complete local verification lane and keep compatibility
 with Python 3.10–3.14. Install an editable development environment with:
 
 ```bash
-python -m pip install -e '.[test]'
+python -m pip install -e '.[dev]'
 ```
 
 The common commands are available through `make`:
@@ -14,8 +14,14 @@ make test-fast
 make lint
 make typecheck
 make test
+make test-native
 make package
 ```
+
+The `dev` extra includes the test runner, Ruff, mypy, build, and Twine used by
+these commands. The smaller `test` extra remains available for running tests
+without development and packaging tools. `make PYTHON=/path/to/python ...`
+selects a particular environment for every tool.
 
 Keep command orchestration in `csubst/cli.py`, pure I/O in focused modules, and
 numerical kernels behind small Python contracts. New optional Cython code must

@@ -5,10 +5,8 @@ import os
 import platform
 import re
 import sys
-try:
-    from importlib import metadata as importlib_metadata
-except ImportError:  # pragma: no cover
-    import importlib_metadata
+from typing import Any
+from importlib import metadata as importlib_metadata
 
 from csubst import __version__
 from csubst import output_stat
@@ -181,23 +179,7 @@ def _format_dependency_versions():
     return ', '.join(dep_versions), missing_packages
 
 
-def get_global_parameters(args):
-    print('OS: {}'.format(platform.platform()), flush=True)
-    print('Python version: {}'.format(sys.version.replace('\n', ' ')), flush=True)
-    print('CSUBST version: {}'.format(__version__), flush=True)
-    dep_versions, missing_packages = _format_dependency_versions()
-    print('CSUBST dependency versions: {}'.format(dep_versions), flush=True)
-    if len(missing_packages):
-        print('CSUBST missing dependency packages: {}'.format(', '.join(missing_packages)), flush=True)
-    else:
-        print('CSUBST missing dependency packages: none', flush=True)
-    print('CSUBST command: {}'.format(' '.join(sys.argv)), flush=True)
-    print('CSUBST working directory: {}'.format(os.getcwd()), flush=True)
-    print('CSUBST bug report: https://github.com/kfuku52/csubst/issues', flush=True)
-    g = dict()
-    for attr in [a for a in dir(args) if not a.startswith('_')]:
-        g[attr] = getattr(args, attr)
-    g['infile_type'] = 'iqtree'
+def _normalize_input_parameters(g: dict[str, Any]) -> dict[str, Any]:
     g['random_seed'] = randomness.normalize_seed(
         g.get('random_seed', randomness.DEFAULT_RANDOM_SEED),
         param_name='--random_seed',
@@ -226,6 +208,10 @@ def get_global_parameters(args):
                 txt = '--alignment_file is disabled when --nonsyn_recode is 3di20. Use --full_cds_alignment_file.'
                 raise ValueError(txt)
             g['alignment_file'] = full_path
+    return g
+
+
+def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'calc_omega_pvalue' in g.keys():
         g['calc_omega_pvalue'] = _parse_bool_like(g['calc_omega_pvalue'], '--calc_omega_pvalue')
     else:
@@ -331,6 +317,10 @@ def get_global_parameters(args):
         g['asrv_dirichlet_alpha'] = 1.0
     if g['asrv_dirichlet_alpha'] < 0:
         raise ValueError('--asrv_dirichlet_alpha should be >= 0.')
+    return g
+
+
+def _normalize_epistasis_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'epistasis_apply_to' in g.keys():
         g['epistasis_apply_to'] = str(g['epistasis_apply_to']).strip().upper()
     else:
@@ -406,6 +396,10 @@ def get_global_parameters(args):
         min_value=0.0,
         strict_min=True,
     )
+    return g
+
+
+def _normalize_epistasis_structure_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'epistasis_degree_file' not in g.keys():
         g['epistasis_degree_file'] = ''
     if g['epistasis_degree_file'] is None:
@@ -508,6 +502,10 @@ def get_global_parameters(args):
     if g['epistasis_degree_outfile'] == '':
         raise ValueError('--epistasis_degree_outfile should be non-empty.')
     g['epistasis_requested'] = bool(g['epistasis_beta_auto'] or (g['epistasis_beta_value'] > 0))
+    return g
+
+
+def _normalize_search_parameters(g: dict[str, Any]) -> dict[str, Any]:
     pseudocount_config = pseudocount.validate_args(g)
     g.update(pseudocount_config)
     if 'exhaustive_until' in g.keys():
@@ -548,7 +546,10 @@ def get_global_parameters(args):
                     iqtree_outdir=g['iqtree_outdir'],
                 )
                 g['iqtree_iqtree'] = iqtree_prefix+'.iqtree'
-    # Numerical kernels and sparse fast paths are standardized on float64.
+    return g
+
+
+def _normalize_state_parameters(g: dict[str, Any]) -> dict[str, Any]:
     g['float_type'] = np.float64
     g['float_tol'] = 10**-9
     if 'expected_state_backend' in g.keys():
@@ -595,6 +596,10 @@ def get_global_parameters(args):
     else:
         txt = '--drop_invariant_tip_sites should be one of no, tip_invariant, zero_sub_mass.'
         raise ValueError(txt)
+    return g
+
+
+def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'num_simulated_site' in g.keys():
         g['num_simulated_site'] = int(g['num_simulated_site'])
         if (g['num_simulated_site'] != -1) and (g['num_simulated_site'] < 1):
@@ -697,6 +702,10 @@ def get_global_parameters(args):
         )
         if (g['percent_biased_sub'] < 0) or (g['percent_biased_sub'] >= 100):
             raise ValueError('--percent_biased_sub should be between 0 and <100.')
+    return g
+
+
+def _normalize_site_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'tree_site_plot_max_sites' in g.keys():
         g['tree_site_plot_max_sites'] = int(g['tree_site_plot_max_sites'])
         if g['tree_site_plot_max_sites'] < 1:
@@ -739,6 +748,10 @@ def get_global_parameters(args):
         )
         if (g['min_combinat_prob'] < 0) or (g['min_combinat_prob'] > 1):
             raise ValueError('--min_combinat_prob should satisfy 0 <= value <= 1.')
+    return g
+
+
+def _normalize_variant_effect_parameters(g: dict[str, Any]) -> dict[str, Any]:
     g['vep_model'] = str(g.get('vep_model', 'none')).strip().lower().replace('_', '-')
     if g['vep_model'] not in ['none', 'vesm-35m']:
         raise ValueError('--vep_model should be one of none, vesm-35m.')
@@ -773,6 +786,10 @@ def get_global_parameters(args):
         raise ValueError('--pymol_color_by should be one of auto, substitution, vesm.')
     if (g['pymol_color_by'] == 'vesm') and (g['vep_model'] == 'none'):
         raise ValueError('--pymol_color_by vesm requires --vep_model vesm-35m.')
+    return g
+
+
+def _normalize_structure_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'database_timeout' in g.keys():
         g['database_timeout'] = _require_finite_float(
             value=float(g['database_timeout']),
@@ -825,6 +842,10 @@ def get_global_parameters(args):
         g['pymol_max_num_chain'] = int(g['pymol_max_num_chain'])
         if g['pymol_max_num_chain'] < 1:
             raise ValueError('--pymol_max_num_chain should be >= 1.')
+    return g
+
+
+def _normalize_execution_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'float_digit' in g.keys():
         g['float_digit'] = int(g['float_digit'])
         if (g['float_digit'] < 0) or (g['float_digit'] > 17):
@@ -840,6 +861,10 @@ def get_global_parameters(args):
     if g['blas_threads'] < 1:
         raise ValueError('--blas_threads should be >= 1.')
     set_num_thread_variables(num_thread=g['blas_threads'])
+    return g
+
+
+def _normalize_recoding_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'nonsyn_recode' in g.keys():
         g['nonsyn_recode'] = recoding_config.normalize_nonsyn_recode(g['nonsyn_recode'])
     else:
@@ -952,6 +977,10 @@ def get_global_parameters(args):
             txt = '--alignment_file is disabled when --nonsyn_recode is 3di20. Use --full_cds_alignment_file.'
             raise ValueError(txt)
         g['alignment_file'] = full_path
+    return g
+
+
+def _normalize_output_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'output_stat' in g.keys():
         g['output_stats'] = output_stat.parse_output_stats(g['output_stat'])
     else:
@@ -970,6 +999,40 @@ def get_global_parameters(args):
         # Fail fast on malformed cutoff tokens/regex/value ranges.
         table.parse_cutoff_stat(cutoff_stat_str=g['cutoff_stat'])
     g = runtime.ensure_output_layout(g, create_dir=False)
+    return g
+
+
+def get_global_parameters(args: Any) -> runtime.RunContext:
+    """Validate arguments in ordered stages, then freeze the configuration view."""
+    print('OS: {}'.format(platform.platform()), flush=True)
+    print('Python version: {}'.format(sys.version.replace('\n', ' ')), flush=True)
+    print('CSUBST version: {}'.format(__version__), flush=True)
+    dep_versions, missing_packages = _format_dependency_versions()
+    print('CSUBST dependency versions: {}'.format(dep_versions), flush=True)
+    if len(missing_packages):
+        print('CSUBST missing dependency packages: {}'.format(', '.join(missing_packages)), flush=True)
+    else:
+        print('CSUBST missing dependency packages: none', flush=True)
+    print('CSUBST command: {}'.format(' '.join(sys.argv)), flush=True)
+    print('CSUBST working directory: {}'.format(os.getcwd()), flush=True)
+    print('CSUBST bug report: https://github.com/kfuku52/csubst/issues', flush=True)
+    g = dict()
+    for attr in [a for a in dir(args) if not a.startswith('_')]:
+        g[attr] = getattr(args, attr)
+    g['infile_type'] = 'iqtree'
+    g = _normalize_input_parameters(g)
+    g = _normalize_model_parameters(g)
+    g = _normalize_epistasis_parameters(g)
+    g = _normalize_epistasis_structure_parameters(g)
+    g = _normalize_search_parameters(g)
+    g = _normalize_state_parameters(g)
+    g = _normalize_simulation_parameters(g)
+    g = _normalize_site_parameters(g)
+    g = _normalize_variant_effect_parameters(g)
+    g = _normalize_structure_parameters(g)
+    g = _normalize_execution_parameters(g)
+    g = _normalize_recoding_parameters(g)
+    g = _normalize_output_parameters(g)
     return runtime.ensure_run_context(g)
 
 def initialize_df_cb_stats(g):

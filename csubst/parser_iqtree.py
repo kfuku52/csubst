@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from collections import OrderedDict
+from contextlib import closing
 from itertools import zip_longest
 
 import numpy as np
@@ -16,6 +17,7 @@ from csubst import genetic_code
 from csubst import resource_cache
 from csubst import runtime
 from csubst import sequence
+from csubst import sequence_io
 from csubst import tree
 from csubst import ete
 from csubst._extensions import load_optional_extension
@@ -339,26 +341,11 @@ def _infer_num_input_site_from_alignment_file(alignment_file):
     path_txt = str(alignment_file).strip()
     if path_txt == '':
         raise ValueError('alignment_file is required to infer the number of input sites.')
-    open_fn = gzip.open if path_txt.lower().endswith('.gz') else open
-    seq_name = None
-    seq_len = 0
-    with open_fn(path_txt, mode='rt', encoding='utf-8') as f:
-        for line in f:
-            line = line.rstrip('\n')
-            if line.startswith('>'):
-                if seq_name is not None:
-                    break
-                seq_name = line[1:].strip()
-                continue
-            if seq_name is None:
-                if line.strip() == '':
-                    continue
-                raise ValueError('Invalid FASTA format in alignment file: sequence line appeared before header.')
-            if line.strip() == '':
-                continue
-            seq_len += len(line.strip())
-    if seq_name is None:
+    with closing(sequence_io.iter_fasta_records(path_txt)) as records:
+        first_record = next(records, None)
+    if first_record is None:
         raise ValueError('Alignment file is empty: {}'.format(alignment_file))
+    seq_len = len(first_record.sequence)
     if (seq_len % 3) != 0:
         raise AssertionError('Sequence length is not multiple of 3 in alignment file.')
     return int(seq_len // 3)

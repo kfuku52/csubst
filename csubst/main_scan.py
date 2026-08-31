@@ -20,7 +20,7 @@ def _require_foreground(g: AnalysisConfig) -> None:
 
 
 def _scan_foreground_branch_ids(g, units_df=None):
-    fg_ids = []
+    fg_ids: list[int] = []
     if (units_df is not None) and ("fg_branch_ids" in units_df.columns):
         for value in units_df["fg_branch_ids"].tolist():
             text = "" if value is None else str(value).strip()
@@ -117,7 +117,7 @@ def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
     return main_sites.plot_tree_site(df=site_df, g=plot_g)
 
 
-def main_scan(g: AnalysisConfig) -> None:
+def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataFrame]:
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
     _require_foreground(g)

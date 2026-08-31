@@ -1540,7 +1540,8 @@ def _assign_grouped_qvalues(scan_df, out_col, group_cols, p_col="p_rate_enrichme
     scan_df[out_col] = np.nan
     if scan_df.shape[0] == 0:
         return scan_df
-    for _, index_values in scan_df.groupby(group_cols, sort=False, dropna=False).groups.items():
+    grouper = group_cols[0] if len(group_cols) == 1 else group_cols
+    for _, index_values in scan_df.groupby(grouper, sort=False, dropna=False).groups.items():
         pvalues = scan_df.loc[index_values, p_col].to_numpy(dtype=np.float64)
         scan_df.loc[index_values, out_col] = _bh_qvalues(pvalues)
     return scan_df

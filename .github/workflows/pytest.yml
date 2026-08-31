@@ -2,22 +2,28 @@ name: Pytest
 
 on:
   push:
+    branches: [master]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
 
 concurrency:
   group: pytest-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   test:
     name: Fast tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        # Python 3.12 runs the full suite below; avoid installing and running it twice.
         python-version: ["3.10", "3.11", "3.13", "3.14"]
-
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -33,167 +39,22 @@ jobs:
             MANIFEST.in
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          for i in 1 2 3; do
-            python -m pip install -e '.[test]' && break
-            if [ "$i" = "3" ]; then
-              echo "Dependency install failed after 3 attempts."
-              exit 1
-            fi
-            echo "Dependency install failed (attempt $i). Retrying in 15s..."
-            sleep 15
-          done
+        run: python -m pip install -e '.[test]'
 
       - name: Verify compiled extensions
-        run: |
-          python -c "import csubst.combination_cy"
-          python -c "import csubst.omega_cy"
-          python -c "import csubst.parser_iqtree_cy"
-          python -c "import csubst.recoding_cy"
-          python -c "import csubst.substitution_cy"
-          python -c "import csubst.substitution_sparse_cy"
+        run: python -c "import csubst.combination_cy, csubst.omega_cy, csubst.parser_iqtree_cy, csubst.recoding_cy, csubst.substitution_cy, csubst.substitution_sparse_cy"
 
       - name: Run fast tests
-        run: pytest -q -n auto --dist worksteal tests/unit tests/cli -m "not slow and not parity" --durations=20
+        run: python -m pytest -q -n auto --dist worksteal tests/unit tests/cli -m "not slow and not parity and not process" --durations=20
 
-  full-test:
-    name: Full test suite (Python 3.12)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            pyproject.toml
-            setup.py
-            MANIFEST.in
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          for i in 1 2 3; do
-            python -m pip install -e '.[test]' && break
-            if [ "$i" = "3" ]; then
-              echo "Dependency install failed after 3 attempts."
-              exit 1
-            fi
-            echo "Dependency install failed (attempt $i). Retrying in 15s..."
-            sleep 15
-          done
-
-      - name: Verify compiled extensions
-        run: |
-          python -c "import csubst.combination_cy"
-          python -c "import csubst.omega_cy"
-          python -c "import csubst.parser_iqtree_cy"
-          python -c "import csubst.recoding_cy"
-          python -c "import csubst.substitution_cy"
-          python -c "import csubst.substitution_sparse_cy"
-
-      - name: Run parallel-safe full test suite
-        run: pytest -q -n auto --dist worksteal -m "not process" --durations=20 --cov=csubst --cov-branch --cov-report=
-
-      - name: Run nested-process tests serially
-        run: pytest -q -m process --durations=20 --cov=csubst --cov-branch --cov-append --cov-report=term-missing:skip-covered --cov-fail-under=70
-
-  pure-python:
-    name: Pure-Python fallback (Python 3.12)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install without compiled extensions
-        env:
-          CSUBST_SKIP_EXTENSIONS: "1"
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install -e '.[test]'
-
-      - name: Verify and test fallback mode
-        env:
-          CSUBST_DISABLE_EXTENSIONS: "1"
-        run: |
-          python -c "from csubst._extensions import load_optional_extension; assert load_optional_extension('combination_cy') is None"
-          pytest -q -n auto --dist worksteal -m "not process and not parity" --durations=20
-
-  parity:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            pyproject.toml
-            setup.py
-            MANIFEST.in
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          for i in 1 2 3; do
-            python -m pip install -e '.[test]' && break
-            if [ "$i" = "3" ]; then
-              echo "Dependency install failed after 3 attempts."
-              exit 1
-            fi
-            echo "Dependency install failed (attempt $i). Retrying in 15s..."
-            sleep 15
-          done
-
-      - name: Verify compiled extensions
-        run: python -c "import csubst.combination_cy, csubst.omega_cy, csubst.substitution_cy"
-
-      - name: Run parity and performance checks (PGK/PEPC)
+      - name: Require native execution
         env:
           CSUBST_STRICT_EXTENSIONS: "1"
-        run: |
-          python .github/scripts/sites_parity_check.py --output parity_metrics.tsv --workdir parity_runs
-          cat parity_metrics.tsv
-
-      - name: Run omega p-value calibration regression (PGK)
-        run: |
-          python .github/scripts/omega_pvalue_calibration_check.py \
-            --output omega_pvalue_calibration_summary.tsv \
-            --runtime-output omega_pvalue_calibration_runtime.tsv \
-            --workdir /tmp/csubst_omega_pvalue_calibration
-          cat omega_pvalue_calibration_summary.tsv
-          cat omega_pvalue_calibration_runtime.tsv
-
-      - name: Upload parity metrics artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: parity-metrics
-          path: parity_metrics.tsv
-
-      - name: Upload omega p-value calibration artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: omega-pvalue-calibration
-          path: |
-            omega_pvalue_calibration_summary.tsv
-            omega_pvalue_calibration_runtime.tsv
+        run: python -m pytest -q -m native
 
   packaging:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -209,79 +70,38 @@ jobs:
             MANIFEST.in
 
       - name: Install packaging tools
-        run: python -m pip install --upgrade pip build
+        run: python -m pip install build twine
 
       - name: Build source distribution
         run: python -m build --sdist --outdir dist
 
-      - name: Rebuild wheel from source distribution
+      - name: Rebuild wheel from generated C in the source distribution
         env:
           CSUBST_USE_CYTHON: "0"
         run: python -m pip wheel --no-deps dist/csubst-*.tar.gz --wheel-dir dist/from-sdist
 
       - name: Verify package contents and dependency metadata
-        run: python .github/scripts/package_artifact_check.py
-
-      - name: Install and smoke-test the wheel
         run: |
-          python -m venv /tmp/csubst-wheel-smoke
-          /tmp/csubst-wheel-smoke/bin/python -m pip install dist/from-sdist/csubst-*.whl pytest
-          smoke_dir=$(mktemp -d)
-          cd "$smoke_dir"
-          /tmp/csubst-wheel-smoke/bin/csubst --version
-          test -z "$(find . -mindepth 1 -print -quit)"
-          /tmp/csubst-wheel-smoke/bin/csubst dataset --name PGK
-          test -s alignment.fa.gz
-          test -s tree.nwk
-          /tmp/csubst-wheel-smoke/bin/python -c "import csubst.combination_cy, csubst.omega_cy, csubst.parser_iqtree_cy, csubst.recoding_cy, csubst.substitution_cy, csubst.substitution_sparse_cy"
+          python .github/scripts/package_artifact_check.py
+          python -m twine check dist/csubst-*.tar.gz dist/from-sdist/*.whl
 
-      - name: Run tests from the source distribution
-        run: |
-          python -c "import glob, tarfile; tarfile.open(glob.glob('dist/csubst-*.tar.gz')[0]).extractall('/tmp/csubst-sdist-test', filter='data')"
-          cd /tmp/csubst-sdist-test/csubst-*
-          /tmp/csubst-wheel-smoke/bin/python -m pytest -q
-
-  fresh-macos-intel:
-    runs-on: macos-15-intel
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up Python 3.10
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Share this run's Python 3.12 artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          python-version: "3.10"
+          name: python312-packages
+          path: |
+            dist/csubst-*.tar.gz
+            dist/from-sdist/*.whl
+          retention-days: 2
+          if-no-files-found: error
 
-      - name: Install from a clean environment
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install .
-          python -m pip check
-          csubst --version
-
-  lint:
+  full-test:
+    name: Full test suite (Python 3.12)
+    needs: packaging
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14"
-          cache: pip
-
-      - name: Run Ruff
-        run: |
-          python -m pip install --upgrade ruff mypy
-          python -m ruff check csubst tests setup.py .github/scripts
-          python .github/scripts/repository_hygiene_check.py
-          for target in csubst/config_types.py csubst/runtime.py csubst/sequence_io.py csubst/expected_sparse.py csubst/tsv.py; do
-            python -m mypy --follow-imports=skip "$target"
-          done
-
-  cython-sanitizers:
-    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CSUBST_TEST_INSTALLED: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -290,12 +110,208 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Download this run's wheel
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python312-packages
+          path: dist
+
+      - name: Install the wheel and test tools
+        run: python .github/scripts/install_test_artifact.py
+
+      - name: Smoke-test the installed CLI outside the checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/csubst-wheel-tests"
+          cd "$RUNNER_TEMP/csubst-wheel-tests"
+          csubst --version
+          test -z "$(find . -mindepth 1 -print -quit)"
+          csubst dataset --name PGK
+          test -s alignment.fa.gz
+          test -s tree.nwk
+
+      - name: Run parallel-safe full test suite against the wheel
+        working-directory: ${{ runner.temp }}/csubst-wheel-tests
+        run: python -m pytest "$GITHUB_WORKSPACE/tests" --import-mode=importlib -q -n auto --dist worksteal -m "not process" --durations=20 --cov=csubst --cov-config="$GITHUB_WORKSPACE/pyproject.toml" --cov-branch --cov-report=
+
+      - name: Run nested-process tests serially against the wheel
+        working-directory: ${{ runner.temp }}/csubst-wheel-tests
+        run: python -m pytest "$GITHUB_WORKSPACE/tests" --import-mode=importlib -q -m process --durations=20 --cov=csubst --cov-config="$GITHUB_WORKSPACE/pyproject.toml" --cov-branch --cov-append --cov-report=term-missing:skip-covered --cov-fail-under=70
+
+      - name: Require native execution from the wheel
+        working-directory: ${{ runner.temp }}/csubst-wheel-tests
+        env:
+          CSUBST_STRICT_EXTENSIONS: "1"
+        run: python -m pytest "$GITHUB_WORKSPACE/tests" --import-mode=importlib -q -m native
+
+  pure-python:
+    name: Pure-Python fallback (Python 3.12)
+    needs: packaging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CSUBST_SKIP_EXTENSIONS: "1"
+      CSUBST_DISABLE_EXTENSIONS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Download this run's source distribution
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python312-packages
+          path: dist
+
+      - name: Install without compiled extensions
+        run: python .github/scripts/install_test_artifact.py --sdist
+
+      - name: Verify fallback and run the complete sdist suite
+        run: |
+          python -c "from csubst._extensions import load_optional_extension; assert load_optional_extension('combination_cy') is None"
+          python .github/scripts/run_sdist_tests.py
+
+  parity:
+    needs: packaging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CSUBST_STRICT_EXTENSIONS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Download this run's wheel
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python312-packages
+          path: dist
+
+      - name: Install the shared wheel
+        run: python .github/scripts/install_test_artifact.py
+
+      - name: Run installed-wheel parity and performance checks
+        run: |
+          mkdir -p "$RUNNER_TEMP/csubst-parity"
+          cd "$RUNNER_TEMP/csubst-parity"
+          python "$GITHUB_WORKSPACE/.github/scripts/sites_parity_check.py" --installed --output parity_metrics.tsv --workdir parity_runs
+
+      - name: Run installed-wheel omega p-value calibration regression
+        working-directory: ${{ runner.temp }}/csubst-parity
+        run: |
+          python "$GITHUB_WORKSPACE/.github/scripts/omega_pvalue_calibration_check.py" --installed \
+            --output omega_pvalue_calibration_summary.tsv \
+            --runtime-output omega_pvalue_calibration_runtime.tsv \
+            --workdir omega_pvalue_calibration
+
+      - name: Upload numerical and performance metrics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: parity-metrics
+          path: |
+            ${{ runner.temp }}/csubst-parity/parity_metrics.tsv
+            ${{ runner.temp }}/csubst-parity/omega_pvalue_calibration_summary.tsv
+            ${{ runner.temp }}/csubst-parity/omega_pvalue_calibration_runtime.tsv
+          retention-days: 14
+          if-no-files-found: error
+
+  fresh-macos-intel:
+    needs: lint
+    if: needs.lint.outputs.macos == 'true'
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    env:
+      CSUBST_TEST_INSTALLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            setup.py
+
+      - name: Install from a clean environment
+        run: |
+          python -m pip install '.[test]'
+          python -m pip check
+          csubst --version
+
+      - name: Verify native kernels and thread setup on macOS
+        env:
+          CSUBST_STRICT_EXTENSIONS: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/csubst-macos-tests"
+          cd "$RUNNER_TEMP/csubst-macos-tests"
+          python -m pytest "$GITHUB_WORKSPACE/tests" --import-mode=importlib -q -m native
+          python -m pytest "$GITHUB_WORKSPACE/tests/unit/test_runtime_threads.py" --import-mode=importlib -q
+
+  lint:
+    runs-on: ubuntu-latest
+    outputs:
+      macos: ${{ steps.scope.outputs.macos }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Select platform coverage
+        id: scope
+        run: python .github/scripts/ci_scope.py
+
+      - name: Install declared development tools
+        run: |
+          python -c "import pathlib, subprocess, sys, tomllib; tools = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['optional-dependencies']['dev']; subprocess.run([sys.executable, '-m', 'pip', 'install', *tools], check=True)"
+
+      - name: Run static checks
+        run: make lint typecheck
+
+  cython-sanitizers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install dependencies without sanitizer flags
         env:
           CSUBST_SKIP_EXTENSIONS: "1"
         run: |
-          python -m pip install --upgrade pip setuptools wheel Cython numpy pytest
+          python -m pip install setuptools wheel Cython numpy pytest
           python -m pip install --no-build-isolation -e .
 
       - name: Build extensions with address and undefined-behavior sanitizers
@@ -311,7 +327,4 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
           export LD_PRELOAD="$(gcc -print-file-name=libasan.so)"
-          pytest -q \
-            tests/parity/test_expected_sparse.py \
-            tests/parity/test_omega_*.py \
-            tests/unit/test_sparse_*.py
+          python -m pytest -q tests/parity/test_expected_sparse.py tests/parity/test_omega_*.py tests/unit/test_sparse_*.py tests/parity/test_site_weight_normalization.py

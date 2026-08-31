@@ -49,6 +49,7 @@ dependencies = [
 [project.optional-dependencies]
 simulate = []
 test = ["pytest", "pytest-cov", "pytest-xdist"]
+dev = ["pytest", "pytest-cov", "pytest-xdist", "ruff", "mypy", "build", "twine"]
 structure = ["pymol-open-source>=3.2.0a0,<3.3"]
 vep = ["huggingface-hub", "sentencepiece", "torch>=2.0", "transformers"]
 
@@ -99,7 +100,7 @@ warn_unused_ignores = true
 [tool.coverage.run]
 branch = true
 source = ["csubst"]
-omit = ["csubst/_vendor/*"]
+omit = ["*/csubst/_vendor/*"]
 
 [tool.coverage.report]
 exclude_also = [

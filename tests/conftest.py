@@ -6,26 +6,33 @@ import importlib.util
 import numpy as np
 import pytest
 
-# Ensure tests import the local checkout rather than an installed csubst package.
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+TEST_INSTALLED = os.environ.get('CSUBST_TEST_INSTALLED') == '1'
 TEST_SUPPORT = ROOT / "tests" / "support"
 if str(TEST_SUPPORT) not in sys.path:
     sys.path.insert(0, str(TEST_SUPPORT))
-if "csubst" in sys.modules:
-    for module_name in list(sys.modules):
-        if module_name == "csubst" or module_name.startswith("csubst."):
-            del sys.modules[module_name]
-spec = importlib.util.spec_from_file_location(
-    "csubst",
-    ROOT / "csubst" / "__init__.py",
-    submodule_search_locations=[str(ROOT / "csubst")],
-)
-module = importlib.util.module_from_spec(spec)
-sys.modules["csubst"] = module
-assert spec.loader is not None
-spec.loader.exec_module(module)
+if TEST_INSTALLED:
+    sys.path[:] = [p for p in sys.path if pathlib.Path(p or '.').resolve() != ROOT]
+    sys.path.insert(0, str(ROOT / '.github' / 'scripts'))
+    from _installed_package import require_installed_package
+    require_installed_package()
+else:
+    # Source tests deliberately select the checkout; artifact tests must not.
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    if "csubst" in sys.modules:
+        for module_name in list(sys.modules):
+            if module_name == "csubst" or module_name.startswith("csubst."):
+                del sys.modules[module_name]
+    spec = importlib.util.spec_from_file_location(
+        "csubst",
+        ROOT / "csubst" / "__init__.py",
+        submodule_search_locations=[str(ROOT / "csubst")],
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["csubst"] = module
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
 
 # Keep Matplotlib's font cache writable without forcing an expensive rebuild on
 # every pytest invocation.  The cache is ignored by git and reused by local
@@ -62,6 +69,11 @@ def pytest_configure(config):
     uses_xdist = getattr(config.option, "numprocesses", None) is not None
     if uses_xdist and not is_worker:
         from matplotlib import font_manager  # noqa: F401
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if TEST_INSTALLED:
+        require_installed_package()
 
 
 def pytest_collection_modifyitems(items):

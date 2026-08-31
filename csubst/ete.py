@@ -6,9 +6,10 @@ ete4 (preferred) or ete3 (fallback for older environments).
 
 from __future__ import annotations
 
-import gzip
 import os
 import types
+
+from csubst import sequence_io
 
 _ete4_import_error = None
 _ete3_import_error = None
@@ -160,28 +161,11 @@ def add_features(node, **kwargs):
 
 
 def _read_fasta(path):
-    seq_dict = {}
-    current_name = None
-    current_alias = None
-    path_txt = str(path)
-    open_fn = gzip.open if path_txt.lower().endswith('.gz') else open
-    with open_fn(path_txt, "rt", encoding="utf-8") as handle:
-        for raw_line in handle:
-            line = raw_line.strip()
-            if not line:
-                continue
-            if line.startswith(">"):
-                current_name = line[1:]
-                current_alias = current_name.split(" ", 1)[0]
-                seq_dict[current_name] = ""
-                if (current_alias != current_name) and (current_alias not in seq_dict):
-                    seq_dict[current_alias] = ""
-                continue
-            if current_name is None:
-                raise ValueError(f"Invalid FASTA format: sequence line before header in {path}")
-            seq_dict[current_name] += line
-            if (current_alias is not None) and (current_alias != current_name):
-                seq_dict[current_alias] += line
+    records = sequence_io.read_fasta_records(path)
+    # Keep both complete headers and identifier aliases, but never silently
+    # concatenate sequences when more than one header has the same identifier.
+    seq_dict = sequence_io.records_to_dict(records, key="id")
+    seq_dict.update(sequence_io.records_to_dict(records, key="description"))
     return seq_dict
 
 
@@ -216,10 +200,10 @@ def del_prop(node, key):
 
 
 def link_to_alignment(tree, alignment, alg_format="fasta"):
-    if _backend != "ete4":
-        tree.link_to_alignment(alignment=alignment, alg_format=alg_format)
-        return None
     if alg_format.lower() != "fasta":
+        if _backend != "ete4":
+            tree.link_to_alignment(alignment=alignment, alg_format=alg_format)
+            return None
         raise ValueError(f"Unsupported alignment format for ete4 compatibility: {alg_format}")
     seq_dict = _read_fasta(alignment)
     for leaf in iter_leaves(tree):

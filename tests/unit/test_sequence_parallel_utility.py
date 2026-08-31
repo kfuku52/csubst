@@ -12,10 +12,7 @@ from csubst import runtime
 from csubst import sequence
 from csubst import tree
 from csubst import utility
-
-
-def _starmap_add_mul(a, b):
-    return (a + b) * 2
+from process_workers import _starmap_add_mul
 
 
 def test_build_worker_pythonpath_prioritizes_local_package(monkeypatch, tmp_path):

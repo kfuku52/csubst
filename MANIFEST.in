@@ -2,6 +2,7 @@ include LICENSE
 include README.md
 include TESTING.md
 include CONTRIBUTING.md
+include Makefile
 include THIRD_PARTY_NOTICES.md
 include pyproject.toml
 include setup.py

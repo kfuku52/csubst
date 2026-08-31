@@ -45,11 +45,14 @@ required_notices = [
     "/csubst/_vendor/pyvolve/LICENSE.txt",
 ]
 required_test_support = [
+    "/Makefile",
     "/pytest.ini",
     "/TESTING.md",
     "/tests/conftest.py",
+    "/tests/support/process_workers.py",
     "/tools/evaluate_epistasis_simulation.py",
     "/.github/scripts/_safe_workdir.py",
+    "/.github/scripts/_installed_package.py",
 ]
 required_typed_package_files = [
     "csubst/config_types.py",
@@ -92,6 +95,9 @@ with zipfile.ZipFile(wheel_path) as archive:
 
 requirements = metadata.get_all("Requires-Dist", [])
 normalized_requirements = [requirement.lower().replace("_", "-") for requirement in requirements]
+for tool in ('ruff', 'mypy', 'build', 'twine'):
+    if not any(req.startswith(tool) and 'dev' in req for req in normalized_requirements):
+        raise RuntimeError('Wheel metadata is missing the dev tool ' + tool)
 for distribution in ("ete4", "numpy", "scipy", "pandas", "matplotlib", "defusedxml", "requests"):
     if not any(requirement.startswith(distribution) for requirement in normalized_requirements):
         raise RuntimeError("Wheel metadata is missing dependency {!r}.".format(distribution))

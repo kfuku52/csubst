@@ -217,6 +217,7 @@ def test_get_sub_sites_raises_when_tree_branch_id_exceeds_state_tensor_axis():
         substitution.get_sub_sites(g=g, sS=sS, sN=sN, state_tensor=state_tensor)
 
 
+@pytest.mark.native
 def test_get_sub_sites_sn_applies_dirichlet_pseudocount():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_branch = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1

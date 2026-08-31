@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from csubst import sequence_io
+from csubst import parser_iqtree
 from csubst._vendor import pyvolve
 from csubst._vendor.pyvolve.evolver import Evolver
 
@@ -44,6 +45,32 @@ def test_read_fasta_records_removes_sequence_whitespace_like_biopython():
         io.StringIO(">seq1\nAC GT\tAA\n C G \n")
     )
     assert records[0].sequence == "ACGTAACG"
+
+
+@pytest.mark.parametrize('compressed', [False, True])
+@pytest.mark.parametrize('sequence', ['ATGGCT\n', 'ATG GCT\n', 'ATG\tGCT\r\n', ' AT G\nGC T\n'])
+def test_alignment_site_count_uses_fasta_whitespace_rules(tmp_path, compressed, sequence):
+    path = tmp_path / ('alignment.fa.gz' if compressed else 'alignment.fa')
+    opener = gzip.open if compressed else open
+    with opener(path, 'wt', encoding='utf-8', newline='') as handle:
+        handle.write('>A\n' + sequence + '>B\nATGCCC\n')
+    assert sequence_io.read_fasta_records(path)[0].sequence == 'ATGGCT'
+    assert parser_iqtree._infer_num_input_site_from_alignment_file(path) == 2
+
+
+def test_fasta_iterator_stops_before_reading_second_sequence():
+    class FirstRecordOnly(io.StringIO):
+        def __next__(self):
+            line = super().__next__()
+            if line.startswith('SHOULD_NOT_READ'):
+                raise AssertionError('Read beyond the requested record')
+            return line
+
+    source = FirstRecordOnly('>A\nATG GCT\n>B\nSHOULD_NOT_READ\n')
+    records = sequence_io.iter_fasta_records(source)
+    assert next(records).sequence == 'ATGGCT'
+    records.close()
+    assert not source.closed
 
 
 def test_read_fasta_records_rejects_sequence_before_header():

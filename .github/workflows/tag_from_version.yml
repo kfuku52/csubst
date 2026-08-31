@@ -11,6 +11,9 @@ permissions:
 
 jobs:
   create_release:
+    outputs:
+      should_release: ${{ steps.version.outputs.should_release }}
+      tag: ${{ steps.version.outputs.tag }}
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
       (github.event_name == 'workflow_run' &&
@@ -82,3 +85,12 @@ jobs:
           else
             gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
           fi
+
+  build-wheels:
+    needs: create_release
+    if: needs.create_release.outputs.should_release == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/wheels.yml
+    with:
+      ref: refs/tags/${{ needs.create_release.outputs.tag }}

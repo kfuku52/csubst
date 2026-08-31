@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import os
 import re
 import subprocess
 import sys
@@ -11,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from _safe_workdir import prepare_owned_workdir
+from _installed_package import configure_package_imports, package_subprocess_env
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -32,6 +32,7 @@ def parse_args():
             "capture runtime + peak RAM."
         )
     )
+    parser.add_argument('--installed', action='store_true', help='Validate the installed wheel and its bundled PGK dataset.')
     parser.add_argument(
         "--output",
         default="omega_pvalue_calibration_summary.tsv",
@@ -51,7 +52,7 @@ def parse_args():
         "--niter",
         type=int,
         default=100,
-        help="Number of randomization iterations passed to --omega_pvalue_niter.",
+        help="Number of randomization iterations passed to --omega_pvalue_niter_schedule.",
     )
     parser.add_argument(
         "--min-sub-pp-levels",
@@ -197,10 +198,11 @@ def _p_col(output_stat, kind):
     return "pomegaC{}".format(output_stat)
 
 
-def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter):
+def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter, installed=False):
     run_dir = Path(run_root) / "{}_min_sub_pp_{}".format(output_stat, _min_sub_pp_tag(min_sub_pp))
     run_dir.mkdir(parents=True, exist_ok=True)
-    dataset_dir = repo_root / "csubst" / "dataset"
+    data_root = configure_package_imports(repo_root, installed=installed)
+    dataset_dir = data_root / "csubst" / "dataset"
     python_exe = sys.executable
     iqtree_model = read_iqtree_model(dataset_dir / "{}.alignment.fa.iqtree".format(DATASET_NAME))
 
@@ -227,7 +229,7 @@ def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter):
         "yes",
         "--min_sub_pp",
         "{:.12g}".format(min_sub_pp),
-        "--omega_pvalue_niter",
+        "--omega_pvalue_niter_schedule",
         str(int(niter)),
         "--omega_pvalue_rounding",
         "round",
@@ -263,10 +265,7 @@ def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter):
         "yes",
     ]
 
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(repo_root) + (
-        os.pathsep + env["PYTHONPATH"] if "PYTHONPATH" in env else ""
-    )
+    env = package_subprocess_env(repo_root, installed=installed)
     elapsed_sec, max_rss_bytes, peak_mem_bytes, stdout_path, stderr_path = run_timed_command(
         cmd=cmd,
         cwd=run_dir,
@@ -417,7 +416,8 @@ def main():
         raise ValueError("The second --min-sub-pp-levels value should be 0.05 (guarded).")
 
     repo_root = REPO_ROOT
-    ensure_precomputed_iqtree_outputs(repo_root=repo_root, dataset_name=DATASET_NAME)
+    data_root = configure_package_imports(repo_root, installed=args.installed)
+    ensure_precomputed_iqtree_outputs(repo_root=data_root, dataset_name=DATASET_NAME)
 
     run_root = prepare_owned_workdir(args.workdir, repo_root=repo_root)
 
@@ -431,6 +431,7 @@ def main():
                 output_stat=output_stat,
                 min_sub_pp=min_sub_pp,
                 niter=int(args.niter),
+                installed=args.installed,
             )
             summary_rows.extend(rows)
             runtime_rows.append(runtime_row)

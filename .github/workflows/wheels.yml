@@ -2,9 +2,27 @@ name: Build wheels
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build (defaults to the selected branch)
+        type: string
+        required: false
+  workflow_call:
+    inputs:
+      ref:
+        description: Tested release tag to build
+        type: string
+        required: true
   push:
     tags:
       - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   wheels:
@@ -26,6 +44,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -40,12 +60,12 @@ jobs:
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
           CIBW_ARCHS: ${{ matrix.archs }}
           CIBW_SKIP: "*-musllinux_*"
-          CIBW_BEFORE_BUILD: "python -m pip install Cython numpy"
+          # The scientific parity runner records wall time/RSS via GNU time.
+          CIBW_BEFORE_ALL_LINUX: "yum install -y time"
           CIBW_TEST_COMMAND: >-
-            python -c "import csubst.combination_cy, csubst.omega_cy,
-            csubst.parser_iqtree_cy, csubst.recoding_cy,
-            csubst.substitution_cy, csubst.substitution_sparse_cy"
-            && csubst --version
+            python {project}/.github/scripts/sites_parity_check.py
+            --installed --numerical-only
+          CIBW_ENVIRONMENT: "CSUBST_STRICT_EXTENSIONS=1"
         run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: Upload wheels
@@ -53,3 +73,4 @@ jobs:
         with:
           name: csubst-${{ matrix.os }}-${{ matrix.archs }}-wheels
           path: wheelhouse/*.whl
+          retention-days: 14

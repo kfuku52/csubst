@@ -15,6 +15,20 @@ import time
 import warnings
 from collections import defaultdict
 
+from csubst.omega_statistics import (
+    _calc_bh_fdr_qvalues as _calc_bh_fdr_qvalues,
+    _calc_omega_empirical_upper_tail_counts as _calc_omega_empirical_upper_tail_counts,
+    _calc_omega_empirical_upper_tail_counts_from_perm as _calc_omega_empirical_upper_tail_counts_from_perm,
+    _calc_omega_empirical_upper_tail_pvalues as _calc_omega_empirical_upper_tail_pvalues,
+    _calc_omega_empirical_upper_tail_pvalues_from_counts as _calc_omega_empirical_upper_tail_pvalues_from_counts,
+    _calc_omega_empirical_upper_tail_pvalues_from_perm as _calc_omega_empirical_upper_tail_pvalues_from_perm,
+    _calc_permutation_omega_matrix as _calc_permutation_omega_matrix,
+    _calc_raw_omega as _calc_raw_omega,
+    _calc_raw_rate as _calc_raw_rate,
+    _calibrate_dsc_matrix as _calibrate_dsc_matrix,
+    _calibrate_dsc_vector as _calibrate_dsc_vector,
+    _needs_omega_pvalue_upper_tail_edge_refinement as _needs_omega_pvalue_upper_tail_edge_refinement,
+)
 from csubst import parallel
 from csubst import randomness
 from csubst import substitution
@@ -2717,6 +2731,7 @@ def joblib_calc_hypergeom(
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
         print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
 
+
 def _calc_hypergeom_chunk_local(
     mode,
     cb_ids,
@@ -2878,6 +2893,7 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
             E_b += item
     return E_b
 
+
 def subroot_E2nan(cb, tree):
     id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
     E_cols = cb.columns[cb.columns.str.startswith('E')]
@@ -2895,6 +2911,7 @@ def subroot_E2nan(cb, tree):
             is_node = (cb.loc[:,id_col]==ete.get_prop(node, "numerical_label"))
             cb.loc[is_node,E_cols] = np.nan
     return cb
+
 
 def get_E(cb, g, ON_tensor, OS_tensor):
     requested_output_stats = _resolve_requested_output_stats(g)
@@ -2998,6 +3015,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
     cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC', output_stats=requested_output_stats)
     cb = subroot_E2nan(cb, tree=g['tree'])
     return cb
+
 
 def get_exp_state(g, mode):
     if mode=='cdn':
@@ -3124,98 +3142,6 @@ def get_exp_state(g, mode):
     if (max_stateE - 1) >= g['float_tol']:
         raise AssertionError('Total probability of expected states should not exceed 1. {}'.format(max_stateE))
     return stateE
-
-
-def _calc_raw_rate(obs, exp, float_tol):
-    obs = np.asarray(obs, dtype=np.float64)
-    exp = np.asarray(exp, dtype=np.float64)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        out = obs / exp
-    out[obs < float_tol] = 0
-    return out
-
-
-def _calc_raw_omega(dNc, dSc, float_tol):
-    dNc = np.asarray(dNc, dtype=np.float64)
-    dSc = np.asarray(dSc, dtype=np.float64)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        omega = dNc / dSc
-    omega[dNc < float_tol] = 0
-    return omega
-
-
-def _calibrate_dsc_vector(dNc_values, dSc_values, transformation='quantile'):
-    # scipy.stats has a large import graph; most analyses never calibrate dS.
-    import scipy.stats as stats
-
-    dNc_values = np.asarray(dNc_values, dtype=np.float64).reshape(-1)
-    dSc_values = np.asarray(dSc_values, dtype=np.float64).reshape(-1)
-    if dNc_values.shape != dSc_values.shape:
-        raise ValueError('dNc_values and dSc_values should have identical shapes.')
-    fit_mask = np.isfinite(dNc_values) & np.isfinite(dSc_values)
-    calibrated_dSc = np.array(dSc_values, dtype=np.float64, copy=True)
-    if not fit_mask.any():
-        return calibrated_dSc, fit_mask, np.zeros(shape=dSc_values.shape, dtype=bool)
-    dNc_values_wo_na = dNc_values[fit_mask]
-    dSc_values_wo_na = dSc_values[fit_mask]
-    ranks = stats.rankdata(dSc_values_wo_na)
-    quantiles = (ranks - 0.5) / float(ranks.shape[0])
-    if transformation == 'gamma':
-        alpha, loc, beta = stats.gamma.fit(dNc_values_wo_na)
-        calibrated_dSc[fit_mask] = stats.gamma.ppf(q=quantiles, a=alpha, loc=loc, scale=beta)
-    elif transformation == 'quantile':
-        # ``np.quantile(values, q)`` partitions once for every requested q.
-        # Here q has the same length as values, so that otherwise becomes
-        # quadratic for exhaustive branch-combination tables. Sorting once
-        # and applying NumPy's default linear interpolation is equivalent.
-        sorted_dNc = np.sort(dNc_values_wo_na)
-        if sorted_dNc.shape[0] == 1:
-            calibrated = np.full(quantiles.shape, sorted_dNc[0], dtype=np.float64)
-        else:
-            virtual_indexes = quantiles * float(sorted_dNc.shape[0] - 1)
-            previous_indexes = np.floor(virtual_indexes).astype(np.intp)
-            next_indexes = np.ceil(virtual_indexes).astype(np.intp)
-            gamma = virtual_indexes - previous_indexes
-            previous = sorted_dNc[previous_indexes]
-            following = sorted_dNc[next_indexes]
-            interval = following - previous
-            calibrated = previous + interval * gamma
-            # Match NumPy's private _lerp rounding order exactly: interpolate
-            # from the upper endpoint when its weight is at least one half.
-            # This retains the sort-once complexity without introducing the
-            # former one-to-two ULP output difference from np.quantile.
-            use_upper = gamma >= 0.5
-            calibrated[use_upper] = (
-                following[use_upper]
-                - interval[use_upper] * (1.0 - gamma[use_upper])
-            )
-        calibrated_dSc[fit_mask] = calibrated
-    else:
-        raise ValueError('Unsupported transformation: {}'.format(transformation))
-    is_nocalib_higher = (
-        np.isfinite(dSc_values) &
-        np.isfinite(calibrated_dSc) &
-        (dSc_values > calibrated_dSc)
-    )
-    calibrated_dSc[is_nocalib_higher] = dSc_values[is_nocalib_higher]
-    return calibrated_dSc, fit_mask, is_nocalib_higher
-
-
-def _calibrate_dsc_matrix(dNc_matrix, dSc_matrix, transformation='quantile'):
-    dNc_matrix = np.asarray(dNc_matrix, dtype=np.float64)
-    dSc_matrix = np.asarray(dSc_matrix, dtype=np.float64)
-    if dNc_matrix.shape != dSc_matrix.shape:
-        raise ValueError('dNc_matrix and dSc_matrix should have identical shapes.')
-    if dNc_matrix.ndim != 2:
-        raise ValueError('dNc_matrix and dSc_matrix should be 2D arrays.')
-    calibrated = np.array(dSc_matrix, dtype=np.float64, copy=True)
-    for col_i in range(dNc_matrix.shape[1]):
-        calibrated[:, col_i], _, _ = _calibrate_dsc_vector(
-            dNc_values=dNc_matrix[:, col_i],
-            dSc_values=dSc_matrix[:, col_i],
-            transformation=transformation,
-        )
-    return calibrated
 
 
 def _collect_stat_masses(cb, prefix):
@@ -3499,6 +3425,7 @@ def get_omega(cb, g):
                 cb.loc[:, col_omega + '_smoothed'] = sm_omega
                 cb.loc[:, 'log' + col_omega + '_smoothed'] = log_sm_omega
     return cb
+
 
 def get_CoD(cb, g):
     for NS in ['OCN','OCS']:
@@ -3982,212 +3909,6 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
     raise ValueError('Unsupported omega_pvalue_null_model: {}'.format(null_model))
 
 
-def _calc_permutation_omega_matrix(
-    exp_N,
-    exp_S,
-    perm_count_N,
-    perm_count_S,
-    float_tol,
-    calibrate_dsc_transformation=None,
-):
-    exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
-    exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
-    perm_count_N = np.asarray(perm_count_N, dtype=np.float64)
-    perm_count_S = np.asarray(perm_count_S, dtype=np.float64)
-    if perm_count_N.shape != perm_count_S.shape:
-        raise ValueError('perm_count_N and perm_count_S should have identical shapes.')
-    if perm_count_N.ndim != 2:
-        raise ValueError('perm_count_N should be a 2D array.')
-    if exp_N.shape[0] != perm_count_N.shape[0]:
-        txt = 'exp_N rows ({}) and permutation rows ({}) should match.'
-        raise ValueError(txt.format(exp_N.shape[0], perm_count_N.shape[0]))
-    if exp_S.shape[0] != perm_count_N.shape[0]:
-        txt = 'exp_S rows ({}) and permutation rows ({}) should match.'
-        raise ValueError(txt.format(exp_S.shape[0], perm_count_N.shape[0]))
-    perm_dNc = _calc_raw_rate(obs=perm_count_N, exp=exp_N[:, None], float_tol=float_tol)
-    perm_dSc = _calc_raw_rate(obs=perm_count_S, exp=exp_S[:, None], float_tol=float_tol)
-    if calibrate_dsc_transformation is not None:
-        perm_dSc = _calibrate_dsc_matrix(
-            dNc_matrix=perm_dNc,
-            dSc_matrix=perm_dSc,
-            transformation=calibrate_dsc_transformation,
-        )
-    return _calc_raw_omega(dNc=perm_dNc, dSc=perm_dSc, float_tol=float_tol)
-
-
-def _calc_omega_empirical_upper_tail_counts_from_perm(obs_omega, perm_omega):
-    obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
-    perm_omega = np.asarray(perm_omega, dtype=np.float64)
-    if perm_omega.ndim != 2:
-        raise ValueError('perm_omega should be a 2D array.')
-    if perm_omega.shape[0] != obs_omega.shape[0]:
-        txt = 'Permutation rows ({}) and observed rows ({}) should match.'
-        raise ValueError(txt.format(perm_omega.shape[0], obs_omega.shape[0]))
-    valid_perm = ~np.isnan(perm_omega)
-    ge_ranks = (valid_perm & (perm_omega >= obs_omega[:, None])).sum(axis=1, dtype=np.int64)
-    valid_niter = valid_perm.sum(axis=1, dtype=np.int64)
-    return ge_ranks, valid_niter
-
-
-def _calc_omega_empirical_upper_tail_pvalues_from_counts(obs_omega, exp_S, ge_ranks, valid_niter):
-    obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
-    exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
-    ge_ranks = np.asarray(ge_ranks, dtype=np.int64).reshape(-1)
-    valid_niter = np.asarray(valid_niter, dtype=np.int64).reshape(-1)
-    if ge_ranks.shape[0] != obs_omega.shape[0]:
-        txt = 'ge_ranks rows ({}) and observed rows ({}) should match.'
-        raise ValueError(txt.format(ge_ranks.shape[0], obs_omega.shape[0]))
-    if valid_niter.shape[0] != obs_omega.shape[0]:
-        txt = 'valid_niter rows ({}) and observed rows ({}) should match.'
-        raise ValueError(txt.format(valid_niter.shape[0], obs_omega.shape[0]))
-    if exp_S.shape[0] != obs_omega.shape[0]:
-        txt = 'exp_S rows ({}) and observed rows ({}) should match.'
-        raise ValueError(txt.format(exp_S.shape[0], obs_omega.shape[0]))
-    if (ge_ranks < 0).any():
-        raise ValueError('ge_ranks should be >= 0.')
-    if (valid_niter < 0).any():
-        raise ValueError('valid_niter should be >= 0.')
-    if (ge_ranks > valid_niter).any():
-        raise ValueError('ge_ranks should be <= valid_niter.')
-    pvalue = np.full(shape=obs_omega.shape, fill_value=np.nan, dtype=np.float64)
-    valid_rows = (~np.isnan(obs_omega)) & (valid_niter > 0)
-    valid_rows &= np.isfinite(exp_S)
-    pvalue[valid_rows] = (ge_ranks[valid_rows] + 1.0) / (valid_niter[valid_rows] + 1.0)
-    return pvalue
-
-
-def _calc_omega_empirical_upper_tail_pvalues_from_perm(obs_omega, exp_S, perm_omega):
-    ge_ranks, valid_niter = _calc_omega_empirical_upper_tail_counts_from_perm(
-        obs_omega=obs_omega,
-        perm_omega=perm_omega,
-    )
-    return _calc_omega_empirical_upper_tail_pvalues_from_counts(
-        obs_omega=obs_omega,
-        exp_S=exp_S,
-        ge_ranks=ge_ranks,
-        valid_niter=valid_niter,
-    )
-
-
-def _calc_omega_empirical_upper_tail_counts(
-    obs_omega,
-    exp_N,
-    exp_S,
-    perm_count_N,
-    perm_count_S,
-    float_tol,
-    calibrate_dsc_transformation=None,
-):
-    obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
-    exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
-    exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
-    perm_count_N = np.asarray(perm_count_N, dtype=np.float64)
-    perm_count_S = np.asarray(perm_count_S, dtype=np.float64)
-    if perm_count_N.shape != perm_count_S.shape:
-        raise ValueError('perm_count_N and perm_count_S should have identical shapes.')
-    if perm_count_N.ndim != 2:
-        raise ValueError('perm_count_N should be a 2D array.')
-    if perm_count_N.shape[0] != obs_omega.shape[0]:
-        txt = 'Permutation rows ({}) and observed rows ({}) should match.'
-        raise ValueError(txt.format(perm_count_N.shape[0], obs_omega.shape[0]))
-    if exp_N.shape[0] != obs_omega.shape[0]:
-        txt = 'exp_N rows ({}) and observed rows ({}) should match.'
-        raise ValueError(txt.format(exp_N.shape[0], obs_omega.shape[0]))
-    if exp_S.shape[0] != obs_omega.shape[0]:
-        txt = 'exp_S rows ({}) and observed rows ({}) should match.'
-        raise ValueError(txt.format(exp_S.shape[0], obs_omega.shape[0]))
-    perm_omega = _calc_permutation_omega_matrix(
-        exp_N=exp_N,
-        exp_S=exp_S,
-        perm_count_N=perm_count_N,
-        perm_count_S=perm_count_S,
-        float_tol=float_tol,
-        calibrate_dsc_transformation=calibrate_dsc_transformation,
-    )
-    return _calc_omega_empirical_upper_tail_counts_from_perm(
-        obs_omega=obs_omega,
-        perm_omega=perm_omega,
-    )
-
-
-def _needs_omega_pvalue_upper_tail_edge_refinement(obs_omega, exp_S, ge_ranks, valid_niter, edge_bins):
-    obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
-    exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
-    ge_ranks = np.asarray(ge_ranks, dtype=np.int64).reshape(-1)
-    valid_niter = np.asarray(valid_niter, dtype=np.int64).reshape(-1)
-    edge_bins = int(edge_bins)
-    if obs_omega.shape[0] != exp_S.shape[0]:
-        txt = 'obs_omega rows ({}) and exp_S rows ({}) should match.'
-        raise ValueError(txt.format(obs_omega.shape[0], exp_S.shape[0]))
-    if ge_ranks.shape[0] != obs_omega.shape[0]:
-        txt = 'ge_ranks rows ({}) and obs_omega rows ({}) should match.'
-        raise ValueError(txt.format(ge_ranks.shape[0], obs_omega.shape[0]))
-    if valid_niter.shape[0] != obs_omega.shape[0]:
-        txt = 'valid_niter rows ({}) and obs_omega rows ({}) should match.'
-        raise ValueError(txt.format(valid_niter.shape[0], obs_omega.shape[0]))
-    if (ge_ranks < 0).any():
-        raise ValueError('ge_ranks should be >= 0.')
-    if (valid_niter < 0).any():
-        raise ValueError('valid_niter should be >= 0.')
-    if (ge_ranks > valid_niter).any():
-        raise ValueError('ge_ranks should be <= valid_niter.')
-    if edge_bins < 0:
-        raise ValueError('edge_bins should be >= 0.')
-    refine = np.zeros(shape=obs_omega.shape, dtype=bool)
-    valid_rows = np.isfinite(obs_omega) & np.isfinite(exp_S)
-    refine[valid_rows] = (valid_niter[valid_rows] <= 0)
-    if edge_bins <= 0:
-        return refine
-    overlap_rows = valid_rows & (valid_niter > 0)
-    refine[overlap_rows] = (ge_ranks[overlap_rows] <= edge_bins)
-    return refine
-
-
-def _calc_omega_empirical_upper_tail_pvalues(
-    obs_omega,
-    exp_N,
-    exp_S,
-    perm_count_N,
-    perm_count_S,
-    float_tol,
-    calibrate_dsc_transformation=None,
-):
-    ge_ranks, valid_niter = _calc_omega_empirical_upper_tail_counts(
-        obs_omega=obs_omega,
-        exp_N=exp_N,
-        exp_S=exp_S,
-        perm_count_N=perm_count_N,
-        perm_count_S=perm_count_S,
-        float_tol=float_tol,
-        calibrate_dsc_transformation=calibrate_dsc_transformation,
-    )
-    return _calc_omega_empirical_upper_tail_pvalues_from_counts(
-        obs_omega=obs_omega,
-        exp_S=exp_S,
-        ge_ranks=ge_ranks,
-        valid_niter=valid_niter,
-    )
-
-
-def _calc_bh_fdr_qvalues(pvalues):
-    pvalues = np.asarray(pvalues, dtype=np.float64).reshape(-1)
-    qvalues = np.full(shape=pvalues.shape, fill_value=np.nan, dtype=np.float64)
-    is_finite = np.isfinite(pvalues)
-    if not is_finite.any():
-        return qvalues
-    p_finite = np.clip(pvalues[is_finite], a_min=0.0, a_max=1.0)
-    m = int(p_finite.shape[0])
-    order = np.argsort(p_finite, kind='mergesort')
-    ranked = p_finite[order]
-    bh = ranked * (float(m) / np.arange(1, m + 1, dtype=np.float64))
-    bh = np.minimum.accumulate(bh[::-1])[::-1]
-    bh = np.clip(bh, a_min=0.0, a_max=1.0)
-    q_finite = np.empty_like(bh)
-    q_finite[order] = bh
-    qvalues[is_finite] = q_finite
-    return qvalues
-
-
 def _resolve_omega_pvalue_dsc_calibration_transformation(cb, sub, g):
     col_dSc = 'dSC' + sub
     col_noncalibrated_dSc = col_dSc + '_nocalib'
@@ -4394,6 +4115,7 @@ def print_cb_stats(cb, prefix, output_stats):
         txt = '{} median {} (non-corrected for dNc vs dSc distribution ranges): {:.3f}'
         print(txt.format(hd, col_omega, median_value), flush=True)
 
+
 def calc_omega(cb, OS_tensor, ON_tensor, g):
     cb = get_E(cb, g, ON_tensor, OS_tensor)
     output_stats = _resolve_requested_output_stats(g)
@@ -4407,6 +4129,7 @@ def calc_omega(cb, OS_tensor, ON_tensor, g):
     cb = add_omega_empirical_pvalues(cb=cb, ON_tensor=ON_tensor, OS_tensor=OS_tensor, g=g)
     print_cb_stats(cb=cb, prefix='cb', output_stats=output_stats)
     return(cb, g)
+
 
 def calibrate_dsc(cb, transformation='quantile', output_stats=None, float_tol=1e-12):
     prefix='cb'

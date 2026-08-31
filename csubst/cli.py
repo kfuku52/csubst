@@ -9,6 +9,7 @@ import sys
 import time
 
 from csubst import __version__
+from csubst import cli_io
 from csubst import runtime
 
 
@@ -163,7 +164,7 @@ def _add_output_namespace_args(
     if include_log_file:
         parser.add_argument('--log_file', metavar='PATH', default=log_default, type=str,
                             help='default=infer from --outdir/--output_prefix: PATH to log file. '
-                                 'Relative paths are resolved under --outdir.')
+                                 'Relative paths are resolved under --outdir. Must not refer to an input file.')
 
 
 def _make_output_parent_parser(default_outdir='.', default_prefix='csubst'):
@@ -654,19 +655,7 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                         help='default=%(default)s: Maximum figure height in inches for the scan tree + site summary.')
 
 
-def _build_parser(show_advanced=False):
-    # Main parser
-    help_epilog = ('This help includes advanced options.' if show_advanced else
-                   'Advanced options are hidden. Use `csubst SUBCOMMAND --help-advanced` to show them.')
-    parser = argparse.ArgumentParser(
-        description='CSUBST - a toolkit for molecular convergence detection. For details, see https://github.com/kfuku52/csubst',
-        epilog=help_epilog,
-    )
-    parser.add_argument('--version', action='version', version='CSUBST version: {}'.format(__version__))
-    _add_output_namespace_args(parser, include_outdir=False, include_output_prefix=False, include_log_file=True)
-    subparsers = parser.add_subparsers(dest='subcommand')
-
-    # shared: common
+def _make_common_parser(show_advanced):
     psr_co = argparse.ArgumentParser(add_help=False)
     psr_co.add_argument('--alignment_file', metavar='PATH', default='', type=str,
                        help='default=%(default)s: PATH to in-frame codon alignment (FASTA format).')
@@ -699,17 +688,10 @@ def _build_parser(show_advanced=False):
     _add_advanced_argument(advanced_performance, '--write_instantaneous_rate_matrix', show_advanced=show_advanced,
                         metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Write csubst instantaneous codon rate matrix TSV.')
+    return psr_co
 
-    psr_out_analyze = _make_output_parent_parser(default_outdir='csubst_search', default_prefix='csubst')
-    psr_out_benchmark = _make_output_parent_parser(default_outdir='csubst_benchmark', default_prefix='csubst')
-    psr_out_benchmark_plot = _make_output_parent_parser(default_outdir='csubst_benchmark_plot', default_prefix='csubst')
-    psr_out_doctor = _make_output_parent_parser(default_outdir='csubst_doctor', default_prefix='csubst')
-    psr_out_inspect = _make_output_parent_parser(default_outdir='csubst_inspect', default_prefix='csubst')
-    psr_out_simulate = _make_output_parent_parser(default_outdir='csubst_simulate', default_prefix='csubst')
-    psr_out_scan = _make_output_parent_parser(default_outdir='csubst_scan', default_prefix='csubst')
-    psr_out_sites = _make_output_parent_parser(default_outdir='csubst_sites', default_prefix='csubst')
 
-    # shared: IQ-TREE inputs
+def _make_iqtree_parser(show_advanced):
     psr_iq = argparse.ArgumentParser(add_help=False)
     psr_iq.add_argument('--iqtree_exe', metavar='PATH', default='iqtree', type=str, required=False,
                         help='default=%(default)s: PATH to the IQ-TREE executable')
@@ -743,8 +725,10 @@ def _build_parser(show_advanced=False):
                         metavar='PATH', default='infer', type=str, required=False,
                         help='default=%(default)s: PATH to the IQ-TREE\'s .log output. '
                              '"infer" resolves inside --iqtree_outdir from --alignment_file')
+    return psr_iq
 
-    # shared: Ancestral_state
+
+def _make_ancestral_parser():
     psr_as = argparse.ArgumentParser(add_help=False)
     psr_as.add_argument('--ml_anc', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Maximum-likelihood-like analysis by binarizing ancestral states.')
@@ -761,6 +745,10 @@ def _build_parser(show_advanced=False):
                              '(both N and S) across analyzed branches. '
                              'In `inspect`, csubst_sites_index_map.tsv is written to map retained internal '
                              'site indices to original alignment positions.')
+    return psr_as
+
+
+def _make_recoding_parser(show_advanced):
     psr_rc = argparse.ArgumentParser(add_help=False)
     psr_rc.add_argument('--nonsyn_recode', metavar='no|3di20|dayhoff6|sr6|kgb6|sr4|dayhoff9|dayhoff12|dayhoff15|dayhoff18|srchisq6|kgbauto6',
                         default='no', type=str,
@@ -819,6 +807,10 @@ def _build_parser(show_advanced=False):
                         metavar='STR', default='GTR', type=str,
                         help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20 '
                              '(used with --seqtype MORPH).')
+    return psr_rc
+
+
+def _make_treeplot_parser():
     psr_treeplot = argparse.ArgumentParser(add_help=False)
     psr_treeplot.add_argument('--species_regex', metavar='REGEX', default='^([^_]+_[^_]+)_', required=False, type=str,
                               help='default=%(default)s: Regular expression for extracting species IDs from leaf labels '
@@ -831,12 +823,10 @@ def _build_parser(show_advanced=False):
                                    '"yes" always tries to plot, "no" disables them, and "auto" enables them only when '
                                    'all tip labels are parseable by --species_regex '
                                    '(GENUS_SPECIES_GENEID labels satisfy the default regex).')
-    psr_output_manifest = argparse.ArgumentParser(add_help=False)
-    psr_output_manifest.add_argument('--output_manifest', metavar='yes|no', default='yes', required=False, type=strtobool,
-                                     help='default=%(default)s: Write an outputs manifest TSV with generated files, '
-                                          'sizes, and key command parameters.')
+    return psr_treeplot
 
-    # shared: foreground
+
+def _make_foreground_parser(show_advanced):
     psr_fg = argparse.ArgumentParser(add_help=False)
     psr_fg.add_argument('--foreground', metavar='PATH', default=None, type=str, required=False,
                     help='default=%(default)s: A text file to specify the foreground lineages. '
@@ -867,7 +857,10 @@ def _build_parser(show_advanced=False):
     _add_advanced_argument(advanced_foreground, '--min_clade_bin_count', show_advanced=show_advanced,
                     metavar='INT', default=10, type=int,
                     help='default=%(default)s: Experimental. Minimum number of branches per bin for foreground clade permutation. ')
+    return psr_fg
 
+
+def _make_scan_foreground_parser(show_advanced):
     psr_fg_scan = argparse.ArgumentParser(add_help=False)
     psr_fg_scan.add_argument('--foreground', metavar='PATH', default=None, type=str, required=False,
                     help='default=%(default)s: A text file to specify the foreground lineages. '
@@ -888,7 +881,10 @@ def _build_parser(show_advanced=False):
     _add_advanced_argument(advanced_foreground_scan, '--min_clade_bin_count', show_advanced=show_advanced,
                     metavar='INT', default=10, type=int,
                     help='default=%(default)s: Minimum number of branches per bin for scan foreground-clade permutations.')
+    return psr_fg_scan
 
+
+def _register_dataset_parser(subparsers):
     # dataset
     help_txt = 'generates out-of-the-box test datasets. See `csubst dataset -h`'
     dataset = subparsers.add_parser('dataset', help=help_txt, parents=[])
@@ -900,6 +896,8 @@ def _build_parser(show_advanced=False):
                          help='default=%(default)s: Allow overwriting existing dataset output files.')
     dataset.set_defaults(handler=command_dataset)
 
+
+def _register_download_parser(show_advanced, subparsers):
     # download
     help_txt = 'downloads and verifies shared model resources. See `csubst download -h`'
     download = subparsers.add_parser('download', help=help_txt, parents=[])
@@ -931,6 +929,8 @@ def _build_parser(show_advanced=False):
                           help='default=%(default)s: Optional local ProstT5 directory.')
     download.set_defaults(handler=command_download)
 
+
+def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparsers):
     # simulate
     help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
     simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_out_simulate])
@@ -986,12 +986,16 @@ def _build_parser(show_advanced=False):
                           help='default=infer from --outdir/--output_prefix: Output path prefix for true-ASR bundle files.')
     simulate.set_defaults(handler=command_simulate)
 
+
+def _register_scan_parser(psr_as, psr_co, psr_fg_scan, psr_iq, psr_out_scan, psr_rc, psr_treeplot, show_advanced, subparsers):
     # scan
     help_txt = 'scans foreground recurrent nonsynonymous-state substitutions without omega_C branch-combination search. See `csubst scan -h`'
     scan = subparsers.add_parser('scan', help=help_txt, parents=[psr_co,psr_iq,psr_fg_scan,psr_as,psr_rc,psr_treeplot,psr_out_scan])
     scan.set_defaults(handler=command_scan)
     _add_scan_subcommand_args(scan, show_advanced=show_advanced)
 
+
+def _register_benchmark_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_benchmark, psr_output_manifest, psr_rc, show_advanced, subparsers):
     # benchmark
     help_txt = 'benchmarks `csubst search` across parameter grids on the same input data and summarizes runtime/output metrics. See `csubst benchmark -h`'
     benchmark = subparsers.add_parser('benchmark', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_output_manifest,psr_out_benchmark])
@@ -1007,7 +1011,8 @@ def _build_parser(show_advanced=False):
     benchmark.add_argument('--benchmark_pseudocount_modes', metavar='LIST', default='', type=str,
                            help='default=current --pseudocount_mode: Comma-delimited pseudocount modes to compare.')
     benchmark.add_argument('--benchmark_keep_going', metavar='yes|no', default='yes', type=strtobool,
-                           help='default=%(default)s: Continue remaining benchmark runs after a failed configuration.')
+                           help='default=%(default)s: Continue remaining benchmark runs after a failed configuration. '
+                                'Any failed run still causes a nonzero exit status after writing the summary.')
     benchmark.add_argument('--benchmark_score_column', metavar='COLUMN', default='omegaCany2spe', type=str,
                            help='default=%(default)s: Score column to summarize from csubst_cb_2.tsv.')
     benchmark.add_argument('--benchmark_ocn_column', metavar='COLUMN', default='OCNany2spe', type=str,
@@ -1018,6 +1023,8 @@ def _build_parser(show_advanced=False):
                            help='default=%(default)s: Threshold for counting high-score hits in benchmark summaries.')
     benchmark.set_defaults(handler=command_benchmark)
 
+
+def _register_benchmark_plot_parser(psr_out_benchmark_plot, psr_output_manifest, subparsers):
     # benchmark-plot
     help_txt = 'collects existing benchmark outputs, compares parameter-wise performance, and writes an overview plot. See `csubst benchmark-plot -h`'
     benchmark_plot = subparsers.add_parser('benchmark-plot', help=help_txt, parents=[psr_output_manifest,psr_out_benchmark_plot])
@@ -1032,6 +1039,8 @@ def _build_parser(show_advanced=False):
                                 help='default=%(default)s: Output format for the overview figure.')
     benchmark_plot.set_defaults(handler=command_benchmark_plot)
 
+
+def _register_doctor_parser(psr_co, psr_fg, psr_iq, psr_out_doctor, psr_output_manifest, psr_rc, subparsers):
     # doctor
     help_txt = 'checks input files, inferred IQ-TREE paths, and optional foreground/3Di settings before running heavier workflows. See `csubst doctor -h`'
     doctor = subparsers.add_parser('doctor', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_rc,psr_output_manifest,psr_out_doctor])
@@ -1043,6 +1052,7 @@ def _build_parser(show_advanced=False):
     doctor.set_defaults(handler=command_doctor)
 
 
+def _register_sites_parser(psr_as, psr_co, psr_iq, psr_out_sites, psr_output_manifest, psr_rc, psr_treeplot, show_advanced, subparsers):
     # sites
     help_txt = 'calculates site-wise combinatorial substitutions on focal branch combinations and maps them onto protein structure. '
     help_txt += 'See `csubst sites -h` (legacy alias: `csubst site -h`).'
@@ -1199,6 +1209,7 @@ def _build_parser(show_advanced=False):
     site.set_defaults(handler=command_sites)
 
 
+def _register_search_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_analyze, psr_rc, show_advanced, subparsers):
     # search
     help_txt = 'calculates convergence rates and other metrics on branch combinations. '
     help_txt += 'See `csubst search -h` (legacy alias: `csubst analyze -h`).'
@@ -1206,6 +1217,8 @@ def _build_parser(show_advanced=False):
     analyze.set_defaults(handler=command_search)
     _add_search_subcommand_args(analyze, show_advanced=show_advanced)
 
+
+def _register_inspect_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_inspect, psr_output_manifest, psr_rc, psr_treeplot, show_advanced, subparsers):
     # inspect
     help_txt = 'writes branch/tree/state inspection outputs without running convergence statistics. See `csubst inspect -h`'
     inspect = subparsers.add_parser('inspect', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_treeplot,psr_output_manifest,psr_out_inspect])
@@ -1251,6 +1264,68 @@ def _build_parser(show_advanced=False):
                          metavar='yes|no', default='no', type=strtobool,
                          help='default=%(default)s: Download/check ProstT5 model files and exit.')
     inspect.set_defaults(handler=command_inspect)
+
+
+def _build_parser(show_advanced=False):
+    # Main parser
+    help_epilog = ('This help includes advanced options.' if show_advanced else
+                   'Advanced options are hidden. Use `csubst SUBCOMMAND --help-advanced` to show them.')
+    parser = argparse.ArgumentParser(
+        description='CSUBST - a toolkit for molecular convergence detection. For details, see https://github.com/kfuku52/csubst',
+        epilog=help_epilog,
+    )
+    parser.add_argument('--version', action='version', version='CSUBST version: {}'.format(__version__))
+    _add_output_namespace_args(parser, include_outdir=False, include_output_prefix=False, include_log_file=True)
+    subparsers = parser.add_subparsers(dest='subcommand')
+
+    # shared: common
+    psr_co = _make_common_parser(show_advanced)
+
+    psr_out_analyze = _make_output_parent_parser(default_outdir='csubst_search', default_prefix='csubst')
+    psr_out_benchmark = _make_output_parent_parser(default_outdir='csubst_benchmark', default_prefix='csubst')
+    psr_out_benchmark_plot = _make_output_parent_parser(default_outdir='csubst_benchmark_plot', default_prefix='csubst')
+    psr_out_doctor = _make_output_parent_parser(default_outdir='csubst_doctor', default_prefix='csubst')
+    psr_out_inspect = _make_output_parent_parser(default_outdir='csubst_inspect', default_prefix='csubst')
+    psr_out_simulate = _make_output_parent_parser(default_outdir='csubst_simulate', default_prefix='csubst')
+    psr_out_scan = _make_output_parent_parser(default_outdir='csubst_scan', default_prefix='csubst')
+    psr_out_sites = _make_output_parent_parser(default_outdir='csubst_sites', default_prefix='csubst')
+
+    # shared: IQ-TREE inputs
+    psr_iq = _make_iqtree_parser(show_advanced)
+
+    # shared: Ancestral_state
+    psr_as = _make_ancestral_parser()
+    psr_rc = _make_recoding_parser(show_advanced)
+    psr_treeplot = _make_treeplot_parser()
+    psr_output_manifest = argparse.ArgumentParser(add_help=False)
+    psr_output_manifest.add_argument('--output_manifest', metavar='yes|no', default='yes', required=False, type=strtobool,
+                                     help='default=%(default)s: Write an outputs manifest TSV with generated files, '
+                                          'sizes, and key command parameters.')
+
+    # shared: foreground
+    psr_fg = _make_foreground_parser(show_advanced)
+
+    psr_fg_scan = _make_scan_foreground_parser(show_advanced)
+
+    _register_dataset_parser(subparsers)
+
+    _register_download_parser(show_advanced, subparsers)
+
+    _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparsers)
+
+    _register_scan_parser(psr_as, psr_co, psr_fg_scan, psr_iq, psr_out_scan, psr_rc, psr_treeplot, show_advanced, subparsers)
+
+    _register_benchmark_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_benchmark, psr_output_manifest, psr_rc, show_advanced, subparsers)
+
+    _register_benchmark_plot_parser(psr_out_benchmark_plot, psr_output_manifest, subparsers)
+
+    _register_doctor_parser(psr_co, psr_fg, psr_iq, psr_out_doctor, psr_output_manifest, psr_rc, subparsers)
+
+    _register_sites_parser(psr_as, psr_co, psr_iq, psr_out_sites, psr_output_manifest, psr_rc, psr_treeplot, show_advanced, subparsers)
+
+    _register_search_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_analyze, psr_rc, show_advanced, subparsers)
+
+    _register_inspect_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_inspect, psr_output_manifest, psr_rc, psr_treeplot, show_advanced, subparsers)
     for subparser in set(subparsers.choices.values()):
         subparser.epilog = help_epilog
     return parser
@@ -1294,18 +1369,30 @@ def main(argv=None):
         return _main(argv=argv)
     normalized_argv, show_advanced = _normalize_help_argv(argv)
     preflight_parser = _build_parser(show_advanced=show_advanced)
+    preflight_args = argparse.Namespace()
     parse_error = io.StringIO()
     try:
         with contextlib.redirect_stderr(
             _TeeTextStream(sys.stderr, parse_error)
         ):
-            preflight_args = preflight_parser.parse_args(normalized_argv)
+            preflight_args = preflight_parser.parse_args(normalized_argv, namespace=preflight_args)
     except SystemExit:
         log_path = _resolve_log_file_from_argv(argv)
-        with open(log_path, 'a', buffering=1, encoding='utf-8') as log_file:
-            log_file.write(parse_error.getvalue())
+        try:
+            cli_io.validate_log_destination(log_path, preflight_parser, preflight_args, argv)
+        except (ValueError, OSError) as exc:
+            sys.stderr.write(str(exc) + '\n')
+        else:
+            with open(log_path, 'a', buffering=1, encoding='utf-8') as log_file:
+                log_file.write(parse_error.getvalue())
         raise
-    log_path = _resolve_log_file_from_argv(argv)
+    try:
+        layout = runtime.ensure_output_layout(vars(preflight_args).copy(), create_dir=False)
+        log_path = layout['log_file']
+        cli_io.validate_log_destination(log_path, preflight_parser, preflight_args, argv)
+        runtime.ensure_output_layout(layout, create_dir=True)
+    except (ValueError, OSError) as exc:
+        preflight_parser.error(str(exc))
     with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
         stdout_tee = _TeeTextStream(sys.stdout, log_file)
         stderr_tee = _TeeTextStream(sys.stderr, log_file)

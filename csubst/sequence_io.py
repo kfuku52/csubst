@@ -1,4 +1,5 @@
 import gzip
+from collections.abc import Generator
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,10 +46,13 @@ def _source_label(source: Any) -> str:
     return str(getattr(source, 'name', '<stream>'))
 
 
-def read_fasta_records(source: Any) -> list[FastaRecord]:
-    """Read FASTA records from a path or text stream, preserving input order."""
+def iter_fasta_records(source: Any) -> Generator[FastaRecord, None, None]:
+    """Stream FASTA records, treating whitespace as sequence formatting.
 
-    records: list[FastaRecord] = []
+    Close the generator when stopping early to release a file opened here.
+    Caller-owned text streams remain open.
+    """
+
     description: str | None = None
     sequence_parts: list[str] = []
     source_label = _source_label(source)
@@ -57,7 +61,7 @@ def read_fasta_records(source: Any) -> list[FastaRecord]:
             line = raw_line.rstrip('\r\n')
             if line.startswith('>'):
                 if description is not None:
-                    records.append(FastaRecord(description, ''.join(sequence_parts)))
+                    yield FastaRecord(description, ''.join(sequence_parts))
                 description = line[1:].strip()
                 if description == '':
                     txt = 'Invalid FASTA header in {} at line {}: sequence name is empty.'
@@ -73,8 +77,12 @@ def read_fasta_records(source: Any) -> list[FastaRecord]:
             # part of the biological sequence (including spaces and tabs).
             sequence_parts.append(''.join(line.split()))
     if description is not None:
-        records.append(FastaRecord(description, ''.join(sequence_parts)))
-    return records
+        yield FastaRecord(description, ''.join(sequence_parts))
+
+
+def read_fasta_records(source: Any) -> list[FastaRecord]:
+    """Read all FASTA records using the shared streaming parser."""
+    return list(iter_fasta_records(source))
 
 
 def records_to_dict(records: Iterable[FastaRecord], key: str = 'description') -> dict[str, str]:

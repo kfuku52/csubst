@@ -1,21 +1,5 @@
-import os
-import subprocess
-import sys
-from pathlib import Path
-
 import pytest
-
-
-def _run_csubst(args, cwd):
-    repo_root = Path(__file__).resolve().parents[2]
-    env = os.environ.copy()
-    old_pythonpath = env.get("PYTHONPATH", "")
-    if old_pythonpath:
-        env["PYTHONPATH"] = str(repo_root) + os.pathsep + old_pythonpath
-    else:
-        env["PYTHONPATH"] = str(repo_root)
-    cmd = [sys.executable, "-m", "csubst"] + args
-    return subprocess.run(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+from cli_runner import run_csubst as _run_csubst
 
 
 def test_cli_help_has_no_log_side_effect(tmp_path):
