@@ -1,4 +1,0 @@
-interface:
-  display_name: "Gmail標準返信"
-  short_description: "元スレッドとGmail標準引用を保った返信下書きを作成"
-  default_prompt: "$gmail-standard-reply を使い、Gmailの通常の返信ボタンと同じ形式で返信下書きを作成してください。"
