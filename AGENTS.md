@@ -1,4 +1,4 @@
-<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=7; sha256=13dc4fca92b78b9c4ad6b0ed3ac42664caa18fabf093e9b2f77b4da7e17e1b17 -->
+<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=8; sha256=74c7b7e2e0f64f6dbdac0aec9acab92873fbcf7011eee38fedefd261fcd43d35 -->
 # Common agent policy
 
 Repository-specific instructions override these defaults.
@@ -24,18 +24,13 @@ Repository-specific instructions override these defaults.
 - Changes confined to unpushed local commits need no backward compatibility.
 - Prefer verified root-cause fixes to fallbacks or relaxed validation that only
   hide failures. Document unavoidable workarounds and their removal conditions.
-- When changing GitHub Actions, preserve required coverage while minimizing
-  runner use: avoid duplicate push/PR runs and high-frequency polling, cancel
-  superseded CI, combine short jobs when isolation is unnecessary, and retain
-  artifacts only as long as needed.
-- Use platform-specific runners only when their coverage is required, gate them
-  by relevant paths, schedules, releases, or manual dispatch, and never execute
+- When changing GitHub Actions, preserve required coverage and never execute
   untrusted pull-request code on self-hosted runners.
 - Run focused checks and, when practical, the standard suite. Directly exercise
   affected behavior or rendered artifacts; report exactly what did and did not
   run.
-- For performance work, benchmark representative workloads before and after,
-  verify equivalent output, and report wall time and peak memory when relevant.
+- Performance claims require representative before-and-after measurements and
+  equivalent output.
 - Individual local commits need no version bump. Before GitHub pushes, bump the
   version even if unrequested, using the repository's scheme or Semantic
   Versioning (`MAJOR.MINOR.PATCH`) if absent.
