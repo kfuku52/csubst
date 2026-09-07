@@ -87,6 +87,36 @@ def test_sort_branch_ids_without_branch_or_site_columns_returns_input_order():
     assert out["value"].tolist() == [3, 1, 2]
 
 
+def test_sort_branch_ids_normalizes_strings_before_numeric_sorting():
+    df = pd.DataFrame({
+        "branch_id_1": ["10", "2", "2"],
+        "branch_id_2": [2, 10, 3],
+        "site": ["10", "2", "1"],
+        "value": [100, 200, 300],
+    })
+    out = table.sort_branch_ids(df)
+    assert out[["branch_id_1", "branch_id_2", "site"]].values.tolist() == [
+        [2, 3, 1], [2, 10, 2], [2, 10, 10],
+    ]
+    assert out["value"].tolist() == [300, 200, 100]
+
+
+@pytest.mark.parametrize("value", ["9007199254740993", "9223372036854775807.0"])
+def test_integer_like_strings_preserve_exact_values(value):
+    out = table.sort_branch_ids(pd.DataFrame({"branch_id_1": [value]}))
+    assert out["branch_id_1"].iloc[0] == int(value.split(".")[0])
+
+
+@pytest.mark.parametrize("values", [
+    np.array([2**63], dtype=np.uint64),
+    np.array([float(2**63)]),
+    np.array(["9223372036854775808"]),
+])
+def test_sort_branch_ids_rejects_int64_overflow(values):
+    with pytest.raises(ValueError, match="int64"):
+        table.sort_branch_ids(pd.DataFrame({"branch_id_1": values}))
+
+
 def test_sort_branch_ids_rejects_non_integer_like_branch_values():
     df = pd.DataFrame(
         {
@@ -177,6 +207,13 @@ def test_set_substitution_dtype_casts_integral_columns_only():
     assert out["S_sub"].dtype.kind in "iu"
     assert out["OCSany2spe"].dtype.kind in "iu"
     assert out["OCNany2any"].dtype.kind == "f"
+
+
+@pytest.mark.parametrize("values", [[1.0, np.nan], [np.nan, np.nan], [1.0, np.inf], [float(2**63), 0.0]])
+def test_set_substitution_dtype_preserves_nonrepresentable_values(values):
+    df = pd.DataFrame({"S_sub": values})
+    out = table.set_substitution_dtype(df.copy())
+    pd.testing.assert_frame_equal(out, df)
 
 
 def test_get_linear_regression_residuals_match_manual_solution():

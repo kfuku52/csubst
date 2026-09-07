@@ -37,7 +37,7 @@ def _normalize_branch_ids(branch_ids):
             raise ValueError('branch_ids should be integer-like.')
         if not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt)):
             raise ValueError('branch_ids should be integer-like.')
-        normalized.append(int(float(value_txt)))
+        normalized.append(int(value_txt.split('.', 1)[0]))
     return np.asarray(normalized, dtype=np.int64)
 
 

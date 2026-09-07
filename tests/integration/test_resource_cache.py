@@ -10,6 +10,7 @@ import pytest
 from csubst import model_resources
 from csubst import main_download
 from csubst import resource_cache
+from csubst import structure_resources
 from process_workers import _concurrent_resource_worker, _sequence_cache_worker
 
 
@@ -354,3 +355,61 @@ def test_resource_lock_rejects_non_finite_timing_values(tmp_path):
             timeout_seconds=float("inf"),
         ):
             pass
+
+
+@pytest.mark.parametrize("use_symlink", [False, True])
+def test_directory_resource_rejects_cache_root_without_removing_other_resources(tmp_path, use_symlink):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    sentinel = cache_dir / "other-resource.txt"
+    sentinel.write_text("keep")
+    resource_dir = cache_dir
+    if use_symlink:
+        resource_dir = tmp_path / "cache-alias"
+        resource_dir.symlink_to(cache_dir, target_is_directory=True)
+
+    def populate(stage_dir):
+        with open(os.path.join(stage_dir, "payload.txt"), "w") as handle:
+            handle.write("payload")
+
+    with pytest.raises(ValueError, match="inside"):
+        resource_cache.ensure_directory_resource(
+            "demo", resource_dir, populate, ["payload.txt"], cache_dir=cache_dir,
+        )
+    assert sentinel.read_text() == "keep"
+
+
+def test_structure_cache_repopulates_when_requested_filename_changes(tmp_path):
+    options = dict(
+        source="demo", structure_id="demo", url="https://example.org/demo.pdb",
+        cache_dir=tmp_path / "cache", download_bytes=lambda *_: b"structure",
+    )
+    structure_resources.ensure_remote_structure(filename="old.pdb", **options)
+    result = structure_resources.ensure_remote_structure(filename="new.pdb", **options)
+    with open(result, "rb") as handle:
+        assert handle.read() == b"structure"
+
+
+@pytest.mark.parametrize("verify_existing", [False, True])
+def test_directory_resource_revalidates_expected_files(tmp_path, verify_existing):
+    cache_dir = tmp_path / "cache"
+    resource_dir = cache_dir / "demo"
+    payload = b"old"
+
+    def populate(stage_dir):
+        with open(os.path.join(stage_dir, "payload.txt"), "wb") as handle:
+            handle.write(payload)
+
+    options = dict(
+        resource_id="demo", resource_dir=resource_dir, populate=populate,
+        required_files=["payload.txt"], cache_dir=cache_dir, verify_existing=verify_existing,
+    )
+    resource_cache.ensure_directory_resource(**options)
+    payload = b"new" if verify_existing else b"new-size"
+    options["expected_files"] = {
+        "payload.txt": {"size": len(payload), "sha256": hashlib.sha256(payload).hexdigest()},
+    }
+    with pytest.raises(FileNotFoundError, match="disabled"):
+        resource_cache.ensure_directory_resource(**options, no_download=True)
+    resource_cache.ensure_directory_resource(**options)
+    assert (resource_dir / "payload.txt").read_bytes() == payload

@@ -385,7 +385,14 @@ def validate_required_files(root_dir, required_files, expected_files=None, verif
     return file_records
 
 
-def is_directory_resource_ready(resource_dir, resource_id, verify_hashes=False):
+def is_directory_resource_ready(
+    resource_dir, resource_id, verify_hashes=False, *, required_files=None, expected_files=None,
+):
+    """Check the manifest and current requirements before reusing a resource.
+
+    Expected sizes always apply; expected checksums apply when verify_hashes
+    is enabled. A manifest alone must not override the caller's requirements.
+    """
     resource_dir = os.path.abspath(str(resource_dir))
     real_resource_dir = os.path.realpath(resource_dir)
     if os.path.islink(resource_dir):
@@ -403,6 +410,11 @@ def is_directory_resource_ready(resource_dir, resource_id, verify_hashes=False):
     files = manifest.get("files")
     if not isinstance(files, dict) or len(files) == 0:
         return False
+    if required_files is not None:
+        required = {str(path).replace("\\", "/") for path in required_files}
+        if not required.issubset(files):
+            return False
+    expected_files = {} if expected_files is None else expected_files
     for relative_path, record in files.items():
         if not isinstance(record, dict):
             return False
@@ -419,11 +431,19 @@ def is_directory_resource_ready(resource_dir, resource_id, verify_hashes=False):
         if (not is_contained) or os.path.islink(path) or (not os.path.isfile(path)):
             return False
         try:
-            if int(os.path.getsize(path)) != int(record.get("size", -1)):
+            size = int(os.path.getsize(path))
+            expected = expected_files.get(relative_path, {})
+            if size != int(record.get("size", -1)):
                 return False
-        except (TypeError, ValueError):
-            return False
-        if verify_hashes and sha256_file(path) != str(record.get("sha256", "")).lower():
+            if "size" in expected and size != int(expected["size"]):
+                return False
+            if verify_hashes:
+                checksum = sha256_file(path)
+                if checksum != str(record.get("sha256", "")).lower():
+                    return False
+                if expected.get("sha256") and checksum != str(expected["sha256"]).lower():
+                    return False
+        except (OSError, TypeError, ValueError, OverflowError):
             return False
     return True
 
@@ -450,15 +470,25 @@ def ensure_directory_resource(
         raise ValueError("timeout_seconds must be > 0.")
     resource_dir = os.path.abspath(os.path.expanduser(str(resource_dir)))
     managed_cache_dir = resolve_cache_dir(cache_dir)
+    real_resource_dir = os.path.realpath(resource_dir)
     try:
-        is_managed_path = os.path.commonpath(
-            [os.path.realpath(resource_dir), os.path.realpath(managed_cache_dir)]
-        ) == os.path.realpath(managed_cache_dir)
+        is_managed_path = (
+            real_resource_dir != managed_cache_dir
+            and os.path.commonpath([real_resource_dir, managed_cache_dir]) == managed_cache_dir
+        )
     except ValueError:
         is_managed_path = False
     if not is_managed_path:
         raise ValueError("Managed resource path should be inside the CSUBST cache directory: {}".format(resource_dir))
-    if is_directory_resource_ready(resource_dir, resource_id, verify_hashes=verify_existing):
+    required_files = tuple(required_files)
+
+    def is_ready():
+        return is_directory_resource_ready(
+            resource_dir, resource_id, verify_hashes=verify_existing,
+            required_files=required_files, expected_files=expected_files,
+        )
+
+    if is_ready():
         return resource_dir
     if no_download:
         raise FileNotFoundError(
@@ -471,7 +501,7 @@ def ensure_directory_resource(
         poll_seconds=poll_seconds,
         timeout_seconds=timeout_seconds,
     ):
-        if is_directory_resource_ready(resource_dir, resource_id, verify_hashes=verify_existing):
+        if is_ready():
             return resource_dir
         parent = os.path.dirname(resource_dir)
         os.makedirs(parent, exist_ok=True)
@@ -497,7 +527,7 @@ def ensure_directory_resource(
             if os.path.lexists(resource_dir):
                 if os.path.islink(resource_dir) or (not os.path.isdir(resource_dir)):
                     raise NotADirectoryError("Resource path exists but is not a directory: {}".format(resource_dir))
-                if is_directory_resource_ready(resource_dir, resource_id, verify_hashes=verify_existing):
+                if is_ready():
                     return resource_dir
                 shutil.rmtree(resource_dir)
             os.replace(stage_dir, resource_dir)

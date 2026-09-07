@@ -96,9 +96,9 @@ def _get_cb_ids(cb):
         value_txt = str(value).strip()
         if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
             raise ValueError('branch_id columns should be integer-like.')
-        if int(float(value_txt)) < 0:
+        if int(value_txt.split('.', 1)[0]) < 0:
             raise ValueError('branch_id columns should be non-negative integers.')
-        normalized.append(int(float(value_txt)))
+        normalized.append(int(value_txt.split('.', 1)[0]))
     return np.array(normalized, dtype=np.int64).reshape(cb_ids.shape)
 
 

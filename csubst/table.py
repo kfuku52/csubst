@@ -25,7 +25,9 @@ def _normalize_integer_like(values, column_name):
             raise ValueError('Column "{}" contains blank values.'.format(column_name))
         if not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt)):
             raise ValueError('Column "{}" should be integer-like.'.format(column_name))
-        normalized.append(int(float(value_txt)))
+        normalized.append(int(value_txt.split('.', 1)[0]))
+    if any(value < -(2**63) or value >= 2**63 for value in normalized):
+        raise ValueError('Column "{}" contains values outside the int64 range.'.format(column_name))
     return np.array(normalized, dtype=np.int64)
 
 
@@ -35,6 +37,8 @@ def _cast_integer_like_column(values, column_name):
         arr = arr.reshape(1)
     kind = arr.dtype.kind
     if kind in ['i', 'u']:
+        if kind == 'u' and (arr > np.iinfo(np.int64).max).any():
+            raise ValueError('Column "{}" contains values outside the int64 range.'.format(column_name))
         return arr.astype(np.int64, copy=False)
     if kind == 'f':
         if not np.isfinite(arr).all():
@@ -42,24 +46,24 @@ def _cast_integer_like_column(values, column_name):
         rounded = np.round(arr)
         if not np.isclose(arr, rounded, rtol=0.0, atol=1e-12).all():
             raise ValueError('Column "{}" should be integer-like.'.format(column_name))
+        if ((rounded < -(2**63)) | (rounded >= 2**63)).any():
+            raise ValueError('Column "{}" contains values outside the int64 range.'.format(column_name))
         return rounded.astype(np.int64, copy=False)
     return _normalize_integer_like(values=arr, column_name=column_name)
 
 
 def sort_branch_ids(df):
     swap_columns = df.columns[df.columns.str.startswith('branch_id')].tolist()
+    sort_columns = swap_columns + (['site'] if 'site' in df.columns else [])
+    for cn in sort_columns:
+        df[cn] = _cast_integer_like_column(values=df.loc[:, cn].to_numpy(copy=False), column_name=cn)
     if len(swap_columns)>1:
         swap_values = df.loc[:,swap_columns].to_numpy(copy=True)
         swap_values.sort(axis=1)
         df.loc[:,swap_columns] = swap_values
-    if 'site' in df.columns:
-        swap_columns.append('site')
-    if len(swap_columns) == 0:
+    if len(sort_columns) == 0:
         return df
-    df = df.sort_values(by=swap_columns)
-    for cn in swap_columns:
-        df[cn] = _cast_integer_like_column(values=df.loc[:, cn].to_numpy(copy=False), column_name=cn)
-    return df
+    return df.sort_values(by=sort_columns)
 
 def sort_cb(cb):
     start = time.time()
@@ -118,8 +122,17 @@ def set_substitution_dtype(df):
     for ck in col_exts:
         sub_cols = sub_cols + df.columns[df.columns.str.endswith(ck)].tolist()
     for sc in sub_cols:
-        if (df[sc]%1).sum()==0:
-            df[sc] = df[sc].astype(int)
+        values = df[sc]
+        # pandas sum skips NaN, so a zero sum of remainders does not prove
+        # that every value can be represented as an integer.
+        if (
+            values.notna().all()
+            and np.isfinite(values).all()
+            and (values >= -(2**63)).all()
+            and (values < 2**63).all()
+            and (values % 1 == 0).all()
+        ):
+            df[sc] = values.astype(np.int64)
     return df
 
 def get_linear_regression(cb):

@@ -772,7 +772,7 @@ def _normalize_branch_ids(branch_ids):
         value_txt = str(value).strip()
         if (value_txt == '') or (not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt))):
             raise ValueError('branch_ids should be integer-like.')
-        normalized.append(int(float(value_txt)))
+        normalized.append(int(value_txt.split('.', 1)[0]))
     return normalized
 
 
@@ -793,7 +793,7 @@ def _parse_positive_site(value):
             return None
         if not bool(re.fullmatch(r'[+-]?[0-9]+(?:\.0+)?', value_txt)):
             return None
-        site = int(float(value_txt))
+        site = int(value_txt.split('.', 1)[0])
     if site <= 0:
         return None
     return site

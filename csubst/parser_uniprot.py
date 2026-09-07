@@ -185,7 +185,7 @@ def _parse_positive_site(value):
         if not bool(re.fullmatch(r"[+-]?[0-9]+(?:\.0+)?", value_txt)):
             return None
         try:
-            site = int(float(value_txt))
+            site = int(value_txt.split('.', 1)[0])
         except (TypeError, ValueError):
             return None
     if site <= 0:
