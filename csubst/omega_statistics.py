@@ -22,8 +22,7 @@ def _calc_raw_rate(
     exp = np.asarray(exp, dtype=np.float64)
     with np.errstate(divide='ignore', invalid='ignore'):
         out = obs / exp
-    out[obs < float_tol] = 0
-    return out
+    return np.where(obs < float_tol, 0.0, out)
 
 
 def _calc_raw_omega(
@@ -35,8 +34,7 @@ def _calc_raw_omega(
     dSc = np.asarray(dSc, dtype=np.float64)
     with np.errstate(divide='ignore', invalid='ignore'):
         omega = dNc / dSc
-    omega[dNc < float_tol] = 0
-    return omega
+    return np.where(dNc < float_tol, 0.0, omega)
 
 
 def _calibrate_dsc_vector(

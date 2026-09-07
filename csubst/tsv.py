@@ -16,11 +16,9 @@ def write_dataframe(
     chunksize = max(1, int(chunksize))
     if dataframe.shape[1] == 0:
         # Preserve the historical csv.writer behavior: an empty header is one
-        # newline and zero-column data rows emit nothing.
-        with open(output_path, mode=mode, encoding='utf-8', newline='') as handle:
-            if header:
-                handle.write('\n')
-        return None
+        # newline and zero-column data rows emit nothing. Keep the shared
+        # pandas writer so compression and caller-owned streams still work.
+        dataframe = dataframe.iloc[:0]
     dataframe.to_csv(
         output_path,
         sep='\t',

@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+import gzip
+import io
+import pytest
 
 from csubst import tsv
 
@@ -52,3 +55,19 @@ def test_write_dataframe_zero_columns_without_header_is_empty(tmp_path):
     tsv.write_dataframe(frame, output_path, header=False)
 
     assert output_path.read_bytes() == b""
+
+
+@pytest.mark.parametrize("header", [False, True])
+def test_write_dataframe_zero_columns_supports_gzip(tmp_path, header):
+    path = tmp_path / "empty.tsv.gz"
+    tsv.write_dataframe(pd.DataFrame(index=range(3)), path, header=header)
+    with gzip.open(path, "rt") as handle:
+        assert handle.read() == ("\n" if header else "")
+
+
+@pytest.mark.parametrize("stream_type", [io.StringIO, io.BytesIO])
+def test_write_dataframe_zero_columns_supports_caller_stream(stream_type):
+    stream = stream_type()
+    tsv.write_dataframe(pd.DataFrame(index=range(3)), stream)
+    assert not stream.closed
+    assert stream.getvalue() in ("\n", b"\n")

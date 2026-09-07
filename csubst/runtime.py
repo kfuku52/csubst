@@ -341,6 +341,11 @@ def replace_file_cross_device(source, destination):
     destination = os.path.abspath(str(destination))
     if source == destination:
         return destination
+    try:
+        if os.path.samefile(source, destination):
+            return destination
+    except FileNotFoundError:
+        pass
     parent = os.path.dirname(destination) or "."
     os.makedirs(parent, exist_ok=True)
     fd, staged = tempfile.mkstemp(prefix=".{}.tmp.".format(os.path.basename(destination)), dir=parent)
@@ -371,8 +376,24 @@ def run_subprocess_tee(command, cwd=None):
         errors="replace",
         bufsize=1,
     )
-    if process.stdout is not None:
-        for line in process.stdout:
-            print(line, end="", flush=True)
-        process.stdout.close()
-    return int(process.wait())
+    try:
+        if process.stdout is not None:
+            for line in process.stdout:
+                print(line, end="", flush=True)
+        return int(process.wait())
+    except BaseException:
+        # Output failures and Ctrl-C must not leave IQ-TREE or model workers
+        # running after the command that owns them has failed.
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        raise
+    finally:
+        if process.stdout is not None:
+            process.stdout.close()
