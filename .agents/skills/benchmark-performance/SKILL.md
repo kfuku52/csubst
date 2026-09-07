@@ -1,6 +1,6 @@
 ---
 name: benchmark-performance
-description: Measure and improve software performance with representative before-and-after benchmarks, equivalent-output checks, and reproducible reporting. Use for performance optimization, benchmark design, or validating a performance claim.
+description: Benchmark or optimize software runtime, throughput, or memory use. Use for software performance measurements, not instruction editing or planning alone.
 ---
 
 # Benchmark Performance

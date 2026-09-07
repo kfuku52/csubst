@@ -1,4 +1,4 @@
-<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=8; sha256=74c7b7e2e0f64f6dbdac0aec9acab92873fbcf7011eee38fedefd261fcd43d35 -->
+<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=9; sha256=03e7ad2c21924fa609040d9176d1a9c3a7f0c6785f2efe97dfe03e48be13411e -->
 # Common agent policy
 
 Repository-specific instructions override these defaults.
@@ -26,9 +26,10 @@ Repository-specific instructions override these defaults.
   hide failures. Document unavoidable workarounds and their removal conditions.
 - When changing GitHub Actions, preserve required coverage and never execute
   untrusted pull-request code on self-hosted runners.
-- Run focused checks and, when practical, the standard suite. Directly exercise
-  affected behavior or rendered artifacts; report exactly what did and did not
-  run.
+- Run checks appropriate to the change and all repository-required checks.
+  Directly verify affected behavior or artifacts; report what did and did not
+  run. After success, expand or repeat checks only for new changes, failures,
+  or unresolved concerns.
 - Performance claims require representative before-and-after measurements and
   equivalent output.
 - Individual local commits need no version bump. Before GitHub pushes, bump the

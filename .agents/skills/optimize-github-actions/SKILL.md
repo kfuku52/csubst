@@ -1,6 +1,6 @@
 ---
 name: optimize-github-actions
-description: Review or modify GitHub Actions workflows while preserving required coverage, reducing unnecessary runner use, and protecting self-hosted runners. Use when changing files under .github/workflows or optimizing CI behavior.
+description: Review or change GitHub Actions workflows and their CI behavior. Use for workflow edits or Actions optimization, not unrelated CI systems.
 ---
 
 # Optimize GitHub Actions

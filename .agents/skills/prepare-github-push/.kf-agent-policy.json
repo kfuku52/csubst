@@ -1,7 +1,7 @@
 {
-  "content_sha256": "5980aa4f2ee57f567c59b4ef63c8737e0a3ebda8b616fa6f5fed5a07d39d91b6",
+  "content_sha256": "e247facabaa9e7d22b424607c020fd24d2685be36a45e8e5af301a1bbf218f15",
   "name": "prepare-github-push",
   "schema_version": 1,
   "source_url": "https://github.com/kfuku52/kf-agent-policy",
-  "version": "1"
+  "version": "2"
 }
