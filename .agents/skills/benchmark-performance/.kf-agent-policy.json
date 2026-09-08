@@ -1,7 +1,7 @@
 {
-  "content_sha256": "742a66c534d1097cc1721604b1bf9309cc197783525285a3324a99aeaaaeb66e",
+  "content_sha256": "6cb78d1eefee3ed3163ea5c1cde140a3279b456ef6b29316435ec7a4efaecd3e",
   "name": "benchmark-performance",
   "schema_version": 1,
   "source_url": "https://github.com/kfuku52/kf-agent-policy",
-  "version": "2"
+  "version": "3"
 }

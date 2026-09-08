@@ -1,11 +1,11 @@
 ---
 name: benchmark-performance
-description: Benchmark or optimize software runtime, throughput, or memory use. Use for software performance measurements, not instruction editing or planning alone.
+description: Benchmark or optimize software runtime, throughput, or memory use. Use for software performance measurements and benchmark design, not instruction editing alone.
 ---
 
 # Benchmark Performance
 
-Establish a comparable baseline before changing performance-sensitive code. Choose workloads that represent the behavior the user cares about, including realistic input sizes and relevant slow or memory-intensive cases. Record the environment, command, inputs, and configuration needed to reproduce the measurement.
+For design-only requests, provide the benchmark plan without changing code or running workloads. Before implementation, establish a comparable baseline. Choose workloads that represent the behavior the user cares about, including realistic input sizes and relevant slow or memory-intensive cases. Record the environment, command, inputs, and configuration needed to reproduce the measurement.
 
 Measure the metric that matches the goal. Report wall time and peak memory when they are relevant; add throughput, latency distribution, allocation counts, or another metric only when it helps evaluate the requested change. Use warmups and repeated runs when startup cost or noise could change the conclusion.
 
