@@ -7,6 +7,7 @@ from csubst import parallel
 from csubst import sequence
 from csubst.recoding_config import (
     AUTO_RECODING_SCHEMES,
+    DEFAULT_SA_BACKEND,
     RECODING_SCHEMES,
     normalize_nonsyn_recode,
 )
@@ -1140,7 +1141,8 @@ def _build_3di20_dataset_feature_vector(g):
         return None
     try:
         g_for_3di = dict(g)
-        if str(g_for_3di.get("prostt5_device", "auto")).strip().lower() == "auto":
+        if (str(g_for_3di.get("prostt5_device", "auto")).strip().lower() == "auto"
+                and g_for_3di.get("sa_backend", DEFAULT_SA_BACKEND) == "prostt5"):
             # Prefer CPU for PCA-time ProstT5 to avoid long MPS fallback stalls.
             g_for_3di["prostt5_device"] = "cpu"
         aa_by_tip = structural_alphabet.build_tip_aa_alignment_from_full_cds(g=g_for_3di)
@@ -1306,7 +1308,7 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
     if "3di20" in feature_by_scheme:
         vector_3di = _build_3di20_dataset_feature_vector(g=g)
         if (vector_3di is None) and (str(g.get("alignment_file", "")).strip() != ""):
-            txt = "Failed to infer 3di20 PCA feature from input dataset via ProstT5."
+            txt = "Failed to infer 3di20 PCA feature from input dataset using the selected 3Di predictor."
             raise ValueError(txt)
         if vector_3di is not None:
             expected_dim = int(feature_by_scheme["3di20"].shape[0])

@@ -17,6 +17,7 @@ license-files = [
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
     "licenses/BIOPYTHON_LICENSE.rst",
+    "licenses/STRUCTURAL_PREDICTORS_LICENSE.txt",
     "csubst/_vendor/pyvolve/LICENSE.txt",
 ]
 authors = [
@@ -52,6 +53,7 @@ test = ["pytest", "pytest-cov", "pytest-xdist"]
 dev = ["pytest", "pytest-cov", "pytest-xdist", "ruff", "mypy", "build", "twine"]
 structure = ["pymol-open-source>=3.2.0a0,<3.3"]
 vep = ["huggingface-hub", "sentencepiece", "torch>=2.0", "transformers"]
+3di = ["huggingface-hub", "sentencepiece", "protobuf", "torch>=2.6", "transformers", "peft"]
 
 [project.scripts]
 csubst = "csubst.cli:main"

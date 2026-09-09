@@ -12,6 +12,7 @@ from csubst import sequence
 from csubst import tree
 from csubst import ete
 from csubst import tsv
+from csubst.recoding_config import DEFAULT_SA_BACKEND
 
 
 _SEVERITY_RANK = {
@@ -315,8 +316,12 @@ def _check_3di_related_inputs(rows, g):
         _pass(rows, "nonsyn_recode", 'nonsyn_recode="{}"; 3Di-specific checks are not required.'.format(g.get("nonsyn_recode", "no")))
         return
     _pass(rows, "nonsyn_recode", 'nonsyn_recode="3di20"; running 3Di-specific checks.')
+    backend = str(g.get("sa_backend", DEFAULT_SA_BACKEND))
+    _pass(rows, "sa_backend", 'Selected 3Di predictor: {}.'.format(backend))
     prostt5_local_dir = _normalize_path(g.get("prostt5_local_dir", ""))
-    if prostt5_local_dir != "":
+    if backend == "esm3di-35m":
+        _pass(rows, "esm3di_model", "Using the pinned ESM3Di-35M model in the CSUBST resource cache.")
+    elif prostt5_local_dir != "":
         if os.path.isdir(prostt5_local_dir):
             _pass(rows, "prostt5_local_dir", "Local ProstT5 directory exists.", path=prostt5_local_dir)
         else:

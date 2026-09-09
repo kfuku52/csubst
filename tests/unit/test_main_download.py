@@ -4,7 +4,7 @@ from csubst import main_download
 
 
 def test_normalize_resources_supports_all_and_rejects_unknown():
-    assert main_download._normalize_resources('all') == ['vesm-35m', 'prostt5']
+    assert main_download._normalize_resources('all') == ['vesm-35m', 'prostt5', 'prostt5-cnn', 'esm3di-35m']
     assert main_download._normalize_resources('VESM_35M') == ['vesm-35m']
     with pytest.raises(ValueError, match='resource should be one of'):
         main_download._normalize_resources('unknown')
@@ -20,6 +20,12 @@ def test_main_download_prepares_both_resources(monkeypatch, capsys):
     def ensure_prostt5_model_files(g):
         calls['prostt5'] = g
         return '/cache/prostt5'
+
+    def ensure_encoder_model_files(g):
+        calls[g['sa_backend']] = g
+        return '/cache/' + g['sa_backend']
+
+    monkeypatch.setattr(main_download.structural_prediction, 'ensure_encoder_model_files', ensure_encoder_model_files)
 
     monkeypatch.setattr(
         main_download.model_resources,
@@ -44,6 +50,8 @@ def test_main_download_prepares_both_resources(monkeypatch, capsys):
     assert calls['vesm']['cache_dir'] == '/cache'
     assert calls['vesm']['no_download'] is True
     assert calls['prostt5']['prostt5_no_download'] is True
+    assert calls['prostt5-cnn']['prostt5_no_download'] is True
+    assert calls['esm3di-35m']['prostt5_no_download'] is True
     assert 'VESM-35M model files are ready' in capsys.readouterr().out
 
 
@@ -86,7 +94,7 @@ def test_main_download_never_disables_vesm_verification(monkeypatch, capsys, leg
     assert ('--verify is deprecated' in output) == (legacy_verify is not None)
 
 
-@pytest.mark.parametrize('resource', ['prostt5', 'all'])
+@pytest.mark.parametrize('resource', ['prostt5', 'prostt5-cnn', 'all'])
 def test_main_download_rejects_unsupported_checksums_before_preparing_any_resource(monkeypatch, resource):
     def unexpected_call(**_kwargs):
         pytest.fail('No resource should be loaded or downloaded for an unsupported checksum request')

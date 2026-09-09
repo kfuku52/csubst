@@ -67,6 +67,26 @@ def _get_cli_parser(show_advanced):
     return _CLI_PARSERS[show_advanced]
 
 
+@pytest.mark.parametrize('command', ['search', 'analyze', 'inspect', 'sites', 'site', 'doctor', 'scan', 'benchmark'])
+def test_3di_default_backend_is_esm3di(command):
+    assert _get_cli_parser(False).parse_args([command]).sa_backend == 'esm3di-35m'
+
+
+@pytest.mark.parametrize('command', ['search', 'inspect', 'sites', 'doctor'])
+@pytest.mark.parametrize('backend', ['prostt5', 'prostt5-cnn', 'esm3di-35m'])
+def test_3di_backend_and_neutral_aliases_share_existing_destinations(command, backend):
+    args = _get_cli_parser(True).parse_args([
+        command, '--sa_backend', backend, '--sa_device', 'cpu', '--sa_batch_size', '3',
+        '--sa_cache', 'no', '--sa_cache_file', 'shared.tsv', '--sa_no_download', 'yes',
+    ])
+    assert args.sa_backend == backend
+    assert args.sa_batch_size == 3
+    assert args.prostt5_device == 'cpu'
+    assert args.prostt5_cache is False
+    assert args.prostt5_cache_file == 'shared.tsv'
+    assert args.prostt5_no_download is True
+
+
 def _run_cli(*args):
     """Exercise parser/handler behavior without starting another Python."""
     namespace = _get_cli_namespace()
@@ -106,7 +126,7 @@ def test_sites_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects()
     assert "Matplotlib" not in log_text
 
 
-@pytest.mark.parametrize('resource', ['prostt5', 'all'])
+@pytest.mark.parametrize('resource', ['prostt5', 'prostt5-cnn', 'all'])
 def test_download_rejects_unsupported_checksum_request_cleanly(resource):
     proc, log_text = _run_cli_subprocess(
         'download', '--resource', resource, '--verify', 'yes', '--no_download', 'yes'

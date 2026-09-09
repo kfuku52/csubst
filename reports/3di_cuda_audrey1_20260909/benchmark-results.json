@@ -1,0 +1,87 @@
+{
+  "host": "audrey1",
+  "platform": "Linux-6.11.0-25-generic-x86_64-with-glibc2.39",
+  "torch": "2.6.0+cu124",
+  "transformers": "5.16.1",
+  "peft": "0.20.0",
+  "cuda_runtime": "12.4",
+  "gpu": "NVIDIA RTX 6000 Ada Generation",
+  "threads": 4,
+  "batch_size": 2,
+  "warmup_runs": 1,
+  "measured_runs": 3,
+  "input_sha256": "86bb22c676a04d3db6c749329bd6fcc7f37df883d96d925cc25e2a8ec47db921",
+  "input_lengths": [
+    960,
+    418
+  ],
+  "cache": false,
+  "model_loading_in_timing": false,
+  "cases": [
+    {
+      "backend": "esm3di-35m",
+      "device": "cpu",
+      "load_seconds": 1.355539320007665,
+      "seconds": [
+        0.901879553013714,
+        0.9059698130004108,
+        0.9019308790157083
+      ],
+      "median_seconds": 0.9019308790157083,
+      "output_sha256": "0b7c1629398b71741744f837b67756734205a7029151a446751fa2c7a482ef02",
+      "output_lengths": [
+        960,
+        418
+      ]
+    },
+    {
+      "backend": "esm3di-35m",
+      "device": "cuda",
+      "load_seconds": 0.8006893949932419,
+      "seconds": [
+        0.022375484986696392,
+        0.01542214400251396,
+        0.015390404005302116
+      ],
+      "median_seconds": 0.01542214400251396,
+      "output_sha256": "0b7c1629398b71741744f837b67756734205a7029151a446751fa2c7a482ef02",
+      "output_lengths": [
+        960,
+        418
+      ]
+    },
+    {
+      "backend": "prostt5-cnn",
+      "device": "cpu",
+      "load_seconds": 0.36193861899664626,
+      "seconds": [
+        27.861853033013176,
+        27.761380120005924,
+        28.43395973200677
+      ],
+      "median_seconds": 27.861853033013176,
+      "output_sha256": "03ec6ee6838c75e1b3afd3c3183eb1e4e560e961cd071d2c7544f264160461de",
+      "output_lengths": [
+        960,
+        418
+      ]
+    },
+    {
+      "backend": "prostt5-cnn",
+      "device": "cuda",
+      "load_seconds": 0.8564768419892062,
+      "seconds": [
+        0.31081802397966385,
+        0.31718563701724634,
+        0.3177961510082241
+      ],
+      "median_seconds": 0.31718563701724634,
+      "output_sha256": "03ec6ee6838c75e1b3afd3c3183eb1e4e560e961cd071d2c7544f264160461de",
+      "output_lengths": [
+        960,
+        418
+      ]
+    }
+  ],
+  "all_repeats_and_cpu_cuda_outputs_identical": true
+}

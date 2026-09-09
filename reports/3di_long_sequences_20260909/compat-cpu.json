@@ -1,0 +1,100 @@
+{
+  "device": "cpu",
+  "torch": "2.6.0",
+  "transformers": "4.57.6",
+  "peft": "0.18.1",
+  "threads": 4,
+  "position_embedding_type": "rotary",
+  "max_position_embeddings": 1026,
+  "attention_implementation": "sdpa",
+  "source_url": "https://rest.uniprot.org/uniprotkb/P11532.fasta",
+  "source_length": 3685,
+  "source_sha256": "f57a786ef3672a3e253c59c58b9fbdb04109bcd856354d930117441f4328ff1a",
+  "cases": [
+    {
+      "residues": 1022,
+      "tokens": 1024,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "61cf1c3500925c64ecd8d3acd21e6b29ff4192fecba7fdee02d77163ee806695",
+      "success": true,
+      "output_length": 1022,
+      "finite_logits": true,
+      "output_sha256": "a15eed29c200d6c8fc8e10bf6ccc23dfd29a564e154242a438368fe2cfda1a61",
+      "seconds": 0.2662289169966243,
+      "peak_rss_bytes": 733790208
+    },
+    {
+      "residues": 1023,
+      "tokens": 1025,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "5da7e0e72d89dcbf80891ac3e87139fe6c37ff278f716d18ac1ecec546567786",
+      "success": true,
+      "output_length": 1023,
+      "finite_logits": true,
+      "output_sha256": "9129ac40b0f5e708b153009c3ae35b638407a994f257a74743a947c55fe3c47d",
+      "seconds": 0.27438625000650063,
+      "peak_rss_bytes": 770637824
+    },
+    {
+      "residues": 1024,
+      "tokens": 1026,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "37157d27d1985e6537673ad14af8ca87c3094f9460e43f5edf0770c6683ccbd3",
+      "success": true,
+      "output_length": 1024,
+      "finite_logits": true,
+      "output_sha256": "3295d6baf7f7c6dbccd89a629888475b2270fe11cb2fa8ece0c9f6c4d93274bb",
+      "seconds": 0.2781532919907477,
+      "peak_rss_bytes": 770736128
+    },
+    {
+      "residues": 1025,
+      "tokens": 1027,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "3d43256dda7b70e359a3f54608c6d46506b511efbff511e7160e52510baf6d45",
+      "success": true,
+      "output_length": 1025,
+      "finite_logits": true,
+      "output_sha256": "644f457ceefe6c8bcb5b464949915d7fe69635445442903a4a6b230c48416128",
+      "seconds": 0.2805979999830015,
+      "peak_rss_bytes": 802488320
+    },
+    {
+      "residues": 2048,
+      "tokens": 2050,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "6ed00f1e001813e03814e4e6de0d9319bacfa1585f89b4e6a193c2002c52eccd",
+      "success": true,
+      "output_length": 2048,
+      "finite_logits": true,
+      "output_sha256": "fda9989c3e67ee545d754235dd51380b6b4e449b917f33ecfbb00dd5c4393567",
+      "seconds": 0.9222696670040023,
+      "peak_rss_bytes": 873873408
+    },
+    {
+      "residues": 3685,
+      "tokens": 3687,
+      "input_kind": "complete natural sequence",
+      "input_sha256": "f57a786ef3672a3e253c59c58b9fbdb04109bcd856354d930117441f4328ff1a",
+      "success": true,
+      "output_length": 3685,
+      "finite_logits": true,
+      "output_sha256": "43b46467cd68a32798b6993825216f3d94bcdb4343f99cf0c1f974a8c2093837",
+      "seconds": 2.757532083982369,
+      "peak_rss_bytes": 987496448
+    },
+    {
+      "residues": 4096,
+      "tokens": 4098,
+      "input_kind": "repeated natural sequence",
+      "input_sha256": "70816fe78ce5096465cab4395a05a5064937342dcdd16fd332eac5ecafe2780f",
+      "success": true,
+      "output_length": 4096,
+      "finite_logits": true,
+      "output_sha256": "44e4a270d1a618b83af1ea02b66418d5ac421a76466f1aedaf37c560aa5d4b61",
+      "seconds": 3.3100376249931287,
+      "peak_rss_bytes": 1113587712
+    }
+  ],
+  "short_prediction_unchanged_after_long_inputs": true
+}

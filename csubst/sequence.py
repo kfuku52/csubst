@@ -220,12 +220,33 @@ def _resolve_alignment_mode(mode, g):
     return missing_state, state, np.asarray(orders, dtype=object)
 
 
+def _alignment_node_names(tree_obj):
+    """Preserve named nodes and give unnamed nodes collision-free FASTA IDs."""
+    nodes = list(tree_obj.traverse())
+    used = {str(node.name) for node in nodes if node.name is not None and str(node.name).strip()}
+    names = {}
+    for node in nodes:
+        label = int(ete.get_prop(node, "numerical_label"))
+        name = '' if node.name is None else str(node.name)
+        if not name.strip():
+            base = 'csubst_branch_{}'.format(label)
+            name = base
+            suffix = 0
+            while name in used:
+                suffix += 1
+                name = '{}_{}'.format(base, suffix)
+            used.add(name)
+        names[label] = name
+    return names
+
+
 def write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
     aln_out = list()
     branch_id_set = None
     if branch_ids is not None:
         branch_id_set = set(int(bid) for bid in _normalize_branch_ids(branch_ids))
     missing_state, state, orders = _resolve_alignment_mode(mode=mode, g=g)
+    node_names = _alignment_node_names(g['tree'])
     records = list()
     if leaf_only:
         nodes = ete.iter_leaves(g['tree'])
@@ -237,7 +258,7 @@ def write_alignment(outfile, mode, g, leaf_only=False, branch_ids=None):
         nlabel = ete.get_prop(node, "numerical_label")
         if (branch_id_set is not None) and (nlabel not in branch_id_set):
             continue
-        node_name = '' if (node.name is None) else str(node.name)
+        node_name = node_names[int(nlabel)]
         records.append((node_name, int(nlabel)))
     if len(records) != 0:
         target_ids = np.asarray([r[1] for r in records], dtype=np.int64)
@@ -264,6 +285,7 @@ def write_alignment_from_symbol_indices(outfile, symbol_index_matrix, orders, mi
     if symbol_index_matrix.ndim != 2:
         raise ValueError('symbol_index_matrix should be a 2D array.')
     aln_out = list()
+    node_names = _alignment_node_names(g['tree'])
     branch_id_set = None
     if branch_ids is not None:
         branch_id_set = set(int(bid) for bid in _normalize_branch_ids(branch_ids))
@@ -284,7 +306,7 @@ def write_alignment_from_symbol_indices(outfile, symbol_index_matrix, orders, mi
         is_valid = (symbol_index >= 0) & (symbol_index < orders.shape[0])
         if is_valid.any():
             symbol_text[is_valid] = orders[symbol_index[is_valid].astype(np.int64, copy=False)]
-        node_name = '' if (node.name is None) else str(node.name)
+        node_name = node_names[nlabel]
         aln_out.append('>' + node_name)
         aln_out.append(''.join(symbol_text.tolist()))
     with open(outfile, 'w') as f:

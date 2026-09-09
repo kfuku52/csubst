@@ -1,0 +1,148 @@
+{
+  "inference": {
+    "cpu": {
+      "lengths": {
+        "empty": 0,
+        "one": 1,
+        "two": 2,
+        "unknown": 7,
+        "short": 31,
+        "PGK:Homo_sapiens_ENSG00000170950": 418,
+        "PEPC:Zea_mays_AB012228": 960,
+        "boundary": 1022
+      },
+      "single_batch_repeat_identical": true,
+      "cache_reuse_without_model_load": true
+    },
+    "overlength_rejected_before_loading": true,
+    "mps": {
+      "auto_selected_mps": true,
+      "single_batch_repeat_identical": true,
+      "mismatches_vs_cpu": {
+        "empty": 0,
+        "one": 0,
+        "two": 0,
+        "unknown": 0,
+        "short": 0,
+        "PGK:Homo_sapiens_ENSG00000170950": 0,
+        "PEPC:Zea_mays_AB012228": 0,
+        "boundary": 0
+      }
+    }
+  },
+  "compatibility": {
+    "torch": "2.6.0",
+    "transformers": "4.57.6",
+    "peft": "0.18.1",
+    "mismatches": {
+      "PGK:Homo_sapiens_ENSG00000170950": 0,
+      "PEPC:Zea_mays_AB012228": 0
+    }
+  },
+  "offline": {
+    "fresh_download": true,
+    "offline_hash_verification_without_network": true,
+    "same_size_corrupt_tokenizer_rejected": true,
+    "restored_resource_verified": true
+  },
+  "pca": {
+    "implicit_and_explicit_esm3di_identical": true,
+    "feature_size": 190,
+    "finite": true
+  },
+  "cli_cases": [
+    {
+      "case": "direct-default",
+      "successful_completion": true
+    },
+    {
+      "case": "direct-explicit",
+      "successful_completion": true
+    },
+    {
+      "case": "direct-state-cache",
+      "successful_completion": true
+    },
+    {
+      "case": "direct-search",
+      "successful_completion": true
+    },
+    {
+      "case": "direct-sites",
+      "successful_completion": true
+    },
+    {
+      "case": "direct-scan",
+      "successful_completion": true
+    },
+    {
+      "case": "translate-default",
+      "successful_completion": true
+    },
+    {
+      "case": "translate-explicit",
+      "successful_completion": true
+    },
+    {
+      "case": "translate-state-cache",
+      "successful_completion": true
+    },
+    {
+      "case": "translate-search",
+      "successful_completion": true
+    },
+    {
+      "case": "translate-sites",
+      "successful_completion": true
+    },
+    {
+      "case": "translate-scan",
+      "successful_completion": true
+    }
+  ],
+  "direct_implicit_explicit_cache_alignment_sha256": "c7db2b04ee53db220a79e8716afe773e01d70ea25ea264d3dd4a305d68bdf867",
+  "translate_implicit_explicit_cache_alignment_sha256": "55953d2217bad4e0b59ef872226cfc4ace73a99a7e1a0fb2edb258dd362302c4",
+  "cache_validation": {
+    "before_fix": {
+      "corrupt_cases_incorrectly_accepted": 6
+    },
+    "after_fix": {
+      "targeted_tests_passed": 20,
+      "invalid_cache_required_mode_rejected": true,
+      "invalid_cache_auto_mode_recomputed": true
+    }
+  },
+  "versions": {
+    "python": "3.12.14",
+    "torch": "2.14.0",
+    "transformers": "5.16.1",
+    "peft": "0.20.0",
+    "platform": "macOS 26.6.2 arm64",
+    "hardware": "Apple M2 Max"
+  },
+  "not_tested": [
+    "CUDA hardware",
+    "Python versions other than 3.12",
+    "other checkpoint families",
+    "structure-derived accuracy on general proteins",
+    "all downstream scientific conclusions"
+  ],
+  "repository_checks": {
+    "non_process_tests_passed": 1516,
+    "process_tests_passed": 4,
+    "strict_native_tests_passed": 7,
+    "lint": "passed",
+    "typecheck": "passed",
+    "repository_and_wiki_docs": "passed",
+    "sdist_and_arm64_wheel_build": "passed",
+    "twine": "passed",
+    "package_artifact_inspection": "passed"
+  },
+  "source_sha256": {
+    "csubst/recoding_config.py": "30a174ca9a5f3d55245584676cad98fffb1beef81f367331f5be9005e4ab2856",
+    "csubst/structural_prediction.py": "829511ae7ee8d3548af8b1203f631ee7d2b22bee7b9f6764217d7c3fc3022ef6",
+    "csubst/structural_alphabet.py": "532ba3f669d221bc2f40c493b8c88f9843d4b7174f109153f50ae3275c62c03a",
+    "csubst/parser_misc.py": "9e4e1d9e1a6fa553422e467c0134a901481250a0548d2c7721964e2b433f9b41",
+    "csubst/cli.py": "ac55d9498647a95bc87d556950d58db40fa60ec4c78aa090bfad15e1358c033d"
+  }
+}

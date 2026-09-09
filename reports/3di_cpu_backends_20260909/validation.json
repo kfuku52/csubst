@@ -1,0 +1,44 @@
+{
+  "non_process_tests_passed": 1498,
+  "process_tests_passed": 4,
+  "native_tests_passed": 7,
+  "lint": "passed",
+  "typecheck": "passed",
+  "repository_and_wiki_documentation": "passed",
+  "arm64_wheel_and_sdist_build": "passed",
+  "twine_check": "passed",
+  "smoke_dataset": "data/GH19_chitinase_tiny",
+  "smoke_max_nonroot_branches": 2,
+  "cli_smoke": [
+    {
+      "case": "esm3di-35m-direct",
+      "exit_code": 0,
+      "manifest_and_3di_alignment_verified": true
+    },
+    {
+      "case": "esm3di-35m-translate",
+      "exit_code": 0,
+      "manifest_and_3di_alignment_verified": true
+    },
+    {
+      "case": "prostt5-cnn-direct",
+      "exit_code": 0,
+      "manifest_and_3di_alignment_verified": true
+    },
+    {
+      "case": "prostt5-cnn-translate",
+      "exit_code": 0,
+      "manifest_and_3di_alignment_verified": true
+    }
+  ],
+  "independent_model_reference": {
+    "prostt5-cnn": "all 1378 residue predictions match independent reference",
+    "esm3di-35m": "all 1378 residue predictions match independent reference"
+  },
+  "not_tested": [
+    "GPU inference",
+    "other Python and dependency versions",
+    "structure-derived accuracy",
+    "downstream scientific equivalence"
+  ]
+}

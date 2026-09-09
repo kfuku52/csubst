@@ -116,6 +116,10 @@ Hugging Face's cache or `--prostt5_local_dir`, independently of that setting.
 See [model caches and offline use](https://github.com/kfuku52/csubst/wiki/csubst-download)
 and [VESM-35M scoring](https://github.com/kfuku52/csubst/wiki/csubst-sites#vesm-35m-variant-effect-scoring).
 
+For 3Di recoding, `--sa_backend` selects ESM3Di-35M (default), ProstT5-CNN,
+or the original ProstT5 generator. See [3Di predictors and CPU inference](docs/STRUCTURAL_ALPHABET.md)
+for the optional `csubst[3di]` dependencies and model-specific limitations.
+
 Foreground formats, higher-order search, site outputs, structure mapping, and
 simulation guides are available in the [Wiki](https://github.com/kfuku52/csubst/wiki).
 Developer setup and checks are documented in [CONTRIBUTING.md](CONTRIBUTING.md),

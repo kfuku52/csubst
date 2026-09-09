@@ -7,6 +7,24 @@ from csubst import param
 from csubst import runtime
 
 
+def test_get_global_parameters_defaults_to_esm3di():
+    assert param.get_global_parameters(_args())['sa_backend'] == 'esm3di-35m'
+
+
+@pytest.mark.parametrize('backend', ['prostt5', 'prostt5-cnn', 'esm3di-35m'])
+def test_get_global_parameters_parses_3di_backend_and_batch_size(backend):
+    g = param.get_global_parameters(_args(sa_backend=backend, sa_batch_size=3))
+    assert g['sa_backend'] == backend
+    assert g['sa_batch_size'] == 3
+
+
+@pytest.mark.parametrize('options,match', [({'sa_backend': 'esm2'}, 'sa_backend'),
+                                         ({'sa_batch_size': -1}, 'sa_batch_size')])
+def test_get_global_parameters_rejects_invalid_3di_predictor_options(options, match):
+    with pytest.raises(ValueError, match=match):
+        param.get_global_parameters(_args(**options))
+
+
 
 
 def test_get_global_parameters_rejects_invalid_percent_biased_sub():

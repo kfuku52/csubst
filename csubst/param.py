@@ -865,6 +865,10 @@ def _normalize_execution_parameters(g: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_recoding_parameters(g: dict[str, Any]) -> dict[str, Any]:
+    g['sa_backend'] = recoding_config.normalize_sa_backend(g.get('sa_backend', recoding_config.DEFAULT_SA_BACKEND))
+    g['sa_batch_size'] = int(g.get('sa_batch_size', 0))
+    if g['sa_batch_size'] < 0:
+        raise ValueError('--sa_batch_size should be >= 0.')
     if 'nonsyn_recode' in g.keys():
         g['nonsyn_recode'] = recoding_config.normalize_nonsyn_recode(g['nonsyn_recode'])
     else:

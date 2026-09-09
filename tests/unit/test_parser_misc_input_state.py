@@ -303,7 +303,7 @@ def test_prep_state_3di20_prefers_sa_inference_branch_ids(monkeypatch):
     np.testing.assert_array_equal(called_selected["ids"], np.array([0, 2], dtype=np.int64))
 
 
-def test_prep_state_3di20_auto_writes_and_reuses_cache(tmp_path, monkeypatch):
+def test_prep_state_3di20_auto_writes_reuses_and_repairs_invalid_cache(tmp_path, monkeypatch):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     num_node = len(list(tr.traverse()))
     state_cdn = np.zeros((num_node, 2, 3), dtype=np.float64)
@@ -357,6 +357,16 @@ def test_prep_state_3di20_auto_writes_and_reuses_cache(tmp_path, monkeypatch):
     assert called["n"] == 1
     assert out_second["nonsyn_state_orders"].tolist() == state_orders.tolist()
     assert out_second["state_nsy"].shape == state_nsy.shape
+    with np.load(cache_file, allow_pickle=False) as archive:
+        fields = {key: archive[key] for key in archive.files}
+    fields['state_nsy'][0, 0, 0] = np.nan
+    np.savez_compressed(cache_file, **fields)
+    with pytest.raises(ValueError, match='cached 3Di probabilities'):
+        parser_misc.prep_state(dict(g_base, sa_state_cache='yes'))
+    monkeypatch.setattr(parser_misc.structural_alphabet, "build_3di_state_from_state_pep", _fake_translate_builder)
+    repaired = parser_misc.prep_state(dict(g_base))
+    assert called['n'] == 2
+    assert np.isfinite(repaired['state_nsy']).all()
 
 
 def test_prep_state_can_defer_site_filtering(monkeypatch):
@@ -405,6 +415,7 @@ def test_3di_state_cache_context_tracks_model_selection(tmp_path):
     iqtree_state_file.write_text("# dummy\n", encoding="utf-8")
 
     g_translate = {
+        "sa_backend": "prostt5",
         "sa_asr_mode": "translate",
         "infile_type": "iqtree",
         "input_data_type": "cdn",
@@ -429,6 +440,13 @@ def test_3di_state_cache_context_tracks_model_selection(tmp_path):
         state_cdn_shape=(3, 4, 5),
     )
     assert ctx_translate_a != ctx_translate_b
+    for backend in ['prostt5-cnn', 'esm3di-35m']:
+        context = parser_misc._get_3di_state_cache_context(
+            g=dict(g_translate, sa_backend=backend),
+            selected_branch_ids=np.array([0, 2], dtype=np.int64),
+            state_cdn_shape=(3, 4, 5),
+        )
+        assert context != ctx_translate_a
 
     g_direct = dict(g_translate, sa_asr_mode="direct")
     ctx_direct_a = parser_misc._get_3di_state_cache_context(

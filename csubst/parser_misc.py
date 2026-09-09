@@ -57,11 +57,11 @@ def _initialize_and_report_nonsyn_recode(g):
         g["max_nonsynonymous_size"] = max(len(index_map[state]) for state in state_orders)
         if recode == "3di20":
             print("Applying nonsynonymous recoding scheme: 3di20")
-            txt = "3Di mode: --sa_asr_mode={}, ProstT5 model={}, direct IQ-TREE model={} (--seqtype MORPH)"
+            txt = "3Di mode: --sa_asr_mode={}, predictor={}, direct IQ-TREE model={} (--seqtype MORPH)"
             print(
                 txt.format(
                     g.get("sa_asr_mode", "direct"),
-                    g.get("prostt5_model", "Rostlab/ProstT5"),
+                    structural_alphabet.get_3di_model_cache_key(g),
                     g.get("sa_iqtree_model", "GTR"),
                 )
             )
@@ -72,11 +72,11 @@ def _initialize_and_report_nonsyn_recode(g):
         txt = "Applying nonsynonymous recoding scheme: {}"
         print(txt.format(g["nonsyn_recode"]))
         if g["nonsyn_recode"] == "3di20":
-            txt = "3Di mode: --sa_asr_mode={}, ProstT5 model={}, direct IQ-TREE model={} (--seqtype MORPH)"
+            txt = "3Di mode: --sa_asr_mode={}, predictor={}, direct IQ-TREE model={} (--seqtype MORPH)"
             print(
                 txt.format(
                     g.get("sa_asr_mode", "direct"),
-                    g.get("prostt5_model", "Rostlab/ProstT5"),
+                    structural_alphabet.get_3di_model_cache_key(g),
                     g.get("sa_iqtree_model", "GTR"),
                 )
             )
@@ -192,7 +192,9 @@ def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
         'prostt5_model': str(g.get('prostt5_model', 'Rostlab/ProstT5')).strip(),
         'prostt5_revision': structural_alphabet._resolve_prostt5_revision(g),
         'prostt5_local_dir': str(g.get('prostt5_local_dir', '')).strip(),
-        'prostt5_model_cache_key': structural_alphabet.get_prostt5_model_cache_key(g),
+        # Retain the cache field name for existing ProstT5 caches. Its value now
+        # identifies the selected predictor, encoder and classifier weights.
+        'prostt5_model_cache_key': structural_alphabet.get_3di_model_cache_key(g),
         'sa_iqtree_model': str(g.get('sa_iqtree_model', 'GTR')).strip(),
         'iqtree_exe': os.path.realpath(str(g.get('iqtree_exe', ''))),
         'iqtree_version': str(
@@ -250,6 +252,19 @@ def _try_load_3di_state_cache(g, selected_branch_ids, state_cdn_shape):
         return None, None, 'cached state_nsy site axis mismatch.'
     if state_nsy.shape[2] != state_orders.shape[0]:
         return None, None, 'cached state_nsy/state_orders dimensions mismatch.'
+    if not np.array_equal(state_orders, structural_alphabet.get_3di_state_orders()):
+        return None, None, 'cached 3Di state order is invalid.'
+    # Corrupt but readable NPZ files must not inject invalid probabilities into
+    # convergence counts. Validate in bounded chunks, allowing all-zero rows
+    # for missing/unloaded states and IQ-TREE's rounded posterior probabilities.
+    rows = state_nsy.reshape(-1, state_orders.shape[0])
+    for start in range(0, rows.shape[0], 65536):
+        block = rows[start:start + 65536]
+        if not np.isfinite(block).all() or np.any(block < 0) or np.any(block > 1):
+            return None, None, 'cached 3Di probabilities must be finite and between 0 and 1.'
+        masses = block.sum(axis=1, dtype=np.float64)
+        if np.any((masses != 0) & (np.abs(masses - 1) > 1e-3)):
+            return None, None, 'cached 3Di probability rows must sum to 0 (missing) or 1.'
     return state_nsy, state_orders, None
 
 

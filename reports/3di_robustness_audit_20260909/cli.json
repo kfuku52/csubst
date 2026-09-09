@@ -1,0 +1,14 @@
+[
+  {
+    "mode": "direct",
+    "exit_code": 0,
+    "sequence_count": 14,
+    "sequence_and_state_cache_disabled": true
+  },
+  {
+    "mode": "translate",
+    "exit_code": 0,
+    "sequence_count": 14,
+    "sequence_and_state_cache_disabled": true
+  }
+]

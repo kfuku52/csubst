@@ -247,6 +247,9 @@ def _load_prostt5_from_local_only(source, tokenizer_cls, model_cls, revision=Non
 
 
 def _load_or_download_prostt5(g, tokenizer_cls, model_cls):
+    # Some Transformers versions start a Hub conversion thread even when
+    # local_files_only=True. Inference must not request remote weight conversion.
+    os.environ["DISABLE_SAFETENSORS_CONVERSION"] = "1"
     model_name, local_dir, no_download = _resolve_prostt5_model_options(g=g)
     revision = _resolve_prostt5_revision(g=g)
     model_source = local_dir if local_dir != "" else model_name
@@ -480,11 +483,22 @@ def get_prostt5_model_cache_key(g):
     )
 
 
+def get_3di_model_cache_key(g):
+    from csubst import structural_prediction
+    return structural_prediction.get_model_cache_key(g)
+
+
+def predict_3di(aa_sequences, g):
+    from csubst import structural_prediction
+    return structural_prediction.predict_3di(aa_sequences, g)
+
+
 def _load_prostt5_sequence_cache(cache_file, model_key):
     out = dict()
     cache_file = str(cache_file).strip()
     if cache_file == "":
         return out
+    cache_file = os.path.abspath(os.path.expanduser(cache_file))
     if not os.path.exists(cache_file):
         return out
     with open(cache_file, encoding="utf-8", errors="replace") as f:
@@ -653,6 +667,11 @@ def predict_3di_with_prostt5(aa_sequences, g):
         device=device,
         unique_sequence_count=len(remaining),
     )
+    requested_batch_size = int(g.get("sa_batch_size", 0))
+    if requested_batch_size < 0:
+        raise ValueError("--sa_batch_size should be >= 0.")
+    if requested_batch_size:
+        batch_size = requested_batch_size
     new_cache_entries = dict()
     infer_context = torch.no_grad
     if hasattr(torch, "inference_mode") and callable(getattr(torch, "inference_mode")):
@@ -732,7 +751,7 @@ def _inject_alignment_gaps(reference_aligned_seq, ungapped_pred_seq, seq_id):
     ungapped_pred_seq = str(ungapped_pred_seq).strip().upper()
     nongap_count = sum([1 for c in reference_aligned_seq if c != "-"])
     if nongap_count != len(ungapped_pred_seq):
-        txt = "ProstT5 output length mismatch for sequence {} after gap projection: expected {}, got {}."
+        txt = "3Di output length mismatch for sequence {} after gap projection: expected {}, got {}."
         raise ValueError(txt.format(seq_id, nongap_count, len(ungapped_pred_seq)))
     out = list()
     k = 0
@@ -840,7 +859,7 @@ def build_tip_3di_alignment_from_full_cds(
     output_path="csubst_alignment_3di_tip.fa",
 ):
     if predictor is None:
-        predictor = predict_3di_with_prostt5
+        predictor = predict_3di
     aa_by_tip = build_tip_aa_alignment_from_full_cds(g=g)
     aa_ungapped = {
         name: _sanitize_aa_sequence_for_prostt5(seq.replace("-", ""))
@@ -1017,7 +1036,7 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
     )
     state_table = pd.read_csv(paths["state"], sep="\t", index_col=False, header=0, comment="#")
     if state_table.shape[0] == 0:
-        return state_tensor, state_orders
+        raise ValueError("Direct 3Di .state file contains no ancestral state rows.")
     required_columns = ["Node", "Site", "State"]
     missing_columns = [col for col in required_columns if col not in state_table.columns]
     if len(missing_columns) > 0:
@@ -1032,14 +1051,21 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
         symbol_3di = _convert_state_symbol_to_3di(raw_symbol, symbol_mode=state_symbol_mode)
         if symbol_3di in state_lookup:
             col_to_state[str(col)] = int(state_lookup[symbol_3di])
-    if len(col_to_state) != state_orders.shape[0]:
+    if not col_to_state or len(col_to_state) != len(state_columns):
         raise ValueError(
-            "Direct .state file should contain exactly {} recognized 3Di probability columns; found {}.".format(
-                state_orders.shape[0], len(col_to_state)
-            )
+            "Direct .state file should contain only recognized 3Di probability columns."
         )
-    if len(set(col_to_state.values())) != state_orders.shape[0]:
+    if len(set(col_to_state.values())) != len(col_to_state):
         raise ValueError("Duplicate 3Di probability-state columns were found in direct .state file.")
+    # IQ-TREE MORPH removes states absent from the entire input alignment.
+    # Their posterior mass stays zero in our fixed 20-state tensor. A missing
+    # column for an observed tip state is corruption, not an absent model state.
+    observed_states = set("".join(str(seq).upper() for seq in tip_3di_by_name.values())) - {"-"}
+    represented_states = {str(state_orders[index]) for index in col_to_state.values()}
+    missing_observed = observed_states - represented_states
+    if missing_observed:
+        raise ValueError("Direct .state file is missing probability columns for observed 3Di states: {}.".format(
+            ",".join(sorted(missing_observed))))
     site_values = pd.to_numeric(state_table.loc[:, "Site"], errors="coerce")
     site_values_arr = site_values.to_numpy(dtype=float)
     if not np.isfinite(site_values_arr).all():
@@ -1197,7 +1223,7 @@ def build_3di_state_direct(g, selected_branch_ids=None, predictor=None):
 
 def build_3di_state_from_state_pep(g, state_pep, selected_branch_ids=None, predictor=None):
     if predictor is None:
-        predictor = predict_3di_with_prostt5
+        predictor = predict_3di
     if state_pep.ndim != 3:
         raise ValueError("state_pep should be a 3D tensor.")
     aa_aligned_by_branch = _state_pep_to_ml_aa_alignment_by_branch(

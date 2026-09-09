@@ -186,16 +186,17 @@ def test_normalize_direct_iqtree_model_maps_gtr20_to_gtr():
     assert remapped_ok is False
 
 
-def test_read_direct_3di_state_tensor_accepts_morph_state_columns(tmp_path):
+@pytest.mark.parametrize("num_states", [2, 19, 20])
+def test_read_direct_3di_state_tensor_accepts_morph_state_columns(tmp_path, num_states):
     rooted_tree = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     treefile_path = tmp_path / "direct.treefile"
     tree.write_tree(rooted_tree, outfile=str(treefile_path), add_numerical_label=False)
     direct_tree = tree.standardize_node_names(ete.PhyloNode(treefile_path.read_text(), format=1))
     root_name = [n.name for n in direct_tree.traverse() if ete.is_root(n)][0]
     state_path = tmp_path / "direct.state"
-    morph_orders = list("0123456789ABCDEFGHIJ")
-    row1 = np.zeros(20, dtype=float)
-    row2 = np.zeros(20, dtype=float)
+    morph_orders = list("0123456789ABCDEFGHIJ")[:num_states]
+    row1 = np.zeros(num_states, dtype=float)
+    row2 = np.zeros(num_states, dtype=float)
     row1[:2] = [0.10, 0.90]
     row2[:2] = [0.80, 0.20]
     state_path.write_text(
@@ -237,6 +238,12 @@ def test_read_direct_3di_state_tensor_accepts_morph_state_columns(tmp_path):
     assert state_tensor[root_id, 1, idx_c] == pytest.approx(0.20)
     assert state_tensor[tip_a_id, 0, idx_a] == pytest.approx(1.0)
     assert state_tensor[tip_a_id, 1, idx_c] == pytest.approx(1.0)
+    np.testing.assert_array_equal(state_tensor[:, :, num_states:], 0)
+    # Absent input states may be omitted, but a missing observed state is an error.
+    lines = [line.split("\t") for line in state_path.read_text().splitlines()]
+    state_path.write_text("\n".join("\t".join(row[:3] + row[4:]) for row in lines) + "\n")
+    with pytest.raises(ValueError, match="missing probability columns for observed"):
+        structural_alphabet._read_direct_3di_state_tensor(g, paths, tip_3di_by_name)
 
 
 def test_run_iqtree_direct_3di_uses_morph_and_remaps_gtr20(tmp_path, monkeypatch):
@@ -355,3 +362,17 @@ def test_build_3di_state_direct_does_not_prefilter_when_mode_is_zero_sub_mass(mo
     structural_alphabet.build_3di_state_direct(g=g)
     assert captured["encoded_tip"] == tip_full
     assert "_precomputed_tip_invariant_site_mask" not in g
+
+
+def test_direct_3di_rejects_header_only_ancestral_state_file(tmp_path):
+    rooted = tree.add_numerical_node_labels(ete.PhyloNode('((A:1,B:1)N:1,C:1)R;', format=1))
+    treefile = tmp_path / 'direct.treefile'
+    tree.write_tree(rooted, outfile=str(treefile), add_numerical_label=False)
+    statefile = tmp_path / 'direct.state'
+    statefile.write_text('Node\tSite\tState\tp_0\tp_1\n')
+    with pytest.raises(ValueError, match='no ancestral state rows'):
+        structural_alphabet._read_direct_3di_state_tensor(
+            {'rooted_tree': rooted, 'float_type': np.float64},
+            {'treefile': str(treefile), 'state': str(statefile), 'state_symbol_mode': 'morph'},
+            {'A': 'AC', 'B': 'CA', 'C': 'AC'},
+        )

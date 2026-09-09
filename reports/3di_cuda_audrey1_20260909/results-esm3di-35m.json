@@ -1,0 +1,70 @@
+{
+  "torch": "2.6.0+cu124",
+  "transformers": "5.16.1",
+  "peft": "0.20.0",
+  "cuda_runtime": "12.4",
+  "gpu": "NVIDIA RTX 6000 Ada Generation",
+  "threads": 4,
+  "tf32_matmul": false,
+  "cases": [
+    {
+      "backend": "esm3di-35m",
+      "device": "cpu",
+      "sequences": 35,
+      "residues": 2817,
+      "singleton_batch_repeat_identical": true,
+      "finite_logits": true,
+      "output_lengths_correct": true,
+      "diagnostic_seconds": 3.7946757859899662,
+      "peak_cuda_allocated_bytes": 0
+    },
+    {
+      "backend": "esm3di-35m",
+      "device": "cuda",
+      "long_residues": 1023,
+      "output_sha256": "9129ac40b0f5e708b153009c3ae35b638407a994f257a74743a947c55fe3c47d",
+      "success": true
+    },
+    {
+      "backend": "esm3di-35m",
+      "device": "cuda",
+      "long_residues": 2048,
+      "output_sha256": "fda9989c3e67ee545d754235dd51380b6b4e449b917f33ecfbb00dd5c4393567",
+      "success": true
+    },
+    {
+      "backend": "esm3di-35m",
+      "device": "cuda",
+      "long_residues": 3685,
+      "output_sha256": "43b46467cd68a32798b6993825216f3d94bcdb4343f99cf0c1f974a8c2093837",
+      "success": true
+    },
+    {
+      "backend": "esm3di-35m",
+      "device": "cuda",
+      "long_residues": 4096,
+      "output_sha256": "44e4a270d1a618b83af1ea02b66418d5ac421a76466f1aedaf37c560aa5d4b61",
+      "success": true
+    },
+    {
+      "backend": "esm3di-35m",
+      "device": "cuda",
+      "long_residues": 8192,
+      "output_sha256": "24cb1df4676a6f48e6965dabb508d7c335a40f0fa87befc7fd7fedc6b5018026",
+      "success": true
+    },
+    {
+      "backend": "esm3di-35m",
+      "device": "cuda",
+      "sequences": 35,
+      "residues": 2817,
+      "singleton_batch_repeat_identical": true,
+      "finite_logits": true,
+      "output_lengths_correct": true,
+      "diagnostic_seconds": 1.0376386029820424,
+      "peak_cuda_allocated_bytes": 458083328
+    }
+  ],
+  "esm3di-35m_cpu_cuda_residue_differences": 0,
+  "esm3di-35m_public_auto_and_cache_pass": true
+}

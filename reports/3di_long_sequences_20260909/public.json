@@ -1,0 +1,10 @@
+{
+  "default_backend": "esm3di-35m",
+  "public_api_matches_direct_inference": true,
+  "cache_roundtrip_matches": true,
+  "lengths": {
+    "natural": 3685,
+    "long": 8192,
+    "short": 128
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "device": "mps",
+  "torch": "2.14.0",
+  "transformers": "5.16.1",
+  "peft": "0.20.0",
+  "threads": 4,
+  "position_embedding_type": "rotary",
+  "max_position_embeddings": 1026,
+  "attention_implementation": "sdpa",
+  "source_url": "https://rest.uniprot.org/uniprotkb/P11532.fasta",
+  "source_length": 3685,
+  "source_sha256": "f57a786ef3672a3e253c59c58b9fbdb04109bcd856354d930117441f4328ff1a",
+  "cases": [
+    {
+      "residues": 1022,
+      "tokens": 1024,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "61cf1c3500925c64ecd8d3acd21e6b29ff4192fecba7fdee02d77163ee806695",
+      "success": true,
+      "output_length": 1022,
+      "finite_logits": true,
+      "output_sha256": "a15eed29c200d6c8fc8e10bf6ccc23dfd29a564e154242a438368fe2cfda1a61",
+      "seconds": 0.2698432079923805,
+      "peak_rss_bytes": 871120896
+    },
+    {
+      "residues": 1023,
+      "tokens": 1025,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "5da7e0e72d89dcbf80891ac3e87139fe6c37ff278f716d18ac1ecec546567786",
+      "success": true,
+      "output_length": 1023,
+      "finite_logits": true,
+      "output_sha256": "9129ac40b0f5e708b153009c3ae35b638407a994f257a74743a947c55fe3c47d",
+      "seconds": 0.20011229201918468,
+      "peak_rss_bytes": 871874560
+    },
+    {
+      "residues": 1024,
+      "tokens": 1026,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "37157d27d1985e6537673ad14af8ca87c3094f9460e43f5edf0770c6683ccbd3",
+      "success": true,
+      "output_length": 1024,
+      "finite_logits": true,
+      "output_sha256": "3295d6baf7f7c6dbccd89a629888475b2270fe11cb2fa8ece0c9f6c4d93274bb",
+      "seconds": 0.14333587500732392,
+      "peak_rss_bytes": 871874560
+    },
+    {
+      "residues": 1025,
+      "tokens": 1027,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "3d43256dda7b70e359a3f54608c6d46506b511efbff511e7160e52510baf6d45",
+      "success": true,
+      "output_length": 1025,
+      "finite_logits": true,
+      "output_sha256": "644f457ceefe6c8bcb5b464949915d7fe69635445442903a4a6b230c48416128",
+      "seconds": 0.1381073340016883,
+      "peak_rss_bytes": 871874560
+    },
+    {
+      "residues": 2048,
+      "tokens": 2050,
+      "input_kind": "natural sequence prefix",
+      "input_sha256": "6ed00f1e001813e03814e4e6de0d9319bacfa1585f89b4e6a193c2002c52eccd",
+      "success": true,
+      "output_length": 2048,
+      "finite_logits": true,
+      "output_sha256": "fda9989c3e67ee545d754235dd51380b6b4e449b917f33ecfbb00dd5c4393567",
+      "seconds": 0.28246779198525473,
+      "peak_rss_bytes": 875266048
+    },
+    {
+      "residues": 3685,
+      "tokens": 3687,
+      "input_kind": "complete natural sequence",
+      "input_sha256": "f57a786ef3672a3e253c59c58b9fbdb04109bcd856354d930117441f4328ff1a",
+      "success": true,
+      "output_length": 3685,
+      "finite_logits": true,
+      "output_sha256": "43b46467cd68a32798b6993825216f3d94bcdb4343f99cf0c1f974a8c2093837",
+      "seconds": 1.1505151659948751,
+      "peak_rss_bytes": 876167168
+    },
+    {
+      "residues": 4096,
+      "tokens": 4098,
+      "input_kind": "repeated natural sequence",
+      "input_sha256": "70816fe78ce5096465cab4395a05a5064937342dcdd16fd332eac5ecafe2780f",
+      "success": true,
+      "output_length": 4096,
+      "finite_logits": true,
+      "output_sha256": "44e4a270d1a618b83af1ea02b66418d5ac421a76466f1aedaf37c560aa5d4b61",
+      "seconds": 1.14119308401132,
+      "peak_rss_bytes": 876167168
+    },
+    {
+      "residues": 8192,
+      "tokens": 8194,
+      "input_kind": "repeated natural sequence",
+      "input_sha256": "0d287bd34e6813b298c213ef2c9bfa2535338dbdbb75c519f70cefd2b499c43b",
+      "success": true,
+      "output_length": 8192,
+      "finite_logits": true,
+      "output_sha256": "24cb1df4676a6f48e6965dabb508d7c335a40f0fa87befc7fd7fedc6b5018026",
+      "seconds": 4.618044375005411,
+      "peak_rss_bytes": 876167168
+    }
+  ],
+  "short_prediction_unchanged_after_long_inputs": true
+}

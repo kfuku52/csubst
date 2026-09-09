@@ -430,3 +430,26 @@ def test_combinations_count_out_of_range_r_returns_zero():
 def test_combinations_count_rejects_negative_n():
     with pytest.raises(ValueError, match=">= 0"):
         foreground.combinations_count(-1, 1)
+
+
+@pytest.mark.parametrize('writer', ['states', 'indices'])
+def test_alignment_export_names_unnamed_nodes_without_collisions(tmp_path, writer):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('((A:1,B:1):1,C:1)R;', format=1))
+    unnamed = next(node for node in tr.traverse() if not ete.is_root(node) and not ete.is_leaf(node))
+    branch_id = int(ete.get_prop(unnamed, 'numerical_label'))
+    reserved = 'csubst_branch_{}'.format(branch_id)
+    next(ete.iter_leaves(tr)).name = reserved
+    size = max(int(ete.get_prop(n, 'numerical_label')) for n in tr.traverse()) + 1
+    g = {'tree': tr, 'float_tol': 1e-12, 'amino_acid_orders': np.array(['K']),
+         'state_pep': np.ones((size, 2, 1))}
+    output = tmp_path / 'alignment.fa'
+    if writer == 'states':
+        sequence.write_alignment(str(output), 'aa', g)
+    else:
+        sequence.write_alignment_from_symbol_indices(str(output), np.zeros((size, 2), dtype=int), ['K'], '-', g)
+    headers = [s[1:] for s in output.read_text().splitlines() if s.startswith('>')]
+    assert all(headers)
+    assert len(set(headers)) == 4
+    assert reserved in headers
+    assert reserved + '_1' in headers
+    assert len(sequence.read_fasta(str(output))) == 4

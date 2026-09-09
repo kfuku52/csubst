@@ -20,6 +20,7 @@ set -euo pipefail
 #   THREADS=12
 #   PROSTT5_DEVICE=auto|cpu|cuda|mps
 #   PROSTT5_CACHE=yes|no
+#   SA_BACKEND=prostt5|prostt5-cnn|esm3di-35m
 #   MODES=no,direct,translate
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,6 +45,7 @@ if [[ -z "${THREADS:-}" ]]; then
 fi
 PROSTT5_DEVICE="${PROSTT5_DEVICE:-auto}"
 PROSTT5_CACHE="${PROSTT5_CACHE:-yes}"
+SA_BACKEND="${SA_BACKEND:-esm3di-35m}"
 MODES="${MODES:-no,direct,translate}"
 IFS=',' read -r -a MODE_LIST <<< "$MODES"
 
@@ -123,6 +125,7 @@ run_mode() {
     args+=(
       --nonsyn_recode 3di20
       --sa_asr_mode "$mode"
+      --sa_backend "$SA_BACKEND"
       --full_cds_alignment_file alignment.fa
       --prostt5_device "$PROSTT5_DEVICE"
       --prostt5_cache "$PROSTT5_CACHE"

@@ -1,0 +1,4 @@
+backend	median_seconds	min_seconds	max_seconds	speedup	peak_rss_GiB	load_seconds
+prostt5	346.250140	302.118474	348.597218	1.000	13.059	1.515133
+prostt5-cnn	5.738639	5.672981	5.967229	60.337	5.699	1.124483
+esm3di-35m	0.364736	0.364123	0.367237	949.317	0.815	1.791078

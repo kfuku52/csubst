@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "host": "audrey1",
+  "gpu": "NVIDIA RTX 6000 Ada Generation",
+  "gpu_memory_mib": 49140,
+  "driver": "550.127.05",
+  "torch": "2.6.0+cu124",
+  "transformers": "5.16.1",
+  "peft": "0.20.0",
+  "jobs": {
+    "esm3di-35m": 25610,
+    "prostt5-cnn": 25612
+  },
+  "source_sha256": {
+    "csubst/structural_prediction.py": "3abb859751cbbe80dfd689e90461c7a8a3035cbca97a591b7c57865d1a076948",
+    "csubst/structural_alphabet.py": "3d59a124836076be2335cee5c9bdb1c9f1a762fddb63892d42e7fca9e2da7752",
+    "csubst/sequence.py": "f727a1bbaa72af814aef31ebfc9c0057b2b8295b73f2e51d49f7bfb8b5e52829",
+    "csubst/recoding_config.py": "30a174ca9a5f3d55245584676cad98fffb1beef81f367331f5be9005e4ab2856"
+  },
+  "model_transfer_complete": true,
+  "remote_source_hashes_match": true,
+  "job_states": {
+    "25610": "COMPLETED (0:0)",
+    "25612": "COMPLETED (0:0)"
+  },
+  "esm3di_long_cuda_matches_prior_cpu": true,
+  "completed_at_jst": {
+    "25610": "2026-09-09T20:00:32+09:00",
+    "25612": "2026-09-09T20:03:38+09:00"
+  },
+  "timing_followup": {
+    "job": 25616,
+    "state": "COMPLETED",
+    "reason": null,
+    "result_file": "benchmark-results.json",
+    "input_lengths": [
+      418,
+      960
+    ],
+    "warmup_runs": 1,
+    "measured_runs": 3,
+    "batch_size": 2,
+    "cpu_threads": 4,
+    "exit_code": "0:0",
+    "wiki_url": "https://github.com/kfuku52/csubst/wiki/ESM3Di-CPU-GPU-benchmark",
+    "wiki_commit": "723ca6d",
+    "report_version": "1.0.0"
+  }
+}

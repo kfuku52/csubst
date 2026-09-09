@@ -1,0 +1,16 @@
+{
+  "esm3di-35m": {
+    "sequences": 35,
+    "residues": 2817,
+    "batch_singleton_differences": 0,
+    "finite_logits": true,
+    "lengths_correct": true
+  },
+  "prostt5-cnn": {
+    "sequences": 35,
+    "residues": 2817,
+    "batch_singleton_differences": 0,
+    "finite_logits": true,
+    "lengths_correct": true
+  }
+}

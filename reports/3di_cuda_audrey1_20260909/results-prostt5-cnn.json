@@ -1,0 +1,35 @@
+{
+  "torch": "2.6.0+cu124",
+  "transformers": "5.16.1",
+  "peft": "0.20.0",
+  "cuda_runtime": "12.4",
+  "gpu": "NVIDIA RTX 6000 Ada Generation",
+  "threads": 4,
+  "tf32_matmul": false,
+  "cases": [
+    {
+      "backend": "prostt5-cnn",
+      "device": "cpu",
+      "sequences": 35,
+      "residues": 2817,
+      "singleton_batch_repeat_identical": true,
+      "finite_logits": true,
+      "output_lengths_correct": true,
+      "diagnostic_seconds": 150.41905356800999,
+      "peak_cuda_allocated_bytes": 0
+    },
+    {
+      "backend": "prostt5-cnn",
+      "device": "cuda",
+      "sequences": 35,
+      "residues": 2817,
+      "singleton_batch_repeat_identical": true,
+      "finite_logits": true,
+      "output_lengths_correct": true,
+      "diagnostic_seconds": 2.197760196024319,
+      "peak_cuda_allocated_bytes": 6536511488
+    }
+  ],
+  "prostt5-cnn_cpu_cuda_residue_differences": 0,
+  "prostt5-cnn_public_auto_and_cache_pass": true
+}

@@ -7,6 +7,17 @@ ordinary (unrecoded) runs do not load its compiled extension during startup.
 from collections import OrderedDict
 
 
+SA_BACKENDS = ("prostt5", "prostt5-cnn", "esm3di-35m")
+DEFAULT_SA_BACKEND = "esm3di-35m"
+
+
+def normalize_sa_backend(value):
+    backend = str(value).strip().lower()
+    if backend not in SA_BACKENDS:
+        raise ValueError("--sa_backend should be one of {}.".format(", ".join(SA_BACKENDS)))
+    return backend
+
+
 RECODING_SCHEMES = OrderedDict(
     [
         ("dayhoff6", ("AGPST", "DENQ", "HKR", "ILMV", "FWY", "C")),

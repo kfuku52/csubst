@@ -1,0 +1,23 @@
+[
+  {
+    "first": "prostt5",
+    "second": "prostt5-cnn",
+    "matching_residues": 1006,
+    "total_residues": 1378,
+    "agreement": 0.7300435413642961
+  },
+  {
+    "first": "prostt5",
+    "second": "esm3di-35m",
+    "matching_residues": 528,
+    "total_residues": 1378,
+    "agreement": 0.38316400580551524
+  },
+  {
+    "first": "prostt5-cnn",
+    "second": "esm3di-35m",
+    "matching_residues": 590,
+    "total_residues": 1378,
+    "agreement": 0.4281567489114659
+  }
+]

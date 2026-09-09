@@ -11,6 +11,7 @@ import time
 from csubst import __version__
 from csubst import cli_io
 from csubst import runtime
+from csubst.recoding_config import DEFAULT_SA_BACKEND, SA_BACKENDS
 
 
 class _TeeTextStream(object):
@@ -754,14 +755,25 @@ def _make_recoding_parser(show_advanced):
                         default='no', type=str,
                         help='default=%(default)s: Recoding scheme for nonsynonymous-state calculations. '
                              'Use "no" for standard 20 amino-acid states. '
-                             '"3di20" enables structural-alphabet (3Di) recoding via ProstT5. '
+                             '"3di20" enables structural-alphabet (3Di) recoding using --sa_backend. '
                              '"srchisq6" and "kgbauto6" infer 6-state groupings from alignment composition.')
     psr_rc.add_argument('--sa_asr_mode', metavar='translate|direct', default='direct', type=str,
                         help='default=%(default)s: Structural-alphabet ancestral-state mode for --nonsyn_recode 3di20. '
-                             '"translate" converts ML amino-acid states to 3Di via ProstT5, then one-hot encodes '
+                             '"translate" converts ML amino-acid states to 3Di using --sa_backend, then one-hot encodes '
                              'each branch-site by argmax state. '
                              '"direct" runs direct 3Di ancestral-state reconstruction with IQ-TREE.')
+    psr_rc.add_argument('--sa_backend', choices=SA_BACKENDS,
+                        default=DEFAULT_SA_BACKEND, type=str,
+                        help='default=%(default)s: AA-to-3Di predictor. "prostt5" uses sequential generation; '
+                             '"prostt5-cnn" and "esm3di-35m" use encoder-only classification. '
+                             'ESM3Di-35M is trained on viral proteins. Sequences are not truncated; '
+                             'long sequences require more compute and memory.')
     advanced_resources = psr_rc.add_argument_group('advanced model resources and caches')
+    _add_advanced_argument(advanced_resources, '--sa_batch_size', show_advanced=show_advanced,
+                        metavar='INT', default=0, type=int,
+                        help='default=%(default)s: Maximum sequences per 3Di inference batch; 0 selects automatically. '
+                             'Encoder backends group similar lengths with a padded-residue budget; '
+                             'ProstT5 generation groups identical lengths. Independent of --blas_threads.')
     _add_advanced_argument(advanced_resources, '--prostt5_model', show_advanced=show_advanced,
                         metavar='STR', default='Rostlab/ProstT5', type=str,
                         help='default=%(default)s: ProstT5 model identifier used for --nonsyn_recode 3di20.')
@@ -772,12 +784,13 @@ def _make_recoding_parser(show_advanced):
                         metavar='PATH', default='', type=str,
                         help='default=%(default)s: Optional local directory containing ProstT5 files. '
                              'If provided, it is used instead of --prostt5_model.')
-    _add_advanced_argument(advanced_resources, '--prostt5_no_download', show_advanced=show_advanced,
+    _add_advanced_argument(advanced_resources, '--sa_no_download', '--prostt5_no_download',
+                        dest='prostt5_no_download', show_advanced=show_advanced,
                         metavar='yes|no', default='no', type=strtobool,
-                        help='default=%(default)s: Set "yes" to disable automatic ProstT5 download and require local files.')
+                        help='default=%(default)s: Disable downloads for the selected 3Di predictor and require local files.')
     _add_advanced_argument(advanced_resources, '--resource_cache_dir', show_advanced=show_advanced,
                         metavar='PATH', default='', type=str,
-                        help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: VESM/structure files and shared locks. '
+                        help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: VESM/3Di/structure files and shared locks. '
                              'ProstT5 weights use the Hugging Face cache or --prostt5_local_dir.')
     _add_advanced_argument(advanced_resources, '--resource_lock_poll', show_advanced=show_advanced,
                         metavar='SECONDS', default=5.0, type=float,
@@ -785,17 +798,20 @@ def _make_recoding_parser(show_advanced):
     _add_advanced_argument(advanced_resources, '--resource_lock_timeout', show_advanced=show_advanced,
                         metavar='SECONDS', default=3600.0, type=float,
                         help='default=%(default)s: Maximum wait for a shared-resource lock.')
-    _add_advanced_argument(advanced_resources, '--prostt5_device', show_advanced=show_advanced,
+    _add_advanced_argument(advanced_resources, '--sa_device', '--prostt5_device',
+                        dest='prostt5_device', show_advanced=show_advanced,
                         metavar='auto|cpu|cuda|mps', default='auto', type=str,
-                        help='default=%(default)s: Device for ProstT5 inference. '
+                        help='default=%(default)s: Device for the selected 3Di predictor. '
                              'With "auto", CUDA is preferred, then MPS, then CPU. '
                              'When MPS is used, CSUBST enables PYTORCH_ENABLE_MPS_FALLBACK=1 automatically.')
-    _add_advanced_argument(advanced_resources, '--prostt5_cache', show_advanced=show_advanced,
+    _add_advanced_argument(advanced_resources, '--sa_cache', '--prostt5_cache',
+                        dest='prostt5_cache', show_advanced=show_advanced,
                         metavar='yes|no', default='yes', type=strtobool,
-                        help='default=%(default)s: Reuse ProstT5 sequence-level cache.')
-    _add_advanced_argument(advanced_resources, '--prostt5_cache_file', show_advanced=show_advanced,
+                        help='default=%(default)s: Reuse the 3Di sequence cache, keyed by predictor and model weights.')
+    _add_advanced_argument(advanced_resources, '--sa_cache_file', '--prostt5_cache_file',
+                        dest='prostt5_cache_file', show_advanced=show_advanced,
                         metavar='PATH', default=_default_prostt5_cache_file(), type=str,
-                        help='default=%(default)s: ProstT5 cache file path.')
+                        help='default=%(default)s: 3Di sequence cache file path (legacy filename retained).')
     _add_advanced_argument(advanced_resources, '--sa_state_cache', show_advanced=show_advanced,
                         metavar='auto|yes|no', default='auto', type=str,
                         help='default=%(default)s: Shared 3Di-state cache mode for --nonsyn_recode 3di20. '
@@ -902,14 +918,15 @@ def _register_download_parser(show_advanced, subparsers):
     # download
     help_txt = 'prepares shared model resources. See `csubst download -h`'
     download = subparsers.add_parser('download', help=help_txt, parents=[])
-    download.add_argument('--resource', metavar='vesm-35m|prostt5|all', default='vesm-35m', type=str,
-                          choices=['vesm-35m', 'prostt5', 'all'],
-                          help='default=%(default)s: Model resource to prepare. VESM files are always '
-                               'SHA-256 verified; ProstT5 is checked by loading local files.')
+    download.add_argument('--resource', metavar='NAME', default='vesm-35m', type=str,
+                          choices=['vesm-35m', 'prostt5', 'prostt5-cnn', 'esm3di-35m', 'all'],
+                          help='default=%(default)s: Prepare vesm-35m, prostt5, prostt5-cnn, esm3di-35m, or all. '
+                               'VESM, ESM3Di and CNN files are SHA-256 verified; '
+                               'the ProstT5 encoder/decoder is checked by loading local files.')
     advanced_download = download.add_argument_group('advanced model resources and caches')
     _add_advanced_argument(advanced_download, '--resource_cache_dir', show_advanced=show_advanced,
                           metavar='PATH', default='', type=str,
-                          help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: VESM files and shared resource locks. '
+                          help='default=$CSUBST_CACHE_DIR or ~/.cache/csubst: VESM/3Di files and shared resource locks. '
                                'ProstT5 weights use the Hugging Face cache or --prostt5_local_dir.')
     _add_advanced_argument(advanced_download, '--resource_lock_poll', show_advanced=show_advanced,
                           metavar='SECONDS', default=5.0, type=float,
@@ -921,8 +938,8 @@ def _register_download_parser(show_advanced, subparsers):
                           help='default=%(default)s: Check local availability without network access.')
     _add_advanced_argument(advanced_download, '--verify', show_advanced=show_advanced,
                           metavar='yes|no', default=None, type=strtobool,
-                          help='Deprecated compatibility option: VESM files are always SHA-256 verified. '
-                               '"yes" is unsupported for ProstT5 (including --resource all). '
+                          help='Deprecated compatibility option: VESM, ESM3Di and CNN files are always SHA-256 verified. '
+                               '"yes" is unsupported for prostt5/prostt5-cnn (including --resource all). '
                                'Use --no_download yes to check local availability.')
     _add_advanced_argument(advanced_download, '--prostt5_model', show_advanced=show_advanced,
                           metavar='STR', default='Rostlab/ProstT5', type=str,
