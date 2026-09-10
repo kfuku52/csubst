@@ -460,3 +460,24 @@ def test_plot_state_tree_pages_request_preserves_root_state(monkeypatch):
     )
     assert captured["figure_title"] == "Site 1"
     assert captured["state_by_node"][labels["R"]] == "AAG"
+
+
+def test_transfer_root_preserves_unrooted_vertex_names_and_total_edge_length():
+    raw = ete.PhyloNode('(A:1,B:2,(C:3,D:4)Node2:6)Node1;', format=1)
+    reference = ete.PhyloNode('((A:1,B:1):0,(C:1,D:1):0)R;', format=1)
+    original_names = tree._internal_node_partition_names(raw)
+    rerooted = tree.transfer_root(raw, reference)
+    new_names = tree._internal_node_partition_names(rerooted)
+    for partition, name in original_names.items():
+        assert new_names[partition] == name
+    assert rerooted.name not in ('Node1', 'Node2')
+    assert sorted(child.dist for child in ete.get_children(rerooted)) == [3, 3]
+
+
+@pytest.mark.parametrize('length', ['-1', 'nan', 'inf'])
+def test_transfer_root_rejects_invalid_input_root_lengths(length):
+    raw = ete.PhyloNode('(A:1,B:2,(C:3,D:4)Node2:6)Node1;', format=1)
+    reference = ete.PhyloNode('((A:1,B:1):1,(C:1,D:1):1)R;', format=1)
+    ete.get_children(reference)[0].dist = float(length)
+    with pytest.raises(ValueError, match='finite and nonnegative'):
+        tree.transfer_root(raw, reference)

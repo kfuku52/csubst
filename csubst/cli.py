@@ -397,7 +397,9 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'In addition to base substitution models, codon frequencies and among-site rate '
                              'heterogeneity are taken into account. '
                              'Described in Fukushima and Pollock (2023, https://doi.org/10.1038/s41559-022-01932-7). '
-                             '"urn" uses among-site randomization (weighted urn sampling).')
+                             '"urn" uses among-site randomization (weighted urn sampling). '
+                             'For 3Di direct ASR, N automatically uses a fitted uniform 3Di GTR model; '
+                             'S retains the codon model. Translate ASR requires explicit "urn".')
     parser.add_argument('--urn_model', metavar='wallenius|fisher|factorized_approx', default=None, type=str,
                         choices=['wallenius', 'fisher', 'factorized_approx'],
                         help='default=wallenius: Urn expectation model used when --expectation_method urn. '
@@ -845,7 +847,7 @@ def _make_recoding_parser(show_advanced):
     _add_advanced_argument(advanced_resources, '--sa_iqtree_model', show_advanced=show_advanced,
                         metavar='STR', default='GTR', type=str,
                         help='default=%(default)s: IQ-TREE model for --sa_asr_mode direct with --nonsyn_recode 3di20 '
-                             '(used with --seqtype MORPH).')
+                             '(used with --seqtype MORPH). Model-based 3Di expectations currently support uniform GTR (+FQ) only.')
     return psr_rc
 
 

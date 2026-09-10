@@ -101,3 +101,13 @@ def normalize_nonsyn_recode(value):
         txt = '--nonsyn_recode should be one of {}.'
         raise ValueError(txt.format(", ".join(SUPPORTED_RECODINGS)))
     return normalized
+
+
+def validate_nonsyn_expectation(nonsyn_recode, expectation_method, sa_asr_mode='direct', sa_iqtree_model='GTR'):
+    """Validate automatic N-model routing without changing the selected method."""
+    from csubst import expectation_3di
+    expectation_3di.validate_options(dict(
+        nonsyn_recode=normalize_nonsyn_recode(nonsyn_recode),
+        expectation_method=expectation_method,
+        sa_asr_mode=sa_asr_mode, sa_iqtree_model=sa_iqtree_model,
+    ))

@@ -728,9 +728,8 @@ def test_rescale_branch_length_adjusted_site_keeps_nonzero_component_when_other_
 
 
 def test_rescale_branch_length_adjusted_site_accumulates_distance_across_state_less_synthetic_parent(monkeypatch):
-    iqtree_like = ete.PhyloNode("(A:1,B:1,(C:1,D:1)Y:1)R;", format=1)
-    rooted = ete.PhyloNode("(A:1,(B:1,(C:1,D:1)Y:1):1)RR;", format=1)
-    tr = tree.add_numerical_node_labels(tree.transfer_root(tree_to=iqtree_like, tree_from=rooted))
+    # Explicit unloaded internal node; rerooting must not erase a real ASR name.
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:.5,(B:1,(C:1,D:1)Y:1):.5)R;", format=1))
     labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse() if node.name}
     b_node = next(node for node in tr.traverse() if node.name == "B")
     synthetic_parent = b_node.up

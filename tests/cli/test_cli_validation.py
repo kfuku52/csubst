@@ -118,6 +118,20 @@ def _run_cli_subprocess(*args):
     return proc, log_text
 
 
+@pytest.mark.parametrize('command', ['search', 'analyze'])
+@pytest.mark.parametrize('method_args', [[], ['--expectation_method', 'codon_model']])
+def test_3di_codon_expectations_fail_cleanly_before_inference(command, method_args):
+    proc, log_text = _run_cli(
+        command, '--nonsyn_recode', '3di20', '--sa_asr_mode', 'translate', '--full_cds_alignment_file', 'missing.fa',
+        *method_args,
+    )
+    assert proc.returncode == 2
+    assert 'require --sa_asr_mode direct' in log_text
+    assert 'use --expectation_method urn explicitly' in log_text
+    assert 'Traceback' not in log_text
+    assert 'Starting IQ-TREE' not in proc.stdout
+
+
 def test_sites_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects():
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--tree_site_plot_max_sites", "0")
     assert proc.returncode == 2

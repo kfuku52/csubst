@@ -185,6 +185,21 @@ def get_tree_cache_signature(tree_obj):
         records.append((descendants, format(distance, ".17g")))
     return tuple(sorted(records))
 
+def _internal_node_partition_names(tree_obj):
+    """Identify vertices by incident leaf partitions, independent of rooting."""
+    all_leaves = frozenset(ete.get_leaf_names(tree_obj))
+    result = {}
+    for node in tree_obj.traverse():
+        if ete.is_leaf(node):
+            continue
+        parts = [frozenset(ete.get_leaf_names(child)) for child in ete.get_children(node)]
+        outside = all_leaves - frozenset(ete.get_leaf_names(node))
+        if outside:
+            parts.append(outside)
+        result[frozenset(parts)] = node.name
+    return result
+
+
 def transfer_root(tree_to, tree_from, verbose=False):
     for node in tree_to.traverse():
         if node.dist is None:
@@ -199,7 +214,7 @@ def transfer_root(tree_to, tree_from, verbose=False):
     outgroups = subroot_leaves[0] if not is_n0_bigger_than_n1 else subroot_leaves[1]
     if verbose:
         print('outgroups:', outgroups)
-    original_root_name = tree_to.name
+    original_node_names = _internal_node_partition_names(tree_to)
     tree_to.set_outgroup(ingroups[0])
     if (len(outgroups) == 1):
         outgroup_ancestor = [n for n in ete.iter_leaves(tree_to) if n.name == outgroups[0]][0]
@@ -211,17 +226,32 @@ def transfer_root(tree_to, tree_from, verbose=False):
     subroot_to = ete.get_children(tree_to)
     subroot_from = ete.get_children(tree_from)
     total_subroot_length_to = sum([(n.dist or 0) for n in subroot_to])
-    total_subroot_length_from = sum([(n.dist or 0) for n in subroot_from])
-    if total_subroot_length_from == 0:
-        total_subroot_length_from = 1
+    source_lengths = np.array([float(n.dist or 0) for n in subroot_from])
+    if not np.isfinite(source_lengths).all() or np.any(source_lengths < 0):
+        raise ValueError('Root-adjacent input branch lengths must be finite and nonnegative.')
+    total_subroot_length_from = source_lengths.sum()
+    proportions = source_lengths / total_subroot_length_from if total_subroot_length_from > 0 else np.full(2, .5)
     for n_to in subroot_to:
-        for n_from in subroot_from:
-            if (set(ete.get_leaf_names(n_to)) == set(ete.get_leaf_names(n_from))):
-                n_to.dist = total_subroot_length_to * ((n_from.dist or 0) / total_subroot_length_from)
-    if original_root_name:
-        tree_to.name = original_root_name
-    elif not tree_to.name:
-        tree_to.name = 'Root'
+        for n_from, proportion in zip(subroot_from, proportions):
+            if set(ete.get_leaf_names(n_to)) == set(ete.get_leaf_names(n_from)):
+                n_to.dist = total_subroot_length_to * proportion
+    # ETE rerooting can move the root's name to a newly inserted vertex. Restore
+    # names from unrooted vertex identity, so ASR rows still refer to the same node.
+    all_leaves = frozenset(ete.get_leaf_names(tree_to))
+    for node in tree_to.traverse():
+        if ete.is_leaf(node):
+            continue
+        parts = [frozenset(ete.get_leaf_names(child)) for child in ete.get_children(node)]
+        outside = all_leaves - frozenset(ete.get_leaf_names(node))
+        if outside:
+            parts.append(outside)
+        node.name = original_node_names.get(frozenset(parts), '')
+    if not tree_to.name:
+        used_names = {n.name for n in tree_to.traverse()}
+        root_name = 'Root'
+        while root_name in used_names:
+            root_name = '_' + root_name
+        tree_to.name = root_name
     tree_to = _clear_duplicate_internal_node_names(tree_to)
     return tree_to
 
@@ -2230,7 +2260,17 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
         sum([(n.dist or 0.0) for n in g['tree'].traverse()])
     ))
     OS_branch_sub = substitution.get_branch_sub_counts(OS_tensor)
-    ON_branch_sub = substitution.get_branch_sub_counts(ON_tensor)
+    if g.get('nonsyn_recode') == '3di20':
+        # Codon exposure must use amino-acid changes, independently of 3Di N.
+        # Apply the same posterior threshold as the ordinary amino-acid route.
+        aa_tensor = substitution.get_substitution_tensor(
+            state_tensor=g['state_pep'], mode='asis', g=g, mmap_attr='codon_exposure_N',
+        )
+        aa_tensor = substitution.apply_min_sub_pp(g, aa_tensor)
+        ON_branch_sub = substitution.get_branch_sub_counts(aa_tensor)
+        del aa_tensor
+    else:
+        ON_branch_sub = substitution.get_branch_sub_counts(ON_tensor)
     state_has_mass = (g['state_cdn'].sum(axis=(1, 2)) > float(g.get('float_tol', 0)))
     for node in g['tree'].traverse():
         if ete.is_root(node):

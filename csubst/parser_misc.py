@@ -22,14 +22,22 @@ from csubst import runtime
 from csubst import structural_alphabet
 from csubst import tree
 from csubst import ete
+from csubst import expectation_3di
 from csubst import tsv
 
-_THREEDI_STATE_CACHE_FORMAT_VERSION = 3
+_THREEDI_STATE_CACHE_FORMAT_VERSION = 5
 
 
 def _initialize_and_report_nonsyn_recode(g):
     recode = recoding_config.normalize_nonsyn_recode(g.get("nonsyn_recode", "no"))
     g["nonsyn_recode"] = recode
+    if recode == '3di20':
+        # Discard any codon-derived N context retained by an in-process caller.
+        # Scan/inspect may still need the codon and amino-acid model contexts.
+        g.pop('instantaneous_nsy_rate_matrix', None)
+        g.pop('rate_nsy_tensor', None)
+        for key in expectation_3di.CONTEXT_KEYS:
+            g.pop(key, None)
     write_pca = bool(g.get("plot_nonsyn_recode_pca", False))
     if (recode in ["no", "3di20"]) and (not write_pca):
         required_keys = ["amino_acid_orders", "synonymous_indices", "matrix_groups"]
@@ -183,6 +191,7 @@ def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
     context = {
         'format_version': int(_THREEDI_STATE_CACHE_FORMAT_VERSION),
         'nonsyn_recode': '3di20',
+        'model_expectations': expectation_3di.required(g),
         'sa_asr_mode': str(g.get('sa_asr_mode', 'direct')).strip().lower(),
         'infile_type': str(g.get('infile_type', '')).strip().lower(),
         'input_data_type': str(g.get('input_data_type', '')).strip().lower(),
@@ -242,6 +251,10 @@ def _try_load_3di_state_cache(g, selected_branch_ids, state_cdn_shape):
                 return None, None, 'cache metadata mismatch.'
             state_nsy = np.asarray(cache['state_nsy'], dtype=g['float_type'])
             state_orders = np.asarray(cache['state_orders'], dtype=object).reshape(-1)
+            model_context = {}
+            if expectation_3di.required(g):
+                model_context = {key: np.asarray(cache[key]) for key in expectation_3di.CONTEXT_KEYS}
+                expectation_3di.validate_context(model_context, int(state_cdn_shape[0]), int(state_cdn_shape[1]))
     except Exception as exc:
         return None, None, 'failed to read cache file: {}'.format(str(exc))
     if state_nsy.ndim != 3:
@@ -265,6 +278,7 @@ def _try_load_3di_state_cache(g, selected_branch_ids, state_cdn_shape):
         masses = block.sum(axis=1, dtype=np.float64)
         if np.any((masses != 0) & (np.abs(masses - 1) > 1e-3)):
             return None, None, 'cached 3Di probability rows must sum to 0 (missing) or 1.'
+    g.update(model_context)
     return state_nsy, state_orders, None
 
 
@@ -281,6 +295,10 @@ def _write_3di_state_cache(g, selected_branch_ids, state_cdn_shape, state_nsy, s
         selected_branch_ids=selected_branch_ids,
         state_cdn_shape=state_cdn_shape,
     )
+    model_context = {}
+    if expectation_3di.required(g):
+        expectation_3di.validate_context(g, int(state_cdn_shape[0]), int(state_cdn_shape[1]))
+        model_context = {key: g[key] for key in expectation_3di.CONTEXT_KEYS}
     metadata_json = json.dumps(context, sort_keys=True, separators=(',', ':'))
     fd, tmp_path = tempfile.mkstemp(prefix='.{}.tmp.'.format(os.path.basename(cache_path)), suffix='.npz', dir=cache_dir or '.')
     os.close(fd)
@@ -290,6 +308,7 @@ def _write_3di_state_cache(g, selected_branch_ids, state_cdn_shape, state_nsy, s
             metadata_json=np.array([metadata_json], dtype=np.str_),
             state_orders=np.asarray([str(v) for v in np.asarray(state_orders, dtype=object).reshape(-1)], dtype=np.str_),
             state_nsy=np.asarray(state_nsy, dtype=g['float_type']),
+            **model_context,
         )
         with open(tmp_path, mode='rb') as handle:
             os.fsync(handle.fileno())
@@ -406,20 +425,21 @@ def read_input(g, state_metadata_only=False):
         raise ValueError(txt.format(g['substitution_model']))
     g = _initialize_and_report_nonsyn_recode(g)
     g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
-    g['instantaneous_nsy_rate_matrix'] = cdn2nsy_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
     g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
     g['rate_aa_tensor'] = get_rate_tensor(inst=g['instantaneous_aa_rate_matrix'], mode='asis', g=g)
-    g['rate_nsy_tensor'] = get_rate_tensor(inst=g['instantaneous_nsy_rate_matrix'], mode='asis', g=g)
+    if g['nonsyn_recode'] != '3di20':
+        g['instantaneous_nsy_rate_matrix'] = cdn2nsy_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
+        g['rate_nsy_tensor'] = get_rate_tensor(inst=g['instantaneous_nsy_rate_matrix'], mode='asis', g=g)
+        sum_tensor_nsy = g['rate_nsy_tensor'].sum()
+        sum_matrix_nsy = g['instantaneous_nsy_rate_matrix'][g['instantaneous_nsy_rate_matrix']>0].sum()
+        if (g['nonsyn_recode'] != 'no') and (abs(sum_tensor_nsy - sum_matrix_nsy) >= g['float_tol']):
+            raise AssertionError('Sum of recoded nonsynonymous rates did not match.')
     sum_tensor_aa = g['rate_aa_tensor'].sum()
-    sum_tensor_nsy = g['rate_nsy_tensor'].sum()
     sum_tensor_syn = g['rate_syn_tensor'].sum()
     sum_matrix_aa = g['instantaneous_aa_rate_matrix'][g['instantaneous_aa_rate_matrix']>0].sum()
-    sum_matrix_nsy = g['instantaneous_nsy_rate_matrix'][g['instantaneous_nsy_rate_matrix']>0].sum()
     sum_matrix_cdn = g['instantaneous_codon_rate_matrix'][g['instantaneous_codon_rate_matrix']>0].sum()
     if abs(sum_tensor_aa - sum_matrix_aa) >= g['float_tol']:
         raise AssertionError('Sum of rates did not match.')
-    if (g['nonsyn_recode'] != 'no') and (abs(sum_tensor_nsy - sum_matrix_nsy) >= g['float_tol']):
-        raise AssertionError('Sum of recoded nonsynonymous rates did not match.')
     txt = 'Sum of rates did not match. Check if --codon_table ({}) matches to that used in the ancestral state reconstruction ({}).'
     txt = txt.format(g['codon_table'], g['reconstruction_codon_table'])
     if abs(sum_matrix_cdn - sum_tensor_syn - sum_tensor_aa) >= g['float_tol']:
@@ -544,6 +564,8 @@ def cdn2pep_matrix(inst_cdn, g):
 
 
 def cdn2nsy_matrix(inst_cdn, g):
+    if g.get('nonsyn_recode') == '3di20':
+        raise ValueError('A codon model does not define transition rates for 3Di states.')
     return _cdn2group_matrix(
         inst_cdn=inst_cdn,
         group_orders=g['nonsyn_state_orders'],
@@ -979,14 +1001,14 @@ def drop_invariant_tip_sites(g):
         expected_num_site = int(g['num_input_site'])
     site_index_alignment = get_site_index_alignment(g=g, expected_num_site=expected_num_site)
     if mode == 'tip_invariant':
-        precomputed = g.get('_precomputed_tip_invariant_site_mask', None)
+        precomputed = g.get('3di_tip_invariant_mask', g.get('_precomputed_tip_invariant_site_mask', None))
         if precomputed is not None:
             precomputed = np.asarray(precomputed, dtype=bool).reshape(-1)
             if precomputed.shape[0] != site_index_alignment.shape[0]:
                 txt = 'Precomputed tip-invariant site mask length ({}) did not match current site axis ({}).'
                 raise ValueError(txt.format(precomputed.shape[0], site_index_alignment.shape[0]))
             is_drop_site = precomputed
-            print('Using precomputed tip-invariant site mask from direct 3Di prefilter.', flush=True)
+            print('Using the tip-invariant site mask from direct 3Di predictions.', flush=True)
         else:
             is_drop_site = _get_tip_invariant_site_mask(g=g, site_index_alignment=site_index_alignment)
         mode_label = 'tip-invariant'
@@ -1022,7 +1044,7 @@ def drop_invariant_tip_sites(g):
     g['dropped_site_alignment'] = dropped_alignment_sites
     g['num_dropped_tip_invariant_sites'] = num_drop
     g['dropped_tip_invariant_site_alignment'] = dropped_alignment_sites
-    for rate_key in ['iqtree_rate_values', 'iqtree_categorized_rate_values']:
+    for rate_key in ['iqtree_rate_values', 'iqtree_categorized_rate_values', '3di_rates', '3di_tip_invariant_mask']:
         if (rate_key not in g) or (g[rate_key] is None):
             continue
         rate_values = np.asarray(g[rate_key])
@@ -1083,6 +1105,8 @@ def prep_state(g, apply_site_filtering=True):
             else:
                 txt = 'Loaded 3Di state cache: {}'
             print(txt.format(os.path.abspath(str(g.get('sa_state_cache_file', '')).strip())), flush=True)
+            if expectation_3di.required(g):
+                print('Model expectations: N=3Di GTRX+FQ (uniform); S=codon.', flush=True)
             return cached_state_nsy
 
         def _compute_3di_state():

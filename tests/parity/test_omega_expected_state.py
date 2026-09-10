@@ -180,13 +180,12 @@ def test_get_exp_state_uses_branch_distance_props():
 
 
 def test_collect_expected_state_branch_jobs_collapses_state_less_synthetic_parent():
-    iqtree_like = ete.PhyloNode("(A:1,B:1,(C:1,D:1)Y:1)R;", format=1)
-    rooted = ete.PhyloNode("(A:1,(B:1,(C:1,D:1)Y:1):1)RR;", format=1)
-    tr = tree.add_numerical_node_labels(tree.transfer_root(tree_to=iqtree_like, tree_from=rooted))
+    # Explicit unloaded internal node; rerooting must not erase a real ASR name.
+    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:.5,(B:1,(C:1,D:1)Y:1):.5)R;", format=1))
     for node in tr.traverse():
         ete.set_prop(node, "Ndist", float(node.dist or 0.0))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
-    synthetic_node = [n for n in tr.traverse() if (not ete.is_leaf(n)) and (not ete.is_root(n)) and (n.name == "")][0]
+    synthetic_node = [n for n in tr.traverse() if (not ete.is_leaf(n)) and (not ete.is_root(n)) and (n.name in ("", None))][0]
     num_node = max(int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()) + 1
     state_has_mass = np.zeros((num_node,), dtype=bool)
     state_has_mass[labels["R"]] = True

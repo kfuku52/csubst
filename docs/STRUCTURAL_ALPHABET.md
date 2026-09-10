@@ -53,6 +53,54 @@ evidence of prediction quality.
 
 ## CPU example
 
+For convergence expectations in `search` (also named `analyze`), the default
+`--expectation_method codon_model` automatically routes **N to the fitted 3Di
+model and S to the codon model** when `--nonsyn_recode 3di20` is selected.
+No additional expectation-method name or flag is needed.
+
+```bash
+csubst search --full_cds_alignment_file full-cds.fa --rooted_tree_file tree.nwk \
+  --nonsyn_recode 3di20 --sa_asr_mode direct
+```
+
+The initial model-based implementation supports direct ASR with uniform
+`--sa_iqtree_model GTR` (also `GTRX`, `GTR20`, and their `+FQ` forms). This is
+GTR fitted to the input 3Di alignment with equal state frequencies, not a
+published fixed Q.3Di.AF or Q.3Di.LLM model. Model fitting retains invariant
+sites; requested site filtering happens afterward. IQ-TREE's fitted
+exchangeabilities, state order, branch lengths in substitutions per 3Di site,
+and unit site rates travel together through inference and the versioned cache.
+Root transfer preserves the identities of IQ-TREE internal nodes. The inserted
+root posterior is calculated by pruning under the fitted uniform GTR model;
+root-adjacent lengths preserve their fitted total and use the input length
+ratio, or equal halves if both input lengths are zero. Version 5 caches also
+retain the 3Di tip-invariant mask, so cached runs use the same site selection.
+States absent from IQ-TREE's fitted alphabet receive zero posterior frequency
+and no transitions. Cache files without a compatible model context are rebuilt
+in `auto` mode or rejected in `yes` mode.
+
+S retains codon Q and codon site rates. Its branch-length rescaling uses
+amino-acid changes, never 3Di changes. Comparisons to a conventional codon run
+must use the same retained sites, posterior thresholds and other settings.
+`Ndist` in the codon tree remains an amino-acid/codon exposure; 3Di expected
+counts use their separately fitted branch lengths. The existing default
+long-tail calibration maps dSC using the N distribution, so calibrated dSC
+can change when N changes. Compare OCS/ECS and `dSC*_nocalib`, or use
+`--calibrate_longtail no`, when checking the unchanged synonymous component.
+
+`translate` ASR, rate mixtures (`+G`, `+R`, `+I`), and other 3Di models are not
+yet supported for model-based expectations and fail explicitly. An explicit
+`--expectation_method urn` is respected and remains available for these
+exploratory analyses. Neither route establishes calibrated evidence for
+structural adaptation: omegaC combines structural N with synonymous codon S,
+and still uses the existing marginal-posterior expected-count approximation.
+GTR estimates many parameters and may be poorly determined by short alignments.
+See the [IQ-TREE morphological model definitions](https://www.iqtree.org/doc/Substitution-Models#binary-and-morphological-models).
+
+`scan` does not compute omegaC expectations and continues to use `state_aware`
+exposure for 3Di. Codon and amino-acid model contexts remain available to
+`scan`, `inspect` and `sites`; they are not used as a 3Di Q.
+
 Use a codon alignment and matching rooted tree. Supply a full CDS alignment
 when the analysis alignment has been trimmed:
 

@@ -231,6 +231,8 @@ def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
         urn_model = 'wallenius'
     g['expectation_method'] = expectation_method
     g['urn_model'] = urn_model
+    if g.get('subcommand') in ['search', 'analyze']:
+        recoding_config.validate_nonsyn_expectation(g.get('nonsyn_recode', 'no'), expectation_method, g.get('sa_asr_mode', 'direct'), g.get('sa_iqtree_model', 'GTR'))
     if g['calc_omega_pvalue'] and (g['expectation_method'] != 'urn'):
         raise ValueError('--calc_omega_pvalue "yes" should be used with --expectation_method "urn".')
     if 'omega_pvalue_null_model' in g.keys():

@@ -169,7 +169,7 @@ def test_prepare_run_context_keeps_shared_cache_paths_at_benchmark_root(tmp_path
     )
     config = {
         "label": "demo",
-        "expectation_method": "codon_model",
+        "expectation_method": "urn",
         "asrv": "each",
         "nonsyn_recode": "3di20",
         "sa_asr_mode": "direct",
@@ -213,7 +213,7 @@ def test_prepare_run_context_retargets_inferred_iqtree_paths_for_3di20(tmp_path)
     )
     config = {
         "label": "demo",
-        "expectation_method": "codon_model",
+        "expectation_method": "urn",
         "asrv": "each",
         "nonsyn_recode": "3di20",
         "sa_asr_mode": "direct",
@@ -353,7 +353,7 @@ def test_run_single_config_fails_when_requested_summary_columns_are_missing(tmp_
 def test_main_benchmark_writes_logs_for_preparation_failures(tmp_path):
     g = _base_benchmark_config(
         tmp_path,
-        benchmark_expectation_methods="codon_model",
+        benchmark_expectation_methods="urn",
         benchmark_nonsyn_recode_modes="3di20",
         benchmark_sa_asr_modes="direct",
         output_manifest=True,
@@ -378,15 +378,20 @@ def test_main_benchmark_writes_logs_for_preparation_failures(tmp_path):
     assert (manifest["output_kind"] == "benchmark_cb_tsv").sum() == 0
 
 
-def test_main_benchmark_preparation_failure_ignores_stale_cb_files(tmp_path):
+def test_main_benchmark_rejects_3di_codon_model_and_ignores_stale_cb_files(tmp_path, monkeypatch):
     g = _base_benchmark_config(
         tmp_path,
         benchmark_expectation_methods="codon_model",
         benchmark_nonsyn_recode_modes="3di20",
-        benchmark_sa_asr_modes="direct",
+        benchmark_sa_asr_modes="translate",
+        full_cds_alignment_file="full.fa",
         output_manifest=True,
     )
-    run_dir = tmp_path / "benchmark" / "runs" / "001.exp-codon_model.asrv-each.recode-3di20.pc-none.sa-direct"
+    def unexpected_analyze(g):
+        pytest.fail('Incompatible benchmark must fail before inference')
+
+    monkeypatch.setattr(main_benchmark.main_analyze, 'main_analyze', unexpected_analyze)
+    run_dir = tmp_path / "benchmark" / "runs" / "001.exp-codon_model.asrv-each.recode-3di20.pc-none.sa-translate"
     run_dir.mkdir(parents=True, exist_ok=True)
     stale_cb = run_dir / "csubst_cb_2.tsv"
     pd.DataFrame(
@@ -403,6 +408,7 @@ def test_main_benchmark_preparation_failure_ignores_stale_cb_files(tmp_path):
     manifest = pd.read_csv(tmp_path / "benchmark" / "csubst_outputs.tsv", sep="\t")
     failed = summary.iloc[0]
     assert failed["status"] == "fail"
+    assert 'require --sa_asr_mode direct' in failed['error_message']
     assert failed["cb_rows"] == 0
     assert failed["hit_rows"] == 0
     assert pd.isna(failed["score_max"])

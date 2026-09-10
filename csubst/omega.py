@@ -39,6 +39,8 @@ from csubst import ete
 from csubst import expected_sparse
 from csubst import output_stat
 from csubst import pseudocount
+from csubst import expectation_3di
+from csubst import recoding_config
 from csubst._extensions import load_optional_extension, warn_extension_fallback
 
 omega_cy = load_optional_extension('omega_cy')
@@ -2096,7 +2098,7 @@ def _calc_hypergeom_count_matrix(
     return dfq
 
 
-def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol, state_has_mass=None):
+def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol, state_has_mass=None, branch_lengths=None):
     jobs = list()
     if mode == 'cdn':
         dist_prop = 'SNdist'
@@ -2104,16 +2106,21 @@ def _collect_expected_state_branch_jobs(tree, mode, num_node, float_tol, state_h
         dist_prop = 'Ndist'
     else:
         raise ValueError('Unsupported expected-state mode: {}'.format(mode))
+    def get_length(node):
+        if branch_lengths is not None:
+            return float(branch_lengths[int(ete.get_prop(node, "numerical_label"))])
+        return max(float(ete.get_prop(node, dist_prop, 0)), 0.0)
+
     for node in tree.traverse():
         if ete.is_root(node):
             continue
         nl = int(ete.get_prop(node, "numerical_label"))
         if (not ete.is_leaf(node)) and (not ete.node_has_state(node, state_has_mass=state_has_mass)):
             continue
-        branch_length = max(float(ete.get_prop(node, dist_prop, 0)), 0.0)
+        branch_length = get_length(node)
         parent_node = node.up
         while (parent_node is not None) and (not ete.node_has_state(parent_node, state_has_mass=state_has_mass)):
-            branch_length += max(float(ete.get_prop(parent_node, dist_prop, 0)), 0.0)
+            branch_length += get_length(parent_node)
             parent_node = parent_node.up
         if (parent_node is None) or (branch_length < float_tol):
             continue
@@ -2322,6 +2329,25 @@ def _project_expected_sparse_chunk(
     return sparse_entries
 
 
+def _get_codon_model_nsy_rate_matrix(g):
+    if g.get('nonsyn_recode') == '3di20':
+        expectation_3di.validate_options(g)
+        expectation_3di.validate_context(g)
+        return g['3di_q']
+    return g['instantaneous_nsy_rate_matrix']
+
+
+def _expected_site_rates(g, mode, state):
+    if mode == 'nsy' and g.get('nonsyn_recode') == '3di20':
+        expectation_3di.validate_context(g, state.shape[0], state.shape[1])
+        return g['3di_rates']
+    return g['iqtree_rate_values']
+
+
+def _expected_branch_lengths(g, mode):
+    return g['3di_branch_lengths'] if mode == 'nsy' and g.get('nonsyn_recode') == '3di20' else None
+
+
 def _get_fused_expected_sparse_substitution_tensor(g, mode):
     if str(g.get('expected_state_backend', 'auto')).strip().lower() == 'expm':
         return None
@@ -2331,8 +2357,8 @@ def _get_fused_expected_sparse_substitution_tensor(g, mode):
         stationary = g.get('equilibrium_frequency', g.get('empirical_eq_freq', None))
         sub_mode = 'syn'
     elif mode == 'nsy':
+        inst = _get_codon_model_nsy_rate_matrix(g)
         state = g['state_nsy'].astype(g['float_type'], copy=False)
-        inst = g['instantaneous_nsy_rate_matrix']
         stationary = None
         sub_mode = 'asis'
     else:
@@ -2344,7 +2370,7 @@ def _get_fused_expected_sparse_substitution_tensor(g, mode):
     )
     if projector is None:
         return None
-    rate_values = np.asarray(g['iqtree_rate_values'], dtype=g['float_type']).reshape(-1)
+    rate_values = np.asarray(_expected_site_rates(g, mode, state), dtype=g['float_type']).reshape(-1)
     state_has_mass = (state.sum(axis=(1, 2)) >= float(g['float_tol']))
     branch_jobs = _collect_expected_state_branch_jobs(
         tree=g['tree'],
@@ -2352,6 +2378,7 @@ def _get_fused_expected_sparse_substitution_tensor(g, mode):
         num_node=state.shape[0],
         float_tol=float(g['float_tol']),
         state_has_mass=state_has_mass,
+        branch_lengths=_expected_branch_lengths(g, mode),
     )
     selected_branch_set = substitution._get_selected_branch_set(g)
     if selected_branch_set is not None:
@@ -2475,8 +2502,8 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
             for aa in g['amino_acid_orders']
         ]
     elif mode == 'nsy':
+        inst = _get_codon_model_nsy_rate_matrix(g)
         state = g['state_nsy'].astype(g['float_type'], copy=False)
-        inst = g['instantaneous_nsy_rate_matrix']
         stationary = None
         sub_mode = 'asis'
         num_group = 1
@@ -2485,7 +2512,7 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
     else:
         raise ValueError('Unsupported expected sparse reducer mode: {}'.format(mode))
     float_tol = float(g['float_tol'])
-    site_rates = np.asarray(g['iqtree_rate_values'], dtype=np.float64).reshape(-1)
+    site_rates = np.asarray(_expected_site_rates(g, mode, state), dtype=np.float64).reshape(-1)
     unique_site_rates, inverse_rate_indices = np.unique(site_rates, return_inverse=True)
     rate_site_indices = [np.where(inverse_rate_indices == i)[0] for i in range(unique_site_rates.shape[0])]
     state_has_mass = state.sum(axis=(1, 2)) >= float_tol
@@ -2495,6 +2522,7 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
         num_node=state.shape[0],
         float_tol=float_tol,
         state_has_mass=state_has_mass,
+        branch_lengths=_expected_branch_lengths(g, mode),
     )
     selected_branch_set = substitution._get_selected_branch_set(g)
     if selected_branch_set is not None:
@@ -2945,9 +2973,12 @@ def subroot_E2nan(cb, tree):
 
 
 def get_E(cb, g, ON_tensor, OS_tensor):
+    expectation_method = _resolve_expectation_method(g=g)
+    recoding_config.validate_nonsyn_expectation(g.get('nonsyn_recode', 'no'), expectation_method, g.get('sa_asr_mode', 'direct'), g.get('sa_iqtree_model', 'GTR'))
+    if expectation_3di.required(g):
+        expectation_3di.validate_context(g)
     requested_output_stats = _resolve_requested_output_stats(g)
     base_stats = output_stat.get_required_base_stats(requested_output_stats)
-    expectation_method = _resolve_expectation_method(g=g)
     if expectation_method == 'urn':
         ON_gad, ON_ga, ON_gd = substitution.get_group_state_totals(ON_tensor)
         OS_gad, OS_ga, OS_gd = substitution.get_group_state_totals(OS_tensor)
@@ -3056,12 +3087,12 @@ def get_exp_state(g, mode):
         state = g['state_pep'].astype(g['float_type'], copy=False)
         inst = g['instantaneous_aa_rate_matrix']
     elif mode=='nsy':
+        inst = _get_codon_model_nsy_rate_matrix(g)
         state = g['state_nsy'].astype(g['float_type'], copy=False)
-        inst = g['instantaneous_nsy_rate_matrix']
     else:
         raise ValueError('Unsupported expected-state mode: {}'.format(mode))
     stateE = np.zeros_like(state, dtype=g['float_type'])
-    rate_values = np.asarray(g['iqtree_rate_values'], dtype=g['float_type'])
+    rate_values = np.asarray(_expected_site_rates(g, mode, state), dtype=g['float_type'])
     if rate_values.ndim != 1:
         rate_values = rate_values.reshape(-1)
     unique_site_rates, inverse_rate_indices = np.unique(rate_values, return_inverse=True)
@@ -3073,6 +3104,7 @@ def get_exp_state(g, mode):
         num_node=stateE.shape[0],
         float_tol=float(g['float_tol']),
         state_has_mass=state_has_mass,
+        branch_lengths=_expected_branch_lengths(g, mode),
     )
     requested_backend = str(g.get('expected_state_backend', 'auto')).strip().lower()
     if requested_backend not in ['auto', 'expm', 'eigen']:

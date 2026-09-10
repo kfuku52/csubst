@@ -6,6 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 
+from csubst import expectation_3di
 from csubst import ete
 from csubst import resource_cache
 from csubst import runtime
@@ -114,8 +115,8 @@ def _normalize_direct_iqtree_model(model):
     model_txt = str(model).strip()
     if model_txt == "":
         raise ValueError("--sa_iqtree_model should be non-empty.")
-    if model_txt.upper() == "GTR20":
-        return "GTR", True
+    if model_txt.upper().split("+")[0] == "GTR20":
+        return "GTR" + model_txt[5:], True
     return model_txt, False
 
 
@@ -965,6 +966,7 @@ def _expand_state_tensor_site_axis(state_tensor, keep_site_index, full_num_site)
 
 
 def _run_iqtree_direct_3di(g, tip_alignment_path):
+    expectation_3di.validate_options(g)
     output_prefix = os.path.abspath(str(tip_alignment_path))
     path_treefile = output_prefix + ".treefile"
     path_state = output_prefix + ".state"
@@ -1005,7 +1007,7 @@ def _run_iqtree_direct_3di(g, tip_alignment_path):
         if os.path.exists(file_tree):
             os.remove(file_tree)
     ckp_path = str(tip_alignment_path) + ".ckp.gz"
-    if os.path.exists(ckp_path):
+    if os.path.exists(ckp_path) and not expectation_3di.required(g):
         os.remove(ckp_path)
     return {
         "treefile": path_treefile,
@@ -1013,6 +1015,7 @@ def _run_iqtree_direct_3di(g, tip_alignment_path):
         "iqtree": path_iqtree,
         "log": path_log,
         "state_symbol_mode": "morph",
+        "checkpoint": ckp_path,
     }
 
 
@@ -1043,6 +1046,11 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
         txt = "Direct 3Di .state file is missing required column(s): {}."
         raise ValueError(txt.format(",".join(missing_columns)))
     state_columns = state_table.columns[3:]
+    if expectation_3di.required(g):
+        expectation_3di.read_context(
+            g, paths, direct_tree, state_columns, state_tensor.shape[1],
+            _get_tip_invariant_3di_site_mask(tip_3di_by_name),
+        )
     state_lookup = {str(s): i for i, s in enumerate(state_orders.tolist())}
     col_to_state = dict()
     state_symbol_mode = str(paths.get("state_symbol_mode", "auto")).strip().lower()
@@ -1155,6 +1163,9 @@ def _read_direct_3di_state_tensor(g, paths, tip_3di_by_name, selected_branch_ids
         state_id = int(col_to_state[col])
         write_values = values[is_write].astype(out_dtype, copy=False)
         state_tensor[row_node_ids[is_write], row_site_index[is_write], state_id] = write_values
+    if expectation_3di.required(g):
+        root_id = int(ete.get_prop(direct_tree, 'numerical_label'))
+        state_tensor[root_id] = expectation_3di.root_posterior(g, direct_tree, state_tensor)
     state_tensor = np.nan_to_num(state_tensor, copy=False)
     if bool(g.get("ml_anc", False)):
         idxmax = np.argmax(state_tensor, axis=2)
@@ -1186,7 +1197,7 @@ def build_3di_state_direct(g, selected_branch_ids=None, predictor=None):
     keep_site_index = np.arange(full_num_site, dtype=np.int64)
     mode = str(g.get("drop_invariant_tip_sites_mode", "tip_invariant")).strip().lower()
     should_prefilter = bool(g.get("drop_invariant_tip_sites", False)) and (mode == "tip_invariant")
-    if should_prefilter and (full_num_site > 0):
+    if should_prefilter and not expectation_3di.required(g) and (full_num_site > 0):
         is_drop_site = _get_tip_invariant_3di_site_mask(tip_3di_by_name=tip_3di_by_name_full)
         if bool(is_drop_site.any()):
             keep_mask = ~is_drop_site

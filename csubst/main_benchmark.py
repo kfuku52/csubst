@@ -15,6 +15,7 @@ from csubst import asrv
 from csubst import output_manifest
 from csubst import pseudocount
 from csubst import recoding
+from csubst import recoding_config
 from csubst import runtime
 from csubst import tsv
 
@@ -252,6 +253,7 @@ def _prepare_run_context(base_g, config, run_dir):
     local_g["nonsyn_recode"] = recoding.normalize_nonsyn_recode(config["nonsyn_recode"])
     local_g["sa_asr_mode"] = config["sa_asr_mode"]
     local_g["pseudocount_mode"] = config["pseudocount_mode"]
+    recoding_config.validate_nonsyn_expectation(local_g["nonsyn_recode"], local_g["expectation_method"], local_g.get("sa_asr_mode", "direct"), local_g.get("sa_iqtree_model", "GTR"))
     # Benchmark configurations share immutable IQ-TREE codon states within
     # this process. Normal one-shot commands avoid retaining the extra array.
     local_g["_cache_state_tensor"] = True

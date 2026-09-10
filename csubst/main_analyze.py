@@ -17,6 +17,7 @@ from csubst import table
 from csubst import ete
 from csubst import output_stat
 from csubst import runtime
+from csubst import recoding_config
 from csubst import tree
 from csubst import tsv
 
@@ -655,6 +656,10 @@ def _prepare_epistasis_configuration(g, ON_tensor, OS_tensor):
 
 
 def main_analyze(g: AnalysisConfig) -> None:
+    recoding_config.validate_nonsyn_expectation(
+        g.get('nonsyn_recode', 'no'), _resolve_expectation_method(g),
+        g.get('sa_asr_mode', 'direct'), g.get('sa_iqtree_model', 'GTR'),
+    )
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
     print("Reading and parsing input files.", flush=True)
