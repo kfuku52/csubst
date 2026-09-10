@@ -380,6 +380,8 @@ def test_scan_help_is_available():
     assert "--scan_rate_exposure" in help_text
     assert "q_weighted" in help_text
     assert "default=q_weighted" in help_text
+    assert "endpoint" in help_text
+    assert "uniform codon site rates" in " ".join(help_text.split())
     assert "--scan_rate_event_mode" in help_text
     assert "--scan_other_scope" in help_text
     assert "all|sister" in help_text

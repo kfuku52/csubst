@@ -634,13 +634,20 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
     parser.add_argument('--scan_min_support', metavar='FRACTION|INTEGER', default='2', type=str,
                         help='default=%(default)s: Minimum foreground-unit support for a scanned candidate. '
                              'Integer tokens (including "1") are counts; decimal/scientific values <=1 are fractions.')
-    parser.add_argument('--scan_rate_exposure', metavar='q_weighted|state_aware|raw_branch_length', default='q_weighted', type=str,
-                        choices=['state_aware', 'raw_branch_length', 'q_weighted'],
+    parser.add_argument('--scan_min_event_count', type=float, default=0.5,
+                        help='Minimum posterior mean jump count for bridge discovery/support; may exceed one.')
+    parser.add_argument('--scan_observation', choices=['marginal', 'joint', 'bridge'], default='marginal',
+                        help='Observed events: marginal product, true joint endpoint posterior, or posterior mean CTMC jump count. Joint/bridge require endpoint exposure and raw lengths.')
+    parser.add_argument('--scan_rate_exposure', metavar='q_weighted|state_aware|raw_branch_length|endpoint', default='q_weighted', type=str,
+                        choices=['state_aware', 'raw_branch_length', 'q_weighted', 'endpoint'],
                         help='default=%(default)s: Exposure model for the exploratory scan rate score. '
                              '"state_aware" counts only branch length whose parent state can produce the candidate substitution; '
                              '"q_weighted" integrates candidate codon-transition rates over the parent codon posterior '
                              'or, with --scan_rate_length n_rescaled, uses their conditional probability among outgoing nonsynonymous transitions. '
-                             'For --nonsyn_recode 3di20, q_weighted resolves to state_aware because a codon-model Q is not a 3Di Q.')
+                             'For --nonsyn_recode 3di20, q_weighted resolves to state_aware because a codon-model Q is not a 3Di Q. '
+                             '"endpoint" uses finite-time codon endpoint probabilities and requires raw model lengths, '
+                             'posterior_sum events and uniform codon site rates. Its exposure is expected endpoint events; '
+                             'With bridge observations, it instead integrates expected jump counts. Analytical P values use a Poisson approximation.')
     parser.add_argument('--scan_rate_event_mode', metavar='called|posterior_sum', default='posterior_sum', type=str,
                         choices=['called', 'posterior_sum'],
                         help='default=%(default)s: Event mass used for the exploratory scan rate score. '
@@ -662,14 +669,14 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
     parser.add_argument('--scan_analytic_profile', default=None, metavar='JSON',
                         help='Frozen independent-training endpoint mixture profile. Requires endpoint_mixture. '
                              'Do not train or choose this profile on the tested alignment.')
-    parser.add_argument('--scan_pvalue_calibration', metavar='none|candidate_fixed|full_scan|parametric_bootstrap', default='full_scan', type=str,
-                        choices=['none', 'candidate_fixed', 'full_scan', 'parametric_bootstrap'],
+    parser.add_argument('--scan_pvalue_calibration', metavar='none|candidate_fixed|full_scan|parametric_bootstrap|parametric', default='full_scan', type=str,
+                        choices=['none', 'candidate_fixed', 'full_scan', 'parametric_bootstrap', 'parametric'],
                         help='default=%(default)s: Empirical calibration for the exploratory scan rate score. '
                              '"candidate_fixed" permutes foreground clades and retests observed candidates; '
                              '"full_scan" repeats discovery over uniform eligible size-binned clade assignments for one trait, including the observed foreground, '
                              'and reports diagnostic maxT-style empirical P values; '
                              '"parametric_bootstrap" simulates a fitted uniform codon null, refits ASR, and repeats discovery. '
-                             'Asymptotic P and trait-by-match BH values are exploratory diagnostics.')
+                             'parametric holds Q/lengths fixed and repeats ASR/discovery (joint/bridge only). Asymptotic P and trait-by-match BH values are exploratory diagnostics.')
     parser.add_argument('--scan_n_permutations', metavar='INT', default=1000, type=int,
                         help='default=%(default)s: Number of null replicates. Clade spaces no larger than this are evaluated exactly. '
                              'Clade permutations use --threads; bootstrap datasets run sequentially with each IQ-TREE fit using --threads.')

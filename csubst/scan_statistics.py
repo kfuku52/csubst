@@ -56,7 +56,8 @@ def calibration_score(row):
     # arithmetic: current instantaneous-Q exposure can be zero for observed
     # multi-step endpoint changes. That contrast has no identifiable rate.
     required = ('target_event_count', 'other_event_count',
-                'target_exposure_branch_length', 'other_exposure_branch_length')
+                'target_exposure' if 'target_exposure' in row else 'target_exposure_branch_length',
+                'other_exposure' if 'other_exposure' in row else 'other_exposure_branch_length')
     if np.isnan(score) and all(key in row for key in required):
         counts_exposure = np.array([row[key] for key in required], dtype=float)
         if (np.isfinite(counts_exposure).all() and (counts_exposure >= 0).all()

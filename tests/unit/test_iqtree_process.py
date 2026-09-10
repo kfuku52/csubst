@@ -71,13 +71,14 @@ def test_run_iqtree_ancestral_rejects_inconsistent_tree_without_force(tmp_path, 
 
 
 @pytest.mark.parametrize('calibration', ['none', 'parametric_bootstrap'])
-def test_scan_fit_passes_seed_and_retains_checkpoint_only_for_bootstrap(tmp_path, monkeypatch, calibration):
+@pytest.mark.parametrize('observation', ['marginal', 'joint', 'bridge'])
+def test_scan_fit_passes_seed_and_retains_checkpoint_for_precise_models(tmp_path, monkeypatch, calibration, observation):
     from pathlib import Path
     alignment = tmp_path/'input.fa'
     alignment.write_text('>A\nAAA\n>B\nAAC\n')
     g = dict(rooted_tree=ete.PhyloNode('(A:.1,B:.2)R;', format=1), alignment_file=str(alignment),
              iqtree_exe='iqtree2', iqtree_model='GY+F', genetic_code=1, threads=1,
-             subcommand='scan', random_seed=5105, scan_pvalue_calibration=calibration,
+             subcommand='scan', random_seed=5105, scan_pvalue_calibration=calibration, scan_observation=observation,
              iqtree_outdir=str(tmp_path/'iqtree'))
     created = []
     def fake_fit(command):
@@ -90,4 +91,4 @@ def test_scan_fit_passes_seed_and_retains_checkpoint_only_for_bootstrap(tmp_path
     monkeypatch.setattr(parser_iqtree.runtime, 'run_subprocess_tee', fake_fit)
     monkeypatch.setattr(parser_iqtree, '_write_iqtree_manifest', lambda g: None)
     parser_iqtree.run_iqtree_ancestral(g)
-    assert created[0].exists() == (calibration == 'parametric_bootstrap')
+    assert created[0].exists() == (calibration == 'parametric_bootstrap' or observation != 'marginal')

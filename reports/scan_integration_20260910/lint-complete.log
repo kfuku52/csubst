@@ -1,0 +1,7 @@
+/tmp/csubst-id7-testenv/bin/python -m ruff check csubst tests setup.py .github/scripts
+All checks passed!
+/tmp/csubst-id7-testenv/bin/python .github/scripts/repository_hygiene_check.py
+Repository hygiene checks passed.
+/tmp/csubst-id7-testenv/bin/python .github/scripts/documentation_check.py
+Documentation checks passed: 20 documents, 22 commands, 1 help examples, 2 templates, 61 local links.
+Pass --wiki-dir to also check Wiki pages and links (15 references not checked).

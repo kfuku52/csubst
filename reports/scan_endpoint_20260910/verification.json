@@ -1,0 +1,11 @@
+{
+  "baseline_commit": "c4e6d821f4be43f15bac9bc7b96e98dc3d5ec25d",
+  "legacy_columns_equal_to_pre_edit": true,
+  "python": "3.10.14",
+  "numpy": "1.26.4",
+  "scipy": "1.15.2",
+  "platform": "macOS-26.6.2-x86_64-i386-64bit",
+  "cpu": "Apple M2 Max",
+  "ram_bytes": 68719476736,
+  "command_cwd": "repository root (repository paths are relative)"
+}

@@ -178,3 +178,11 @@ The paired study uses the *same selected trait×match BH* for the Poisson
 diagnostic, default endpoint mixture and learned mixture. That comparison is
 diagnostic and differs from the production full-family correction above.
 See [the independent training/holdout report](../reports/scan_analytic_training_20260910/REPORT.md).
+
+
+When combined with `--scan_observation joint` or `bridge`, the analytical
+likelihood retains the original tip emissions, including missingness and
+partial ambiguity. It never treats imputed tip posteriors as fresh observations.
+The observation mode affects candidate discovery and the exploratory rate score;
+the analytical P remains a test of endpoints under its frozen null.
+Joint/bridge mode's uniform-model restrictions still apply.

@@ -1,4 +1,5 @@
 
+import pandas as pd
 import numpy as np
 import pytest
 
@@ -6,6 +7,40 @@ from csubst import ete
 from csubst import foreground
 from csubst import substitution_scan
 from scan_fixtures import make_scan_context as _toy_scan_context
+
+
+@pytest.mark.parametrize("calibration", ["candidate_fixed", "full_scan"])
+def test_endpoint_scan_dense_sparse_and_parallel_permutations_agree(calibration):
+    from csubst import substitution
+
+    g, on_tensor = _toy_scan_context()
+    g.update(scan_rate_exposure="endpoint", state_cdn=g["state_nsy"].copy(),
+             instantaneous_codon_rate_matrix=np.array([[-1., 1.], [1., -1.]]),
+             equilibrium_frequency=np.array([.5, .5]), substitution_model="GY",
+             nonsynonymous_indices={"A": [0], "K": [1]},
+             iqtree_rate_values=np.ones(1), scan_n_permutations=4,
+             scan_pvalue_calibration=calibration, threads=1)
+    dense, _ = substitution_scan.scan_substitutions(g=dict(g), ON_tensor=on_tensor)
+    sparse, _ = substitution_scan.scan_substitutions(
+        g=dict(g, threads=2), ON_tensor=substitution.dense_to_sparse_sub_tensor(on_tensor))
+    cols = [c for c in dense if c not in ["scan_permutation_n_jobs", "scan_permutation_backend"]]
+    pd.testing.assert_frame_equal(dense[cols], sparse[cols])
+    assert dense.iloc[0]["scan_permutation_success_count"] == 4
+    assert dense.iloc[0]["scan_exposure_units"] == "expected_endpoint_events"
+
+
+@pytest.mark.parametrize("calibration", ["candidate_fixed", "full_scan"])
+def test_endpoint_undefined_permutation_is_not_treated_as_no_candidates(monkeypatch, calibration):
+    monkeypatch.setattr(substitution_scan, "_build_permuted_context_with_seed", lambda **kw: dict(configuration_id="a", configuration=[], sampling_attempts=1))
+    monkeypatch.setattr(substitution_scan, "_candidate_fixed_permutation_scores", lambda **kw: {"x": np.nan})
+    monkeypatch.setattr(substitution_scan, "_scan_substitutions_core", lambda **kw: (pd.DataFrame({"score_rate_enrichment": [np.nan]}), None))
+    monkeypatch.setattr(substitution_scan, "_scan_row_key", lambda row: "x")
+    result = substitution_scan._run_scan_permutation(
+        permutation_index=0, g={}, observed_df=None, observed_keys={"x"}, calibration=calibration,
+        trait_names=[], branch_meta=None, valid_branch_ids=[], ON_tensor=None,
+        rate_ON_tensor=None, scan_static={"rate_exposure": "endpoint"})
+    assert not result["success"]
+    assert "undefined" in result["failure_reason"].lower()
 
 
 def test_scan_candidate_fixed_permutation_adds_empirical_pvalues():

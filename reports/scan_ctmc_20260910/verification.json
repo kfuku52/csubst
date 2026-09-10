@@ -1,0 +1,36 @@
+{
+  "tests": {
+    "command": "python -m pytest -q -n 4 --import-mode=importlib tests",
+    "passed": 1791,
+    "skipped": 5,
+    "skips": {
+      "torch_2_6_required_installed_2_2_2": 3,
+      "gemmi_missing": 2
+    }
+  },
+  "checks": [
+    "make lint",
+    "make typecheck",
+    "python -m mypy --follow-imports=skip csubst/scan_ctmc.py csubst/scan_endpoint.py",
+    "git diff --check"
+  ],
+  "checks_passed": true,
+  "legacy_existing_columns_unchanged": true,
+  "memory_cleanup_tables_exactly_equal": true,
+  "pepc_calibration_smoke": {
+    "joint_replicates": 1,
+    "bridge_replicates": 1,
+    "candidates_each": 98
+  },
+  "hardware": {
+    "cpu": "Apple M2 Max",
+    "physical_cores": 12,
+    "ram_bytes": 68719476736
+  },
+  "timing_limitation": "Shared host; unrelated CPU-heavy workloads were observed during the later calibration measurements.",
+  "scope": "Fixed parsed codon Q and tree; ASR and candidate selection replayed; no model/tree refitting.",
+  "not_run": [
+    "Broad codon-model misspecification calibration study",
+    "External Wiki documentation validation"
+  ]
+}

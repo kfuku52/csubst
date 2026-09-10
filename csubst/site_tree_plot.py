@@ -551,7 +551,7 @@ def get_lineage_site_heatmap_values(df, display_meta, g):
             value = float(df.at[row_index, col])
             if not np.isfinite(value):
                 continue
-            values[row_index_branch, col_index] = min(max(value, 0.0), 1.0)
+            values[row_index_branch, col_index] = max(value, 0.0) if g.get('scan_observation') == 'bridge' else min(max(value, 0.0), 1.0)
     return values, branch_ids
 
 
@@ -637,7 +637,7 @@ def add_heatmap_column_labels(ax_heat, display_meta, label_by_site):
     return None
 
 
-def draw_lineage_site_heatmap(ax_heat, heat_values, heat_branch_ids, branch_color_by_id, cmap):
+def draw_lineage_site_heatmap(ax_heat, heat_values, heat_branch_ids, branch_color_by_id, cmap, vmax=1.0):
     ax_heat.set_facecolor((1, 1, 1, 0))
     if heat_values.shape[1] == 0:
         ax_heat.axis('off')
@@ -649,7 +649,7 @@ def draw_lineage_site_heatmap(ax_heat, heat_values, heat_branch_ids, branch_colo
         aspect='auto',
         cmap=cmap,
         vmin=0.0,
-        vmax=1.0,
+        vmax=vmax,
         origin='upper',
     )
     ax_heat.set_xlim(-0.5, heat_values.shape[1]-0.5)
@@ -670,8 +670,8 @@ def draw_lineage_site_heatmap(ax_heat, heat_values, heat_branch_ids, branch_colo
     return im
 
 
-def add_lineage_heatmap_colorbar(fig, ax_cb_holder, cmap):
-    norm = matplotlib.colors.Normalize(vmin=0.0, vmax=1.0)
+def add_lineage_heatmap_colorbar(fig, ax_cb_holder, cmap, vmax=1.0, mean_counts=False):
+    norm = matplotlib.colors.Normalize(vmin=0.0, vmax=vmax)
     scalar = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
     ax_cb_holder.set_facecolor((1, 1, 1, 0))
     ax_cb_holder.set_xticks([])
@@ -682,13 +682,13 @@ def add_lineage_heatmap_colorbar(fig, ax_cb_holder, cmap):
     # This avoids overlap with the heatmap y-label and alignment top labels.
     cax = ax_cb_holder.inset_axes([0.535, 0.78, 0.15, 0.12])
     cbar = fig.colorbar(scalar, cax=cax, orientation='horizontal')
-    cbar.set_ticks([0.0, 0.5, 1.0])
+    cbar.set_ticks([0.0, vmax/2, vmax])
     cbar.ax.xaxis.set_ticks_position('top')
     cbar.ax.tick_params(labelsize=font_size, length=2, labeltop=True, labelbottom=False, pad=1)
     ax_cb_holder.text(
         0.61,
         0.72,
-        'Substitution\nposterior\nprobability',
+        'Posterior mean\njump count' if mean_counts else 'Substitution\nposterior\nprobability',
         transform=ax_cb_holder.transAxes,
         ha='center',
         va='top',
@@ -1234,6 +1234,8 @@ def plot_tree_site(df: pd.DataFrame, g: MutableMapping[str, Any]) -> list[str]:
         min_prob_text = '{:g}'.format(float(min_prob))
         title_text += '; Convergence & Divergence: N={:,}&{:,}, PP \u2265 {}'
         title_text = title_text.format(num_convergence, num_divergence, min_prob_text)
+        if g.get('scan_observation') == 'bridge':
+            title_text = title_text.replace('PP ', 'Mean jumps ')
     if mode == 'set':
         mode_expression = str(g.get('mode_expression', '')).strip()
         set_stat_type = str(g.get('set_stat_type', '')).strip()
@@ -1403,6 +1405,9 @@ def plot_tree_site(df: pd.DataFrame, g: MutableMapping[str, Any]) -> list[str]:
             display_meta=display_meta,
             g=g,
         )
+        mean_counts = g.get('scan_observation') == 'bridge'
+        finite_heat = heat_values[np.isfinite(heat_values)]
+        heat_vmax = max(1.0, float(finite_heat.max())) if mean_counts and finite_heat.size else 1.0
         heatmap_cmap = plt.get_cmap('viridis')
         if hasattr(heatmap_cmap, 'copy'):
             heatmap_cmap = heatmap_cmap.copy()
@@ -1416,11 +1421,14 @@ def plot_tree_site(df: pd.DataFrame, g: MutableMapping[str, Any]) -> list[str]:
             heat_branch_ids=heat_branch_ids,
             branch_color_by_id=branch_color_by_id,
             cmap=heatmap_cmap,
+            vmax=heat_vmax,
         )
         _ = add_lineage_heatmap_colorbar(
             fig=fig,
             ax_cb_holder=ax_cb_holder,
             cmap=heatmap_cmap,
+            vmax=heat_vmax,
+            mean_counts=mean_counts,
         )
         if mode == 'set':
             label_by_site = get_set_heatmap_column_labels(df=df, display_meta=display_meta, g=g)
@@ -1432,7 +1440,8 @@ def plot_tree_site(df: pd.DataFrame, g: MutableMapping[str, Any]) -> list[str]:
         ax_heat.set_xlim(ax_site.get_xlim())
 
     if overflow_count > 0:
-        overflow_label = '+{} sites with PP ≥ {:.2f}'.format(int(overflow_count), float(min_prob))
+        mass_label = 'mean jumps' if g.get('scan_observation') == 'bridge' else 'PP'
+        overflow_label = '+{} sites with {} ≥ {:.2f}'.format(int(overflow_count), mass_label, float(min_prob))
         if has_structure_track:
             # Place overflow text below structure-site tick labels.
             fig.canvas.draw()

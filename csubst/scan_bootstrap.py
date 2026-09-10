@@ -58,15 +58,46 @@ def validate_options(g):
                              'explicit IQ-TREE intermediate inputs are not supported.')
 
 
+def requires_precise_model(g):
+    return (g.get('scan_pvalue_calibration') == 'parametric_bootstrap'
+            or (g.get('scan_observation', 'marginal') != 'marginal'
+                and str(g.get('iqtree_model', '')).upper() in ('GY+F', 'GY+FQ')))
+
+
 def require_precise_fit(g):
-    if g.get('scan_pvalue_calibration') != 'parametric_bootstrap':
+    if not requires_precise_model(g):
         return
-    prefix = runtime.infer_iqtree_output_prefix(g['alignment_file'], g['iqtree_outdir'])
+    explicit_state = g.get('scan_cli_options', g).get('iqtree_state', 'infer')
+    prefix = (str(explicit_state).removesuffix('.state') if explicit_state not in ('infer', '', None)
+              else runtime.infer_iqtree_output_prefix(g['alignment_file'], g['iqtree_outdir']))
     checkpoint = Path(prefix + '.ckp.gz')
-    log = Path(prefix + '.log')
-    if not checkpoint.is_file() or not log.is_file() or 'Empirical state frequencies:' not in log.read_text():
+    log = Path(g['iqtree_log']) if g.get('iqtree_log', 'infer') not in ('infer', '', None) else Path(prefix + '.log')
+    needs_frequencies = str(g.get('iqtree_model', '')).upper() != 'GY+FQ'
+    if (not checkpoint.is_file() or not log.is_file()
+            or (needs_frequencies and 'Empirical state frequencies:' not in log.read_text())):
+        if explicit_state not in ('infer', '', None):
+            raise ValueError('Joint/bridge GY scans require a matching .ckp.gz and precise log beside the supplied state; '
+                             'omit explicit IQ-TREE intermediates to refit.')
         print('Scan bootstrap requires a checkpoint and full-precision frequencies; refitting IQ-TREE.', flush=True)
         g['iqtree_redo'] = True
+
+
+def prepare_observation_model(g):
+    """Use the fitted report's model, including explicitly supplied ASR files."""
+    if g.get('scan_observation', 'marginal') == 'marginal':
+        return
+    model = str(g.get('substitution_model', '')).upper()
+    if model not in ('GY+F', 'GY+FQ'):
+        return
+    # With supplied intermediates, iqtree_model may still be the CLI default.
+    # The report's frequency scheme is authoritative for the existing fit.
+    local = dict(g, iqtree_model=model)
+    state_path = Path(g['path_iqtree_state'])
+    if not Path(str(state_path).removesuffix('.state') + '.ckp.gz').is_file():
+        raise ValueError('Precise joint/bridge GY observations require the matching IQ-TREE checkpoint; refit the supplied model.')
+    q, pi, provenance = _fitted_generator(local, np.asarray(g['codon_orders']))
+    g.update(instantaneous_codon_rate_matrix=q, equilibrium_frequency=pi,
+             scan_ctmc_model_precision=provenance)
 
 
 def _precise_newick(tr):
@@ -290,6 +321,7 @@ def calibrate(g, observed, model):
                'fixed': ['topology', 'root_position', 'foreground', 'alignment_length', 'missing_codon_mask'],
                'refitted': ['codon_model_parameters', 'branch_lengths', 'ASR', 'automatic_recoding_if_requested'],
                'repeated': ['site_filtering', 'exposure', 'candidate_discovery', 'support_filter', 'maximum_score'],
+               'observation': g.get('scan_observation', 'marginal'),
                'score_method': scan_statistics.SCORE_METHOD, 'maximum_scope': scan_statistics.MAXIMUM_SCOPE,
                'fitted_model_validation': model.get('provenance'),
                'inference': 'model_conditional_parametric_bootstrap_not_exact', 'replicates': []}
@@ -339,14 +371,17 @@ def calibrate(g, observed, model):
 def write_inference_report(g, frame):
     calibration = g.get('scan_pvalue_calibration', 'full_scan')
     report = {'schema_version': 1, 'csubst_version': __version__,
-              'score_method': scan_statistics.SCORE_METHOD, 'event_measure': 'posterior_mass_in_both_event_modes',
+              'score_method': scan_statistics.SCORE_METHOD,
+              'event_measure': 'posterior_mean_jump_count' if g.get('scan_observation') == 'bridge' else 'posterior_mass_in_both_event_modes',
+              'observation': g.get('scan_observation', 'marginal'),
+              'ctmc_model_precision': g.get('scan_ctmc_model_precision'),
               'asymptotic_and_bh_interpretation': 'exploratory_diagnostics_not_selection_adjusted_FDR',
               'bh_scope': scan_statistics.BH_SCOPE, 'calibration': calibration,
               'requested_replicates': int(g.get('scan_n_permutations', 1000)),
               'seed': int(g.get('scan_permutation_seed', 1)),
               'candidate_count': len(frame), 'bh_families': [],
               'status': ['no_observed_candidates'] if frame.empty else frame['scan_inference_status'].unique().tolist(),
-              'maximum_scope': scan_statistics.MAXIMUM_SCOPE if calibration in ('full_scan', 'parametric_bootstrap') else 'none',
+              'maximum_scope': scan_statistics.MAXIMUM_SCOPE if calibration in ('full_scan', 'parametric_bootstrap', 'parametric') else 'none',
               'no_test_reason': g.get('scan_no_test_reason'),
               'clade_resampling_note': 'Requires exchangeability; not a universal FWER guarantee. '
                                        'Candidate-fixed inference does not adjust discovery selection.'}

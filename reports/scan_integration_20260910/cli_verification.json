@@ -1,0 +1,44 @@
+[
+  {
+    "scenario": "null",
+    "mode": "marginal",
+    "candidates": 1,
+    "maximum": 1.9572270399958,
+    "agrees": true
+  },
+  {
+    "scenario": "null",
+    "mode": "joint",
+    "candidates": 1,
+    "maximum": 1.9611288216387948,
+    "agrees": true
+  },
+  {
+    "scenario": "null",
+    "mode": "bridge",
+    "candidates": 1,
+    "maximum": 1.8694272383630073,
+    "agrees": true
+  },
+  {
+    "scenario": "alt",
+    "mode": "marginal",
+    "candidates": 3,
+    "maximum": 1.7701735224522106,
+    "agrees": true
+  },
+  {
+    "scenario": "alt",
+    "mode": "joint",
+    "candidates": 3,
+    "maximum": 1.9531246230730468,
+    "agrees": true
+  },
+  {
+    "scenario": "alt",
+    "mode": "bridge",
+    "candidates": 3,
+    "maximum": 1.8563569104108628,
+    "agrees": true
+  }
+]

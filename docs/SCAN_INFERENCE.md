@@ -24,7 +24,9 @@ exposures**, conditioning on the total instead gives an exact binomial upper
 tail of 0.25. That comparison is a small-sample diagnostic, not a replacement
 test for scan output.
 
-Both `called` and `posterior_sum` sum fractional posterior event mass.
+For marginal/joint observations, both `called` and `posterior_sum` sum
+fractional posterior event mass. Bridge observations sum posterior mean jump
+counts, which can exceed one; see [joint/bridge scan](SCAN_CTMC.md).
 `called` sums only events that pass the event threshold; it does not convert
 them to integer observations. Neither rounding the mass nor switching to
 `called` establishes the assumptions of an exact integer-count test.
@@ -70,6 +72,7 @@ repair invalid individual P values.
 | `none` | No null replicates | Exploratory score and asymptotic/BH diagnostics |
 | `candidate_fixed` | Change foreground clades; retest observed candidates against the fixed posterior tensors | Candidate-wise `p_rate_enrichment_empirical`; discovery selection is not corrected |
 | `full_scan` (default) | Change foreground clades; repeat discovery/support selection against the fixed posterior tensors | Candidate-wise empirical values plus `p_rate_enrichment_empirical_maxT`, compared with the maximum over all testable output candidates in each replicate |
+| `parametric` | Hold the fitted model/lengths fixed; simulate new tips, repeat exact ASR and joint/bridge discovery | Global `p_rate_enrichment_empirical_maxT`; see [fixed-model limits](SCAN_CTMC.md#parametric-calibration) |
 | `parametric_bootstrap` | Simulate a fitted uniform GY codon null; refit IQ-TREE/ASR and repeat recoding, filtering, exposure, discovery and support selection | `p_rate_enrichment_bootstrap_maxT`, compared with each complete replicate's maximum score |
 
 All maximum-score families cover **all traits, requested matches and testable
@@ -142,6 +145,11 @@ The procedure is:
    A successfully processed dataset without candidates remains in the
    reference. When every site is excluded by the configured scan filter,
    scan writes an empty result and records that no-test outcome.
+
+Joint/bridge scan observations are supported with endpoint exposure and raw
+model lengths. The original observation mode and threshold are repeated in
+every bootstrap child. These modes use checkpoint/log model precision in the
+observed and each simulated analysis.
 
 An explicit set of precomputed IQ-TREE intermediate inputs is not supported
 for bootstrap: it would not define a reproducible refitting procedure for

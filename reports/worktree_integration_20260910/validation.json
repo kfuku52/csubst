@@ -1,0 +1,13 @@
+{
+  "runtime": "local/genegalleon:csubst-scan-inference-dev",
+  "python": "3.12",
+  "non_process_passed": 2083,
+  "process_passed": 4,
+  "optional_skipped": 3,
+  "native_passed": 8,
+  "related_subset_passed": 266,
+  "cli_configurations": 6,
+  "fixture_recheck": "two missing-fixture failures passed after copying existing fixture",
+  "defaults_changed": false,
+  "sif_tested": false
+}

@@ -539,7 +539,8 @@ def run_iqtree_ancestral(g, force_notree_run=False):
         _write_iqtree_manifest(g)
         ckp_paths = [g['alignment_file']+'.ckp.gz', iqtree_prefix+'.ckp.gz']
         for ckp_path in ckp_paths:
-            if os.path.exists(ckp_path) and g.get('scan_pvalue_calibration') != 'parametric_bootstrap':
+            if (os.path.exists(ckp_path) and g.get('scan_pvalue_calibration') != 'parametric_bootstrap'
+                    and g.get('scan_observation', 'marginal') == 'marginal'):
                 os.remove(ckp_path)
     finally:
         if os.path.exists(file_tree):

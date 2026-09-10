@@ -1,0 +1,38 @@
+[
+  {
+    "observation": "marginal",
+    "calibration": "none",
+    "candidates": 8,
+    "passed": true
+  },
+  {
+    "observation": "marginal",
+    "calibration": "parametric_bootstrap",
+    "candidates": 8,
+    "passed": true
+  },
+  {
+    "observation": "joint",
+    "calibration": "none",
+    "candidates": 8,
+    "passed": true
+  },
+  {
+    "observation": "joint",
+    "calibration": "parametric_bootstrap",
+    "candidates": 8,
+    "passed": true
+  },
+  {
+    "observation": "bridge",
+    "calibration": "none",
+    "candidates": 4,
+    "passed": true
+  },
+  {
+    "observation": "bridge",
+    "calibration": "parametric_bootstrap",
+    "candidates": 4,
+    "passed": true
+  }
+]

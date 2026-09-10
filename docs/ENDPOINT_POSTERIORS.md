@@ -4,6 +4,10 @@ Use `--substitution_posterior joint` to compute the joint probability of the two
 states at each branch's endpoints. The default `marginal` retains the previous
 product of node marginals for reproducibility and comparisons.
 
+For `scan`, use [joint/bridge observations](SCAN_CTMC.md) through
+`--scan_observation joint` or `bridge`, with endpoint exposure and raw model
+lengths. The `--substitution_posterior` switch remains `marginal` in scan.
+
 ```bash
 csubst search --alignment_file alignment.fa --rooted_tree_file tree.nwk \
   --substitution_posterior joint --endpoint_block_size 64

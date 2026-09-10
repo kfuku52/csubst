@@ -1,0 +1,48 @@
+{
+  "command": [
+    "python",
+    "-m",
+    "csubst",
+    "scan",
+    "--alignment_file",
+    "csubst/dataset/PEPC.alignment.fa",
+    "--rooted_tree_file",
+    "csubst/dataset/PEPC.tree.nwk",
+    "--foreground",
+    "reports/csubst_scan_pepc_20260625/PEPC.foreground.independent.txt",
+    "--iqtree_model",
+    "ECMK07+F",
+    "--iqtree_outdir",
+    "/tmp/csubst-id7-implementation/fit",
+    "--scan_match",
+    "any2spe",
+    "--scan_pvalue_calibration",
+    "none",
+    "--scan_site_plot",
+    "no",
+    "--threads",
+    "1",
+    "--float_digit",
+    "10"
+  ],
+  "platform": "macOS-26.6.2-x86_64-i386-64bit",
+  "python": "3.10.14",
+  "results": [
+    {
+      "repeat": 0,
+      "seconds": 4.107143250002991,
+      "log": "/tmp/csubst-id7-implementation/old_0.log"
+    },
+    {
+      "repeat": 1,
+      "seconds": 4.067394083976978,
+      "log": "/tmp/csubst-id7-implementation/old_1.log"
+    },
+    {
+      "repeat": 2,
+      "seconds": 4.152128500019899,
+      "log": "/tmp/csubst-id7-implementation/old_2.log"
+    }
+  ],
+  "command_cwd": "repository root (repository paths are relative)"
+}

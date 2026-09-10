@@ -236,7 +236,8 @@ def annotate(g, frame, units, engine):
         site = int(row['site'])
         tips = {}
         for leaf in engine.model.leaves:
-            obs = np.asarray(g['state_cdn'][leaf, site], dtype=float)
+            emissions = g.get('scan_tip_emissions', g['state_cdn'])
+            obs = np.asarray(emissions[leaf, site], dtype=float)
             tips[leaf] = obs if obs.sum() else np.ones(engine.model.pi.size)
         branches = substitution_scan._target_branch_ids_from_maps(rate_fg, row['trait'], row['target_class'], valid)
         p, log_e = engine.test(tips, branches,

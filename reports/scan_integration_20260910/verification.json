@@ -1,0 +1,121 @@
+{
+  "repeatability": [
+    {
+      "mode": "baseline",
+      "calibration": "none",
+      "exact": true
+    },
+    {
+      "mode": "baseline",
+      "calibration": "parametric_bootstrap",
+      "exact": true
+    },
+    {
+      "mode": "joint",
+      "calibration": "none",
+      "exact": true
+    },
+    {
+      "mode": "joint",
+      "calibration": "parametric_bootstrap",
+      "exact": true
+    },
+    {
+      "mode": "bridge",
+      "calibration": "none",
+      "exact": true
+    },
+    {
+      "mode": "bridge",
+      "calibration": "parametric_bootstrap",
+      "exact": true
+    }
+  ],
+  "common_null_alignments": [
+    {
+      "replicate": 0,
+      "sha256": "db1291d50e83cb271b16c110af1579dd0ac0f2774eb4f62c1675928a1e3abfc8",
+      "models_identical": true
+    },
+    {
+      "replicate": 1,
+      "sha256": "aaa547f21e713f96d8d12d91439b1392e39b77b80473c5519cecb30746000fdd",
+      "models_identical": true
+    },
+    {
+      "replicate": 2,
+      "sha256": "3ff7f80448579adbb93d70cbc2a215568fc9fa7399d8a39348c856866f1c63fc",
+      "models_identical": true
+    }
+  ],
+  "pvalue_checks": [
+    {
+      "mode": "baseline",
+      "repeat": 1,
+      "rows": 103,
+      "verified": true
+    },
+    {
+      "mode": "baseline",
+      "repeat": 2,
+      "rows": 103,
+      "verified": true
+    },
+    {
+      "mode": "baseline",
+      "repeat": 3,
+      "rows": 103,
+      "verified": true
+    },
+    {
+      "mode": "joint",
+      "repeat": 1,
+      "rows": 103,
+      "verified": true
+    },
+    {
+      "mode": "joint",
+      "repeat": 2,
+      "rows": 103,
+      "verified": true
+    },
+    {
+      "mode": "joint",
+      "repeat": 3,
+      "rows": 103,
+      "verified": true
+    },
+    {
+      "mode": "bridge",
+      "repeat": 1,
+      "rows": 104,
+      "verified": true
+    },
+    {
+      "mode": "bridge",
+      "repeat": 2,
+      "rows": 104,
+      "verified": true
+    },
+    {
+      "mode": "bridge",
+      "repeat": 3,
+      "rows": 104,
+      "verified": true
+    }
+  ],
+  "legacy_parity": [
+    {
+      "calibration": "none",
+      "rows": 103,
+      "columns": 100,
+      "exact": true
+    },
+    {
+      "calibration": "parametric_bootstrap",
+      "rows": 103,
+      "columns": 100,
+      "exact": true
+    }
+  ]
+}

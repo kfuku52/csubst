@@ -128,7 +128,8 @@ def test_child_options_recompute_asr_and_preserve_analysis_choices(tmp_path, mon
     options = dict(rooted_tree_file=str(rooted), foreground=str(fg),
                    iqtree_state='/observed/input.state', iqtree_treefile='/observed/input.treefile',
                    scan_min_support='2', nonsyn_recode='kgbauto6', drop_invariant_tip_sites='tip_invariant',
-                   ml_anc=False, scan_rate_event_mode='called', scan_site_plot=True,
+                   ml_anc=False, scan_observation='bridge', scan_min_event_count=1.2, scan_rate_exposure='endpoint',
+                   scan_rate_length='raw', scan_rate_event_mode='called', scan_site_plot=True,
                    full_cds_alignment_file='')
     def fake_run(command, **kwargs):
         run_dir = Path(kwargs['cwd'])
@@ -138,6 +139,8 @@ def test_child_options_recompute_asr_and_preserve_analysis_choices(tmp_path, mon
         assert parsed.nonsyn_recode == 'kgbauto6'
         assert parsed.drop_invariant_tip_sites == 'tip_invariant' and parsed.scan_rate_event_mode == 'called'
         assert not parsed.scan_site_plot and parsed.scan_pvalue_calibration == 'none'
+        assert parsed.scan_observation == 'bridge' and parsed.scan_min_event_count == 1.2
+        assert parsed.scan_rate_exposure == 'endpoint' and parsed.scan_rate_length == 'raw'
         assert parsed.random_seed == 123
         assert Path(parsed.foreground).parent == run_dir
         assert parsed.full_cds_alignment_file == ''
@@ -173,3 +176,29 @@ def test_seed_is_index_based_and_manifest_serializes_empty_reference(tmp_path, m
     manifest = json.loads((Path(result.iloc[0]['scan_bootstrap_directory'])/'manifest.json').read_text())
     assert manifest['replicates'][0]['maximum_score'] is None
     assert result.iloc[0]['p_rate_enrichment_bootstrap_maxT'] == .5
+
+
+def test_precise_fit_distinguishes_resolved_auto_paths_from_explicit_inputs(tmp_path):
+    g = dict(scan_observation='joint', iqtree_model='GY+FQ', alignment_file=str(tmp_path/'input.fa'),
+             iqtree_outdir=str(tmp_path/'iqtree'), iqtree_state=str(tmp_path/'future.state'),
+             iqtree_log=str(tmp_path/'future.log'), scan_cli_options={'iqtree_state':'infer'})
+    boot.require_precise_fit(g)
+    assert g['iqtree_redo'] is True
+    g['scan_cli_options']['iqtree_state'] = str(tmp_path/'explicit.state')
+    with pytest.raises(ValueError, match='matching .ckp.gz'):
+        boot.require_precise_fit(g)
+
+
+def test_joint_precision_uses_reported_frequency_scheme_for_supplied_fit(tmp_path, monkeypatch):
+    state = tmp_path/'input.state'
+    (tmp_path/'input.ckp.gz').write_bytes(b'provided checkpoint')
+    g = dict(scan_observation='joint', substitution_model='GY+FQ', iqtree_model='GY+F',
+             path_iqtree_state=str(state), codon_orders=np.array(['AAA','AAC']))
+    def generator(context, codons):
+        assert context['iqtree_model'] == 'GY+FQ'
+        return np.array([[-1.,1.],[1.,-1.]]), np.array([.5,.5]), {'verified':True}
+    monkeypatch.setattr(boot,'_fitted_generator',generator)
+    boot.prepare_observation_model(g)
+    np.testing.assert_array_equal(g['equilibrium_frequency'],[.5,.5])
+    assert g['iqtree_model'] == 'GY+F'  # original CLI procedure is not rewritten
+    assert g['scan_ctmc_model_precision']['verified']

@@ -107,7 +107,8 @@ and still uses the existing marginal-posterior expected-count approximation.
 GTR estimates many parameters and may be poorly determined by short alignments.
 See the [IQ-TREE morphological model definitions](https://www.iqtree.org/doc/Substitution-Models#binary-and-morphological-models).
 
-`scan` does not compute omegaC expectations and continues to use `state_aware`
+The codon-only [endpoint exposure option](SCAN_ENDPOINT.md) is not yet available
+for native 3Di states. `scan` does not compute omegaC expectations and continues to use `state_aware`
 exposure for 3Di. Codon and amino-acid model contexts remain available to
 `scan`, `inspect` and `sites`; they are not used as a 3Di Q.
 

@@ -17,6 +17,7 @@ from csubst import parallel
 from csubst import parser_misc
 from csubst import randomness
 from csubst import runtime
+from csubst import scan_endpoint
 from csubst import scan_permutation
 from csubst import sequence
 from csubst import scan_statistics
@@ -36,9 +37,9 @@ SCAN_MATCHES = (
 )
 
 SCAN_RATE_EVENT_MODES = ("called", "posterior_sum")
-SCAN_RATE_EXPOSURES = ("q_weighted", "state_aware", "raw_branch_length")
+SCAN_RATE_EXPOSURES = ("q_weighted", "state_aware", "raw_branch_length", "endpoint")
 SCAN_OTHER_SCOPES = ("all", "sister")
-SCAN_PVALUE_CALIBRATIONS = ("none", "candidate_fixed", "full_scan", "parametric_bootstrap")
+SCAN_PVALUE_CALIBRATIONS = ("none", "candidate_fixed", "full_scan", "parametric_bootstrap", "parametric")
 SCAN_UNIT_MODES = ("lineage", "stem", "clade")
 
 
@@ -59,11 +60,21 @@ SCAN_OUTPUT_COLUMNS = (
     "to_state_distribution",
     "state_change",
     "candidate_event_pp_sum",
+    "candidate_event_mass_sum",
+    "scan_event_threshold",
+    "scan_event_units",
+    "support_mass_sum",
+    "support_mass_mean",
     "scan_unit_mode",
     "scan_min_support_count",
     "scan_min_event_pp",
     "scan_rate_length_used",
     "scan_rate_exposure",
+    "scan_exposure_units",
+    "scan_endpoint_model",
+    "scan_observation_method",
+    "scan_inference_method",
+    "rate_status",
     "scan_rate_event_mode",
     "scan_other_scope",
     "scan_pvalue_calibration",
@@ -114,12 +125,22 @@ SCAN_OUTPUT_COLUMNS = (
     "target_sn_rescaled_length",
     "target_n_rescaled_length",
     "target_exposure_branch_length",
+    "target_exposure",
+    "target_zero_exposure_branch_count",
+    "target_positive_event_zero_exposure_branch_count",
+    "target_missing_exposure_branch_count",
+    "target_exposure_diagnostics",
     "other_event_count",
     "other_event_branch_count",
     "other_raw_branch_length",
     "other_sn_rescaled_length",
     "other_n_rescaled_length",
     "other_exposure_branch_length",
+    "other_exposure",
+    "other_zero_exposure_branch_count",
+    "other_positive_event_zero_exposure_branch_count",
+    "other_missing_exposure_branch_count",
+    "other_exposure_diagnostics",
     "target_event_rate",
     "other_event_rate",
     "rate_ratio",
@@ -247,7 +268,32 @@ def normalize_scan_n_permutations(value):
     return n_permutations
 
 
+def scan_event_threshold(g):
+    bridge = g.get("scan_observation") == "bridge"
+    value = float(g.get("scan_min_event_count", .5) if bridge else g.get("scan_min_event_pp", .5))
+    if not np.isfinite(value) or value < 0 or (not bridge and value > 1):
+        raise ValueError("--scan_min_event_count / --scan_min_event_pp must be finite and nonnegative; probabilities cannot exceed one.")
+    return value
+
+
 def validate_scan_configuration(g):
+    scan_event_threshold(g)
+    if g.get("substitution_posterior", "marginal") != "marginal":
+        raise ValueError("For scan use --scan_observation joint or bridge; --substitution_posterior joint is for search/analyze.")
+    if g.get("scan_observation", "marginal") != "marginal" and bool(g.get("ml_anc", False)):
+        raise ValueError("Joint/bridge scan requires --ml_anc no.")
+    observation = str(g.get("scan_observation", "marginal"))
+    if observation not in ("marginal", "joint", "bridge"):
+        raise ValueError("Unknown scan observation method.")
+    if observation != "marginal":
+        if resolve_scan_rate_exposure(g) != "endpoint":
+            raise ValueError("Joint/bridge observations require --scan_rate_exposure endpoint.")
+        if float(g.get("min_sub_pp", 0)) != 0:
+            raise ValueError("Joint/bridge observations require --min_sub_pp 0; use scan_min_event_pp for candidate selection.")
+    if g.get("scan_pvalue_calibration") == "parametric" and observation == "marginal":
+        raise ValueError("Parametric calibration requires joint or bridge observations.")
+    if resolve_scan_rate_exposure(g) == "endpoint":
+        scan_endpoint.validate_options(g)
     # Validate discovery settings before loading ASR or taking an empty-site
     # shortcut. An empty result must not hide invalid user input.
     normalize_scan_matches(g.get("scan_match", "any2spe"))
@@ -266,6 +312,8 @@ def validate_scan_configuration(g):
     n_permutations = normalize_scan_n_permutations(
         g.get("scan_n_permutations", 1000)
     )
+    if calibration == "parametric" and int(g.get("scan_permutation_seed", 1)) < 0:
+        raise ValueError("--scan_permutation_seed must be nonnegative for parametric calibration.")
     if calibration != "none" and n_permutations == 0:
         raise ValueError(
             "--scan_n_permutations should be > 0 when --scan_pvalue_calibration is {}.".format(
@@ -305,11 +353,11 @@ def validate_scan_configuration(g):
     if filter_mode == "empirical" and calibration not in ("candidate_fixed", "full_scan"):
         raise ValueError(
             "--scan_site_plot_filter empirical requires --scan_pvalue_calibration "
-            "candidate_fixed or full_scan."
+            "candidate_fixed or full_scan; use the full_scan plot filter for fixed-model parametric calibration."
         )
-    if filter_mode == "full_scan" and calibration != "full_scan":
+    if filter_mode == "full_scan" and calibration not in ("full_scan", "parametric"):
         raise ValueError(
-            "--scan_site_plot_filter full_scan requires --scan_pvalue_calibration full_scan."
+            "--scan_site_plot_filter full_scan requires --scan_pvalue_calibration full_scan or parametric."
         )
     if filter_mode == "parametric_bootstrap" and calibration != "parametric_bootstrap":
         raise ValueError(
@@ -454,6 +502,12 @@ def _pack_scan_worker_context(g, scan_static):
     for unused_key in ["state_nuc", "state_pep", "_3di_alignment_by_branch_id", "_3di_tip_alignment_by_leaf"]:
         worker_g.pop(unused_key, None)
     worker_static = dict(scan_static)
+    endpoint_context = q_context.get("endpoint_context")
+    if endpoint_context is not None:
+        q_context["endpoint_context"] = {
+            key: _pack_scan_array_for_worker(value, name="endpoint_" + key, owned_paths=owned_paths)
+            for key, value in endpoint_context.items()
+        }
     worker_static["q_context"] = q_context
     worker_static["observed_site_annotations"] = {}
     return worker_g, worker_static, owned_paths
@@ -471,6 +525,11 @@ def _unpack_scan_worker_context(g, scan_static):
         state_cdn = _unpack_scan_tensor_for_worker(packed_state_cdn)
         worker_g["state_cdn"] = state_cdn
         q_context["state_cdn"] = state_cdn
+    if q_context.get("endpoint_context") is not None:
+        q_context["endpoint_context"] = {
+            key: _unpack_scan_tensor_for_worker(value)
+            for key, value in q_context["endpoint_context"].items()
+        }
     worker_static["q_context"] = q_context
     return worker_g, worker_static
 
@@ -1427,8 +1486,8 @@ def _build_codon_state_ids(g):
     return codon_state_ids
 
 
-def _build_scan_q_context(g, rate_exposure):
-    if rate_exposure != "q_weighted":
+def _build_scan_q_context(g, rate_exposure, branch_meta=None):
+    if rate_exposure not in ("q_weighted", "endpoint"):
         return {
             "q_matrix": None,
             "state_cdn": None,
@@ -1439,6 +1498,15 @@ def _build_scan_q_context(g, rate_exposure):
     state_cdn = g.get("state_cdn", None)
     codon_state_ids = _build_codon_state_ids(g)
     q_matrix = g.get("instantaneous_nsy_rate_matrix", None)
+    if rate_exposure == "endpoint":
+        if codon_q is None or state_cdn is None or codon_state_ids is None:
+            raise ValueError("Scan endpoint exposure requires codon posterior states, codon Q and state groups.")
+        if branch_meta is None:
+            branch_meta = build_branch_metadata(g)
+        endpoint_context = scan_endpoint.build_context(g, branch_meta, codon_state_ids)
+        return {"q_matrix": None, "state_cdn": state_cdn,
+                "codon_q_matrix": codon_q, "codon_state_ids": codon_state_ids,
+                "endpoint_context": endpoint_context}
     if (codon_q is None) or (state_cdn is None) or (codon_state_ids is None):
         if q_matrix is None:
             raise ValueError(
@@ -1510,17 +1578,18 @@ def _assign_grouped_qvalues(scan_df, out_col, group_cols, p_col="p_rate_enrichme
 def _annotate_inference(scan_df, g):
     calibration = normalize_scan_pvalue_calibration(g.get('scan_pvalue_calibration', 'full_scan'))
     scan_df['scan_score_method'] = scan_statistics.SCORE_METHOD
-    scan_df['scan_event_measure'] = 'posterior_mass'
+    scan_df['scan_event_measure'] = 'posterior_mean_jump_count' if g.get('scan_observation') == 'bridge' else 'posterior_mass'
     scan_df['scan_bh_scope'] = scan_statistics.BH_SCOPE
     if calibration in ('none', 'parametric_bootstrap'):
         scan_df['scan_permutation_backend'] = 'not_used'
         scan_df['scan_permutation_n_jobs'] = 0
     scan_df['scan_maxT_scope'] = (
-        scan_statistics.MAXIMUM_SCOPE if calibration in ('full_scan', 'parametric_bootstrap') else 'none'
+        scan_statistics.MAXIMUM_SCOPE if calibration in ('full_scan', 'parametric_bootstrap', 'parametric') else 'none'
     )
     status = {'none': 'exploratory_asymptotic',
               'candidate_fixed': 'diagnostic_fixed_candidates',
               'full_scan': 'diagnostic_clade_resampling',
+              'parametric': 'fixed_model_parametric_bootstrap',
               'parametric_bootstrap': 'pending_parametric_bootstrap'}[calibration]
     if 'scan_inference_status' not in scan_df:
         scan_df['scan_inference_status'] = status
@@ -1630,6 +1699,7 @@ def _rate_summary(
     state_cdn=None,
     codon_q_matrix=None,
     codon_state_ids=None,
+    endpoint_context=None,
 ):
     target_set = set(int(v) for v in np.asarray(target_branch_ids, dtype=np.int64).reshape(-1).tolist())
     branch_ids = branch_meta["branch_id"].astype(int).to_numpy(copy=False)
@@ -1647,7 +1717,17 @@ def _rate_summary(
     raw_length = branch_meta["raw_length"].to_numpy(dtype=np.float64, copy=False)
     sn_length = branch_meta["sn_rescaled_length"].to_numpy(dtype=np.float64, copy=False)
     n_length = branch_meta["n_rescaled_length"].to_numpy(dtype=np.float64, copy=False)
-    if rate_exposure == "state_aware":
+    missing_exposure = np.zeros(branch_ids.shape[0], dtype=bool)
+    exposure_reasons = np.full(branch_ids.shape[0], "ok", dtype="U24")
+    if rate_exposure == "endpoint":
+        if rate_length != "raw" or endpoint_context is None:
+            raise ValueError("Scan endpoint requires raw model lengths and a fitted endpoint context.")
+        if not np.array_equal(branch_ids, endpoint_context["branch_ids"]):
+            raise ValueError("Scan endpoint context branch order does not match branch metadata.")
+        opportunity, missing_exposure, exposure_reasons = scan_endpoint.expected_events(
+            endpoint_context, state_cdn, state_nsy, site, from_ids, to_ids,
+        )
+    elif rate_exposure == "state_aware":
         opp_states = _opportunity_states(from_ids=from_ids, to_ids=to_ids)
         if opp_states.shape[0] == 0:
             opportunity = np.zeros(shape=branch_ids.shape[0], dtype=np.float64)
@@ -1672,7 +1752,9 @@ def _rate_summary(
     else:
         txt = "--scan_rate_exposure should be one of {}."
         raise ValueError(txt.format(", ".join(SCAN_RATE_EXPOSURES)))
-    exposure = chosen_length * opportunity
+    exposure = opportunity if rate_exposure == "endpoint" else chosen_length * opportunity
+    if rate_exposure != "endpoint":
+        exposure_reasons[exposure == 0] = "legacy_zero_exposure"
     target_event = float(event_values[is_target].sum())
     other_event = float(event_values[is_other].sum())
     target_exposure = float(exposure[is_target].sum())
@@ -1692,6 +1774,22 @@ def _rate_summary(
         x_other=other_event,
         l_other=other_exposure,
     )
+    impossible = (event_values > 0) & (exposure == 0)
+    if impossible[is_target | is_other].any():
+        rate_status = "positive_event_zero_exposure"
+        if rate_exposure == "endpoint":
+            target_rate = other_rate = rate_ratio = score = pvalue = np.nan
+    elif target_exposure == 0:
+        rate_status = "zero_target_exposure"
+    elif other_exposure == 0:
+        rate_status = "zero_other_exposure"
+    else:
+        rate_status = "ok"
+
+    def exposure_diagnostics(selected):
+        labels, counts = np.unique(exposure_reasons[selected], return_counts=True)
+        return ";".join("{}:{}".format(label, count) for label, count in zip(labels, counts) if label != "ok")
+
     reason = ''
     if not np.isfinite(score):
         inputs = np.array([target_event, other_event, target_exposure, other_exposure])
@@ -1700,18 +1798,33 @@ def _rate_summary(
         else:
             reason = 'invalid_rate_inputs'
     return {
+        "scan_exposure_units": "expected_endpoint_events" if rate_exposure == "endpoint" else "legacy_weighted_branch_length",
+        "scan_endpoint_model": endpoint_context["model"] if endpoint_context is not None else "",
+        "scan_observation_method": "marginal_posterior_product",
+        "scan_inference_method": "exploratory_poisson_lrt",
+        "rate_status": rate_status,
         "target_event_count": target_event,
         "target_event_branch_count": int((event_values[is_target] > 0).sum()),
         "target_raw_branch_length": float(raw_length[is_target].sum()),
         "target_sn_rescaled_length": float(sn_length[is_target].sum()),
         "target_n_rescaled_length": float(n_length[is_target].sum()),
-        "target_exposure_branch_length": target_exposure,
+        "target_exposure_branch_length": np.nan if rate_exposure == "endpoint" else target_exposure,
+        "target_exposure": target_exposure,
+        "target_zero_exposure_branch_count": int(((exposure == 0) & ~missing_exposure & is_target).sum()),
+        "target_positive_event_zero_exposure_branch_count": int((impossible & is_target).sum()),
+        "target_missing_exposure_branch_count": int((missing_exposure & is_target).sum()),
+        "target_exposure_diagnostics": exposure_diagnostics(is_target),
         "other_event_count": other_event,
         "other_event_branch_count": int((event_values[is_other] > 0).sum()),
         "other_raw_branch_length": float(raw_length[is_other].sum()),
         "other_sn_rescaled_length": float(sn_length[is_other].sum()),
         "other_n_rescaled_length": float(n_length[is_other].sum()),
-        "other_exposure_branch_length": other_exposure,
+        "other_exposure_branch_length": np.nan if rate_exposure == "endpoint" else other_exposure,
+        "other_exposure": other_exposure,
+        "other_zero_exposure_branch_count": int(((exposure == 0) & ~missing_exposure & is_other).sum()),
+        "other_positive_event_zero_exposure_branch_count": int((impossible & is_other).sum()),
+        "other_missing_exposure_branch_count": int((missing_exposure & is_other).sum()),
+        "other_exposure_diagnostics": exposure_diagnostics(is_other),
         "target_event_rate": target_rate,
         "other_event_rate": other_rate,
         "rate_ratio": rate_ratio,
@@ -1845,6 +1958,12 @@ def _select_scan_plot_rows(scan_df):
     ]:
         if col not in plot_rows.columns:
             plot_rows[col] = default
+    for generic, legacy in [("support_mass_sum", "support_pp_sum"),
+                            ("candidate_event_mass_sum", "candidate_event_pp_sum")]:
+        if generic not in plot_rows:
+            plot_rows[generic] = plot_rows[legacy]
+        else:
+            plot_rows[generic] = plot_rows[generic].fillna(plot_rows[legacy])
     plot_rows["__plot_bootstrap_p__"] = pd.to_numeric(
         plot_rows["p_rate_enrichment_bootstrap_maxT"], errors="coerce"
     ).fillna(np.inf)
@@ -1858,8 +1977,8 @@ def _select_scan_plot_rows(scan_df):
         by=[
             "codon_site_alignment",
             "support_unit_count",
-            "support_pp_sum",
-            "candidate_event_pp_sum",
+            "support_mass_sum",
+            "candidate_event_mass_sum",
             "__plot_bootstrap_p__",
             "__plot_empirical_p__",
             "__plot_analytical_p__",
@@ -1886,11 +2005,11 @@ def filter_scan_site_plot_candidates(scan_df, g):
     if (mode == "empirical") and (calibration not in ("candidate_fixed", "full_scan")):
         raise ValueError(
             "--scan_site_plot_filter empirical requires --scan_pvalue_calibration "
-            "candidate_fixed or full_scan."
+            "candidate_fixed or full_scan; use the full_scan plot filter for fixed-model parametric calibration."
         )
-    if (mode == "full_scan") and (calibration != "full_scan"):
+    if (mode == "full_scan") and (calibration not in ("full_scan", "parametric")):
         raise ValueError(
-            "--scan_site_plot_filter full_scan requires --scan_pvalue_calibration full_scan."
+            "--scan_site_plot_filter full_scan requires --scan_pvalue_calibration full_scan or parametric."
         )
     if mode == "parametric_bootstrap" and calibration != "parametric_bootstrap":
         raise ValueError("--scan_site_plot_filter parametric_bootstrap requires --scan_pvalue_calibration parametric_bootstrap.")
@@ -1974,7 +2093,7 @@ def build_scan_site_plot_table(scan_df, g, ON_tensor):
 
 
 def _build_scan_static_context(g, ON_tensor, rate_ON_tensor=None):
-    min_event_pp = float(g.get("scan_min_event_pp", 0.5))
+    min_event_pp = scan_event_threshold(g)
     events = extract_atomic_events(
         sub_tensor=ON_tensor,
         min_event_pp=min_event_pp,
@@ -2007,7 +2126,7 @@ def _build_scan_static_context(g, ON_tensor, rate_ON_tensor=None):
         "branch_meta": branch_meta,
         "valid_branch_ids": branch_meta["branch_id"].astype(int).to_numpy(copy=False),
         "rate_exposure": rate_exposure,
-        "q_context": _build_scan_q_context(g=g, rate_exposure=rate_exposure),
+        "q_context": _build_scan_q_context(g=g, rate_exposure=rate_exposure, branch_meta=branch_meta),
         "observed_site_annotations": observed_site_annotations,
         "permutation_site_annotations": permutation_site_annotations,
         "rate_event_projection": rate_event_projection,
@@ -2029,9 +2148,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
     permutation_seed = int(g.get("scan_permutation_seed", 1))
     permutation_backend = _resolve_scan_permutation_backend()
     permutation_n_jobs = _resolve_scan_permutation_n_jobs(g=g, n_permutations=n_permutations)
-    min_event_pp = float(g.get("scan_min_event_pp", 0.5))
-    if (not np.isfinite(min_event_pp)) or (min_event_pp < 0) or (min_event_pp > 1):
-        raise ValueError("--scan_min_event_pp should satisfy 0 <= value <= 1.")
+    min_event_pp = scan_event_threshold(g)
     state_orders = sequence.get_nonsyn_state_orders(g)
     if rate_ON_tensor is None:
         rate_ON_tensor = ON_tensor
@@ -2173,6 +2290,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     state_cdn=q_context["state_cdn"],
                     codon_q_matrix=q_context["codon_q_matrix"],
                     codon_state_ids=q_context["codon_state_ids"],
+                    endpoint_context=q_context.get("endpoint_context"),
                 )
                 row = {
                     "scan_id": int(scan_id),
@@ -2299,7 +2417,7 @@ def _candidate_fixed_permutation_scores(
     rate_exposure = scan_static["rate_exposure"] if scan_static is not None else resolve_scan_rate_exposure(g)
     rate_event_mode = normalize_scan_rate_event_mode(g.get("scan_rate_event_mode", "posterior_sum"))
     scan_other_scope = normalize_scan_other_scope(g.get("scan_other_scope", "all"))
-    min_event_pp = float(g.get("scan_min_event_pp", 0.5))
+    min_event_pp = scan_event_threshold(g)
     called_events = None
     if rate_event_mode == "called":
         if scan_static is not None:
@@ -2313,6 +2431,7 @@ def _candidate_fixed_permutation_scores(
     q_context = scan_static["q_context"] if scan_static is not None else _build_scan_q_context(
         g=g,
         rate_exposure=rate_exposure,
+        branch_meta=branch_meta,
     )
     out = {}
     for _, row in observed_df.iterrows():
@@ -2367,6 +2486,7 @@ def _candidate_fixed_permutation_scores(
             state_cdn=q_context["state_cdn"],
             codon_q_matrix=q_context["codon_q_matrix"],
             codon_state_ids=q_context["codon_state_ids"],
+            endpoint_context=q_context.get("endpoint_context"),
         )
         out[_scan_row_key(row)] = scan_statistics.calibration_score(rate)
     return out
@@ -2631,6 +2751,9 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         "resolved_rate_exposure": scan_static["rate_exposure"],
         "state_tensor_shape": list(np.asarray(g["state_nsy"]).shape),
     }
+    if calibration == "parametric":
+        from csubst import scan_ctmc
+        return scan_ctmc.calibrate(g, observed_df)
     if calibration in ("none", "parametric_bootstrap"):
         diagnostic.update(status="disabled", null="none", scope="uncalibrated", assumption=None, original_foreground_included=None)
         return _finish_scan_calibration(g, observed_df, diagnostic)
@@ -2759,6 +2882,20 @@ def scan_substitutions(g, ON_tensor, rate_ON_tensor=None):
         scan_static=scan_static,
     )
     if scan_df.shape[0] > 0:
+        observation = g.get("scan_observation", "marginal")
+        scan_df["scan_event_threshold"] = scan_event_threshold(g)
+        scan_df["scan_event_units"] = "posterior_mean_jump_count" if observation == "bridge" else "endpoint_probability"
+        scan_df["candidate_event_mass_sum"] = scan_df["candidate_event_pp_sum"]
+        scan_df["support_mass_sum"] = scan_df["support_pp_sum"]
+        scan_df["support_mass_mean"] = scan_df["support_pp_mean"]
+        if observation == "bridge":
+            scan_df[["candidate_event_pp_sum", "support_pp_sum", "support_pp_mean", "scan_min_event_pp"]] = np.nan
+        if observation != "marginal":
+            scan_df["scan_observation_method"] = "joint_endpoint_posterior" if observation == "joint" else "posterior_mean_jump_count"
+            if observation == "bridge":
+                scan_df["scan_exposure_units"] = "expected_jump_count"
+        if g.get("scan_pvalue_calibration") == "parametric":
+            scan_df["scan_inference_method"] = "fixed_model_parametric_bootstrap_global_max_score"
         scan_df = _assign_grouped_qvalues(
             scan_df=scan_df,
             out_col="q_rate_enrichment_empirical_by_trait_match",

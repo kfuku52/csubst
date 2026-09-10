@@ -1,0 +1,38 @@
+[
+  {
+    "label": "baseline",
+    "calibration": "none",
+    "median_seconds": 4.030667875020299,
+    "median_peak_GiB": 0.3232002258300781
+  },
+  {
+    "label": "baseline",
+    "calibration": "parametric_bootstrap",
+    "median_seconds": 59.046734792005736,
+    "median_peak_GiB": 0.7508888244628906
+  },
+  {
+    "label": "joint",
+    "calibration": "none",
+    "median_seconds": 11.325221416016575,
+    "median_peak_GiB": 1.0128631591796875
+  },
+  {
+    "label": "joint",
+    "calibration": "parametric_bootstrap",
+    "median_seconds": 86.57891779096099,
+    "median_peak_GiB": 2.041767120361328
+  },
+  {
+    "label": "bridge",
+    "calibration": "none",
+    "median_seconds": 19.98856916598743,
+    "median_peak_GiB": 1.0266799926757812
+  },
+  {
+    "label": "bridge",
+    "calibration": "parametric_bootstrap",
+    "median_seconds": 121.44689550000476,
+    "median_peak_GiB": 2.0785064697265625
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "outdir": "/private/tmp/csubst-scan-integration-20260910/accuracy-nested",
+  "verify_pilot": null,
+  "datasets": 100,
+  "replicates": 39,
+  "workers": 4,
+  "seed": 19092026,
+  "signal_sites": 8,
+  "factor": 12.0,
+  "sites": 80,
+  "topology": "${HOME}/.codex/worktrees/d82b/csubst/reports/scientific_review_20260910/scan_id5/inputs/tree.nwk",
+  "foreground": "${HOME}/.codex/worktrees/d82b/csubst/reports/scientific_review_20260910/scan_id5/inputs/foreground.tsv",
+  "scope": "nested_fitted_GY_FQ_null_fixed_topology_and_foreground",
+  "implementation": "production_Q_parser_ASR_loading_scan_discovery_and_maximum_score; IQTREE_fixed_single_thread"
+}

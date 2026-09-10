@@ -123,8 +123,8 @@ def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
             "tree_site_plot": True,
             "tree_site_plot_prefix": plot_prefix,
             "tree_site_output_table": False,
-            "min_single_prob": float(g.get("scan_min_event_pp", 0.5)),
-            "min_combinat_prob": float(g.get("scan_min_event_pp", 0.5)),
+            "min_single_prob": substitution_scan.scan_event_threshold(g),
+            "min_combinat_prob": substitution_scan.scan_event_threshold(g),
         }
     )
     print("Writing scan site visualization from detected candidates.", flush=True)
@@ -156,6 +156,7 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     )
     substitution_scan.validate_scan_configuration(g)
     g = parser_misc.prep_state(g, apply_site_filtering=False)
+    scan_bootstrap.prepare_observation_model(g)
     bootstrap_model = scan_bootstrap.prepare_model(g) if g.get("scan_pvalue_calibration") == "parametric_bootstrap" else None
     analytic_engine = scan_analytic.prepare(g)
     no_sites = False
@@ -172,12 +173,20 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     else:
         g = parser_misc.apply_site_filters(g)
     print("Generating nonsynonymous substitution tensor for scan.", flush=True)
-    ON_tensor_rate = substitution.get_substitution_tensor(
-        state_tensor=g["state_nsy"],
-        mode="asis",
-        g=g,
-        mmap_attr="scan_N",
-    )
+    if g.get("scan_observation", "marginal") != "marginal":
+        from csubst import scan_ctmc
+        # Keep emissions for bootstrap missingness; inferred marginals fill missing tips.
+        g.update(scan_tip_emissions=np.asarray(g["state_cdn"]))
+        if g.get("scan_pvalue_calibration") == "parametric":
+            scan_ctmc.validate_parametric_inputs(g)
+        g, ON_tensor_rate = scan_ctmc.prepare(g)
+    else:
+        ON_tensor_rate = substitution.get_substitution_tensor(
+            state_tensor=g["state_nsy"],
+            mode="asis",
+            g=g,
+            mmap_attr="scan_N",
+        )
     rate_event_mode = substitution_scan.normalize_scan_rate_event_mode(g.get("scan_rate_event_mode", "posterior_sum"))
     ON_tensor_called = ON_tensor_rate
     if float(g.get("min_sub_pp", 0)) != 0:
@@ -191,16 +200,19 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
             )
             np.copyto(ON_tensor_called, ON_tensor_rate)
         ON_tensor_called = substitution.apply_min_sub_pp(g, ON_tensor_called)
-    print("Generating synonymous substitution tensor for branch-length context.", flush=True)
-    OS_tensor = substitution.get_substitution_tensor(
-        state_tensor=g["state_cdn"],
-        mode="syn",
-        g=g,
-        mmap_attr="scan_S",
-    )
-    OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
-    g = tree.rescale_branch_length(g, OS_tensor, ON_tensor_called)
-    del OS_tensor
+    if g.get("scan_observation", "marginal") != "marginal":
+        g = scan_ctmc.set_branch_length_summaries(g, ON_tensor_rate)
+    else:
+        print("Generating synonymous substitution tensor for branch-length context.", flush=True)
+        OS_tensor = substitution.get_substitution_tensor(
+            state_tensor=g["state_cdn"],
+            mode="syn",
+            g=g,
+            mmap_attr="scan_S",
+        )
+        OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
+        g = tree.rescale_branch_length(g, OS_tensor, ON_tensor_called)
+        del OS_tensor
     print("Scanning recurrent foreground substitution patterns.", flush=True)
     rate_ON_tensor = ON_tensor_rate if rate_event_mode == "posterior_sum" else ON_tensor_called
     if no_sites:
