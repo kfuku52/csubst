@@ -43,6 +43,8 @@ STAT_COLUMN_PREFIXES = (
     "dNC",
     "dSC",
     "omegaC",
+    "pomegaC",
+    "qomegaC",
 )
 
 DEFAULT_CUTOFF_STAT = "OCNany2spe,2.0|omegaCany2spe,5.0"
@@ -224,8 +226,9 @@ def drop_unrequested_stat_columns(df, output_stats):
     drop_cols = []
     for col in df.columns:
         col_str = str(col)
-        if col_str.startswith('calibration_'):
-            if any(col_str.endswith('_' + stat) for stat in ALL_OUTPUT_STATS if stat not in requested):
+        if col_str.startswith(('calibration_', 'pvalue_')):
+            metadata_name = col_str.removesuffix('_nocalib')
+            if any(metadata_name.endswith('_' + stat) for stat in ALL_OUTPUT_STATS if stat not in requested):
                 drop_cols.append(col)
             continue
         for prefix in STAT_COLUMN_PREFIXES:

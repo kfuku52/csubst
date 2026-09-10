@@ -14,6 +14,7 @@ from csubst import main_analyze
 from csubst import asrv
 from csubst import output_manifest
 from csubst import pseudocount
+from csubst import omega_calibration, omega_null
 from csubst import recoding
 from csubst import recoding_config
 from csubst import runtime
@@ -286,6 +287,8 @@ def _prepare_run_context(base_g, config, run_dir):
     local_g.update(pseudocount.validate_args(local_g))
     if local_g.get("calc_omega_pvalue", False) and (local_g["expectation_method"] != "urn"):
         raise ValueError("--calc_omega_pvalue yes requires expectation_method urn.")
+    omega_calibration.validate_config(local_g)
+    omega_null.validate_config(local_g)
     return runtime.ensure_output_layout(local_g, create_dir=True)
 
 

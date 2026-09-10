@@ -190,3 +190,13 @@ def test_output_stat_atomic_weight_map_covers_all_output_stats():
     for stat_name in output_stat.ALL_OUTPUT_STATS:
         weights = output_stat.STAT_TO_ATOMIC_WEIGHTS[stat_name]
         assert len(weights) == len(output_stat.ATOMIC_OUTPUT_STATS)
+
+
+@pytest.mark.parametrize('mode,alpha', [('symmetric', 1.), ('empirical', 'auto')])
+def test_validate_args_supports_real_cli_run_context(mode, alpha):
+    from csubst.runtime import RunContext
+    raw = dict(pseudocount_mode=mode, pseudocount_alpha=alpha, pseudocount_target='expected')
+    expected = pseudocount.validate_args(raw)
+    actual = pseudocount.validate_args(RunContext(config=raw))
+    assert actual == expected
+    assert actual['pseudocount_enabled']

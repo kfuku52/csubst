@@ -1053,6 +1053,8 @@ def get_global_parameters(args: Any) -> runtime.RunContext:
         site_filter.validate_report_options(g)
     from csubst import omega_calibration
     omega_calibration.validate_config(g)
+    from csubst import omega_null
+    omega_null.validate_config(g)
     return runtime.ensure_run_context(g)
 
 def initialize_df_cb_stats(g):

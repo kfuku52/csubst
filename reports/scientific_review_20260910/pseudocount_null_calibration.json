@@ -1,0 +1,1538 @@
+{
+  "scope": "Known-mean, independent-row and N/S Poisson atom count null. No ASR, fitted-parameter uncertainty, biological false-positive calibration, or BH guarantee.",
+  "observed_sampler": "scipy.stats.poisson; independent seed per dataset",
+  "inference": "production get_omega / calibrate_dsc / add_omega_empirical_pvalues",
+  "independent_unit": "row zero of each independently generated eight-row dataset",
+  "results": [
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 3,
+      "rejection_rate": 0.012,
+      "interval_95": [
+        0.0024815582546992327,
+        0.03466661457477235
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 15,
+      "rejection_rate": 0.06,
+      "interval_95": [
+        0.03396696165657101,
+        0.09703078089909854
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 19,
+      "rejection_rate": 0.076,
+      "interval_95": [
+        0.04637523766478917,
+        0.11614052663678233
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 1,
+      "rejection_rate": 0.004,
+      "interval_95": [
+        0.00010126610417906264,
+        0.022083865000667606
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 11,
+      "rejection_rate": 0.044,
+      "interval_95": [
+        0.022166258024794883,
+        0.07736291656955725
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 17,
+      "rejection_rate": 0.068,
+      "interval_95": [
+        0.0401084949153655,
+        0.10664383604137115
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 4,
+      "rejection_rate": 0.016,
+      "interval_95": [
+        0.004376226508763044,
+        0.040457380632099034
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 7,
+      "rejection_rate": 0.028,
+      "interval_95": [
+        0.011330013795658534,
+        0.05683724527305363
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 17,
+      "rejection_rate": 0.068,
+      "interval_95": [
+        0.0401084949153655,
+        0.10664383604137115
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 2,
+      "rejection_rate": 0.008,
+      "interval_95": [
+        0.0009703097230388928,
+        0.02859834724496237
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 15,
+      "rejection_rate": 0.06,
+      "interval_95": [
+        0.03396696165657101,
+        0.09703078089909854
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 19,
+      "rejection_rate": 0.076,
+      "interval_95": [
+        0.04637523766478917,
+        0.11614052663678233
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 3,
+      "rejection_rate": 0.012,
+      "interval_95": [
+        0.0024815582546992327,
+        0.03466661457477235
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 14,
+      "rejection_rate": 0.056,
+      "interval_95": [
+        0.030950404619160866,
+        0.09217426632676302
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 27,
+      "rejection_rate": 0.108,
+      "interval_95": [
+        0.07238925204829043,
+        0.1532354566206647
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 2,
+      "rejection_rate": 0.008,
+      "interval_95": [
+        0.0009703097230388928,
+        0.02859834724496237
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 13,
+      "rejection_rate": 0.052,
+      "interval_95": [
+        0.027974892458440443,
+        0.08728018493035454
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 24,
+      "rejection_rate": 0.096,
+      "interval_95": [
+        0.062481484218205284,
+        0.13946947695368622
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 1,
+      "rejection_rate": 0.004,
+      "interval_95": [
+        0.00010126610417906264,
+        0.022083865000667606
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 11,
+      "rejection_rate": 0.044,
+      "interval_95": [
+        0.022166258024794883,
+        0.07736291656955725
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 29,
+      "rejection_rate": 0.116,
+      "interval_95": [
+        0.07907891913316525,
+        0.16233205313310983
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 2,
+      "rejection_rate": 0.008,
+      "interval_95": [
+        0.0009703097230388928,
+        0.02859834724496237
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 9,
+      "rejection_rate": 0.036,
+      "interval_95": [
+        0.016591282925781586,
+        0.06723690845885114
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 25,
+      "rejection_rate": 0.1,
+      "interval_95": [
+        0.06576600699670024,
+        0.14407535481373632
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 1,
+      "rejection_rate": 0.004,
+      "interval_95": [
+        0.00010126610417906264,
+        0.022083865000667606
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 8,
+      "rejection_rate": 0.032,
+      "interval_95": [
+        0.013914611548624707,
+        0.06207669737487926
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 18,
+      "rejection_rate": 0.072,
+      "interval_95": [
+        0.04322745952168668,
+        0.11140562957868552
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 1,
+      "rejection_rate": 0.004,
+      "interval_95": [
+        0.00010126610417906264,
+        0.022083865000667606
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 10,
+      "rejection_rate": 0.04,
+      "interval_95": [
+        0.019345498505149102,
+        0.07232935549038058
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 16,
+      "rejection_rate": 0.064,
+      "interval_95": [
+        0.03702073823086971,
+        0.10185303061434929
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 2,
+      "rejection_rate": 0.008,
+      "interval_95": [
+        0.0009703097230388928,
+        0.02859834724496237
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 6,
+      "rejection_rate": 0.024,
+      "interval_95": [
+        0.008857361276904578,
+        0.051503261105309374
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 12,
+      "rejection_rate": 0.048,
+      "interval_95": [
+        0.025044996923924943,
+        0.08234462908773926
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 3,
+      "rejection_rate": 0.012,
+      "interval_95": [
+        0.0024815582546992327,
+        0.03466661457477235
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 6,
+      "rejection_rate": 0.024,
+      "interval_95": [
+        0.008857361276904578,
+        0.051503261105309374
+      ]
+    },
+    {
+      "regime": "sparse_S",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 23,
+      "rejection_rate": 0.092,
+      "interval_95": [
+        0.05921637830005323,
+        0.13484514686740456
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 3,
+      "rejection_rate": 0.012,
+      "interval_95": [
+        0.0024815582546992327,
+        0.03466661457477235
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 8,
+      "rejection_rate": 0.032,
+      "interval_95": [
+        0.013914611548624707,
+        0.06207669737487926
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 15,
+      "rejection_rate": 0.06,
+      "interval_95": [
+        0.03396696165657101,
+        0.09703078089909854
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 10,
+      "rejection_rate": 0.04,
+      "interval_95": [
+        0.019345498505149102,
+        0.07232935549038058
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 21,
+      "rejection_rate": 0.084,
+      "interval_95": [
+        0.052749149986258674,
+        0.12553682737312497
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 12,
+      "rejection_rate": 0.048,
+      "interval_95": [
+        0.025044996923924943,
+        0.08234462908773926
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "none",
+      "alpha": 0.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 22,
+      "rejection_rate": 0.088,
+      "interval_95": [
+        0.055971839666085835,
+        0.13020131762061657
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 8,
+      "rejection_rate": 0.032,
+      "interval_95": [
+        0.013914611548624707,
+        0.06207669737487926
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 16,
+      "rejection_rate": 0.064,
+      "interval_95": [
+        0.03702073823086971,
+        0.10185303061434929
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 9,
+      "rejection_rate": 0.036,
+      "interval_95": [
+        0.016591282925781586,
+        0.06723690845885114
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 18,
+      "rejection_rate": 0.072,
+      "interval_95": [
+        0.04322745952168668,
+        0.11140562957868552
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 0,
+      "rejection_rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.014647188635680361
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 10,
+      "rejection_rate": 0.04,
+      "interval_95": [
+        0.019345498505149102,
+        0.07232935549038058
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 11,
+      "rejection_rate": 0.044,
+      "interval_95": [
+        0.022166258024794883,
+        0.07736291656955725
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 4,
+      "rejection_rate": 0.016,
+      "interval_95": [
+        0.004376226508763044,
+        0.040457380632099034
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 14,
+      "rejection_rate": 0.056,
+      "interval_95": [
+        0.030950404619160866,
+        0.09217426632676302
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 17,
+      "rejection_rate": 0.068,
+      "interval_95": [
+        0.0401084949153655,
+        0.10664383604137115
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 1,
+      "rejection_rate": 0.004,
+      "interval_95": [
+        0.00010126610417906264,
+        0.022083865000667606
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 13,
+      "rejection_rate": 0.052,
+      "interval_95": [
+        0.027974892458440443,
+        0.08728018493035454
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 27,
+      "rejection_rate": 0.108,
+      "interval_95": [
+        0.07238925204829043,
+        0.1532354566206647
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 2,
+      "rejection_rate": 0.008,
+      "interval_95": [
+        0.0009703097230388928,
+        0.02859834724496237
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 15,
+      "rejection_rate": 0.06,
+      "interval_95": [
+        0.03396696165657101,
+        0.09703078089909854
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": 1.0,
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 29,
+      "rejection_rate": 0.116,
+      "interval_95": [
+        0.07907891913316525,
+        0.16233205313310983
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 2,
+      "rejection_rate": 0.008,
+      "interval_95": [
+        0.0009703097230388928,
+        0.02859834724496237
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 13,
+      "rejection_rate": 0.052,
+      "interval_95": [
+        0.027974892458440443,
+        0.08728018493035454
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 23,
+      "rejection_rate": 0.092,
+      "interval_95": [
+        0.05921637830005323,
+        0.13484514686740456
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 3,
+      "rejection_rate": 0.012,
+      "interval_95": [
+        0.0024815582546992327,
+        0.03466661457477235
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 9,
+      "rejection_rate": 0.036,
+      "interval_95": [
+        0.016591282925781586,
+        0.06723690845885114
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 18,
+      "rejection_rate": 0.072,
+      "interval_95": [
+        0.04322745952168668,
+        0.11140562957868552
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 1,
+      "rejection_rate": 0.004,
+      "interval_95": [
+        0.00010126610417906264,
+        0.022083865000667606
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 12,
+      "rejection_rate": 0.048,
+      "interval_95": [
+        0.025044996923924943,
+        0.08234462908773926
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "empirical",
+      "alpha": "auto",
+      "longtail": "none",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 26,
+      "rejection_rate": 0.104,
+      "interval_95": [
+        0.06906890933631117,
+        0.14866372782704662
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2any",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 4,
+      "rejection_rate": 0.016,
+      "interval_95": [
+        0.004376226508763044,
+        0.040457380632099034
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2any",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 16,
+      "rejection_rate": 0.064,
+      "interval_95": [
+        0.03702073823086971,
+        0.10185303061434929
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2any",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 26,
+      "rejection_rate": 0.104,
+      "interval_95": [
+        0.06906890933631117,
+        0.14866372782704662
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2spe",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 2,
+      "rejection_rate": 0.008,
+      "interval_95": [
+        0.0009703097230388928,
+        0.02859834724496237
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2spe",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 11,
+      "rejection_rate": 0.044,
+      "interval_95": [
+        0.022166258024794883,
+        0.07736291656955725
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2spe",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 30,
+      "rejection_rate": 0.12,
+      "interval_95": [
+        0.08244675241090257,
+        0.16685829710448202
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2dif",
+      "nominal": 0.01,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 3,
+      "rejection_rate": 0.012,
+      "interval_95": [
+        0.0024815582546992327,
+        0.03466661457477235
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2dif",
+      "nominal": 0.05,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 8,
+      "rejection_rate": 0.032,
+      "interval_95": [
+        0.013914611548624707,
+        0.06207669737487926
+      ]
+    },
+    {
+      "regime": "heterogeneous_exposure",
+      "mode": "symmetric",
+      "alpha": 1.0,
+      "longtail": "empirical",
+      "stat": "any2dif",
+      "nominal": 0.1,
+      "trials": 250,
+      "draws": 199,
+      "valid": 250,
+      "rejections": 21,
+      "rejection_rate": 0.084,
+      "interval_95": [
+        0.052749149986258674,
+        0.12553682737312497
+      ]
+    }
+  ]
+}

@@ -228,9 +228,10 @@ available to examine signal attenuation as well as selection.
 
 ## Remaining dependencies and acceptance scope
 
-The pseudocount/omega-P transformation and joint dif count generation remain
-owned by scientific review IDs 2 and 4. No duplicated implementation was
-added here. Their conditional P values need validation after those fixes.
+The [pseudocount/omega-P implementation](PSEUDOCOUNT_PVALUES.md) shares
+observed/null smoothing and provides a compatible-mean joint Poisson category
+null (scientific review IDs 2 and 4). Its conditional-count checks do not
+replace full-pipeline validation with independently generated alignments.
 Epistasis cross-validation (ID 3), 3Di measurement (ID 9), long-tail
 calibration (ID 10), site filtering (ID 11) and search-family selection
 (ID 13) require their own appropriate configurations and independent tests.

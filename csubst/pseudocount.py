@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 import math
 import numpy as np
 
@@ -14,13 +16,13 @@ _PSEUDOCOUNT_TARGETS = ("observed", "expected", "both")
 
 
 def _get_arg(args, key, default):
-    if isinstance(args, dict):
+    if isinstance(args, Mapping):
         return args.get(key, default)
     return getattr(args, key, default)
 
 
 def _has_arg(args, key):
-    if isinstance(args, dict):
+    if isinstance(args, Mapping):
         return key in args
     return hasattr(args, key)
 
@@ -231,6 +233,9 @@ def estimate_alpha_empirical_bayes(obs_list, exp_list, float_tol=1e-12, alpha_gr
     obs_all = np.concatenate(obs_chunks)
     exp_all = np.concatenate(exp_chunks)
 
+    # Fit and deterministic thinning must not depend on row/category order.
+    order = np.lexsort((obs_all, exp_all))
+    obs_all, exp_all = obs_all[order], exp_all[order]
     max_samples = int(max_samples)
     if (max_samples > 0) and (obs_all.shape[0] > max_samples):
         idx = np.linspace(0, obs_all.shape[0] - 1, max_samples, dtype=np.int64)
@@ -319,3 +324,47 @@ def compute_empirical_stat_alphas(stat_masses, stats, alpha):
         weights = np.asarray(output_stat.STAT_TO_ATOMIC_WEIGHTS[stat_name], dtype=np.float64)
         alpha_stats[i] = float(weights @ alpha_atomic)
     return alpha_stats, p_atomic
+
+
+def fit_stat_context(count_columns, args, stats, float_tol):
+    """Fit identical smoothing parameters from observed or simulated counts.
+
+    ``count_columns`` maps OC/EC column names to one-dimensional arrays. No
+    tabular copies or reporting diagnostics are needed inside a null replicate.
+    """
+    config = validate_args(args).copy()
+    fit_diag = {}
+    if config['pseudocount_alpha_auto'] and config['pseudocount_mode'] != 'none':
+        obs, exp = [], []
+        for stat in stats:
+            for ch in ['N', 'S']:
+                oc, ec = 'OC'+ch+stat, 'EC'+ch+stat
+                if oc in count_columns and ec in count_columns:
+                    obs.append(count_columns[oc])
+                    exp.append(count_columns[ec])
+        alpha, fit_diag = estimate_alpha_empirical_bayes(obs, exp, float_tol=float_tol)
+        config['pseudocount_alpha'] = float(alpha)
+        config['pseudocount_enabled'] = bool(alpha > 0)
+        config['pseudocount_add_output_columns'] = bool(alpha > 0 or config['pseudocount_report'])
+    context = dict(config=config, output_stats=tuple(stats), fit_diagnostics=fit_diag, atomic_priors={})
+    for prefix, key in [('OCN', 'alpha_obs_N'), ('ECN', 'alpha_exp_N'), ('OCS', 'alpha_obs_S'), ('ECS', 'alpha_exp_S')]:
+        if config['pseudocount_mode'] == 'empirical':
+            masses = {}
+            for stat in output_stat.ALL_OUTPUT_STATS:
+                col = prefix+stat
+                if col not in count_columns:
+                    continue
+                values = np.asarray(count_columns[col], dtype=float)
+                finite = values[np.isfinite(values)]
+                if finite.size:
+                    masses[stat] = float(np.clip(finite, 0., None).sum(dtype=float))
+            context[key], context['atomic_priors'][prefix] = compute_empirical_stat_alphas(masses, stats, config['pseudocount_alpha'])
+        else:
+            context[key] = compute_alpha_vector(config['pseudocount_mode'], config['pseudocount_alpha'], K=len(stats))
+    if config['pseudocount_target'] == 'observed':
+        context['alpha_exp_N'][:] = 0
+        context['alpha_exp_S'][:] = 0
+    elif config['pseudocount_target'] == 'expected':
+        context['alpha_obs_N'][:] = 0
+        context['alpha_obs_S'][:] = 0
+    return context

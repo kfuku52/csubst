@@ -5,6 +5,7 @@
 #    my_class.wait()
 
 import numpy as np
+import pandas as pd
 from scipy.linalg import expm
 
 import itertools
@@ -16,6 +17,7 @@ import warnings
 from collections import defaultdict
 
 from csubst.omega_statistics import (
+    _count_rates,
     _calc_bh_fdr_qvalues as _calc_bh_fdr_qvalues,
     _calc_omega_empirical_upper_tail_counts as _calc_omega_empirical_upper_tail_counts,
     _calc_omega_empirical_upper_tail_counts_from_perm as _calc_omega_empirical_upper_tail_counts_from_perm,
@@ -3217,20 +3219,6 @@ def get_exp_state(g, mode):
     return stateE
 
 
-def _collect_stat_masses(cb, prefix):
-    stat_masses = dict()
-    for stat_name in output_stat.ALL_OUTPUT_STATS:
-        col_name = prefix + stat_name
-        if col_name not in cb.columns:
-            continue
-        values = cb.loc[:, col_name].to_numpy(dtype=np.float64, copy=False)
-        is_finite = np.isfinite(values)
-        if not is_finite.any():
-            continue
-        stat_masses[stat_name] = float(np.clip(values[is_finite], a_min=0.0, a_max=None).sum(dtype=np.float64))
-    return stat_masses
-
-
 def _calc_distribution_entropy(prob):
     prob = np.asarray(prob, dtype=np.float64)
     positive = prob[prob > 0]
@@ -3250,111 +3238,28 @@ def _calc_zero_fraction(cb, prefix, output_stats, float_tol):
     return float(((values < float_tol) & is_finite).sum() / is_finite.sum())
 
 
-def _collect_alpha_fit_pairs(cb, output_stats):
-    obs_list = list()
-    exp_list = list()
-    for sub in output_stats:
-        col_obs_n = 'OCN' + sub
-        col_exp_n = 'ECN' + sub
-        col_obs_s = 'OCS' + sub
-        col_exp_s = 'ECS' + sub
-        if all([c in cb.columns for c in [col_obs_n, col_exp_n]]):
-            obs_list.append(cb.loc[:, col_obs_n].to_numpy(dtype=np.float64, copy=False))
-            exp_list.append(cb.loc[:, col_exp_n].to_numpy(dtype=np.float64, copy=False))
-        if all([c in cb.columns for c in [col_obs_s, col_exp_s]]):
-            obs_list.append(cb.loc[:, col_obs_s].to_numpy(dtype=np.float64, copy=False))
-            exp_list.append(cb.loc[:, col_exp_s].to_numpy(dtype=np.float64, copy=False))
-    return obs_list, exp_list
-
-
 def _get_pseudocount_context(cb, g, output_stats):
-    config = pseudocount.validate_args(g).copy()
-    alpha_fit_diag = dict()
-    if config['pseudocount_alpha_auto'] and (config['pseudocount_mode'] != 'none'):
-        obs_list, exp_list = _collect_alpha_fit_pairs(cb=cb, output_stats=output_stats)
-        estimated_alpha, alpha_fit_diag = pseudocount.estimate_alpha_empirical_bayes(
-            obs_list=obs_list,
-            exp_list=exp_list,
-            float_tol=g['float_tol'],
-        )
-        config['pseudocount_alpha'] = float(estimated_alpha)
-        config['pseudocount_enabled'] = bool((config['pseudocount_alpha'] > 0) and (config['pseudocount_mode'] != 'none'))
-        config['pseudocount_add_output_columns'] = bool(config['pseudocount_enabled'] or config['pseudocount_report'])
-    K = len(output_stats)
-    alpha_obs_N = np.zeros(shape=(K,), dtype=np.float64)
-    alpha_exp_N = np.zeros(shape=(K,), dtype=np.float64)
-    alpha_obs_S = np.zeros(shape=(K,), dtype=np.float64)
-    alpha_exp_S = np.zeros(shape=(K,), dtype=np.float64)
+    from csubst.omega_null import population_signature
+
+    columns = {str(c): cb[c].to_numpy(dtype=np.float64, copy=False) for c in cb
+               if str(c) in {p+s for p in ('OCN', 'ECN', 'OCS', 'ECS') for s in output_stat.ALL_OUTPUT_STATS}}
+    context = pseudocount.fit_stat_context(columns, g, output_stats, g['float_tol'])
+    config = context['config']
     summary = {
         'pseudocount_mode': config['pseudocount_mode'],
         'pseudocount_alpha': float(config['pseudocount_alpha']),
         'pseudocount_alpha_source': 'auto' if config.get('pseudocount_alpha_auto', False) else 'fixed',
         'pseudocount_target': config['pseudocount_target'],
         'pseudocount_enabled': int(config['pseudocount_enabled']),
-        'pseudocount_zero_prop_OCN': _calc_zero_fraction(cb, 'OCN', output_stats, g['float_tol']),
-        'pseudocount_zero_prop_ECN': _calc_zero_fraction(cb, 'ECN', output_stats, g['float_tol']),
-        'pseudocount_zero_prop_OCS': _calc_zero_fraction(cb, 'OCS', output_stats, g['float_tol']),
-        'pseudocount_zero_prop_ECS': _calc_zero_fraction(cb, 'ECS', output_stats, g['float_tol']),
     }
-    if len(alpha_fit_diag):
-        summary['pseudocount_alpha_fit_pairs'] = int(alpha_fit_diag.get('num_pairs', 0))
-        summary['pseudocount_alpha_fit_loglikelihood'] = float(alpha_fit_diag.get('fit_loglikelihood', np.nan))
-    if K > 0:
-        if config['pseudocount_mode'] == 'empirical':
-            obs_N_masses = _collect_stat_masses(cb=cb, prefix='OCN')
-            exp_N_masses = _collect_stat_masses(cb=cb, prefix='ECN')
-            obs_S_masses = _collect_stat_masses(cb=cb, prefix='OCS')
-            exp_S_masses = _collect_stat_masses(cb=cb, prefix='ECS')
-            alpha_obs_N, p_atomic_obs_N = pseudocount.compute_empirical_stat_alphas(
-                stat_masses=obs_N_masses,
-                stats=output_stats,
-                alpha=config['pseudocount_alpha'],
-            )
-            alpha_exp_N, p_atomic_exp_N = pseudocount.compute_empirical_stat_alphas(
-                stat_masses=exp_N_masses,
-                stats=output_stats,
-                alpha=config['pseudocount_alpha'],
-            )
-            alpha_obs_S, p_atomic_obs_S = pseudocount.compute_empirical_stat_alphas(
-                stat_masses=obs_S_masses,
-                stats=output_stats,
-                alpha=config['pseudocount_alpha'],
-            )
-            alpha_exp_S, p_atomic_exp_S = pseudocount.compute_empirical_stat_alphas(
-                stat_masses=exp_S_masses,
-                stats=output_stats,
-                alpha=config['pseudocount_alpha'],
-            )
-            summary['pseudocount_pglobal_entropy_atomic_OCN'] = _calc_distribution_entropy(p_atomic_obs_N)
-            summary['pseudocount_pglobal_entropy_atomic_ECN'] = _calc_distribution_entropy(p_atomic_exp_N)
-            summary['pseudocount_pglobal_entropy_atomic_OCS'] = _calc_distribution_entropy(p_atomic_obs_S)
-            summary['pseudocount_pglobal_entropy_atomic_ECS'] = _calc_distribution_entropy(p_atomic_exp_S)
-        else:
-            alpha_base = pseudocount.compute_alpha_vector(
-                mode=config['pseudocount_mode'],
-                alpha=config['pseudocount_alpha'],
-                p_global=None,
-                K=K,
-            )
-            alpha_obs_N = alpha_base.copy()
-            alpha_exp_N = alpha_base.copy()
-            alpha_obs_S = alpha_base.copy()
-            alpha_exp_S = alpha_base.copy()
-    if config['pseudocount_target'] == 'observed':
-        alpha_exp_N[:] = 0
-        alpha_exp_S[:] = 0
-    elif config['pseudocount_target'] == 'expected':
-        alpha_obs_N[:] = 0
-        alpha_obs_S[:] = 0
-    context = {
-        'config': config,
-        'output_stats': tuple(output_stats),
-        'alpha_obs_N': alpha_obs_N,
-        'alpha_exp_N': alpha_exp_N,
-        'alpha_obs_S': alpha_obs_S,
-        'alpha_exp_S': alpha_exp_S,
-        'summary': summary,
-    }
+    for prefix in ('OCN', 'ECN', 'OCS', 'ECS'):
+        summary['pseudocount_zero_prop_'+prefix] = _calc_zero_fraction(cb, prefix, output_stats, g['float_tol'])
+    if context['fit_diagnostics']:
+        summary['pseudocount_alpha_fit_pairs'] = int(context['fit_diagnostics'].get('num_pairs', 0))
+        summary['pseudocount_alpha_fit_loglikelihood'] = float(context['fit_diagnostics'].get('fit_loglikelihood', np.nan))
+    for prefix, prior in context['atomic_priors'].items():
+        summary['pseudocount_pglobal_entropy_atomic_'+prefix] = _calc_distribution_entropy(prior)
+    context.update(summary=summary, population_signature=population_signature(cb))
     return context
 
 
@@ -3411,11 +3316,13 @@ def _write_pseudocount_summary_to_cb_stats(g, context):
         g['df_cb_stats'].at[0, key] = value
 
 
-def get_omega(cb, g):
+def get_omega(cb, g, context=None):
     requested_output_stats = _resolve_requested_output_stats(g)
-    context = g.get('_pseudocount_context', None)
-    if (context is None) or (tuple(requested_output_stats) != context.get('output_stats', tuple())):
+    if context is None:
         context = _get_pseudocount_context(cb=cb, g=g, output_stats=requested_output_stats)
+    if tuple(requested_output_stats) != context['output_stats']:
+        raise ValueError('Explicit pseudocount context does not match the requested statistics.')
+    g['_pseudocount_context'] = context
     config = context['config']
     if (not config['pseudocount_enabled']) and (not config['pseudocount_add_output_columns']):
         for sub in requested_output_stats:
@@ -3438,6 +3345,7 @@ def get_omega(cb, g):
                 cb.loc[:, col_dSc] = dSc
                 cb.loc[:, col_omega] = omegaC
         return cb
+    result = {}
     for i, sub in enumerate(requested_output_stats):
         col_omega = 'omegaC'+sub
         col_N = 'OCN'+sub
@@ -3455,49 +3363,33 @@ def get_omega(cb, g):
             raw_dSc = _calc_raw_rate(obs=obs_S, exp=exp_S, float_tol=g['float_tol'])
             raw_omega = _calc_raw_omega(dNc=raw_dNc, dSc=raw_dSc, float_tol=g['float_tol'])
             if config['pseudocount_enabled']:
-                sm_dNc = pseudocount.smooth_ratio(
-                    O=obs_N,
-                    E=exp_N,
-                    alpha_obs=context['alpha_obs_N'][i],
-                    alpha_exp=context['alpha_exp_N'][i],
+                sm_dNc, sm_dSc = _count_rates(
+                    obs_N, exp_N, obs_S, exp_S, g['float_tol'],
+                    tuple(context[key][i] for key in ('alpha_obs_N', 'alpha_exp_N', 'alpha_obs_S', 'alpha_exp_S')),
                 )
-                sm_dSc = pseudocount.smooth_ratio(
-                    O=obs_S,
-                    E=exp_S,
-                    alpha_obs=context['alpha_obs_S'][i],
-                    alpha_exp=context['alpha_exp_S'][i],
-                )
-                sm_omega = np.asarray(
-                    pseudocount.smooth_ratio(O=sm_dNc, E=sm_dSc, alpha_obs=0, alpha_exp=0),
-                    dtype=np.float64,
-                )
-                # Enforce the same convention as raw ratios: 0/0 -> 0.
-                is_zero_over_zero = (
-                    np.isfinite(sm_dNc) &
-                    np.isfinite(sm_dSc) &
-                    (sm_dNc < g['float_tol']) &
-                    (sm_dSc < g['float_tol'])
-                )
-                sm_omega[is_zero_over_zero] = 0
-                log_sm_omega = pseudocount.smooth_log_ratio(O=sm_dNc, E=sm_dSc, alpha_obs=0, alpha_exp=0)
+                sm_omega = _calc_raw_omega(sm_dNc, sm_dSc, g['float_tol'])
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    log_sm_omega = np.log(sm_omega)
             else:
                 sm_dNc = raw_dNc.copy()
                 sm_dSc = raw_dSc.copy()
                 sm_omega = raw_omega.copy()
                 with np.errstate(divide='ignore', invalid='ignore'):
                     log_sm_omega = np.log(sm_omega)
-            cb.loc[:, col_dNc] = sm_dNc
-            cb.loc[:, col_dSc] = sm_dSc
-            cb.loc[:, col_omega] = sm_omega
+            result[col_dNc] = sm_dNc
+            result[col_dSc] = sm_dSc
+            result[col_omega] = sm_omega
             if config['pseudocount_add_output_columns']:
-                cb.loc[:, col_dNc + '_raw'] = raw_dNc
-                cb.loc[:, col_dSc + '_raw'] = raw_dSc
-                cb.loc[:, col_omega + '_raw'] = raw_omega
-                cb.loc[:, col_dNc + '_smoothed'] = sm_dNc
-                cb.loc[:, col_dSc + '_smoothed'] = sm_dSc
-                cb.loc[:, col_omega + '_smoothed'] = sm_omega
-                cb.loc[:, 'log' + col_omega + '_smoothed'] = log_sm_omega
-    return cb
+                result[col_dNc + '_raw'] = raw_dNc
+                result[col_dSc + '_raw'] = raw_dSc
+                result[col_omega + '_raw'] = raw_omega
+                result[col_dNc + '_smoothed'] = sm_dNc
+                result[col_dSc + '_smoothed'] = sm_dSc
+                result[col_omega + '_smoothed'] = sm_omega
+                result['log' + col_omega + '_smoothed'] = log_sm_omega
+    if not result:
+        return cb
+    return pd.concat([cb.drop(columns=list(result), errors='ignore'), pd.DataFrame(result, index=cb.index)], axis=1)
 
 
 def get_CoD(cb, g):
@@ -4023,10 +3915,18 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
         txt = 'Skipping --calc_omega_pvalue because --expectation_method is not "urn".\n'
         sys.stderr.write(txt)
         return cb
+    from csubst import omega_null
+    omega_null.validate_config(g)
+    omega_null.validate_population(cb, g)
+    if omega_null.needs_joint(g):
+        return omega_null.add_joint_pvalues(cb, ON_tensor, OS_tensor, g)
     if (g.get('longtail_method', 'independent_null') == 'independent_null'
             and any(str(col).startswith('calibration_reference_') for col in cb.columns)):
         from csubst import omega_calibration
         return omega_calibration.add_independent_null_pvalues(cb, ON_tensor, OS_tensor, g)
+    calibrated = any(str(c).startswith('dSC') and str(c).endswith('_nocalib') for c in cb)
+    if pseudocount.validate_args(g)['pseudocount_enabled'] or calibrated:
+        return omega_null.add_fixed_pvalues(cb, ON_tensor, OS_tensor, g)
     null_model = _resolve_omega_pvalue_null_model(g=g)
     txt = 'omega_C empirical p-value null model: {}'
     print(txt.format(null_model), flush=True)
@@ -4038,7 +3938,9 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
     print(txt.format(null_model, ','.join([str(int(v)) for v in pvalue_schedule])), flush=True)
     cb_ids = _get_cb_ids(cb)
     output_stats = _resolve_requested_output_stats(g)
+    smoothing_context = _get_pseudocount_context(cb, g, output_stats)
     for sub in output_stats:
+        alphas = omega_null.stat_alphas(smoothing_context, sub)
         col_omega = 'omegaC' + sub
         col_exp_N = 'ECN' + sub
         col_exp_S = 'ECS' + sub
@@ -4054,6 +3956,7 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
         exp_S_values = cb.loc[:, col_exp_S].to_numpy(dtype=np.float64, copy=False)
         ge_ranks = np.zeros(shape=(cb.shape[0],), dtype=np.int64)
         valid_niter = np.zeros(shape=(cb.shape[0],), dtype=np.int64)
+        attempted = np.zeros(cb.shape[0], dtype=np.int64)
         active_rows = np.arange(cb.shape[0], dtype=np.int64)
         prev_total_niter = 0
         for stage_index, stage_niter in enumerate(pvalue_schedule):
@@ -4125,7 +4028,9 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
                 perm_count_S=perm_count_S,
                 float_tol=g['float_tol'],
                 calibrate_dsc_transformation=calibrate_dsc_transformation,
+                alphas=alphas,
             )
+            attempted[active_rows] += incremental_niter
             ge_ranks[active_rows] += ge_increment
             valid_niter[active_rows] += valid_increment
             is_last_stage = (stage_index == (len(pvalue_schedule) - 1))
@@ -4163,6 +4068,7 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
             ge_ranks=ge_ranks,
             valid_niter=valid_niter,
         )
+        omega_null.add_diagnostics(cb, sub, smoothing_context, valid_niter, attempted, calibrate_dsc_transformation)
         col_p = 'pomegaC' + sub
         cb.loc[:, col_p] = pvalue
         col_q = 'qomegaC' + sub
@@ -4213,17 +4119,34 @@ def print_cb_stats(cb, prefix, output_stats):
         print(txt.format(hd, col_omega, median_value), flush=True)
 
 
-def calc_omega(cb, OS_tensor, ON_tensor, g):
+def calc_omega(cb, OS_tensor, ON_tensor, g, reuse_pseudocount_context=False):
     cb = get_E(cb, g, ON_tensor, OS_tensor)
     output_stats = _resolve_requested_output_stats(g)
-    context = _get_pseudocount_context(cb=cb, g=g, output_stats=output_stats)
+    from csubst import omega_null
+    reuse = reuse_pseudocount_context and omega_null.data_dependent(g)
+    if reuse:
+        context = g.get('_pseudocount_context')
+        if context is None:
+            raise ValueError('Supplemental rows require the original pseudocount fitting context.')
+    else:
+        context = _get_pseudocount_context(cb=cb, g=g, output_stats=output_stats)
     g['_pseudocount_context'] = context
-    if context['config']['pseudocount_add_output_columns']:
+    if context['config']['pseudocount_add_output_columns'] and not reuse:
         _print_pseudocount_summary(context=context)
         _write_pseudocount_summary_to_cb_stats(g=g, context=context)
-    cb = get_omega(cb, g)
+    cb = get_omega(cb, g, context=context)
     cb = get_CoD(cb, g)
-    cb = add_omega_empirical_pvalues(cb=cb, ON_tensor=ON_tensor, OS_tensor=OS_tensor, g=g)
+    if reuse and g.get('calc_omega_pvalue', False):
+        for sub in output_stats:
+            cb['pomegaC'+sub] = np.nan
+            cb['qomegaC'+sub] = np.nan
+            omega_null.add_diagnostics(cb, sub, context, np.zeros(len(cb), dtype=int), 0)
+            cb['pvalue_status_'+sub] = 'unavailable_full_population_null'
+            cb['pvalue_alpha_'+sub] = 'not_tested'
+            cb['pvalue_prior_'+sub] = 'not_tested'
+            cb['pvalue_joint_'+sub] = 'not_tested'
+    else:
+        cb = add_omega_empirical_pvalues(cb=cb, ON_tensor=ON_tensor, OS_tensor=OS_tensor, g=g)
     print_cb_stats(cb=cb, prefix='cb', output_stats=output_stats)
     return(cb, g)
 

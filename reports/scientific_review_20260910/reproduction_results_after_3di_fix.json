@@ -1,0 +1,42 @@
+{
+  "pseudocount_identical_null": {
+    "omegaCany2spe": 0.18181818181818182,
+    "pomegaCany2spe": 0.000999000999000999
+  },
+  "iid_uniform_epistasis_cv": {
+    "selected_beta": 3.0,
+    "diagnostics": {
+      "active_branch_count": 500,
+      "num_folds": 5,
+      "best_score": -242.22768208232225,
+      "best_beta": 3.0,
+      "selected_beta": 3.0,
+      "one_se": 2.463544931459913,
+      "selection_rule": "argmax_mean_cv_loglik"
+    }
+  },
+  "independent_nested_null": {
+    "undefined_fraction": 0.34517,
+    "positive_fraction": 0.345675
+  },
+  "sparse_poisson_test": {
+    "lrt": 0.04794548357123278,
+    "conditional_exact": 0.25
+  },
+  "single_row_longtail": {
+    "raw_omega": 10.0,
+    "calibrated_omega": 1.0
+  },
+  "marginal_product_zero_length": {
+    "marginal_product_change_mass": 0.5,
+    "joint_change_mass": 0.0
+  },
+  "instantaneous_vs_endpoint": {
+    "exposure": 0.0,
+    "endpoint_probability": 0.1576914574755899
+  },
+  "3di_initial_q": {
+    "blocked": true,
+    "reason": "--nonsyn_recode 3di20 is incompatible with --expectation_method codon_model: a codon model does not define transition rates for 3Di states. A fitted 3Di expectation model is not implemented, including for --sa_asr_mode direct. Use --expectation_method urn explicitly for exploratory 3Di convergence analysis, or --nonsyn_recode no for codon-model expectations."
+  }
+}

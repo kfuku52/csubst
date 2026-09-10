@@ -39,6 +39,27 @@ def _calc_raw_omega(
     return np.where(dNc < float_tol, 0.0, omega)
 
 
+def _count_rates(obs_N, exp_N, obs_S, exp_S, float_tol, alphas=None):
+    """One observed/null transform; alphas are ON, EN, OS, ES in that order.
+
+    A nonzero prior is not discarded as a near-zero observed count. Zero-alpha
+    replicates retain the original raw-count tolerance convention exactly.
+    """
+    from csubst.pseudocount import smooth_ratio
+
+    if alphas is None:
+        alphas = (0., 0., 0., 0.)
+    active = np.asarray(False)
+    for alpha in alphas:
+        active = active | (np.asarray(alpha) != 0)
+    n = _calc_raw_rate(obs_N, exp_N, float_tol)
+    s = _calc_raw_rate(obs_S, exp_S, float_tol)
+    if active.any():
+        n = np.where(active, smooth_ratio(obs_N, exp_N, alphas[0], alphas[1]), n)
+        s = np.where(active, smooth_ratio(obs_S, exp_S, alphas[2], alphas[3]), s)
+    return n, s
+
+
 def _calibrate_dsc_vector(
     dNc_values: ArrayLike,
     dSc_values: ArrayLike,
@@ -102,6 +123,7 @@ def _calc_permutation_omega_matrix(
     perm_count_S: ArrayLike,
     float_tol: float,
     calibrate_dsc_transformation: str | None = None,
+    alphas=None,
 ) -> FloatArray:
     exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
     exp_S = np.asarray(exp_S, dtype=np.float64).reshape(-1)
@@ -117,8 +139,9 @@ def _calc_permutation_omega_matrix(
     if exp_S.shape[0] != perm_count_N.shape[0]:
         txt = 'exp_S rows ({}) and permutation rows ({}) should match.'
         raise ValueError(txt.format(exp_S.shape[0], perm_count_N.shape[0]))
-    perm_dNc = _calc_raw_rate(obs=perm_count_N, exp=exp_N[:, None], float_tol=float_tol)
-    perm_dSc = _calc_raw_rate(obs=perm_count_S, exp=exp_S[:, None], float_tol=float_tol)
+    perm_dNc, perm_dSc = _count_rates(
+        perm_count_N, exp_N[:, None], perm_count_S, exp_S[:, None], float_tol, alphas,
+    )
     if calibrate_dsc_transformation is not None:
         perm_dSc = _calibrate_dsc_matrix(
             dNc_matrix=perm_dNc,
@@ -140,7 +163,11 @@ def _calc_omega_empirical_upper_tail_counts_from_perm(
         txt = 'Permutation rows ({}) and observed rows ({}) should match.'
         raise ValueError(txt.format(perm_omega.shape[0], obs_omega.shape[0]))
     valid_perm = ~np.isnan(perm_omega)
-    ge_ranks = (valid_perm & (perm_omega >= obs_omega[:, None])).sum(axis=1, dtype=np.int64)
+    # Relative machine precision only: do not turn small positive tails into
+    # ties with zero through an arbitrary absolute tolerance.
+    with np.errstate(invalid='ignore'):
+        ties = np.isclose(perm_omega, obs_omega[:, None], rtol=float(8*np.finfo(float).eps), atol=0.)
+    ge_ranks = (valid_perm & ((perm_omega >= obs_omega[:, None]) | ties)).sum(axis=1, dtype=np.int64)
     valid_niter = valid_perm.sum(axis=1, dtype=np.int64)
     return ge_ranks, valid_niter
 
@@ -202,6 +229,7 @@ def _calc_omega_empirical_upper_tail_counts(
     perm_count_S: ArrayLike,
     float_tol: float,
     calibrate_dsc_transformation: str | None = None,
+    alphas=None,
 ) -> tuple[IntArray, IntArray]:
     obs_omega = np.asarray(obs_omega, dtype=np.float64).reshape(-1)
     exp_N = np.asarray(exp_N, dtype=np.float64).reshape(-1)
@@ -228,6 +256,7 @@ def _calc_omega_empirical_upper_tail_counts(
         perm_count_S=perm_count_S,
         float_tol=float_tol,
         calibrate_dsc_transformation=calibrate_dsc_transformation,
+        alphas=alphas,
     )
     return _calc_omega_empirical_upper_tail_counts_from_perm(
         obs_omega=obs_omega,
@@ -282,6 +311,7 @@ def _calc_omega_empirical_upper_tail_pvalues(
     perm_count_S: ArrayLike,
     float_tol: float,
     calibrate_dsc_transformation: str | None = None,
+    alphas=None,
 ) -> FloatArray:
     ge_ranks, valid_niter = _calc_omega_empirical_upper_tail_counts(
         obs_omega=obs_omega,
@@ -291,6 +321,7 @@ def _calc_omega_empirical_upper_tail_pvalues(
         perm_count_S=perm_count_S,
         float_tol=float_tol,
         calibrate_dsc_transformation=calibrate_dsc_transformation,
+        alphas=alphas,
     )
     return _calc_omega_empirical_upper_tail_pvalues_from_counts(
         obs_omega=obs_omega,

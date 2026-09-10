@@ -408,7 +408,8 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              '"factorized_approx" uses the legacy factorized approximation.')
     parser.add_argument('--calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
-                             'P values of omega_C by substitution randomization (--expectation_method urn only). '
+                             'P values of omega_C under fitted count nulls (--expectation_method urn only). '
+                             'dif categories and empirical/auto pseudocounts require the poisson null. '
                              'When --calibrate_longtail is active, uncalibrated P/Q columns are retained as "_nocalib" and calibrated P/Q values are recomputed.')
     advanced_statistics = parser.add_argument_group('advanced statistical tuning')
     _add_advanced_argument(advanced_statistics, '--urn_wallenius_expectation', show_advanced=show_advanced,
@@ -437,6 +438,7 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              '"poisson" uses factorized branch/site continuous-rate nulls (Poisson sampling from expected counts). '
                              '"poisson_full" uses observed branch-specific site masses to obtain an urn-overlap mean, then samples counts; '
                              '"nbinom" adds Gamma-Poisson overdispersion on factorized mean counts. '
+                             'Poisson supports joint dif categories and empirical/auto pseudocounts when category means are compatible. '
                              'These are fitted count nulls, not full phylogenetic simulations; calibration is not established.')
     _add_advanced_argument(advanced_statistics, '--omega_pvalue_nbinom_alpha', show_advanced=show_advanced,
                         metavar='auto|FLOAT', default='auto', type=str,
@@ -448,7 +450,8 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                         help='default=%(default)s: Experimental feature. Iteration schedule for staged '
                              '--calc_omega_pvalue refinement under all --omega_pvalue_null_model modes '
                              '(upper-tail edge focused). '
-                             'Set 0 (auto) to use adaptive stages (100,1000). '
+                             'Set 0 (auto) for stages (100,1000). Smoothed, joint-category and calibrated tests use '
+                             'the final budget for all rows; other base tests retain adaptive refinement. '
                              'Custom values should be comma-delimited strictly increasing integers '
                              '(e.g., 200,2000,10000).')
     _add_advanced_argument(advanced_statistics, '--omega_pvalue_refine_upper_edge_bins', show_advanced=show_advanced,
@@ -593,11 +596,11 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'by quantile-based transformation. This sensitivity analysis is off by default; '
                              'it changes higher-arity candidate selection when enabled.')
     parser.add_argument('--longtail_method', default='independent_null', choices=['empirical', 'independent_null'],
-                        help='default=%(default)s: Empirical full-table reference or per-combination independent fitted-null reference. Requires --calibrate_longtail yes. Independent null also requires urn expectations, base output stats, and zero pseudocounts.')
+                        help='default=%(default)s: Empirical full-table reference or per-combination independent fitted-null reference. Requires --calibrate_longtail yes. Independent null requires urn expectations and fixed symmetric or zero pseudocounts; dif requires the poisson null.')
     _add_advanced_argument(advanced_statistics, '--longtail_null_niter', show_advanced=show_advanced,
                           default=1000, type=int, help='default=%(default)s: Independent calibration draws per combination (>=100); distinct from p-value draws.')
     _add_advanced_argument(advanced_statistics, '--longtail_test_block_size', show_advanced=show_advanced,
-                          default=256, type=int, help='default=%(default)s: Calibrated test-statistic block size; does not change the random draws.')
+                          default=256, type=int, help='default=%(default)s: Joint Poisson and calibrated test-statistic block size; does not change the random draws.')
 
 
 def _add_scan_subcommand_args(parser, show_advanced=False):

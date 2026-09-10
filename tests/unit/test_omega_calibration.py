@@ -56,49 +56,13 @@ def test_calibrate_dsc_quantile_matches_numpy_bitwise_for_small_samples():
             np.testing.assert_array_equal(observed, expected)
 
 
-def test_add_omega_empirical_pvalues_supports_dif_stats(monkeypatch):
-    cb = pd.DataFrame(
-        {
-            "branch_id_1": [0, 1],
-            "branch_id_2": [2, 3],
-            "omegaCany2dif": [2.0, 0.0],
-            "ECNany2dif": [1.0, 1.0],
-            "ECSany2dif": [1.0, 1.0],
-        }
-    )
-    mode_counts = {
-        ("N", "any2any"): np.array([[4.0, 2.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64),
-        ("N", "any2spe"): np.array([[2.0, 1.0, 1.0], [1.0, 2.0, 1.0]], dtype=np.float64),
-        ("S", "any2any"): np.array([[2.0, 2.0, 2.0], [1.0, 1.0, 1.0]], dtype=np.float64),
-        ("S", "any2spe"): np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64),
-    }
-    calls = []
-
-    def fake_get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, obs_count=None):
-        calls.append((SN, mode, int(niter), cb_ids.shape))
-        return mode_counts[(SN, mode)]
-
-    monkeypatch.setattr(omega, "_get_mode_permutation_count_matrix", fake_get_mode_permutation_count_matrix)
-    out = omega.add_omega_empirical_pvalues(
-        cb=cb.copy(),
-        ON_tensor=None,
-        OS_tensor=None,
-        g={
-            "calc_omega_pvalue": True,
-            "expectation_method": "urn",
-            "omega_pvalue_niter_schedule": [3],
-            "output_stats": ["any2dif"],
-            "float_tol": 1e-12,
-        },
-    )
-    assert calls == [
-        ("N", "any2any", 3, (2, 2)),
-        ("S", "any2any", 3, (2, 2)),
-        ("N", "any2spe", 3, (2, 2)),
-        ("S", "any2spe", 3, (2, 2)),
-    ]
-    np.testing.assert_allclose(out.loc[:, "pomegaCany2dif"].to_numpy(dtype=np.float64), np.array([0.5, 1.0]))
-    np.testing.assert_allclose(out.loc[:, "qomegaCany2dif"].to_numpy(dtype=np.float64), np.array([1.0, 1.0]))
+def test_add_omega_empirical_pvalues_rejects_independent_dif_null():
+    import pytest
+    with pytest.raises(ValueError, match='joint category distribution'):
+        omega.add_omega_empirical_pvalues(pd.DataFrame(), None, None, {
+            'calc_omega_pvalue': True, 'expectation_method': 'urn',
+            'output_stats': ['any2dif'], 'float_tol': 1e-12,
+        })
 
 
 def test_add_omega_empirical_pvalues_hypergeom_refines_only_upper_edge_rows(monkeypatch):

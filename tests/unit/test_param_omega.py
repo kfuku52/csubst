@@ -153,6 +153,7 @@ def test_get_global_parameters_keeps_min_sub_pp_unchanged_for_omega_pvalue(capsy
         _args(
             calc_omega_pvalue=True,
             expectation_method="urn",
+            omega_pvalue_null_model="poisson",
             min_sub_pp=0,
             ml_anc="no",
         )
@@ -172,6 +173,7 @@ def test_get_global_parameters_keeps_explicit_min_sub_pp_for_omega_pvalue(capsys
         _args(
             calc_omega_pvalue=True,
             expectation_method="urn",
+            omega_pvalue_null_model="poisson",
             min_sub_pp=0.2,
             ml_anc="no",
         )
@@ -186,6 +188,7 @@ def test_get_global_parameters_does_not_auto_set_min_sub_pp_when_ml_anc_yes(caps
         _args(
             calc_omega_pvalue=True,
             expectation_method="urn",
+            omega_pvalue_null_model="poisson",
             min_sub_pp=0,
             ml_anc="yes",
         )
@@ -221,3 +224,16 @@ def test_get_global_parameters_rejects_invalid_asrv_dirichlet_alpha():
 def test_get_global_parameters_rejects_invalid_asrv_mode():
     with pytest.raises(ValueError, match="--asrv"):
         param.get_global_parameters(_args(asrv="hybrid"))
+
+
+def test_default_dif_pvalues_require_joint_count_null():
+    with pytest.raises(ValueError, match='joint category distribution'):
+        param.get_global_parameters(_args(calc_omega_pvalue=True, expectation_method='urn'))
+
+
+@pytest.mark.parametrize('mode,alpha', [('none', 'auto'), ('empirical', 0.)])
+def test_inactive_smoothing_does_not_restrict_base_nulls(mode, alpha):
+    g = param.get_global_parameters(_args(calc_omega_pvalue=True, expectation_method='urn',
+                                          output_stat='any2spe', pseudocount_mode=mode,
+                                          pseudocount_alpha=alpha))
+    assert g['omega_pvalue_null_model'] == 'hypergeom'

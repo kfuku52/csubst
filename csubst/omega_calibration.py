@@ -10,10 +10,10 @@ import hashlib
 
 import numpy as np
 
-from csubst import longtail, output_stat, pseudocount, randomness
+from csubst import longtail, randomness, omega_null
 from csubst.omega_statistics import (
     _calc_bh_fdr_qvalues,
-    _calc_raw_rate,
+    _count_rates,
     _calc_raw_omega,
     _calc_omega_empirical_upper_tail_counts_from_perm,
     _calc_omega_empirical_upper_tail_pvalues_from_counts,
@@ -36,11 +36,11 @@ def validate_config(g, calibration_active=None):
         return
     if str(g.get('expectation_method', 'codon_model')) != 'urn':
         raise ValueError('Independent-null long-tail calibration requires --expectation_method urn.')
-    stats = g.get('output_stats', output_stat.DEFAULT_OUTPUT_STATS)
-    if any('dif' in sub for sub in stats):
-        raise ValueError('Independent-null calibration currently requires base output stats (no dif); joint dif null generation is not yet supported.')
-    if pseudocount.validate_args(dict(g))['pseudocount_enabled']:
-        raise ValueError('Independent-null calibration with nonzero pseudocounts requires the shared observed/null smoothing implementation; currently unsupported.')
+    stats = omega_null.requested_stats(g)
+    if any('dif' in sub for sub in stats) and g.get('omega_pvalue_null_model', 'hypergeom') != 'poisson':
+        raise ValueError('Independent-null calibration requires poisson for joint dif categories (other models: no dif).')
+    if omega_null.data_dependent(g):
+        raise ValueError('Independent-null calibration supports fixed symmetric pseudocounts only; empirical/auto requires empirical calibration or no calibration.')
     if (g.get('omega_pvalue_null_model', 'hypergeom') == 'nbinom'
             and str(g.get('omega_pvalue_nbinom_alpha', 'auto')).lower() == 'auto'):
         raise ValueError('Independent-null calibration with nbinom requires a fixed --omega_pvalue_nbinom_alpha; automatic dispersion estimation is not independent of the tested rows.')
@@ -60,17 +60,25 @@ def _draw_rates(row, sub, purpose, niter, ON_tensor, OS_tensor, g):
     ids = omega._get_cb_ids(row)
     ids = np.sort(ids, axis=1)
     local = dict(g)
-    local['random_seed'] = randomness.derive_seed(_base_seed(g), purpose, sub, *ids[0].tolist())
+    local['random_seed'] = randomness.derive_seed(_base_seed(g), purpose, 'joint' if omega_null.needs_joint(g) else sub, *ids[0].tolist())
     local['_random_stream_counters'] = {}
     local['_omega_nbinom_alpha_cache'] = {}
-    rates = []
+    counts_by_channel = []
     for channel, tensor in [('N', ON_tensor), ('S', OS_tensor)]:
-        counts = omega._get_mode_permutation_count_matrix(
-            cb_ids=ids, sub_tensor=tensor, mode=sub, SN=channel, niter=niter,
-            g=local, obs_count=row['OC' + channel + sub].to_numpy() if 'OC' + channel + sub in row else None,
-        )
-        rates.append(_calc_raw_rate(counts[0], float(row['EC' + channel + sub].iloc[0]), g.get('float_tol', 1e-12)))
-    return rates
+        if omega_null.needs_joint(g):
+            atoms = omega_null.fitted_atoms(row, tensor, channel, g)
+            sampler = omega_null.PoissonAtoms(ids, atoms, local['random_seed'], channel)
+            counts = omega_null.project_atoms(sampler.draw(niter), sub)
+        else:
+            counts = omega._get_mode_permutation_count_matrix(
+                cb_ids=ids, sub_tensor=tensor, mode=sub, SN=channel, niter=niter,
+                g=local, obs_count=row['OC' + channel + sub].to_numpy() if 'OC' + channel + sub in row else None,
+            )
+        counts_by_channel.append(counts[0])
+    context = omega._get_pseudocount_context(row, g, [sub])
+    return _count_rates(counts_by_channel[0], float(row['ECN'+sub].iloc[0]),
+                        counts_by_channel[1], float(row['ECS'+sub].iloc[0]),
+                        g.get('float_tol', 1e-12), omega_null.stat_alphas(context, sub))
 
 
 def _draw_config(cb, g):
@@ -98,7 +106,7 @@ def _calibrated_rates(mapping, n, s, float_tol):
 def apply_calibration(cb, g, ON_tensor=None, OS_tensor=None, reuse_reference=False):
     validate_config(g, calibration_active=True)
     method = g.get('longtail_method', 'independent_null')
-    stats = g.get('output_stats', output_stat.DEFAULT_OUTPUT_STATS)
+    stats = omega_null.requested_stats(g)
     arity = sum(str(c).startswith('branch_id_') for c in cb.columns)
     context = g.setdefault('_longtail_references', {})
     populations = g.setdefault('_longtail_populations', {})
@@ -111,7 +119,8 @@ def apply_calibration(cb, g, ON_tensor=None, OS_tensor=None, reuse_reference=Fal
         if ss + '_nocalib' in out:
             raise ValueError('Long-tail calibration has already been applied to ' + sub)
         n, s = out[ns].to_numpy(dtype=float), out[ss].to_numpy(dtype=float)
-        for col in (ss, ws, 'pomegaC' + sub, 'qomegaC' + sub):
+        inference_metadata = [c for c in out if str(c).startswith('pvalue_') and str(c).endswith('_'+sub)]
+        for col in (ss, ws, 'pomegaC' + sub, 'qomegaC' + sub, *inference_metadata):
             if col in out:
                 out[col + '_nocalib'] = out[col]
         # Calibrated P/Q values must be recomputed, never retain the raw ones.
@@ -159,6 +168,7 @@ def apply_calibration(cb, g, ON_tensor=None, OS_tensor=None, reuse_reference=Fal
             out['pomegaC' + sub] = np.nan
             out['qomegaC' + sub] = np.nan
             out['calibration_pvalue_status_' + sub] = 'unavailable_full_population_null'
+        out = out.copy()
         print('Long-tail {} {}: {}/{} denominators increased; reference is frozen.'.format(method, sub, int((calibrated > s).sum()), len(out)), flush=True)
     return out
 
@@ -166,8 +176,8 @@ def apply_calibration(cb, g, ON_tensor=None, OS_tensor=None, reuse_reference=Fal
 def add_independent_null_pvalues(cb, ON_tensor, OS_tensor, g):
     """Same frozen map for observed and test null; fixed final simulation budget.
 
-    Raw-count smoothing is deliberately not duplicated here (review ID 2).
-    Unsupported nonzero smoothing and derived dif statistics fail explicitly.
+    Observed and null counts share smoothing before the same frozen map.
+    Data-dependent smoothing needs population-level refitting and is rejected.
     """
     from csubst import omega
 
@@ -175,7 +185,7 @@ def add_independent_null_pvalues(cb, ON_tensor, OS_tensor, g):
     budget = omega._resolve_omega_pvalue_niter_schedule(g)[-1]
     block_size = int(g.get('longtail_test_block_size', 256))
     tol = g.get('float_tol', 1e-12)
-    for sub in g.get('output_stats', output_stat.DEFAULT_OUTPUT_STATS):
+    for sub in omega_null.requested_stats(g):
         col = 'omegaC' + sub
         if col + '_nocalib' not in cb:
             continue
@@ -196,10 +206,13 @@ def add_independent_null_pvalues(cb, ON_tensor, OS_tensor, g):
                 ge[i] += delta[0]
                 valid[i] += count[0]
         p = _calc_omega_empirical_upper_tail_pvalues_from_counts(cb[col].to_numpy(), cb['ECS' + sub].to_numpy(), ge, valid)
+        smoothing_context = omega._get_pseudocount_context(cb, g, [sub])
+        omega_null.add_diagnostics(cb, sub, smoothing_context, valid, budget, 'independent_null', omega_null.needs_joint(g))
         cb['pomegaC' + sub] = p
         cb['qomegaC' + sub] = _calc_bh_fdr_qvalues(p)
         cb['calibration_test_n_' + sub] = valid
         cb['calibration_test_undefined_' + sub] = budget - valid
         cb['calibration_pvalue_status_' + sub] = 'fixed_independent_null'
+        cb = cb.copy()
         print('Independent-null calibrated pomegaC {}: {} test draws per row; final scheduled budget, no adaptive row selection.'.format(sub, budget), flush=True)
     return cb

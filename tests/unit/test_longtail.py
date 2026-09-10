@@ -104,7 +104,7 @@ def test_frozen_pipeline_rejects_inconsistent_transformation_argument():
 def test_direct_calibration_call_cannot_bypass_smoothing_guard():
     g = config('independent_null')
     g.pop('calibrate_longtail')
-    g.update(pseudocount_mode='symmetric', pseudocount_alpha=1.)
+    g.update(pseudocount_mode='empirical', pseudocount_alpha=1.)
     with pytest.raises(ValueError, match='pseudocounts'):
         omega.calibrate_dsc(frame(), g=g, ON_tensor=object(), OS_tensor=object())
 
@@ -112,7 +112,7 @@ def test_direct_calibration_call_cannot_bypass_smoothing_guard():
 @pytest.mark.parametrize('change,match', [
     ({'expectation_method': 'codon_model'}, 'expectation_method urn'),
     ({'output_stats': ['any2dif']}, 'no dif'),
-    ({'pseudocount_mode': 'symmetric', 'pseudocount_alpha': 1}, 'pseudocounts'),
+    ({'pseudocount_mode': 'empirical', 'pseudocount_alpha': 1}, 'pseudocounts'),
     ({'omega_pvalue_null_model': 'nbinom'}, 'fixed'),
     ({'longtail_null_niter': 1}, '>= 100'),
     ({'longtail_test_block_size': 0}, 'positive'),

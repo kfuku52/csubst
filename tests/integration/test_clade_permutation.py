@@ -334,7 +334,8 @@ def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(mo
     def fake_merge_tables(cbOS, cbON):
         return cbOS.copy(deep=True)
 
-    def fake_calc_omega(cb_missing, OS_tensor_reducer, ON_tensor_reducer, g):
+    def fake_calc_omega(cb_missing, OS_tensor_reducer, ON_tensor_reducer, g, reuse_pseudocount_context=False):
+        assert reuse_pseudocount_context
         captured["site_filter_report"] = g.get("site_filter_report")
         out = cb_missing.copy(deep=True)
         out["dNCany2spe"] = np.array([1.0, np.inf], dtype=np.float64)

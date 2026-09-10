@@ -1,0 +1,151 @@
+{
+  "result_fixed": {
+    "rows": 1620,
+    "stats": {
+      "any2any": {
+        "statistic": [
+          "smoothed"
+        ],
+        "n": [
+          30
+        ],
+        "undefined": [
+          0
+        ],
+        "alpha": [
+          "fixed"
+        ],
+        "prior": [
+          "fixed"
+        ],
+        "joint": [
+          "independent_poisson_atoms"
+        ],
+        "finite_P": 1620,
+        "min_P": 0.0323,
+        "finite_Q": 1620
+      },
+      "any2dif": {
+        "statistic": [
+          "smoothed"
+        ],
+        "n": [
+          30
+        ],
+        "undefined": [
+          0
+        ],
+        "alpha": [
+          "fixed"
+        ],
+        "prior": [
+          "fixed"
+        ],
+        "joint": [
+          "independent_poisson_atoms"
+        ],
+        "finite_P": 1620,
+        "min_P": 0.0323,
+        "finite_Q": 1620
+      },
+      "any2spe": {
+        "statistic": [
+          "smoothed"
+        ],
+        "n": [
+          30
+        ],
+        "undefined": [
+          0
+        ],
+        "alpha": [
+          "fixed"
+        ],
+        "prior": [
+          "fixed"
+        ],
+        "joint": [
+          "independent_poisson_atoms"
+        ],
+        "finite_P": 1620,
+        "min_P": 0.0323,
+        "finite_Q": 1620
+      }
+    }
+  },
+  "result_auto": {
+    "rows": 1620,
+    "stats": {
+      "any2any": {
+        "statistic": [
+          "smoothed_calibrated"
+        ],
+        "n": [
+          20
+        ],
+        "undefined": [
+          0
+        ],
+        "alpha": [
+          "refit"
+        ],
+        "prior": [
+          "refit"
+        ],
+        "joint": [
+          "independent_poisson_atoms"
+        ],
+        "finite_P": 1620,
+        "min_P": 0.0476,
+        "finite_Q": 1620
+      },
+      "any2dif": {
+        "statistic": [
+          "smoothed_calibrated"
+        ],
+        "n": [
+          20
+        ],
+        "undefined": [
+          0
+        ],
+        "alpha": [
+          "refit"
+        ],
+        "prior": [
+          "refit"
+        ],
+        "joint": [
+          "independent_poisson_atoms"
+        ],
+        "finite_P": 1620,
+        "min_P": 0.0476,
+        "finite_Q": 1620
+      },
+      "any2spe": {
+        "statistic": [
+          "smoothed_calibrated"
+        ],
+        "n": [
+          20
+        ],
+        "undefined": [
+          0
+        ],
+        "alpha": [
+          "refit"
+        ],
+        "prior": [
+          "refit"
+        ],
+        "joint": [
+          "independent_poisson_atoms"
+        ],
+        "finite_P": 1620,
+        "min_P": 0.0476,
+        "finite_Q": 1620
+      }
+    }
+  },
+  "source": "Bundled PGK dataset; cached ECMK07+F+R4 ASR; urn, ASRV no; seed default 1. Fixed symmetric alpha=1 (30 draws); empirical auto alpha plus empirical long-tail (20 draws)."
+}

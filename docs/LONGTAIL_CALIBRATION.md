@@ -101,12 +101,15 @@ Supported combinations:
   `spe2any`, `spe2spe`.
 - `hypergeom`, `poisson`, `poisson_full`, and `nbinom` with an explicitly fixed
   `--omega_pvalue_nbinom_alpha`.
-- No nonzero pseudocount smoothing. Mode `none`, a fixed effective alpha of
-  zero and report-only settings are allowed.
+- Fixed symmetric pseudocount smoothing, mode `none`, fixed alpha zero,
+  and report-only settings. Observations, calibration samples and test samples
+  use the same count transformation.
+- Derived `dif` categories with the `poisson` null and compatible joint means.
 
-Derived `dif` categories and nonzero pseudocounts are rejected pending the joint
-category-null and shared observed/null smoothing work. Automatic negative
-binomial dispersion is also rejected. These errors are not relaxed by filtering
+Data-dependent pseudocounts (`empirical` / `alpha=auto`) remain unsupported
+with `independent_null`; use empirical calibration or no calibration for their
+replicate refitting. Non-Poisson dif tests and automatic negative-binomial
+dispersion are also rejected. See [pseudocount P values](PSEUDOCOUNT_PVALUES.md). These errors are not relaxed by filtering
 invalid null draws or substituting another null model.
 
 “Independent” describes calibration versus test **random draws**, conditional
@@ -128,7 +131,7 @@ not validate ASR, posterior dependence, fitted site rates or structural omegaC.
   meanings; `_nocalib` does not imply unsmoothed.
 - `pomegaC*_nocalib` and `qomegaC*_nocalib` retain uncalibrated inference when
   requested. Unsuffixed P/Q columns are recomputed for the calibrated statistic.
-  Existing limitations of uncalibrated pseudocount/dif P values remain separate.
+  The [pseudocount P-value support matrix](PSEUDOCOUNT_PVALUES.md) also applies.
 - Per-category `calibration_*` columns record method, map hash, empirical
   population hash (or `per_combination`), finite reference pairs, unique S
   values, status, actual denominator increase, resolved null seed, P-value
