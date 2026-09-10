@@ -1,0 +1,934 @@
+{
+  "schema_version": 1,
+  "calibration": "full_scan",
+  "null": "uniform_nonoverlapping_size_binned_clades",
+  "assumption": "The observed assignment is uniform over the fixed eligible configurations, conditional on the tree, states, masks and bin/group counts.",
+  "scope": "within_trait_full_scan",
+  "status": "conditional_assignment",
+  "sampling": "exact",
+  "requested_count": 99,
+  "seed": 1,
+  "original_foreground_included": true,
+  "trials": [
+    {
+      "permutation_index": 1,
+      "seed": null,
+      "configuration_id": "c77da9cf4d16ad7813eeddce4931d45e9b9d1a360034a72559ee4033568435d3",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 2,
+      "seed": null,
+      "configuration_id": "da248e1d08f776082f0ce3e4a6cb3ecc4b56e336521923c930712c4814cd6883",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            0,
+            3
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 2,
+      "testable_candidate_count": 2,
+      "max_score": 2.21431037417757,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 3,
+      "seed": null,
+      "configuration_id": "71d321a257d86eaee2faf7f99d365c55adba41ffa87c11789e0ef870ab93b4bd",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            0,
+            4
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 4,
+      "seed": null,
+      "configuration_id": "3b81d9b5ad9e67ca1338b8966b49b900f4b3246b219727d1760f55d82d3f1225",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            0,
+            7
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 9,
+      "testable_candidate_count": 9,
+      "max_score": 2.0518309932542946,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 5,
+      "seed": null,
+      "configuration_id": "44e99c298b3a44fa7b4d4a41110e5400b234ed65ceb27fe4971e7198893dc9c8",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            0,
+            8
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 6,
+      "seed": null,
+      "configuration_id": "4fb4fc9f8b506610f6193fe64ce834cc8ddb70218d54273c5729ffd832f24877",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            0,
+            10
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 7,
+      "seed": null,
+      "configuration_id": "73dfd19327045abbbf8e6e911bdb94be17c063d7260ec54b0182640f9bfcbe59",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            0,
+            11
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 8,
+      "seed": null,
+      "configuration_id": "18c9acf63f7c65a1880a9ef13e9378b92e6361a5e2bae96c7b9f01b679c4639d",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            1,
+            3
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 9,
+      "seed": null,
+      "configuration_id": "49b17eb25dc26c33e613fc3851481ef33e6c90cd38755ed8b212e0c7de9cecd9",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            1,
+            4
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 10,
+      "seed": null,
+      "configuration_id": "162ac05a944ab363b98f126e93e3c9e4c388e551094956451002066ba1541072",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            1,
+            7
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 11,
+      "seed": null,
+      "configuration_id": "f556efc3acbbab7e8c9feb00d1ba18c3d887f1b055e1239a9774ba6976aa38d4",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            1,
+            8
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 12,
+      "seed": null,
+      "configuration_id": "4ff049ac392c28ecc4933afd6f5cf6eef5f7a5f35388a10740aa0ed5af901efa",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            1,
+            10
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 13,
+      "seed": null,
+      "configuration_id": "d75475be8e213220ffb3a10b172b613f8d2ffb47dc0fee65e21a4140ccd5e325",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            1,
+            11
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 14,
+      "seed": null,
+      "configuration_id": "8c4d90d2f2dae8efab6d901dd42bed75243f1bcb84e7748ab2087cd6be48351e",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            3,
+            4
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 15,
+      "seed": null,
+      "configuration_id": "e2619d11039647d8edb2240dbb0867a4bbd8ef5663b4017e7aa2a59a6b0d332a",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            3,
+            7
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 2,
+      "testable_candidate_count": 2,
+      "max_score": 2.328466440441422,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 16,
+      "seed": null,
+      "configuration_id": "635dd886f8f03d3f853427d99785b4156c859461b838beb49b0fb65414a49ed3",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            3,
+            8
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 17,
+      "seed": null,
+      "configuration_id": "88203ff9743945087cd5a4ff6685af4c6ffe875b4779140d5bec67a0235c2a4c",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            3,
+            10
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 18,
+      "seed": null,
+      "configuration_id": "078fb3b3363017e2cc7e0b94fece6b6a5e55b816801ca0af421954fd4ef06c65",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            3,
+            11
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 2,
+      "testable_candidate_count": 2,
+      "max_score": 2.4266218764993566,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 19,
+      "seed": null,
+      "configuration_id": "b38e9a08d86bbd88cccc021abe4727cf173cbcd84425c381abee2f5f6a032c9b",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            4,
+            7
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 20,
+      "seed": null,
+      "configuration_id": "aeb06a3f2337652eab471fe5744bc3d37d91a95a03b3b6f67059e90cadbb59fe",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            4,
+            8
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 21,
+      "seed": null,
+      "configuration_id": "0f52ad4d1e41bf1e8cda793a5e06a3cf39e67ca312f88c011a551382978278c9",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            4,
+            10
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 2,
+      "testable_candidate_count": 2,
+      "max_score": 2.0538793659520236,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 22,
+      "seed": null,
+      "configuration_id": "d52d3c2913e5eb8f6260b8ec329765b46085c2e2ac4598b1fc00c8468108b700",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            4,
+            11
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 2,
+      "testable_candidate_count": 2,
+      "max_score": 2.2247435674859046,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 23,
+      "seed": null,
+      "configuration_id": "b086c4373c57c8e9dcf464130b44f32c6cd70bf322ef908d0df73b4051d63e0e",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            7,
+            8
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 24,
+      "seed": null,
+      "configuration_id": "f5d9408da2d8401fcb7d0c5da7acfd209b1ef045e22aab642c7ff751ff031a35",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            7,
+            10
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 25,
+      "seed": null,
+      "configuration_id": "b9ff7b71d6eaef5b85813f3391d5f9867ac58f941720c074bab0fcebcffa642e",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            7,
+            11
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 26,
+      "seed": null,
+      "configuration_id": "681d5f5c7cca61e1ed5760c70bed691df386d2819e692dc2bf3d10ff0432e71e",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            8,
+            10
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 27,
+      "seed": null,
+      "configuration_id": "b87bcafe1e49a309da8f18298e027ab4ed73e53deb77b3932dc9abfc826f4c01",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            8,
+            11
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    },
+    {
+      "permutation_index": 28,
+      "seed": null,
+      "configuration_id": "347d7f21de947247c6849b00eb9f11164b2974fb583baeb6db9e3d3c8a1e17a2",
+      "configuration": {
+        "PLACEHOLDER": [
+          [
+            10,
+            11
+          ]
+        ]
+      },
+      "sampling_attempts": 0,
+      "candidate_count": 0,
+      "testable_candidate_count": 0,
+      "max_score": null,
+      "status": "success",
+      "failure_reason": ""
+    }
+  ],
+  "settings": {
+    "scan_match": [
+      "any2spe",
+      "spe2spe"
+    ],
+    "scan_min_support": "2",
+    "scan_min_event_pp": 0.5,
+    "scan_rate_length": "n_rescaled",
+    "scan_rate_event_mode": "called",
+    "scan_other_scope": "all",
+    "scan_unit_mode": "clade",
+    "fg_stem_only": false,
+    "scan_sister_stem_only": false,
+    "min_clade_bin_count": 1
+  },
+  "resolved_rate_exposure": "q_weighted",
+  "state_tensor_shape": [
+    15,
+    97,
+    6
+  ],
+  "plan": {
+    "trait": "PLACEHOLDER",
+    "bin_boundaries": [
+      5,
+      4,
+      2,
+      1
+    ],
+    "bin_pools": [
+      [
+        0,
+        1,
+        3,
+        4,
+        7,
+        8,
+        10,
+        11
+      ]
+    ],
+    "component_counts_by_bin_and_group": [
+      [
+        2
+      ]
+    ],
+    "group_labels": [
+      "pooled_clades"
+    ],
+    "proposal_space_size": "28",
+    "valid_space_size": 28,
+    "sampling_probability": 0.03571428571428571,
+    "sampling_law": "uniform_over_valid_configurations",
+    "max_rejection_draws": 10000,
+    "clades": [
+      {
+        "stem_branch_id": 0,
+        "parent_branch_id": 2,
+        "leaf_names": [
+          "a"
+        ],
+        "leaf_count": 1,
+        "bin": 1,
+        "eligible": true,
+        "target_branch_ids": [
+          0
+        ],
+        "root_distance": 0.9142434161999999,
+        "stem_raw_length": 0.581606811,
+        "target_raw_length": 0.581606811,
+        "target_n_rescaled_length": 0.17868505154639178,
+        "target_sn_rescaled_length": 0.26335515463917525,
+        "analyzable_state_fraction": 0.9484536082474226,
+        "mean_state_entropy": 0.0
+      },
+      {
+        "stem_branch_id": 1,
+        "parent_branch_id": 2,
+        "leaf_names": [
+          "b"
+        ],
+        "leaf_count": 1,
+        "bin": 1,
+        "eligible": true,
+        "target_branch_ids": [
+          1
+        ],
+        "root_distance": 0.5822978995,
+        "stem_raw_length": 0.2496612943,
+        "target_raw_length": 0.2496612943,
+        "target_n_rescaled_length": 0.11952979381443297,
+        "target_sn_rescaled_length": 0.17842680412371134,
+        "analyzable_state_fraction": 0.9587628865979382,
+        "mean_state_entropy": 0.0
+      },
+      {
+        "stem_branch_id": 2,
+        "parent_branch_id": 6,
+        "leaf_names": [
+          "a",
+          "b"
+        ],
+        "leaf_count": 2,
+        "bin": 2,
+        "eligible": true,
+        "target_branch_ids": [
+          2,
+          0,
+          1
+        ],
+        "root_distance": 0.3326366052,
+        "stem_raw_length": 0.1794053711,
+        "target_raw_length": 1.0106734764,
+        "target_n_rescaled_length": 0.3771630584628866,
+        "target_sn_rescaled_length": 0.5915961469206186,
+        "analyzable_state_fraction": 0.9690721649484536,
+        "mean_state_entropy": 0.04037857774751859
+      },
+      {
+        "stem_branch_id": 3,
+        "parent_branch_id": 5,
+        "leaf_names": [
+          "c"
+        ],
+        "leaf_count": 1,
+        "bin": 1,
+        "eligible": true,
+        "target_branch_ids": [
+          3
+        ],
+        "root_distance": 0.593160547,
+        "stem_raw_length": 0.217415705,
+        "target_raw_length": 0.217415705,
+        "target_n_rescaled_length": 0.07455855670103094,
+        "target_sn_rescaled_length": 0.1387953608247423,
+        "analyzable_state_fraction": 0.9484536082474226,
+        "mean_state_entropy": 0.0
+      },
+      {
+        "stem_branch_id": 4,
+        "parent_branch_id": 5,
+        "leaf_names": [
+          "d"
+        ],
+        "leaf_count": 1,
+        "bin": 1,
+        "eligible": true,
+        "target_branch_ids": [
+          4
+        ],
+        "root_distance": 0.7194635093,
+        "stem_raw_length": 0.3437186673,
+        "target_raw_length": 0.3437186673,
+        "target_n_rescaled_length": 0.1296179381443299,
+        "target_sn_rescaled_length": 0.22009701030927836,
+        "analyzable_state_fraction": 0.9484536082474226,
+        "mean_state_entropy": 0.0
+      },
+      {
+        "stem_branch_id": 5,
+        "parent_branch_id": 6,
+        "leaf_names": [
+          "c",
+          "d"
+        ],
+        "leaf_count": 2,
+        "bin": 2,
+        "eligible": true,
+        "target_branch_ids": [
+          5,
+          3,
+          4
+        ],
+        "root_distance": 0.375744842,
+        "stem_raw_length": 0.2225136079,
+        "target_raw_length": 0.7836479802,
+        "target_n_rescaled_length": 0.2741289406917526,
+        "target_sn_rescaled_length": 0.48623088308453616,
+        "analyzable_state_fraction": 0.9656357388316151,
+        "mean_state_entropy": 0.022747068502527112
+      },
+      {
+        "stem_branch_id": 6,
+        "parent_branch_id": 14,
+        "leaf_names": [
+          "c",
+          "d",
+          "a",
+          "b"
+        ],
+        "leaf_count": 4,
+        "bin": 3,
+        "eligible": true,
+        "target_branch_ids": [
+          5,
+          2,
+          3,
+          4,
+          0,
+          1
+        ],
+        "root_distance": 0.1532312341,
+        "stem_raw_length": 0.1532312341,
+        "target_raw_length": 1.7943214566,
+        "target_n_rescaled_length": 0.6512919991546392,
+        "target_sn_rescaled_length": 1.0778270300051547,
+        "analyzable_state_fraction": 0.9673539518900344,
+        "mean_state_entropy": 0.03157848165898821
+      },
+      {
+        "stem_branch_id": 7,
+        "parent_branch_id": 9,
+        "leaf_names": [
+          "e"
+        ],
+        "leaf_count": 1,
+        "bin": 1,
+        "eligible": true,
+        "target_branch_ids": [
+          7
+        ],
+        "root_distance": 0.8083915358,
+        "stem_raw_length": 0.4835193217,
+        "target_raw_length": 0.4835193217,
+        "target_n_rescaled_length": 0.1329517525773196,
+        "target_sn_rescaled_length": 0.20859701030927835,
+        "analyzable_state_fraction": 0.9587628865979382,
+        "mean_state_entropy": 0.0
+      },
+      {
+        "stem_branch_id": 8,
+        "parent_branch_id": 9,
+        "leaf_names": [
+          "f"
+        ],
+        "leaf_count": 1,
+        "bin": 1,
+        "eligible": true,
+        "target_branch_ids": [
+          8
+        ],
+        "root_distance": 0.5608563865,
+        "stem_raw_length": 0.2359841724,
+        "target_raw_length": 0.2359841724,
+        "target_n_rescaled_length": 0.10572783505154638,
+        "target_sn_rescaled_length": 0.13996577319587628,
+        "analyzable_state_fraction": 0.9484536082474226,
+        "mean_state_entropy": 0.0
+      },
+      {
+        "stem_branch_id": 9,
+        "parent_branch_id": 13,
+        "leaf_names": [
+          "f",
+          "e"
+        ],
+        "leaf_count": 2,
+        "bin": 2,
+        "eligible": true,
+        "target_branch_ids": [
+          9,
+          8,
+          7
+        ],
+        "root_distance": 0.3248722141,
+        "stem_raw_length": 0.17164098,
+        "target_raw_length": 0.8911444741,
+        "target_n_rescaled_length": 0.3364911847154639,
+        "target_sn_rescaled_length": 0.4955822699340206,
+        "analyzable_state_fraction": 0.9690721649484536,
+        "mean_state_entropy": 0.0330880316154209
+      },
+      {
+        "stem_branch_id": 10,
+        "parent_branch_id": 12,
+        "leaf_names": [
+          "g"
+        ],
+        "leaf_count": 1,
+        "bin": 1,
+        "eligible": true,
+        "target_branch_ids": [
+          10
+        ],
+        "root_distance": 0.5788653967999999,
+        "stem_raw_length": 0.2331723952,
+        "target_raw_length": 0.2331723952,
+        "target_n_rescaled_length": 0.08595845360824743,
+        "target_sn_rescaled_length": 0.17160278350515465,
+        "analyzable_state_fraction": 0.9484536082474226,
+        "mean_state_entropy": 0.0
+      },
+      {
+        "stem_branch_id": 11,
+        "parent_branch_id": 12,
+        "leaf_names": [
+          "h"
+        ],
+        "leaf_count": 1,
+        "bin": 1,
+        "eligible": true,
+        "target_branch_ids": [
+          11
+        ],
+        "root_distance": 0.6894435432,
+        "stem_raw_length": 0.3437505416,
+        "target_raw_length": 0.3437505416,
+        "target_n_rescaled_length": 0.13502092783505154,
+        "target_sn_rescaled_length": 0.21493525773195876,
+        "analyzable_state_fraction": 0.9484536082474226,
+        "mean_state_entropy": 0.0
+      },
+      {
+        "stem_branch_id": 12,
+        "parent_branch_id": 13,
+        "leaf_names": [
+          "g",
+          "h"
+        ],
+        "leaf_count": 2,
+        "bin": 2,
+        "eligible": true,
+        "target_branch_ids": [
+          12,
+          10,
+          11
+        ],
+        "root_distance": 0.3456930016,
+        "stem_raw_length": 0.1924617675,
+        "target_raw_length": 0.7693847042999999,
+        "target_n_rescaled_length": 0.31538338895051543,
+        "target_sn_rescaled_length": 0.5359205233082475,
+        "analyzable_state_fraction": 0.9656357388316151,
+        "mean_state_entropy": 0.029283810086664405
+      },
+      {
+        "stem_branch_id": 13,
+        "parent_branch_id": 14,
+        "leaf_names": [
+          "g",
+          "h",
+          "f",
+          "e"
+        ],
+        "leaf_count": 4,
+        "bin": 3,
+        "eligible": true,
+        "target_branch_ids": [
+          12,
+          9,
+          10,
+          11,
+          8,
+          7
+        ],
+        "root_distance": 0.1532312341,
+        "stem_raw_length": 0.1532312341,
+        "target_raw_length": 1.6605291784,
+        "target_n_rescaled_length": 0.6518745736659795,
+        "target_sn_rescaled_length": 1.031502793242268,
+        "analyzable_state_fraction": 0.9673539518900344,
+        "mean_state_entropy": 0.03118929937815522
+      }
+    ]
+  },
+  "space_size": 28,
+  "observed": {
+    "configuration": {
+      "PLACEHOLDER": [
+        [
+          0,
+          7
+        ]
+      ]
+    },
+    "configuration_id": "3b81d9b5ad9e67ca1338b8966b49b900f4b3246b219727d1760f55d82d3f1225",
+    "candidate_count": 9,
+    "max_score": 2.0518309932542946
+  },
+  "pvalue_resolution": 0.03571428571428571,
+  "backend": "multiprocessing",
+  "n_jobs": 1,
+  "global_pvalue": 0.21428571428571427,
+  "success_count": 28,
+  "failure_count": 0,
+  "sampling_attempts": 0,
+  "unique_configuration_count": 28,
+  "original_configuration_count": 1
+}

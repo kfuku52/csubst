@@ -1,5 +1,8 @@
 # Method review for `csubst scan`
 
+Historical review of the June 2026 implementation. Current column names,
+calibration modes and interpretation are documented in [Scan inference](../../docs/SCAN_INFERENCE.md).
+
 Date: 2026-06-26 (updated 2026-07-10)
 
 This report reviews the theoretical status of the current `csubst scan` implementation and compares it with methods that address similar questions: explicit convergent amino-acid substitution counting, PCOC/profile-shift methods, CSUBST omegaC-style convergence-rate tests, and ESL-PSC-style predictive approaches.

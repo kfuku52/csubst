@@ -182,8 +182,10 @@ def test_scan_posterior_sum_uses_unthresholded_rate_tensor_when_called_tensor_is
     assert scan_df.iloc[0]["other_event_count"] == pytest.approx(0.2)
 
 
-def test_scan_substitutions_handles_multiple_traits_and_stratified_qvalues():
+@pytest.mark.parametrize("calibration", ["none", "parametric_bootstrap"])
+def test_scan_substitutions_handles_multiple_traits_and_stratified_qvalues(calibration):
     g, on_tensor = _toy_scan_context()
+    g.update(scan_pvalue_calibration=calibration, scan_n_permutations=3)
     labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in g["tree"].traverse()}
     g["fg_df"]["trait2"] = [1, 2]
     g["fg_leaf_names"]["trait2"] = [["A"], ["C"]]
@@ -204,16 +206,14 @@ def test_scan_substitutions_handles_multiple_traits_and_stratified_qvalues():
     assert units.groupby("trait").size().to_dict() == {"trait": 2, "trait2": 2}
     assert scan_df.groupby("trait").size().to_dict() == {"trait": 1, "trait2": 1}
     q_cols = [
-        "q_rate_enrichment",
-        "q_rate_enrichment_by_trait",
-        "q_rate_enrichment_by_trait_match",
+        "q_rate_enrichment_asymptotic_by_trait_match",
     ]
     for col in q_cols:
         assert col in scan_df.columns
         assert np.isfinite(scan_df[col].to_numpy(dtype=float)).all()
     assert np.allclose(
-        scan_df["q_rate_enrichment_by_trait_match"].to_numpy(dtype=float),
-        scan_df["p_rate_enrichment"].to_numpy(dtype=float),
+        scan_df["q_rate_enrichment_asymptotic_by_trait_match"].to_numpy(dtype=float),
+        scan_df["p_rate_enrichment_asymptotic"].to_numpy(dtype=float),
     )
 
 
@@ -233,9 +233,36 @@ def test_scan_full_scan_permutation_adds_empirical_maxt_pvalues():
     assert row["scan_permutation_failure_reasons"] == ""
     assert np.isfinite(float(row["p_rate_enrichment_empirical_maxT"]))
     assert 0 < float(row["p_rate_enrichment_empirical_maxT"]) <= 1
-    assert row["q_rate_enrichment_empirical"] == pytest.approx(
+    assert row["q_rate_enrichment_empirical_by_trait_match"] == pytest.approx(
         row["p_rate_enrichment_empirical"]
     )
+
+
+def test_bh_families_are_trait_by_match_and_do_not_pool_other_groups():
+    frame = pd.DataFrame({'trait': ['A', 'A', 'A', 'B'],
+                          'scan_match': ['any2spe', 'any2spe', 'spe2spe', 'any2spe'],
+                          'p_rate_enrichment_asymptotic': [.01, .04, .03, .002],
+                          'p_rate_enrichment_empirical': [.02, .08, .06, .004]})
+    for label in ('asymptotic', 'empirical'):
+        frame = substitution_scan._assign_grouped_qvalues(
+            frame, 'q_' + label, ['trait', 'scan_match'], 'p_rate_enrichment_' + label,
+        )
+    frame = substitution_scan._annotate_inference(frame, {'scan_pvalue_calibration': 'none'})
+    assert frame['q_asymptotic'].tolist() == pytest.approx([.02, .04, .03, .002])
+    assert frame['q_empirical'].tolist() == pytest.approx([.04, .08, .06, .004])
+    assert frame['scan_bh_family_size'].tolist() == [2, 2, 1, 1]
+    assert frame['scan_bh_family_id'].nunique() == 3
+    g, tensor = _toy_scan_context()
+    output, _ = substitution_scan.scan_substitutions(g, tensor)
+    assert set(c for c in output if c.startswith('q_')) == {
+        'q_rate_enrichment_asymptotic_by_trait_match', 'q_rate_enrichment_empirical_by_trait_match',
+    }
+
+
+def test_score_tsv_precision_preserves_resampling_ties():
+    values = np.array([2.123456789012345, 3.987654321098765])
+    serialized = main_scan._prepare_scan_output_table(pd.DataFrame({'score_rate_enrichment': values}))
+    assert np.array_equal(serialized['score_rate_enrichment'].astype(float), values)
 
 
 def test_full_scan_reuses_static_atomic_events_across_permutations(monkeypatch):
@@ -261,8 +288,8 @@ def test_prepare_scan_output_table_formats_p_q_and_resolution_scientifically():
         {
             "target_event_count": [0.000002],
             "candidate_event_pp_sum": [0.000002],
-            "p_rate_enrichment": [0.000002],
-            "q_rate_enrichment": [0.00015577],
+            "p_rate_enrichment_asymptotic": [0.000002],
+            "q_rate_enrichment_asymptotic_by_trait_match": [0.00015577],
             "p_rate_enrichment_empirical": [np.nan],
             "scan_pvalue_resolution": [1e-8],
         }
@@ -270,8 +297,8 @@ def test_prepare_scan_output_table_formats_p_q_and_resolution_scientifically():
 
     out = main_scan._prepare_scan_output_table(df)
 
-    assert out.loc[0, "p_rate_enrichment"] == "2.000000e-06"
-    assert out.loc[0, "q_rate_enrichment"] == "1.557700e-04"
+    assert out.loc[0, "p_rate_enrichment_asymptotic"] == "2.000000e-06"
+    assert out.loc[0, "q_rate_enrichment_asymptotic_by_trait_match"] == "1.557700e-04"
     assert out.loc[0, "p_rate_enrichment_empirical"] == ""
     assert out.loc[0, "scan_pvalue_resolution"] == "1.000000e-08"
     assert out.loc[0, "target_event_count"] == pytest.approx(0.000002)

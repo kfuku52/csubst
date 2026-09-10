@@ -94,6 +94,14 @@ Model of substitution: ECMK07+F+R4
         parser_iqtree.read_iqtree(g, eq=True)
 
 
+@pytest.mark.parametrize('version', ['2.3.6', '3.0.1'])
+def test_equal_frequency_model_does_not_require_pi_entries_or_use_empirical_counts(tmp_path, version):
+    text = 'IQ-TREE multicore version {}\nModel of substitution: GY+FQ\n'.format(version)
+    g = _get_base_g(tmp_path, text, '')
+    result = parser_iqtree.read_iqtree(g)
+    assert result['equilibrium_frequency'] == pytest.approx([1/3, 1/3, 1/3])
+
+
 def test_read_iqtree_iqtree3_missing_frequency_falls_back_to_alignment_empirical(tmp_path):
     iqtree_text = """
 IQ-TREE multicore version 3.0.1 for Linux 64-bit built Jan  1 2025

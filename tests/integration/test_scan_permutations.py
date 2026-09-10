@@ -144,8 +144,8 @@ def test_scan_rejects_negative_permutation_count_even_without_calibration():
 
 def test_empirical_pvalue_rejects_an_inconsistent_denominator():
     with pytest.raises(ValueError, match="exactly one null statistic"):
-        substitution_scan._empirical_p_from_values(
-            p_obs=0.05, values=[0.01, 0.02, 0.03, 0.04, 0.05, 0.06], denominator_count=4,
+        substitution_scan._empirical_p_from_scores(
+            score_obs=2., values=[0.01, 0.02, 0.03, 0.04, 0.05, 0.06], denominator_count=4,
         )
 
 

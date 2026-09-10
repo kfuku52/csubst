@@ -1,0 +1,62 @@
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+sparse / filter=False: 2199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+{"scenario": "sparse", "filter_tip_invariant": false, "null": {"datasets": 1000, "rejections": 24, "rate": 0.024, "ci95": [0.015436383233508497, 0.03550063853135918], "empty_families": 976, "diagnostic_p_any_rejections": 13, "diagnostic_trait_match_bh_any_rejections": 13}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 4, "rate": 0.02, "ci95": [0.00547556587955645, 0.05041360908989629], "empty_families": 61, "diagnostic_p_any_rejections": 3, "diagnostic_trait_match_bh_any_rejections": 3}, "null_fpr_criterion_met": true}
+sparse / filter=True: 2199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+{"scenario": "sparse", "filter_tip_invariant": true, "null": {"datasets": 1000, "rejections": 24, "rate": 0.024, "ci95": [0.015436383233508497, 0.03550063853135918], "empty_families": 976, "diagnostic_p_any_rejections": 12, "diagnostic_trait_match_bh_any_rejections": 12}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 3, "rate": 0.015, "ci95": [0.00310410762155351, 0.0432082819177126], "empty_families": 67, "diagnostic_p_any_rejections": 3, "diagnostic_trait_match_bh_any_rejections": 3}, "null_fpr_criterion_met": true}
+unequal / filter=False: 2199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+{"scenario": "unequal", "filter_tip_invariant": false, "null": {"datasets": 1000, "rejections": 53, "rate": 0.053, "ci95": [0.03994925236001938, 0.06875518328996323], "empty_families": 893, "diagnostic_p_any_rejections": 36, "diagnostic_trait_match_bh_any_rejections": 36}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 13, "rate": 0.065, "ci95": [0.03506070865697905, 0.10858723650381519], "empty_families": 158, "diagnostic_p_any_rejections": 11, "diagnostic_trait_match_bh_any_rejections": 9}, "null_fpr_criterion_met": false}
+unequal / filter=True: 2199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+{"scenario": "unequal", "filter_tip_invariant": true, "null": {"datasets": 1000, "rejections": 49, "rate": 0.049, "ci95": [0.03646705917204783, 0.06426605314016964], "empty_families": 887, "diagnostic_p_any_rejections": 36, "diagnostic_trait_match_bh_any_rejections": 35}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 3, "rate": 0.015, "ci95": [0.00310410762155351, 0.0432082819177126], "empty_families": 162, "diagnostic_p_any_rejections": 2, "diagnostic_trait_match_bh_any_rejections": 2}, "null_fpr_criterion_met": false}
+uncertain / filter=False: 2199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+{"scenario": "uncertain", "filter_tip_invariant": false, "null": {"datasets": 1000, "rejections": 40, "rate": 0.04, "ci95": [0.0287276252858908, 0.0540726968193685], "empty_families": 515, "diagnostic_p_any_rejections": 85, "diagnostic_trait_match_bh_any_rejections": 80}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 6, "rate": 0.03, "ci95": [0.011087455672254776, 0.064150626705027], "empty_families": 59, "diagnostic_p_any_rejections": 19, "diagnostic_trait_match_bh_any_rejections": 16}, "null_fpr_criterion_met": true}
+uncertain / filter=True: 2199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+{"scenario": "uncertain", "filter_tip_invariant": true, "null": {"datasets": 1000, "rejections": 77, "rate": 0.077, "ci95": [0.061242027783549, 0.09529938097825966], "empty_families": 493, "diagnostic_p_any_rejections": 105, "diagnostic_trait_match_bh_any_rejections": 101}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 19, "rate": 0.095, "ci95": [0.058169609725120246, 0.14437663997685252], "empty_families": 64, "diagnostic_p_any_rejections": 25, "diagnostic_trait_match_bh_any_rejections": 20}, "null_fpr_criterion_met": false}

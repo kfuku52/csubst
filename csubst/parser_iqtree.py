@@ -526,6 +526,10 @@ def run_iqtree_ancestral(g, force_notree_run=False):
                            '--prefix', iqtree_prefix]
             else:
                 raise ValueError('--rooted_tree and --alignment_file are not consistent.')
+        if g.get('random_seed') is not None:
+            command.extend(['-seed', str(int(g['random_seed']))])
+        if g.get('subcommand') == 'scan' or g.get('scan_pvalue_calibration') == 'parametric_bootstrap':
+            command.append('-v')  # Preserve empirical frequencies at full log precision.
         returncode = runtime.run_subprocess_tee(command)
         if returncode != 0:
             msg = 'IQ-TREE did not finish safely (exit code {}).'
@@ -535,7 +539,7 @@ def run_iqtree_ancestral(g, force_notree_run=False):
         _write_iqtree_manifest(g)
         ckp_paths = [g['alignment_file']+'.ckp.gz', iqtree_prefix+'.ckp.gz']
         for ckp_path in ckp_paths:
-            if os.path.exists(ckp_path):
+            if os.path.exists(ckp_path) and g.get('scan_pvalue_calibration') != 'parametric_bootstrap':
                 os.remove(ckp_path)
     finally:
         if os.path.exists(file_tree):
@@ -650,6 +654,14 @@ def read_iqtree(g, eq=True):
     if g['substitution_model'] is None:
         raise AssertionError('Failed to parse substitution model from IQ-TREE output.')
     if eq:
+        if re.search(r'(?:^|\+)FQ(?:\+|$)', g['substitution_model']):
+            # Equal frequencies are part of the model definition; IQ-TREE
+            # legitimately omits pi(...) entries for this case.
+            count = len(g['codon_orders'])
+            if count == 0:
+                raise ValueError('An equal-frequency model requires a nonempty codon alphabet.')
+            g['equilibrium_frequency'] = np.full(count, 1.0 / count, dtype=g['float_type'])
+            return g
         try:
             g['equilibrium_frequency'] = _parse_equilibrium_frequency(
                 iqtree_txt=iqtree_txt,

@@ -1,0 +1,11 @@
+.......................                                                  [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+23 passed, 1 warning in 3.15s
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/_pytest/pathlib.py:96: PytestWarning: (rm_rf) error removing /private/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/pytest-of-kf/garbage-cc23c258-0cfe-4394-b91e-29eda76b98ac
+<class 'OSError'>: [Errno 66] Directory not empty: '/private/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/pytest-of-kf/garbage-cc23c258-0cfe-4394-b91e-29eda76b98ac'
+  warnings.warn(

@@ -1,4 +1,6 @@
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -164,6 +166,41 @@ def test_scan_called_rate_mode_does_not_build_unused_projection(monkeypatch):
     )
 
     assert context["rate_event_projection"] is None
+
+
+def test_main_scan_all_sites_filtered_writes_no_test_result(monkeypatch, tmp_path):
+    g, on_tensor = _toy_scan_context()
+    g.update(foreground="foreground.tsv", outdir=str(tmp_path), output_prefix="csubst",
+             float_format="%.6g", drop_invariant_tip_sites=True, scan_site_plot=False,
+             state_cdn=g["state_nsy"], min_sub_pp=0)
+    monkeypatch.setattr(main_scan.parser_misc, "prepare_input_context", lambda g, **kw: g)
+    monkeypatch.setattr(main_scan.parser_misc, "prep_state", lambda g, **kw: g)
+    monkeypatch.setattr(main_scan.parser_misc, "get_site_index_alignment", lambda *a, **kw: np.array([0]))
+    monkeypatch.setattr(main_scan.parser_misc, "get_site_drop_mask", lambda *a: np.array([True]))
+    monkeypatch.setattr(main_scan.substitution, "get_substitution_tensor", lambda **kw: on_tensor.copy())
+    monkeypatch.setattr(main_scan.tree, "rescale_branch_length", lambda g, *a: g)
+    monkeypatch.setattr(main_scan.substitution_scan, "scan_substitutions",
+                        lambda **kw: pytest.fail("Excluded sites must not enter discovery"))
+
+    _, frame, units = main_scan.main_scan(g)
+
+    assert frame.empty
+    assert not units.empty
+    assert pd.read_csv(tmp_path / "csubst_scan.tsv", sep="\t").empty
+    report = json.loads((tmp_path / "csubst_scan_inference.json").read_text())
+    assert report["no_test_reason"] == "all_sites_excluded_by_configured_filter"
+    assert report["status"] == ["no_observed_candidates"]
+
+
+@pytest.mark.parametrize("setting", [dict(scan_min_event_pp=np.nan), dict(scan_min_event_pp=1.1),
+                                     dict(scan_min_support="1.2"), dict(scan_match="invalid")])
+def test_main_scan_rejects_invalid_discovery_settings_before_loading_asr(monkeypatch, tmp_path, setting):
+    g = dict(foreground="foreground.tsv", outdir=str(tmp_path), drop_invariant_tip_sites=True,
+             scan_pvalue_calibration="none", scan_n_permutations=0, **setting)
+    monkeypatch.setattr(main_scan.parser_misc, "prepare_input_context",
+                        lambda *a, **kw: pytest.fail("Invalid settings must fail before ASR"))
+    with pytest.raises(ValueError, match="scan_"):
+        main_scan.main_scan(g)
 
 
 def _toy_clade_scan_context():
@@ -450,7 +487,7 @@ def test_select_scan_plot_rows_keeps_one_best_candidate_per_site():
             "support_pp_sum": [1.8, 3.2, 2.7],
             "candidate_event_pp_sum": [1.8, 3.2, 2.7],
             "p_rate_enrichment_empirical_maxT": [0.2, 0.1, 0.3],
-            "p_rate_enrichment": [0.02, 0.01, 0.03],
+            "p_rate_enrichment_asymptotic": [0.02, 0.01, 0.03],
         }
     )
 
@@ -464,7 +501,7 @@ def test_filter_scan_site_plot_candidates_uses_full_scan_maxt_pvalue():
     scan_df = pd.DataFrame(
         {
             "codon_site_alignment": [10, 20, 30],
-            "p_rate_enrichment": [1e-6, 1e-3, 0.2],
+            "p_rate_enrichment_asymptotic": [1e-6, 1e-3, 0.2],
             "p_rate_enrichment_empirical": [0.01, 0.03, 0.04],
             "p_rate_enrichment_empirical_maxT": [0.02, 0.05, 0.2],
         }

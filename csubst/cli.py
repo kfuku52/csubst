@@ -296,6 +296,8 @@ def command_scan(args):
     print('csubst scan start:', datetime.datetime.now(datetime.timezone.utc), flush=True)
     start = time.time()
     g = get_global_parameters_or_exit(args)
+    from csubst import scan_bootstrap
+    g["scan_cli_options"] = scan_bootstrap.capture_options(args, _build_parser(show_advanced=True))
     from csubst.main_scan import main_scan
     main_scan(g)
     print('csubst scan: Time elapsed: {:,} sec'.format(int(time.time() - start)))
@@ -627,21 +629,21 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                              'dif2any, dif2spe, dif2dif, or "all".')
     parser.add_argument('--scan_min_event_pp', metavar='FLOAT', default=0.5, type=float,
                         help='default=%(default)s: Minimum posterior probability for candidate discovery and foreground-unit support calls. '
-                             'With --scan_rate_event_mode posterior_sum, this threshold does not filter the event mass used for rate P values.')
+                             'With --scan_rate_event_mode posterior_sum, this threshold does not filter the event mass used for rate scores.')
     parser.add_argument('--scan_min_support', metavar='FRACTION|INTEGER', default='2', type=str,
                         help='default=%(default)s: Minimum foreground-unit support for a scanned candidate. '
                              'Integer tokens (including "1") are counts; decimal/scientific values <=1 are fractions.')
     parser.add_argument('--scan_rate_exposure', metavar='q_weighted|state_aware|raw_branch_length', default='q_weighted', type=str,
                         choices=['state_aware', 'raw_branch_length', 'q_weighted'],
-                        help='default=%(default)s: Exposure model for scan rate P values. '
+                        help='default=%(default)s: Exposure model for the exploratory scan rate score. '
                              '"state_aware" counts only branch length whose parent state can produce the candidate substitution; '
                              '"q_weighted" integrates candidate codon-transition rates over the parent codon posterior '
                              'or, with --scan_rate_length n_rescaled, uses their conditional probability among outgoing nonsynonymous transitions. '
                              'For --nonsyn_recode 3di20, q_weighted resolves to state_aware because a codon-model Q is not a 3Di Q.')
     parser.add_argument('--scan_rate_event_mode', metavar='called|posterior_sum', default='posterior_sum', type=str,
                         choices=['called', 'posterior_sum'],
-                        help='default=%(default)s: Event mass used for scan rate P values. '
-                             '"called" uses events passing --scan_min_event_pp; '
+                        help='default=%(default)s: Event mass used for the exploratory scan rate score. '
+                             'Both modes sum fractional posterior mass. "called" uses events passing --scan_min_event_pp; '
                              '"posterior_sum" keeps candidate discovery/support thresholded but sums all matching posterior event mass.')
     parser.add_argument('--scan_other_scope', metavar='all|sister', default='all', type=str,
                         choices=['all', 'sister'],
@@ -649,22 +651,22 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                              '"all" uses all non-foreground branches; "sister" uses sister branches for foreground rows.')
     parser.add_argument('--scan_rate_length', metavar='raw|sn_rescaled|n_rescaled', default='n_rescaled', type=str,
                         choices=['raw', 'sn_rescaled', 'n_rescaled'],
-                        help='default=%(default)s: Branch-length scale used for scan rate P values. '
+                        help='default=%(default)s: Branch-length scale used for the exploratory scan rate score. '
                              '"n_rescaled" uses CSUBST nonsynonymous-substitution branch lengths; '
                              '"raw" uses IQ-TREE/tree branch lengths; "sn_rescaled" uses CSUBST S+N branch lengths.')
-    parser.add_argument('--scan_pvalue_calibration', metavar='none|candidate_fixed|full_scan', default='full_scan', type=str,
-                        choices=['none', 'candidate_fixed', 'full_scan'],
-                        help='default=%(default)s: Conditional foreground-assignment calibration for one trait. '
-                             '"candidate_fixed" retests observed candidates (exploratory after discovery); '
-                             '"full_scan" repeats discovery and reports within-scan minP adjustment in the '
-                             'empirical_maxT column. Both assume uniform assignment over eligible, size-binned, '
-                             'non-overlapping clades, including the observed foreground; this is not an unconditional FWER guarantee.')
+    parser.add_argument('--scan_pvalue_calibration', metavar='none|candidate_fixed|full_scan|parametric_bootstrap', default='full_scan', type=str,
+                        choices=['none', 'candidate_fixed', 'full_scan', 'parametric_bootstrap'],
+                        help='default=%(default)s: Empirical calibration for the exploratory scan rate score. '
+                             '"candidate_fixed" permutes foreground clades and retests observed candidates; '
+                             '"full_scan" repeats discovery over uniform eligible size-binned clade assignments for one trait, including the observed foreground, '
+                             'and reports diagnostic maxT-style empirical P values; '
+                             '"parametric_bootstrap" simulates a fitted uniform codon null, refits ASR, and repeats discovery. '
+                             'Asymptotic P and trait-by-match BH values are exploratory diagnostics.')
     parser.add_argument('--scan_n_permutations', metavar='INT', default=1000, type=int,
-                        help='default=%(default)s: Monte Carlo configurations for scan calibration. '
-                             'An enumerable assignment space no larger than this is evaluated exactly instead. '
-                             'Iterations are parallelized over --threads; diagnostics are written to scan_calibration.json.')
+                        help='default=%(default)s: Number of null replicates. Clade spaces no larger than this are evaluated exactly. '
+                             'Clade permutations use --threads; bootstrap datasets run sequentially with each IQ-TREE fit using --threads.')
     parser.add_argument('--scan_permutation_seed', metavar='INT', default=1, type=int,
-                        help='default=%(default)s: Random seed for scan foreground clade permutations.')
+                        help='default=%(default)s: Random seed for scan null replicates.')
     advanced_scan = parser.add_argument_group('advanced scan tuning')
     _add_advanced_argument(advanced_scan, '--scan_permutation_sample_original', show_advanced=show_advanced,
                         metavar='yes|no', default='yes', type=strtobool,
@@ -676,13 +678,13 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
     parser.add_argument('--scan_site_plot', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Generate a tree + detected-site summary plot using the csubst sites plotter. '
                              'When multiple candidates share a site, the best-supported candidate represents that site.')
-    parser.add_argument('--scan_site_plot_filter', metavar='all|analytical|empirical|full_scan',
+    parser.add_argument('--scan_site_plot_filter', metavar='all|analytical|empirical|full_scan|parametric_bootstrap',
                         default='all', type=str,
-                        choices=['all', 'analytical', 'empirical', 'full_scan'],
-                        help='default=%(default)s: Candidate significance filter for --scan_site_plot. '
-                             '"analytical" uses p_rate_enrichment; "empirical" uses the candidate-wise '
-                             'permutation P value (exploratory after discovery); "full_scan" uses the minP adjustment from '
-                             '--scan_pvalue_calibration full_scan.')
+                        choices=['all', 'analytical', 'empirical', 'full_scan', 'parametric_bootstrap'],
+                        help='default=%(default)s: Candidate display filter for --scan_site_plot; analytical/empirical filters are exploratory. '
+                             '"analytical" uses p_rate_enrichment_asymptotic; "empirical" uses the candidate-wise '
+                             'permutation P value; "full_scan" uses the maxT-style empirical P value from '
+                             '--scan_pvalue_calibration full_scan; "parametric_bootstrap" uses the fitted-null maximum-score P value.')
     parser.add_argument('--scan_site_plot_alpha', metavar='FLOAT', default=0.05, type=float,
                         help='default=%(default)s: Inclusive P-value cutoff used by --scan_site_plot_filter.')
     parser.add_argument('--tree_site_plot_format', metavar='pdf|png|svg', default='pdf', required=False, type=str,

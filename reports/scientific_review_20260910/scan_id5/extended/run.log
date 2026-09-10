@@ -1,0 +1,152 @@
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+sparse / filter=False: 15199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+  completed 1000/15199
+  completed 2000/15199
+  completed 3000/15199
+  completed 4000/15199
+  completed 5000/15199
+  completed 6000/15199
+  completed 7000/15199
+  completed 8000/15199
+  completed 9000/15199
+  completed 10000/15199
+  completed 11000/15199
+  completed 12000/15199
+  completed 13000/15199
+  completed 14000/15199
+  completed 15000/15199
+{"scenario": "sparse", "filter_tip_invariant": false, "null": {"datasets": 5000, "rejections": 105, "rate": 0.021, "ci95": [0.017207250536944503, 0.025365369976971624], "empty_families": 4894, "diagnostic_p_any_rejections": 46, "diagnostic_trait_match_bh_any_rejections": 46}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 6, "rate": 0.03, "ci95": [0.011087455672254776, 0.064150626705027], "empty_families": 63, "diagnostic_p_any_rejections": 5, "diagnostic_trait_match_bh_any_rejections": 5}, "null_fpr_criterion_met": true}
+sparse / filter=True: 15199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+  completed 1000/15199
+  completed 2000/15199
+  completed 3000/15199
+  completed 4000/15199
+  completed 5000/15199
+  completed 6000/15199
+  completed 7000/15199
+  completed 8000/15199
+  completed 9000/15199
+  completed 10000/15199
+  completed 11000/15199
+  completed 12000/15199
+  completed 13000/15199
+  completed 14000/15199
+  completed 15000/15199
+{"scenario": "sparse", "filter_tip_invariant": true, "null": {"datasets": 5000, "rejections": 95, "rate": 0.019, "ci95": [0.015398641720779621, 0.023177272868713336], "empty_families": 4904, "diagnostic_p_any_rejections": 33, "diagnostic_trait_match_bh_any_rejections": 33}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 4, "rate": 0.02, "ci95": [0.00547556587955645, 0.05041360908989629], "empty_families": 77, "diagnostic_p_any_rejections": 2, "diagnostic_trait_match_bh_any_rejections": 2}, "null_fpr_criterion_met": true}
+unequal / filter=False: 15199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+  completed 1000/15199
+  completed 2000/15199
+  completed 3000/15199
+  completed 4000/15199
+  completed 5000/15199
+  completed 6000/15199
+  completed 7000/15199
+  completed 8000/15199
+  completed 9000/15199
+  completed 10000/15199
+  completed 11000/15199
+  completed 12000/15199
+  completed 13000/15199
+  completed 14000/15199
+  completed 15000/15199
+{"scenario": "unequal", "filter_tip_invariant": false, "null": {"datasets": 5000, "rejections": 275, "rate": 0.055, "ci95": [0.04884216852126752, 0.0616835875409322], "empty_families": 4458, "diagnostic_p_any_rejections": 207, "diagnostic_trait_match_bh_any_rejections": 204}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 10, "rate": 0.05, "ci95": [0.024234165472108552, 0.09002753770135137], "empty_families": 154, "diagnostic_p_any_rejections": 8, "diagnostic_trait_match_bh_any_rejections": 8}, "null_fpr_criterion_met": false}
+unequal / filter=True: 15199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+  completed 1000/15199
+  completed 2000/15199
+  completed 3000/15199
+  completed 4000/15199
+  completed 5000/15199
+  completed 6000/15199
+  completed 7000/15199
+  completed 8000/15199
+  completed 9000/15199
+  completed 10000/15199
+  completed 11000/15199
+  completed 12000/15199
+  completed 13000/15199
+  completed 14000/15199
+  completed 15000/15199
+{"scenario": "unequal", "filter_tip_invariant": true, "null": {"datasets": 5000, "rejections": 280, "rate": 0.056, "ci95": [0.049787772715522455, 0.06273671247401372], "empty_families": 4485, "diagnostic_p_any_rejections": 194, "diagnostic_trait_match_bh_any_rejections": 193}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 12, "rate": 0.06, "ci95": [0.031383953893483446, 0.1024618313083245], "empty_families": 152, "diagnostic_p_any_rejections": 7, "diagnostic_trait_match_bh_any_rejections": 7}, "null_fpr_criterion_met": false}
+uncertain / filter=False: 15199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+  completed 1000/15199
+  completed 2000/15199
+  completed 3000/15199
+  completed 4000/15199
+  completed 5000/15199
+  completed 6000/15199
+  completed 7000/15199
+  completed 8000/15199
+  completed 9000/15199
+  completed 10000/15199
+  completed 11000/15199
+  completed 12000/15199
+  completed 13000/15199
+  completed 14000/15199
+  completed 15000/15199
+{"scenario": "uncertain", "filter_tip_invariant": false, "null": {"datasets": 5000, "rejections": 243, "rate": 0.0486, "ci95": [0.04280484988701789, 0.05492911536102369], "empty_families": 2429, "diagnostic_p_any_rejections": 490, "diagnostic_trait_match_bh_any_rejections": 459}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 8, "rate": 0.04, "ci95": [0.017424808994480605, 0.07729196822601608], "empty_families": 38, "diagnostic_p_any_rejections": 16, "diagnostic_trait_match_bh_any_rejections": 14}, "null_fpr_criterion_met": true}
+uncertain / filter=True: 15199 datasets
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+  completed 1000/15199
+  completed 2000/15199
+  completed 3000/15199
+  completed 4000/15199
+  completed 5000/15199
+  completed 6000/15199
+  completed 7000/15199
+  completed 8000/15199
+  completed 9000/15199
+  completed 10000/15199
+  completed 11000/15199
+  completed 12000/15199
+  completed 13000/15199
+  completed 14000/15199
+  completed 15000/15199
+{"scenario": "uncertain", "filter_tip_invariant": true, "null": {"datasets": 5000, "rejections": 240, "rate": 0.048, "ci95": [0.042240239091834185, 0.054294503376987414], "empty_families": 2459, "diagnostic_p_any_rejections": 536, "diagnostic_trait_match_bh_any_rejections": 500}, "partial_alternative_false_detections": {"datasets": 200, "rejections": 7, "rate": 0.035, "ci95": [0.014185525898419248, 0.0707809983509772], "empty_families": 60, "diagnostic_p_any_rejections": 15, "diagnostic_trait_match_bh_any_rejections": 13}, "null_fpr_criterion_met": true}

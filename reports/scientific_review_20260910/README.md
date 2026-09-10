@@ -7,6 +7,8 @@
 未対応モデルと translate の model-based 期待値は計算前に拒否する。
 [対応内容](RESOLUTION_3DI.md)。追加監査で根の節対応・ゼロ枝長・3Di サイトマスクも修正済み。
 ID 2・4 は[擬似カウント・P 値・共同 Poisson カテゴリ帰無の修正](RESOLUTION_PSEUDOCOUNT_PVALUES.md)を実施した。
+ID 5 は[scan の診断値分離・trait×match BH・fitted bootstrap](RESOLUTION_SCAN.md)を実装した。
+独立検証の未達条件と統計的保証の制約は同報告に記録している。
 ID 3 は[評価応答の再利用の除去とクレード単位の交差検証](RESOLUTION_EPISTASIS.md)を実施した。
 残基ペアの既知パラメータでの検証は[別レポート](../pair_epistasis_oracle_20260910/README.md)に記録した。
 外部データの導入と実データでの生物学的補正の確立は今回の対象外とする。

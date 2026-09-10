@@ -4,8 +4,9 @@
 values compare foreground assignments on **fixed data**. They do not by
 themselves establish a biological null of no adaptive convergence, or control
 error across genes, repeated runs, or choices of settings made after inspecting
-the results. Analytical rate P values are used as ranking scores; their own
-small-sample approximation is separate from this calibration.
+the results. `score_rate_enrichment` is the ranking score (larger means greater enrichment).
+Its asymptotic tail is a separate exploratory diagnostic; see
+[scan scores and bootstrap inference](SCAN_INFERENCE.md).
 
 ## What is held fixed
 
@@ -31,10 +32,12 @@ Rate normalization does not establish label exchangeability. The diagnostics
 provide clade sizes, depths, lengths, state availability and entropy for
 checking these differences; they do not certify exchangeability.
 
-Calibration currently accepts **one trait per scan**. Independent randomization
+Clade assignment calibration currently accepts **one trait per scan**. Independent randomization
 of several traits would not preserve their observed dependence. A calibrated
 multi-trait analysis needs a specified joint assignment model. Multi-trait
 candidate listing remains available with `--scan_pvalue_calibration none`.
+The fitted sequence `parametric_bootstrap` also supports multiple fixed traits;
+it simulates a joint alignment rather than randomizing trait labels.
 Separate single-trait runs do not correct across traits.
 
 ## Sampling and tail probabilities
@@ -44,7 +47,7 @@ proposal space has at most 10,000 configurations, it enumerates all valid
 allocations. If the valid space size `M` is no greater than
 `--scan_n_permutations`, all `M` configurations are evaluated, including the
 observation. The exact upper-enrichment tail is the fraction whose ranking
-score is no greater than the observed score; there is **no extra +1** in this
+score is at least the observed score; there is **no extra +1** in this
 complete enumeration.
 
 Otherwise, the requested `B` Monte Carlo configurations are drawn with
@@ -68,30 +71,34 @@ is not repaired simply by adding 1 or by using this uniform sampler.
 | Mode / column | Interpretation |
 | --- | --- |
 | `candidate_fixed`, `p_rate_enrichment_empirical` | Re-evaluates the observed candidate under each assignment. Useful for a candidate specified independently of these data, or as an exploratory comparison after discovery. It does not repeat selection or correct the selected family. |
-| `full_scan`, `p_rate_enrichment_empirical` | Candidate-key tail with rediscovery: an absent key contributes 1. This is not the scan-wide adjustment. |
-| `full_scan`, `p_rate_enrichment_empirical_maxT` | Compares each observed score with the minimum score over **all candidates rediscovered** in each assignment. Despite its retained column name, the calculation is minP-style. |
+| `full_scan`, `p_rate_enrichment_empirical` | Candidate-key tail with rediscovery: an absent or explicitly untestable key contributes score −∞. This is not the scan-wide adjustment. |
+| `full_scan`, `p_rate_enrichment_empirical_maxT` | Compares each observed score with the maximum score over **all testable candidates rediscovered** in each assignment. |
 
 The full-scan family contains sites and match classes searched for this trait
 with the specified settings. A valid assignment null supports a conditional
 complete-null/global test. Strong FWER control with true and false nulls mixed
 requires additional assumptions or validation; it is not claimed here.
 
-BH columns computed from analytical or candidate-wise empirical P values are
+BH is applied only within each trait × match output family.
+BH columns computed from asymptotic or candidate-wise empirical P values are
 exploratory after foreground-based selection. Applying BH does not fix selection
 bias, establish FDR control, or extend the family across genes and runs.
 
 ## Empty scans and failures
 
-A successful full-scan trial with no candidates contributes a minimum score of
-1. A candidate with an undefined score (for example, zero foreground/control
-exposure) is **not** equivalent to no candidates. If any evaluated trial fails
-or has an undefined statistic, empirical P and q values for the run remain
-unavailable. The denominator is never reduced to successful trials. An
-undefined observed statistic also makes calibration unavailable.
+A successful full-scan trial with no testable candidates contributes maximum
+score −∞. Finite nonnegative event mass with zero target/control exposure is an
+explicit no-test outcome: the row is marked `scan_rate_testable=false`, its P
+values stay undefined, and the trial remains in the denominator. This does not
+repair the instantaneous-Q versus endpoint-change mismatch.
+
+Other undefined or invalid statistics, or failed trials, make empirical P/q
+unavailable for the run. The denominator is never reduced to successful trials.
+An invalid observed statistic also makes assignment calibration unavailable.
 
 `--scan_permutation_sample_original` now defaults to `yes`, and
 `--scan_permutation_retry_sample_original` defaults to `no`. When calibration is
-enabled, the former `no` / `yes` combination is rejected with a migration
+enabled for `candidate_fixed` or `full_scan`, the former `no` / `yes` combination is rejected with a migration
 message. There is no fallback to a different assignment space.
 
 ## Outputs
@@ -106,7 +113,7 @@ disabled. Schema version 1 records:
   space sizes (unknown valid sizes are `null`, not an overlap-ignorant count);
 - the observed configuration and its stable ID;
 - per-trial configuration, ID, seed (Monte Carlo), proposal count, candidate
-  count, finite-statistic count, minimum score, status and failure reason;
+  count, testable-candidate count, maximum score (`null` for −∞), status and failure reason;
 - aggregate successes, failures, distinct configurations, observation inclusion
   count, sampling mode and P-value resolution.
 
@@ -114,7 +121,9 @@ Configuration groups contain numerical stem branch IDs. The clade catalog maps
 these to leaf names, parent IDs and diagnostics. Rejected complete proposals
 are counted but are not retained as successful trials. If no candidates were
 observed, the status is `no_observed_candidates`, no trials are needed, and the
-global non-rejection value is 1. Disabled calibration has status `disabled`.
+global non-rejection value is 1. The assignment diagnostics have status `disabled` for `none` or
+`parametric_bootstrap`; bootstrap status is recorded separately in
+`csubst_scan_inference.json` and its bootstrap manifest.
 `conditional_assignment` means computation succeeded under the documented
 assignment null, **not** that biological calibration has been demonstrated.
 

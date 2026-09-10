@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "calibration": "parametric_bootstrap",
+  "null": "none",
+  "assumption": null,
+  "scope": "uncalibrated",
+  "status": "disabled",
+  "sampling": "not_run",
+  "requested_count": 3,
+  "seed": 5105,
+  "original_foreground_included": null,
+  "trials": [],
+  "settings": {
+    "scan_match": [
+      "any2spe",
+      "spe2spe"
+    ],
+    "scan_min_support": "2",
+    "scan_min_event_pp": 0.5,
+    "scan_rate_length": "n_rescaled",
+    "scan_rate_event_mode": "called",
+    "scan_other_scope": "all",
+    "scan_unit_mode": "clade",
+    "fg_stem_only": false,
+    "scan_sister_stem_only": false,
+    "min_clade_bin_count": 10
+  },
+  "resolved_rate_exposure": "q_weighted",
+  "state_tensor_shape": [
+    15,
+    97,
+    6
+  ],
+  "success_count": 0,
+  "failure_count": 0,
+  "sampling_attempts": 0,
+  "unique_configuration_count": 0,
+  "original_configuration_count": 0
+}

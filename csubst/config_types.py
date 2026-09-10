@@ -127,6 +127,16 @@ class InternalControls(TypedDict, total=False):
     _scan_permutation_exact: bool
 
 
+class ScanConfig(TypedDict, total=False):
+    scan_pvalue_calibration: str
+    scan_n_permutations: int
+    scan_permutation_seed: int
+    scan_site_plot_filter: str
+    scan_cli_options: dict[str, Any]
+    scan_bootstrap_summary: dict[str, Any]
+    scan_no_test_reason: str
+
+
 class AnalysisConfig(
     InputConfig,
     OutputConfig,
@@ -135,6 +145,7 @@ class AnalysisConfig(
     AnalysisState,
     OutputSwitches,
     InternalControls,
+    ScanConfig,
     total=False,
 ):
     """Compatibility view of the combined pipeline mapping."""

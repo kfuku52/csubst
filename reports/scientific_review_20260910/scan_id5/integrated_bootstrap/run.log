@@ -1,0 +1,148 @@
+CSUBST start: 2026-09-10 04:19:21.532470+00:00
+csubst scan start: 2026-09-10 04:19:21.533522+00:00
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+OS: macOS-26.6.2-x86_64-i386-64bit
+Python version: 3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]
+CSUBST version: 1.15.0
+CSUBST dependency versions: ete4=4.4.0, requests=2.32.5, numpy=1.26.4, scipy=1.15.2, pandas=2.2.3, cython=3.0.11, matplotlib=3.9.3
+CSUBST missing dependency packages: none
+CSUBST command: ${WORKTREE}/csubst/__main__.py scan --alignment_file reports/scientific_review_20260910/scan_id5/inputs/missing.fa --rooted_tree_file reports/scientific_review_20260910/scan_id5/inputs/tree.nwk --foreground ${MULTITRAIT_FOREGROUND} --fg_format 2 --iqtree_model GY+FQ --iqtree_outdir ${IQTREE_RUN} --outdir ${BOOTSTRAP_RUN} --scan_match any2spe,spe2spe --scan_pvalue_calibration parametric_bootstrap --scan_n_permutations 3 --scan_permutation_seed 5105 --scan_rate_event_mode called --nonsyn_recode kgbauto6 --drop_invariant_tip_sites tip_invariant --scan_site_plot no --threads 1
+CSUBST working directory: ${WORKTREE}
+CSUBST bug report: https://github.com/kfuku52/csubst/issues
+Scan bootstrap requires a checkpoint and full-precision frequencies; refitting IQ-TREE.
+Scan foreground unit mode: clade
+Reading and parsing input files.
+Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.
+Intermediate file is missing: ${IQTREE_RUN}/missing.fa.26467f456ca1678d.iqtree
+Intermediate file is missing: ${IQTREE_RUN}/missing.fa.26467f456ca1678d.log
+Intermediate file is missing: ${IQTREE_RUN}/missing.fa.26467f456ca1678d.rate
+Intermediate file is missing: ${IQTREE_RUN}/missing.fa.26467f456ca1678d.state
+Intermediate file is missing: ${IQTREE_RUN}/missing.fa.26467f456ca1678d.treefile
+Starting IQ-TREE to estimate parameters and ancestral states.
+IQ-TREE's version: 2.3.6, PATH: iqtree
+IQ-TREE multicore version 2.3.6 for MacOS Intel 64-bit built Aug  4 2024
+Developed by Bui Quang Minh, Nguyen Lam Tung, Olga Chernomor, Heiko Schmidt,
+Dominik Schrempf, Michael Woodhams, Ly Trong Nhan, Thomas Wong
+
+Host:    fukushimakenjis-Mac-Studio.local (SSE4.2, 64 GB RAM)
+Command: iqtree -s reports/scientific_review_20260910/scan_id5/inputs/missing.fa -te /var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/.csubst_tmp_zipu9rce/tmp.csubst.nwk -m GY+FQ --seqtype CODON1 --threads-max 1 -T AUTO --ancestral --rate --redo --prefix ${IQTREE_RUN}/missing.fa.26467f456ca1678d -seed 1 -v
+Seed:    1 (Using SPRNG - Scalable Parallel Random Number Generator)
+
+64 bit Linear Congruential Generator with Prime Addend
+
+        seed = 1, stream_number = 0     parameter = 0
+
+Time:    Thu Sep 10 13:19:22 2026
+Kernel:  SSE2 - auto-detect threads (12 CPU cores detected)
+
+Reading alignment file reports/scientific_review_20260910/scan_id5/inputs/missing.fa ... Fasta format detected
+Reading fasta file: done in 7.9155e-05 secs using 74.54% CPU
+Name shortening took 0.000032 seconds.
+Duplicate sequence name check took 0.000004 seconds.
+Sequence Type detection took 0.000050 seconds.
+Alignment most likely contains DNA/RNA sequences
+Converting to codon sequences with genetic code 1 ...
+Time to read input file was 0.000753 sec.
+Time to count constant sites was 0.000002 sec.
+Alignment has 8 sequences with 100 columns, 100 distinct patterns
+48 parsimony-informative, 49 singleton sites, 3 constant sites
+Alignment state count time was 0.000007 seconds.
+Empirical state frequencies: 0.0013157895 0.0039473684 0.0171052632 0.0302631579 0.0171052632 0.0131578947 0.0118421053 0.0092105263 0.0052631579 0.0026315789 0.0315789474 0.0171052632 0.0144736842 0.0078947368 0.0210526316 0.0039473684 0.0184210526 0.0092105263 0.0118421053 0.0078947368 0.0131578947 0.0118421053 0.0210526316 0.0223684211 0.0105263158 0.0184210526 0.0105263158 0.0171052632 0.0131578947 0.0223684211 0.0223684211 0.0434210526 0.0052631579 0.0144736842 0.0092105263 0.0144736842 0.0131578947 0.0171052632 0.0131578947 0.0315789474 0.0236842105 0.0118421053 0.0131578947 0.0052631579 0.0144736842 0.0368421053 0.0078947368 0.0210526316 0.0289473684 0.0355263158 0.0263157895 0.0250000000 0.0157894737 0.0118421053 0.0131578947 0.0184210526 0.0223684211 0.0092105263 0.0184210526 0.0263157895 0.0144736842
+   Gap/Ambiguity  Composition  p-value
+Analyzing sequences: done in 8.10623e-06 secs using 61.68% CPU
+   1  a    5.00%    passed     94.31%
+   2  b    5.00%    passed     89.06%
+   3  c    5.00%    passed     99.34%
+   4  d    5.00%    passed     99.91%
+   5  e    5.00%    passed     92.51%
+   6  f    5.00%    passed     99.77%
+   7  g    5.00%    passed     83.70%
+   8  h    5.00%    passed     92.34%
+****  TOTAL    5.00%  0 sequences failed composition chi2 test (p-value<5%; df=60)
+Alignment state count time was 0.000 seconds.
+Empirical state frequencies: 0.0013157895 0.0039473684 0.0171052632 0.0302631579 0.0171052632 0.0131578947 0.0118421053 0.0092105263 0.0052631579 0.0026315789 0.0315789474 0.0171052632 0.0144736842 0.0078947368 0.0210526316 0.0039473684 0.0184210526 0.0092105263 0.0118421053 0.0078947368 0.0131578947 0.0118421053 0.0210526316 0.0223684211 0.0105263158 0.0184210526 0.0105263158 0.0171052632 0.0131578947 0.0223684211 0.0223684211 0.0434210526 0.0052631579 0.0144736842 0.0092105263 0.0144736842 0.0131578947 0.0171052632 0.0131578947 0.0315789474 0.0236842105 0.0118421053 0.0131578947 0.0052631579 0.0144736842 0.0368421053 0.0078947368 0.0210526316 0.0289473684 0.0355263158 0.0263157895 0.0250000000 0.0157894737 0.0118421053 0.0131578947 0.0184210526 0.0223684211 0.0092105263 0.0184210526 0.0263157895 0.0144736842
+Reading input tree file /var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/.csubst_tmp_zipu9rce/tmp.csubst.nwk ...Tree contains 8 taxa and 14 branches (rooted)
+ rooted tree
+Converting rooted to unrooted tree...
+
+ML-TREE SEARCH START WITH THE FOLLOWING PARAMETERS:
+Model of evolution: GY+FQ with equal frequencies (15 free parameters)
+Fixed branch lengths: No
+Phylogenetic likelihood library: No
+Branch length optimization method: Newton
+Number of Newton-Raphson steps in NNI evaluation and branch length optimization: 10 / 10
+SSE instructions: Yes
+
+NOTE: 0 MB RAM (0 GB) is required!
+Measuring multi-threading efficiency up to 1 CPU cores
+Increase to 10 rounds for branch lengths
+51 trees examined
+Threads: 1 / Time: 1.0212879181 sec / Speedup: 1.0000000000 / Efficiency: 100% / LogL: -1909
+BEST NUMBER OF THREADS: 1
+
+Estimate model parameters (epsilon = 0.0100000000)
+1. Initial log-likelihood: -1774.8060189762 (took 0.0016369820 wall-clock sec)
+Nonsynonymous/synonymous ratio (omega): 0.8542574942
+Transition/transversion ratio (kappa): 1.2840728147
+2. Current log-likelihood: -1758.8054392096 (after 0.0459880829 wall-clock sec)
+Nonsynonymous/synonymous ratio (omega): 0.8536615693
+Transition/transversion ratio (kappa): 1.2845207053
+Optimal log-likelihood: -1758.7994768796
+Parameters optimization took 2 rounds (0.0658340454 sec)
+Best tree printed to ${IQTREE_RUN}/missing.fa.26467f456ca1678d.treefile
+Wrote distance file to...
+BEST SCORE FOUND : -1758.7994768796
+Ancestral state probabilities printed to ${IQTREE_RUN}/missing.fa.26467f456ca1678d.state
+Site rates printed to ${IQTREE_RUN}/missing.fa.26467f456ca1678d.rate
+Total tree length: 3.7613131031
+
+Total number of iterations: 0
+CPU time used for tree search: 0.0000070000 sec (0h:0m:0s)
+Wall-clock time used for tree search: 0.0000090599 sec (0h:0m:0s)
+Total CPU time used: 1.0964690000 sec (0h:0m:1s)
+Total wall-clock time used: 1.1127481461 sec (0h:0m:1s)
+Best tree printed to ${IQTREE_RUN}/missing.fa.26467f456ca1678d.treefile
+
+Analysis results written to:
+  IQ-TREE report:                ${IQTREE_RUN}/missing.fa.26467f456ca1678d.iqtree
+  Maximum-likelihood tree:       ${IQTREE_RUN}/missing.fa.26467f456ca1678d.treefile
+  Ancestral state:               ${IQTREE_RUN}/missing.fa.26467f456ca1678d.state
+  Screen log file:               ${IQTREE_RUN}/missing.fa.26467f456ca1678d.log
+
+Date and Time: Thu Sep 10 13:19:23 2026
+Total branch length of --rooted_tree_file: 3.6000
+Total branch length of --iqtree_treefile: 3.7613
+
+Reading the state file: ${IQTREE_RUN}/missing.fa.26467f456ca1678d.state
+
+Instantaneous substitution rate matrix will be generated using the base model: GY+FQ
+Transition matrix will be generated using the model in the ancestral state reconstruction: GY+FQ
+Applying nonsynonymous recoding scheme: kgbauto6
+Trait names in --foreground file: trait1, trait2
+Dropped 3 codon site(s) by tip-invariant criterion; retained 97 / 100 sites.
+Generating nonsynonymous substitution tensor for scan.
+Generated packed sparse substitution tensor (Cython two-pass): shape=(15, 97, 1, 6, 6), density=0.156663 (8,206/52,380), storage=98,536 bytes, compression=4.3x
+Generating synonymous substitution tensor for branch-length context.
+Generated packed sparse substitution tensor (Cython two-pass): shape=(15, 97, 20, 6, 6), density=0.007237 (7,581/1,047,600), storage=91,036 bytes, compression=92.1x
+Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, rather than nucleotide-substitutions/codon-site.
+Total branch length before rescaling: 3.761 nucleotide substitutions / codon site
+Total S+N branch length after rescaling: 2.109 codon substitutions / codon site
+Total S branch length after rescaling: 0.806 codon substitutions / codon site
+Total N branch length after rescaling: 1.303 codon substitutions / codon site
+Scanning recurrent foreground substitution patterns.
+Scan parametric bootstrap: replicate 1/3 (seed=1411650642).
+Scan parametric bootstrap: replicate 2/3 (seed=1341318232).
+Scan parametric bootstrap: replicate 3/3 (seed=513533892).
+Scan asymptotic P and trait-by-match BH values are exploratory diagnostics; they do not correct candidate discovery selection.
+Writing ${BOOTSTRAP_RUN}/csubst_scan.tsv
+Writing ${BOOTSTRAP_RUN}/csubst_scan_units.tsv
+Writing ${BOOTSTRAP_RUN}/csubst_scan_calibration.json
+Skipping scan site visualization (--scan_site_plot no).
+Scan candidates: 18 rows, 4 foreground units.
+Elapsed time: 13.0 sec
+
+csubst scan: Time elapsed: 14 sec
+csubst scan end: 2026-09-10 04:19:36.407134+00:00
+
+CSUBST end: 2026-09-10 04:19:36.407847+00:00, Elapsed time = 14.0 sec

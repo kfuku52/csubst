@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "csubst_version": "1.15.0",
+  "status": "model_conditional_parametric_bootstrap",
+  "null": "fitted_uniform_codon_ctmc",
+  "requested": 3,
+  "seed": 5105,
+  "success_count": 3,
+  "failure_count": 0,
+  "fixed": [
+    "topology",
+    "root_position",
+    "foreground",
+    "alignment_length",
+    "missing_codon_mask"
+  ],
+  "refitted": [
+    "codon_model_parameters",
+    "branch_lengths",
+    "ASR",
+    "automatic_recoding_if_requested"
+  ],
+  "repeated": [
+    "site_filtering",
+    "exposure",
+    "candidate_discovery",
+    "support_filter",
+    "maximum_score"
+  ],
+  "score_method": "negative_log10_one_sided_poisson_asymptotic_tail",
+  "maximum_scope": "all_testable_selected_candidates_all_traits_matches_in_this_run",
+  "fitted_model_validation": {
+    "omega": 0.8536615693,
+    "kappa": 1.284520705,
+    "checkpoint": "${IQTREE_RUN}/missing.fa.26467f456ca1678d.ckp.gz",
+    "frequency_source": "verbose_log_or_FQ",
+    "reported_loglik": -1758.799477,
+    "reproduced_loglik": -1758.799476879643
+  },
+  "inference": "model_conditional_parametric_bootstrap_not_exact",
+  "replicates": [
+    {
+      "index": 0,
+      "seed": 1411650642,
+      "status": "success",
+      "empty": true,
+      "maximum_score": null
+    },
+    {
+      "index": 1,
+      "seed": 1341318232,
+      "status": "success",
+      "empty": false,
+      "maximum_score": 1.0191410031310495
+    },
+    {
+      "index": 2,
+      "seed": 513533892,
+      "status": "success",
+      "empty": true,
+      "maximum_score": null
+    }
+  ],
+  "minimum_p": 0.25
+}

@@ -1,0 +1,775 @@
+{
+  "schema_version": 1,
+  "csubst_version": "1.15.0",
+  "score_method": "negative_log10_one_sided_poisson_asymptotic_tail",
+  "event_measure": "posterior_mass_in_both_event_modes",
+  "asymptotic_and_bh_interpretation": "exploratory_diagnostics_not_selection_adjusted_FDR",
+  "bh_scope": "selected_candidates_within_trait_match",
+  "calibration": "parametric_bootstrap",
+  "requested_replicates": 99,
+  "seed": 1,
+  "candidate_count": 10,
+  "bh_families": [
+    {
+      "scan_bh_family_id": "[\"PLACEHOLDER\", \"any2spe\"]",
+      "scan_bh_family_size": 7,
+      "scan_bh_valid_asymptotic_count": 7,
+      "scan_bh_valid_empirical_count": 0
+    },
+    {
+      "scan_bh_family_id": "[\"PLACEHOLDER\", \"spe2spe\"]",
+      "scan_bh_family_size": 3,
+      "scan_bh_valid_asymptotic_count": 2,
+      "scan_bh_valid_empirical_count": 0
+    }
+  ],
+  "status": [
+    "model_conditional_parametric_bootstrap"
+  ],
+  "maximum_scope": "all_testable_selected_candidates_all_traits_matches_in_this_run",
+  "no_test_reason": null,
+  "clade_resampling_note": "Requires exchangeability; not a universal FWER guarantee. Candidate-fixed inference does not adjust discovery selection.",
+  "clade_replicates": {
+    "success_count": 0,
+    "failure_count": 0,
+    "failure_reasons": ""
+  },
+  "bootstrap": {
+    "schema_version": 1,
+    "csubst_version": "1.15.0",
+    "status": "model_conditional_parametric_bootstrap",
+    "null": "fitted_uniform_codon_ctmc",
+    "requested": 99,
+    "seed": 1,
+    "success_count": 99,
+    "failure_count": 0,
+    "fixed": [
+      "topology",
+      "root_position",
+      "foreground",
+      "alignment_length",
+      "missing_codon_mask"
+    ],
+    "refitted": [
+      "codon_model_parameters",
+      "branch_lengths",
+      "ASR",
+      "automatic_recoding_if_requested"
+    ],
+    "repeated": [
+      "site_filtering",
+      "exposure",
+      "candidate_discovery",
+      "support_filter",
+      "maximum_score"
+    ],
+    "score_method": "negative_log10_one_sided_poisson_asymptotic_tail",
+    "maximum_scope": "all_testable_selected_candidates_all_traits_matches_in_this_run",
+    "fitted_model_validation": {
+      "omega": 0.8983089442,
+      "kappa": 1.212273838,
+      "checkpoint": "${RUN_ROOT}/verbose_iqtree/input.fa.60ed40e593f21e32.ckp.gz",
+      "frequency_source": "verbose_log_or_FQ",
+      "reported_loglik": -1817.900419,
+      "reproduced_loglik": -1817.900419434838
+    },
+    "inference": "model_conditional_parametric_bootstrap_not_exact",
+    "replicates": [
+      {
+        "index": 0,
+        "seed": 2080620106,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9990406969007768
+      },
+      {
+        "index": 1,
+        "seed": 1666826666,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 2,
+        "seed": 1821025799,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.4496046993142473
+      },
+      {
+        "index": 3,
+        "seed": 1162386294,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 4,
+        "seed": 210620470,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 5,
+        "seed": 1371566530,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.874828054665569
+      },
+      {
+        "index": 6,
+        "seed": 816877992,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 7,
+        "seed": 1112017963,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 8,
+        "seed": 1656767470,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 9,
+        "seed": 1255954950,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 10,
+        "seed": 1657052578,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 2.0077855837743086
+      },
+      {
+        "index": 11,
+        "seed": 1998884659,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 12,
+        "seed": 2082082741,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 13,
+        "seed": 2115256094,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.4759664287376828
+      },
+      {
+        "index": 14,
+        "seed": 2093457911,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.905696426454202
+      },
+      {
+        "index": 15,
+        "seed": 635255413,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 16,
+        "seed": 505909276,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.7985770638678067
+      },
+      {
+        "index": 17,
+        "seed": 1639964526,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 18,
+        "seed": 710837799,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.86198787206
+      },
+      {
+        "index": 19,
+        "seed": 1720593264,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.5936474100924507
+      },
+      {
+        "index": 20,
+        "seed": 1498937441,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.1084150314429548
+      },
+      {
+        "index": 21,
+        "seed": 756039320,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 22,
+        "seed": 270804030,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.5875832091957287
+      },
+      {
+        "index": 23,
+        "seed": 205856491,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.988535855880412
+      },
+      {
+        "index": 24,
+        "seed": 530627592,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 25,
+        "seed": 175964883,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9317277609059664
+      },
+      {
+        "index": 26,
+        "seed": 1905247593,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 27,
+        "seed": 1371076819,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.7953044437190304
+      },
+      {
+        "index": 28,
+        "seed": 2009584592,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 29,
+        "seed": 331306997,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 30,
+        "seed": 1828164045,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 31,
+        "seed": 2057642472,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 32,
+        "seed": 1162065216,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 33,
+        "seed": 1643425812,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8681777796768009
+      },
+      {
+        "index": 34,
+        "seed": 2002711527,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 35,
+        "seed": 1542747058,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 36,
+        "seed": 2112022091,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 2.0338197340943
+      },
+      {
+        "index": 37,
+        "seed": 1727905662,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.6560805240705458
+      },
+      {
+        "index": 38,
+        "seed": 402784625,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8268950402645607
+      },
+      {
+        "index": 39,
+        "seed": 611761024,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 0.7849253627917153
+      },
+      {
+        "index": 40,
+        "seed": 275382235,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 41,
+        "seed": 1642686475,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.1343574580344062
+      },
+      {
+        "index": 42,
+        "seed": 957735169,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 43,
+        "seed": 710265036,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9832726999136416
+      },
+      {
+        "index": 44,
+        "seed": 992612513,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.804816903170206
+      },
+      {
+        "index": 45,
+        "seed": 1477617748,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 46,
+        "seed": 1551377076,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 47,
+        "seed": 729728308,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9949348796590547
+      },
+      {
+        "index": 48,
+        "seed": 141870740,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.5571028133490543
+      },
+      {
+        "index": 49,
+        "seed": 578838929,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.3832714750736195
+      },
+      {
+        "index": 50,
+        "seed": 1341737695,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 0.9344442379489684
+      },
+      {
+        "index": 51,
+        "seed": 185712160,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 52,
+        "seed": 14469704,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8051648224805668
+      },
+      {
+        "index": 53,
+        "seed": 852312038,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.0969266771660813
+      },
+      {
+        "index": 54,
+        "seed": 1754517240,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 0.9735464486842765
+      },
+      {
+        "index": 55,
+        "seed": 1221560181,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 56,
+        "seed": 20570132,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8339944129167332
+      },
+      {
+        "index": 57,
+        "seed": 395075700,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8279703936455096
+      },
+      {
+        "index": 58,
+        "seed": 57926685,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 59,
+        "seed": 1968656929,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 60,
+        "seed": 782209309,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9948473719544024
+      },
+      {
+        "index": 61,
+        "seed": 869786278,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.900970520955089
+      },
+      {
+        "index": 62,
+        "seed": 1070260966,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.0902778296574795
+      },
+      {
+        "index": 63,
+        "seed": 2108463349,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 64,
+        "seed": 17211924,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 65,
+        "seed": 2030152112,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 0.7093104407037849
+      },
+      {
+        "index": 66,
+        "seed": 872264465,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.944729842056256
+      },
+      {
+        "index": 67,
+        "seed": 191578058,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 68,
+        "seed": 680123724,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 69,
+        "seed": 1873930699,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 70,
+        "seed": 768220146,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.3736411928864847
+      },
+      {
+        "index": 71,
+        "seed": 1969780465,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8078821536676073
+      },
+      {
+        "index": 72,
+        "seed": 1104274466,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 73,
+        "seed": 1773100608,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.656268498024248
+      },
+      {
+        "index": 74,
+        "seed": 1372643355,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8068463102317969
+      },
+      {
+        "index": 75,
+        "seed": 2040445414,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 76,
+        "seed": 654903694,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8178053244129748
+      },
+      {
+        "index": 77,
+        "seed": 1484114,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 78,
+        "seed": 1126592946,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 2.021756590499749
+      },
+      {
+        "index": 79,
+        "seed": 1887521532,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.6425827981465673
+      },
+      {
+        "index": 80,
+        "seed": 527812214,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.6578008909045623
+      },
+      {
+        "index": 81,
+        "seed": 1311015067,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 82,
+        "seed": 54360370,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9241001883549225
+      },
+      {
+        "index": 83,
+        "seed": 1670347953,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 84,
+        "seed": 2004589279,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.7242066115982153
+      },
+      {
+        "index": 85,
+        "seed": 158719518,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8122355924025375
+      },
+      {
+        "index": 86,
+        "seed": 1133831892,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9356503587227616
+      },
+      {
+        "index": 87,
+        "seed": 1045740874,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.1437657250883535
+      },
+      {
+        "index": 88,
+        "seed": 1161418149,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 89,
+        "seed": 72273155,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.5799908406986882
+      },
+      {
+        "index": 90,
+        "seed": 1746194137,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9880143093271985
+      },
+      {
+        "index": 91,
+        "seed": 1847514972,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 0.7256184650606574
+      },
+      {
+        "index": 92,
+        "seed": 2124479342,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 2.0059359226081472
+      },
+      {
+        "index": 93,
+        "seed": 235303515,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8548103633907116
+      },
+      {
+        "index": 94,
+        "seed": 2023488197,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.7212748689560295
+      },
+      {
+        "index": 95,
+        "seed": 1787024974,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.89103321795884
+      },
+      {
+        "index": 96,
+        "seed": 1487164839,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.8630755762180489
+      },
+      {
+        "index": 97,
+        "seed": 338795876,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.1294261253877502
+      },
+      {
+        "index": 98,
+        "seed": 825663290,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9500493210638303
+      }
+    ],
+    "minimum_p": 0.01,
+    "directory": "${RUN_ROOT}/bootstrap99_final/csubst_scan_bootstrap_qty0brcc"
+  }
+}

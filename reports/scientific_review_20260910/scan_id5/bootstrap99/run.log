@@ -1,0 +1,144 @@
+CSUBST start: 2026-09-10 03:43:03.836663+00:00
+csubst scan start: 2026-09-10 03:43:03.837675+00:00
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+OS: macOS-26.6.2-x86_64-i386-64bit
+Python version: 3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]
+CSUBST version: 1.15.0
+CSUBST dependency versions: ete4=4.4.0, requests=2.32.5, numpy=1.26.4, scipy=1.15.2, pandas=2.2.3, cython=3.0.11, matplotlib=3.9.3
+CSUBST missing dependency packages: none
+CSUBST command: ${WORKTREE}/csubst/__main__.py scan --alignment_file ${RUN_ROOT}/input.fa --rooted_tree_file ${RUN_ROOT}/tree.nwk --foreground ${RUN_ROOT}/foreground.tsv --iqtree_model GY+F --iqtree_outdir ${RUN_ROOT}/verbose_iqtree --outdir ${RUN_ROOT}/bootstrap99_final --scan_pvalue_calibration parametric_bootstrap --scan_n_permutations 99 --threads 1 --scan_site_plot no --scan_match any2spe,spe2spe
+CSUBST working directory: ${WORKTREE}
+CSUBST bug report: https://github.com/kfuku52/csubst/issues
+Scan foreground unit mode: clade
+Reading and parsing input files.
+Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.
+IQ-TREE's inferred intermediate files and provenance manifest are compatible.
+The model in the IQ-TREE's output (GY+F) matched --iqtree_model (GY+F). Skipping IQ-TREE.
+Total branch length of --rooted_tree_file: 3.6000
+Total branch length of --iqtree_treefile: 3.8513
+
+Reading the state file: ${RUN_ROOT}/verbose_iqtree/input.fa.60ed40e593f21e32.state
+
+Instantaneous substitution rate matrix will be generated using the base model: GY+F
+Transition matrix will be generated using the model in the ancestral state reconstruction: GY+F
+Generating nonsynonymous substitution tensor for scan.
+Generated packed sparse substitution tensor (Cython two-pass): shape=(15, 100, 1, 20, 20), density=0.044368 (26,621/600,000), storage=319,516 bytes, compression=15.0x
+Generating synonymous substitution tensor for branch-length context.
+Generated packed sparse substitution tensor (Cython two-pass): shape=(15, 100, 20, 6, 6), density=0.006891 (7,442/1,080,000), storage=89,368 bytes, compression=96.7x
+Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, rather than nucleotide-substitutions/codon-site.
+Total branch length before rescaling: 3.851 nucleotide substitutions / codon site
+Total S+N branch length after rescaling: 3.006 codon substitutions / codon site
+Total S branch length after rescaling: 0.806 codon substitutions / codon site
+Total N branch length after rescaling: 2.200 codon substitutions / codon site
+Scanning recurrent foreground substitution patterns.
+Scan parametric bootstrap: replicate 1/99 (seed=2080620106).
+Scan parametric bootstrap: replicate 2/99 (seed=1666826666).
+Scan parametric bootstrap: replicate 3/99 (seed=1821025799).
+Scan parametric bootstrap: replicate 4/99 (seed=1162386294).
+Scan parametric bootstrap: replicate 5/99 (seed=210620470).
+Scan parametric bootstrap: replicate 6/99 (seed=1371566530).
+Scan parametric bootstrap: replicate 7/99 (seed=816877992).
+Scan parametric bootstrap: replicate 8/99 (seed=1112017963).
+Scan parametric bootstrap: replicate 9/99 (seed=1656767470).
+Scan parametric bootstrap: replicate 10/99 (seed=1255954950).
+Scan parametric bootstrap: replicate 11/99 (seed=1657052578).
+Scan parametric bootstrap: replicate 12/99 (seed=1998884659).
+Scan parametric bootstrap: replicate 13/99 (seed=2082082741).
+Scan parametric bootstrap: replicate 14/99 (seed=2115256094).
+Scan parametric bootstrap: replicate 15/99 (seed=2093457911).
+Scan parametric bootstrap: replicate 16/99 (seed=635255413).
+Scan parametric bootstrap: replicate 17/99 (seed=505909276).
+Scan parametric bootstrap: replicate 18/99 (seed=1639964526).
+Scan parametric bootstrap: replicate 19/99 (seed=710837799).
+Scan parametric bootstrap: replicate 20/99 (seed=1720593264).
+Scan parametric bootstrap: replicate 21/99 (seed=1498937441).
+Scan parametric bootstrap: replicate 22/99 (seed=756039320).
+Scan parametric bootstrap: replicate 23/99 (seed=270804030).
+Scan parametric bootstrap: replicate 24/99 (seed=205856491).
+Scan parametric bootstrap: replicate 25/99 (seed=530627592).
+Scan parametric bootstrap: replicate 26/99 (seed=175964883).
+Scan parametric bootstrap: replicate 27/99 (seed=1905247593).
+Scan parametric bootstrap: replicate 28/99 (seed=1371076819).
+Scan parametric bootstrap: replicate 29/99 (seed=2009584592).
+Scan parametric bootstrap: replicate 30/99 (seed=331306997).
+Scan parametric bootstrap: replicate 31/99 (seed=1828164045).
+Scan parametric bootstrap: replicate 32/99 (seed=2057642472).
+Scan parametric bootstrap: replicate 33/99 (seed=1162065216).
+Scan parametric bootstrap: replicate 34/99 (seed=1643425812).
+Scan parametric bootstrap: replicate 35/99 (seed=2002711527).
+Scan parametric bootstrap: replicate 36/99 (seed=1542747058).
+Scan parametric bootstrap: replicate 37/99 (seed=2112022091).
+Scan parametric bootstrap: replicate 38/99 (seed=1727905662).
+Scan parametric bootstrap: replicate 39/99 (seed=402784625).
+Scan parametric bootstrap: replicate 40/99 (seed=611761024).
+Scan parametric bootstrap: replicate 41/99 (seed=275382235).
+Scan parametric bootstrap: replicate 42/99 (seed=1642686475).
+Scan parametric bootstrap: replicate 43/99 (seed=957735169).
+Scan parametric bootstrap: replicate 44/99 (seed=710265036).
+Scan parametric bootstrap: replicate 45/99 (seed=992612513).
+Scan parametric bootstrap: replicate 46/99 (seed=1477617748).
+Scan parametric bootstrap: replicate 47/99 (seed=1551377076).
+Scan parametric bootstrap: replicate 48/99 (seed=729728308).
+Scan parametric bootstrap: replicate 49/99 (seed=141870740).
+Scan parametric bootstrap: replicate 50/99 (seed=578838929).
+Scan parametric bootstrap: replicate 51/99 (seed=1341737695).
+Scan parametric bootstrap: replicate 52/99 (seed=185712160).
+Scan parametric bootstrap: replicate 53/99 (seed=14469704).
+Scan parametric bootstrap: replicate 54/99 (seed=852312038).
+Scan parametric bootstrap: replicate 55/99 (seed=1754517240).
+Scan parametric bootstrap: replicate 56/99 (seed=1221560181).
+Scan parametric bootstrap: replicate 57/99 (seed=20570132).
+Scan parametric bootstrap: replicate 58/99 (seed=395075700).
+Scan parametric bootstrap: replicate 59/99 (seed=57926685).
+Scan parametric bootstrap: replicate 60/99 (seed=1968656929).
+Scan parametric bootstrap: replicate 61/99 (seed=782209309).
+Scan parametric bootstrap: replicate 62/99 (seed=869786278).
+Scan parametric bootstrap: replicate 63/99 (seed=1070260966).
+Scan parametric bootstrap: replicate 64/99 (seed=2108463349).
+Scan parametric bootstrap: replicate 65/99 (seed=17211924).
+Scan parametric bootstrap: replicate 66/99 (seed=2030152112).
+Scan parametric bootstrap: replicate 67/99 (seed=872264465).
+Scan parametric bootstrap: replicate 68/99 (seed=191578058).
+Scan parametric bootstrap: replicate 69/99 (seed=680123724).
+Scan parametric bootstrap: replicate 70/99 (seed=1873930699).
+Scan parametric bootstrap: replicate 71/99 (seed=768220146).
+Scan parametric bootstrap: replicate 72/99 (seed=1969780465).
+Scan parametric bootstrap: replicate 73/99 (seed=1104274466).
+Scan parametric bootstrap: replicate 74/99 (seed=1773100608).
+Scan parametric bootstrap: replicate 75/99 (seed=1372643355).
+Scan parametric bootstrap: replicate 76/99 (seed=2040445414).
+Scan parametric bootstrap: replicate 77/99 (seed=654903694).
+Scan parametric bootstrap: replicate 78/99 (seed=1484114).
+Scan parametric bootstrap: replicate 79/99 (seed=1126592946).
+Scan parametric bootstrap: replicate 80/99 (seed=1887521532).
+Scan parametric bootstrap: replicate 81/99 (seed=527812214).
+Scan parametric bootstrap: replicate 82/99 (seed=1311015067).
+Scan parametric bootstrap: replicate 83/99 (seed=54360370).
+Scan parametric bootstrap: replicate 84/99 (seed=1670347953).
+Scan parametric bootstrap: replicate 85/99 (seed=2004589279).
+Scan parametric bootstrap: replicate 86/99 (seed=158719518).
+Scan parametric bootstrap: replicate 87/99 (seed=1133831892).
+Scan parametric bootstrap: replicate 88/99 (seed=1045740874).
+Scan parametric bootstrap: replicate 89/99 (seed=1161418149).
+Scan parametric bootstrap: replicate 90/99 (seed=72273155).
+Scan parametric bootstrap: replicate 91/99 (seed=1746194137).
+Scan parametric bootstrap: replicate 92/99 (seed=1847514972).
+Scan parametric bootstrap: replicate 93/99 (seed=2124479342).
+Scan parametric bootstrap: replicate 94/99 (seed=235303515).
+Scan parametric bootstrap: replicate 95/99 (seed=2023488197).
+Scan parametric bootstrap: replicate 96/99 (seed=1787024974).
+Scan parametric bootstrap: replicate 97/99 (seed=1487164839).
+Scan parametric bootstrap: replicate 98/99 (seed=338795876).
+Scan parametric bootstrap: replicate 99/99 (seed=825663290).
+Scan asymptotic P and trait-by-match BH values are exploratory diagnostics; they do not correct candidate discovery selection.
+Writing ${RUN_ROOT}/bootstrap99_final/csubst_scan.tsv
+Writing ${RUN_ROOT}/bootstrap99_final/csubst_scan_units.tsv
+Skipping scan site visualization (--scan_site_plot no).
+Scan candidates: 10 rows, 2 foreground units.
+Elapsed time: 491.0 sec
+
+csubst scan: Time elapsed: 493 sec
+csubst scan end: 2026-09-10 03:51:17.076488+00:00
+
+CSUBST end: 2026-09-10 03:51:17.077523+00:00, Elapsed time = 493.0 sec

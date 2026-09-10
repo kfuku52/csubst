@@ -1,0 +1,49 @@
+CSUBST start: 2026-09-10 03:37:19.534846+00:00
+csubst scan start: 2026-09-10 03:37:19.538297+00:00
+${USER_HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+OS: macOS-26.6.2-x86_64-i386-64bit
+Python version: 3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]
+CSUBST version: 1.15.0
+CSUBST dependency versions: ete4=4.4.0, requests=2.32.5, numpy=1.26.4, scipy=1.15.2, pandas=2.2.3, cython=3.0.11, matplotlib=3.9.3
+CSUBST missing dependency packages: none
+CSUBST command: ${WORKTREE}/csubst/__main__.py scan --alignment_file ${RUN_ROOT}/missing.fa --rooted_tree_file ${RUN_ROOT}/tree.nwk --foreground ${RUN_ROOT}/foreground.tsv --iqtree_model GY+FQ --iqtree_outdir ${RUN_ROOT}/fq_iqtree --outdir ${RUN_ROOT}/fq --scan_pvalue_calibration parametric_bootstrap --scan_n_permutations 3 --threads 1 --scan_site_plot no --drop_invariant_tip_sites tip_invariant --scan_match any2spe,spe2spe
+CSUBST working directory: ${WORKTREE}
+CSUBST bug report: https://github.com/kfuku52/csubst/issues
+Scan foreground unit mode: clade
+Reading and parsing input files.
+Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.
+IQ-TREE's inferred intermediate files and provenance manifest are compatible.
+The model in the IQ-TREE's output (GY+FQ) matched --iqtree_model (GY+FQ). Skipping IQ-TREE.
+Total branch length of --rooted_tree_file: 3.6000
+Total branch length of --iqtree_treefile: 3.7613
+
+Reading the state file: ${RUN_ROOT}/fq_iqtree/missing.fa.3c268a840f55bdf2.state
+
+Instantaneous substitution rate matrix will be generated using the base model: GY+FQ
+Transition matrix will be generated using the model in the ancestral state reconstruction: GY+FQ
+Dropped 3 codon site(s) by tip-invariant criterion; retained 97 / 100 sites.
+Generating nonsynonymous substitution tensor for scan.
+Generated packed sparse substitution tensor (Cython two-pass): shape=(15, 97, 1, 20, 20), density=0.046512 (27,070/582,000), storage=324,904 bytes, compression=14.3x
+Generating synonymous substitution tensor for branch-length context.
+Generated packed sparse substitution tensor (Cython two-pass): shape=(15, 97, 20, 6, 6), density=0.007237 (7,581/1,047,600), storage=91,036 bytes, compression=92.1x
+Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, rather than nucleotide-substitutions/codon-site.
+Total branch length before rescaling: 3.761 nucleotide substitutions / codon site
+Total S+N branch length after rescaling: 2.934 codon substitutions / codon site
+Total S branch length after rescaling: 0.806 codon substitutions / codon site
+Total N branch length after rescaling: 2.128 codon substitutions / codon site
+Scanning recurrent foreground substitution patterns.
+Scan parametric bootstrap: replicate 1/3 (seed=2080620106).
+Scan parametric bootstrap: replicate 2/3 (seed=1666826666).
+Scan parametric bootstrap: replicate 3/3 (seed=1821025799).
+Scan asymptotic P and trait-by-match BH values are exploratory diagnostics; they do not correct candidate discovery selection.
+Writing ${RUN_ROOT}/fq/csubst_scan.tsv
+Writing ${RUN_ROOT}/fq/csubst_scan_units.tsv
+Skipping scan site visualization (--scan_site_plot no).
+Scan candidates: 10 rows, 2 foreground units.
+Elapsed time: 18.0 sec
+
+csubst scan: Time elapsed: 21 sec
+csubst scan end: 2026-09-10 03:37:40.820872+00:00
+
+CSUBST end: 2026-09-10 03:37:40.821671+00:00, Elapsed time = 21.0 sec

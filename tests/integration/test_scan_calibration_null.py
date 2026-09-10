@@ -71,7 +71,7 @@ def test_full_scan_reselects_competing_candidates():
 
 
 @pytest.mark.parametrize("mode", ["candidate_fixed", "full_scan"])
-def test_undefined_candidate_invalidates_calibration(mode):
+def test_zero_exposure_is_a_successful_no_test_configuration(mode):
     g, tensor = make_scan_context()
     if mode == "full_scan":
         labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in g["tree"].traverse()}
@@ -90,17 +90,17 @@ def test_undefined_candidate_invalidates_calibration(mode):
     g.update(scan_pvalue_calibration=mode, scan_n_permutations=99)
     scan, _ = substitution_scan.scan_substitutions(g, tensor)
     row = scan.iloc[0]
-    assert row["scan_calibration_status"] == "unavailable_failed_trials"
-    assert row["scan_permutation_failure_count"] == 1
-    assert row["scan_permutation_success_count"] == 5
-    assert np.isnan(row["p_rate_enrichment_empirical"])
-    assert np.isnan(row["q_rate_enrichment_empirical"])
-    assert np.isnan(row["p_rate_enrichment_empirical_maxT"])
+    assert row["scan_calibration_status"] == "conditional_assignment"
+    assert row["scan_permutation_failure_count"] == 0
+    assert row["scan_permutation_success_count"] == 6
+    assert np.isfinite(row["p_rate_enrichment_empirical"])
+    assert np.isfinite(row["q_rate_enrichment_empirical_by_trait_match"])
     trials = g["scan_calibration_diagnostics"]["trials"]
-    failed = [trial for trial in trials if trial["status"] == "failed"]
-    assert failed[0]["candidate_count"] == 1
-    assert failed[0]["finite_pvalue_count"] == 0
-    assert failed[0]["configuration_id"] is not None
+    no_tests = [trial for trial in trials if trial["candidate_count"] == 1 and trial["testable_candidate_count"] == 0]
+    assert len(no_tests) == 1
+    assert no_tests[0]["status"] == "success"
+    assert no_tests[0]["max_score"] is None
+    assert no_tests[0]["configuration_id"] is not None
 
 
 def test_one_exception_does_not_condition_the_null_on_success(monkeypatch):
@@ -121,6 +121,45 @@ def test_one_exception_does_not_condition_the_null_on_success(monkeypatch):
     assert len(g["scan_calibration_diagnostics"]["trials"]) == 6
 
 
+@pytest.mark.parametrize("mode", ["candidate_fixed", "full_scan"])
+def test_invalid_null_score_cannot_be_reclassified_as_no_test(monkeypatch, mode):
+    g, tensor = make_scan_context()
+    g.update(scan_pvalue_calibration=mode, scan_n_permutations=99)
+    injected = []
+    if mode == "candidate_fixed":
+        original = substitution_scan._candidate_fixed_permutation_scores
+
+        def invalid_fixed(*args, **kwargs):
+            values = original(*args, **kwargs)
+            if values and not injected:
+                values[next(iter(values))] = np.nan
+                injected.append(True)
+            return values
+
+        monkeypatch.setattr(substitution_scan, "_candidate_fixed_permutation_scores", invalid_fixed)
+    else:
+        original = substitution_scan._scan_substitutions_core
+
+        def invalid_discovery(*args, **kwargs):
+            frame, units = original(*args, **kwargs)
+            if kwargs.get("scan_context") is not None and not frame.empty and not injected:
+                frame = frame.copy()
+                frame.loc[frame.index[0], ["score_rate_enrichment", "target_event_count"]] = np.nan
+                injected.append(True)
+            return frame, units
+
+        monkeypatch.setattr(substitution_scan, "_scan_substitutions_core", invalid_discovery)
+    frame, _ = substitution_scan.scan_substitutions(g, tensor)
+    assert injected == [True]
+    row = frame.iloc[0]
+    assert row["scan_permutation_failure_count"] == 1
+    assert row["scan_permutation_success_count"] == 5
+    assert row["scan_calibration_status"] == "unavailable_failed_trials"
+    assert row["scan_inference_status"] == "failed_null_replicates"
+    assert frame[["p_rate_enrichment_empirical", "p_rate_enrichment_empirical_maxT",
+                  "q_rate_enrichment_empirical_by_trait_match"]].isna().all().all()
+
+
 @pytest.mark.parametrize("unit_mode", ["stem", "clade", "lineage"])
 @pytest.mark.parametrize("other_scope", ["all", "sister"])
 def test_original_configuration_restores_the_statistic(unit_mode, other_scope):
@@ -135,7 +174,7 @@ def test_original_configuration_restores_the_statistic(unit_mode, other_scope):
     )
     restored, _ = substitution_scan._scan_substitutions_core(g, tensor, scan_context=context, scan_static=static)
     cols = ["site", "support_unit_count", "target_event_count", "other_event_count",
-            "target_exposure_branch_length", "other_exposure_branch_length", "p_rate_enrichment"]
+            "target_exposure_branch_length", "other_exposure_branch_length", "score_rate_enrichment"]
     pd.testing.assert_frame_equal(observed[cols], restored[cols], check_exact=True)
 
 
@@ -173,6 +212,7 @@ def test_multiple_traits_require_a_joint_null():
 
 
 def test_nonfinite_values_are_not_treated_as_nonextreme():
-    assert np.isnan(substitution_scan._empirical_p_from_values(0.01, [np.nan] * 99, 99))
-    assert substitution_scan._empirical_p_from_values(0.01, [0.01] * 99, 99) == 1.0
-    assert substitution_scan._empirical_p_from_values(0.01, [0.01] * 99, 99, exact=True) == 1.0
+    with pytest.raises(ValueError, match="undefined"):
+        substitution_scan._empirical_p_from_scores(2., [np.nan] * 99, 99)
+    assert substitution_scan._empirical_p_from_scores(0.01, [0.01] * 99, 99) == 1.0
+    assert substitution_scan._empirical_p_from_scores(0.01, [0.01] * 99, 99, exact=True) == 1.0

@@ -1,5 +1,8 @@
 # csubst scan PEPC report
 
+Historical run record from June 2026. Saved tables retain their original schema;
+see [Scan inference](../../docs/SCAN_INFERENCE.md) for current columns and calibration.
+
 Date: 2026-06-26 (updated 2026-07-10)
 
 This report records a smoke/example analysis for the new `csubst scan` command on the bundled PEPC dataset, and compares the intended scope of `csubst scan` with PCOC and ESL-PSC Toolkit.

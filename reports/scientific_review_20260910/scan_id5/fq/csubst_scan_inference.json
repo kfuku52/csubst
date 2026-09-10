@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "csubst_version": "1.15.0",
+  "score_method": "negative_log10_one_sided_poisson_asymptotic_tail",
+  "event_measure": "posterior_mass_in_both_event_modes",
+  "asymptotic_and_bh_interpretation": "exploratory_diagnostics_not_selection_adjusted_FDR",
+  "bh_scope": "selected_candidates_within_trait_match",
+  "calibration": "parametric_bootstrap",
+  "requested_replicates": 3,
+  "seed": 1,
+  "candidate_count": 10,
+  "bh_families": [
+    {
+      "scan_bh_family_id": "[\"PLACEHOLDER\", \"any2spe\"]",
+      "scan_bh_family_size": 7,
+      "scan_bh_valid_asymptotic_count": 7,
+      "scan_bh_valid_empirical_count": 0
+    },
+    {
+      "scan_bh_family_id": "[\"PLACEHOLDER\", \"spe2spe\"]",
+      "scan_bh_family_size": 3,
+      "scan_bh_valid_asymptotic_count": 2,
+      "scan_bh_valid_empirical_count": 0
+    }
+  ],
+  "status": [
+    "model_conditional_parametric_bootstrap"
+  ],
+  "maximum_scope": "all_selected_candidates_all_traits_matches_in_this_run",
+  "no_test_reason": null,
+  "clade_resampling_note": "Requires exchangeability; not a universal FWER guarantee. Candidate-fixed inference does not adjust discovery selection.",
+  "clade_replicates": {
+    "success_count": 0,
+    "failure_count": 0,
+    "failure_reasons": ""
+  },
+  "bootstrap": {
+    "schema_version": 1,
+    "csubst_version": "1.15.0",
+    "status": "model_conditional_parametric_bootstrap",
+    "null": "fitted_uniform_codon_ctmc",
+    "requested": 3,
+    "seed": 1,
+    "success_count": 3,
+    "failure_count": 0,
+    "fixed": [
+      "topology",
+      "root_position",
+      "foreground",
+      "alignment_length",
+      "missing_codon_mask"
+    ],
+    "refitted": [
+      "codon_model_parameters",
+      "branch_lengths",
+      "ASR",
+      "automatic_recoding_if_requested"
+    ],
+    "repeated": [
+      "site_filtering",
+      "exposure",
+      "candidate_discovery",
+      "support_filter",
+      "maximum_score"
+    ],
+    "score_method": "negative_log10_one_sided_poisson_asymptotic_tail",
+    "maximum_scope": "all_selected_candidates_all_traits_matches_in_this_run",
+    "fitted_model_validation": {
+      "omega": 0.8536615693,
+      "kappa": 1.284520705,
+      "checkpoint": "${RUN_ROOT}/fq_iqtree/missing.fa.3c268a840f55bdf2.ckp.gz",
+      "frequency_source": "verbose_log_or_FQ",
+      "reported_loglik": -1758.799477,
+      "reproduced_loglik": -1758.799476879643
+    },
+    "inference": "model_conditional_parametric_bootstrap_not_exact",
+    "replicates": [
+      {
+        "index": 0,
+        "seed": 2080620106,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.9344201286694935
+      },
+      {
+        "index": 1,
+        "seed": 1666826666,
+        "status": "success",
+        "empty": true,
+        "maximum_score": null
+      },
+      {
+        "index": 2,
+        "seed": 1821025799,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.872220220359448
+      }
+    ],
+    "minimum_p": 0.25,
+    "directory": "${RUN_ROOT}/fq/csubst_scan_bootstrap_o5u3j6nk"
+  }
+}

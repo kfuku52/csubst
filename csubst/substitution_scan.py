@@ -1,6 +1,6 @@
-import math
 import hashlib
 import json
+import math
 import os
 import re
 import tempfile
@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy.stats import chi2, rankdata
+from scipy.stats import rankdata
 
 from csubst import ete
 from csubst import foreground
@@ -19,6 +19,7 @@ from csubst import randomness
 from csubst import runtime
 from csubst import scan_permutation
 from csubst import sequence
+from csubst import scan_statistics
 from csubst import substitution
 
 
@@ -37,7 +38,7 @@ SCAN_MATCHES = (
 SCAN_RATE_EVENT_MODES = ("called", "posterior_sum")
 SCAN_RATE_EXPOSURES = ("q_weighted", "state_aware", "raw_branch_length")
 SCAN_OTHER_SCOPES = ("all", "sister")
-SCAN_PVALUE_CALIBRATIONS = ("none", "candidate_fixed", "full_scan")
+SCAN_PVALUE_CALIBRATIONS = ("none", "candidate_fixed", "full_scan", "parametric_bootstrap")
 SCAN_UNIT_MODES = ("lineage", "stem", "clade")
 
 
@@ -122,15 +123,27 @@ SCAN_OUTPUT_COLUMNS = (
     "target_event_rate",
     "other_event_rate",
     "rate_ratio",
-    "p_rate_enrichment",
+    "score_rate_enrichment",
+    "scan_rate_testable",
+    "scan_rate_undefined_reason",
+    "scan_score_method",
+    "scan_event_measure",
+    "scan_inference_status",
+    "scan_bh_scope",
+    "scan_bh_family_id",
+    "scan_bh_family_size",
+    "scan_bh_valid_asymptotic_count",
+    "scan_bh_valid_empirical_count",
+    "scan_maxT_scope",
+    "scan_bootstrap_success_count",
+    "scan_bootstrap_failure_count",
+    "scan_bootstrap_directory",
+    "p_rate_enrichment_bootstrap_maxT",
+    "p_rate_enrichment_asymptotic",
     "p_rate_enrichment_empirical",
-    "q_rate_enrichment_empirical",
-    "q_rate_enrichment_empirical_by_trait",
     "q_rate_enrichment_empirical_by_trait_match",
     "p_rate_enrichment_empirical_maxT",
-    "q_rate_enrichment",
-    "q_rate_enrichment_by_trait",
-    "q_rate_enrichment_by_trait_match",
+    "q_rate_enrichment_asymptotic_by_trait_match",
 )
 
 SCAN_UNIT_COLUMNS = (
@@ -235,6 +248,18 @@ def normalize_scan_n_permutations(value):
 
 
 def validate_scan_configuration(g):
+    # Validate discovery settings before loading ASR or taking an empty-site
+    # shortcut. An empty result must not hide invalid user input.
+    normalize_scan_matches(g.get("scan_match", "any2spe"))
+    normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
+    normalize_scan_rate_event_mode(g.get("scan_rate_event_mode", "posterior_sum"))
+    normalize_scan_rate_exposure(g.get("scan_rate_exposure", "q_weighted"))
+    normalize_scan_other_scope(g.get("scan_other_scope", "all"))
+    _length_column(str(g.get("scan_rate_length", "n_rescaled")).strip().lower())
+    parse_scan_support_threshold(g.get("scan_min_support", "2"), total_units=0)
+    min_event_pp = float(g.get("scan_min_event_pp", 0.5))
+    if not np.isfinite(min_event_pp) or not 0 <= min_event_pp <= 1:
+        raise ValueError("--scan_min_event_pp should satisfy 0 <= value <= 1.")
     calibration = normalize_scan_pvalue_calibration(
         g.get("scan_pvalue_calibration", "full_scan")
     )
@@ -247,7 +272,7 @@ def validate_scan_configuration(g):
                 calibration
             )
         )
-    if calibration != "none":
+    if calibration in ("candidate_fixed", "full_scan"):
         if not bool(g.get("scan_permutation_sample_original", True)):
             raise ValueError(
                 "--scan_permutation_sample_original no is not supported for calibration: "
@@ -265,7 +290,7 @@ def validate_scan_configuration(g):
                 "for an uncalibrated multi-trait scan."
             )
     filter_mode = str(g.get("scan_site_plot_filter", "all")).strip().lower()
-    allowed_filters = {"all", "analytical", "empirical", "full_scan"}
+    allowed_filters = {"all", "analytical", "empirical", "full_scan", "parametric_bootstrap"}
     if filter_mode not in allowed_filters:
         raise ValueError(
             "--scan_site_plot_filter should be one of {}.".format(
@@ -277,7 +302,7 @@ def validate_scan_configuration(g):
         raise ValueError(
             "--scan_site_plot_alpha should be a finite value between 0 and 1."
         )
-    if filter_mode == "empirical" and calibration == "none":
+    if filter_mode == "empirical" and calibration not in ("candidate_fixed", "full_scan"):
         raise ValueError(
             "--scan_site_plot_filter empirical requires --scan_pvalue_calibration "
             "candidate_fixed or full_scan."
@@ -285,6 +310,10 @@ def validate_scan_configuration(g):
     if filter_mode == "full_scan" and calibration != "full_scan":
         raise ValueError(
             "--scan_site_plot_filter full_scan requires --scan_pvalue_calibration full_scan."
+        )
+    if filter_mode == "parametric_bootstrap" and calibration != "parametric_bootstrap":
+        raise ValueError(
+            "--scan_site_plot_filter parametric_bootstrap requires --scan_pvalue_calibration parametric_bootstrap."
         )
     return None
 
@@ -1440,31 +1469,8 @@ def _length_column(rate_length):
 
 
 def _poisson_lrt_pvalue(x_target, l_target, x_other, l_other):
-    x_target = float(x_target)
-    x_other = float(x_other)
-    l_target = float(l_target)
-    l_other = float(l_other)
-    if (l_target <= 0) or (l_other <= 0):
-        return np.nan
-    rate_target = x_target / l_target
-    rate_other = x_other / l_other
-    if not (rate_target > rate_other):
-        return 1.0
-    x_total = x_target + x_other
-    l_total = l_target + l_other
-    if (x_total <= 0) or (l_total <= 0):
-        return 1.0
-
-    def term(x, exposure, rate):
-        if (x <= 0) or (rate <= 0):
-            return -rate * exposure
-        return x * math.log(rate) - rate * exposure
-
-    common_rate = x_total / l_total
-    ll_alt = term(x_target, l_target, rate_target) + term(x_other, l_other, rate_other)
-    ll_null = term(x_target, l_target, common_rate) + term(x_other, l_other, common_rate)
-    statistic = max(0.0, 2.0 * (ll_alt - ll_null))
-    return min(1.0, float(0.5 * chi2.sf(statistic, df=1)))
+    """Legacy numerical diagnostic only; posterior mass has no exact Poisson P."""
+    return scan_statistics.rate_score(x_target, l_target, x_other, l_other)[1]
 
 
 def _bh_qvalues(pvalues):
@@ -1490,7 +1496,7 @@ def _bh_qvalues(pvalues):
     return qvalues
 
 
-def _assign_grouped_qvalues(scan_df, out_col, group_cols, p_col="p_rate_enrichment"):
+def _assign_grouped_qvalues(scan_df, out_col, group_cols, p_col="p_rate_enrichment_asymptotic"):
     scan_df[out_col] = np.nan
     if scan_df.shape[0] == 0:
         return scan_df
@@ -1498,6 +1504,36 @@ def _assign_grouped_qvalues(scan_df, out_col, group_cols, p_col="p_rate_enrichme
     for _, index_values in scan_df.groupby(grouper, sort=False, dropna=False).groups.items():
         pvalues = scan_df.loc[index_values, p_col].to_numpy(dtype=np.float64)
         scan_df.loc[index_values, out_col] = _bh_qvalues(pvalues)
+    return scan_df
+
+
+def _annotate_inference(scan_df, g):
+    calibration = normalize_scan_pvalue_calibration(g.get('scan_pvalue_calibration', 'full_scan'))
+    scan_df['scan_score_method'] = scan_statistics.SCORE_METHOD
+    scan_df['scan_event_measure'] = 'posterior_mass'
+    scan_df['scan_bh_scope'] = scan_statistics.BH_SCOPE
+    if calibration in ('none', 'parametric_bootstrap'):
+        scan_df['scan_permutation_backend'] = 'not_used'
+        scan_df['scan_permutation_n_jobs'] = 0
+    scan_df['scan_maxT_scope'] = (
+        scan_statistics.MAXIMUM_SCOPE if calibration in ('full_scan', 'parametric_bootstrap') else 'none'
+    )
+    status = {'none': 'exploratory_asymptotic',
+              'candidate_fixed': 'diagnostic_fixed_candidates',
+              'full_scan': 'diagnostic_clade_resampling',
+              'parametric_bootstrap': 'pending_parametric_bootstrap'}[calibration]
+    if 'scan_inference_status' not in scan_df:
+        scan_df['scan_inference_status'] = status
+    else:
+        scan_df['scan_inference_status'] = scan_df['scan_inference_status'].fillna(status)
+    for (trait, match), indices in scan_df.groupby(['trait', 'scan_match'], dropna=False).groups.items():
+        scan_df.loc[indices, 'scan_bh_family_id'] = json.dumps([str(trait), str(match)], ensure_ascii=False)
+        scan_df.loc[indices, 'scan_bh_family_size'] = len(indices)
+        for label in ('asymptotic', 'empirical'):
+            values = scan_df.loc[indices, 'p_rate_enrichment_' + label].to_numpy(dtype=float)
+            scan_df.loc[indices, 'scan_bh_valid_' + label + '_count'] = int(np.isfinite(values).sum())
+    for col in ('scan_bh_family_size', 'scan_bh_valid_asymptotic_count', 'scan_bh_valid_empirical_count'):
+        scan_df[col] = scan_df[col].astype('int64')
     return scan_df
 
 
@@ -1650,12 +1686,19 @@ def _rate_summary(
             rate_ratio = target_rate / other_rate
     else:
         rate_ratio = np.nan
-    pvalue = _poisson_lrt_pvalue(
+    score, pvalue = scan_statistics.rate_score(
         x_target=target_event,
         l_target=target_exposure,
         x_other=other_event,
         l_other=other_exposure,
     )
+    reason = ''
+    if not np.isfinite(score):
+        inputs = np.array([target_event, other_event, target_exposure, other_exposure])
+        if np.isfinite(inputs).all() and (inputs >= 0).all() and (inputs[2:] == 0).any():
+            reason = 'zero_exposure_no_rate_contrast'
+        else:
+            reason = 'invalid_rate_inputs'
     return {
         "target_event_count": target_event,
         "target_event_branch_count": int((event_values[is_target] > 0).sum()),
@@ -1672,7 +1715,10 @@ def _rate_summary(
         "target_event_rate": target_rate,
         "other_event_rate": other_rate,
         "rate_ratio": rate_ratio,
-        "p_rate_enrichment": pvalue,
+        "score_rate_enrichment": score,
+        "scan_rate_testable": bool(np.isfinite(score)),
+        "scan_rate_undefined_reason": reason,
+        "p_rate_enrichment_asymptotic": pvalue,
     }
 
 
@@ -1793,16 +1839,20 @@ def _select_scan_plot_rows(scan_df):
         ("support_unit_count", 0),
         ("support_pp_sum", 0.0),
         ("candidate_event_pp_sum", 0.0),
+        ("p_rate_enrichment_bootstrap_maxT", np.inf),
         ("p_rate_enrichment_empirical_maxT", np.inf),
-        ("p_rate_enrichment", np.inf),
+        ("p_rate_enrichment_asymptotic", np.inf),
     ]:
         if col not in plot_rows.columns:
             plot_rows[col] = default
+    plot_rows["__plot_bootstrap_p__"] = pd.to_numeric(
+        plot_rows["p_rate_enrichment_bootstrap_maxT"], errors="coerce"
+    ).fillna(np.inf)
     plot_rows["__plot_empirical_p__"] = pd.to_numeric(
         plot_rows["p_rate_enrichment_empirical_maxT"], errors="coerce"
     ).fillna(np.inf)
     plot_rows["__plot_analytical_p__"] = pd.to_numeric(
-        plot_rows["p_rate_enrichment"], errors="coerce"
+        plot_rows["p_rate_enrichment_asymptotic"], errors="coerce"
     ).fillna(np.inf)
     plot_rows = plot_rows.sort_values(
         by=[
@@ -1810,19 +1860,20 @@ def _select_scan_plot_rows(scan_df):
             "support_unit_count",
             "support_pp_sum",
             "candidate_event_pp_sum",
+            "__plot_bootstrap_p__",
             "__plot_empirical_p__",
             "__plot_analytical_p__",
         ],
-        ascending=[True, False, False, False, True, True],
+        ascending=[True, False, False, False, True, True, True],
         kind="mergesort",
     )
     plot_rows = plot_rows.drop_duplicates(subset=["codon_site_alignment"], keep="first")
-    return plot_rows.drop(columns=["__plot_empirical_p__", "__plot_analytical_p__"]).reset_index(drop=True)
+    return plot_rows.drop(columns=["__plot_bootstrap_p__", "__plot_empirical_p__", "__plot_analytical_p__"]).reset_index(drop=True)
 
 
 def filter_scan_site_plot_candidates(scan_df, g):
     mode = str(g.get("scan_site_plot_filter", "all")).strip().lower()
-    allowed = {"all", "analytical", "empirical", "full_scan"}
+    allowed = {"all", "analytical", "empirical", "full_scan", "parametric_bootstrap"}
     if mode not in allowed:
         raise ValueError("--scan_site_plot_filter should be one of {}.".format(", ".join(sorted(allowed))))
     alpha = float(g.get("scan_site_plot_alpha", 0.05))
@@ -1832,7 +1883,7 @@ def filter_scan_site_plot_candidates(scan_df, g):
         return scan_df.copy()
 
     calibration = normalize_scan_pvalue_calibration(g.get("scan_pvalue_calibration", "full_scan"))
-    if (mode == "empirical") and (calibration == "none"):
+    if (mode == "empirical") and (calibration not in ("candidate_fixed", "full_scan")):
         raise ValueError(
             "--scan_site_plot_filter empirical requires --scan_pvalue_calibration "
             "candidate_fixed or full_scan."
@@ -1841,10 +1892,13 @@ def filter_scan_site_plot_candidates(scan_df, g):
         raise ValueError(
             "--scan_site_plot_filter full_scan requires --scan_pvalue_calibration full_scan."
         )
+    if mode == "parametric_bootstrap" and calibration != "parametric_bootstrap":
+        raise ValueError("--scan_site_plot_filter parametric_bootstrap requires --scan_pvalue_calibration parametric_bootstrap.")
     pvalue_columns = {
-        "analytical": "p_rate_enrichment",
+        "analytical": "p_rate_enrichment_asymptotic",
         "empirical": "p_rate_enrichment_empirical",
         "full_scan": "p_rate_enrichment_empirical_maxT",
+        "parametric_bootstrap": "p_rate_enrichment_bootstrap_maxT",
     }
     pvalue_column = pvalue_columns[mode]
     if pvalue_column not in scan_df.columns:
@@ -2151,6 +2205,10 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     "scan_permutation_success_count": 0,
                     "scan_permutation_failure_count": 0,
                     "scan_permutation_failure_reasons": "",
+                    "p_rate_enrichment_bootstrap_maxT": np.nan,
+                    "scan_bootstrap_success_count": 0,
+                    "scan_bootstrap_failure_count": 0,
+                    "scan_bootstrap_directory": "",
                     "p_rate_enrichment_empirical": np.nan,
                     "p_rate_enrichment_empirical_maxT": np.nan,
                 }
@@ -2167,27 +2225,21 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
             "scan_match",
             "site_rate_quantile",
             "target_class",
-            "p_rate_enrichment",
+            "p_rate_enrichment_asymptotic",
             "support_fraction",
             "support_unit_count",
         ]
         for col in sort_cols:
             if col not in scan_df.columns:
                 scan_df[col] = np.nan
-        scan_df["q_rate_enrichment"] = _bh_qvalues(scan_df["p_rate_enrichment"].to_numpy(dtype=np.float64))
         scan_df = _assign_grouped_qvalues(
             scan_df=scan_df,
-            out_col="q_rate_enrichment_by_trait",
-            group_cols=["trait"],
-        )
-        scan_df = _assign_grouped_qvalues(
-            scan_df=scan_df,
-            out_col="q_rate_enrichment_by_trait_match",
+            out_col="q_rate_enrichment_asymptotic_by_trait_match",
             group_cols=["trait", "scan_match"],
         )
         scan_df = scan_df.sort_values(
-            by=["trait", "scan_match", "p_rate_enrichment", "site_rate_quantile", "target_class"],
-            ascending=[True, True, True, True, True],
+            by=["trait", "scan_match", "score_rate_enrichment", "site_rate_quantile", "target_class"],
+            ascending=[True, True, False, True, True],
             na_position="last",
         ).reset_index(drop=True)
         scan_df = scan_df.loc[:, [col for col in SCAN_OUTPUT_COLUMNS if col in scan_df.columns]]
@@ -2210,18 +2262,10 @@ def _scan_row_key(row):
     )
 
 
-def _empirical_p_from_values(p_obs, values, denominator_count, exact=False):
-    p_obs = float(p_obs)
-    denominator_count = int(denominator_count)
-    if (not np.isfinite(p_obs)) or not (0 <= p_obs <= 1) or (denominator_count <= 0):
-        return np.nan
-    values = np.asarray(values, dtype=np.float64).reshape(-1)
+def _empirical_p_from_scores(score_obs, values, denominator_count, exact=False):
     if len(values) != denominator_count:
         raise ValueError("Each scan configuration must contribute exactly one null statistic.")
-    if (not np.isfinite(values).all()) or ((values < 0) | (values > 1)).any():
-        return np.nan
-    offset = 0 if exact else 1
-    return float((offset + int((values <= p_obs).sum())) / (offset + denominator_count))
+    return scan_statistics.empirical_pvalue(score_obs, values, denominator_count, exact=exact)
 
 
 def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutation_index):
@@ -2240,7 +2284,7 @@ def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutat
     )
 
 
-def _candidate_fixed_permutation_pvalues(
+def _candidate_fixed_permutation_scores(
     g,
     observed_df,
     scan_context,
@@ -2323,7 +2367,7 @@ def _candidate_fixed_permutation_pvalues(
             codon_q_matrix=q_context["codon_q_matrix"],
             codon_state_ids=q_context["codon_state_ids"],
         )
-        out[_scan_row_key(row)] = float(rate["p_rate_enrichment"])
+        out[_scan_row_key(row)] = scan_statistics.calibration_score(rate)
     return out
 
 
@@ -2349,8 +2393,8 @@ def _run_scan_permutation(
         "configuration": None,
         "sampling_attempts": 0,
         "candidate_count": 0,
-        "finite_pvalue_count": 0,
-        "min_p": None,
+        "testable_candidate_count": 0,
+        "max_score": None,
         "status": "failed",
         "failure_reason": "",
     }
@@ -2364,7 +2408,7 @@ def _run_scan_permutation(
         for key in ("configuration_id", "configuration", "sampling_attempts"):
             diagnostic[key] = scan_context[key]
         if calibration == "candidate_fixed":
-            perm_by_key = _candidate_fixed_permutation_pvalues(
+            perm_by_key = _candidate_fixed_permutation_scores(
                 g=g, observed_df=observed_df, scan_context=scan_context,
                 branch_meta=branch_meta, valid_branch_ids=valid_branch_ids,
                 ON_tensor=ON_tensor, rate_ON_tensor=rate_ON_tensor, scan_static=scan_static,
@@ -2376,22 +2420,21 @@ def _run_scan_permutation(
                 g=g, ON_tensor=ON_tensor, rate_ON_tensor=rate_ON_tensor,
                 scan_context=scan_context, scan_static=scan_static,
             )
-            perm_by_key = {_scan_row_key(row): float(row["p_rate_enrichment"]) for _, row in perm_df.iterrows()}
+            perm_by_key = {_scan_row_key(row): scan_statistics.calibration_score(row) for _, row in perm_df.iterrows()}
             if len(perm_by_key) != len(perm_df):
                 raise ValueError("Duplicate candidate keys in a scan permutation.")
-        pvalues = np.asarray(list(perm_by_key.values()), dtype=np.float64)
-        diagnostic["candidate_count"] = int(len(pvalues))
-        diagnostic["finite_pvalue_count"] = int(np.isfinite(pvalues).sum())
-        if (not np.isfinite(pvalues).all()) or ((pvalues < 0) | (pvalues > 1)).any():
+        scores = np.asarray(list(perm_by_key.values()), dtype=np.float64)
+        diagnostic["candidate_count"] = int(len(scores))
+        diagnostic["testable_candidate_count"] = int(np.isfinite(scores).sum())
+        if np.isnan(scores).any() or np.isposinf(scores).any():
             raise ValueError("A scan candidate has an undefined or invalid rate statistic (check exposures and states).")
-        # An empty candidate set is a well-defined non-rejection, unlike a
-        # nonempty set containing undefined statistics. Absent row keys also
-        # contribute 1, so every configuration contributes once to each tail.
-        min_p = float(pvalues.min()) if len(pvalues) else 1.0
-        row_key_to_p = {key: [float(perm_by_key.get(key, 1.0))] for key in observed_keys}
-        diagnostic.update(status="success", min_p=min_p)
+        # Empty/testability-excluded families are successful no-test outcomes.
+        # Every configuration contributes once, even when a key is absent.
+        max_score = float(scores.max()) if len(scores) else -np.inf
+        row_key_to_score = {key: [float(perm_by_key.get(key, -np.inf))] for key in observed_keys}
+        diagnostic.update(status="success", max_score=None if max_score == -np.inf else max_score)
         return {
-            "success": True, "min_p": min_p, "row_key_to_p": row_key_to_p,
+            "success": True, "max_score": max_score, "row_key_to_score": row_key_to_score,
             "failure_reason": "", "diagnostic": diagnostic,
         }
     except Exception as exc:
@@ -2400,7 +2443,7 @@ def _run_scan_permutation(
         if isinstance(exc, scan_permutation.SamplingError):
             diagnostic["sampling_attempts"] = exc.attempts
         return {
-            "success": False, "min_p": np.nan, "row_key_to_p": {},
+            "success": False, "max_score": np.nan, "row_key_to_score": {},
             "failure_reason": reason, "diagnostic": diagnostic,
         }
 
@@ -2426,8 +2469,8 @@ def _run_scan_permutation_chunk(
         "failure_count": 0,
         "failure_reasons": [],
         "diagnostics": [],
-        "min_p": [],
-        "row_key_to_p": {},
+        "max_score": [],
+        "row_key_to_score": {},
     }
     for permutation_index in np.asarray(
         permutation_indices, dtype=np.int64
@@ -2453,9 +2496,9 @@ def _run_scan_permutation_chunk(
                 summary["failure_reasons"].append(reason)
             continue
         summary["success_count"] += 1
-        summary["min_p"].append(float(result["min_p"]))
-        for key, pvalues in result.get("row_key_to_p", {}).items():
-            summary["row_key_to_p"].setdefault(key, []).extend(
+        summary["max_score"].append(float(result["max_score"]))
+        for key, pvalues in result.get("row_key_to_score", {}).items():
+            summary["row_key_to_score"].setdefault(key, []).extend(
                 float(value) for value in pvalues
             )
     return summary
@@ -2551,6 +2594,8 @@ def _finish_scan_calibration(g, observed_df, diagnostic):
     }
     for col, value in columns.items():
         out[col] = value
+    if str(diagnostic["status"]).startswith("unavailable"):
+        out["scan_inference_status"] = "failed_null_replicates"
     g["scan_calibration_diagnostics"] = diagnostic
     return out
 
@@ -2585,8 +2630,8 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         "resolved_rate_exposure": scan_static["rate_exposure"],
         "state_tensor_shape": list(np.asarray(g["state_nsy"]).shape),
     }
-    if calibration == "none":
-        diagnostic.update(null="none", scope="uncalibrated", assumption=None, original_foreground_included=None)
+    if calibration in ("none", "parametric_bootstrap"):
+        diagnostic.update(status="disabled", null="none", scope="uncalibrated", assumption=None, original_foreground_included=None)
         return _finish_scan_calibration(g, observed_df, diagnostic)
     branch_meta = scan_static["branch_meta"]
     valid_branch_ids = scan_static["valid_branch_ids"]
@@ -2609,13 +2654,15 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         if calibration == "full_scan":
             diagnostic["global_pvalue"] = 1.0
         return _finish_scan_calibration(g, observed_df, diagnostic)
-    observed_p = observed_df["p_rate_enrichment"].to_numpy(dtype=np.float64)
-    if not np.isfinite(observed_p).all() or ((observed_p < 0) | (observed_p > 1)).any():
-        diagnostic.update(status="unavailable_observed_statistic", failure_reason="An observed candidate has an undefined or invalid rate statistic.")
+    try:
+        observed_maximum = scan_statistics.maximum_score(observed_df)
+    except ValueError as exc:
+        diagnostic.update(status="unavailable_observed_statistic", failure_reason=str(exc))
         return _finish_scan_calibration(g, observed_df, diagnostic)
-    diagnostic["observed"]["min_p"] = float(observed_p.min())
-    row_key_to_perm_p: dict[tuple, list[float]] = {_scan_row_key(row): [] for _, row in observed_df.iterrows()}
-    observed_keys = set(row_key_to_perm_p)
+    observed_scores = observed_df["score_rate_enrichment"].to_numpy(dtype=np.float64)
+    diagnostic["observed"]["max_score"] = None if observed_maximum == -np.inf else observed_maximum
+    row_key_to_perm_score: dict[tuple, list[float]] = {_scan_row_key(row): [] for _, row in observed_df.iterrows()}
+    observed_keys = set(row_key_to_perm_score)
     if len(observed_keys) != len(observed_df):
         raise ValueError("Duplicate observed candidate keys in scan calibration.")
     exact = sampler.configurations is not None and len(sampler.configurations) <= requested_count
@@ -2655,12 +2702,12 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
                 os.remove(path)
             except FileNotFoundError:
                 pass
-    min_perm_p = []
+    max_perm_score = []
     for result in chunk_results:
         diagnostic["trials"].extend(result["diagnostics"])
-        min_perm_p.extend(result["min_p"])
-        for key, values in result["row_key_to_p"].items():
-            row_key_to_perm_p[key].extend(values)
+        max_perm_score.extend(result["max_score"])
+        for key, values in result["row_key_to_score"].items():
+            row_key_to_perm_score[key].extend(values)
     diagnostic["trials"].sort(key=lambda trial: trial["permutation_index"])
     out = observed_df.copy()
     out["scan_permutation_backend"] = backend
@@ -2675,14 +2722,14 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         # Never silently change the null to the subset of successful trials.
         return _finish_scan_calibration(g, out, diagnostic)
     out["p_rate_enrichment_empirical"] = [
-        _empirical_p_from_values(float(row["p_rate_enrichment"]), row_key_to_perm_p[_scan_row_key(row)], n_permutations, exact=exact)
+        _empirical_p_from_scores(float(row["score_rate_enrichment"]), row_key_to_perm_score[_scan_row_key(row)], n_permutations, exact=exact)
         for _, row in out.iterrows()
     ]
     if calibration == "full_scan":
         out["p_rate_enrichment_empirical_maxT"] = [
-            _empirical_p_from_values(p, min_perm_p, n_permutations, exact=exact) for p in observed_p
+            _empirical_p_from_scores(score, max_perm_score, n_permutations, exact=exact) for score in observed_scores
         ]
-        diagnostic["global_pvalue"] = _empirical_p_from_values(float(observed_p.min()), min_perm_p, n_permutations, exact=exact)
+        diagnostic["global_pvalue"] = _empirical_p_from_scores(observed_maximum, max_perm_score, n_permutations, exact=exact)
     diagnostic["status"] = "conditional_assignment"
     return _finish_scan_calibration(g, out, diagnostic)
 
@@ -2711,19 +2758,12 @@ def scan_substitutions(g, ON_tensor, rate_ON_tensor=None):
         scan_static=scan_static,
     )
     if scan_df.shape[0] > 0:
-        empirical_p = scan_df["p_rate_enrichment_empirical"].to_numpy(dtype=np.float64)
-        scan_df["q_rate_enrichment_empirical"] = _bh_qvalues(empirical_p)
-        scan_df = _assign_grouped_qvalues(
-            scan_df=scan_df,
-            out_col="q_rate_enrichment_empirical_by_trait",
-            group_cols=["trait"],
-            p_col="p_rate_enrichment_empirical",
-        )
         scan_df = _assign_grouped_qvalues(
             scan_df=scan_df,
             out_col="q_rate_enrichment_empirical_by_trait_match",
             group_cols=["trait", "scan_match"],
             p_col="p_rate_enrichment_empirical",
         )
+        scan_df = _annotate_inference(scan_df, g)
         scan_df = scan_df.loc[:, [col for col in SCAN_OUTPUT_COLUMNS if col in scan_df.columns]]
     return scan_df, units

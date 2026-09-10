@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "csubst_version": "1.15.0",
+  "score_method": "negative_log10_one_sided_poisson_asymptotic_tail",
+  "event_measure": "posterior_mass_in_both_event_modes",
+  "asymptotic_and_bh_interpretation": "exploratory_diagnostics_not_selection_adjusted_FDR",
+  "bh_scope": "selected_candidates_within_trait_match",
+  "calibration": "full_scan",
+  "requested_replicates": 99,
+  "seed": 1,
+  "candidate_count": 9,
+  "bh_families": [
+    {
+      "scan_bh_family_id": "[\"PLACEHOLDER\", \"any2spe\"]",
+      "scan_bh_family_size": 5,
+      "scan_bh_valid_asymptotic_count": 5,
+      "scan_bh_valid_empirical_count": 5
+    },
+    {
+      "scan_bh_family_id": "[\"PLACEHOLDER\", \"spe2spe\"]",
+      "scan_bh_family_size": 4,
+      "scan_bh_valid_asymptotic_count": 4,
+      "scan_bh_valid_empirical_count": 4
+    }
+  ],
+  "status": [
+    "diagnostic_clade_resampling"
+  ],
+  "maximum_scope": "all_testable_selected_candidates_all_traits_matches_in_this_run",
+  "no_test_reason": null,
+  "clade_resampling_note": "Requires exchangeability; not a universal FWER guarantee. Candidate-fixed inference does not adjust discovery selection.",
+  "clade_replicates": {
+    "success_count": 28,
+    "failure_count": 0,
+    "failure_reasons": ""
+  }
+}

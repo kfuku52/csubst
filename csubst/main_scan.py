@@ -8,6 +8,7 @@ from csubst import parser_misc
 from csubst import runtime
 from csubst import substitution
 from csubst import substitution_scan
+from csubst import scan_bootstrap
 from csubst import tree
 from csubst import main_sites
 from csubst import tsv
@@ -40,11 +41,12 @@ def _prepare_scan_output_table(scan_df):
     out = scan_df.copy()
     stat_columns = [
         col for col in out.columns
-        if str(col).startswith("p_") or str(col).startswith("q_") or col == "scan_pvalue_resolution"
+        if str(col).startswith(("p_", "q_", "score_")) or col == "scan_pvalue_resolution"
     ]
     for col in stat_columns:
         values = np.asarray(pd.to_numeric(out[col], errors="coerce"), dtype=np.float64)
-        out[col] = ["{:.6e}".format(value) if np.isfinite(value) else "" for value in values]
+        precision = "{:.17e}" if str(col).startswith("score_") else "{:.6e}"
+        out[col] = [precision.format(value) if np.isfinite(value) else "" for value in values]
     return out
 
 
@@ -88,7 +90,7 @@ def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
             flush=True,
         )
     if filtered_scan_df.shape[0] == 0:
-        print("Skipping scan site visualization because no candidate passed the plot significance filter.", flush=True)
+        print("Skipping scan site visualization because no candidate passed the plot display filter.", flush=True)
         return []
     site_df, branch_ids = substitution_scan.build_scan_site_plot_table(
         scan_df=filtered_scan_df,
@@ -133,6 +135,8 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     g = runtime.ensure_output_layout(g, create_dir=True)
     _require_foreground(g)
     substitution_scan.validate_scan_configuration(g)
+    scan_bootstrap.validate_options(g)
+    scan_bootstrap.require_precise_fit(g)
     unit_mode = substitution_scan.normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
     if unit_mode == "stem":
         g["fg_stem_only"] = True
@@ -150,7 +154,20 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     )
     substitution_scan.validate_scan_configuration(g)
     g = parser_misc.prep_state(g, apply_site_filtering=False)
-    g = parser_misc.apply_site_filters(g)
+    bootstrap_model = scan_bootstrap.prepare_model(g) if g.get("scan_pvalue_calibration") == "parametric_bootstrap" else None
+    no_sites = False
+    if bool(g.get('drop_invariant_tip_sites', False)):
+        mask = parser_misc.get_site_drop_mask(
+            g, g.get('drop_invariant_tip_sites_mode', 'tip_invariant'),
+            parser_misc.get_site_index_alignment(g, expected_num_site=g['state_cdn'].shape[1]),
+        )
+        no_sites = bool(mask.size and mask.all())
+    if no_sites:
+        # A successful scan with no eligible sites is a no-test outcome, not a
+        # failed bootstrap draw. Keep full states only for foreground metadata.
+        g['scan_no_test_reason'] = 'all_sites_excluded_by_configured_filter'
+    else:
+        g = parser_misc.apply_site_filters(g)
     print("Generating nonsynonymous substitution tensor for scan.", flush=True)
     ON_tensor_rate = substitution.get_substitution_tensor(
         state_tensor=g["state_nsy"],
@@ -183,11 +200,22 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     del OS_tensor
     print("Scanning recurrent foreground substitution patterns.", flush=True)
     rate_ON_tensor = ON_tensor_rate if rate_event_mode == "posterior_sum" else ON_tensor_called
-    scan_df, units_df = substitution_scan.scan_substitutions(
-        g=g,
-        ON_tensor=ON_tensor_called,
-        rate_ON_tensor=rate_ON_tensor,
-    )
+    if no_sites:
+        scan_df = pd.DataFrame(columns=list(substitution_scan.SCAN_OUTPUT_COLUMNS))
+        units_df = substitution_scan.build_scan_units(g, substitution_scan.build_branch_metadata(g))
+        scan_df = substitution_scan._calibrate_scan_pvalues(
+            g, scan_df, ON_tensor_called, rate_ON_tensor,
+            substitution_scan._build_scan_static_context(g, ON_tensor_called, rate_ON_tensor),
+        )
+    else:
+        scan_df, units_df = substitution_scan.scan_substitutions(
+            g=g,
+            ON_tensor=ON_tensor_called,
+            rate_ON_tensor=rate_ON_tensor,
+        )
+    if bootstrap_model is not None:
+        scan_df = scan_bootstrap.calibrate(g, scan_df, bootstrap_model)
+    scan_bootstrap.write_inference_report(g, scan_df)
     scan_path = runtime.output_path(g, "scan.tsv")
     units_path = runtime.output_path(g, "scan_units.tsv")
     if scan_df.shape[0] == 0:
