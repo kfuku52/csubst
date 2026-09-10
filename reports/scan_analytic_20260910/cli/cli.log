@@ -1,0 +1,140 @@
+CSUBST start: 2026-09-10 09:53:42.176471+00:00
+csubst scan start: 2026-09-10 09:53:42.178538+00:00
+OS: Linux-6.12.76-linuxkit-aarch64-with-glibc2.39
+Python version: 3.12.14 (main, Sep  2 2026, 23:29:55) [GCC 15.3.0]
+CSUBST version: 1.15.0
+CSUBST dependency versions: ete4=4.4.0, requests=2.34.2, numpy=1.26.4, scipy=1.17.1, pandas=3.0.5, cython=3.3.0, matplotlib=3.10.9
+CSUBST missing dependency packages: none
+CSUBST command: /work/csubst/__main__.py scan --alignment_file inputs/input.fa --rooted_tree_file inputs/tree.nwk --foreground inputs/foreground.tsv --iqtree_model GY+FQ --scan_pvalue_calibration none --scan_n_permutations 0 --scan_analytic_pvalue endpoint_mixture --scan_match any2spe,spe2spe --scan_site_plot no --threads 1 --outdir result
+CSUBST working directory: /work
+CSUBST bug report: https://github.com/kfuku52/csubst/issues
+Scan foreground unit mode: clade
+Reading and parsing input files.
+Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.
+IQ-TREE intermediate files will be regenerated because alignment, tree, IQ-TREE model, or genetic code changed.
+Starting IQ-TREE to estimate parameters and ancestral states.
+IQ-TREE's version: 3.1.4, PATH: iqtree
+IQ-TREE version 3.1.4 for Linux ARM 64-bit built Sep  9 2026
+Developed by Bui Quang Minh, Thomas Wong, Nhan Ly-Trong, Huaiyan Ren
+Contributed by Lam-Tung Nguyen, Dominik Schrempf, Chris Bielow,
+Olga Chernomor, Michael Woodhams, Diep Thi Hoang, Heiko Schmidt
+
+Host:    1d70a052e010 (SSE4.2, 7 GB RAM)
+Command: iqtree -s inputs/input.fa -te /tmp/.csubst_tmp_tqouu8hj/tmp.csubst.nwk -m GY+FQ --seqtype CODON1 --threads-max 1 -T AUTO --ancestral --rate --redo --prefix /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b -seed 1 -v
+Seed:    1 (Using SPRNG - Scalable Parallel Random Number Generator)
+
+64 bit Linear Congruential Generator with Prime Addend
+
+ 	seed = 1, stream_number = 0	parameter = 0
+
+Time:    Thu Sep 10 09:53:42 2026
+Kernel:  SSE2 - auto-detect threads (12 CPU cores detected)
+
+Reading alignment file inputs/input.fa ... Fasta format detected
+Reading fasta file: done in 0.00013113 secs using 39.66% CPU
+Name shortening took 0.000003 seconds.
+Duplicate sequence name check took 0.000013 seconds.
+Sequence Type detection took 0.000051 seconds.
+Alignment most likely contains DNA/RNA sequences
+Converting to codon sequences with genetic code 1 ...
+Constructing alignment: done in 0.000103951 secs using 99.09% CPU
+Time to read input file was 0.002910 sec.
+Time to count constant sites was 0.000001 sec.
+Alignment has 8 sequences with 100 columns, 100 distinct patterns
+50 parsimony-informative, 47 singleton sites, 3 constant sites
+Alignment state count time was 0.000005 seconds.
+Empirical state frequencies: 0.0037500000 0.0037500000 0.0175000000 0.0312500000 0.0187500000 0.0137500000 0.0125000000 0.0100000000 0.0050000000 0.0025000000 0.0300000000 0.0175000000 0.0150000000 0.0075000000 0.0212500000 0.0050000000 0.0175000000 0.0100000000 0.0112500000 0.0075000000 0.0137500000 0.0125000000 0.0200000000 0.0212500000 0.0100000000 0.0200000000 0.0100000000 0.0162500000 0.0125000000 0.0225000000 0.0212500000 0.0425000000 0.0050000000 0.0137500000 0.0087500000 0.0150000000 0.0125000000 0.0162500000 0.0125000000 0.0325000000 0.0225000000 0.0125000000 0.0162500000 0.0062500000 0.0137500000 0.0375000000 0.0075000000 0.0212500000 0.0275000000 0.0337500000 0.0275000000 0.0237500000 0.0162500000 0.0137500000 0.0125000000 0.0175000000 0.0212500000 0.0100000000 0.0200000000 0.0250000000 0.0137500000 
+   Gap/Ambiguity  Composition  p-value
+Analyzing sequences: done in 6.91414e-06 secs using 86.78% CPU
+   1  a    0.00%    passed     86.66%
+   2  b    0.00%    passed     84.70%
+   3  c    0.00%    passed     99.75%
+   4  d    0.00%    passed     99.84%
+   5  e    0.00%    passed     96.84%
+   6  f    0.00%    passed     99.38%
+   7  g    0.00%    passed     79.42%
+   8  h    0.00%    passed     92.78%
+****  TOTAL    0.00%  0 sequences failed composition chi2 test (p-value<5%; df=60)
+Alignment state count time was 0.000 seconds.
+Empirical state frequencies: 0.0037500000 0.0037500000 0.0175000000 0.0312500000 0.0187500000 0.0137500000 0.0125000000 0.0100000000 0.0050000000 0.0025000000 0.0300000000 0.0175000000 0.0150000000 0.0075000000 0.0212500000 0.0050000000 0.0175000000 0.0100000000 0.0112500000 0.0075000000 0.0137500000 0.0125000000 0.0200000000 0.0212500000 0.0100000000 0.0200000000 0.0100000000 0.0162500000 0.0125000000 0.0225000000 0.0212500000 0.0425000000 0.0050000000 0.0137500000 0.0087500000 0.0150000000 0.0125000000 0.0162500000 0.0125000000 0.0325000000 0.0225000000 0.0125000000 0.0162500000 0.0062500000 0.0137500000 0.0375000000 0.0075000000 0.0212500000 0.0275000000 0.0337500000 0.0275000000 0.0237500000 0.0162500000 0.0137500000 0.0125000000 0.0175000000 0.0212500000 0.0100000000 0.0200000000 0.0250000000 0.0137500000 
+Reading input tree file /tmp/.csubst_tmp_tqouu8hj/tmp.csubst.nwk ...Tree contains 8 taxa and 14 branches (rooted)
+ rooted tree
+Converting rooted to unrooted tree...
+
+ML-TREE SEARCH START WITH THE FOLLOWING PARAMETERS:
+Model of evolution: GY+FQ with equal frequencies (15 free parameters)
+Fixed branch lengths: No
+Phylogenetic likelihood library: No
+Branch length optimization method: Newton
+Number of Newton-Raphson steps in NNI evaluation and branch length optimization: 10 / 10
+SSE instructions: Yes
+
+NOTE: 0 MB RAM (0 GB) is required!
+Measuring multi-threading efficiency up to 1 CPU cores
+Increase to 10 rounds for branch lengths
+23 trees examined
+Threads: 1 / Time: 1.0350790024 sec / Speedup: 1.0000000000 / Efficiency: 100% / LogL: -1998
+Determining AUTO threadcount: done in 1.03551 secs using 99.82% CPU
+BEST NUMBER OF THREADS: 1
+
+Estimate model parameters (epsilon = 0.0100000000)
+1. Initial log-likelihood: -1842.5256168979 (took 0.0030078888 wall-clock sec)
+Nonsynonymous/synonymous ratio (omega): 0.8745688298
+Transition/transversion ratio (kappa): 1.2798605772
+2. Current log-likelihood: -1828.3827618459 (after 0.0876560211 wall-clock sec)
+Nonsynonymous/synonymous ratio (omega): 0.8742454812
+Transition/transversion ratio (kappa): 1.2801724837
+Optimal log-likelihood: -1828.3782279695
+Parameters optimization took 2 rounds (0.1300990582 sec)
+Best tree printed to /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.treefile
+Wrote distance file to... 
+BEST SCORE FOUND : -1828.3782279695
+Ancestral state probabilities printed to /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.state
+Site rates printed to /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.rate
+Total tree length: 3.7640292631
+
+Total number of iterations: 0
+CPU time used for tree search: 0.0000130000 sec (0h:0m:0s)
+Wall-clock time used for tree search: 0.0000121593 sec (0h:0m:0s)
+Total CPU time used: 1.1999800000 sec (0h:0m:1s)
+Total wall-clock time used: 1.2445390224 sec (0h:0m:1s)
+Best tree printed to /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.treefile
+
+Analysis results written to: 
+  IQ-TREE report:                /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.iqtree
+  Maximum-likelihood tree:       /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.treefile
+  Ancestral state:               /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.state
+  Screen log file:               /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.log
+
+Date and Time: Thu Sep 10 09:53:44 2026
+Total branch length of --rooted_tree_file: 3.6000
+Total branch length of --iqtree_treefile: 3.7640
+
+Reading the state file: /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.state
+
+Instantaneous substitution rate matrix will be generated using the base model: GY+FQ
+Transition matrix will be generated using the model in the ancestral state reconstruction: GY+FQ
+Generating nonsynonymous substitution tensor for scan.
+Sub-tensor scheduler (sparse, mode=asis): branches=12, workers=1 (threads=1)
+Generated sparse substitution tensor: shape=(15, 100, 1, 20, 20), density=0.044450 (26,670/600,000), storage=320,104 bytes, compression=15.0x
+Generating synonymous substitution tensor for branch-length context.
+Sub-tensor scheduler (sparse, mode=syn): branches=12, workers=1 (threads=1)
+Generated sparse substitution tensor: shape=(15, 100, 20, 6, 6), density=0.006781 (7,323/1,080,000), storage=87,940 bytes, compression=98.2x
+Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, rather than nucleotide-substitutions/codon-site.
+Total branch length before rescaling: 3.764 nucleotide substitutions / codon site
+Total S+N branch length after rescaling: 2.951 codon substitutions / codon site
+Total S branch length after rescaling: 0.796 codon substitutions / codon site
+Total N branch length after rescaling: 2.156 codon substitutions / codon site
+Scanning recurrent foreground substitution patterns.
+Scan asymptotic P and trait-by-match BH values are exploratory diagnostics; they do not correct candidate discovery selection.
+Writing /work/result/csubst_scan.tsv
+Writing /work/result/csubst_scan_units.tsv
+Writing /work/result/csubst_scan_calibration.json
+Skipping scan site visualization (--scan_site_plot no).
+Scan candidates: 8 rows, 2 foreground units.
+Elapsed time: 1.0 sec
+
+csubst scan: Time elapsed: 2 sec
+csubst scan end: 2026-09-10 09:53:44.438337+00:00
+
+CSUBST end: 2026-09-10 09:53:44.438637+00:00, Elapsed time = 2.0 sec

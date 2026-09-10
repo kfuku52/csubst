@@ -1,0 +1,123 @@
+{
+  "records": [
+    {
+      "scenario": "sparse",
+      "rows": [],
+      "realized_endpoints": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "jumps": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "scenario": "unequal",
+      "rows": [],
+      "realized_endpoints": [
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "jumps": [
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "scenario": "uncertain",
+      "rows": [
+        [
+          1,
+          0.17523445702957408,
+          1.7416304472741242
+        ],
+        [
+          0,
+          0.17883359342184332,
+          1.7212995512179603
+        ],
+        [
+          1,
+          0.17523445702957408,
+          1.7416304472741242
+        ],
+        [
+          0,
+          0.17883359342184332,
+          1.7212995512179603
+        ]
+      ],
+      "realized_endpoints": [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "jumps": [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false
+      ]
+    }
+  ],
+  "seconds": 0.15815170801943168,
+  "rss": 135917568
+}

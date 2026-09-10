@@ -358,6 +358,8 @@ def write_inference_report(g, frame):
             'failure_count': int(frame['scan_permutation_failure_count'].iloc[0]),
             'failure_reasons': str(frame['scan_permutation_failure_reasons'].iloc[0]),
         }
+    if 'scan_analytic_summary' in g:
+        report['analytical_endpoint'] = g['scan_analytic_summary']
     if 'scan_bootstrap_summary' in g:
         report['bootstrap'] = g['scan_bootstrap_summary']
     Path(runtime.output_path(g, 'scan_inference.json')).write_text(json.dumps(report, indent=2, allow_nan=False) + '\n')

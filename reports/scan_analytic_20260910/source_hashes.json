@@ -1,0 +1,7 @@
+{
+  "csubst/scan_analytic.py": "85798e2af8d4fece71664ba5f887512c4b6de49c4390f2eb9264d0750eae4ffa",
+  "csubst/endpoint.py": "2882cea64455c98857fef6bd9ef5a011e0cb5f112a7189167e456d550e1bf8bf",
+  "tools/benchmark_scan_analytic.py": "fb91372a4e9e033017129d8056a9ee217f011a8d878bf030479d27c4ae329ac6",
+  "tools/benchmark_scan_analytic_codon.py": "07fe4292ca63c9936d8d37d3c610cfd3bc91f02efc06b33d7965842275d01011",
+  "tools/validate_scan_calibration.py": "f7ac20f0d17d5f4be738ac0f9807f275d52811853308f2b80bad8700af54cc68"
+}

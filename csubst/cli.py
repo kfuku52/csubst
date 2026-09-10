@@ -655,6 +655,13 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                         help='default=%(default)s: Branch-length scale used for the exploratory scan rate score. '
                              '"n_rescaled" uses CSUBST nonsynonymous-substitution branch lengths; '
                              '"raw" uses IQ-TREE/tree branch lengths; "sn_rescaled" uses CSUBST S+N branch lengths.')
+    parser.add_argument('--scan_analytic_pvalue', choices=['none', 'endpoint_mixture'], default='none',
+                        help='default=%(default)s: Opt-in analytical endpoint-enrichment P from a fixed '
+                             'codon-tree mixture likelihood ratio; integrates ancestors and rate categories. '
+                             'Requires --scan_pvalue_calibration none. Fitted-model uncertainty remains uncalibrated.')
+    parser.add_argument('--scan_analytic_profile', default=None, metavar='JSON',
+                        help='Frozen independent-training endpoint mixture profile. Requires endpoint_mixture. '
+                             'Do not train or choose this profile on the tested alignment.')
     parser.add_argument('--scan_pvalue_calibration', metavar='none|candidate_fixed|full_scan|parametric_bootstrap', default='full_scan', type=str,
                         choices=['none', 'candidate_fixed', 'full_scan', 'parametric_bootstrap'],
                         help='default=%(default)s: Empirical calibration for the exploratory scan rate score. '
@@ -683,7 +690,7 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                         default='all', type=str,
                         choices=['all', 'analytical', 'empirical', 'full_scan', 'parametric_bootstrap'],
                         help='default=%(default)s: Candidate display filter for --scan_site_plot; analytical/empirical filters are exploratory. '
-                             '"analytical" uses p_rate_enrichment_asymptotic; "empirical" uses the candidate-wise '
+                             '"analytical" uses the endpoint P when enabled, otherwise p_rate_enrichment_asymptotic; "empirical" uses the candidate-wise '
                              'permutation P value; "full_scan" uses the maxT-style empirical P value from '
                              '--scan_pvalue_calibration full_scan; "parametric_bootstrap" uses the fitted-null maximum-score P value.')
     parser.add_argument('--scan_site_plot_alpha', metavar='FLOAT', default=0.05, type=float,

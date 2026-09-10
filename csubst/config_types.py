@@ -130,6 +130,8 @@ class InternalControls(TypedDict, total=False):
 
 
 class ScanConfig(TypedDict, total=False):
+    scan_analytic_pvalue: str
+    scan_analytic_profile: str | None
     scan_pvalue_calibration: str
     scan_n_permutations: int
     scan_permutation_seed: int

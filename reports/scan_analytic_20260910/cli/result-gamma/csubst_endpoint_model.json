@@ -1,0 +1,43 @@
+{
+  "codon": {
+    "observed_storage": "full_events",
+    "direct_projection": false,
+    "rates": [
+      0.6149,
+      0.8631,
+      1.0743,
+      1.4478
+    ],
+    "weights": [
+      0.25,
+      0.25,
+      0.25,
+      0.25
+    ],
+    "branch_lengths": [
+      0.5770819027,
+      0.2543452856,
+      0.1928435654,
+      0.2336941371,
+      0.3351640214,
+      0.2178727347,
+      0.1544038284,
+      0.4365801868,
+      0.2484698991,
+      0.184450106,
+      0.2469234229,
+      0.3443609396,
+      0.2290477418,
+      0.1544038284,
+      0.0
+    ],
+    "parameter_source": "iqtree_report_and_model_matrix"
+  },
+  "schema_version": 1,
+  "substitution_posterior": "joint",
+  "quantity": "endpoint_state_difference",
+  "expectation": "fitted_parent_and_rate_posterior_predictive",
+  "branch_combinations": "factorized_edge_scores",
+  "block_size": 64,
+  "codon_parameter_precision": "rounded_IQ_TREE_report; conditional_on_parsed_parameters"
+}

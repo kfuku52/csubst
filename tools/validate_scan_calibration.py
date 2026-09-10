@@ -86,7 +86,7 @@ def posterior_dataset(scenario, sites, rng, signal_sites=0):
     return tr, state, rates
 
 
-def one_dataset(arguments):
+def one_dataset(arguments, analytical=False):
     scenario, sites, seed, filtered, signal_sites = arguments
     with open(os.devnull, 'w') as sink, contextlib.redirect_stdout(sink):
         tr, state, rates = posterior_dataset(scenario, sites, np.random.default_rng(seed), signal_sites)
@@ -118,21 +118,51 @@ def one_dataset(arguments):
             g['drop_invariant_tip_sites_mode'] = 'tip_invariant'
             mask = parser_misc.get_site_drop_mask(g, 'tip_invariant', np.arange(sites))
             if mask.all():
-                return dict(score=None, null_score=None, candidates=0, diagnostic_p_reject=False, diagnostic_bh_reject=False)
+                return dict(score=None, null_score=None, candidates=0, diagnostic_p_reject=False, diagnostic_bh_reject=False, **({key: 0 for key in ['p_false_any', 'bh_false_any', 'by_false_any', 'p_fdp', 'bh_fdp', 'by_fdp', 'p_true_any', 'bh_true_any', 'by_true_any', 'diagnostic_true_any', 'diagnostic_full_bh_false_any', 'diagnostic_full_bh_fdp', 'diagnostic_full_bh_true_any', 'old_selected_false_any', 'old_selected_fdp', 'old_selected_true_any', 'new_selected_false_any', 'new_selected_fdp', 'new_selected_true_any']} if analytical else {}))
             parser_misc.drop_invariant_tip_sites(g)
         on = substitution.get_substitution_tensor(g['state_nsy'], mode='asis', g=g)
         os_tensor = substitution.get_substitution_tensor(g['state_cdn'], mode='syn', g=g)
         tree.rescale_branch_length(g, os_tensor, on)
-        frame, _ = substitution_scan.scan_substitutions(g, on)
+        frame, units = substitution_scan.scan_substitutions(g, on)
+        if analytical:
+            from csubst import endpoint, endpoint_io, scan_analytic
+            parents, lengths = endpoint_io._tree_arrays(g, False)
+            rate_categories = [.2, 1., 2.8] if scenario == 'uncertain' else [1.]
+            model = endpoint.EndpointModel(parents, lengths, Q, np.full(4, .25),
+                                           rate_categories, np.full(len(rate_categories), 1 / len(rate_categories)))
+            g['scan_analytic_summary'] = {'family_size': scan_analytic.family_size(sites, 2, 2, 1, ['any2spe', 'spe2spe'])}
+            frame = scan_analytic.annotate(g, frame, units, scan_analytic.EndpointEnrichment(model, np.array([0, 0, 1, 1])))
     maximum = scan_statistics.maximum_score(frame)
     # In partial alternatives, only uninjected sites count as false detections.
     null = frame.loc[pd.to_numeric(frame['codon_site_alignment']) > signal_sites]
     null_maximum = scan_statistics.maximum_score(null)
-    return dict(score=None if maximum == -np.inf else maximum,
+    result = dict(score=None if maximum == -np.inf else maximum,
                 null_score=None if null_maximum == -np.inf else null_maximum,
                 candidates=len(frame),
                 diagnostic_p_reject=bool((null['p_rate_enrichment_asymptotic'] <= .05).any()),
                 diagnostic_bh_reject=bool((null['q_rate_enrichment_asymptotic_by_trait_match'] <= .05).any()))
+    if analytical:
+        from csubst import scan_analytic
+        diagnostic = pd.to_numeric(frame['p_rate_enrichment_asymptotic']).fillna(1).to_numpy()
+        frame['diagnostic_full_bh'] = scan_analytic.adjusted_pvalues(diagnostic, g['scan_analytic_summary']['family_size'])
+        # Controlled comparison: identical selected rows and trait/match families.
+        # Undefined diagnostics contribute P=1, preserving a shared denominator.
+        for label, p_column in [('old_selected', 'p_rate_enrichment_asymptotic'),
+                                 ('new_selected', 'p_endpoint_enrichment_analytic')]:
+            frame[label] = np.nan
+            for _, indices in frame.groupby(['trait', 'scan_match'], dropna=False).groups.items():
+                values = pd.to_numeric(frame.loc[indices, p_column]).fillna(1).to_numpy()
+                frame.loc[indices, label] = scan_analytic.adjusted_pvalues(values, len(indices))
+        for method, column in [('old_selected', 'old_selected'), ('new_selected', 'new_selected'), ('p', 'p_endpoint_enrichment_analytic'), ('bh', 'q_endpoint_enrichment_analytic_bh'),
+                               ('by', 'q_endpoint_enrichment_analytic_by'), ('diagnostic_full_bh', 'diagnostic_full_bh')]:
+            rejected = frame[column] <= .05
+            false = rejected & (pd.to_numeric(frame['codon_site_alignment']) > signal_sites)
+            result[method + '_false_any'] = bool(false.any())
+            result[method + '_fdp'] = float(false.sum() / max(1, rejected.sum()))
+            result[method + '_true_any'] = bool((rejected & ~false).any())
+        signal = pd.to_numeric(frame['codon_site_alignment']) <= signal_sites
+        result['diagnostic_true_any'] = bool(((frame['q_rate_enrichment_asymptotic_by_trait_match'] <= .05) & signal).any())
+    return result
 
 
 def evaluate(reference, validation, level):

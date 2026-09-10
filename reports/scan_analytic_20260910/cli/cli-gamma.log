@@ -1,0 +1,43 @@
+CSUBST start: 2026-09-10 09:52:19.261805+00:00
+csubst scan start: 2026-09-10 09:52:19.269465+00:00
+OS: Linux-6.12.76-linuxkit-aarch64-with-glibc2.39
+Python version: 3.12.14 (main, Sep  2 2026, 23:29:55) [GCC 15.3.0]
+CSUBST version: 1.15.0
+CSUBST dependency versions: ete4=4.4.0, requests=2.34.2, numpy=1.26.4, scipy=1.17.1, pandas=3.0.5, cython=3.3.0, matplotlib=3.10.9
+CSUBST missing dependency packages: none
+CSUBST command: /work/csubst/__main__.py scan --alignment_file inputs/input.fa --rooted_tree_file inputs/tree.nwk --foreground inputs/foreground.tsv --iqtree_model GY+FQ+G4 --scan_pvalue_calibration none --scan_n_permutations 0 --scan_analytic_pvalue endpoint_mixture --scan_match any2spe,spe2spe --scan_site_plot no --substitution_posterior joint --threads 1 --outdir result-gamma
+CSUBST working directory: /work
+CSUBST bug report: https://github.com/kfuku52/csubst/issues
+Scan foreground unit mode: clade
+Reading and parsing input files.
+Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.
+IQ-TREE's inferred intermediate files and provenance manifest are compatible.
+The model in the IQ-TREE's output (GY+FQ+G4) matched --iqtree_model (GY+FQ+G4). Skipping IQ-TREE.
+Total branch length of --rooted_tree_file: 3.6000
+Total branch length of --iqtree_treefile: 3.8096
+
+Reading the state file: /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.state
+
+Instantaneous substitution rate matrix will be generated using the base model: GY+FQ
+Transition matrix will be generated using the model in the ancestral state reconstruction: GY+FQ+G4
+Joint endpoint inference: blocked pruning, block_size=64; no ancestral-history sampling.
+Generating nonsynonymous substitution tensor for scan.
+Generating synonymous substitution tensor for branch-length context.
+Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, rather than nucleotide-substitutions/codon-site.
+Total branch length before rescaling: 3.810 nucleotide substitutions / codon site
+Total S+N branch length after rescaling: 3.126 codon substitutions / codon site
+Total S branch length after rescaling: 0.847 codon substitutions / codon site
+Total N branch length after rescaling: 2.278 codon substitutions / codon site
+Scanning recurrent foreground substitution patterns.
+Scan asymptotic P and trait-by-match BH values are exploratory diagnostics; they do not correct candidate discovery selection.
+Writing /work/result-gamma/csubst_scan.tsv
+Writing /work/result-gamma/csubst_scan_units.tsv
+Writing /work/result-gamma/csubst_scan_calibration.json
+Skipping scan site visualization (--scan_site_plot no).
+Scan candidates: 8 rows, 2 foreground units.
+Elapsed time: 0.0 sec
+
+csubst scan: Time elapsed: 1 sec
+csubst scan end: 2026-09-10 09:52:20.750307+00:00
+
+CSUBST end: 2026-09-10 09:52:20.750956+00:00, Elapsed time = 1.0 sec

@@ -1,0 +1,265 @@
+{
+  "training_replicates": 100,
+  "test_replicates": 100,
+  "seed": 9102026,
+  "role_train": 0,
+  "role_holdout": 1,
+  "training_sites": 8,
+  "test_sites": 12,
+  "test_signal_sites": 3,
+  "scenarios": [
+    "sparse",
+    "unequal",
+    "uncertain"
+  ],
+  "foreground_counts": [
+    2,
+    4
+  ],
+  "test_regimes": [
+    "null",
+    "moderate",
+    "heterogeneous"
+  ],
+  "filters": [
+    false,
+    true
+  ],
+  "basis_names": [
+    "fixed_four",
+    "log_uniform_full",
+    "log_uniform_half",
+    "infinite_half",
+    "infinite_full"
+  ],
+  "basis_matrix": [
+    [
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.050614268145188344,
+      0.11119051722668717,
+      0.15685332293894352,
+      0.18134189168918088,
+      0.18134189168918088,
+      0.15685332293894352,
+      0.11119051722668717,
+      0.050614268145188344,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.050614268145188344,
+      0.11119051722668717,
+      0.15685332293894352,
+      0.18134189168918088,
+      0.18134189168918088,
+      0.15685332293894352,
+      0.11119051722668717,
+      0.050614268145188344,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "atom_profile": {
+    "version": 1,
+    "atoms": [
+      {
+        "multiplier": 2.0,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 10.0,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 100.0,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": null,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 1.1470047469345959,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 2.018367683000977,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 5.148745022628818,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 16.78216691492811,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 59.58706078119612,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 194.22208627636118,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 495.44986695048834,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 871.8359733667446,
+        "participation": 1.0,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 1.1470047469345959,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 2.018367683000977,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 5.148745022628818,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 16.78216691492811,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 59.58706078119612,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 194.22208627636118,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 495.44986695048834,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": 871.8359733667446,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      },
+      {
+        "multiplier": null,
+        "participation": 0.5,
+        "weight": 0.047619047619047616
+      }
+    ]
+  },
+  "objective": "mean log predictive likelihood on all training signal sites, no candidate selection",
+  "correction": "BH within identical selected trait x match rows for all methods; diagnostic only",
+  "truth": "null sites for FDP; process changed sites, recurrent endpoints and jumps for sensitivity"
+}

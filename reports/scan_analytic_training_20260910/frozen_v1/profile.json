@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "provenance": {
+    "training_config": "preregistered.json",
+    "training_sites": 4800,
+    "component_weights": [
+      1.0000000000000002e-08,
+      0.7728625571840766,
+      1.0000000105543574e-08,
+      0.22713741281592334,
+      1.0000000066205986e-08
+    ],
+    "objective": 0.3369682839681965,
+    "optimizer_message": "Optimization terminated successfully",
+    "holdout_used": false
+  },
+  "atoms": [
+    {
+      "multiplier": 2.0,
+      "participation": 1.0,
+      "weight": 2.5000000000000005e-09
+    },
+    {
+      "multiplier": 10.0,
+      "participation": 1.0,
+      "weight": 2.5000000000000005e-09
+    },
+    {
+      "multiplier": 100.0,
+      "participation": 1.0,
+      "weight": 2.5000000000000005e-09
+    },
+    {
+      "multiplier": null,
+      "participation": 1.0,
+      "weight": 1.2500000066205987e-08
+    },
+    {
+      "multiplier": 1.1470047469345959,
+      "participation": 1.0,
+      "weight": 0.03911787270869081
+    },
+    {
+      "multiplier": 2.018367683000977,
+      "participation": 1.0,
+      "weight": 0.08593498747843757
+    },
+    {
+      "multiplier": 5.148745022628818,
+      "participation": 1.0,
+      "weight": 0.12122606026941167
+    },
+    {
+      "multiplier": 16.78216691492811,
+      "participation": 1.0,
+      "weight": 0.14015235813549817
+    },
+    {
+      "multiplier": 59.58706078119612,
+      "participation": 1.0,
+      "weight": 0.14015235813549817
+    },
+    {
+      "multiplier": 194.22208627636118,
+      "participation": 1.0,
+      "weight": 0.12122606026941167
+    },
+    {
+      "multiplier": 495.44986695048834,
+      "participation": 1.0,
+      "weight": 0.08593498747843757
+    },
+    {
+      "multiplier": 871.8359733667446,
+      "participation": 1.0,
+      "weight": 0.03911787270869081
+    },
+    {
+      "multiplier": 1.1470047469345959,
+      "participation": 0.5,
+      "weight": 5.061426867938942e-10
+    },
+    {
+      "multiplier": 2.018367683000977,
+      "participation": 0.5,
+      "weight": 1.1119051840023163e-09
+    },
+    {
+      "multiplier": 5.148745022628818,
+      "participation": 0.5,
+      "weight": 1.5685332459442956e-09
+    },
+    {
+      "multiplier": 16.78216691492811,
+      "participation": 0.5,
+      "weight": 1.8134189360312802e-09
+    },
+    {
+      "multiplier": 59.58706078119612,
+      "participation": 0.5,
+      "weight": 1.8134189360312802e-09
+    },
+    {
+      "multiplier": 194.22208627636118,
+      "participation": 0.5,
+      "weight": 1.5685332459442956e-09
+    },
+    {
+      "multiplier": 495.44986695048834,
+      "participation": 0.5,
+      "weight": 1.1119051840023163e-09
+    },
+    {
+      "multiplier": 871.8359733667446,
+      "participation": 0.5,
+      "weight": 5.061426867938942e-10
+    },
+    {
+      "multiplier": null,
+      "participation": 0.5,
+      "weight": 0.22713741281592334
+    }
+  ]
+}

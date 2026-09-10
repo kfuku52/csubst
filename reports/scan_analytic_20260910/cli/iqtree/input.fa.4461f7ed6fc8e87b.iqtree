@@ -1,0 +1,96 @@
+IQ-TREE 3.1.4 built Sep  9 2026
+
+Input file name: inputs/input.fa
+User tree file name: /tmp/.csubst_tmp_ze_xaqx9/tmp.csubst.nwk
+Type of analysis: tree reconstruction
+Random seed number: 1
+
+REFERENCES
+----------
+
+To cite IQ-TREE 3 please use:
+
+Thomas K.F. Wong, Nhan Ly-Trong, Huaiyan Ren, Piyumal Demotte, Hector Banos,
+Andrew J. Roger, Edward Susko, Chris Bielow, Nicola De Maio, Nick Goldman,
+Matthew W. Hahn, Mario dos Reis, Le Sy Vinh, Gavin Huttley, Robert Lanfear, Bui Quang Minh (2026)
+IQ-TREE 3: Phylogenomic Inference Software using Complex Evolutionary Models.
+Molecular Biology and Evolution, msag117.
+https://doi.org/10.1093/molbev/msag117
+
+SEQUENCE ALIGNMENT
+------------------
+
+Input data: 8 sequences with 100 codon sites
+Number of constant sites: 3 (= 3% of all sites)
+Number of invariant (constant or ambiguous constant) sites: 3 (= 3% of all sites)
+Number of parsimony informative sites: 50
+Number of distinct site patterns: 100
+
+SUBSTITUTION PROCESS
+--------------------
+
+Model of substitution: GY+FQ+G4
+
+Nonsynonymous/synonymous ratio (omega): 0.8764
+Transition/transversion ratio (kappa): 1.2918
+Model of rate heterogeneity: Gamma with 4 categories
+Gamma shape alpha: 9.0604
+
+ Category  Relative_rate  Proportion
+  1         0.6149         0.2500
+  2         0.8631         0.2500
+  3         1.0743         0.2500
+  4         1.4478         0.2500
+Relative rates are computed as MEAN of the portion of the Gamma distribution falling in the category.
+
+USER TREE
+---------
+
+Log-likelihood of the tree: -1826.7349 (s.e. 57.1291)
+Unconstrained log-likelihood (without tree): -460.5170
+Number of free parameters (#branches + #model parameters): 16
+Akaike information criterion (AIC) score: 3685.4699
+Corrected Akaike information criterion (AICc) score: 3692.0241
+Bayesian information criterion (BIC) score: 3727.1526
+
+Total tree length (sum of branch lengths): 3.8096
+Sum of internal branch lengths: 1.1330 (29.7409% of tree length)
+
+NOTE: Tree is UNROOTED although outgroup taxon 'a' is drawn at root
+
+NOTE: Branch lengths are interpreted as number of nucleotide substitutions per codon site!
+      Rescale them by 1/3 if you want to have #nt substitutions per nt site
+
++-----------------------------a
+| (Node1)
++------------b
+|
+|                    +-----------c
+|         +----------| (Node3)
+|         |          +----------------d
++---------| (Node2)
+          |                        +----------------------e
+          |               +--------| (Node5)
+          |               |        +------------f
+          +---------------| (Node4)
+                          |           +------------g
+                          +-----------| (Node6)
+                                      +-----------------h
+
+Tree in newick format:
+
+(a:0.5770819027,b:0.2543452856,((c:0.2336941371,d:0.3351640214)Node3:0.2178727347,((e:0.4365801868,f:0.2484698991)Node5:0.1844501060,(g:0.2469234229,h:0.3443609396)Node6:0.2290477418)Node4:0.3088076568)Node2:0.1928435654)Node1;
+
+ALISIM COMMAND
+--------------
+Currently, we only support exporting AliSim commands automatically from the analysis for common models of DNA, Protein, Binary, and Morphological data. To simulate data from other models (mixture, lie-markov, etc), please refer to the User Manual of AliSim. Thanks!
+
+For more information on using AliSim, please visit: www.iqtree.org/doc/AliSim
+
+TIME STAMP
+----------
+
+Date and time: Thu Sep 10 09:39:47 2026
+Total CPU time used: 2.34964 seconds (0h:0m:2s)
+Total wall-clock time used: 2.42281 seconds (0h:0m:2s)
+

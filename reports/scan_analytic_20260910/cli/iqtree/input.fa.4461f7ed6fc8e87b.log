@@ -1,0 +1,96 @@
+IQ-TREE version 3.1.4 for Linux ARM 64-bit built Sep  9 2026
+Developed by Bui Quang Minh, Thomas Wong, Nhan Ly-Trong, Huaiyan Ren
+Contributed by Lam-Tung Nguyen, Dominik Schrempf, Chris Bielow,
+Olga Chernomor, Michael Woodhams, Diep Thi Hoang, Heiko Schmidt
+
+Host:    6833df9551b4 (SSE4.2, 7 GB RAM)
+Command: iqtree -s inputs/input.fa -te /tmp/.csubst_tmp_ze_xaqx9/tmp.csubst.nwk -m GY+FQ+G4 --seqtype CODON1 --threads-max 1 -T AUTO --ancestral --rate --redo --prefix /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b -seed 1 -v
+Seed:    1 (Using SPRNG - Scalable Parallel Random Number Generator)
+Time:    Thu Sep 10 09:39:45 2026
+Kernel:  SSE2 - auto-detect threads (12 CPU cores detected)
+
+Reading alignment file inputs/input.fa ... Fasta format detected
+Reading fasta file: done in 0.000138998 secs using 62.59% CPU
+Name shortening took 0.000007 seconds.
+Duplicate sequence name check took 0.000003 seconds.
+Sequence Type detection took 0.000048 seconds.
+Alignment most likely contains DNA/RNA sequences
+Converting to codon sequences with genetic code 1 ...
+Constructing alignment: done in 0.000161171 secs using 75.08% CPU
+Time to read input file was 0.003143 sec.
+Time to count constant sites was 0.000002 sec.
+Alignment has 8 sequences with 100 columns, 100 distinct patterns
+50 parsimony-informative, 47 singleton sites, 3 constant sites
+Alignment state count time was 0.000003 seconds.
+Empirical state frequencies: 0.0037500000 0.0037500000 0.0175000000 0.0312500000 0.0187500000 0.0137500000 0.0125000000 0.0100000000 0.0050000000 0.0025000000 0.0300000000 0.0175000000 0.0150000000 0.0075000000 0.0212500000 0.0050000000 0.0175000000 0.0100000000 0.0112500000 0.0075000000 0.0137500000 0.0125000000 0.0200000000 0.0212500000 0.0100000000 0.0200000000 0.0100000000 0.0162500000 0.0125000000 0.0225000000 0.0212500000 0.0425000000 0.0050000000 0.0137500000 0.0087500000 0.0150000000 0.0125000000 0.0162500000 0.0125000000 0.0325000000 0.0225000000 0.0125000000 0.0162500000 0.0062500000 0.0137500000 0.0375000000 0.0075000000 0.0212500000 0.0275000000 0.0337500000 0.0275000000 0.0237500000 0.0162500000 0.0137500000 0.0125000000 0.0175000000 0.0212500000 0.0100000000 0.0200000000 0.0250000000 0.0137500000 
+   Gap/Ambiguity  Composition  p-value
+Analyzing sequences: done in 2.38419e-05 secs using 92.27% CPU
+   1  a    0.00%    passed     86.66%
+   2  b    0.00%    passed     84.70%
+   3  c    0.00%    passed     99.75%
+   4  d    0.00%    passed     99.84%
+   5  e    0.00%    passed     96.84%
+   6  f    0.00%    passed     99.38%
+   7  g    0.00%    passed     79.42%
+   8  h    0.00%    passed     92.78%
+****  TOTAL    0.00%  0 sequences failed composition chi2 test (p-value<5%; df=60)
+Alignment state count time was 0.000 seconds.
+Empirical state frequencies: 0.0037500000 0.0037500000 0.0175000000 0.0312500000 0.0187500000 0.0137500000 0.0125000000 0.0100000000 0.0050000000 0.0025000000 0.0300000000 0.0175000000 0.0150000000 0.0075000000 0.0212500000 0.0050000000 0.0175000000 0.0100000000 0.0112500000 0.0075000000 0.0137500000 0.0125000000 0.0200000000 0.0212500000 0.0100000000 0.0200000000 0.0100000000 0.0162500000 0.0125000000 0.0225000000 0.0212500000 0.0425000000 0.0050000000 0.0137500000 0.0087500000 0.0150000000 0.0125000000 0.0162500000 0.0125000000 0.0325000000 0.0225000000 0.0125000000 0.0162500000 0.0062500000 0.0137500000 0.0375000000 0.0075000000 0.0212500000 0.0275000000 0.0337500000 0.0275000000 0.0237500000 0.0162500000 0.0137500000 0.0125000000 0.0175000000 0.0212500000 0.0100000000 0.0200000000 0.0250000000 0.0137500000 
+Reading input tree file /tmp/.csubst_tmp_ze_xaqx9/tmp.csubst.nwk ...Tree contains 8 taxa and 14 branches (rooted)
+ rooted tree
+Converting rooted to unrooted tree...
+
+ML-TREE SEARCH START WITH THE FOLLOWING PARAMETERS:
+Model of evolution: GY+FQ+G4 with equal frequencies (16 free parameters)
+Fixed branch lengths: No
+Phylogenetic likelihood library: No
+Branch length optimization method: Newton
+Number of Newton-Raphson steps in NNI evaluation and branch length optimization: 10 / 10
+SSE instructions: Yes
+
+NOTE: 2 MB RAM (0 GB) is required!
+Measuring multi-threading efficiency up to 1 CPU cores
+Increase to 10 rounds for branch lengths
+6 trees examined
+Threads: 1 / Time: 1.0712997913 sec / Speedup: 1.0000000000 / Efficiency: 100% / LogL: -1984
+Determining AUTO threadcount: done in 1.07173 secs using 99.83% CPU
+BEST NUMBER OF THREADS: 1
+
+Estimate model parameters (epsilon = 0.0100000000)
+1. Initial log-likelihood: -1864.4401142527 (took 0.0124800205 wall-clock sec)
+Nonsynonymous/synonymous ratio (omega): 0.8801042072
+Transition/transversion ratio (kappa): 1.3288480875
+Gamma shape alpha: 8.8171007471
+2. Current log-likelihood: -1827.8979089343 (after 0.5795960426 wall-clock sec)
+Nonsynonymous/synonymous ratio (omega): 0.8763370990
+Transition/transversion ratio (kappa): 1.2930113115
+Gamma shape alpha: 9.0604432531
+3. Current log-likelihood: -1826.7350737862 (after 1.0227940083 wall-clock sec)
+Nonsynonymous/synonymous ratio (omega): 0.8764236851
+Transition/transversion ratio (kappa): 1.2917647420
+Gamma shape alpha: 9.0604432531
+Optimal log-likelihood: -1826.7349456476
+Parameters optimization took 3 rounds (1.2166998386 sec)
+Best tree printed to /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.treefile
+Wrote distance file to... 
+BEST SCORE FOUND : -1826.7349456476
+Ancestral state probabilities printed to /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.state
+Empirical proportions for each category: 0.3900000000 0.1800000000 0.1200000000 0.3100000000
+Site rates printed to /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.rate
+Total tree length: 3.8096415999
+
+Total number of iterations: 0
+CPU time used for tree search: 0.0000460000 sec (0h:0m:0s)
+Wall-clock time used for tree search: 0.0000450611 sec (0h:0m:0s)
+Total CPU time used: 2.3496350000 sec (0h:0m:2s)
+Total wall-clock time used: 2.4113361835 sec (0h:0m:2s)
+Best tree printed to /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.treefile
+
+Analysis results written to: 
+  IQ-TREE report:                /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.iqtree
+  Maximum-likelihood tree:       /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.treefile
+  Site-specific rates:           /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.rate
+  Ancestral state:               /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.state
+  Screen log file:               /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.log
+
+Date and Time: Thu Sep 10 09:39:47 2026

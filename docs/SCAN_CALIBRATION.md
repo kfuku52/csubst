@@ -1,5 +1,10 @@
 # Scan calibration and its assignment null
 
+An opt-in simulation-free alternative is documented in
+[analytical endpoint-enrichment inference](SCAN_ANALYTICAL.md). It has its own
+P columns and prespecified full-family correction; the diagnostics below retain
+their existing interpretation.
+
 `csubst scan` defaults to `--scan_pvalue_calibration full_scan`. Its empirical
 values compare foreground assignments on **fixed data**. They do not by
 themselves establish a biological null of no adaptive convergence, or control

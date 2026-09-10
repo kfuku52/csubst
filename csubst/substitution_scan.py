@@ -1895,7 +1895,8 @@ def filter_scan_site_plot_candidates(scan_df, g):
     if mode == "parametric_bootstrap" and calibration != "parametric_bootstrap":
         raise ValueError("--scan_site_plot_filter parametric_bootstrap requires --scan_pvalue_calibration parametric_bootstrap.")
     pvalue_columns = {
-        "analytical": "p_rate_enrichment_asymptotic",
+        "analytical": ("p_endpoint_enrichment_analytic" if g.get("scan_analytic_pvalue") == "endpoint_mixture"
+                       else "p_rate_enrichment_asymptotic"),
         "empirical": "p_rate_enrichment_empirical",
         "full_scan": "p_rate_enrichment_empirical_maxT",
         "parametric_bootstrap": "p_rate_enrichment_bootstrap_maxT",

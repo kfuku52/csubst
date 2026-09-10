@@ -1,0 +1,7 @@
+{
+  "model": "GY+FQ+G4",
+  "pruning_log_likelihood": -1826.7349458099109,
+  "iqtree_log_likelihood": -1826.7349,
+  "absolute_difference": 4.5809910943717114e-05,
+  "interpretation": "agreement within IQ-TREE report rounding; validates model/branch/rate integration, not FDR"
+}

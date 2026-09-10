@@ -1,0 +1,3 @@
+trait	unit_id	unit_mode	lineage_value	stem_branch_ids	fg_leaf_names	fg_branch_ids	sister_branch_ids	fg_clade_branch_ids
+PLACEHOLDER	1	clade	1	0	a	0	1	0
+PLACEHOLDER	2	clade	2	7	e	7	8	7

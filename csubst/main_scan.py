@@ -9,6 +9,7 @@ from csubst import runtime
 from csubst import substitution
 from csubst import substitution_scan
 from csubst import scan_bootstrap
+from csubst import scan_analytic
 from csubst import tree
 from csubst import main_sites
 from csubst import tsv
@@ -41,11 +42,11 @@ def _prepare_scan_output_table(scan_df):
     out = scan_df.copy()
     stat_columns = [
         col for col in out.columns
-        if str(col).startswith(("p_", "q_", "score_")) or col == "scan_pvalue_resolution"
+        if str(col).startswith(("p_", "q_", "score_")) or col in ("scan_pvalue_resolution", "log_e_endpoint_enrichment")
     ]
     for col in stat_columns:
         values = np.asarray(pd.to_numeric(out[col], errors="coerce"), dtype=np.float64)
-        precision = "{:.17e}" if str(col).startswith("score_") else "{:.6e}"
+        precision = "{:.17e}" if str(col).startswith(("score_", "log_e_", "p_endpoint_", "q_endpoint_")) else "{:.6e}"
         out[col] = [precision.format(value) if np.isfinite(value) else "" for value in values]
     return out
 
@@ -135,6 +136,7 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     g = runtime.ensure_output_layout(g, create_dir=True)
     _require_foreground(g)
     substitution_scan.validate_scan_configuration(g)
+    scan_analytic.validate_options(g)
     scan_bootstrap.validate_options(g)
     scan_bootstrap.require_precise_fit(g)
     unit_mode = substitution_scan.normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
@@ -155,11 +157,12 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     substitution_scan.validate_scan_configuration(g)
     g = parser_misc.prep_state(g, apply_site_filtering=False)
     bootstrap_model = scan_bootstrap.prepare_model(g) if g.get("scan_pvalue_calibration") == "parametric_bootstrap" else None
+    analytic_engine = scan_analytic.prepare(g)
     no_sites = False
     if bool(g.get('drop_invariant_tip_sites', False)):
         mask = parser_misc.get_site_drop_mask(
             g, g.get('drop_invariant_tip_sites_mode', 'tip_invariant'),
-            parser_misc.get_site_index_alignment(g, expected_num_site=g['state_cdn'].shape[1]),
+            parser_misc.get_site_index_alignment(g, expected_num_site=np.asarray(g['state_cdn']).shape[1]),
         )
         no_sites = bool(mask.size and mask.all())
     if no_sites:
@@ -215,6 +218,7 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
         )
     if bootstrap_model is not None:
         scan_df = scan_bootstrap.calibrate(g, scan_df, bootstrap_model)
+    scan_df = scan_analytic.annotate(g, scan_df, units_df, analytic_engine)
     scan_bootstrap.write_inference_report(g, scan_df)
     scan_path = runtime.output_path(g, "scan.tsv")
     units_path = runtime.output_path(g, "scan_units.tsv")

@@ -1,5 +1,10 @@
 # Scan scores and inference
 
+An opt-in simulation-free alternative is documented in
+[analytical endpoint-enrichment inference](SCAN_ANALYTICAL.md). It has its own
+P columns and prespecified full-family correction; the diagnostics below retain
+their existing interpretation.
+
 `scan` discovers recurrent foreground substitutions. The discovery threshold,
 foreground support and rate contrast use the same data. Consequently, the
 analytic tail and its BH adjustment are **exploratory diagnostics**, not

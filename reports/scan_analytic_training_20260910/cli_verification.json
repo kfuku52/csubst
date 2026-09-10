@@ -1,0 +1,7 @@
+{
+  "model": "GY+FQ+G4",
+  "runtime": "local/genegalleon:csubst-scan-inference-dev",
+  "candidate_rows": 8,
+  "profile_matches": true,
+  "pvalues_in_unit_interval": true
+}
