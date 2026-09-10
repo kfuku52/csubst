@@ -1,0 +1,25 @@
+{
+  "branch_table_PGK": {
+    "csubst_cb_2.tsv": {
+      "shape": [
+        1682,
+        39
+      ],
+      "parity": true
+    },
+    "csubst_b.tsv": {
+      "shape": [
+        65,
+        8
+      ],
+      "parity": true
+    }
+  },
+  "pytest": {
+    "passed": 1799,
+    "skipped": 5
+  },
+  "native_tests_passed": 8,
+  "lint": true,
+  "typecheck": true
+}

@@ -1,5 +1,9 @@
 # Choosing a 3Di predictor
 
+For model-conditioned branch endpoint probabilities, see
+[joint endpoint posteriors](ENDPOINT_POSTERIORS.md). This option uses the fitted
+native 3Di GTR model for N and an independent codon model for S.
+
 For residue-level accuracy and uncertainty measurements, see the
 [scientific validation workflow](STRUCTURAL_VALIDATION.md). These measurements
 do not by themselves calibrate ancestral events or structural omegaC.

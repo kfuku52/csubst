@@ -189,6 +189,14 @@ class SparseSubstitutionTensor:
         sg, a, d = self.decode_event_ids(event_ids)
         return np.asarray(coo.row, dtype=np.int64), site, sg, a, d, coo.data
 
+    def iter_branch_coordinates(self):
+        """Decode only one CSR row at a time, bounding temporary coordinate RAM."""
+        for branch in range(self.num_branch):
+            begin, end = self.matrix.indptr[branch:branch + 2]
+            event_ids, site = np.divmod(self.matrix.indices[begin:end], self.num_site)
+            sg, a, d = self.decode_event_ids(event_ids)
+            yield branch, site, sg, a, d, self.matrix.data[begin:end]
+
     def to_dense(self):
         out = np.zeros(shape=self.shape, dtype=self.dtype)
         branch, site, sg, a, d, data = self._coordinates()
@@ -206,13 +214,13 @@ class SparseSubstitutionTensor:
         out = np.zeros(tuple(self.shape[ax] for ax in remaining_axes), dtype=out_dtype)
         if self.nnz == 0:
             return out
-        branch, site, sg, a, d, data = self._coordinates()
-        coords = (branch, site, sg, a, d)
-        values = np.asarray(data, dtype=out_dtype)
-        if not remaining_axes:
-            out[...] = values.sum(dtype=out_dtype)
-        else:
-            np.add.at(out, tuple(coords[ax] for ax in remaining_axes), values)
+        for branch, site, sg, a, d, data in self.iter_branch_coordinates():
+            coords = (branch, site, sg, a, d)
+            values = np.asarray(data, dtype=out_dtype)
+            if not remaining_axes:
+                out[...] += values.sum(dtype=out_dtype)
+            else:
+                np.add.at(out, tuple(coords[ax] for ax in remaining_axes), values)
         return out
 
     def get_block(self, sg, a, d):
@@ -227,34 +235,35 @@ class SparseSubstitutionTensor:
     def project(self, stat):
         if stat == 'spe2spe':
             return self.matrix if self.matrix.dtype == np.float64 else self.matrix.astype(np.float64)
-        event_ids = self.matrix.indices // self.num_site
-        sites = self.matrix.indices % self.num_site
-        sg, a, d = self.decode_event_ids(event_ids)
         if stat == 'any2any':
-            feature = sg
             num_feature = self.num_group
         elif stat == 'spe2any':
-            feature = sg * self.num_state_from + a
             num_feature = self.num_group * self.num_state_from
         elif stat == 'any2spe':
-            feature = sg * self.num_state_to + d
             num_feature = self.num_group * self.num_state_to
         else:
             raise ValueError('Unsupported projection statistic: {}'.format(stat))
-        indices = np.asarray(feature * self.num_site + sites, dtype=self.matrix.indices.dtype)
-        projection = sp.csr_matrix(
-            (
-                np.asarray(self.matrix.data, dtype=np.float64).copy(),
-                indices,
-                self.matrix.indptr.copy(),
-            ),
-            shape=(self.num_branch, int(num_feature) * self.num_site),
-            dtype=np.float64,
-        )
-        projection.sum_duplicates()
-        projection.eliminate_zeros()
-        projection.sort_indices()
-        return projection
+        # Do not decode five coordinates and copy all values at once. Exact
+        # endpoint posteriors can have many tiny nonzeros; that former path
+        # used several times the tensor's RAM simply to reduce its state axes.
+        width = int(num_feature) * self.num_site
+        rows = []
+        for branch in range(self.num_branch):
+            begin, end = self.matrix.indptr[branch:branch + 2]
+            columns = self.matrix.indices[begin:end]
+            event_ids, sites = np.divmod(columns, self.num_site)
+            sg, a, d = self.decode_event_ids(event_ids)
+            feature = sg if stat == 'any2any' else (
+                sg * self.num_state_from + a if stat == 'spe2any' else sg * self.num_state_to + d)
+            indices = np.asarray(feature * self.num_site + sites, dtype=self.matrix.indices.dtype)
+            row = sp.csr_matrix((np.asarray(self.matrix.data[begin:end], dtype=np.float64).copy(),
+                                 indices, np.array([0, end - begin])), shape=(1, width))
+            row.sum_duplicates()
+            row.eliminate_zeros()
+            rows.append(row)
+        if not rows:
+            return sp.csr_matrix((0, width), dtype=np.float64)
+        return sp.vstack(rows, format='csr')
 
     def project_any2any(self, sg):
         return self.project('any2any')[:, int(sg) * self.num_site:(int(sg) + 1) * self.num_site]
@@ -312,28 +321,57 @@ def summarize_sparse_sub_tensor(sparse_tensor, mode):
     out_dtype = np.int64 if np.issubdtype(dtype, np.bool_) else np.result_type(
         dtype, np.int64 if np.issubdtype(dtype, np.integer) else dtype
     )
-    branch, site, sg, a, d, values = sparse_tensor._coordinates()
-    values = np.asarray(values, dtype=out_dtype)
     if mode == 'spe2spe':
         sub_bg = np.zeros((num_branch, num_group, num_state_from, num_state_to), dtype=out_dtype)
         sub_sg = np.zeros((num_site, num_group, num_state_from, num_state_to), dtype=out_dtype)
-        np.add.at(sub_bg, (branch, sg, a, d), values)
-        np.add.at(sub_sg, (site, sg, a, d), values)
     elif mode == 'spe2any':
         sub_bg = np.zeros((num_branch, num_group, num_state_from), dtype=out_dtype)
         sub_sg = np.zeros((num_site, num_group, num_state_from), dtype=out_dtype)
-        np.add.at(sub_bg, (branch, sg, a), values)
-        np.add.at(sub_sg, (site, sg, a), values)
     elif mode == 'any2spe':
         sub_bg = np.zeros((num_branch, num_group, num_state_to), dtype=out_dtype)
         sub_sg = np.zeros((num_site, num_group, num_state_to), dtype=out_dtype)
-        np.add.at(sub_bg, (branch, sg, d), values)
-        np.add.at(sub_sg, (site, sg, d), values)
     elif mode == 'any2any':
         sub_bg = np.zeros((num_branch, num_group), dtype=out_dtype)
         sub_sg = np.zeros((num_site, num_group), dtype=out_dtype)
-        np.add.at(sub_bg, (branch, sg), values)
-        np.add.at(sub_sg, (site, sg), values)
     else:
         raise ValueError('Unsupported mode: {}'.format(mode))
+    for branch, site, sg, a, d, values in sparse_tensor.iter_branch_coordinates():
+        values = np.asarray(values, dtype=out_dtype)
+        axes = (sg, a, d) if mode == 'spe2spe' else ((sg, a) if mode == 'spe2any' else (
+            (sg, d) if mode == 'any2spe' else (sg,)))
+        np.add.at(sub_bg, (branch, *axes), values)
+        np.add.at(sub_sg, (site, *axes), values)
     return sub_bg, sub_sg
+
+
+class ProjectedSubstitutionTensor(SparseSubstitutionTensor):
+    """Search reducer containing projections, not individual substitution events.
+
+    Only created for consumers that need counts and selected CB projections.
+    Full event consumers must request the ordinary SparseSubstitutionTensor.
+    """
+
+    def __init__(self, shape, dtype, projections, sitewise_max=None):
+        self.shape = tuple(shape)
+        self.dtype = np.dtype(dtype)
+        self.projections = projections
+        self.sitewise_max = sitewise_max
+        self.branch_site = projections['any2any'].toarray().reshape(
+            self.num_branch, self.num_group, self.num_site).sum(axis=1)
+        for matrix in projections.values():
+            matrix.data.flags.writeable = False
+            matrix.indices.flags.writeable = False
+            matrix.indptr.flags.writeable = False
+
+    @property
+    def matrix(self):
+        raise ValueError('Individual events were not retained by the projected search reducer.')
+
+    @property
+    def nbytes(self):
+        return self.branch_site.nbytes + sum(
+            x.data.nbytes + x.indices.nbytes + x.indptr.nbytes for x in self.projections.values()
+        ) + (0 if self.sitewise_max is None else sum(x.nbytes for x in self.sitewise_max))
+
+    def project(self, stat):
+        return self.projections[stat]

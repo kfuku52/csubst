@@ -2350,6 +2350,9 @@ def _expected_branch_lengths(g, mode):
 
 
 def _get_fused_expected_sparse_substitution_tensor(g, mode):
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        raise ValueError('Joint endpoints use the expected sparse reducer; a projected child marginal is insufficient.')
     if str(g.get('expected_state_backend', 'auto')).strip().lower() == 'expm':
         return None
     if mode == 'cdn':
@@ -2491,6 +2494,9 @@ def _project_expected_branch_expm(
 def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
     """Build only reducer projections, never an expected 5-D tensor."""
     selected = substitution._resolve_cb_base_substitutions(selected_base_stats)
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        return endpoint_io.expected_reducer(g, mode, selected)
     if mode == 'cdn':
         state = g['state_cdn'].astype(g['float_type'], copy=False)
         inst = g['instantaneous_codon_rate_matrix']
@@ -3090,6 +3096,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
 
 
 def get_exp_state(g, mode):
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        raise ValueError('Joint endpoint predictions retain both state axes; use the expected sparse reducer.')
     if mode=='cdn':
         state = g['state_cdn'].astype(g['float_type'], copy=False)
         inst = g['instantaneous_codon_rate_matrix']

@@ -758,6 +758,13 @@ def _make_iqtree_parser(show_advanced):
 
 def _make_ancestral_parser():
     psr_as = argparse.ArgumentParser(add_help=False)
+    psr_as.add_argument('--substitution_posterior', choices=['marginal', 'joint'], default='marginal',
+                        help='default=%(default)s: marginal multiplies node marginals; joint computes '
+                             'CTMC endpoint posteriors and matched conditional model predictions. '
+                             'Joint supports ECM/GY codons and direct uniform-GTR 3Di.')
+    psr_as.add_argument('--endpoint_block_size', metavar='INTEGER', type=int, default=64,
+                        help='default=%(default)s: Sites per joint-endpoint inference block; '
+                             'smaller values reduce temporary RAM without changing the estimator.')
     psr_as.add_argument('--ml_anc', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Maximum-likelihood-like analysis by binarizing ancestral states.')
     psr_as.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,

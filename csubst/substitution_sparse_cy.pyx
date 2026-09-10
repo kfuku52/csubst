@@ -842,3 +842,50 @@ cpdef scan_sitewise_max_indices_double(
         numpy.asarray(anc_idx[:out_count]),
         numpy.asarray(der_idx[:out_count]),
     )
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef project_endpoint_syn_double(
+    const double[:, :] left,
+    const double[:, :] right,
+    const double[:, :] transition,
+    const numpy.int64_t[:, :] pairs,
+    Py_ssize_t num_group,
+    Py_ssize_t num_state,
+    bint need_from,
+    bint need_to,
+):
+    """Sum within-group off-diagonal endpoints without a padded event block."""
+    cdef Py_ssize_t size = left.shape[0]
+    cdef Py_ssize_t k = left.shape[1]
+    cdef Py_ssize_t s, p, g, a, d, ca, cd
+    if (right.shape[0] != size or right.shape[1] != k or
+            transition.shape[0] != k or transition.shape[1] != k or
+            pairs.shape[1] != 5 or num_group < 1 or num_state < 1):
+        raise ValueError('Invalid endpoint projection dimensions.')
+    for p in range(pairs.shape[0]):
+        if (pairs[p, 0] < 0 or pairs[p, 0] >= num_group or
+                pairs[p, 1] < 0 or pairs[p, 1] >= num_state or
+                pairs[p, 2] < 0 or pairs[p, 2] >= num_state or
+                pairs[p, 3] < 0 or pairs[p, 3] >= k or
+                pairs[p, 4] < 0 or pairs[p, 4] >= k):
+            raise ValueError('Invalid endpoint projection pair indices.')
+    cdef object total = numpy.zeros((size, num_group))
+    cdef object ancestral = numpy.zeros((size, num_group, num_state if need_from else 0))
+    cdef object derived = numpy.zeros((size, num_group, num_state if need_to else 0))
+    cdef double[:, :] total_mv = total
+    cdef double[:, :, :] from_mv = ancestral
+    cdef double[:, :, :] to_mv = derived
+    cdef double value
+    with nogil:
+        for s in range(size):
+            for p in range(pairs.shape[0]):
+                g, a, d, ca, cd = pairs[p, 0], pairs[p, 1], pairs[p, 2], pairs[p, 3], pairs[p, 4]
+                value = left[s, ca] * transition[ca, cd] * right[s, cd]
+                total_mv[s, g] += value
+                if need_from:
+                    from_mv[s, g, a] += value
+                if need_to:
+                    to_mv[s, g, d] += value
+    return total, ancestral, derived

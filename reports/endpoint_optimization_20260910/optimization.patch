@@ -1,0 +1,394 @@
+--- a/csubst/endpoint.py
++++ b/csubst/endpoint.py
+@@ -22,6 +22,8 @@
+     node: np.ndarray
+     joint: np.ndarray | None
+     predictive: np.ndarray | None
++    reduced: dict | None = None
++    reduced_predictive: dict | None = None
+ 
+ 
+ class EndpointModel:
+@@ -88,7 +90,7 @@
+         self._transitions.move_to_end(t)
+         return self._transitions[t]
+ 
+-    def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False):
++    def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None):
+         """Yield one edge/site block; root records only contain a node marginal.
+ 
+         Tips are observation likelihoods, NOT posterior probabilities. Missing
+@@ -152,22 +154,37 @@
+             for child in self.order[1:]:
+                 parent = int(self.parents[child])
+                 wanted = child in selected
+-                edge = np.zeros((size, k, k)) if joint and wanted else None
+-                pred = np.zeros((size, k, k)) if predictive and wanted else None
++                edge = np.zeros((size, k, k)) if joint and wanted and transform is None else None
++                pred = np.zeros((size, k, k)) if predictive and wanted and transform is None else None
++                reduced: dict = {}
++                reduced_pred: dict = {}
+                 for c in range(nc):
+                     transition = self.transition(child, c)
+                     denominator = inside[c, child] @ transition.T
+                     # Conditioning the child on its parent avoids retaining
+                     # outside likelihoods or a joint for every branch.
+-                    conditional = transition[None, :, :] * inside[c, child, :, None, :]
+-                    np.divide(conditional, denominator[:, :, None], out=conditional,
+-                              where=denominator[:, :, None] > 0)
+-                    conditional *= post[c, parent, :, :, None]
+-                    post[c, child] = conditional.sum(axis=1)
++                    left = np.divide(post[c, parent], denominator,
++                                     out=np.zeros_like(denominator), where=denominator > 0)
++                    right = inside[c, child]
++                    post[c, child] = (left @ transition) * right
+                     if edge is not None:
+-                        edge += class_weight[c, :, None, None] * conditional
++                        edge += ((left * class_weight[c, :, None])[:, :, None]
++                                 * transition * right[:, None, :])
+                     if pred is not None:
+                         pred += (class_weight[c, :, None, None]
+                                  * post[c, parent, :, :, None] * transition)
++                    if transform is not None and wanted:
++                        for target, lvalues, rvalues in (
++                                (reduced, left, right),
++                                (reduced_pred, post[c, parent], np.ones_like(right))):
++                            if target is reduced_pred and not predictive:
++                                continue
++                            values = transform(lvalues * class_weight[c, :, None], rvalues, transition)
++                            for key, value in values.items():
++                                if key not in target:
++                                    target[key] = value
++                                else:
++                                    target[key] += value
+                 yield EndpointBlock(start, stop, child, parent,
+-                                    np.einsum('cs,csk->sk', class_weight, post[:, child]), edge, pred)
++                                    np.einsum('cs,csk->sk', class_weight, post[:, child]), edge, pred,
++                                    reduced, reduced_pred)
+--- a/csubst/endpoint_io.py
++++ b/csubst/endpoint_io.py
+@@ -153,6 +153,68 @@
+             'any2spe': events.sum(axis=2),
+             'spe2spe': events}
+ 
++
++
++def _use_projected_search(g, selected_stats):
++    # These consumers require individual events or additional null summaries.
++    # Keep their full, exact representation rather than approximate a missing
++    # statistic from a coarser projection.
++    return (g.get('subcommand') in ('search', 'analyze', 'benchmark')
++            and g.get('expectation_method', 'codon_model') == 'codon_model'
++            and not any(g.get(key, False) for key in (
++                'cs', 'cbs', 'calc_omega_pvalue', 'asrv_report', 'calibrate_longtail'))
++            and not g.get('epistasis_requested', False)
++            and g.get('asrv_training_branches', 'all') == 'all'
++            and float(g.get('min_sub_pp', 0)) == 0
++            and 'spe2spe' not in selected_stats)
++
++
++def _projection_transform(g, kinds, mappings, stats):
++    """Contract only within-S pairs and cross-group N transition marginals.
++
++    The cross-group mask sums positive terms directly, avoiding cancellation
++    from subtracting the (often almost unit) unchanged probability.
++    """
++    syn_indices = [np.asarray(g['synonymous_indices'][aa], dtype=int)
++                   for aa in g['amino_acid_orders']] if 'S' in kinds else []
++    syn_pairs = [(sg, a, d, int(ca), int(cd))
++                 for sg, idx in enumerate(syn_indices)
++                 for a, ca in enumerate(idx) for d, cd in enumerate(idx) if a != d]
++    pairs = np.asarray(syn_pairs, dtype=np.int64).reshape(-1, 5)
++    syn_axes = pairs.T
++    cython_project = getattr(substitution_sparse.substitution_sparse_cy, 'project_endpoint_syn_double', None)
++    masks = {kind: (mapping @ mapping.T == 0) for kind, mapping in mappings.items()
++             if mapping is not None}
++
++    def transform(left, right, transition):
++        out = {}
++        for kind in kinds:
++            if kind == 'S' and cython_project is not None:
++                total, ancestral, derived = cython_project(
++                    left, right, transition, pairs, len(syn_indices),
++                    g['max_synonymous_size'], 'spe2any' in stats, 'any2spe' in stats)
++                out[kind, 'any2any'] = total
++                if 'spe2any' in stats:
++                    out[kind, 'spe2any'] = ancestral
++                if 'any2spe' in stats:
++                    out[kind, 'any2spe'] = derived
++            elif kind == 'S':
++                events = np.zeros((left.shape[0], len(syn_indices),
++                                   g['max_synonymous_size'], g['max_synonymous_size']))
++                sg, a, d, ca, cd = syn_axes
++                events[:, sg, a, d] = left[:, ca] * transition[ca, cd] * right[:, cd]
++                out.update({(kind, stat): value for stat, value in _projections(events).items()
++                            if stat in stats})
++            else:
++                cross = transition * masks[kind]
++                derived = ((left @ cross) * right) @ mappings[kind]
++                out[kind, 'any2any'] = derived.sum(axis=1, keepdims=True)
++                if 'any2spe' in stats:
++                    out[kind, 'any2spe'] = derived[:, None, :]
++                if 'spe2any' in stats:
++                    out[kind, 'spe2any'] = (((right @ cross.T) * left) @ mappings[kind])[:, None, :]
++        return out
++    return transform
+ 
+ def _build(g, structural=False):
+     source = g['state_nsy'] if structural else g['state_cdn']
+@@ -211,9 +273,24 @@
+         shapes[kind] = (n, num_site, ng, ns, ns)
+     from csubst import omega, output_stat
+     selected_stats = output_stat.get_required_base_stats(omega._resolve_requested_output_stats(g))
++    projected = _use_projected_search(g, selected_stats)
++    observed_stats = set(selected_stats) | {'any2any'}
++    direct = projected and not g.get('b', False) and 'AA' not in kinds
++    transform = _projection_transform(g, kinds, mappings, observed_stats) if direct else None
+     with ExitStack() as stack:
+         builders = {kind: _Spool(stack, n, int(np.prod(shape[1:])), source.dtype)
+-                    for kind, shape in shapes.items()}
++                    for kind, shape in shapes.items()} if not projected else {}
++        obuilders = {}
++        maxima = {}
++        if projected:
++            for kind, shape in shapes.items():
++                ng, ns = shape[2:4]
++                features = {'any2any': ng, 'spe2any': ng * ns, 'any2spe': ng * ns}
++                obuilders[kind] = {stat: _Spool(stack, n, num_site * features[stat], source.dtype)
++                                   for stat in observed_stats}
++                if g.get('b', False):
++                    maxima[kind] = (np.zeros((n, num_site)), np.zeros((n, num_site), dtype=np.int32),
++                                    np.zeros((n, num_site), dtype=np.int32))
+         ebuilders = {}
+         totals = {kind: 0.0 for kind in kinds}
+         for kind in kinds:
+@@ -222,7 +299,7 @@
+                 features = {'any2any': ng, 'spe2any': ng * ns, 'any2spe': ng * ns, 'spe2spe': ng * ns * ns}
+                 ebuilders[kind] = {stat: _Spool(stack, n, num_site * count, source.dtype)
+                                    for stat, count in features.items() if stat in selected_stats}
+-        for record in model.iter_blocks(tips, block_size=g.get('endpoint_block_size', 64), predictive=expected):
++        for record in model.iter_blocks(tips, block_size=g.get('endpoint_block_size', 64), predictive=expected, transform=transform):
+             sl = slice(record.start, record.stop)
+             node = record.child
+             if node not in model.leaves:
+@@ -237,21 +314,51 @@
+             if record.parent < 0:
+                 continue
+             valid = observed[node, sl] & observed[record.parent, sl]
+-            record.joint[~valid] = 0
++            if record.joint is not None:
++                record.joint[~valid] = 0
+             if record.predictive is not None:
+                 record.predictive[~valid] = 0
+             for kind in kinds:
+-                events = _events(record.joint, kind, g, mappings[kind])
+-                builders[kind].append(node, events, record.start, num_site)
++                if direct:
++                    projections = {stat: record.reduced[kind, stat] for stat in observed_stats}
++                    for values in projections.values():
++                        values[~valid] = 0
++                else:
++                    events = _events(record.joint, kind, g, mappings[kind])
++                    projections = _projections(events)
++                if projected:
++                    for stat, builder in obuilders[kind].items():
++                        builder.append(node, projections[stat], record.start, num_site)
++                    if kind in maxima:
++                        flat = events.reshape(events.shape[0], -1)
++                        index = flat.argmax(axis=1)
++                        ns = shapes[kind][-1]
++                        maxima[kind][0][node, sl] = flat[np.arange(len(index)), index]
++                        maxima[kind][1][node, sl] = (index // ns) % ns
++                        maxima[kind][2][node, sl] = index % ns
++                else:
++                    builders[kind].append(node, events, record.start, num_site)
+                 if kind in ebuilders:
+-                    prediction = _events(record.predictive, kind, g, mappings[kind])
+-                    totals[kind] += float(prediction.sum())
+-                    for stat, values in _projections(prediction).items():
+-                        if stat in ebuilders[kind]:
+-                            ebuilders[kind][stat].append(node, values, record.start, num_site)
++                    if direct:
++                        prediction_projections = {stat: record.reduced_predictive[kind, stat]
++                                                  for stat in observed_stats}
++                        for values in prediction_projections.values():
++                            values[~valid] = 0
++                    else:
++                        prediction = _events(record.predictive, kind, g, mappings[kind])
++                        prediction_projections = _projections(prediction)
++                    totals[kind] += float(prediction_projections['any2any'].sum())
++                    for stat, builder in ebuilders[kind].items():
++                        builder.append(node, prediction_projections[stat], record.start, num_site)
+         for kind in kinds:
+-            cache[kind] = substitution_sparse.SparseSubstitutionTensor(
+-                shapes[kind], source.dtype, matrix=builders[kind].finish())
++            if projected:
++                cache[kind] = substitution_sparse.ProjectedSubstitutionTensor(
++                    shapes[kind], source.dtype,
++                    {stat: builder.finish() for stat, builder in obuilders[kind].items()},
++                    maxima.get(kind))
++            else:
++                cache[kind] = substitution_sparse.SparseSubstitutionTensor(
++                    shapes[kind], source.dtype, matrix=builders[kind].finish())
+             if kind in ebuilders:
+                 projections = {stat: builder.finish() for stat, builder in ebuilders[kind].items()}
+                 expected_cache[kind] = {
+@@ -264,6 +371,8 @@
+         cache['AA'] = cache['N']
+     manifest = g.setdefault('_endpoint_manifest', {})
+     manifest['3di' if structural else 'codon'] = {
++        'observed_storage': 'projections' if projected else 'full_events',
++        'direct_projection': direct,
+         'rates': np.asarray(rates).tolist(), 'weights': np.asarray(weights).tolist(),
+         'branch_lengths': lengths.tolist(),
+         'parameter_source': '3di_checkpoint' if structural else 'iqtree_report_and_model_matrix',
+--- a/csubst/substitution.py
++++ b/csubst/substitution.py
+@@ -666,12 +666,16 @@
+ 
+ 
+ def get_branch_sub_counts(sub_tensor):
++    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
++        return sub_tensor.branch_site.sum(axis=1)
+     if _is_sparse_sub_tensor(sub_tensor):
+         return np.asarray(sub_tensor.matrix.sum(axis=1), dtype=np.float64).reshape(-1)
+     return sub_tensor.sum(axis=(1, 2, 3, 4))
+ 
+ 
+ def get_site_sub_counts(sub_tensor):
++    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
++        return sub_tensor.branch_site.sum(axis=0)
+     if _is_sparse_sub_tensor(sub_tensor):
+         out = np.zeros(shape=(sub_tensor.num_site,), dtype=np.float64)
+         np.add.at(out, sub_tensor.matrix.indices % sub_tensor.num_site, sub_tensor.matrix.data)
+@@ -680,6 +684,8 @@
+ 
+ 
+ def get_branch_site_sub_counts(sub_tensor, branch_id):
++    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
++        return sub_tensor.branch_site[int(branch_id)]
+     if _is_sparse_sub_tensor(sub_tensor):
+         out = np.zeros(shape=(sub_tensor.num_site,), dtype=np.float64)
+         start = int(sub_tensor.matrix.indptr[int(branch_id)])
+@@ -770,6 +776,8 @@
+ 
+ 
+ def get_total_substitution(sub_tensor):
++    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
++        return float(sub_tensor.branch_site.sum())
+     if _is_sparse_sub_tensor(sub_tensor):
+         return float(sub_tensor.matrix.data.sum())
+     return float(sub_tensor.sum())
+@@ -856,6 +864,10 @@
+ 
+ 
+ def _get_sparse_branch_sitewise_max_indices(sub_tensor, branch_id, min_sitewise_pp):
++    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
++        prob, anc, der = sub_tensor.sitewise_max
++        selected = np.flatnonzero((prob[int(branch_id)] > 0) & (prob[int(branch_id)] >= min_sitewise_pp))
++        return selected, anc[int(branch_id), selected], der[int(branch_id), selected]
+     num_site = int(sub_tensor.num_site)
+     max_prob = np.full(shape=(num_site,), fill_value=-np.inf, dtype=np.float64)
+     max_a = np.full(shape=(num_site,), fill_value=-1, dtype=np.int64)
+@@ -2134,6 +2146,9 @@
+ 
+ 
+ def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
++    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
++        return get_cb_from_sparse_projections(id_combinations, sub_tensor.projections,
++                                              attr, g, selected_base_stats)
+     sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cb_'+attr)
+     arity = id_combinations.shape[1]
+     selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
+--- a/csubst/substitution_sparse.py
++++ b/csubst/substitution_sparse.py
+@@ -342,3 +342,36 @@
+         np.add.at(sub_bg, (branch, *axes), values)
+         np.add.at(sub_sg, (site, *axes), values)
+     return sub_bg, sub_sg
++
++
++class ProjectedSubstitutionTensor(SparseSubstitutionTensor):
++    """Search reducer containing projections, not individual substitution events.
++
++    Only created for consumers that need counts and selected CB projections.
++    Full event consumers must request the ordinary SparseSubstitutionTensor.
++    """
++
++    def __init__(self, shape, dtype, projections, sitewise_max=None):
++        self.shape = tuple(shape)
++        self.dtype = np.dtype(dtype)
++        self.projections = projections
++        self.sitewise_max = sitewise_max
++        self.branch_site = projections['any2any'].toarray().reshape(
++            self.num_branch, self.num_group, self.num_site).sum(axis=1)
++        for matrix in projections.values():
++            matrix.data.flags.writeable = False
++            matrix.indices.flags.writeable = False
++            matrix.indptr.flags.writeable = False
++
++    @property
++    def matrix(self):
++        raise ValueError('Individual events were not retained by the projected search reducer.')
++
++    @property
++    def nbytes(self):
++        return self.branch_site.nbytes + sum(
++            x.data.nbytes + x.indices.nbytes + x.indptr.nbytes for x in self.projections.values()
++        ) + (0 if self.sitewise_max is None else sum(x.nbytes for x in self.sitewise_max))
++
++    def project(self, stat):
++        return self.projections[stat]
+--- a/csubst/substitution_sparse_cy.pyx
++++ b/csubst/substitution_sparse_cy.pyx
+@@ -842,3 +842,50 @@
+         numpy.asarray(anc_idx[:out_count]),
+         numpy.asarray(der_idx[:out_count]),
+     )
++
++
++@cython.boundscheck(False)
++@cython.wraparound(False)
++cpdef project_endpoint_syn_double(
++    const double[:, :] left,
++    const double[:, :] right,
++    const double[:, :] transition,
++    const numpy.int64_t[:, :] pairs,
++    Py_ssize_t num_group,
++    Py_ssize_t num_state,
++    bint need_from,
++    bint need_to,
++):
++    """Sum within-group off-diagonal endpoints without a padded event block."""
++    cdef Py_ssize_t size = left.shape[0]
++    cdef Py_ssize_t k = left.shape[1]
++    cdef Py_ssize_t s, p, g, a, d, ca, cd
++    if (right.shape[0] != size or right.shape[1] != k or
++            transition.shape[0] != k or transition.shape[1] != k or
++            pairs.shape[1] != 5 or num_group < 1 or num_state < 1):
++        raise ValueError('Invalid endpoint projection dimensions.')
++    for p in range(pairs.shape[0]):
++        if (pairs[p, 0] < 0 or pairs[p, 0] >= num_group or
++                pairs[p, 1] < 0 or pairs[p, 1] >= num_state or
++                pairs[p, 2] < 0 or pairs[p, 2] >= num_state or
++                pairs[p, 3] < 0 or pairs[p, 3] >= k or
++                pairs[p, 4] < 0 or pairs[p, 4] >= k):
++            raise ValueError('Invalid endpoint projection pair indices.')
++    cdef object total = numpy.zeros((size, num_group))
++    cdef object ancestral = numpy.zeros((size, num_group, num_state if need_from else 0))
++    cdef object derived = numpy.zeros((size, num_group, num_state if need_to else 0))
++    cdef double[:, :] total_mv = total
++    cdef double[:, :, :] from_mv = ancestral
++    cdef double[:, :, :] to_mv = derived
++    cdef double value
++    with nogil:
++        for s in range(size):
++            for p in range(pairs.shape[0]):
++                g, a, d, ca, cd = pairs[p, 0], pairs[p, 1], pairs[p, 2], pairs[p, 3], pairs[p, 4]
++                value = left[s, ca] * transition[ca, cd] * right[s, cd]
++                total_mv[s, g] += value
++                if need_from:
++                    from_mv[s, g, a] += value
++                if need_to:
++                    to_mv[s, g, d] += value
++    return total, ancestral, derived

@@ -396,7 +396,8 @@ def read_input(g, state_metadata_only=False):
     else:
         raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     expectation_method = _resolve_expectation_method(g)
-    if expectation_method != 'codon_model':
+    from csubst import endpoint_io
+    if expectation_method != 'codon_model' and not endpoint_io.enabled(g):
         g = _initialize_and_report_nonsyn_recode(g)
         return g
     base_model = re.sub(r'\+G.*', '', g['substitution_model'])
@@ -611,6 +612,9 @@ def get_equilibrium_frequency(g, mode):
         raise ValueError('Unsupported equilibrium-frequency mode: {}'.format(mode))
 
 def _can_use_selective_state_loading(g):
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        return False, 'joint endpoint inference conditions on all tips.'
     if g.get('exhaustive_until', None) != 1:
         return False, None
     if g.get('foreground', None) is None:
@@ -946,6 +950,12 @@ def _get_drop_site_branch_pairs(g):
 
 
 def _get_zero_substitution_mass_site_mask(g):
+    from csubst import endpoint_io, substitution
+    if endpoint_io.enabled(g):
+        endpoint_io.prepare(g)
+        s_counts = substitution.get_site_sub_counts(g['_endpoint_tensors']['S'])
+        n_counts = substitution.get_site_sub_counts(g['_endpoint_tensors']['N'])
+        return (s_counts + n_counts) <= float(g.get('float_tol', 0))
     state_cdn = g.get('state_cdn', None)
     state_nsy = g.get('state_nsy', None)
     if (state_cdn is None) or (state_nsy is None):
@@ -1047,6 +1057,9 @@ def drop_invariant_tip_sites(g):
         g['dropped_tip_invariant_site_alignment'] = np.array([], dtype=np.int64)
         return g
     keep_mask = ~is_drop_site
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        endpoint_io.invalidate(g)
     if keep_mask.sum() == 0:
         txt = 'All codon sites were classified as drop candidates and would be dropped (mode={}).'
         raise ValueError(txt.format(mode))
@@ -1223,6 +1236,8 @@ def prep_state(g, apply_site_filtering=True):
     g['state_nsy'] = state_nsy
     if state_cdn is not None:
         get_site_index_alignment(g=g, expected_num_site=state_cdn.shape[1])
+    from csubst import endpoint_io
+    endpoint_io.prepare(g)
     if apply_site_filtering:
         g = apply_site_filters(g)
     return g

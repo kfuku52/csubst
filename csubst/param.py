@@ -555,6 +555,8 @@ def _normalize_search_parameters(g: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_state_parameters(g: dict[str, Any]) -> dict[str, Any]:
+    from csubst import endpoint_io
+    endpoint_io.validate_options(g)
     g['float_type'] = np.float64
     g['float_tol'] = 10**-9
     if 'expected_state_backend' in g.keys():
