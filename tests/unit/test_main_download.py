@@ -10,6 +10,21 @@ def test_normalize_resources_supports_all_and_rejects_unknown():
         main_download._normalize_resources('unknown')
 
 
+@pytest.mark.parametrize('config', [{}, {'no_download': True}])
+def test_main_download_defaults_to_esm3di(monkeypatch, config):
+    calls = []
+
+    def prepare(g):
+        calls.append(g)
+        return '/cache/esm3di-35m'
+
+    monkeypatch.setattr(main_download.structural_prediction, 'ensure_encoder_model_files', prepare)
+    main_download.main_download(config)
+    assert len(calls) == 1
+    assert calls[0]['sa_backend'] == 'esm3di-35m'
+    assert calls[0]['prostt5_no_download'] is config.get('no_download', False)
+
+
 def test_main_download_prepares_both_resources(monkeypatch, capsys):
     calls = {}
 

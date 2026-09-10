@@ -994,7 +994,7 @@ def _register_download_parser(show_advanced, subparsers):
     # download
     help_txt = 'prepares shared model resources. See `csubst download -h`'
     download = subparsers.add_parser('download', help=help_txt, parents=[])
-    download.add_argument('--resource', metavar='NAME', default='vesm-35m', type=str,
+    download.add_argument('--resource', metavar='NAME', default=DEFAULT_SA_BACKEND, type=str,
                           choices=['vesm-35m', 'prostt5', 'prostt5-cnn', 'esm3di-35m', 'all'],
                           help='default=%(default)s: Prepare vesm-35m, prostt5, prostt5-cnn, esm3di-35m, or all. '
                                'VESM, ESM3Di and CNN files are SHA-256 verified; '
