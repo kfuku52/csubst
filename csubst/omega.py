@@ -37,6 +37,7 @@ from csubst import substitution_sparse
 from csubst import table
 from csubst import ete
 from csubst import expected_sparse
+from csubst import site_filter
 from csubst import output_stat
 from csubst import pseudocount
 from csubst import expectation_3di
@@ -2979,6 +2980,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         expectation_3di.validate_context(g)
     requested_output_stats = _resolve_requested_output_stats(g)
     base_stats = output_stat.get_required_base_stats(requested_output_stats)
+    filter_report = site_filter.start_count_report(g, cb, ON_tensor, OS_tensor, base_stats)
     if expectation_method == 'urn':
         ON_gad, ON_ga, ON_gd = substitution.get_group_state_totals(ON_tensor)
         OS_gad, OS_ga, OS_gd = substitution.get_group_state_totals(OS_tensor)
@@ -3028,6 +3030,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             selected_base_stats=base_stats,
         )
         cb = table.merge_tables(cb, cbEN)
+        if filter_report is not None:
+            for stat in base_stats:
+                site_filter.collect_projection(filter_report, g['EN_reducer']['projections'][stat], 'ECN' + stat)
         del cbEN
         is_final_arity = int(g.get('current_arity', 0)) >= int(g.get('max_arity', 1))
         if is_final_arity:
@@ -3064,6 +3069,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             selected_base_stats=base_stats,
         )
         cb = table.merge_tables(cb, cbES)
+        if filter_report is not None:
+            for stat in base_stats:
+                site_filter.collect_projection(filter_report, g['ES_reducer']['projections'][stat], 'ECS' + stat)
         del cbES
         if is_final_arity:
             released_nbytes = int(g['ES_reducer']['storage'])
@@ -3076,6 +3084,7 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         raise ValueError('Unsupported expectation_method: {}'.format(expectation_method))
     cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='EC', output_stats=requested_output_stats)
     cb = subroot_E2nan(cb, tree=g['tree'])
+    site_filter.finish_count_report(filter_report, g)
     return cb
 
 

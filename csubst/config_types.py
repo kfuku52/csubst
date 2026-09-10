@@ -97,6 +97,7 @@ class OutputSwitches(TypedDict, total=False):
     s: bool
     branch_dist: bool
     drop_invariant_tip_sites: bool
+    site_filter_report: bool
     output_stats: Any
 
 

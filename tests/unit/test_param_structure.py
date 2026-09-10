@@ -64,7 +64,7 @@ def test_get_global_parameters_parses_drop_invariant_tip_sites_single_option():
     g_tip = param.get_global_parameters(_args(drop_invariant_tip_sites="tip_invariant"))
     g_zero = param.get_global_parameters(_args(drop_invariant_tip_sites="zero_sub_mass"))
     assert g_no["drop_invariant_tip_sites"] is False
-    assert g_no["drop_invariant_tip_sites_mode"] == "tip_invariant"
+    assert g_no["drop_invariant_tip_sites_mode"] == "no"
     assert g_tip["drop_invariant_tip_sites"] is True
     assert g_tip["drop_invariant_tip_sites_mode"] == "tip_invariant"
     assert g_zero["drop_invariant_tip_sites"] is True
@@ -300,3 +300,18 @@ def test_get_global_parameters_validates_site_database_and_pymol_ranges():
 
     with pytest.raises(ValueError, match="pymol_max_num_chain"):
         param.get_global_parameters(_args(pymol_max_num_chain=0))
+
+
+def test_site_filter_report_requires_full_site_model_reference():
+    g = param.get_global_parameters(_args())
+    assert g['drop_invariant_tip_sites'] is False
+    assert g['drop_invariant_tip_sites_mode'] == 'no'
+    assert param.get_global_parameters(_args(site_filter_report=True))['site_filter_report']
+    for extra, match in [
+        ({'drop_invariant_tip_sites': 'tip_invariant'}, 'drop_invariant_tip_sites no'),
+        ({'expectation_method': 'urn'}, 'codon_model'),
+        ({'cb': False}, 'cb yes'),
+        ({'subcommand': 'benchmark'}, 'search/analyze'),
+    ]:
+        with pytest.raises(ValueError, match=match):
+            param.get_global_parameters(_args(site_filter_report=True, **extra))

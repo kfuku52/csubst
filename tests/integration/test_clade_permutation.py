@@ -335,6 +335,7 @@ def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(mo
         return cbOS.copy(deep=True)
 
     def fake_calc_omega(cb_missing, OS_tensor_reducer, ON_tensor_reducer, g):
+        captured["site_filter_report"] = g.get("site_filter_report")
         out = cb_missing.copy(deep=True)
         out["dNCany2spe"] = np.array([1.0, np.inf], dtype=np.float64)
         out["dSCany2spe"] = np.array([1.0, 1.0], dtype=np.float64)
@@ -369,6 +370,7 @@ def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(mo
 
     g = {
         "float_tol": 1e-7,
+        "site_filter_report": True,
         "output_stats": ["any2spe"],
         "output_base_stats": ["any2spe"],
         "calibrate_longtail": True,
@@ -379,13 +381,16 @@ def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(mo
         "threads": 1,
         "float_type": np.float64,
     }
-    out, _ = foreground._recompute_missing_permutation_rows(
+    out, returned_g = foreground._recompute_missing_permutation_rows(
         g=g,
         missing_id_combinations=missing_id_combinations,
         OS_tensor_reducer=object(),
         ON_tensor_reducer=object(),
     )
 
+    assert captured["site_filter_report"] is False
+    assert g["site_filter_report"] is True
+    assert returned_g["site_filter_report"] is True
     assert captured["float_tol"] == pytest.approx(1e-7)
     assert captured["output_stats"] == ["any2spe"]
     assert "omegaCany2spe_nocalib" in out.columns

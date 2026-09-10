@@ -1,0 +1,98 @@
+{
+  "seed": 20260910,
+  "reference_replicates": 199,
+  "evaluation_replicates": 200,
+  "sites": 12,
+  "scope": "known_parameter_four_codon_fixed_pair",
+  "statistic": "any2any omegaC; fixed symmetric alpha=1, both; no long-tail",
+  "model_fitting": "parameters known, exact posterior pruning repeated; no IQ-TREE refit",
+  "undefined_policy": "no-test p=1, included in denominator; null atom at minus infinity",
+  "production_pvalue_calibrated": false,
+  "results": [
+    {
+      "ml_anc": false,
+      "criterion": "no",
+      "rejected": 10,
+      "rejection_rate": 0.05,
+      "binomial_ci95": [
+        0.02423416547210829,
+        0.09002753770155869
+      ],
+      "reference_undefined": 0,
+      "evaluation_undefined": 0,
+      "mean_retained": 12.0,
+      "mismatched_unfiltered_null_rejected": 10
+    },
+    {
+      "ml_anc": false,
+      "criterion": "tip_invariant",
+      "rejected": 11,
+      "rejection_rate": 0.055,
+      "binomial_ci95": [
+        0.02777225455217507,
+        0.09627764443388101
+      ],
+      "reference_undefined": 0,
+      "evaluation_undefined": 0,
+      "mean_retained": 9.52,
+      "mismatched_unfiltered_null_rejected": 9
+    },
+    {
+      "ml_anc": false,
+      "criterion": "zero_sub_mass",
+      "rejected": 10,
+      "rejection_rate": 0.05,
+      "binomial_ci95": [
+        0.02423416547210829,
+        0.09002753770155869
+      ],
+      "reference_undefined": 0,
+      "evaluation_undefined": 0,
+      "mean_retained": 12.0,
+      "mismatched_unfiltered_null_rejected": 10
+    },
+    {
+      "ml_anc": true,
+      "criterion": "no",
+      "rejected": 7,
+      "rejection_rate": 0.035,
+      "binomial_ci95": [
+        0.01418552589838592,
+        0.0707809983509546
+      ],
+      "reference_undefined": 0,
+      "evaluation_undefined": 0,
+      "mean_retained": 12.0,
+      "mismatched_unfiltered_null_rejected": 7
+    },
+    {
+      "ml_anc": true,
+      "criterion": "tip_invariant",
+      "rejected": 7,
+      "rejection_rate": 0.035,
+      "binomial_ci95": [
+        0.01418552589838592,
+        0.0707809983509546
+      ],
+      "reference_undefined": 0,
+      "evaluation_undefined": 0,
+      "mean_retained": 9.64,
+      "mismatched_unfiltered_null_rejected": 7
+    },
+    {
+      "ml_anc": true,
+      "criterion": "zero_sub_mass",
+      "rejected": 7,
+      "rejection_rate": 0.035,
+      "binomial_ci95": [
+        0.01418552589838592,
+        0.0707809983509546
+      ],
+      "reference_undefined": 0,
+      "evaluation_undefined": 0,
+      "mean_retained": 9.64,
+      "mismatched_unfiltered_null_rejected": 7
+    }
+  ],
+  "binomial_interval_scope": "conditional_on_shared_reference_sample"
+}

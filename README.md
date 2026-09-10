@@ -127,6 +127,9 @@ simulation guides are available in the [Wiki](https://github.com/kfuku52/csubst/
 Developer setup and checks are documented in [CONTRIBUTING.md](CONTRIBUTING.md),
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [TESTING.md](TESTING.md).
 
+All sites are retained by default. Optional site filters change the analysis target;
+see [site selection and excluded-count diagnostics](docs/SITE_FILTERING.md).
+
 ## Citation
 Fukushima K, Pollock DD. 2023. Detecting macroevolutionary genotype-phenotype associations using error-corrected rates of protein convergence. Nature Ecology & Evolution 7: 155–170. [DOI: 10.1038/s41559-022-01932-7](https://doi.org/10.1038/s41559-022-01932-7)
 

@@ -8,7 +8,8 @@ def _cache(tmp_path):
     source = tmp_path / 'input.fa'
     source.write_text('>A\nATGATG\n')
     g = {'alignment_file': str(source), 'float_type': np.float64,
-         'sa_state_cache_file': str(tmp_path / 'states.npz')}
+         'sa_state_cache_file': str(tmp_path / 'states.npz'),
+         '_precomputed_tip_invariant_site_mask': np.array([True, False])}
     shape = (2, 2, 61)
     states = np.zeros((2, 2, 20))
     states[0, :, 0] = 1  # The second branch is legitimately unloaded/missing.
@@ -61,3 +62,12 @@ def test_3di_default_does_not_reuse_legacy_prostt5_cache(tmp_path):
     cached, _, error = parser_misc._try_load_3di_state_cache(g, None, shape)
     assert cached is None and error == 'cache metadata mismatch.'
     assert parser_misc._try_load_3di_state_cache(dict(g, sa_backend='prostt5'), None, shape)[2] is None
+
+
+def test_direct_urn_cache_restores_full_site_selection_mask(tmp_path):
+    g, shape = _cache(tmp_path)
+    fresh = {key: value for key, value in g.items() if not key.startswith('_precomputed')}
+    assert parser_misc._try_load_3di_state_cache(fresh, None, shape)[2] is None
+    np.testing.assert_array_equal(fresh['_precomputed_tip_invariant_site_mask'], [True, False])
+    _rewrite(g, lambda fields: fields.pop('tip_invariant_mask'))
+    assert parser_misc._try_load_3di_state_cache(fresh, None, shape)[0] is None

@@ -1191,24 +1191,14 @@ def build_3di_state_direct(g, selected_branch_ids=None, predictor=None):
         predictor=predictor,
         output_path=runtime.temp_path("csubst_alignment_3di_tip.fa"),
     )
-    g.pop("_precomputed_tip_invariant_site_mask", None)
+    # Fit and infer on the full alignment for both codon_model and urn.
+    # Selecting variable columns before fitting changes ASR as well as counts.
     tip_3di_by_name_direct = tip_3di_by_name_full
-    full_num_site = _get_tip_alignment_length(tip_3di_by_name_full)
-    keep_site_index = np.arange(full_num_site, dtype=np.int64)
-    mode = str(g.get("drop_invariant_tip_sites_mode", "tip_invariant")).strip().lower()
-    should_prefilter = bool(g.get("drop_invariant_tip_sites", False)) and (mode == "tip_invariant")
-    if should_prefilter and not expectation_3di.required(g) and (full_num_site > 0):
-        is_drop_site = _get_tip_invariant_3di_site_mask(tip_3di_by_name=tip_3di_by_name_full)
-        if bool(is_drop_site.any()):
-            keep_mask = ~is_drop_site
-            if bool(keep_mask.any()):
-                tip_3di_by_name_direct, keep_site_index = _slice_tip_alignment_by_site_mask(
-                    tip_alignment=tip_3di_by_name_full,
-                    keep_mask=keep_mask,
-                )
-                g["_precomputed_tip_invariant_site_mask"] = np.asarray(is_drop_site, dtype=bool)
-                txt = "Direct 3Di prefilter: dropping {:,} tip-invariant 3Di site(s) before IQ-TREE."
-                print(txt.format(int(is_drop_site.sum())), flush=True)
+    g.pop("_precomputed_tip_invariant_site_mask", None)
+    if not expectation_3di.required(g):
+        g["_precomputed_tip_invariant_site_mask"] = _get_tip_invariant_3di_site_mask(
+            tip_3di_by_name_full,
+        )
     morph_alignment_path = runtime.temp_path("csubst_alignment_3di_tip_morph.fa")
     _encode_tip_3di_alignment_for_morph(
         tip_3di_by_name=tip_3di_by_name_direct,
@@ -1221,15 +1211,7 @@ def build_3di_state_direct(g, selected_branch_ids=None, predictor=None):
         tip_3di_by_name=tip_3di_by_name_direct,
         selected_branch_ids=selected_branch_ids,
     )
-    if keep_site_index.shape[0] != full_num_site:
-        state_tensor = _expand_state_tensor_site_axis(
-            state_tensor=state_tensor_direct,
-            keep_site_index=keep_site_index,
-            full_num_site=full_num_site,
-        )
-    else:
-        state_tensor = state_tensor_direct
-    return state_tensor, state_orders, tip_3di_by_name_full
+    return state_tensor_direct, state_orders, tip_3di_by_name_full
 
 
 def build_3di_state_from_state_pep(g, state_pep, selected_branch_ids=None, predictor=None):

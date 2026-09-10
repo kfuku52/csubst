@@ -73,8 +73,10 @@ and unit site rates travel together through inference and the versioned cache.
 Root transfer preserves the identities of IQ-TREE internal nodes. The inserted
 root posterior is calculated by pruning under the fitted uniform GTR model;
 root-adjacent lengths preserve their fitted total and use the input length
-ratio, or equal halves if both input lengths are zero. Version 5 caches also
-retain the 3Di tip-invariant mask, so cached runs use the same site selection.
+ratio, or equal halves if both input lengths are zero. Version 6 caches
+retain the direct 3Di tip-invariant mask for both expectation routes. Both routes
+fit all columns before analysis filtering. All sites are retained by default;
+see [site selection and excluded-count diagnostics](SITE_FILTERING.md).
 States absent from IQ-TREE's fitted alphabet receive zero posterior frequency
 and no transitions. Cache files without a compatible model context are rebuilt
 in `auto` mode or rejected in `yes` mode.

@@ -479,3 +479,10 @@ def test_cli_entrypoint_runs_from_repo_root_without_pythonpath():
     combined = (proc.stdout or "") + (proc.stderr or "")
     assert "ModuleNotFoundError" not in combined
     assert "No module named 'csubst'" not in combined
+
+
+@pytest.mark.parametrize('command', ['search', 'analyze', 'inspect', 'benchmark'])
+def test_all_sites_are_retained_by_default(command):
+    args = _get_cli_parser(False).parse_args([command])
+    assert args.drop_invariant_tip_sites == 'no'
+    assert args.site_filter_report is False

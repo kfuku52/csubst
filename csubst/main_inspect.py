@@ -303,7 +303,7 @@ def _configure_3di_smoke_mode(g):
 
 
 def _normalize_drop_invariant_mode(g):
-    mode = str(g.get("drop_invariant_tip_sites_mode", g.get("drop_invariant_tip_sites", "tip_invariant"))).strip().lower()
+    mode = str(g.get("drop_invariant_tip_sites_mode", g.get("drop_invariant_tip_sites", "no"))).strip().lower()
     if mode in ["1", "true", "yes", "on"]:
         return "tip_invariant"
     if mode in ["0", "false", "off", "no"]:

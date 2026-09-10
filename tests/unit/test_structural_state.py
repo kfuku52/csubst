@@ -279,12 +279,12 @@ def test_run_iqtree_direct_3di_uses_morph_and_remaps_gtr20(tmp_path, monkeypatch
     assert paths["state_symbol_mode"] == "morph"
 
 
-def test_build_3di_state_direct_prefilters_tip_invariant_sites_when_enabled(monkeypatch):
+def test_build_3di_state_direct_preserves_all_sites_during_fitting(monkeypatch):
     tip_full = OrderedDict([("A", "AAC"), ("B", "ABC"), ("C", "A-C")])
     captured = {"encoded_tip": None}
     num_node = 3
     num_state = 20
-    reduced_tensor = np.zeros((num_node, 1, num_state), dtype=float)
+    reduced_tensor = np.zeros((num_node, 3, num_state), dtype=float)
     reduced_tensor[:, :, 0] = 0.25
 
     monkeypatch.setattr(
@@ -318,13 +318,11 @@ def test_build_3di_state_direct_prefilters_tip_invariant_sites_when_enabled(monk
     }
     state_tensor, state_orders, tip_out = structural_alphabet.build_3di_state_direct(g=g)
     assert tip_out == tip_full
-    assert captured["encoded_tip"] == OrderedDict([("A", "A"), ("B", "B"), ("C", "-")])
+    assert captured["encoded_tip"] == tip_full
     assert "_precomputed_tip_invariant_site_mask" in g
     np.testing.assert_array_equal(g["_precomputed_tip_invariant_site_mask"], np.array([True, False, True]))
     assert state_tensor.shape == (num_node, 3, num_state)
-    np.testing.assert_allclose(state_tensor[:, 0, :], 0.0, atol=1e-12)
-    np.testing.assert_allclose(state_tensor[:, 1, 0], 0.25, atol=1e-12)
-    np.testing.assert_allclose(state_tensor[:, 2, :], 0.0, atol=1e-12)
+    np.testing.assert_array_equal(state_tensor, reduced_tensor)
     assert state_orders.tolist() == list("ACDEFGHIKLMNPQRSTVWY")
 
 
@@ -361,7 +359,7 @@ def test_build_3di_state_direct_does_not_prefilter_when_mode_is_zero_sub_mass(mo
     }
     structural_alphabet.build_3di_state_direct(g=g)
     assert captured["encoded_tip"] == tip_full
-    assert "_precomputed_tip_invariant_site_mask" not in g
+    np.testing.assert_array_equal(g["_precomputed_tip_invariant_site_mask"], [True, True, True])
 
 
 def test_direct_3di_rejects_header_only_ancestral_state_file(tmp_path):

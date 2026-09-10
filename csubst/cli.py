@@ -757,15 +757,20 @@ def _make_ancestral_parser():
                          help='default=%(default)s: The minimum posterior probability of single substitutions to count. '
                               'Set 0 for a counting without binarization. Omitted if --ml_anc is set to "yes". '
                               'For empirical omega_C p-values (--calc_omega_pvalue yes), values around 0.05 are recommended.')
-    psr_as.add_argument('--drop_invariant_tip_sites', metavar='no|tip_invariant|zero_sub_mass', default='tip_invariant', type=str,
+    psr_as.add_argument('--drop_invariant_tip_sites', metavar='no|tip_invariant|zero_sub_mass', default='no', type=str,
                         help='default=%(default)s: Site-drop criterion before substitution-tensor generation. '
                              '"no" disables site dropping. '
-                             '"tip_invariant" drops codon sites invariant across non-missing tips '
+                             '"tip_invariant" drops sites invariant across non-missing tips (direct 3Di uses structural states) '
                              '(including sites with only one unambiguous tip codon). '
-                             '"zero_sub_mass" drops only sites guaranteed to have zero observed substitution mass '
-                             '(both N and S) across analyzed branches. '
+                             '"zero_sub_mass" drops sites with observed N and S mass at or below float_tol '
+                             'on every analyzed branch. Neither criterion guarantees zero expected mass; '
+                             'both change the analysis site set and can change omegaC. '
                              'In `inspect`, csubst_site_index_map.tsv is written to map retained internal '
                              'site indices to original alignment positions.')
+    psr_as.add_argument('--site_filter_report', metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Report fixed-model retained/excluded OCN/OCS/ECN/ECS '
+                             'for both site filters. Requires search/analyze, --drop_invariant_tip_sites no, '
+                             '--expectation_method codon_model and --cb yes. Does not calibrate P-values.')
     return psr_as
 
 

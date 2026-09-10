@@ -25,7 +25,7 @@ from csubst import ete
 from csubst import expectation_3di
 from csubst import tsv
 
-_THREEDI_STATE_CACHE_FORMAT_VERSION = 5
+_THREEDI_STATE_CACHE_FORMAT_VERSION = 6
 
 
 def _initialize_and_report_nonsyn_recode(g):
@@ -183,7 +183,7 @@ def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
     if full_cds_path == '':
         full_cds_path = str(g.get('alignment_file', '')).strip()
     ml_anc_value = str(g.get('ml_anc', False)).strip().lower()
-    drop_mode = str(g.get('drop_invariant_tip_sites_mode', g.get('drop_invariant_tip_sites', 'tip_invariant'))).strip().lower()
+    drop_mode = str(g.get('drop_invariant_tip_sites_mode', g.get('drop_invariant_tip_sites', 'no'))).strip().lower()
     if drop_mode in ['1', 'true', 'yes', 'on']:
         drop_mode = 'tip_invariant'
     elif drop_mode in ['0', 'false', 'off']:
@@ -255,6 +255,11 @@ def _try_load_3di_state_cache(g, selected_branch_ids, state_cdn_shape):
             if expectation_3di.required(g):
                 model_context = {key: np.asarray(cache[key]) for key in expectation_3di.CONTEXT_KEYS}
                 expectation_3di.validate_context(model_context, int(state_cdn_shape[0]), int(state_cdn_shape[1]))
+            elif str(g.get('sa_asr_mode', 'direct')).lower() == 'direct':
+                mask = np.asarray(cache['tip_invariant_mask'])
+                if mask.dtype != np.bool_ or mask.shape != (int(state_cdn_shape[1]),):
+                    raise ValueError('Invalid direct 3Di tip-invariant mask.')
+                model_context['_precomputed_tip_invariant_site_mask'] = mask
     except Exception as exc:
         return None, None, 'failed to read cache file: {}'.format(str(exc))
     if state_nsy.ndim != 3:
@@ -299,6 +304,11 @@ def _write_3di_state_cache(g, selected_branch_ids, state_cdn_shape, state_nsy, s
     if expectation_3di.required(g):
         expectation_3di.validate_context(g, int(state_cdn_shape[0]), int(state_cdn_shape[1]))
         model_context = {key: g[key] for key in expectation_3di.CONTEXT_KEYS}
+    elif str(g.get('sa_asr_mode', 'direct')).lower() == 'direct':
+        mask = np.asarray(g['_precomputed_tip_invariant_site_mask'])
+        if mask.dtype != np.bool_ or mask.shape != (int(state_cdn_shape[1]),):
+            raise ValueError('Invalid direct 3Di tip-invariant mask.')
+        model_context['tip_invariant_mask'] = mask
     metadata_json = json.dumps(context, sort_keys=True, separators=(',', ':'))
     fd, tmp_path = tempfile.mkstemp(prefix='.{}.tmp.'.format(os.path.basename(cache_path)), suffix='.npz', dir=cache_dir or '.')
     os.close(fd)
@@ -991,15 +1001,11 @@ def _slice_site_axis_in_state_tensor(state_tensor, keep_mask):
     raise ValueError(txt.format(state_tensor.shape[1], keep_mask.shape[0]))
 
 
-def drop_invariant_tip_sites(g):
-    state_cdn = g.get('state_cdn', None)
-    mode = str(g.get('drop_invariant_tip_sites_mode', 'tip_invariant')).strip().lower()
-    expected_num_site = None
-    if state_cdn is not None:
-        expected_num_site = state_cdn.shape[1]
-    elif g.get('num_input_site', None) is not None:
-        expected_num_site = int(g['num_input_site'])
-    site_index_alignment = get_site_index_alignment(g=g, expected_num_site=expected_num_site)
+def get_site_drop_mask(g, mode, site_index_alignment):
+    """Compute a selection mask without mutating state or model site axes."""
+    state_cdn = g.get('state_cdn')
+    if mode == 'no':
+        return np.zeros(len(site_index_alignment), dtype=bool)
     if mode == 'tip_invariant':
         precomputed = g.get('3di_tip_invariant_mask', g.get('_precomputed_tip_invariant_site_mask', None))
         if precomputed is not None:
@@ -1011,14 +1017,26 @@ def drop_invariant_tip_sites(g):
             print('Using the tip-invariant site mask from direct 3Di predictions.', flush=True)
         else:
             is_drop_site = _get_tip_invariant_site_mask(g=g, site_index_alignment=site_index_alignment)
-        mode_label = 'tip-invariant'
     elif mode == 'zero_sub_mass':
         if state_cdn is None:
             raise ValueError('state_cdn and state_nsy are required for zero_sub_mass site filtering.')
         is_drop_site = _get_zero_substitution_mass_site_mask(g=g)
-        mode_label = 'zero-sub-mass'
     else:
         raise ValueError('Unsupported --drop_invariant_tip_sites_mode: {}'.format(mode))
+    return is_drop_site
+
+
+def drop_invariant_tip_sites(g):
+    state_cdn = g.get('state_cdn', None)
+    mode = str(g.get('drop_invariant_tip_sites_mode', 'tip_invariant')).strip().lower()
+    expected_num_site = None
+    if state_cdn is not None:
+        expected_num_site = state_cdn.shape[1]
+    elif g.get('num_input_site', None) is not None:
+        expected_num_site = int(g['num_input_site'])
+    site_index_alignment = get_site_index_alignment(g=g, expected_num_site=expected_num_site)
+    is_drop_site = get_site_drop_mask(g, mode, site_index_alignment)
+    mode_label = mode.replace('_', '-')
     num_drop = int(is_drop_site.sum())
     if num_drop == 0:
         print('No codon sites were dropped (mode={}).'.format(mode), flush=True)
@@ -1126,6 +1144,8 @@ def prep_state(g, apply_site_filtering=True):
                 )
                 g['nonsyn_state_orders'] = np.asarray(state_orders, dtype=object)
                 g['_3di_tip_alignment_by_leaf'] = tip_3di
+                if not expectation_3di.required(g):
+                    g['_precomputed_tip_invariant_site_mask'] = structural_alphabet._get_tip_invariant_3di_site_mask(tip_3di)
                 return state_nsy_local, state_orders
             raise ValueError('--sa_asr_mode should be one of translate, direct.')
 

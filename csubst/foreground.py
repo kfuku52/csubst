@@ -1717,7 +1717,14 @@ def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_re
         prefix='OC',
         output_stats=g.get('output_stats'),
     )
+    report_enabled = bool(g.get('site_filter_report', False))
+    if report_enabled:
+        # Supplemental permutation rows must not overwrite the primary search's
+        # fixed-site report. Isolate the option without mutating a shared config.
+        g = dict(g, site_filter_report=False)
     cb_missing, g = omega.calc_omega(cb_missing, OS_tensor_reducer, ON_tensor_reducer, g)
+    if report_enabled:
+        g['site_filter_report'] = True
     if g['calibrate_longtail'] and (g['exhaustive_until'] >= g['current_arity']):
         cb_missing = omega.calibrate_dsc(
             cb_missing,

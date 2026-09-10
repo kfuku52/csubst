@@ -12,6 +12,7 @@ from csubst import foreground
 from csubst import omega
 from csubst import param
 from csubst import parser_misc
+from csubst import site_filter
 from csubst import substitution
 from csubst import table
 from csubst import ete
@@ -672,6 +673,7 @@ def main_analyze(g: AnalysisConfig) -> None:
         prepare_state=False,
     )
     g = parser_misc.prep_state(g, apply_site_filtering=False)
+    site_filter.prepare(g)
     g = parser_misc.apply_site_filters(g)
     g = combination.get_dep_ids(g)
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')

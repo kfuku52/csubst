@@ -591,10 +591,10 @@ def _normalize_state_parameters(g: dict[str, Any]) -> dict[str, Any]:
         g['export2chimera'] = export2chimera
         if export2chimera and (g.get('untrimmed_cds', None) in [None, '']):
             raise ValueError('--export2chimera "yes" requires --untrimmed_cds.')
-    drop_mode_token = str(g.get('drop_invariant_tip_sites', 'tip_invariant')).strip().lower()
+    drop_mode_token = str(g.get('drop_invariant_tip_sites', 'no')).strip().lower()
     if drop_mode_token == 'no':
         g['drop_invariant_tip_sites'] = False
-        g['drop_invariant_tip_sites_mode'] = 'tip_invariant'
+        g['drop_invariant_tip_sites_mode'] = 'no'
     elif drop_mode_token in ['tip_invariant', 'zero_sub_mass']:
         g['drop_invariant_tip_sites'] = True
         g['drop_invariant_tip_sites_mode'] = drop_mode_token
@@ -1047,6 +1047,10 @@ def get_global_parameters(args: Any) -> runtime.RunContext:
     g = _normalize_execution_parameters(g)
     g = _normalize_recoding_parameters(g)
     g = _normalize_output_parameters(g)
+    g['site_filter_report'] = _parse_bool_like(g.get('site_filter_report', False), '--site_filter_report')
+    if g['site_filter_report']:
+        from csubst import site_filter
+        site_filter.validate_report_options(g)
     return runtime.ensure_run_context(g)
 
 def initialize_df_cb_stats(g):
