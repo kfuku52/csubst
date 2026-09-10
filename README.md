@@ -85,7 +85,7 @@ CSUBST provides ten main subcommands:
 - [`csubst download`](https://github.com/kfuku52/csubst/wiki/csubst-download): prepare model resources without an input alignment; VESM files are always SHA-256 checked.
 - [`csubst doctor`](https://github.com/kfuku52/csubst/wiki/csubst-doctor): validate input files, inferred IQ-TREE paths, and optional 3Di settings before longer runs.
 - [`csubst search`](https://github.com/kfuku52/csubst/wiki/csubst-search) (legacy alias: `csubst analyze`): run convergence analysis and report metrics such as `omegaC`, `dNC`, and `dSC`.
-- [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): find foreground recurrent amino-acid/state substitutions and compare foreground and control rates.
+- [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): find foreground recurrent amino-acid/state substitutions and compare foreground and control rates. See the [calibration assumptions and scope](docs/SCAN_CALIBRATION.md).
 - [`csubst inspect`](https://github.com/kfuku52/csubst/wiki/csubst-inspect): summarize branch mappings, inspect ancestral states, and report exact topology-derived independent branch-combination counts without enumerating combinations.
 - [`csubst sites`](https://github.com/kfuku52/csubst/wiki/csubst-sites) (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree and site-summary plots, and optionally map sites to protein structures.
 - [`csubst simulate`](https://github.com/kfuku52/csubst/wiki/csubst-simulate): simulate codon sequence evolution under user-defined convergence scenarios.

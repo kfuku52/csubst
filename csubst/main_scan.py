@@ -1,4 +1,5 @@
 import time
+import json
 
 import numpy as np
 import pandas as pd
@@ -39,12 +40,22 @@ def _prepare_scan_output_table(scan_df):
     out = scan_df.copy()
     stat_columns = [
         col for col in out.columns
-        if str(col).startswith("p_") or str(col).startswith("q_")
+        if str(col).startswith("p_") or str(col).startswith("q_") or col == "scan_pvalue_resolution"
     ]
     for col in stat_columns:
         values = np.asarray(pd.to_numeric(out[col], errors="coerce"), dtype=np.float64)
         out[col] = ["{:.6e}".format(value) if np.isfinite(value) else "" for value in values]
     return out
+
+
+def _write_scan_calibration(g: AnalysisConfig) -> str:
+    """Write diagnostics independently of scan rows, including empty scans."""
+    path = runtime.output_path(g, "scan_calibration.json")
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(g["scan_calibration_diagnostics"], handle, indent=2, allow_nan=False)
+        handle.write("\n")
+    print("Writing {}".format(path), flush=True)
+    return path
 
 
 def _write_scan_site_plot(g, scan_df, ON_tensor, units_df=None):
@@ -137,6 +148,7 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
         resolve_state_subset=True,
         prepare_state=False,
     )
+    substitution_scan.validate_scan_configuration(g)
     g = parser_misc.prep_state(g, apply_site_filtering=False)
     g = parser_misc.apply_site_filters(g)
     print("Generating nonsynonymous substitution tensor for scan.", flush=True)
@@ -194,6 +206,7 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     )
     print("Writing {}".format(scan_path), flush=True)
     print("Writing {}".format(units_path), flush=True)
+    _write_scan_calibration(g)
     _write_scan_site_plot(g=g, scan_df=scan_df, ON_tensor=ON_tensor_called, units_df=units_df)
     print(
         "Scan candidates: {:,} rows, {:,} foreground units.".format(

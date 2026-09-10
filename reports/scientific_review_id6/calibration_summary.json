@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "csubst_version": "1.15.0",
+  "python": "3.12.14",
+  "platform": "Darwin arm64",
+  "model": "equal-frequency finite-state CTMC, fitted global rate on a fixed tree; independent reference ASR",
+  "scope": "state-aware/raw-length scan; not codon-Q, native 3Di or a strong-FWER guarantee",
+  "settings": {
+    "replicates": 1000,
+    "sites": 64,
+    "states": 20,
+    "permutations": 999,
+    "seed": 20260910,
+    "alpha": 0.05,
+    "workers": 2,
+    "fwer_margin": 0.01,
+    "require_calibration_bound": true,
+    "scenarios": "balanced,pectinate,larger_clades,branch_heterogeneity,random_missing,foreground_missing,partial_signal"
+  },
+  "scenarios": {
+    "balanced": {
+      "interpretation": "matched_conditional_assignment_null",
+      "replicates": 1000,
+      "null_family_rejections": 17,
+      "rejection_fraction_all_runs": 0.017,
+      "binomial_95_interval": [
+        0.009933512592716532,
+        0.027079496864851366
+      ],
+      "no_candidate_runs": 957,
+      "unavailable_runs": 0,
+      "signal_detected_runs": 0,
+      "criterion": {
+        "max_binomial_95_upper": 0.060000000000000005,
+        "require_no_unavailable_runs": true,
+        "passed": true
+      }
+    },
+    "pectinate": {
+      "interpretation": "matched_conditional_assignment_null",
+      "replicates": 1000,
+      "null_family_rejections": 26,
+      "rejection_fraction_all_runs": 0.026,
+      "binomial_95_interval": [
+        0.017052786345629425,
+        0.037865122478921445
+      ],
+      "no_candidate_runs": 936,
+      "unavailable_runs": 0,
+      "signal_detected_runs": 0,
+      "criterion": {
+        "max_binomial_95_upper": 0.060000000000000005,
+        "require_no_unavailable_runs": true,
+        "passed": true
+      }
+    },
+    "larger_clades": {
+      "interpretation": "matched_conditional_assignment_null",
+      "replicates": 1000,
+      "null_family_rejections": 33,
+      "rejection_fraction_all_runs": 0.033,
+      "binomial_95_interval": [
+        0.02282238334945957,
+        0.046033981817023194
+      ],
+      "no_candidate_runs": 679,
+      "unavailable_runs": 0,
+      "signal_detected_runs": 0,
+      "criterion": {
+        "max_binomial_95_upper": 0.060000000000000005,
+        "require_no_unavailable_runs": true,
+        "passed": true
+      }
+    },
+    "branch_heterogeneity": {
+      "interpretation": "matched_conditional_assignment_null",
+      "replicates": 1000,
+      "null_family_rejections": 28,
+      "rejection_fraction_all_runs": 0.028,
+      "binomial_95_interval": [
+        0.018684686195537564,
+        0.04021488737384331
+      ],
+      "no_candidate_runs": 852,
+      "unavailable_runs": 0,
+      "signal_detected_runs": 0,
+      "criterion": {
+        "max_binomial_95_upper": 0.060000000000000005,
+        "require_no_unavailable_runs": true,
+        "passed": true
+      }
+    },
+    "random_missing": {
+      "interpretation": "matched_conditional_assignment_null",
+      "replicates": 1000,
+      "null_family_rejections": 21,
+      "rejection_fraction_all_runs": 0.021,
+      "binomial_95_interval": [
+        0.013045192290387683,
+        0.0319223351804155
+      ],
+      "no_candidate_runs": 971,
+      "unavailable_runs": 0,
+      "signal_detected_runs": 0,
+      "criterion": {
+        "max_binomial_95_upper": 0.060000000000000005,
+        "require_no_unavailable_runs": true,
+        "passed": true
+      }
+    },
+    "foreground_missing": {
+      "interpretation": "sensitivity_only",
+      "replicates": 1000,
+      "null_family_rejections": 4,
+      "rejection_fraction_all_runs": 0.004,
+      "binomial_95_interval": [
+        0.0010909079877259714,
+        0.010209664683929871
+      ],
+      "no_candidate_runs": 995,
+      "unavailable_runs": 0,
+      "signal_detected_runs": 0
+    },
+    "partial_signal": {
+      "interpretation": "sensitivity_only",
+      "replicates": 1000,
+      "null_family_rejections": 26,
+      "rejection_fraction_all_runs": 0.026,
+      "binomial_95_interval": [
+        0.017052786345629425,
+        0.037865122478921445
+      ],
+      "no_candidate_runs": 220,
+      "unavailable_runs": 0,
+      "signal_detected_runs": 500
+    }
+  },
+  "base_commit": "dd37bee67b39199a1920600cf00c0ecb8566f477",
+  "verified_source_sha256": {
+    "csubst/scan_permutation.py": "f6b74158dda6e93801a376dd8446c38411d119bd38580acda89d2ca58bad0da0",
+    "csubst/substitution_scan.py": "fcde27734b6eccd6ca4e4cb8d046e3a18ad5b8c6e7166fa4e1c7a674e2c05a22",
+    ".github/scripts/scan_calibration_check.py": "e25c4094689eb728efc5c71e46eac7744edb78119d6ce193550ec9d8b2b82e3e"
+  }
+}

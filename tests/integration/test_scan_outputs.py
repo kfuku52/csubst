@@ -72,8 +72,8 @@ def _toy_scan_context():
         "scan_pvalue_calibration": "none",
         "scan_n_permutations": 0,
         "scan_permutation_seed": 1,
-        "scan_permutation_sample_original": False,
-        "scan_permutation_retry_sample_original": True,
+        "scan_permutation_sample_original": True,
+        "scan_permutation_retry_sample_original": False,
         "min_clade_bin_count": 1,
     }
     return g, on_tensor
@@ -256,7 +256,7 @@ def test_full_scan_reuses_static_atomic_events_across_permutations(monkeypatch):
     assert len(calls) == 1
 
 
-def test_prepare_scan_output_table_formats_only_p_and_q_values_scientifically():
+def test_prepare_scan_output_table_formats_p_q_and_resolution_scientifically():
     df = pd.DataFrame(
         {
             "target_event_count": [0.000002],
@@ -264,6 +264,7 @@ def test_prepare_scan_output_table_formats_only_p_and_q_values_scientifically():
             "p_rate_enrichment": [0.000002],
             "q_rate_enrichment": [0.00015577],
             "p_rate_enrichment_empirical": [np.nan],
+            "scan_pvalue_resolution": [1e-8],
         }
     )
 
@@ -272,5 +273,6 @@ def test_prepare_scan_output_table_formats_only_p_and_q_values_scientifically():
     assert out.loc[0, "p_rate_enrichment"] == "2.000000e-06"
     assert out.loc[0, "q_rate_enrichment"] == "1.557700e-04"
     assert out.loc[0, "p_rate_enrichment_empirical"] == ""
+    assert out.loc[0, "scan_pvalue_resolution"] == "1.000000e-08"
     assert out.loc[0, "target_event_count"] == pytest.approx(0.000002)
     assert out.loc[0, "candidate_event_pp_sum"] == pytest.approx(0.000002)

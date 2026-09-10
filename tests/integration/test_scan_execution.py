@@ -141,8 +141,8 @@ def _toy_scan_context():
         "scan_pvalue_calibration": "none",
         "scan_n_permutations": 0,
         "scan_permutation_seed": 1,
-        "scan_permutation_sample_original": False,
-        "scan_permutation_retry_sample_original": True,
+        "scan_permutation_sample_original": True,
+        "scan_permutation_retry_sample_original": False,
         "min_clade_bin_count": 1,
     }
     return g, on_tensor
@@ -352,20 +352,12 @@ def test_scan_permutation_context_uses_the_same_unit_mode_as_observed(
     g, _, labels = _toy_binary_unit_modes_context()
     g["scan_unit_mode"] = unit_mode
     trait_cache = foreground._get_trait_clade_permutation_cache(g=g, trait_name="trait")
-    selected_flags = np.zeros_like(trait_cache["is_fg_stem"], dtype=bool)
-    selected_flags[trait_cache["branch_id_to_index"][labels["X"]]] = True
-    selected_flags[trait_cache["branch_id_to_index"][labels["Y"]]] = True
-    monkeypatch.setattr(
-        substitution_scan.foreground,
-        "_randomize_foreground_stem_flags_from_plan",
-        lambda **kwargs: selected_flags,
-    )
-
     context = substitution_scan._build_permuted_trait_context(
         g=g,
         trait_name="trait",
         valid_branch_ids=trait_cache["branch_ids"],
         sample_original_foreground=True,
+        configuration=substitution_scan._get_scan_trait_plan(g, "trait", trait_cache["branch_ids"])["sampler"].observed,
     )
 
     assert context["units"].shape[0] == expected_unit_count

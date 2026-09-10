@@ -34,6 +34,13 @@ counts/p-values, and FDR. Its typed array inputs/outputs do not depend on the
 pipeline context, I/O, or accelerator dispatch. `omega` retains null-model and
 expected-count orchestration and re-exports the existing helper names.
 
+`scan_permutation` owns scan's uniform, non-overlapping clade assignment space
+and sampler. It is separate from the foreground permutation machinery used by
+the omega search. `substitution_scan` supplies fixed eligibility/bin/group
+constraints, reruns candidate discovery, and computes conditional tails;
+`main_scan` writes the independent calibration JSON, including empty results.
+See [SCAN_CALIBRATION.md](SCAN_CALIBRATION.md) for the null and failure contract.
+
 `site_tree_plot` owns tree/site selection, layout, labels, heatmaps, and figure
 output for prepared site tables. `main_sites` retains data preparation,
 structure integration, and command orchestration, and re-exports existing

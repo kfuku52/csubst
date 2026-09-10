@@ -1,0 +1,87 @@
+diff --git a/csubst-scan.md b/csubst-scan.md
+index a199da0..a887209 100644
+--- a/csubst-scan.md
++++ b/csubst-scan.md
+@@ -23,2 +23,3 @@ clade` and `--scan_match any2spe`, tests foreground branches against all
+-non-foreground branches, and calibrates rate-enrichment P values with full
+-foreground-clade permutations.
++non-foreground branches, and computes conditional assignment P values by repeating candidate discovery.
++This assumes uniform foreground assignment over a fixed, size-binned,
++non-overlapping clade space. It does not establish unconditional FWER control.
+@@ -44 +45,2 @@ Run `csubst doctor` first when working with a new dataset.
+-`--scan_unit_mode` defines independent foreground support units:
++`--scan_unit_mode` defines foreground support units (statistical independence
++is not implied by their definition):
+@@ -84 +86 @@ usually the most direct representation of convergent amino-acid substitutions.
+-- `--scan_unit_mode lineage|stem|clade`: definition of independent foreground
++- `--scan_unit_mode lineage|stem|clade`: definition of foreground
+@@ -107,4 +109,6 @@ usually the most direct representation of convergent amino-acid substitutions.
+-- `--scan_pvalue_calibration none|candidate_fixed|full_scan`: empirical
+-  calibration for rate-enrichment P values. `full_scan` reruns candidate
+-  discovery for each size-binned, non-overlapping foreground-clade permutation.
+-- `--scan_n_permutations`: number of foreground-clade permutations. Permutations
++- `--scan_pvalue_calibration none|candidate_fixed|full_scan`: conditional
++  assignment calibration for one trait. `candidate_fixed` retests observed
++  candidates and is exploratory after discovery. `full_scan` repeats discovery
++  and compares scores with each configuration’s minimum candidate score.
++- `--scan_n_permutations`: Monte Carlo configurations; enumerable valid spaces
++  no larger than this are evaluated exactly instead. Configurations
+@@ -132,0 +137,2 @@ Common files include:
++- `csubst_scan_calibration.json`: assignment space, assumptions, configuration IDs,
++  trial outcomes and failure diagnostics, including scans with no candidates
+@@ -182,2 +188,3 @@ Top foreground candidates:
+-- `p_rate_enrichment_empirical`, `p_rate_enrichment_empirical_maxT`: empirical
+-  permutation-calibrated P values, when enabled
++- `p_rate_enrichment_empirical`: candidate-key conditional assignment tail
++- `p_rate_enrichment_empirical_maxT`: within-scan minP adjustment, despite the
++  retained maxT column name; requires the documented assignment null
+@@ -188 +195,6 @@ Top foreground candidates:
+-  empirical P values. The maxT P value is already scan-wide family-wise calibrated.
++  empirical P values. BH does not correct foreground-based candidate selection.
++- `scan_calibration_status`, `scan_calibration_null`, `scan_calibration_scope`:
++  computation status, assumed null and inference scope
++- `scan_permutation_sampling`, `scan_permutation_unique_count`,
++  `scan_permutation_space_size`, `scan_pvalue_resolution`: exact/Monte Carlo
++  sampling, observed configuration diversity, known valid space size and resolution
+@@ -214,2 +226,2 @@ This command reports substitutions shared by at least 80% of foreground units,
+-uses posterior expected counts for rate tests, and calibrates scan-wide
+-significance with parallel foreground-clade permutations.
++uses posterior expected counts for rate scores, and computes a within-scan
++conditional assignment adjustment with parallel clade configurations.
+@@ -217 +229 @@ significance with parallel foreground-clade permutations.
+-P and Q columns are written in scientific notation independently of
++P and Q columns and `scan_pvalue_resolution` are written in scientific notation independently of
+@@ -220,0 +233,33 @@ use the requested fixed precision.
++## Assignment null and limitations
++
++The tree, posterior states, masks, rates and scan settings remain fixed. Size
++bins and branch eligibility are fixed independently of foreground labels. The
++original configuration is always allowed; lineage mode preserves each lineage’s
++component count in each bin. Size matching alone does not match branch lengths,
++phylogenetic depth, composition, missingness or reconstruction uncertainty.
++
++Small spaces are enumerated. Larger spaces use uniform complete allocations
++and reject the whole allocation if clades overlap, rather than sampling clades
++sequentially from changing pools. Complete enumeration uses the exact tail
++fraction. Monte Carlo uses `(1 + extreme_count) / (B + 1)` with replacement,
++including ties and repeated configurations.
++
++The former `--scan_permutation_sample_original no` and
++`--scan_permutation_retry_sample_original yes` settings are rejected when
++calibration is enabled. Defaults are now `yes` and `no`, respectively. A failed
++or undefined trial makes calibration unavailable: the null is not restricted
++to successful trials. A successful full-scan trial without candidates contributes
++1. Diagnostics are saved separately even when the observed scan has no rows.
++
++`full_scan` covers candidate discovery across the sites and match classes in one
++single-trait run. It does not cover multiple genes, repeated parameter choices,
++or automatically guarantee strong FWER control under mixed null/signal sites.
++Multi-trait listing is supported with calibration disabled; calibrated
++multi-trait scans require a joint assignment model and are currently rejected.
++For an observational foreground, the assignment-null assumption needs scientific
++justification. Sequence generation, fitting and ASR must be included in any
++claim about calibration of the biological analysis pipeline.
++
++See the [complete calibration contract](https://github.com/kfuku52/csubst/blob/master/docs/SCAN_CALIBRATION.md)
++for the sampler, diagnostic schema and verification boundary.
++

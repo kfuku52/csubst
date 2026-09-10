@@ -654,22 +654,25 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                              '"raw" uses IQ-TREE/tree branch lengths; "sn_rescaled" uses CSUBST S+N branch lengths.')
     parser.add_argument('--scan_pvalue_calibration', metavar='none|candidate_fixed|full_scan', default='full_scan', type=str,
                         choices=['none', 'candidate_fixed', 'full_scan'],
-                        help='default=%(default)s: Empirical calibration for scan rate P values. '
-                             '"candidate_fixed" permutes foreground clades and retests observed candidates; '
-                             '"full_scan" reruns candidate discovery for each size-binned, non-overlapping clade permutation '
-                             'and reports maxT-style empirical P values.')
+                        help='default=%(default)s: Conditional foreground-assignment calibration for one trait. '
+                             '"candidate_fixed" retests observed candidates (exploratory after discovery); '
+                             '"full_scan" repeats discovery and reports within-scan minP adjustment in the '
+                             'empirical_maxT column. Both assume uniform assignment over eligible, size-binned, '
+                             'non-overlapping clades, including the observed foreground; this is not an unconditional FWER guarantee.')
     parser.add_argument('--scan_n_permutations', metavar='INT', default=1000, type=int,
-                        help='default=%(default)s: Number of foreground clade permutations for scan P-value calibration. '
-                             'Permutation iterations are parallelized over --threads.')
+                        help='default=%(default)s: Monte Carlo configurations for scan calibration. '
+                             'An enumerable assignment space no larger than this is evaluated exactly instead. '
+                             'Iterations are parallelized over --threads; diagnostics are written to scan_calibration.json.')
     parser.add_argument('--scan_permutation_seed', metavar='INT', default=1, type=int,
                         help='default=%(default)s: Random seed for scan foreground clade permutations.')
     advanced_scan = parser.add_argument_group('advanced scan tuning')
     _add_advanced_argument(advanced_scan, '--scan_permutation_sample_original', show_advanced=show_advanced,
-                        metavar='yes|no', default='no', type=strtobool,
-                        help='default=%(default)s: Allow original foreground clades to be sampled as permutation targets.')
-    _add_advanced_argument(advanced_scan, '--scan_permutation_retry_sample_original', show_advanced=show_advanced,
                         metavar='yes|no', default='yes', type=strtobool,
-                        help='default=%(default)s: Retry a failed scan permutation while allowing original foreground clades.')
+                        help='default=%(default)s: Calibration requires yes so the assignment space includes the observed foreground. '
+                             'The former no setting is rejected when calibration is enabled.')
+    _add_advanced_argument(advanced_scan, '--scan_permutation_retry_sample_original', show_advanced=show_advanced,
+                        metavar='yes|no', default='no', type=strtobool,
+                        help='default=%(default)s: Calibration requires no; its assignment space cannot change after a failure.')
     parser.add_argument('--scan_site_plot', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Generate a tree + detected-site summary plot using the csubst sites plotter. '
                              'When multiple candidates share a site, the best-supported candidate represents that site.')
@@ -678,7 +681,7 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                         choices=['all', 'analytical', 'empirical', 'full_scan'],
                         help='default=%(default)s: Candidate significance filter for --scan_site_plot. '
                              '"analytical" uses p_rate_enrichment; "empirical" uses the candidate-wise '
-                             'permutation P value; "full_scan" uses the maxT-style empirical P value from '
+                             'permutation P value (exploratory after discovery); "full_scan" uses the minP adjustment from '
                              '--scan_pvalue_calibration full_scan.')
     parser.add_argument('--scan_site_plot_alpha', metavar='FLOAT', default=0.05, type=float,
                         help='default=%(default)s: Inclusive P-value cutoff used by --scan_site_plot_filter.')
@@ -945,7 +948,8 @@ def _make_scan_foreground_parser(show_advanced):
     advanced_foreground_scan = psr_fg_scan.add_argument_group('advanced foreground tuning')
     _add_advanced_argument(advanced_foreground_scan, '--min_clade_bin_count', show_advanced=show_advanced,
                     metavar='INT', default=10, type=int,
-                    help='default=%(default)s: Minimum number of branches per bin for scan foreground-clade permutations.')
+                    help='default=%(default)s: Target minimum eligible clades per size bin for scan calibration. '
+                         'Boundaries are fixed independently of foreground labels; 1 keeps distinct clade sizes separate.')
     return psr_fg_scan
 
 

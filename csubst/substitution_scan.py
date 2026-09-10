@@ -1,8 +1,11 @@
 import math
+import hashlib
+import json
 import os
 import re
 import tempfile
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -14,6 +17,7 @@ from csubst import parallel
 from csubst import parser_misc
 from csubst import randomness
 from csubst import runtime
+from csubst import scan_permutation
 from csubst import sequence
 from csubst import substitution
 
@@ -35,10 +39,6 @@ SCAN_RATE_EXPOSURES = ("q_weighted", "state_aware", "raw_branch_length")
 SCAN_OTHER_SCOPES = ("all", "sister")
 SCAN_PVALUE_CALIBRATIONS = ("none", "candidate_fixed", "full_scan")
 SCAN_UNIT_MODES = ("lineage", "stem", "clade")
-
-
-class _RetryableScanPermutationError(RuntimeError):
-    pass
 
 
 SCAN_OUTPUT_COLUMNS = (
@@ -73,6 +73,13 @@ SCAN_OUTPUT_COLUMNS = (
     "scan_permutation_success_count",
     "scan_permutation_failure_count",
     "scan_permutation_failure_reasons",
+    "scan_calibration_status",
+    "scan_calibration_null",
+    "scan_calibration_scope",
+    "scan_permutation_sampling",
+    "scan_permutation_unique_count",
+    "scan_permutation_space_size",
+    "scan_pvalue_resolution",
     "codon_site_alignment",
     "site_rate",
     "site_rate_categorized",
@@ -240,6 +247,23 @@ def validate_scan_configuration(g):
                 calibration
             )
         )
+    if calibration != "none":
+        if not bool(g.get("scan_permutation_sample_original", True)):
+            raise ValueError(
+                "--scan_permutation_sample_original no is not supported for calibration: "
+                "the assignment space must include the observed foreground. Use yes."
+            )
+        if bool(g.get("scan_permutation_retry_sample_original", False)):
+            raise ValueError(
+                "--scan_permutation_retry_sample_original yes is not supported: "
+                "scan calibration cannot change the assignment space after a failure. Use no."
+            )
+        if "fg_df" in g and len(g["fg_df"].columns[1:]) != 1:
+            raise ValueError(
+                "Scan calibration currently requires one trait. Multiple traits need a joint "
+                "assignment null preserving their dependence; use --scan_pvalue_calibration none "
+                "for an uncalibrated multi-trait scan."
+            )
     filter_mode = str(g.get("scan_site_plot_filter", "all")).strip().lower()
     allowed_filters = {"all", "analytical", "empirical", "full_scan"}
     if filter_mode not in allowed_filters:
@@ -920,224 +944,146 @@ def _selected_stem_fg_branch_ids(g, trait_cache, stem_index):
     return np.array(trait_cache["descendant_branch_ids_by_index"][stem_index], dtype=np.int64)
 
 
-def _component_has_candidate_branches(g, unit_mode, component):
-    if unit_mode == "stem":
-        return bool(component["stem_is_valid"])
-    if unit_mode == "clade":
-        return np.asarray(component["clade_branch_ids"], dtype=np.int64).shape[0] > 0
-    if bool(g.get("fg_stem_only", False)):
-        return bool(component["stem_is_valid"])
-    return np.asarray(component["clade_branch_ids"], dtype=np.int64).shape[0] > 0
-
-
-def _assign_permuted_components_to_lineages(selected_components, observed_groups, trait_name, g):
-    slots = []
-    for group_index, group in enumerate(observed_groups):
-        for component_index, component in enumerate(group["components"]):
-            if not _component_has_candidate_branches(
-                g=g,
-                unit_mode="lineage",
-                component=component,
-            ):
-                continue
-            slots.append(
-                (
-                    int(np.asarray(component["clade_branch_ids"], dtype=np.int64).shape[0]),
-                    int(group_index),
-                    int(component_index),
-                )
-            )
-    selected_components = sorted(
-        selected_components,
-        key=lambda component: (
-            -int(np.asarray(component["clade_branch_ids"], dtype=np.int64).shape[0]),
-            int(component["stem_branch_id"]),
-        ),
+def _get_scan_trait_plan(g, trait_name, valid_branch_ids):
+    cache_key = (str(trait_name), tuple(int(i) for i in valid_branch_ids))
+    plans = g.setdefault("_scan_trait_plans", {})
+    if cache_key in plans:
+        return plans[cache_key]
+    trait_cache = foreground._get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
+    valid_set = set(int(i) for i in valid_branch_ids)
+    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
+    groups = _lineage_component_groups(g=g, trait_name=trait_name, valid_branches=valid_set)
+    observed = [
+        tuple(trait_cache["branch_id_to_index"][component["stem_branch_id"]] for component in group["components"])
+        for group in groups
+    ]
+    if unit_mode != "lineage":
+        observed = [tuple(i for group in observed for i in group)]
+    elif any(len(group) == 0 for group in observed):
+        raise ValueError("Every foreground lineage needs a non-root component for scan calibration.")
+    eligible = np.array([
+        any(int(bid) in valid_set for bid in _selected_stem_fg_branch_ids(g, trait_cache, i))
+        for i in range(len(trait_cache["branch_ids"]))
+    ], dtype=bool)
+    if not eligible.any():
+        raise ValueError("No clades have analyzable target branches for scan calibration.")
+    min_count = int(g.get("min_clade_bin_count", g.get("scan_permutation_min_clade_bin_count", 10)))
+    if min_count < 1:
+        raise ValueError("The minimum clade bin count must be positive.")
+    # Bin boundaries depend only on the eligible tree, never on which clades
+    # happened to be foreground. Keep the existing size-bin boundary convention.
+    bins, _ = foreground._build_clade_permutation_bins_from_arrays(
+        size_array=trait_cache["size"][eligible],
+        is_fg_stem=np.zeros(int(eligible.sum()), dtype=bool),
+        min_clade_bin_count=min_count,
+        sample_original_foreground=True,
     )
-    slots = sorted(slots, key=lambda slot: (-int(slot[0]), int(slot[1]), int(slot[2])))
-    if len(selected_components) != len(slots):
-        txt = (
-            "A scan permutation retained {} of {} foreground components for trait {} after filtering "
-            "branches without analyzable states."
-        )
-        raise _RetryableScanPermutationError(
-            txt.format(len(selected_components), len(slots), trait_name)
-        )
-    assigned = [[] for _ in observed_groups]
-    for component, (_, group_index, _) in zip(selected_components, slots):
-        assigned[int(group_index)].append(component)
-    return assigned
+    bin_array = np.digitize(trait_cache["size"], bins[::-1], right=False)
+    sampler = scan_permutation.build_plan(
+        bin_array=bin_array,
+        eligible=eligible,
+        observed=observed,
+        descendants=trait_cache["descendant_indices_by_index"],
+    )
+    plan = {
+        "sampler": sampler,
+        "trait_cache": trait_cache,
+        "groups": groups,
+        "eligible": eligible,
+        "bins": bins,
+        "bin_array": bin_array,
+    }
+    plans[cache_key] = plan
+    return plan
+
+
+def _scan_configuration_id(configurations):
+    payload = json.dumps(configurations, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _build_permuted_trait_context(
     g,
     trait_name,
     valid_branch_ids,
-    sample_original_foreground,
+    sample_original_foreground=True,
     rng=None,
+    configuration=None,
 ):
+    if not sample_original_foreground:
+        raise ValueError("Scan calibration must include the original foreground clades.")
     if rng is None:
         rng = randomness.next_generator(g, 'scan_permutation_direct', str(trait_name))
-    if "min_clade_bin_count" not in g:
-        g["min_clade_bin_count"] = int(g.get("scan_permutation_min_clade_bin_count", 10))
-    trait_cache = foreground._get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
-    randomization_plan = foreground._get_clade_permutation_randomization_plan(
-        g=g,
-        trait_name=trait_name,
-        sample_original_foreground=sample_original_foreground,
-    )
-    stem_flags = foreground._randomize_foreground_stem_flags_from_plan(
-        trait_cache=trait_cache,
-        randomization_plan=randomization_plan,
-        sample_original_foreground=sample_original_foreground,
-        rng=rng,
-    )
-    stem_indices = np.where(stem_flags)[0].astype(np.int64, copy=False)
-    valid_set = set(int(v) for v in np.asarray(valid_branch_ids, dtype=np.int64).reshape(-1).tolist())
-    node_by_id = _node_by_branch_id(g)
-    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
-    selected_components = []
-    for stem_index in stem_indices.tolist():
-        fg_ids = _selected_stem_fg_branch_ids(g=g, trait_cache=trait_cache, stem_index=stem_index)
-        fg_ids = np.array([int(v) for v in fg_ids.tolist() if int(v) in valid_set], dtype=np.int64)
-        if fg_ids.shape[0] == 0:
-            continue
-        fg_clade_ids = np.array(
-            [
-                int(v)
-                for v in trait_cache["descendant_branch_ids_by_index"][int(stem_index)].tolist()
-                if int(v) in valid_set
-            ],
-            dtype=np.int64,
-        )
-        selected_components.append(
-            {
-                "stem_branch_id": int(trait_cache["branch_ids"][int(stem_index)]),
-                "fg_branch_ids": fg_ids,
-                "clade_branch_ids": fg_clade_ids,
-                "leaf_names": sorted(
-                    str(v) for v in trait_cache["leaf_names_by_index"][int(stem_index)]
-                ),
-            }
-        )
-    observed_groups = _lineage_component_groups(
-        g=g,
-        trait_name=trait_name,
-        valid_branches=valid_set,
-    )
-    expected_component_count = sum(
-        1
-        for group in observed_groups
-        for component in group["components"]
-        if _component_has_candidate_branches(g=g, unit_mode=unit_mode, component=component)
-    )
-    if len(selected_components) != expected_component_count:
-        txt = (
-            "A scan permutation retained {} of {} foreground components for trait {} after filtering "
-            "branches without analyzable states."
-        )
-        raise _RetryableScanPermutationError(
-            txt.format(len(selected_components), expected_component_count, trait_name)
-        )
-    occupied_clade_ids = set()
-    for component in selected_components:
-        clade_ids = np.asarray(component["clade_branch_ids"], dtype=np.int64)
-        clade_id_set = set(int(v) for v in clade_ids.tolist())
-        if len(occupied_clade_ids.intersection(clade_id_set)) > 0:
-            raise _RetryableScanPermutationError(
-                "A scan permutation produced overlapping foreground clades for trait {}.".format(trait_name)
-            )
-        occupied_clade_ids.update(clade_id_set)
-    if len(selected_components) == 0:
-        return {
-            "units": pd.DataFrame(columns=list(SCAN_UNIT_COLUMNS)),
-            "fg_ids": np.array([], dtype=np.int64),
-            "rate_fg_ids": np.array([], dtype=np.int64),
-            "fg_leaf_names": [],
-        }
-    if unit_mode == "lineage":
-        assigned_components = _assign_permuted_components_to_lineages(
-            selected_components=selected_components,
-            observed_groups=observed_groups,
-            trait_name=trait_name,
-            g=g,
-        )
-        unit_specs = []
-        for group, components in zip(observed_groups, assigned_components):
-            fg_ids = _component_ids(components, "fg_branch_ids")
-            clade_ids = _component_ids(components, "clade_branch_ids")
-            stem_ids = np.array(
-                sorted(int(component["stem_branch_id"]) for component in components),
-                dtype=np.int64,
-            )
-            leaf_names = sorted(
-                {
-                    str(leaf_name)
-                    for component in components
-                    for leaf_name in component["leaf_names"]
-                }
-            )
-            unit_specs.append(
-                {
-                    "lineage_value": group["lineage_value"],
-                    "stem_branch_ids": stem_ids,
-                    "fg_branch_ids": fg_ids,
-                    "clade_branch_ids": clade_ids,
-                    "leaf_names": leaf_names,
-                }
-            )
+    plan = _get_scan_trait_plan(g, trait_name, valid_branch_ids)
+    if configuration is None:
+        configuration, attempts = scan_permutation.sample_configuration(plan["sampler"], rng)
     else:
-        unit_specs = [
-            {
-                "lineage_value": int(i) + 1,
-                "stem_branch_ids": np.array([int(component["stem_branch_id"])], dtype=np.int64),
-                "fg_branch_ids": np.asarray(component["fg_branch_ids"], dtype=np.int64),
-                "clade_branch_ids": np.asarray(component["clade_branch_ids"], dtype=np.int64),
-                "leaf_names": component["leaf_names"],
-            }
-            for i, component in enumerate(selected_components)
-        ]
-    unit_fg_arrays = [np.asarray(spec["fg_branch_ids"], dtype=np.int64) for spec in unit_specs]
-    unit_fg_clade_arrays = [np.asarray(spec["clade_branch_ids"], dtype=np.int64) for spec in unit_specs]
-    all_fg_ids = _component_ids(
-        [{"ids": values} for values in unit_fg_arrays],
-        "ids",
-    )
-    all_rate_fg_ids = _component_ids(
-        [{"ids": values} for values in unit_fg_clade_arrays],
-        "ids",
-    )
+        attempts = 0
+    trait_cache = plan["trait_cache"]
+    valid_set = set(int(v) for v in valid_branch_ids)
+    unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
+    unit_specs: list[dict[str, Any]] = []
+    for group_index, indices in enumerate(configuration):
+        components = []
+        for stem_index in indices:
+            fg_ids = np.array([
+                int(bid) for bid in _selected_stem_fg_branch_ids(g, trait_cache, stem_index)
+                if int(bid) in valid_set
+            ], dtype=np.int64)
+            if fg_ids.size == 0:
+                raise ValueError("A sampled foreground component has no analyzable target branches.")
+            components.append({
+                "stem_branch_id": int(trait_cache["branch_ids"][stem_index]),
+                "fg_branch_ids": fg_ids,
+                "clade_branch_ids": np.array([
+                    int(bid) for bid in trait_cache["descendant_branch_ids_by_index"][stem_index]
+                    if int(bid) in valid_set
+                ], dtype=np.int64),
+                "leaf_names": list(trait_cache["leaf_names_by_index"][stem_index]),
+            })
+        # Lineage groups (including the number of components in each bin) are
+        # part of the sampled configuration. No rank-based reassignment occurs.
+        component_groups = [components] if unit_mode == "lineage" else [[c] for c in components]
+        for component_group in component_groups:
+            unit_specs.append({
+                "lineage_value": (
+                    plan["groups"][group_index]["lineage_value"] if unit_mode == "lineage"
+                    else len(unit_specs) + 1
+                ),
+                "stem_branch_ids": np.array(sorted(c["stem_branch_id"] for c in component_group), dtype=np.int64),
+                "fg_branch_ids": _component_ids(component_group, "fg_branch_ids"),
+                "clade_branch_ids": _component_ids(component_group, "clade_branch_ids"),
+                "leaf_names": sorted({str(name) for c in component_group for name in c["leaf_names"]}),
+            })
+    all_fg_ids = _component_ids(unit_specs, "fg_branch_ids")
+    all_rate_fg_ids = _component_ids(unit_specs, "clade_branch_ids")
+    node_by_id = _node_by_branch_id(g)
     rows = []
     fg_leaf_names = []
     for i, spec in enumerate(unit_specs):
-        fg_ids = np.asarray(spec["fg_branch_ids"], dtype=np.int64)
         sister_ids = _unit_sister_branch_ids(
-            g=g,
-            fg_branch_ids=fg_ids,
-            all_fg_branch_ids=all_fg_ids,
-            node_by_id=node_by_id,
+            g=g, fg_branch_ids=spec["fg_branch_ids"], all_fg_branch_ids=all_fg_ids, node_by_id=node_by_id,
         )
-        sister_ids = np.array([int(v) for v in sister_ids.tolist() if int(v) in valid_set], dtype=np.int64)
-        leaf_names = sorted(str(v) for v in spec["leaf_names"])
-        fg_leaf_names.append(leaf_names)
-        rows.append(
-            {
-                "trait": trait_name,
-                "unit_id": i + 1,
-                "unit_mode": unit_mode,
-                "lineage_value": spec["lineage_value"],
-                "stem_branch_ids": _format_branch_id_list(spec["stem_branch_ids"]),
-                "fg_leaf_names": ",".join(leaf_names),
-                "fg_branch_ids": _format_branch_id_list(fg_ids),
-                "sister_branch_ids": _format_branch_id_list(sister_ids),
-                "fg_clade_branch_ids": _format_branch_id_list(spec["clade_branch_ids"]),
-            }
-        )
+        sister_ids = np.array([int(v) for v in sister_ids if int(v) in valid_set], dtype=np.int64)
+        fg_leaf_names.append(spec["leaf_names"])
+        rows.append({
+            "trait": trait_name,
+            "unit_id": i + 1,
+            "unit_mode": unit_mode,
+            "lineage_value": spec["lineage_value"],
+            "stem_branch_ids": _format_branch_id_list(spec["stem_branch_ids"]),
+            "fg_leaf_names": ",".join(spec["leaf_names"]),
+            "fg_branch_ids": _format_branch_id_list(spec["fg_branch_ids"]),
+            "sister_branch_ids": _format_branch_id_list(sister_ids),
+            "fg_clade_branch_ids": _format_branch_id_list(spec["clade_branch_ids"]),
+        })
     return {
-        "units": pd.DataFrame(rows).loc[:, list(SCAN_UNIT_COLUMNS)],
+        "units": pd.DataFrame(rows, columns=list(SCAN_UNIT_COLUMNS)),
         "fg_ids": all_fg_ids,
         "rate_fg_ids": all_rate_fg_ids,
         "fg_leaf_names": fg_leaf_names,
+        "sampling_attempts": attempts,
+        "configuration": [[int(trait_cache["branch_ids"][i]) for i in group] for group in configuration],
     }
 
 
@@ -1145,8 +1091,9 @@ def _build_permuted_scan_context(
     g,
     trait_names,
     valid_branch_ids,
-    sample_original_foreground,
+    sample_original_foreground=True,
     rng=None,
+    configurations=None,
 ):
     if rng is None:
         rng = randomness.next_generator(g, 'scan_permutation_context')
@@ -1154,6 +1101,8 @@ def _build_permuted_scan_context(
     fg_ids = {}
     rate_fg_ids = {}
     fg_leaf_names = {}
+    sampled_configurations = {}
+    attempts = 0
     for trait_name in trait_names:
         trait_context = _build_permuted_trait_context(
             g=g,
@@ -1161,18 +1110,23 @@ def _build_permuted_scan_context(
             valid_branch_ids=valid_branch_ids,
             sample_original_foreground=sample_original_foreground,
             rng=rng,
+            configuration=None if configurations is None else configurations[trait_name],
         )
         units.append(trait_context["units"])
         fg_ids[trait_name] = trait_context["fg_ids"]
         rate_fg_ids[trait_name] = trait_context["rate_fg_ids"]
         fg_leaf_names[trait_name] = trait_context["fg_leaf_names"]
-    units_df = pd.concat(units, ignore_index=True) if len(units) > 0 else pd.DataFrame()
+        sampled_configurations[trait_name] = trait_context["configuration"]
+        attempts += trait_context["sampling_attempts"]
     return {
-        "units": units_df,
+        "units": pd.concat(units, ignore_index=True) if units else pd.DataFrame(columns=list(SCAN_UNIT_COLUMNS)),
         "fg_ids": fg_ids,
         "rate_fg_ids": rate_fg_ids,
         "fg_leaf_names": fg_leaf_names,
         "trait_names": list(trait_names),
+        "sampling_attempts": attempts,
+        "configuration": sampled_configurations,
+        "configuration_id": _scan_configuration_id(sampled_configurations),
     }
 
 
@@ -2256,45 +2210,34 @@ def _scan_row_key(row):
     )
 
 
-def _empirical_p_from_values(p_obs, values, denominator_count):
+def _empirical_p_from_values(p_obs, values, denominator_count, exact=False):
     p_obs = float(p_obs)
     denominator_count = int(denominator_count)
-    if (not np.isfinite(p_obs)) or (denominator_count <= 0):
+    if (not np.isfinite(p_obs)) or not (0 <= p_obs <= 1) or (denominator_count <= 0):
         return np.nan
     values = np.asarray(values, dtype=np.float64).reshape(-1)
-    values = values[np.isfinite(values)]
-    return min(1.0, float((1 + int((values <= p_obs).sum())) / (1 + denominator_count)))
+    if len(values) != denominator_count:
+        raise ValueError("Each scan configuration must contribute exactly one null statistic.")
+    if (not np.isfinite(values).all()) or ((values < 0) | (values > 1)).any():
+        return np.nan
+    offset = 0 if exact else 1
+    return float((offset + int((values <= p_obs).sum())) / (offset + denominator_count))
 
 
 def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutation_index):
-    base_seed = int(g.get("scan_permutation_seed", 1))
-    sample_original = bool(g.get("scan_permutation_sample_original", False))
-    retry_with_original = bool(g.get("scan_permutation_retry_sample_original", True))
-    rng = np.random.default_rng(
-        _scan_permutation_seed(base_seed=base_seed, permutation_index=permutation_index)
+    rng = np.random.default_rng(_scan_permutation_seed(
+        base_seed=int(g.get("scan_permutation_seed", 1)), permutation_index=permutation_index,
+    ))
+    configurations = None
+    if g.get("_scan_permutation_exact", False):
+        configurations = {
+            trait: _get_scan_trait_plan(g, trait, valid_branch_ids)["sampler"].configurations[permutation_index - 1]
+            for trait in trait_names
+        }
+    return _build_permuted_scan_context(
+        g=g, trait_names=trait_names, valid_branch_ids=valid_branch_ids,
+        sample_original_foreground=True, rng=rng, configurations=configurations,
     )
-
-    def build_with_retry(sample_original_foreground):
-        last_error = None
-        for _ in range(100):
-            try:
-                return _build_permuted_scan_context(
-                    g=g,
-                    trait_names=trait_names,
-                    valid_branch_ids=valid_branch_ids,
-                    sample_original_foreground=sample_original_foreground,
-                    rng=rng,
-                )
-            except _RetryableScanPermutationError as exc:
-                last_error = exc
-        raise last_error
-
-    try:
-        return build_with_retry(sample_original_foreground=sample_original)
-    except Exception:
-        if sample_original or (not retry_with_original):
-            raise
-        return build_with_retry(sample_original_foreground=True)
 
 
 def _candidate_fixed_permutation_pvalues(
@@ -2397,6 +2340,20 @@ def _run_scan_permutation(
     rate_ON_tensor,
     scan_static,
 ):
+    diagnostic = {
+        "permutation_index": int(permutation_index),
+        "seed": None if g.get("_scan_permutation_exact", False) else _scan_permutation_seed(
+            int(g.get("scan_permutation_seed", 1)), permutation_index,
+        ),
+        "configuration_id": None,
+        "configuration": None,
+        "sampling_attempts": 0,
+        "candidate_count": 0,
+        "finite_pvalue_count": 0,
+        "min_p": None,
+        "status": "failed",
+        "failure_reason": "",
+    }
     try:
         scan_context = _build_permuted_context_with_seed(
             g=g,
@@ -2404,52 +2361,47 @@ def _run_scan_permutation(
             valid_branch_ids=valid_branch_ids,
             permutation_index=permutation_index,
         )
-        row_key_to_p = {}
-        min_p = np.nan
+        for key in ("configuration_id", "configuration", "sampling_attempts"):
+            diagnostic[key] = scan_context[key]
         if calibration == "candidate_fixed":
             perm_by_key = _candidate_fixed_permutation_pvalues(
-                g=g,
-                observed_df=observed_df,
-                scan_context=scan_context,
-                branch_meta=branch_meta,
-                valid_branch_ids=valid_branch_ids,
-                ON_tensor=ON_tensor,
-                rate_ON_tensor=rate_ON_tensor,
-                scan_static=scan_static,
+                g=g, observed_df=observed_df, scan_context=scan_context,
+                branch_meta=branch_meta, valid_branch_ids=valid_branch_ids,
+                ON_tensor=ON_tensor, rate_ON_tensor=rate_ON_tensor, scan_static=scan_static,
             )
-            for key, pvalue in perm_by_key.items():
-                if key in observed_keys:
-                    row_key_to_p.setdefault(key, []).append(float(pvalue))
+            if set(perm_by_key) != observed_keys:
+                raise ValueError("A fixed-candidate scan permutation did not evaluate every observed candidate.")
         else:
             perm_df, _ = _scan_substitutions_core(
-                g=g,
-                ON_tensor=ON_tensor,
-                rate_ON_tensor=rate_ON_tensor,
-                scan_context=scan_context,
-                scan_static=scan_static,
+                g=g, ON_tensor=ON_tensor, rate_ON_tensor=rate_ON_tensor,
+                scan_context=scan_context, scan_static=scan_static,
             )
-            if perm_df.shape[0] == 0:
-                min_p = 1.0
-            else:
-                pvalues = perm_df["p_rate_enrichment"].to_numpy(dtype=np.float64)
-                finite = pvalues[np.isfinite(pvalues)]
-                min_p = float(finite.min()) if finite.shape[0] > 0 else 1.0
-                for _, perm_row in perm_df.iterrows():
-                    key = _scan_row_key(perm_row)
-                    if key in observed_keys:
-                        row_key_to_p.setdefault(key, []).append(float(perm_row["p_rate_enrichment"]))
+            perm_by_key = {_scan_row_key(row): float(row["p_rate_enrichment"]) for _, row in perm_df.iterrows()}
+            if len(perm_by_key) != len(perm_df):
+                raise ValueError("Duplicate candidate keys in a scan permutation.")
+        pvalues = np.asarray(list(perm_by_key.values()), dtype=np.float64)
+        diagnostic["candidate_count"] = int(len(pvalues))
+        diagnostic["finite_pvalue_count"] = int(np.isfinite(pvalues).sum())
+        if (not np.isfinite(pvalues).all()) or ((pvalues < 0) | (pvalues > 1)).any():
+            raise ValueError("A scan candidate has an undefined or invalid rate statistic (check exposures and states).")
+        # An empty candidate set is a well-defined non-rejection, unlike a
+        # nonempty set containing undefined statistics. Absent row keys also
+        # contribute 1, so every configuration contributes once to each tail.
+        min_p = float(pvalues.min()) if len(pvalues) else 1.0
+        row_key_to_p = {key: [float(perm_by_key.get(key, 1.0))] for key in observed_keys}
+        diagnostic.update(status="success", min_p=min_p)
         return {
-            "success": True,
-            "min_p": min_p,
-            "row_key_to_p": row_key_to_p,
-            "failure_reason": "",
+            "success": True, "min_p": min_p, "row_key_to_p": row_key_to_p,
+            "failure_reason": "", "diagnostic": diagnostic,
         }
     except Exception as exc:
+        reason = "{}: {}".format(type(exc).__name__, str(exc))
+        diagnostic["failure_reason"] = reason
+        if isinstance(exc, scan_permutation.SamplingError):
+            diagnostic["sampling_attempts"] = exc.attempts
         return {
-            "success": False,
-            "min_p": np.nan,
-            "row_key_to_p": {},
-            "failure_reason": "{}: {}".format(type(exc).__name__, str(exc)),
+            "success": False, "min_p": np.nan, "row_key_to_p": {},
+            "failure_reason": reason, "diagnostic": diagnostic,
         }
 
 
@@ -2469,10 +2421,11 @@ def _run_scan_permutation_chunk(
     g, scan_static = _unpack_scan_worker_context(g=g, scan_static=scan_static)
     ON_tensor = _unpack_scan_tensor_for_worker(ON_tensor)
     rate_ON_tensor = _unpack_scan_tensor_for_worker(rate_ON_tensor)
-    summary = {
+    summary: dict[str, Any] = {
         "success_count": 0,
         "failure_count": 0,
         "failure_reasons": [],
+        "diagnostics": [],
         "min_p": [],
         "row_key_to_p": {},
     }
@@ -2492,6 +2445,7 @@ def _run_scan_permutation_chunk(
             rate_ON_tensor=rate_ON_tensor,
             scan_static=scan_static,
         )
+        summary["diagnostics"].append(result["diagnostic"])
         if not result.get("success", False):
             summary["failure_count"] += 1
             reason = str(result.get("failure_reason", "")).strip()
@@ -2499,8 +2453,7 @@ def _run_scan_permutation_chunk(
                 summary["failure_reasons"].append(reason)
             continue
         summary["success_count"] += 1
-        min_p = float(result.get("min_p", np.nan))
-        summary["min_p"].append(min_p if np.isfinite(min_p) else 1.0)
+        summary["min_p"].append(float(result["min_p"]))
         for key, pvalues in result.get("row_key_to_p", {}).items():
             summary["row_key_to_p"].setdefault(key, []).extend(
                 float(value) for value in pvalues
@@ -2508,144 +2461,237 @@ def _run_scan_permutation_chunk(
     return summary
 
 
+def _scan_plan_diagnostics(g, trait_name, plan, branch_meta):
+    trait_cache = plan["trait_cache"]
+    sampler = plan["sampler"]
+    state = np.asarray(g["state_nsy"])
+    # Summarize in bounded blocks: diagnostics must not copy a potentially large
+    # branch x site x state memmap or retain a second posterior tensor.
+    valid_counts = np.zeros(state.shape[0], dtype=np.int64)
+    entropy_sums = np.zeros(state.shape[0], dtype=np.float64)
+    for bid in branch_meta["branch_id"]:
+        for start in range(0, state.shape[1], 4096):
+            block = np.asarray(state[int(bid), start:start + 4096], dtype=np.float64)
+            mass = block.sum(axis=1)
+            valid = np.isfinite(block).all(axis=1) & (mass > float(g.get("float_tol", 0)))
+            probabilities = np.divide(block, mass[:, None], out=np.zeros_like(block), where=valid[:, None])
+            with np.errstate(divide="ignore", invalid="ignore"):
+                entropy = -np.where(probabilities > 0, probabilities * np.log(probabilities), 0).sum(axis=1)
+            valid_counts[int(bid)] += int(valid.sum())
+            entropy_sums[int(bid)] += float(entropy[valid].sum())
+    metadata = branch_meta.set_index("branch_id")
+    nodes = _node_by_branch_id(g)
+    depths: dict[int, float] = {}
+    for node in g["tree"].traverse("preorder"):
+        bid = int(ete.get_prop(node, "numerical_label"))
+        depths[bid] = 0.0 if ete.is_root(node) else depths[int(ete.get_prop(node.up, "numerical_label"))] + float(node.dist)
+
+    def finite_or_none(value):
+        return float(value) if np.isfinite(value) else None
+
+    clades = []
+    for i, bid in enumerate(trait_cache["branch_ids"]):
+        target_ids = [int(b) for b in _selected_stem_fg_branch_ids(g, trait_cache, i) if int(b) in metadata.index]
+        valid_count = int(valid_counts[target_ids].sum())
+        cell_count = len(target_ids) * state.shape[1]
+        clades.append({
+            "stem_branch_id": int(bid),
+            "parent_branch_id": int(ete.get_prop(nodes[int(bid)].up, "numerical_label")),
+            "leaf_names": list(trait_cache["leaf_names_by_index"][i]),
+            "leaf_count": int(trait_cache["size"][i]),
+            "bin": int(plan["bin_array"][i]),
+            "eligible": bool(plan["eligible"][i]),
+            "target_branch_ids": target_ids,
+            "root_distance": finite_or_none(depths[int(bid)]),
+            "stem_raw_length": finite_or_none(float(nodes[int(bid)].dist)),
+            "target_raw_length": finite_or_none(metadata.loc[target_ids, "raw_length"].sum()),
+            "target_n_rescaled_length": finite_or_none(metadata.loc[target_ids, "n_rescaled_length"].sum()),
+            "target_sn_rescaled_length": finite_or_none(metadata.loc[target_ids, "sn_rescaled_length"].sum()),
+            "analyzable_state_fraction": valid_count / cell_count if cell_count else 0.0,
+            "mean_state_entropy": finite_or_none(entropy_sums[target_ids].sum() / valid_count) if valid_count else None,
+        })
+    return {
+        "trait": str(trait_name),
+        "bin_boundaries": [int(v) for v in plan["bins"]],
+        "bin_pools": [[int(trait_cache["branch_ids"][i]) for i in pool] for pool in sampler.pools],
+        "component_counts_by_bin_and_group": [list(counts) for counts in sampler.counts],
+        "group_labels": [str(group["lineage_value"]) for group in plan["groups"]] if normalize_scan_unit_mode(g.get("scan_unit_mode")) == "lineage" else ["pooled_clades"],
+        "proposal_space_size": str(sampler.proposal_count),
+        "valid_space_size": len(sampler.configurations) if sampler.configurations is not None else None,
+        "sampling_probability": 1.0 / len(sampler.configurations) if sampler.configurations is not None else None,
+        "sampling_law": "uniform_over_valid_configurations",
+        "max_rejection_draws": scan_permutation.MAX_REJECTION_DRAWS,
+        "clades": clades,
+    }
+
+
+def _finish_scan_calibration(g, observed_df, diagnostic):
+    trials = diagnostic["trials"]
+    diagnostic["success_count"] = sum(trial["status"] == "success" for trial in trials)
+    diagnostic["failure_count"] = len(trials) - diagnostic["success_count"]
+    diagnostic["sampling_attempts"] = sum(trial["sampling_attempts"] for trial in trials)
+    diagnostic["unique_configuration_count"] = len({trial["configuration_id"] for trial in trials if trial["configuration_id"] is not None})
+    observed_id = diagnostic.get("observed", {}).get("configuration_id")
+    diagnostic["original_configuration_count"] = sum(trial["configuration_id"] == observed_id for trial in trials) if observed_id is not None else 0
+    reasons = list(dict.fromkeys(trial["failure_reason"] for trial in trials if trial["failure_reason"]))
+    if diagnostic.get("failure_reason"):
+        reasons.insert(0, diagnostic["failure_reason"])
+    out = observed_df.copy()
+    columns = {
+        "scan_permutation_success_count": diagnostic["success_count"],
+        "scan_permutation_failure_count": diagnostic["failure_count"],
+        "scan_permutation_failure_reasons": "; ".join(reasons[:5]),
+        "scan_calibration_status": diagnostic["status"],
+        "scan_calibration_null": diagnostic["null"],
+        "scan_calibration_scope": diagnostic["scope"],
+        "scan_permutation_sampling": diagnostic["sampling"],
+        "scan_permutation_unique_count": diagnostic["unique_configuration_count"],
+        "scan_permutation_space_size": diagnostic.get("space_size"),
+        "scan_pvalue_resolution": diagnostic.get("pvalue_resolution"),
+    }
+    for col, value in columns.items():
+        out[col] = value
+    g["scan_calibration_diagnostics"] = diagnostic
+    return out
+
+
 def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_static):
     calibration = normalize_scan_pvalue_calibration(g.get("scan_pvalue_calibration", "full_scan"))
+    requested_count = normalize_scan_n_permutations(g.get("scan_n_permutations", 1000))
+    diagnostic = {
+        "schema_version": 1,
+        "calibration": calibration,
+        "null": "uniform_nonoverlapping_size_binned_clades",
+        "assumption": "The observed assignment is uniform over the fixed eligible configurations, conditional on the tree, states, masks and bin/group counts.",
+        "scope": "within_trait_full_scan" if calibration == "full_scan" else "observed_candidates_exploratory",
+        "status": "disabled" if calibration == "none" else "pending",
+        "sampling": "not_run",
+        "requested_count": requested_count,
+        "seed": int(g.get("scan_permutation_seed", 1)),
+        "original_foreground_included": True,
+        "trials": [],
+        "settings": {
+            "scan_match": normalize_scan_matches(g.get("scan_match", "any2spe")),
+            "scan_min_support": str(g.get("scan_min_support", "2")),
+            "scan_min_event_pp": float(g.get("scan_min_event_pp", 0.5)),
+            "scan_rate_length": str(g.get("scan_rate_length", "n_rescaled")),
+            "scan_rate_event_mode": normalize_scan_rate_event_mode(g.get("scan_rate_event_mode", "posterior_sum")),
+            "scan_other_scope": normalize_scan_other_scope(g.get("scan_other_scope", "all")),
+            "scan_unit_mode": normalize_scan_unit_mode(g.get("scan_unit_mode", "clade")),
+            "fg_stem_only": bool(g.get("fg_stem_only", False)),
+            "scan_sister_stem_only": bool(g.get("scan_sister_stem_only", False)),
+            "min_clade_bin_count": int(g.get("min_clade_bin_count", g.get("scan_permutation_min_clade_bin_count", 10))),
+        },
+        "resolved_rate_exposure": scan_static["rate_exposure"],
+        "state_tensor_shape": list(np.asarray(g["state_nsy"]).shape),
+    }
     if calibration == "none":
-        return observed_df
-    n_permutations = normalize_scan_n_permutations(g.get("scan_n_permutations", 1000))
-    if n_permutations == 0 or observed_df.shape[0] == 0:
-        return observed_df
+        diagnostic.update(null="none", scope="uncalibrated", assumption=None, original_foreground_included=None)
+        return _finish_scan_calibration(g, observed_df, diagnostic)
     branch_meta = scan_static["branch_meta"]
     valid_branch_ids = scan_static["valid_branch_ids"]
     trait_names = g["fg_df"].columns[1:].tolist()
-    row_key_to_perm_p = {_scan_row_key(row): [] for _, row in observed_df.iterrows()}
-    observed_keys = set(row_key_to_perm_p.keys())
-    min_perm_p = []
-    failure_reasons = []
+    plan = _get_scan_trait_plan(g, trait_names[0], valid_branch_ids)
+    sampler = plan["sampler"]
+    diagnostic["plan"] = _scan_plan_diagnostics(g, trait_names[0], plan, branch_meta)
+    diagnostic["space_size"] = len(sampler.configurations) if sampler.configurations is not None else None
+    observed_context = _build_permuted_scan_context(
+        g, trait_names, valid_branch_ids,
+        configurations={trait_names[0]: sampler.observed},
+    )
+    diagnostic["observed"] = {
+        "configuration": observed_context["configuration"],
+        "configuration_id": observed_context["configuration_id"],
+        "candidate_count": int(len(observed_df)),
+    }
+    if observed_df.empty:
+        diagnostic.update(status="no_observed_candidates")
+        if calibration == "full_scan":
+            diagnostic["global_pvalue"] = 1.0
+        return _finish_scan_calibration(g, observed_df, diagnostic)
+    observed_p = observed_df["p_rate_enrichment"].to_numpy(dtype=np.float64)
+    if not np.isfinite(observed_p).all() or ((observed_p < 0) | (observed_p > 1)).any():
+        diagnostic.update(status="unavailable_observed_statistic", failure_reason="An observed candidate has an undefined or invalid rate statistic.")
+        return _finish_scan_calibration(g, observed_df, diagnostic)
+    diagnostic["observed"]["min_p"] = float(observed_p.min())
+    row_key_to_perm_p: dict[tuple, list[float]] = {_scan_row_key(row): [] for _, row in observed_df.iterrows()}
+    observed_keys = set(row_key_to_perm_p)
+    if len(observed_keys) != len(observed_df):
+        raise ValueError("Duplicate observed candidate keys in scan calibration.")
+    exact = sampler.configurations is not None and len(sampler.configurations) <= requested_count
+    g["_scan_permutation_exact"] = exact
+    n_permutations = len(sampler.configurations) if exact else requested_count
+    diagnostic.update(
+        sampling="exact" if exact else "monte_carlo",
+        pvalue_resolution=1.0 / (n_permutations if exact else n_permutations + 1),
+    )
     n_jobs = _resolve_scan_permutation_n_jobs(g=g, n_permutations=n_permutations)
     backend = _resolve_scan_permutation_backend()
-    permutation_indices = np.arange(1, n_permutations + 1, dtype=np.int64)
-    chunk_factor = parallel.resolve_chunk_factor(task="general")
+    diagnostic.update(backend=backend, n_jobs=n_jobs)
     permutation_chunks, _ = parallel.get_chunks(
-        input_data=permutation_indices,
-        threads=n_jobs,
-        chunk_factor=chunk_factor,
+        input_data=np.arange(1, n_permutations + 1, dtype=np.int64),
+        threads=n_jobs, chunk_factor=parallel.resolve_chunk_factor(task="general"),
     )
     owned_worker_paths = []
     if (backend == "multiprocessing") and (n_jobs > 1):
-        worker_g, worker_scan_static, owned_worker_paths = _pack_scan_worker_context(
-            g=g,
-            scan_static=scan_static,
+        worker_g, worker_scan_static, owned_worker_paths = _pack_scan_worker_context(g=g, scan_static=scan_static)
+        worker_ON_tensor = _pack_scan_array_for_worker(ON_tensor, name="ON_tensor", owned_paths=owned_worker_paths, min_copy_bytes=0)
+        worker_rate_ON_tensor = worker_ON_tensor if rate_ON_tensor is ON_tensor else _pack_scan_array_for_worker(
+            rate_ON_tensor, name="rate_ON_tensor", owned_paths=owned_worker_paths, min_copy_bytes=0,
         )
-        worker_ON_tensor = _pack_scan_array_for_worker(
-            ON_tensor,
-            name="ON_tensor",
-            owned_paths=owned_worker_paths,
-            min_copy_bytes=0,
-        )
-        if rate_ON_tensor is ON_tensor:
-            worker_rate_ON_tensor = worker_ON_tensor
-        else:
-            worker_rate_ON_tensor = _pack_scan_array_for_worker(
-                rate_ON_tensor,
-                name="rate_ON_tensor",
-                owned_paths=owned_worker_paths,
-                min_copy_bytes=0,
-            )
     else:
-        worker_g = g
-        worker_scan_static = scan_static
-        worker_ON_tensor = ON_tensor
-        worker_rate_ON_tensor = rate_ON_tensor
+        worker_g, worker_scan_static = g, scan_static
+        worker_ON_tensor, worker_rate_ON_tensor = ON_tensor, rate_ON_tensor
     permutation_args = [
-        (
-            permutation_chunk,
-            worker_g,
-            observed_df,
-            observed_keys,
-            calibration,
-            trait_names,
-            branch_meta,
-            valid_branch_ids,
-            worker_ON_tensor,
-            worker_rate_ON_tensor,
-            worker_scan_static,
-        )
-        for permutation_chunk in permutation_chunks
+        (chunk, worker_g, observed_df, observed_keys, calibration, trait_names, branch_meta,
+         valid_branch_ids, worker_ON_tensor, worker_rate_ON_tensor, worker_scan_static)
+        for chunk in permutation_chunks
     ]
     try:
-        chunk_results = parallel.run_starmap(
-            _run_scan_permutation_chunk,
-            permutation_args,
-            n_jobs=n_jobs,
-            backend=backend,
-        )
+        chunk_results = parallel.run_starmap(_run_scan_permutation_chunk, permutation_args, n_jobs=n_jobs, backend=backend)
     finally:
         for path in owned_worker_paths:
             try:
                 os.remove(path)
             except FileNotFoundError:
                 pass
-    success_count = 0
-    failure_count = 0
+    min_perm_p = []
     for result in chunk_results:
-        success_count += int(result.get("success_count", 0))
-        failure_count += int(result.get("failure_count", 0))
-        failure_reasons.extend(result.get("failure_reasons", []))
-        if calibration == "full_scan":
-            min_perm_p.extend(float(value) for value in result.get("min_p", []))
-        for key, pvalues in result.get("row_key_to_p", {}).items():
-            if key in row_key_to_perm_p:
-                row_key_to_perm_p[key].extend(float(v) for v in pvalues)
-    observed_df = observed_df.copy()
-    observed_df.loc[:, "scan_permutation_backend"] = backend
-    observed_df.loc[:, "scan_permutation_n_jobs"] = int(n_jobs)
-    observed_df.loc[:, "scan_permutation_success_count"] = int(success_count)
-    observed_df.loc[:, "scan_permutation_failure_count"] = int(failure_count)
-    unique_failure_reasons = list(dict.fromkeys(failure_reasons))
-    observed_df.loc[:, "scan_permutation_failure_reasons"] = "; ".join(unique_failure_reasons[:5])
-    if failure_count > 0:
-        reason_txt = observed_df["scan_permutation_failure_reasons"].iloc[0]
-        if reason_txt == "":
-            reason_txt = "unknown"
-        print(
-            "Scan warning: {} of {} permutations failed: {}".format(
-                int(failure_count),
-                int(n_permutations),
-                reason_txt,
-            ),
-            flush=True,
-        )
-    if success_count == 0:
-        return observed_df
-    empirical = []
-    empirical_maxT = []
-    for _, row in observed_df.iterrows():
-        key = _scan_row_key(row)
-        p_obs = float(row["p_rate_enrichment"])
-        empirical.append(
-            _empirical_p_from_values(
-                p_obs=p_obs,
-                values=row_key_to_perm_p.get(key, []),
-                denominator_count=success_count,
-            )
-        )
-        if calibration == "full_scan":
-            empirical_maxT.append(
-                _empirical_p_from_values(
-                    p_obs=p_obs,
-                    values=min_perm_p,
-                    denominator_count=success_count,
-                )
-            )
-        else:
-            empirical_maxT.append(np.nan)
-    observed_df.loc[:, "p_rate_enrichment_empirical"] = empirical
-    observed_df.loc[:, "p_rate_enrichment_empirical_maxT"] = empirical_maxT
-    return observed_df
+        diagnostic["trials"].extend(result["diagnostics"])
+        min_perm_p.extend(result["min_p"])
+        for key, values in result["row_key_to_p"].items():
+            row_key_to_perm_p[key].extend(values)
+    diagnostic["trials"].sort(key=lambda trial: trial["permutation_index"])
+    out = observed_df.copy()
+    out["scan_permutation_backend"] = backend
+    out["scan_permutation_n_jobs"] = int(n_jobs)
+    failure_count = sum(trial["status"] != "success" for trial in diagnostic["trials"])
+    if failure_count:
+        diagnostic["status"] = "unavailable_failed_trials"
+        reasons = list(dict.fromkeys(trial["failure_reason"] for trial in diagnostic["trials"] if trial["failure_reason"]))
+        print("Scan warning: {} of {} permutations failed; calibration is unavailable: {}".format(
+            failure_count, n_permutations, "; ".join(reasons[:5]),
+        ), flush=True)
+        # Never silently change the null to the subset of successful trials.
+        return _finish_scan_calibration(g, out, diagnostic)
+    out["p_rate_enrichment_empirical"] = [
+        _empirical_p_from_values(float(row["p_rate_enrichment"]), row_key_to_perm_p[_scan_row_key(row)], n_permutations, exact=exact)
+        for _, row in out.iterrows()
+    ]
+    if calibration == "full_scan":
+        out["p_rate_enrichment_empirical_maxT"] = [
+            _empirical_p_from_values(p, min_perm_p, n_permutations, exact=exact) for p in observed_p
+        ]
+        diagnostic["global_pvalue"] = _empirical_p_from_values(float(observed_p.min()), min_perm_p, n_permutations, exact=exact)
+    diagnostic["status"] = "conditional_assignment"
+    return _finish_scan_calibration(g, out, diagnostic)
 
 
 def scan_substitutions(g, ON_tensor, rate_ON_tensor=None):
+    validate_scan_configuration(g)
+    g.pop("scan_calibration_diagnostics", None)
+    g["_scan_trait_plans"] = {}
+    g["_scan_permutation_exact"] = False
     scan_static = _build_scan_static_context(
         g=g,
         ON_tensor=ON_tensor,

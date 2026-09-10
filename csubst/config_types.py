@@ -15,6 +15,7 @@ class InputConfig(TypedDict, total=False):
     full_cds_alignment_file: str
     rooted_tree_file: str
     foreground: str
+    fg_stem_only: bool
     path_iqtree_state: str
     path_iqtree_rate: str
     infile_type: str
@@ -103,6 +104,7 @@ class AnalysisState(TypedDict, total=False):
     epistasis_enabled: bool
     _epistasis_state: dict[str, Any]
     _epistasis_provenance: dict[str, Any]
+    scan_calibration_diagnostics: dict[str, Any]
 
 
 class OutputSwitches(TypedDict, total=False):
@@ -121,6 +123,8 @@ class OutputSwitches(TypedDict, total=False):
 class InternalControls(TypedDict, total=False):
     _release_state_after_expected_reducer: bool
     _cbs_stream_target_bytes: int
+    _scan_trait_plans: dict[Any, Any]
+    _scan_permutation_exact: bool
 
 
 class AnalysisConfig(

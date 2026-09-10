@@ -413,6 +413,15 @@ def test_scan_help_is_available():
     assert "--scan_permutation_sample_original" in advanced_help
 
 
+def test_scan_parser_defaults_keep_one_assignment_space():
+    from csubst import cli
+
+    args = cli._build_parser(show_advanced=True).parse_args(["scan"])
+    assert args.scan_permutation_sample_original is True
+    assert args.scan_permutation_retry_sample_original is False
+    assert args.scan_pvalue_calibration == "full_scan"
+
+
 def test_benchmark_plot_help_is_available():
     proc, log_text = _run_cli("benchmark-plot", "-h")
     assert proc.returncode == 0
