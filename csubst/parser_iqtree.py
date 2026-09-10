@@ -1000,7 +1000,12 @@ def get_state_tensor(g, selected_branch_ids=None):
               'Delete intermediate files and rerun.'
     if num_alignment_site != g['num_input_site']:
         raise AssertionError(err_txt)
-    use_state_cache = bool(g.get('_cache_state_tensor', False))
+    tip_only = (g.get('substitution_posterior') == 'joint'
+                and g.get('nonsyn_recode', 'no') == 'no'
+                and g.get('subcommand') in ('search', 'analyze', 'benchmark')
+                and selected_branch_ids is None)
+    g['_endpoint_tip_only_input'] = tip_only
+    use_state_cache = bool(g.get('_cache_state_tensor', False)) and not tip_only
     state_cache_key = None
     if use_state_cache:
         state_cache_key = _state_tensor_cache_key(
@@ -1060,16 +1065,20 @@ def get_state_tensor(g, selected_branch_ids=None):
         selective=(selected_set is not None),
         mmap_name='tmp.csubst.state_tensor.mmap',
     )
-    loaded_internal_names = _load_internal_state_rows_one_pass(
-        state_tensor=state_tensor,
-        state_path=state_path,
-        state_columns=state_columns,
-        expected_num_site=g['num_input_site'],
-        internal_id_by_name=internal_id_by_name,
-        target_node_names=target_internal_names,
-        required_node_names=required_internal_names,
-        dtype=g['float_type'],
-    )
+    if tip_only:
+        loaded_internal_names = set()
+        print('Joint endpoint input: reading tip observations; internal posteriors will be recomputed.', flush=True)
+    else:
+        loaded_internal_names = _load_internal_state_rows_one_pass(
+            state_tensor=state_tensor,
+            state_path=state_path,
+            state_columns=state_columns,
+            expected_num_site=g['num_input_site'],
+            internal_id_by_name=internal_id_by_name,
+            target_node_names=target_internal_names,
+            required_node_names=required_internal_names,
+            dtype=g['float_type'],
+        )
     codon_lookup = None
     codon_state_lookup = None
     if g['input_data_type'] == 'cdn':
@@ -1105,6 +1114,8 @@ def get_state_tensor(g, selected_branch_ids=None):
                 )
             state_tensor[nl,:,:] = state_matrix
         else: # Internal nodes
+            if tip_only:
+                continue
             if (
                 (not ete.is_root(node))
                 and (node.name is not None)
@@ -1113,7 +1124,9 @@ def get_state_tensor(g, selected_branch_ids=None):
             ):
                 raise ValueError('Internal node was missing from .state file: {}'.format(node.name))
     state_tensor = np.nan_to_num(state_tensor, copy=False)
-    if selected_set is None:
+    if tip_only:
+        pass  # Internal missingness is inferred from the tip likelihoods by EndpointModel.
+    elif selected_set is None:
         state_tensor = mask_missing_sites(state_tensor, g['tree'])
     else:
         leaf_nonmissing_sites = _get_leaf_nonmissing_sites(g, required_leaf_ids=required_leaf_ids)

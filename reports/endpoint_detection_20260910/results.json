@@ -1,0 +1,104 @@
+{
+  "conditions": {
+    "dataset": "bundled PEPC",
+    "max_arity": 6,
+    "exhaustive_until": 2,
+    "cutoff": "OCNany2spe>=2 and omegaCany2spe>=5",
+    "calibrate_longtail": false,
+    "b": false,
+    "diagnostic_override": "get_node_combinations(cb_passed=...) uses cb_all=True in both modes; no package file changed"
+  },
+  "arities": {
+    "2": {
+      "legacy": {
+        "tested": 8308,
+        "passed": 107
+      },
+      "joint": {
+        "tested": 8446,
+        "passed": 85
+      },
+      "shared": 68,
+      "legacy_only": 39,
+      "joint_only": 17
+    },
+    "3": {
+      "legacy": {
+        "tested": 446,
+        "passed": 39
+      },
+      "joint": {
+        "tested": 416,
+        "passed": 45
+      },
+      "shared": 38,
+      "legacy_only": 1,
+      "joint_only": 7
+    },
+    "4": {
+      "legacy": {
+        "tested": 66,
+        "passed": 20
+      },
+      "joint": {
+        "tested": 87,
+        "passed": 20
+      },
+      "shared": 19,
+      "legacy_only": 1,
+      "joint_only": 1
+    },
+    "5": {
+      "legacy": {
+        "tested": 13,
+        "passed": 6
+      },
+      "joint": {
+        "tested": 14,
+        "passed": 6
+      },
+      "shared": 6,
+      "legacy_only": 0,
+      "joint_only": 0
+    },
+    "6": {
+      "legacy": {
+        "tested": 1,
+        "passed": 1,
+        "combination": {
+          "branch_id_1": 1.0,
+          "branch_id_2": 26.0,
+          "branch_id_3": 33.0,
+          "branch_id_4": 35.0,
+          "branch_id_5": 40.0,
+          "branch_id_6": 102.0,
+          "OCNany2spe": 2.4994162706232297,
+          "ECNany2spe": 2.939115671391823e-07,
+          "OCSany2spe": 9.23654372624581e-20,
+          "ECSany2spe": 4.58804746603307e-06,
+          "omegaCany2spe": "inf"
+        }
+      },
+      "joint": {
+        "tested": 1,
+        "passed": 1,
+        "combination": {
+          "branch_id_1": 1.0,
+          "branch_id_2": 26.0,
+          "branch_id_3": 33.0,
+          "branch_id_4": 35.0,
+          "branch_id_5": 40.0,
+          "branch_id_6": 102.0,
+          "OCNany2spe": 2.4988965626551876,
+          "ECNany2spe": 9.535080360286127e-09,
+          "OCSany2spe": 3.565179101921672e-20,
+          "ECSany2spe": 1.5508001027234464e-06,
+          "omegaCany2spe": "inf"
+        }
+      },
+      "shared": 1,
+      "legacy_only": 0,
+      "joint_only": 0
+    }
+  }
+}

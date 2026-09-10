@@ -116,6 +116,26 @@ def _plot_state_tree_in_directory(output_dir, state, orders, mode, g):
     tree.plot_state_tree(state=state, orders=orders, mode=mode, g=g, output_dir=output_dir)
 
 
+def _select_high_order_candidates(cb, g):
+    """Apply eligibility before the cap, preserving the requested stat priority."""
+    stat_columns = []
+    for expression, _ in table.parse_cutoff_stat(g['cutoff_stat']):
+        for column in cb.columns[cb.columns.str.fullmatch(expression, na=False)]:
+            if column not in stat_columns:
+                stat_columns.append(column)
+    eligible = table.get_cutoff_stat_bool_array(cb, g['cutoff_stat'])
+    if g['foreground'] is not None:
+        trait_masks = combination.get_foreground_candidate_masks(cb, g)
+        eligible = eligible & np.logical_or.reduce(list(trait_masks.values()))
+    selected = cb.loc[eligible, :]
+    if selected.shape[0] > g['max_combination']:
+        print('Limiting eligible K-1 candidates from {:,} to {:,} (--max_combination).'.format(
+            selected.shape[0], g['max_combination']), flush=True)
+        selected = selected.sort_values(by=stat_columns, ascending=False, kind='stable').iloc[:g['max_combination']]
+    columns = [column for column in cb.columns if column.startswith(('branch_id_', 'is_fg_', 'is_mf_', 'is_mg_'))]
+    return selected.loc[:, list(dict.fromkeys(columns + stat_columns))].reset_index(drop=True)
+
+
 def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
     if int(g['max_arity']) < 2:
         raise ValueError('--max_arity should be >= 2.')
@@ -144,33 +164,19 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                                                                       arity=current_arity, check_attr="name")
         elif (current_arity >= 3):
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')].tolist()
-            fg_columns = cb.columns[cb.columns.str.startswith('is_fg_')].tolist()
-            mf_columns = cb.columns[cb.columns.str.startswith('is_mf_')].tolist()
-            mg_columns = cb.columns[cb.columns.str.startswith('is_mg_')].tolist()
-            cutoff_stat_entries = table.parse_cutoff_stat(cutoff_stat_str=g['cutoff_stat'])
-            cutoff_stat_exp = [item[0] for item in cutoff_stat_entries]
-            stat_columns = cb.columns[cb.columns.str.fullmatch('|'.join(cutoff_stat_exp), na=False)].tolist()
-            cb_passed_columns = id_columns + fg_columns + mf_columns + mg_columns + stat_columns
             if (g['exhaustive_until'] < current_arity):
                 is_stat_enough = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
                 num_branch_ids = is_stat_enough.sum()
                 txt = 'Arity (K) = {:,}: Heuristic search with {:,} K-1 branch combinations that passed cutoff stats ({})'
                 print(txt.format(current_arity, num_branch_ids, g['cutoff_stat']), flush=True)
                 g['df_cb_stats'].at[0, 'mode'] = 'branch_and_bound'
-                if is_stat_enough.sum() > g['max_combination']:
-                    txt = 'Arity (K) = {:,}: Search will be limited to {:,} of {:,} K-1 branch combinations (see --max_combination)\n'
-                    txt = txt.format(current_arity, g['max_combination'], is_stat_enough.sum())
-                    sys.stderr.write(txt)
-                    cb_passed = cb.loc[is_stat_enough, :].sort_values(by=stat_columns, ascending=False).reset_index(drop=True)
-                    cb_passed = cb_passed.iloc[:g['max_combination'], :].loc[:, cb_passed_columns].reset_index(drop=True)
-                else:
-                    cb_passed = cb.loc[is_stat_enough,cb_passed_columns].reset_index(drop=True)
+                cb_passed = _select_high_order_candidates(cb, g)
                 if len(set(cb_passed.loc[:,id_columns].values.ravel().tolist())) < current_arity:
                     cb = pd.DataFrame()
-                    txt = 'Arity (K) = {:,}: No branch combination satisfied --cutoff_stat. Ending higher-order search at K = {:,}.'
+                    txt = 'Arity (K) = {:,}: Not enough eligible branches after --cutoff_stat, foreground selection, and --max_combination. Ending higher-order search at K = {:,}.'
                     print(txt.format(current_arity, current_arity))
                     break
-                g,id_combinations = combination.get_node_combinations(g=g, cb_passed=cb_passed, cb_all=False,
+                g,id_combinations = combination.get_node_combinations(g=g, cb_passed=cb_passed, cb_all=(g['foreground'] is None),
                                                                       arity=current_arity, check_attr='name')
             else:
                 txt = 'Arity (K) = {:,}: Direct exhaustive generation of all independent branch combinations'
@@ -186,7 +192,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             raise ValueError('Invalid arity: {}'.format(current_arity))
         if id_combinations.shape[0] == 0:
             cb = pd.DataFrame()
-            txt = 'Arity (K) = {:,}: No branch combination satisfied phylogenetic independence. Ending higher-order search at K = {:,}.'
+            txt = 'Arity (K) = {:,}: No eligible independent branch combinations remain. Ending higher-order search at K = {:,}.'
             print(txt.format(current_arity, current_arity))
             break
         print('Preparing OCS table with up to {:,} process(es).'.format(g['threads']), flush=True)

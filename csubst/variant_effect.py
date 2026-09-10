@@ -157,6 +157,8 @@ def infer_ancestral_gap_presence(tree_obj, presence_by_tip, num_node, num_site):
 
 
 def prepare_ancestral_contexts(g):
+    from csubst import endpoint_io
+    endpoint_io.prepare(g)
     state_pep = np.asarray(g.get("state_pep", None))
     if state_pep.ndim != 3:
         raise ValueError("state_pep is required before preparing VESM ancestral contexts.")
@@ -216,6 +218,8 @@ def _effective_parent_ids(g, branch_ids):
 
 
 def extract_atomic_aa_events(g, branch_ids):
+    from csubst import endpoint_io, substitution
+    endpoint_io.prepare(g)
     if "_vep_ancestral_contexts" not in g:
         raise ValueError("VESM ancestral contexts were not prepared before event extraction.")
     state_pep = np.nan_to_num(np.asarray(g["state_pep"]), nan=0.0)
@@ -238,7 +242,11 @@ def extract_atomic_aa_events(g, branch_ids):
         child_context = bundle["contexts"].get(int(branch_id), None)
         if (parent_context is None) or (child_context is None):
             continue
-        joint = state_pep[parent_id, :, :, np.newaxis] * state_pep[branch_id, :, np.newaxis, :]
+        if endpoint_io.enabled(g):
+            tensor = endpoint_io.observed_tensor(g, g['state_pep'], 'asis')
+            joint = substitution.get_branch_sub_tensor(tensor, branch_id)[:, 0, :, :].copy()
+        else:
+            joint = state_pep[parent_id, :, :, np.newaxis] * state_pep[branch_id, :, np.newaxis, :]
         diagonal = np.arange(aa_orders.shape[0], dtype=np.int64)
         joint[:, diagonal, diagonal] = 0.0
         site_ids, from_ids, to_ids = np.where((joint >= threshold) & (joint > float_tol))

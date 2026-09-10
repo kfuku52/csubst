@@ -357,10 +357,11 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'Be careful of combinatorial explosion if set to 3 or higher. '
                              'Set to 1 for foreground-only analysis.')
     parser.add_argument('--max_combination', metavar='INTEGER', default=10000, type=int,
-                        help='default=%(default)s: Maximum number of branch combinations to generate at K+1. '
-                             'If possible branch combinations at K+1 are more than this number, '
-                             'top N convergent combinatinons are selected with the thresholds specified by --cutoff_stat. '
-                             'The first stat in --cutoff_stat is most prioritized.')
+                        help='default=%(default)s: Maximum number of eligible K-1 combinations retained to generate K '
+                             'during heuristic search. Apply cutoff and foreground selection before this limit. '
+                             'Rank by --cutoff_stat in its specified order, with the first stat most prioritized; '
+                             'regex matches within one stat follow table column order. '
+                             'This does not cap the number of generated K combinations.')
     parser.add_argument('--exclude_sister_pair', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Set to "yes" for excluding sister branches in branch combination analysis.')
     parser.add_argument('--cutoff_stat', metavar='[STAT1,VALUE1|STAT2,VALUE2|...]',
@@ -775,6 +776,13 @@ def _make_iqtree_parser(show_advanced):
 
 def _make_ancestral_parser():
     psr_as = argparse.ArgumentParser(add_help=False)
+    psr_as.add_argument('--substitution_posterior', choices=['marginal', 'joint'], default='marginal',
+                        help='default=%(default)s: marginal multiplies node marginals; joint computes '
+                             'CTMC endpoint posteriors and matched conditional model predictions. '
+                             'Joint supports ECM/GY codons and direct uniform-GTR 3Di.')
+    psr_as.add_argument('--endpoint_block_size', metavar='INTEGER', type=int, default=64,
+                        help='default=%(default)s: Sites per joint-endpoint inference block; '
+                             'smaller values reduce temporary RAM without changing the estimator.')
     psr_as.add_argument('--ml_anc', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Maximum-likelihood-like analysis by binarizing ancestral states.')
     psr_as.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,

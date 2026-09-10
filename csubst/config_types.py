@@ -53,6 +53,8 @@ class NumericConfig(TypedDict, total=False):
 
 
 class ModelConfig(TypedDict, total=False):
+    substitution_posterior: str
+    endpoint_block_size: int
     calibrate_longtail: bool
     longtail_method: str
     longtail_null_niter: int

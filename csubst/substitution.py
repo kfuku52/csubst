@@ -666,12 +666,16 @@ def _can_use_cython_sitewise_max_scan(branch_tensor):
 
 
 def get_branch_sub_counts(sub_tensor):
+    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+        return sub_tensor.branch_site.sum(axis=1)
     if _is_sparse_sub_tensor(sub_tensor):
         return np.asarray(sub_tensor.matrix.sum(axis=1), dtype=np.float64).reshape(-1)
     return sub_tensor.sum(axis=(1, 2, 3, 4))
 
 
 def get_site_sub_counts(sub_tensor):
+    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+        return sub_tensor.branch_site.sum(axis=0)
     if _is_sparse_sub_tensor(sub_tensor):
         out = np.zeros(shape=(sub_tensor.num_site,), dtype=np.float64)
         np.add.at(out, sub_tensor.matrix.indices % sub_tensor.num_site, sub_tensor.matrix.data)
@@ -680,6 +684,8 @@ def get_site_sub_counts(sub_tensor):
 
 
 def get_branch_site_sub_counts(sub_tensor, branch_id):
+    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+        return sub_tensor.branch_site[int(branch_id)]
     if _is_sparse_sub_tensor(sub_tensor):
         out = np.zeros(shape=(sub_tensor.num_site,), dtype=np.float64)
         start = int(sub_tensor.matrix.indptr[int(branch_id)])
@@ -770,6 +776,8 @@ def aggregate_sparse_branches(sub_tensor, branch_ids, operation):
 
 
 def get_total_substitution(sub_tensor):
+    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+        return float(sub_tensor.branch_site.sum())
     if _is_sparse_sub_tensor(sub_tensor):
         return float(sub_tensor.matrix.data.sum())
     return float(sub_tensor.sum())
@@ -781,9 +789,8 @@ def get_group_state_totals(sub_tensor):
             shape=(sub_tensor.num_group, sub_tensor.num_state_from, sub_tensor.num_state_to),
             dtype=np.float64,
         )
-        event_ids = sub_tensor.matrix.indices // sub_tensor.num_site
-        sg, a, d = sub_tensor.decode_event_ids(event_ids)
-        np.add.at(gad, (sg, a, d), sub_tensor.matrix.data)
+        for _branch, _site, sg, a, d, values in sub_tensor.iter_branch_coordinates():
+            np.add.at(gad, (sg, a, d), values)
     else:
         gad = sub_tensor.sum(axis=(0, 1))
     ga = gad.sum(axis=2)
@@ -857,6 +864,10 @@ def get_branches_sub_tensor(sub_tensor, branch_ids):
 
 
 def _get_sparse_branch_sitewise_max_indices(sub_tensor, branch_id, min_sitewise_pp):
+    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+        prob, anc, der = sub_tensor.sitewise_max
+        selected = np.flatnonzero((prob[int(branch_id)] > 0) & (prob[int(branch_id)] >= min_sitewise_pp))
+        return selected, anc[int(branch_id), selected], der[int(branch_id), selected]
     num_site = int(sub_tensor.num_site)
     max_prob = np.full(shape=(num_site,), fill_value=-np.inf, dtype=np.float64)
     max_a = np.full(shape=(num_site,), fill_value=-1, dtype=np.int64)
@@ -966,6 +977,11 @@ def get_cs_sparse(id_combinations, sub_tensor, attr):
 def get_substitution_tensor(state_tensor, state_tensor_anc=None, mode='', g=None, mmap_attr=''):
     if g is None:
         raise ValueError('g is required.')
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        if state_tensor_anc is not None:
+            raise ValueError('Joint endpoints cannot be constructed from two marginal state tensors.')
+        return endpoint_io.observed_tensor(g, state_tensor, mode)
     if state_tensor_anc is None:
         state_tensor_anc = state_tensor
     return _build_sparse_substitution_tensor(
@@ -1773,6 +1789,29 @@ def _run_sparse_cb_projection_product(
     return selected_df.astype(float_type, copy=False)
 
 
+
+def get_cb_from_pairwise_grams(id_combinations, pairwise, attr, selected_base_stats=None):
+    selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
+    ids = np.asarray(id_combinations, dtype=np.int64)
+    if ids.ndim != 2 or ids.shape[1] != 2:
+        raise ValueError('Streaming endpoint scores require arity=2.')
+    n = next(iter(pairwise.values())).shape[0]
+    if ids.size and (ids.min() < 0 or ids.max() >= n):
+        raise IndexError('Branch ID is out of range for streaming endpoint scores.')
+    out = np.empty((len(ids), 2 + len(selected)))
+    out[:, :2] = ids
+    for i, stat in enumerate(selected):
+        out[:, 2 + i] = pairwise[stat][ids[:, 0], ids[:, 1]]
+    columns = _build_branch_id_columns(arity=2) + [attr + stat for stat in selected]
+    return table.set_substitution_dtype(table.sort_branch_ids(pd.DataFrame(out, columns=columns)))
+
+
+def get_cb_from_expected_reducer(id_combinations, reducer, attr, g, selected_base_stats=None):
+    if 'pairwise' in reducer:
+        return get_cb_from_pairwise_grams(id_combinations, reducer['pairwise'], attr, selected_base_stats)
+    return get_cb_from_sparse_projections(id_combinations=id_combinations, projections=reducer['projections'],
+                                          attr=attr, g=g, selected_base_stats=selected_base_stats)
+
 def get_cb_from_sparse_projections(
     id_combinations,
     projections,
@@ -2130,6 +2169,11 @@ def _run_cb_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, selecte
 
 
 def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
+    if isinstance(sub_tensor, substitution_sparse.PairwiseSubstitutionSummary):
+        return get_cb_from_pairwise_grams(id_combinations, sub_tensor.pairwise, attr, selected_base_stats)
+    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+        return get_cb_from_sparse_projections(id_combinations, sub_tensor.projections,
+                                              attr, g, selected_base_stats)
     sub_tensor = get_reducer_sub_tensor(sub_tensor=sub_tensor, g=g, label='cb_'+attr)
     arity = id_combinations.shape[1]
     selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)

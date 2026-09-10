@@ -1666,6 +1666,9 @@ def _expected_branch_lengths(g, mode):
 
 
 def _get_fused_expected_sparse_substitution_tensor(g, mode):
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        raise ValueError('Joint endpoints use the expected sparse reducer; a projected child marginal is insufficient.')
     if str(g.get('expected_state_backend', 'auto')).strip().lower() == 'expm':
         return None
     if mode == 'cdn':
@@ -1807,6 +1810,9 @@ def _project_expected_branch_expm(
 def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
     """Build only reducer projections, never an expected 5-D tensor."""
     selected = substitution._resolve_cb_base_substitutions(selected_base_stats)
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        return endpoint_io.expected_reducer(g, mode, selected)
     if mode == 'cdn':
         state = g['state_cdn'].astype(g['float_type'], copy=False)
         inst = g['instantaneous_codon_rate_matrix']
@@ -2339,9 +2345,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
         print(txt.format(g['EN_reducer']['total']))
         print('Preparing the ECN table with up to {:,} process(es).'.format(g['threads']), flush=True)
-        cbEN = substitution.get_cb_from_sparse_projections(
+        cbEN = substitution.get_cb_from_expected_reducer(
             id_combinations=cb.loc[:, id_cols].values,
-            projections=g['EN_reducer']['projections'],
+            reducer=g['EN_reducer'],
             attr='ECN',
             g=g,
             selected_base_stats=base_stats,
@@ -2355,6 +2361,8 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         if is_final_arity:
             released_nbytes = int(g['EN_reducer']['storage'])
             del g['EN_reducer']
+            from csubst import endpoint_io
+            endpoint_io.release_expected(g, 'N')
             print(
                 'Released final-arity EN sparse projections ({:,} bytes).'.format(released_nbytes),
                 flush=True,
@@ -2378,9 +2386,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
         print(txt.format(g['ES_reducer']['total']))
         print('Preparing the ECS table with up to {:,} process(es).'.format(g['threads']), flush=True)
-        cbES = substitution.get_cb_from_sparse_projections(
+        cbES = substitution.get_cb_from_expected_reducer(
             id_combinations=cb.loc[:, id_cols].values,
-            projections=g['ES_reducer']['projections'],
+            reducer=g['ES_reducer'],
             attr='ECS',
             g=g,
             selected_base_stats=base_stats,
@@ -2393,6 +2401,8 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         if is_final_arity:
             released_nbytes = int(g['ES_reducer']['storage'])
             del g['ES_reducer']
+            from csubst import endpoint_io
+            endpoint_io.release_expected(g, 'S')
             print(
                 'Released final-arity ES sparse projections ({:,} bytes).'.format(released_nbytes),
                 flush=True,
@@ -2406,6 +2416,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
 
 
 def get_exp_state(g, mode):
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        raise ValueError('Joint endpoint predictions retain both state axes; use the expected sparse reducer.')
     if mode=='cdn':
         state = g['state_cdn'].astype(g['float_type'], copy=False)
         inst = g['instantaneous_codon_rate_matrix']

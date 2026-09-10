@@ -1,0 +1,98 @@
+{
+  "structural": {
+    "before": {
+      "kernel_seconds": 4.162440833984874,
+      "nodes": 63,
+      "sites": 2000,
+      "change_brier": 0.005318572843952851,
+      "event_brier": 0.01019346192557302,
+      "total_change_mass": 6241.028837443698,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 5.582091999996919,
+      "peak_rss_mib": 169.77734375,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "after": {
+      "kernel_seconds": 1.2318998329574242,
+      "nodes": 63,
+      "sites": 2000,
+      "change_brier": 0.005318572843952851,
+      "event_brier": 0.01019346192557302,
+      "total_change_mass": 6241.028837443699,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 3.6946914580184966,
+      "peak_rss_mib": 154.078125,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "per_site_loss_max_abs_difference": {
+      "change": 2.0816681711721685e-16,
+      "event": 1.8041124150158794e-16
+    }
+  },
+  "codon": {
+    "before": {
+      "kernel_seconds": 4.150523916003294,
+      "nodes": 63,
+      "sites": 1000,
+      "change_brier": 0.004701458973433511,
+      "event_brier": 0.0065206639779959085,
+      "total_change_mass": 3039.7146623170556,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 5.329465874994639,
+      "peak_rss_mib": 249.3359375,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "after": {
+      "kernel_seconds": 2.5081513749901205,
+      "nodes": 63,
+      "sites": 1000,
+      "change_brier": 0.00470145897343351,
+      "event_brier": 0.006520663977995906,
+      "total_change_mass": 3039.7146623170556,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 3.7821681660134345,
+      "peak_rss_mib": 252.4296875,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "per_site_loss_max_abs_difference": {
+      "change": 2.42861286636753e-16,
+      "event": 3.191891195797325e-16
+    }
+  },
+  "large_structural": {
+    "before": {
+      "kernel_seconds": 5.6560615000198595,
+      "nodes": 255,
+      "sites": 2000,
+      "change_brier": 0.0065792021624794085,
+      "event_brier": 0.012133926918311983,
+      "total_change_mass": 26916.291742277062,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 6.868036209023558,
+      "peak_rss_mib": 216.1640625,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "after": {
+      "kernel_seconds": 3.876259625016246,
+      "nodes": 255,
+      "sites": 2000,
+      "change_brier": 0.0065792021624794085,
+      "event_brier": 0.012133926918311983,
+      "total_change_mass": 26916.291742277066,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 5.0419458750402555,
+      "peak_rss_mib": 203.828125,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "per_site_loss_max_abs_difference": {
+      "change": 1.0408340855860843e-16,
+      "event": 1.8041124150158794e-16
+    }
+  }
+}

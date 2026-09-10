@@ -1,0 +1,52 @@
+Verified comparisons: 106
+{
+  "pair/csubst_cb_2.tsv.unrounded.pkl": {
+    "marginal": 8308,
+    "joint": 8446,
+    "shared": 8308,
+    "marginal_only": 0,
+    "joint_only": 138
+  },
+  "foreground4/csubst_cb_2.tsv.unrounded.pkl": {
+    "marginal": 64,
+    "joint": 64,
+    "shared": 64,
+    "marginal_only": 0,
+    "joint_only": 0
+  },
+  "foreground4/csubst_cb_3.tsv.unrounded.pkl": {
+    "marginal": 200,
+    "joint": 200,
+    "shared": 200,
+    "marginal_only": 0,
+    "joint_only": 0
+  },
+  "foreground4/csubst_cb_4.tsv.unrounded.pkl": {
+    "marginal": 406,
+    "joint": 406,
+    "shared": 406,
+    "marginal_only": 0,
+    "joint_only": 0
+  },
+  "exhaustive3/csubst_cb_2.tsv.unrounded.pkl": {
+    "marginal": 8308,
+    "joint": 8446,
+    "shared": 8308,
+    "marginal_only": 0,
+    "joint_only": 138
+  },
+  "exhaustive3/csubst_cb_3.tsv.unrounded.pkl": {
+    "marginal": 307432,
+    "joint": 315740,
+    "shared": 307432,
+    "marginal_only": 0,
+    "joint_only": 8308
+  },
+  "pair_b/csubst_cb_2.tsv.unrounded.pkl": {
+    "marginal": 8308,
+    "joint": 8446,
+    "shared": 8308,
+    "marginal_only": 0,
+    "joint_only": 138
+  }
+}

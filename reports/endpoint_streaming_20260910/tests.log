@@ -1,0 +1,58 @@
+/tmp/csubst-endpoint-test-venv/bin/python -m pytest -q -n auto --dist worksteal -m "not process"
+${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  3%]
+........................................................................ [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 19%]
+........................................................................ [ 23%]
+........................................................................ [ 27%]
+........................................................................ [ 31%]
+....................................sss.........ss...................... [ 35%]
+........................................................................ [ 39%]
+........................................................................ [ 43%]
+........................................................................ [ 47%]
+........................................................................ [ 51%]
+........................................................................ [ 55%]
+........................................................................ [ 59%]
+........................................................................ [ 63%]
+........................................................................ [ 67%]
+........................................................................ [ 71%]
+........................................................................ [ 74%]
+........................................................................ [ 78%]
+........................................................................ [ 82%]
+........................................................................ [ 86%]
+........................................................................ [ 90%]
+........................................................................ [ 94%]
+........................................................................ [ 98%]
+.........................                                                [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [3] tests/unit/test_structural_prediction.py:156: module 'torch' has __version__ '2.2.2', required is: '2.6'
+SKIPPED [1] tests/unit/test_structural_reference.py:89: could not import 'gemmi': No module named 'gemmi'
+SKIPPED [1] tests/unit/test_structural_reference.py:105: could not import 'gemmi': No module named 'gemmi'
+1820 passed, 5 skipped, 4 warnings in 34.30s
+${HOME}/miniforge3/lib/python3.10/site-packages/_pytest/pathlib.py:96: PytestWarning: (rm_rf) error removing /private/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/pytest-of-kf/garbage-594a6eaa-bd18-487b-8f52-1f81970a90ae
+<class 'OSError'>: [Errno 66] Directory not empty: '/private/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/pytest-of-kf/garbage-594a6eaa-bd18-487b-8f52-1f81970a90ae'
+  warnings.warn(
+/tmp/csubst-endpoint-test-venv/bin/python -m pytest -q -m process
+....                                                                     [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+4 passed, 1825 deselected, 1 warning in 9.88s

@@ -312,6 +312,9 @@ def _normalize_drop_invariant_mode(g):
 
 
 def _should_use_fast_state_plot_bypass(g):
+    from csubst import endpoint_io
+    if endpoint_io.enabled(g):
+        return False
     request_modes = [
         tree.normalize_state_plot_request(g.get("plot_state_aa", "no"), param_name="--plot_state_aa")["mode"],
         tree.normalize_state_plot_request(g.get("plot_state_codon", "no"), param_name="--plot_state_codon")["mode"],

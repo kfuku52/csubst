@@ -1,0 +1,79 @@
+{
+  "baseline_commit": "b591efc",
+  "branch_table_PGK": {
+    "csubst_cb_2.tsv": {
+      "shape": [
+        1682,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 1.9281287677586079e-10,
+          "max_relative_difference": 2.057255276845036e-14
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.255102688446641e-10,
+          "max_relative_difference": 1.0877838306059742e-10
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 7.34871719032526e-10,
+          "max_relative_difference": 4.583890362678358e-14
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 3.410605131648481e-13,
+          "max_relative_difference": 1.4328705840644645e-14
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 3.979039320256561e-13,
+          "max_relative_difference": 1.0877832727763028e-10
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 1.7053025658242404e-12,
+          "max_relative_difference": 3.19051973272605e-14
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 1.3500311979441904e-13,
+          "max_relative_difference": 1.3702228281859697e-14
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 2.4158453015843406e-13,
+          "max_relative_difference": 5.290253167227462e-12
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 3.197442310920451e-13,
+          "max_relative_difference": 4.104271793408165e-14
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 9.464623872190714e-06,
+          "max_relative_difference": 1.0878120616989327e-10
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 6.084701453801244e-08,
+          "max_relative_difference": 5.296246884697718e-12
+        }
+      }
+    },
+    "csubst_b.tsv": {
+      "shape": [
+        65,
+        8
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {}
+    }
+  },
+  "full_suite": {
+    "passed": 1824,
+    "skipped": 5
+  },
+  "additional_new_tests_passed": 2,
+  "native_tests_passed": 8,
+  "targeted_final_tests_passed": 103,
+  "lint": true,
+  "typecheck": true
+}

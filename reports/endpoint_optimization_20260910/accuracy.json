@@ -1,0 +1,98 @@
+{
+  "structural": {
+    "before": {
+      "kernel_seconds": 3.5474262920033652,
+      "nodes": 63,
+      "sites": 2000,
+      "change_brier": 0.005318572843952851,
+      "event_brier": 0.01019346192557302,
+      "total_change_mass": 6241.028837443698,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 4.700064791017212,
+      "peak_rss_mib": 170.77734375,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "after": {
+      "kernel_seconds": 3.917820708011277,
+      "nodes": 63,
+      "sites": 2000,
+      "change_brier": 0.005318572843952851,
+      "event_brier": 0.01019346192557302,
+      "total_change_mass": 6241.028837443698,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 5.707311500009382,
+      "peak_rss_mib": 168.83203125,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "per_site_loss_max_abs_difference": {
+      "change": 2.0816681711721685e-17,
+      "event": 4.163336342344337e-17
+    }
+  },
+  "codon": {
+    "before": {
+      "kernel_seconds": 7.734446042013587,
+      "nodes": 63,
+      "sites": 1000,
+      "change_brier": 0.004701458973433511,
+      "event_brier": 0.006520663977995908,
+      "total_change_mass": 3039.7146623170556,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 10.42022033399553,
+      "peak_rss_mib": 270.890625,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "after": {
+      "kernel_seconds": 5.057500124996295,
+      "nodes": 63,
+      "sites": 1000,
+      "change_brier": 0.004701458973433511,
+      "event_brier": 0.0065206639779959085,
+      "total_change_mass": 3039.7146623170556,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 7.318496416002745,
+      "peak_rss_mib": 263.8046875,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "per_site_loss_max_abs_difference": {
+      "change": 4.163336342344337e-17,
+      "event": 5.551115123125783e-17
+    }
+  },
+  "large_structural": {
+    "before": {
+      "kernel_seconds": 8.398832708015107,
+      "nodes": 255,
+      "sites": 2000,
+      "change_brier": 0.0065792021624794085,
+      "event_brier": 0.012133926918311983,
+      "total_change_mass": 26916.291742277062,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 10.078539291978814,
+      "peak_rss_mib": 216.59375,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "after": {
+      "kernel_seconds": 6.9598152919788845,
+      "nodes": 255,
+      "sites": 2000,
+      "change_brier": 0.0065792021624794085,
+      "event_brier": 0.012133926918311983,
+      "total_change_mass": 26916.291742277062,
+      "zero_branch_mean_mass": 0.0,
+      "worker_seconds": 8.657046624983195,
+      "peak_rss_mib": 220.87109375,
+      "mode": "joint",
+      "block_size": 64
+    },
+    "per_site_loss_max_abs_difference": {
+      "change": 2.0816681711721685e-17,
+      "event": 2.7755575615628914e-17
+    }
+  }
+}

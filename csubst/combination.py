@@ -1007,6 +1007,34 @@ def nc_matrix2id_combinations(
     row_ids = flat_row_major % int(nc_matrix.shape[0])
     return row_ids.reshape(valid_cols.shape[0], arity).astype(np.int64, copy=False)
 
+def get_foreground_candidate_masks(cb, g):
+    """Return the same per-trait eligibility used for candidate expansion."""
+    return {
+        trait: np.logical_or.reduce([
+            cb['is_' + label + '_' + trait].to_numpy(copy=False) == 'Y'
+            for label in ('fg', 'mf', 'mg')
+        ])
+        for trait in g['fg_df'].columns[1:]
+    }
+
+
+def _merge_trait_candidates(candidates, fg_dep_indices, restrict_foreground, verbose):
+    # Retain trait provenance until its independence check has been applied.
+    # Otherwise an unrelated trait with no dependencies can rescue invalid rows.
+    rows = []
+    for trait, values in candidates.items():
+        if restrict_foreground:
+            dependent = _mark_dependent_row_combinations(values, fg_dep_indices[trait])
+            if verbose and dependent.any():
+                print('Removing {:,} (out of {:,}) non-independent foreground branch combinations for {}.'.format(
+                    dependent.sum(), values.shape[0], trait), flush=True)
+            values = values[~dependent, :]
+        rows.append(values)
+    if len(rows) == 1:
+        return rows[0]
+    return _unique_rows_int64(np.concatenate(rows, axis=0))
+
+
 def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=False, cb_all=False, arity=2,
                           check_attr=None, verbose=True):
     if sum([target_id_dict is not None, cb_passed is not None, exhaustive])!=1:
@@ -1039,6 +1067,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
     if verbose:
         print("Number of all branches: {:,}".format(len(all_nodes)), flush=True)
     row_combinations = None
+    trait_scoped = target_id_dict is not None or (cb_passed is not None and not cb_all)
     if exhaustive:
         target_rows = np.array(
             [
@@ -1130,10 +1159,9 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             sys.stderr.write(txt.format(arity))
             id_combinations = np.zeros(shape=[0, arity], dtype=np.int64)
             return g, id_combinations
-        if len(node_combination_dict) == 1:
-            row_combinations = list(node_combination_dict.values())[0]
-        else:
-            row_combinations = _unique_rows_int64(np.concatenate(list(node_combination_dict.values()), axis=0))
+        row_combinations = _merge_trait_candidates(
+            node_combination_dict, fg_dep_indices, g['exhaustive_until'] < arity, verbose,
+        )
     if cb_passed is not None:
         node_combinations_dict = dict()
         if cb_all:
@@ -1147,19 +1175,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             trait_mask_dict = None
         else:
             cb_all_mask = None
-            if len(cb_trait_names) == 1:
-                trait_name = cb_trait_names[0]
-                is_fg = (cb_passed.loc[:, 'is_fg_' + trait_name].to_numpy(copy=False) == 'Y')
-                is_mf = (cb_passed.loc[:, 'is_mf_' + trait_name].to_numpy(copy=False) == 'Y')
-                is_mg = (cb_passed.loc[:, 'is_mg_' + trait_name].to_numpy(copy=False) == 'Y')
-                trait_mask_dict = {trait_name: (is_fg | is_mf | is_mg)}
-            else:
-                trait_mask_dict = dict()
-                for trait_name in cb_trait_names:
-                    is_fg = (cb_passed.loc[:, 'is_fg_' + trait_name].to_numpy(copy=False) == 'Y')
-                    is_mf = (cb_passed.loc[:, 'is_mf_' + trait_name].to_numpy(copy=False) == 'Y')
-                    is_mg = (cb_passed.loc[:, 'is_mg_' + trait_name].to_numpy(copy=False) == 'Y')
-                    trait_mask_dict[trait_name] = (is_fg | is_mf | is_mg)
+            trait_mask_dict = get_foreground_candidate_masks(cb_passed, g)
         trait_union_items = list()
         is_all_trait_no_branch_combination = True
         for trait_name in cb_trait_names:
@@ -1226,10 +1242,10 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             sys.stderr.write(txt.format(arity))
             id_combinations = np.zeros(shape=[0, arity], dtype=np.int64)
             return g, id_combinations
-        if len(node_combinations_dict) == 1:
-            row_combinations = list(node_combinations_dict.values())[0]
-        else:
-            row_combinations = _unique_rows_int64(np.concatenate(list(node_combinations_dict.values()), axis=0))
+        row_combinations = _merge_trait_candidates(
+            node_combinations_dict, fg_dep_indices,
+            trait_scoped and g['exhaustive_until'] < arity, verbose,
+        )
     if row_combinations is None:
         row_combinations = np.zeros(shape=(0, arity), dtype=np.int64)
     if verbose:
@@ -1255,7 +1271,7 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
             row_combinations=independent_row_combinations,
             dep_row_groups=fg_dep_indices[trait_name],
         )
-        if (g['exhaustive_until']>=arity):
+        if (g['exhaustive_until']>=arity) or trait_scoped:
             if verbose:
                 txt = 'Number of non-independent foreground branch combinations to be non-foreground-marked for {}: {:,} / {:,}'
                 print(txt.format(trait_name, is_fg_dependent_col.sum(), is_fg_dependent_col.shape[0]), flush=True)

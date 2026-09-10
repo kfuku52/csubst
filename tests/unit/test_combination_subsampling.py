@@ -122,7 +122,8 @@ def test_node_combination_subsamples_shotgun_handles_noncontiguous_branch_ids():
     assert len({tuple(sorted(row.tolist())) for row in id_combinations}) == 5
 
 
-def test_get_node_combinations_cb_passed_multi_trait_does_not_overprune_between_traits():
+@pytest.mark.parametrize("other_trait_support", [False, True])
+def test_get_node_combinations_cb_passed_multi_trait_does_not_overprune_between_traits(other_trait_support):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1,C:1,D:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
     a,b,c,d = labels["A"], labels["B"], labels["C"], labels["D"]
@@ -156,6 +157,8 @@ def test_get_node_combinations_cb_passed_multi_trait_does_not_overprune_between_
         }
     )
 
+    if other_trait_support:
+        cb_passed.loc[:, ['is_fg_traitA', 'is_fg_traitB']] = 'Y'
     _, id_combinations = combination.get_node_combinations(
         g=g,
         cb_passed=cb_passed,
@@ -166,7 +169,9 @@ def test_get_node_combinations_cb_passed_multi_trait_does_not_overprune_between_
     )
 
     observed = {tuple(sorted(row.tolist())) for row in id_combinations}
-    expected = {tuple(sorted([a, b, c])), tuple(sorted([a, b, d]))}
+    # A row may survive through another trait only if that trait's passing
+    # sub-combinations can actually generate it, as well as being independent.
+    expected = {tuple(sorted(row)) for row in ([a, b, c], [a, b, d], [a, c, d])} if other_trait_support else set()
     assert observed == expected
 
 

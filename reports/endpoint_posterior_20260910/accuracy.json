@@ -1,0 +1,7 @@
+{
+  "node": 6.106226635438361e-16,
+  "joint": 4.440892098500626e-16,
+  "predictive": 3.885780586188048e-16,
+  "legacy_output_parity": true,
+  "projection_optimization_parity": true
+}
