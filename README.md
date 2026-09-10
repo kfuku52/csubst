@@ -103,14 +103,17 @@ native BLAS/OpenMP work separately (default 1). Analysis commands support
 
 <a id="vesm-35m-variant-effect-scores-in-csubst-sites"></a>
 
-Shared models can be prepared before running an offline or batch job:
+The default 3Di predictor, ESM3Di-35M, can be prepared before an offline or batch job:
 
 ```bash
-csubst download --resource vesm-35m
-csubst download --resource vesm-35m --no_download yes
+csubst download --resource esm3di-35m
+csubst download --resource esm3di-35m --no_download yes
 ```
 
-VESM files and structure downloads use the CSUBST cache (default
+Omitting `--resource` also selects ESM3Di-35M. For variant-effect scoring,
+prepare VESM separately with `csubst download --resource vesm-35m`.
+
+ESM3Di and VESM files and structure downloads use the CSUBST cache (default
 `~/.cache/csubst`, overridable with `CSUBST_CACHE_DIR`). ProstT5 weights use
 Hugging Face's cache or `--prostt5_local_dir`, independently of that setting.
 See [model caches and offline use](https://github.com/kfuku52/csubst/wiki/csubst-download)

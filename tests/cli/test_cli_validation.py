@@ -72,6 +72,11 @@ def test_3di_default_backend_is_esm3di(command):
     assert _get_cli_parser(False).parse_args([command]).sa_backend == 'esm3di-35m'
 
 
+def test_download_default_resource_matches_3di_backend():
+    parser = _get_cli_parser(False)
+    assert parser.parse_args(['download']).resource == parser.parse_args(['sites']).sa_backend
+
+
 @pytest.mark.parametrize('command', ['search', 'inspect', 'sites', 'doctor'])
 @pytest.mark.parametrize('backend', ['prostt5', 'prostt5-cnn', 'esm3di-35m'])
 def test_3di_backend_and_neutral_aliases_share_existing_destinations(command, backend):

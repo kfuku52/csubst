@@ -2,6 +2,7 @@ from csubst import model_resources
 from csubst import structural_alphabet
 from csubst import structural_prediction
 from csubst.config_types import AnalysisConfig
+from csubst.recoding_config import DEFAULT_SA_BACKEND
 
 
 def _normalize_resources(value: object) -> list[str]:
@@ -14,7 +15,7 @@ def _normalize_resources(value: object) -> list[str]:
 
 
 def main_download(g: AnalysisConfig) -> None:
-    resources = _normalize_resources(g.get("resource", "vesm-35m"))
+    resources = _normalize_resources(g.get("resource", DEFAULT_SA_BACKEND))
     legacy_verify = g.get("verify")
     if legacy_verify and any(name in resources for name in ["prostt5", "prostt5-cnn"]):
         raise ValueError(
