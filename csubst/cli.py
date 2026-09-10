@@ -485,7 +485,7 @@ def _add_search_subcommand_args(parser, show_advanced=False):
     advanced_epistasis = parser.add_argument_group('advanced epistasis options')
     _add_advanced_argument(advanced_epistasis, '--epistasis_apply_to', show_advanced=show_advanced,
                         metavar='N|S|NS', default='N', type=str,
-                        help='default=%(default)s: Experimental feature. Expected-count channels to apply structure-aware epistasis correction. '
+                        help='default=%(default)s: Experimental feature. Expected-count channels for exploratory structure weighting. '
                              '"N" adjusts nonsynonymous expectations (ECN), '
                              '"S" adjusts synonymous expectations (ECS; useful as a negative-control check), '
                              '"NS" adjusts both.')
@@ -498,16 +498,25 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              '"proximity" uses distance-weighted local proximity, '
                              '"hybrid" averages degree/proximity z-scores, '
                              '"auto" selects hybrid when both are available (otherwise falls back).')
+    _add_advanced_argument(advanced_epistasis, '--epistasis_context_file', show_advanced=show_advanced,
+                        default='', type=str, metavar='PATH',
+                        help='Independent branch context TSV: branch_key (JSON descendant taxa), context_1[, context_2]. Required for active structure weighting.')
+    _add_advanced_argument(advanced_epistasis, '--epistasis_context_source', show_advanced=show_advanced,
+                        default='', type=str, metavar='TEXT',
+                        help='Provenance of context independent of evaluation substitutions; independence is user-declared, not automatically established.')
+    _add_advanced_argument(advanced_epistasis, '--epistasis_cv_clades', show_advanced=show_advanced,
+                        default=5, type=int, metavar='INT',
+                        help='Target monophyletic blocks for nested CV (at least 3); ancestral connectors are prediction-only buffers.')
     _add_advanced_argument(advanced_epistasis, '--epistasis_beta', show_advanced=show_advanced,
                         metavar='off|auto|FLOAT', default='off', type=str,
-                        help='default=%(default)s: Experimental feature. Strength of structure-aware epistasis correction. '
+                        help='default=%(default)s: Experimental feature. Exploratory structure weighting; requires independent context and urn/ASRV sn. '
                              'Set "off"/0 to disable, a non-negative float for fixed strength, '
-                             'or "auto" for branch-level CV tuning.')
+                             'or "auto" for clade-blocked nested CV. No omega P values.')
     _add_advanced_argument(advanced_epistasis, '--epistasis_beta_partition', show_advanced=show_advanced,
                         metavar='global|branch_depth', default='global', type=str,
                         help='default=%(default)s: Experimental feature. Scope of epistasis beta estimation. '
-                             '"global" fits one beta per channel; '
-                             '"branch_depth" fits beta per branch-depth bin to reduce over-shrinkage from global averaging.')
+                             '"global" pools depths within each training fold/channel; '
+                             '"branch_depth" tunes separately per depth bin, with clade holdouts in every bin.')
     _add_advanced_argument(advanced_epistasis, '--epistasis_branch_depth_bins', show_advanced=show_advanced,
                         metavar='INT', default=3, type=int,
                         help='default=%(default)s: Experimental feature. Number of branch-depth bins for --epistasis_beta_partition branch_depth.')

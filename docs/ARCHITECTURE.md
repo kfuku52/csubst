@@ -68,3 +68,12 @@ The full CI lane enforces branch coverage, a pure-Python lane validates source
 archives without binaries, and versioned PGK/PEPC baselines detect numerical,
 runtime, and peak-memory regressions. Cython sanitizer tests cover native memory
 safety. See [../TESTING.md](../TESTING.md) for commands.
+
+
+## Structure weighting
+
+`epistasis.py` owns external-context validation, rooted clade partitioning,
+blocked nested CV and conditional site probabilities. `omega.py` installs
+those probabilities for urn/ASRV sn without reweighting full-data priors.
+See [STRUCTURE_WEIGHTING.md](STRUCTURE_WEIGHTING.md) for the input contract,
+scientific limits and independent simulator.

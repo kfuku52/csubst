@@ -1038,6 +1038,8 @@ def get_global_parameters(args: Any) -> runtime.RunContext:
     g = _normalize_epistasis_parameters(g)
     g = _normalize_epistasis_structure_parameters(g)
     asrv.validate_epistasis_compatibility(g)
+    from csubst import epistasis
+    epistasis.validate_options(g)
     g = _normalize_search_parameters(g)
     g = _normalize_state_parameters(g)
     g = _normalize_simulation_parameters(g)

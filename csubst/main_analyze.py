@@ -634,6 +634,8 @@ def _prepare_epistasis_configuration(g, ON_tensor, OS_tensor):
         g['epistasis_enabled'] = False
         return g
     asrv.validate_epistasis_compatibility(g)
+    from csubst import epistasis
+    epistasis.validate_options(g)
     if _resolve_expectation_method(g) != 'urn':
         raise ValueError('--epistasis_beta should be used with --expectation_method "urn".')
     num_site = int(ON_tensor.shape[1])
@@ -641,7 +643,7 @@ def _prepare_epistasis_configuration(g, ON_tensor, OS_tensor):
     if degree_internal is None:
         degree_internal = _compute_epistasis_degree_from_structure(g=g, num_site=num_site)
     if degree_internal is None:
-        txt = 'Epistasis correction requires --epistasis_degree_file or --epistasis_pdb when --epistasis_beta is active.'
+        txt = 'Exploratory structure weighting requires --epistasis_degree_file or --epistasis_pdb when --epistasis_beta is active.'
         raise ValueError(txt)
     g['epistasis_site_degree_internal'] = np.asarray(degree_internal, dtype=np.float64).reshape(-1)
     if g['epistasis_site_degree_internal'].shape[0] != num_site:
@@ -876,4 +878,7 @@ def main_analyze(g: AnalysisConfig) -> None:
         if bool(g.get('asrv_report', False)) and g.get('sub_sites') is not None:
             asrv.collect_diagnostics(g, OS_tensor, ON_tensor)
         asrv.write_provenance(g, runtime.output_path(g, 'urn_provenance.json'))
+        if g.get('epistasis_enabled', False):
+            from csubst import epistasis
+            epistasis.write_report(g, runtime.output_path(g, 'epistasis.json'))
     runtime.cleanup_legacy_temp_artifacts()

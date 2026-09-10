@@ -1,0 +1,31 @@
+diff --git a/FAQ.md b/FAQ.md
+index dc7e818..054734a 100644
+--- a/FAQ.md
++++ b/FAQ.md
+@@ -75,7 +75,13 @@ Yes. CSUBST accepts both plain FASTA files (`.fa`, `.fasta`) and gzip-compressed
+ 
+ ### Are epistasis and empirical omega p-value options production-stable?
+ 
+-Not yet. In current CLI help, epistasis-related options and `--calc_omega_pvalue` options are marked as **Experimental feature** and default to off unless explicitly enabled.
++Not yet. Both remain experimental and default to off. The `epistasis_*`
++options implement exploratory structure weighting, not an epistasis test.
++Active fixed/auto beta requires independent branch context and
++`--expectation_method urn --asrv sn`. Tuning and predictions exclude held-out
++monophyletic clades; self-response context is no longer supported. Positive beta
++is not evidence of epistasis. Omega P values cannot currently be combined with
++this weighting. See the [input contract and validation limits](https://github.com/kfuku52/csubst/blob/master/docs/STRUCTURE_WEIGHTING.md).
+ 
+ ### How to find v0.20.17 used in Fukushima & Pollock (2023)?
+ The latest release is recommended for general use. If you need the legacy version v0.20.17 referenced in [Fukushima & Pollock (2023)](https://www.nature.com/articles/s41559-022-01932-7), it is available at the link below.
+diff --git a/Interpreting-output-files-of-csubst-analyze.md b/Interpreting-output-files-of-csubst-analyze.md
+index 9b8c38a..3145d18 100644
+--- a/Interpreting-output-files-of-csubst-analyze.md
++++ b/Interpreting-output-files-of-csubst-analyze.md
+@@ -29,6 +29,7 @@ Optional auxiliary outputs:
+ 
+ - `csubst_foreground_branch_<TRAIT>.txt`
+ - `csubst_marginal_branch_<TRAIT>.txt`
++- `csubst_epistasis.json`: independent-context provenance, clade folds, per-fold parameters and outer count-prediction scores; not an epistasis test or P-value calibration
+ - `csubst_epistasis_structure_degree.tsv` when search-time epistasis structure mapping is used
+ - `csubst_instantaneous_rate_matrix.tsv` when `--write_instantaneous_rate_matrix yes`
+ - `csubst_nonsyn_recoding.tsv` for amino-acid grouping recodings

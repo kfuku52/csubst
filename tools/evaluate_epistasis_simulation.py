@@ -377,8 +377,11 @@ def _analyze_command(paths, args, mode, degree_file):
         "--fg_stem_only",
         "no",
     ]
+    base += ['--asrv', 'sn']
     if mode == "baseline_no_epi":
         return base
+    base += ['--epistasis_context_file', str(args.epistasis_context_file),
+             '--epistasis_context_source', str(args.epistasis_context_source)]
     if mode == "epi_N_auto":
         return base + [
             "--epistasis_apply_to",
@@ -424,7 +427,7 @@ def _git_head(path):
 def main():
     repo_root = Path(__file__).resolve().parents[1]
     psr = argparse.ArgumentParser(
-        description="Run reproducible epistasis simulation evaluation with runtime + peak RAM tracking."
+        description="Artificial structure-feature stress test, not an epistatic evolution simulator. Independent context is required for weighting."
     )
     psr.add_argument(
         "--dataset-prefix",
@@ -439,6 +442,8 @@ def main():
     psr.add_argument("--allow-non-tmp-outdir", action="store_true", help="Allow outdir outside /tmp.")
     psr.add_argument("--scenarios", default="null,epi_signal", help="Comma-separated scenarios: null,epi_signal")
     psr.add_argument("--modes", default="baseline_no_epi,epi_N_auto,epi_S_auto,epi_NS_auto")
+    psr.add_argument("--epistasis-context-file", default="", help="Independent context TSV for the analysis tree.")
+    psr.add_argument("--epistasis-context-source", default="", help="Independent context provenance.")
     psr.add_argument("--replicates", type=int, default=3)
     psr.add_argument("--base-seed", type=int, default=20260226)
     psr.add_argument("--threads", type=int, default=1)
@@ -451,10 +456,15 @@ def main():
     psr.add_argument("--score-col", default="omegaCany2spe")
     psr.add_argument("--jaccard-threshold", type=float, default=5.0)
     psr.add_argument("--python-exe", default=sys.executable)
-    psr.add_argument("--csubst-script", default=str(repo_root / "csubst" / "csubst"))
+    psr.add_argument("--csubst-script", default=str(repo_root / "csubst" / "__main__.py"))
     psr.add_argument("--iqtree-exe", default="iqtree")
     args = psr.parse_args()
 
+    if any(mode != 'baseline_no_epi' for mode in _parse_mode_list(args.modes)):
+        if not args.epistasis_context_file or not args.epistasis_context_source:
+            psr.error('Weighted modes require --epistasis-context-file and --epistasis-context-source. '
+                      'For a true independent simulator use tools/validate_epistasis.py.')
+        args.epistasis_context_file = str(Path(args.epistasis_context_file).expanduser().resolve())
     if args.replicates <= 0:
         raise ValueError("--replicates should be > 0.")
     if args.num_simulated_site <= 0:

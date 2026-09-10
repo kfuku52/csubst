@@ -169,8 +169,8 @@ def add_joint_pvalues(cb, ON_tensor, OS_tensor, g):
                 for ch, tensor in [('N', ON_tensor), ('S', OS_tensor)]}
     context = omega._get_pseudocount_context(work, g, fit_stats)
     dependent = data_dependent(g)
-    ge = {s: np.zeros(len(work), dtype=np.int64) for s in stats}
-    valid = {s: np.zeros(len(work), dtype=np.int64) for s in stats}
+    ge: dict[str, np.ndarray] = {s: np.zeros(len(work), dtype=np.int64) for s in stats}
+    valid: dict[str, np.ndarray] = {s: np.zeros(len(work), dtype=np.int64) for s in stats}
     transforms = {s: omega._resolve_omega_pvalue_dsc_calibration_transformation(work, s, g) for s in stats}
     # Preserve precisely the population of columns used for observed priors.
     observed_columns = [(ch, s) for ch in ('N', 'S') for s in output_stat.ALL_OUTPUT_STATS if 'OC'+ch+s in work]
@@ -236,7 +236,8 @@ def add_fixed_pvalues(cb, ON_tensor, OS_tensor, g):
         if 'omegaC'+sub not in work:
             continue
         transform = omega._resolve_omega_pvalue_dsc_calibration_transformation(work, sub, g)
-        ge, valid = np.zeros(len(work), dtype=np.int64), np.zeros(len(work), dtype=np.int64)
+        ge: np.ndarray = np.zeros(len(work), dtype=np.int64)
+        valid: np.ndarray = np.zeros(len(work), dtype=np.int64)
         for start in range(0, budget, 128):
             counts = []
             for channel, tensor in [('N', ON_tensor), ('S', OS_tensor)]:

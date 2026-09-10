@@ -44,5 +44,5 @@ def test_external_recoding_training_requires_auto_scheme():
 
 
 def test_epistasis_cannot_silently_reintroduce_foreground_training():
-    with pytest.raises(ValueError, match='epistasis fitting still uses all branches'):
+    with pytest.raises(ValueError, match='structure cross-fitting defines its own clade training sets'):
         param.get_global_parameters(make_args(expectation_method='urn', asrv_training_branches='background', epistasis_beta='1'))

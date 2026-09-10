@@ -7,6 +7,9 @@
 未対応モデルと translate の model-based 期待値は計算前に拒否する。
 [対応内容](RESOLUTION_3DI.md)。追加監査で根の節対応・ゼロ枝長・3Di サイトマスクも修正済み。
 ID 2・4 は[擬似カウント・P 値・共同 Poisson カテゴリ帰無の修正](RESOLUTION_PSEUDOCOUNT_PVALUES.md)を実施した。
+ID 3 は[評価応答の再利用の除去とクレード単位の交差検証](RESOLUTION_EPISTASIS.md)を実施した。
+残基ペアの既知パラメータでの検証は[別レポート](../pair_epistasis_oracle_20260910/README.md)に記録した。
+外部データの導入と実データでの生物学的補正の確立は今回の対象外とする。
 以下の所見と `reproduction_results.json` は修正前の記録。
 
 **結論：ある。探索用途として妥当な近似に加えて、検定結果をそのまま採用すべきでない実装上の不整合がある。** 特に 3Di の codon-model 期待値、擬似カウント併用 P 値、エピスタシス自動推定、差分カテゴリの乱数生成を優先して扱うべきである。

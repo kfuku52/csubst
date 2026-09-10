@@ -180,3 +180,13 @@ def test_advanced_options_remain_parseable_in_normal_execution_mode():
 
     search = parser.parse_args(["search", "--epistasis_beta", "auto"])
     assert search.epistasis_beta == "auto"
+
+
+def test_independent_context_cannot_be_overwritten_by_log(tmp_path):
+    context = tmp_path / 'context.tsv'
+    original = 'branch_key\tcontext_1\n'
+    context.write_text(original)
+    result = _run_csubst(['search', '--epistasis_context_file', str(context),
+                         '--log_file', str(context)], cwd=tmp_path)
+    assert result.returncode != 0
+    assert context.read_text() == original

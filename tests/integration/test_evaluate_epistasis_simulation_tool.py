@@ -111,3 +111,15 @@ def test_write_epistasis_degree_table_signal(tmp_path):
     assert df["codon_site_alignment"].tolist() == list(range(1, 11))
     assert abs(float(df["epistasis_contact_degree_z"].mean())) < 1e-10
     assert abs(float(df["epistasis_contact_proximity_z"].mean())) < 1e-10
+
+
+def test_weighted_stress_command_requires_independent_context_and_sn():
+    from types import SimpleNamespace
+    args = SimpleNamespace(python_exe='python', csubst_script='entry.py', threads=1,
+                           iqtree_exe='iqtree', epistasis_context_file='external.tsv',
+                           epistasis_context_source='independent experiment')
+    paths = {'simulate_alignment': 'alignment.fa', 'tree': 'tree.nwk', 'foreground': 'fg.txt'}
+    command = _tool._analyze_command(paths, args, 'epi_N_auto', 'features.tsv')
+    assert command[command.index('--asrv') + 1] == 'sn'
+    assert command[command.index('--epistasis_context_file') + 1] == 'external.tsv'
+    assert command[command.index('--epistasis_context_source') + 1] == 'independent experiment'

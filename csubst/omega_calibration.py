@@ -191,8 +191,8 @@ def add_independent_null_pvalues(cb, ON_tensor, OS_tensor, g):
             continue
         _base_seed(g)
         draw_g = _draw_config(cb, g)
-        ge = np.zeros(len(cb), dtype=np.int64)
-        valid = np.zeros(len(cb), dtype=np.int64)
+        ge: np.ndarray = np.zeros(len(cb), dtype=np.int64)
+        valid: np.ndarray = np.zeros(len(cb), dtype=np.int64)
         for i in range(len(cb)):
             row = cb.iloc[[i]]
             mapping = _null_map(row, sub, ON_tensor, OS_tensor, draw_g)

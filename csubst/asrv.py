@@ -82,7 +82,7 @@ def validate_epistasis_compatibility(g):
     customized = g.get('asrv_training_branches', 'all') != 'all' or g.get('asrv_concentration') is not None
     if customized and g.get('epistasis_requested', False):
         raise ValueError('Custom ASRV training/concentration with epistasis is not yet supported: '
-                         'epistasis fitting still uses all branches and per-site alpha (review ID 3).')
+                         'structure cross-fitting defines its own clade training sets and uses per-site alpha.')
 
 
 def training_site_summary(sub_tensor, mode, ids):
@@ -173,6 +173,13 @@ def write_provenance(g, path):
         'weight_diagnostics_requested': bool(g.get('asrv_report', False)),
         'wallenius_methods_complete': bool(g.get('_asrv_diagnostics_complete', False)),
     }
+    if g.get('epistasis_enabled', False):
+        payload['structure_weighting'] = g['_epistasis_provenance']
+        payload['training_branches'] = 'per_prediction_clade_excluded'
+        payload['training_branch_ids'] = None
+        payload['asrv_alpha_per_site'] = None
+        payload['weight_diagnostics'] = []
+        payload['weight_diagnostics_source'] = 'epistasis.json'
     Path(path).write_text(json.dumps(payload, indent=2, allow_nan=False) + '\n')
     return path
 

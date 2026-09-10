@@ -1,0 +1,3390 @@
+{
+  "schema_version": 1,
+  "seed": 20260911,
+  "replicates_per_cell": 5000,
+  "independent_pairs_per_replicate": 20,
+  "scope": "known_landscape_known_parents_endpoint_convergence_oracle",
+  "production_omega_calibrated": false,
+  "observation": "net endpoint substitutions; hidden recurrent events are not counted",
+  "null": "constant pair landscape across branches; epistasis allowed, no shared adaptive field shift",
+  "alternative": "same landscape plus field +2 toward state 2 at site 0 on both branches",
+  "baseline": "independent sites matched to true stationary marginals and mean per-site substitution rates",
+  "max_absolute_oracle_mc_standardized_error": 2.1235284523799156,
+  "results": [
+    {
+      "coupling": 0.0,
+      "duration": 0.1,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.01832043289061216,
+          "independent_expectation": 0.018320432890612158,
+          "mc_mean": 0.0178,
+          "mc_standard_error": 0.00041884765050498166,
+          "oracle_standardized_error": -1.242535060145865,
+          "independent_bias": -3.469446951953614e-18
+        },
+        "any2spe": {
+          "oracle_expectation": 0.00917465761192517,
+          "independent_expectation": 0.009174657611925168,
+          "mc_mean": 0.00903,
+          "mc_standard_error": 0.00029914124733118727,
+          "oracle_standardized_error": -0.48357628115729345,
+          "independent_bias": -1.734723475976807e-18
+        },
+        "spe2any": {
+          "oracle_expectation": 0.01832043289061216,
+          "independent_expectation": 0.018320432890612158,
+          "mc_mean": 0.0178,
+          "mc_standard_error": 0.00041884765050498166,
+          "oracle_standardized_error": -1.242535060145865,
+          "independent_bias": -3.469446951953614e-18
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.00917465761192517,
+          "independent_expectation": 0.009174657611925168,
+          "mc_mean": 0.00903,
+          "mc_standard_error": 0.00029914124733118727,
+          "oracle_standardized_error": -0.48357628115729345,
+          "independent_bias": -1.734723475976807e-18
+        },
+        "any2dif": {
+          "oracle_expectation": 0.009145775278686995,
+          "independent_expectation": 0.009145775278686995,
+          "mc_mean": 0.00877,
+          "mc_standard_error": 0.00029518086373852756,
+          "oracle_standardized_error": -1.2730340101581203,
+          "independent_bias": 0.0
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.009145775278686995,
+          "independent_expectation": 0.009145775278686995,
+          "mc_mean": 0.00877,
+          "mc_standard_error": 0.00029518086373852756,
+          "oracle_standardized_error": -1.2730340101581203,
+          "independent_bias": 0.0
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.014542596961361775,
+        "mc_rejection_fraction": 0.016,
+        "mc_interval95": [
+          0.01270685488316784,
+          0.019874320025641438
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.014542596961361775,
+        "mc_rejection_fraction": 0.016,
+        "mc_interval95": [
+          0.01270685488316784,
+          0.019874320025641438
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.0365637986523386,
+        "mc_rejection_fraction": 0.039,
+        "mc_interval95": [
+          0.03380463593481863,
+          0.04474197224063619
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.0365637986523386,
+        "mc_rejection_fraction": 0.039,
+        "mc_interval95": [
+          0.03380463593481863,
+          0.04474197224063619
+        ]
+      }
+    },
+    {
+      "coupling": 0.0,
+      "duration": 0.1,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.01484991180512681,
+          "independent_expectation": 0.014849911805126804,
+          "mc_mean": 0.01523,
+          "mc_standard_error": 0.00038856399835780997,
+          "oracle_standardized_error": 0.9781868533357693,
+          "independent_bias": -5.204170427930421e-18
+        },
+        "any2spe": {
+          "oracle_expectation": 0.00746889738315038,
+          "independent_expectation": 0.007468897383150376,
+          "mc_mean": 0.00725,
+          "mc_standard_error": 0.0002686542327062194,
+          "oracle_standardized_error": -0.8147922366432604,
+          "independent_bias": -3.469446951953614e-18
+        },
+        "spe2any": {
+          "oracle_expectation": 0.01484991180512681,
+          "independent_expectation": 0.014849911805126804,
+          "mc_mean": 0.01523,
+          "mc_standard_error": 0.00038856399835780997,
+          "oracle_standardized_error": 0.9781868533357693,
+          "independent_bias": -5.204170427930421e-18
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.00746889738315038,
+          "independent_expectation": 0.007468897383150376,
+          "mc_mean": 0.00725,
+          "mc_standard_error": 0.0002686542327062194,
+          "oracle_standardized_error": -0.8147922366432604,
+          "independent_bias": -3.469446951953614e-18
+        },
+        "any2dif": {
+          "oracle_expectation": 0.0073810144219764295,
+          "independent_expectation": 0.007381014421976428,
+          "mc_mean": 0.00798,
+          "mc_standard_error": 0.0002820708982506285,
+          "oracle_standardized_error": 2.1235284523799156,
+          "independent_bias": -1.734723475976807e-18
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.0073810144219764295,
+          "independent_expectation": 0.007381014421976428,
+          "mc_mean": 0.00798,
+          "mc_standard_error": 0.0002820708982506285,
+          "oracle_standardized_error": 2.1235284523799156,
+          "independent_bias": -1.734723475976807e-18
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.009864452722874386,
+        "mc_rejection_fraction": 0.0088,
+        "mc_interval95": [
+          0.006401167219498249,
+          0.011795768950453579
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.009864452722874386,
+        "mc_rejection_fraction": 0.0088,
+        "mc_interval95": [
+          0.006401167219498249,
+          0.011795768950453579
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.02934202290192647,
+        "mc_rejection_fraction": 0.029,
+        "mc_interval95": [
+          0.024525404432578862,
+          0.03403508119999847
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.02934202290192647,
+        "mc_rejection_fraction": 0.029,
+        "mc_interval95": [
+          0.024525404432578862,
+          0.03403508119999847
+        ]
+      }
+    },
+    {
+      "coupling": 0.0,
+      "duration": 0.1,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.017859101820450394,
+          "independent_expectation": 0.01785910182045039,
+          "mc_mean": 0.01793,
+          "mc_standard_error": 0.00042152927284979703,
+          "oracle_standardized_error": 0.16819277833373786,
+          "independent_bias": -3.469446951953614e-18
+        },
+        "any2spe": {
+          "oracle_expectation": 0.00787632057196668,
+          "independent_expectation": 0.007876320571966678,
+          "mc_mean": 0.0082,
+          "mc_standard_error": 0.0002858818239835699,
+          "oracle_standardized_error": 1.1322140859571517,
+          "independent_bias": -1.734723475976807e-18
+        },
+        "spe2any": {
+          "oracle_expectation": 0.013975050902506418,
+          "independent_expectation": 0.013975050902506413,
+          "mc_mean": 0.01404,
+          "mc_standard_error": 0.0003720620489940931,
+          "oracle_standardized_error": 0.17456523090484216,
+          "independent_bias": -5.204170427930421e-18
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.006992623654378235,
+          "independent_expectation": 0.006992623654378233,
+          "mc_mean": 0.00723,
+          "mc_standard_error": 0.00026791414441922957,
+          "oracle_standardized_error": 0.8860164741818235,
+          "independent_bias": -1.734723475976807e-18
+        },
+        "any2dif": {
+          "oracle_expectation": 0.009982781248483702,
+          "independent_expectation": 0.0099827812484837,
+          "mc_mean": 0.00973,
+          "mc_standard_error": 0.00031105343358076823,
+          "oracle_standardized_error": -0.8126618168902607,
+          "independent_bias": -1.734723475976807e-18
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0038840509179439717,
+          "independent_expectation": 0.0038840509179439726,
+          "mc_mean": 0.00389,
+          "mc_standard_error": 0.0001968478257199325,
+          "oracle_standardized_error": 0.030221731097463147,
+          "independent_bias": 8.673617379884035e-19
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0008836969175884472,
+          "independent_expectation": 0.0008836969175884475,
+          "mc_mean": 0.00097,
+          "mc_standard_error": 9.844129167620195e-05,
+          "oracle_standardized_error": 0.8766959569712404,
+          "independent_bias": 3.2526065174565133e-19
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.006982427248128177,
+          "independent_expectation": 0.0069824272481281745,
+          "mc_mean": 0.00681,
+          "mc_standard_error": 0.00026007098140537265,
+          "oracle_standardized_error": -0.663000720789432,
+          "independent_bias": -2.6020852139652106e-18
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.003000354000355525,
+          "independent_expectation": 0.0030003540003555253,
+          "mc_mean": 0.00292,
+          "mc_standard_error": 0.00017063126076505297,
+          "oracle_standardized_error": -0.47092191662444965,
+          "independent_bias": 4.336808689942018e-19
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.010817297395584579,
+        "mc_rejection_fraction": 0.0102,
+        "mc_interval95": [
+          0.007603735661462108,
+          0.013389554190680018
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.010817297395584579,
+        "mc_rejection_fraction": 0.0102,
+        "mc_interval95": [
+          0.007603735661462108,
+          0.013389554190680018
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.02991747354043841,
+        "mc_rejection_fraction": 0.0294,
+        "mc_interval95": [
+          0.0248941601153994,
+          0.034465749370675945
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.02991747354043841,
+        "mc_rejection_fraction": 0.0294,
+        "mc_interval95": [
+          0.0248941601153994,
+          0.034465749370675945
+        ]
+      }
+    },
+    {
+      "coupling": 0.0,
+      "duration": 0.5,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.2541779383111575,
+          "independent_expectation": 0.2541779383111575,
+          "mc_mean": 0.25378,
+          "mc_standard_error": 0.0014668260400559833,
+          "oracle_standardized_error": -0.27129209619314326,
+          "independent_bias": 0.0
+        },
+        "any2spe": {
+          "oracle_expectation": 0.12741097108704103,
+          "independent_expectation": 0.12741097108704105,
+          "mc_mean": 0.12713,
+          "mc_standard_error": 0.0010825393064057762,
+          "oracle_standardized_error": -0.2595481617881444,
+          "independent_bias": 2.7755575615628914e-17
+        },
+        "spe2any": {
+          "oracle_expectation": 0.2541779383111575,
+          "independent_expectation": 0.2541779383111575,
+          "mc_mean": 0.25378,
+          "mc_standard_error": 0.0014668260400559833,
+          "oracle_standardized_error": -0.27129209619314326,
+          "independent_bias": 0.0
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.12741097108704103,
+          "independent_expectation": 0.12741097108704105,
+          "mc_mean": 0.12713,
+          "mc_standard_error": 0.0010825393064057762,
+          "oracle_standardized_error": -0.2595481617881444,
+          "independent_bias": 2.7755575615628914e-17
+        },
+        "any2dif": {
+          "oracle_expectation": 0.12676696722411646,
+          "independent_expectation": 0.12676696722411648,
+          "mc_mean": 0.12665,
+          "mc_standard_error": 0.0010826400584196766,
+          "oracle_standardized_error": -0.10803888439818086,
+          "independent_bias": 2.7755575615628914e-17
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.12676696722411646,
+          "independent_expectation": 0.12676696722411648,
+          "mc_mean": 0.12665,
+          "mc_standard_error": 0.0010826400584196766,
+          "oracle_standardized_error": -0.10803888439818086,
+          "independent_bias": 2.7755575615628914e-17
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.038711601743935446,
+        "mc_rejection_fraction": 0.04,
+        "mc_interval95": [
+          0.03473851352366431,
+          0.04580675369823151
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.038711601743935446,
+        "mc_rejection_fraction": 0.04,
+        "mc_interval95": [
+          0.03473851352366431,
+          0.04580675369823151
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.25380236094636416,
+        "mc_rejection_fraction": 0.2486,
+        "mc_interval95": [
+          0.23666972861428728,
+          0.26082444784084813
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.25380236094636416,
+        "mc_rejection_fraction": 0.2486,
+        "mc_interval95": [
+          0.23666972861428728,
+          0.26082444784084813
+        ]
+      }
+    },
+    {
+      "coupling": 0.0,
+      "duration": 0.5,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.213762870307996,
+          "independent_expectation": 0.21376287030799596,
+          "mc_mean": 0.21475,
+          "mc_standard_error": 0.0013744610821819088,
+          "oracle_standardized_error": 0.7181939923951512,
+          "independent_bias": -5.551115123125783e-17
+        },
+        "any2spe": {
+          "oracle_expectation": 0.10783684877402602,
+          "independent_expectation": 0.10783684877402601,
+          "mc_mean": 0.10708,
+          "mc_standard_error": 0.0010031693772678645,
+          "oracle_standardized_error": -0.7544576132171306,
+          "independent_bias": -1.3877787807814457e-17
+        },
+        "spe2any": {
+          "oracle_expectation": 0.213762870307996,
+          "independent_expectation": 0.21376287030799596,
+          "mc_mean": 0.21475,
+          "mc_standard_error": 0.0013744610821819088,
+          "oracle_standardized_error": 0.7181939923951512,
+          "independent_bias": -5.551115123125783e-17
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.10783684877402602,
+          "independent_expectation": 0.10783684877402601,
+          "mc_mean": 0.10708,
+          "mc_standard_error": 0.0010031693772678645,
+          "oracle_standardized_error": -0.7544576132171306,
+          "independent_bias": -1.3877787807814457e-17
+        },
+        "any2dif": {
+          "oracle_expectation": 0.10592602153396999,
+          "independent_expectation": 0.10592602153396995,
+          "mc_mean": 0.10767,
+          "mc_standard_error": 0.001006072478909113,
+          "oracle_standardized_error": 1.7334521146240016,
+          "independent_bias": -4.163336342344337e-17
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.10592602153396999,
+          "independent_expectation": 0.10592602153396995,
+          "mc_mean": 0.10767,
+          "mc_standard_error": 0.001006072478909113,
+          "oracle_standardized_error": 1.7334521146240016,
+          "independent_bias": -4.163336342344337e-17
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.01911409869988881,
+        "mc_rejection_fraction": 0.0168,
+        "mc_interval95": [
+          0.01342189276536027,
+          0.02075783435669023
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.01911409869988881,
+        "mc_rejection_fraction": 0.0168,
+        "mc_interval95": [
+          0.01342189276536027,
+          0.02075783435669023
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.18899004232313285,
+        "mc_rejection_fraction": 0.1894,
+        "mc_interval95": [
+          0.1786230650502107,
+          0.20054079066388555
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.18899004232313285,
+        "mc_rejection_fraction": 0.1894,
+        "mc_interval95": [
+          0.1786230650502107,
+          0.20054079066388555
+        ]
+      }
+    },
+    {
+      "coupling": 0.0,
+      "duration": 0.5,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.2468493959744322,
+          "independent_expectation": 0.24684939597443212,
+          "mc_mean": 0.24565,
+          "mc_standard_error": 0.0014446735429904077,
+          "oracle_standardized_error": -0.8302193808779105,
+          "independent_bias": -8.326672684688674e-17
+        },
+        "any2spe": {
+          "oracle_expectation": 0.10532052119388428,
+          "independent_expectation": 0.10532052119388428,
+          "mc_mean": 0.10498,
+          "mc_standard_error": 0.000983769116214135,
+          "oracle_standardized_error": -0.34613934130674573,
+          "independent_bias": 0.0
+        },
+        "spe2any": {
+          "oracle_expectation": 0.1809192691781336,
+          "independent_expectation": 0.18091926917813356,
+          "mc_mean": 0.18105,
+          "mc_standard_error": 0.001217671467284186,
+          "oracle_standardized_error": 0.10736132477338035,
+          "independent_bias": -5.551115123125783e-17
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.09056408242698648,
+          "independent_expectation": 0.09056408242698648,
+          "mc_mean": 0.09081,
+          "mc_standard_error": 0.0009086493798143232,
+          "oracle_standardized_error": 0.27064077572338796,
+          "independent_bias": 0.0
+        },
+        "any2dif": {
+          "oracle_expectation": 0.14152887478054793,
+          "independent_expectation": 0.14152887478054793,
+          "mc_mean": 0.14067,
+          "mc_standard_error": 0.001138961142148771,
+          "oracle_standardized_error": -0.7540861130060881,
+          "independent_bias": 0.0
+        },
+        "dif2any": {
+          "oracle_expectation": 0.06593012679629857,
+          "independent_expectation": 0.06593012679629856,
+          "mc_mean": 0.0646,
+          "mc_standard_error": 0.0007773509135161721,
+          "oracle_standardized_error": -1.7111021202535674,
+          "independent_bias": -1.3877787807814457e-17
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.014756438766897808,
+          "independent_expectation": 0.01475643876689781,
+          "mc_mean": 0.01417,
+          "mc_standard_error": 0.0003737559470230264,
+          "oracle_standardized_error": -1.5690419686129515,
+          "independent_bias": 1.734723475976807e-18
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.09035518675114719,
+          "independent_expectation": 0.09035518675114718,
+          "mc_mean": 0.09024,
+          "mc_standard_error": 0.0009060770572949839,
+          "oracle_standardized_error": -0.1271268820017026,
+          "independent_bias": -1.3877787807814457e-17
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.05117368802940075,
+          "independent_expectation": 0.05117368802940074,
+          "mc_mean": 0.05043,
+          "mc_standard_error": 0.0006920064593119036,
+          "oracle_standardized_error": -1.074683652722304,
+          "independent_bias": -6.938893903907228e-18
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.01589162434979136,
+        "mc_rejection_fraction": 0.0154,
+        "mc_interval95": [
+          0.012172045227487311,
+          0.019210241073831798
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.01589162434979136,
+        "mc_rejection_fraction": 0.0154,
+        "mc_interval95": [
+          0.012172045227487311,
+          0.019210241073831798
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.19482977782661118,
+        "mc_rejection_fraction": 0.1914,
+        "mc_interval95": [
+          0.18057819567312916,
+          0.202583299808765
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.19482977782661118,
+        "mc_rejection_fraction": 0.1914,
+        "mc_interval95": [
+          0.18057819567312916,
+          0.202583299808765
+        ]
+      }
+    },
+    {
+      "coupling": 0.0,
+      "duration": 1.5,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.7265450735699106,
+          "independent_expectation": 0.7265450735699106,
+          "mc_mean": 0.73003,
+          "mc_standard_error": 0.0021187512553551015,
+          "oracle_standardized_error": 1.6448020603085285,
+          "independent_bias": 0.0
+        },
+        "any2spe": {
+          "oracle_expectation": 0.36506396411553255,
+          "independent_expectation": 0.36506396411553244,
+          "mc_mean": 0.36745,
+          "mc_standard_error": 0.0017220727715013388,
+          "oracle_standardized_error": 1.385560426919274,
+          "independent_bias": -1.1102230246251565e-16
+        },
+        "spe2any": {
+          "oracle_expectation": 0.7265450735699106,
+          "independent_expectation": 0.7265450735699106,
+          "mc_mean": 0.73003,
+          "mc_standard_error": 0.0021187512553551015,
+          "oracle_standardized_error": 1.6448020603085285,
+          "independent_bias": 0.0
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.36506396411553255,
+          "independent_expectation": 0.36506396411553244,
+          "mc_mean": 0.36745,
+          "mc_standard_error": 0.0017220727715013388,
+          "oracle_standardized_error": 1.385560426919274,
+          "independent_bias": -1.1102230246251565e-16
+        },
+        "any2dif": {
+          "oracle_expectation": 0.36148110945437806,
+          "independent_expectation": 0.361481109454378,
+          "mc_mean": 0.36258,
+          "mc_standard_error": 0.001712129302905449,
+          "oracle_standardized_error": 0.641826843192953,
+          "independent_bias": -5.551115123125783e-17
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.36148110945437806,
+          "independent_expectation": 0.361481109454378,
+          "mc_mean": 0.36258,
+          "mc_standard_error": 0.001712129302905449,
+          "oracle_standardized_error": 0.641826843192953,
+          "independent_bias": -5.551115123125783e-17
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.047905674790072385,
+        "mc_rejection_fraction": 0.0526,
+        "mc_interval95": [
+          0.04657513537602291,
+          0.05915368299385235
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.047905674790072385,
+        "mc_rejection_fraction": 0.0526,
+        "mc_interval95": [
+          0.04657513537602291,
+          0.05915368299385235
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.6487784398670102,
+        "mc_rejection_fraction": 0.65,
+        "mc_interval95": [
+          0.6365947361797577,
+          0.663229919741328
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.6487784398670102,
+        "mc_rejection_fraction": 0.65,
+        "mc_interval95": [
+          0.6365947361797577,
+          0.663229919741328
+        ]
+      }
+    },
+    {
+      "coupling": 0.0,
+      "duration": 1.5,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.6435935990343725,
+          "independent_expectation": 0.6435935990343726,
+          "mc_mean": 0.64055,
+          "mc_standard_error": 0.0020826666439935845,
+          "oracle_standardized_error": -1.4613951988669502,
+          "independent_bias": 1.1102230246251565e-16
+        },
+        "any2spe": {
+          "oracle_expectation": 0.3263811670204738,
+          "independent_expectation": 0.3263811670204739,
+          "mc_mean": 0.32332,
+          "mc_standard_error": 0.001644952532655075,
+          "oracle_standardized_error": -1.860945504325812,
+          "independent_bias": 5.551115123125783e-17
+        },
+        "spe2any": {
+          "oracle_expectation": 0.6435935990343725,
+          "independent_expectation": 0.6435935990343726,
+          "mc_mean": 0.64055,
+          "mc_standard_error": 0.0020826666439935845,
+          "oracle_standardized_error": -1.4613951988669502,
+          "independent_bias": 1.1102230246251565e-16
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.3263811670204738,
+          "independent_expectation": 0.3263811670204739,
+          "mc_mean": 0.32332,
+          "mc_standard_error": 0.001644952532655075,
+          "oracle_standardized_error": -1.860945504325812,
+          "independent_bias": 5.551115123125783e-17
+        },
+        "any2dif": {
+          "oracle_expectation": 0.31721243201389876,
+          "independent_expectation": 0.3172124320138988,
+          "mc_mean": 0.31723,
+          "mc_standard_error": 0.0016354748603326762,
+          "oracle_standardized_error": 0.01074182583135443,
+          "independent_bias": 5.551115123125783e-17
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.31721243201389876,
+          "independent_expectation": 0.3172124320138988,
+          "mc_mean": 0.31723,
+          "mc_standard_error": 0.0016354748603326762,
+          "oracle_standardized_error": 0.01074182583135443,
+          "independent_bias": 5.551115123125783e-17
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.022245391701625858,
+        "mc_rejection_fraction": 0.0226,
+        "mc_interval95": [
+          0.018660999839477138,
+          0.027109077847954213
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.022245391701625858,
+        "mc_rejection_fraction": 0.0226,
+        "mc_interval95": [
+          0.018660999839477138,
+          0.027109077847954213
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.5451771279211852,
+        "mc_rejection_fraction": 0.553,
+        "mc_interval95": [
+          0.539091449764745,
+          0.5668466201495771
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.5451771279211852,
+        "mc_rejection_fraction": 0.553,
+        "mc_interval95": [
+          0.539091449764745,
+          0.5668466201495771
+        ]
+      }
+    },
+    {
+      "coupling": 0.0,
+      "duration": 1.5,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.7016935793155371,
+          "independent_expectation": 0.7016935793155369,
+          "mc_mean": 0.69908,
+          "mc_standard_error": 0.0020792101305899006,
+          "oracle_standardized_error": -1.2570058586601658,
+          "independent_bias": -2.220446049250313e-16
+        },
+        "any2spe": {
+          "oracle_expectation": 0.27938148875212154,
+          "independent_expectation": 0.27938148875212143,
+          "mc_mean": 0.27874,
+          "mc_standard_error": 0.0015005541111957296,
+          "oracle_standardized_error": -0.42750124592999794,
+          "independent_bias": -1.1102230246251565e-16
+        },
+        "spe2any": {
+          "oracle_expectation": 0.4476692059113392,
+          "independent_expectation": 0.44766920591133885,
+          "mc_mean": 0.44781,
+          "mc_standard_error": 0.0015725097032666185,
+          "oracle_standardized_error": 0.08953463903486576,
+          "independent_bias": -3.3306690738754696e-16
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.22427630798597847,
+          "independent_expectation": 0.22427630798597836,
+          "mc_mean": 0.22424,
+          "mc_standard_error": 0.0013189319996937665,
+          "oracle_standardized_error": -0.027528322905888115,
+          "independent_bias": -1.1102230246251565e-16
+        },
+        "any2dif": {
+          "oracle_expectation": 0.4223120905634157,
+          "independent_expectation": 0.4223120905634156,
+          "mc_mean": 0.42034,
+          "mc_standard_error": 0.0018196636930376878,
+          "oracle_standardized_error": -1.0837665063941242,
+          "independent_bias": -5.551115123125783e-17
+        },
+        "dif2any": {
+          "oracle_expectation": 0.2540243734041979,
+          "independent_expectation": 0.254024373404198,
+          "mc_mean": 0.25127,
+          "mc_standard_error": 0.001371624104675492,
+          "oracle_standardized_error": -2.0081109648110025,
+          "independent_bias": 5.551115123125783e-17
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.05510518076614302,
+          "independent_expectation": 0.05510518076614304,
+          "mc_mean": 0.0545,
+          "mc_standard_error": 0.0007178458421043686,
+          "oracle_standardized_error": -0.8430511547840557,
+          "independent_bias": 2.0816681711721685e-17
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.22339289792536068,
+          "independent_expectation": 0.2233928979253606,
+          "mc_mean": 0.22357,
+          "mc_standard_error": 0.001317528713090951,
+          "oracle_standardized_error": 0.13441989755488648,
+          "independent_bias": -8.326672684688674e-17
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.1989191926380549,
+          "independent_expectation": 0.1989191926380549,
+          "mc_mean": 0.19677,
+          "mc_standard_error": 0.00125719190114905,
+          "oracle_standardized_error": -1.7095183607932778,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.03955459744486183,
+        "mc_rejection_fraction": 0.0428,
+        "mc_interval95": [
+          0.0373581734981642,
+          0.04878337203367798
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.03955459744486183,
+        "mc_rejection_fraction": 0.0428,
+        "mc_interval95": [
+          0.0373581734981642,
+          0.04878337203367798
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.8128224766953269,
+        "mc_rejection_fraction": 0.8012,
+        "mc_interval95": [
+          0.7898633280759964,
+          0.8121839047313052
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.8128224766953269,
+        "mc_rejection_fraction": 0.8012,
+        "mc_interval95": [
+          0.7898633280759964,
+          0.8121839047313052
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 0.1,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.008747954265864284,
+          "independent_expectation": 0.016817850900393227,
+          "mc_mean": 0.00847,
+          "mc_standard_error": 0.0002904882697018045,
+          "oracle_standardized_error": -0.9568519450014731,
+          "independent_bias": 0.008069896634528943
+        },
+        "any2spe": {
+          "oracle_expectation": 0.004380859172934911,
+          "independent_expectation": 0.008416120939466447,
+          "mc_mean": 0.00424,
+          "mc_standard_error": 0.00020547663177710026,
+          "oracle_standardized_error": -0.6855240506750881,
+          "independent_bias": 0.004035261766531535
+        },
+        "spe2any": {
+          "oracle_expectation": 0.008747954265864284,
+          "independent_expectation": 0.016817850900393227,
+          "mc_mean": 0.00847,
+          "mc_standard_error": 0.0002904882697018045,
+          "oracle_standardized_error": -0.9568519450014731,
+          "independent_bias": 0.008069896634528943
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.004380859172934911,
+          "independent_expectation": 0.008416120939466447,
+          "mc_mean": 0.00424,
+          "mc_standard_error": 0.00020547663177710026,
+          "oracle_standardized_error": -0.6855240506750881,
+          "independent_bias": 0.004035261766531535
+        },
+        "any2dif": {
+          "oracle_expectation": 0.004367095092929373,
+          "independent_expectation": 0.008401729960926783,
+          "mc_mean": 0.00423,
+          "mc_standard_error": 0.0002057218856002981,
+          "oracle_standardized_error": -0.6664098597450059,
+          "independent_bias": 0.00403463486799741
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.004367095092929373,
+          "independent_expectation": 0.008401729960926783,
+          "mc_mean": 0.00423,
+          "mc_standard_error": 0.0002057218856002981,
+          "oracle_standardized_error": -0.6664098597450059,
+          "independent_bias": 0.00403463486799741
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.0036519403288437107,
+        "mc_rejection_fraction": 0.0032,
+        "mc_interval95": [
+          0.0018301486598199567,
+          0.005191411332075067
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.0036519403288437107,
+        "mc_rejection_fraction": 0.0032,
+        "mc_interval95": [
+          0.0018301486598199567,
+          0.005191411332075067
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.01023220771164919,
+        "mc_rejection_fraction": 0.0118,
+        "mc_interval95": [
+          0.008994508277584447,
+          0.015195059023066242
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.01023220771164919,
+        "mc_rejection_fraction": 0.0118,
+        "mc_interval95": [
+          0.008994508277584447,
+          0.015195059023066242
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 0.1,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.02184115742905253,
+          "independent_expectation": 0.013058843561612856,
+          "mc_mean": 0.02196,
+          "mc_standard_error": 0.0004643056534195959,
+          "oracle_standardized_error": 0.2559576220366889,
+          "independent_bias": -0.008782313867439674
+        },
+        "any2spe": {
+          "oracle_expectation": 0.01124784959986109,
+          "independent_expectation": 0.0065602858401114005,
+          "mc_mean": 0.01134,
+          "mc_standard_error": 0.0003348360272605854,
+          "oracle_standardized_error": 0.27521052884549124,
+          "independent_bias": -0.00468756375974969
+        },
+        "spe2any": {
+          "oracle_expectation": 0.02184115742905253,
+          "independent_expectation": 0.013058843561612856,
+          "mc_mean": 0.02196,
+          "mc_standard_error": 0.0004643056534195959,
+          "oracle_standardized_error": 0.2559576220366889,
+          "independent_bias": -0.008782313867439674
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.01124784959986109,
+          "independent_expectation": 0.0065602858401114005,
+          "mc_mean": 0.01134,
+          "mc_standard_error": 0.0003348360272605854,
+          "oracle_standardized_error": 0.27521052884549124,
+          "independent_bias": -0.00468756375974969
+        },
+        "any2dif": {
+          "oracle_expectation": 0.010593307829191441,
+          "independent_expectation": 0.006498557721501457,
+          "mc_mean": 0.01062,
+          "mc_standard_error": 0.00032445833127242596,
+          "oracle_standardized_error": 0.08226686830287207,
+          "independent_bias": -0.004094750107689984
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.010593307829191441,
+          "independent_expectation": 0.006498557721501457,
+          "mc_mean": 0.01062,
+          "mc_standard_error": 0.00032445833127242596,
+          "oracle_standardized_error": 0.08226686830287207,
+          "independent_bias": -0.004094750107689984
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.021200219120459555,
+        "mc_rejection_fraction": 0.0206,
+        "mc_interval95": [
+          0.016844730165730334,
+          0.02492853807518848
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.021200219120459555,
+        "mc_rejection_fraction": 0.0206,
+        "mc_interval95": [
+          0.016844730165730334,
+          0.02492853807518848
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.04508017547397679,
+        "mc_rejection_fraction": 0.045,
+        "mc_interval95": [
+          0.03942111325668625,
+          0.05111753839982247
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.04508017547397679,
+        "mc_rejection_fraction": 0.045,
+        "mc_interval95": [
+          0.03942111325668625,
+          0.05111753839982247
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 0.1,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.014905096244394242,
+          "independent_expectation": 0.016228335183657797,
+          "mc_mean": 0.01494,
+          "mc_standard_error": 0.00038622461818811724,
+          "oracle_standardized_error": 0.09037164893708918,
+          "independent_bias": 0.001323238939263555
+        },
+        "any2spe": {
+          "oracle_expectation": 0.006389863181072405,
+          "independent_expectation": 0.007166997952027816,
+          "mc_mean": 0.00654,
+          "mc_standard_error": 0.0002552899052633247,
+          "oracle_standardized_error": 0.5881032341358441,
+          "independent_bias": 0.0007771347709554111
+        },
+        "spe2any": {
+          "oracle_expectation": 0.011628123089728432,
+          "independent_expectation": 0.012654969960339955,
+          "mc_mean": 0.01138,
+          "mc_standard_error": 0.0003354192616127026,
+          "oracle_standardized_error": -0.7397401345869393,
+          "independent_bias": 0.0010268468706115235
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.005786769447498222,
+          "independent_expectation": 0.006327825800045922,
+          "mc_mean": 0.00588,
+          "mc_standard_error": 0.00024177435874882488,
+          "oracle_standardized_error": 0.3856097602088281,
+          "independent_bias": 0.0005410563525477001
+        },
+        "any2dif": {
+          "oracle_expectation": 0.008515233063321834,
+          "independent_expectation": 0.009061337231629975,
+          "mc_mean": 0.0084,
+          "mc_standard_error": 0.00028930129096215514,
+          "oracle_standardized_error": -0.39831506779176146,
+          "independent_bias": 0.0005461041683081404
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0032769731546658074,
+          "independent_expectation": 0.00357336522331784,
+          "mc_mean": 0.00356,
+          "mc_standard_error": 0.00018834441519776306,
+          "oracle_standardized_error": 1.5027089868155215,
+          "independent_bias": 0.00029639206865203277
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0006030937335741835,
+          "independent_expectation": 0.000839172151981895,
+          "mc_mean": 0.00066,
+          "mc_standard_error": 8.121397636552201e-05,
+          "oracle_standardized_error": 0.7006954833697209,
+          "independent_bias": 0.0002360784184077115
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.005841353642230212,
+          "independent_expectation": 0.006327144160294034,
+          "mc_mean": 0.0055,
+          "mc_standard_error": 0.00023387613597900447,
+          "oracle_standardized_error": -1.4595488368289808,
+          "independent_bias": 0.0004857905180638217
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0026738794210916235,
+          "independent_expectation": 0.002734193071335945,
+          "mc_mean": 0.0029,
+          "mc_standard_error": 0.00017004760851564954,
+          "oracle_standardized_error": 1.3297486561686422,
+          "independent_bias": 6.03136502443217e-05
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.007292061950461113,
+        "mc_rejection_fraction": 0.007,
+        "mc_interval95": [
+          0.0048804591301544065,
+          0.009721980885076868
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.007292061950461113,
+        "mc_rejection_fraction": 0.007,
+        "mc_interval95": [
+          0.0048804591301544065,
+          0.009721980885076868
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.0186878949865751,
+        "mc_rejection_fraction": 0.02,
+        "mc_interval95": [
+          0.016301680007784362,
+          0.024272569792539788
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.0186878949865751,
+        "mc_rejection_fraction": 0.02,
+        "mc_interval95": [
+          0.016301680007784362,
+          0.024272569792539788
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 0.5,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.14815740317668416,
+          "independent_expectation": 0.2406708553086198,
+          "mc_mean": 0.14929,
+          "mc_standard_error": 0.0012196884173420494,
+          "oracle_standardized_error": 0.9285952110490693,
+          "independent_bias": 0.09251345213193565
+        },
+        "any2spe": {
+          "oracle_expectation": 0.07425080900486054,
+          "independent_expectation": 0.12050217712117899,
+          "mc_mean": 0.07555,
+          "mc_standard_error": 0.0008700744481338667,
+          "oracle_standardized_error": 1.4931952063710914,
+          "independent_bias": 0.04625136811631844
+        },
+        "spe2any": {
+          "oracle_expectation": 0.14815740317668416,
+          "independent_expectation": 0.2406708553086198,
+          "mc_mean": 0.14929,
+          "mc_standard_error": 0.0012196884173420494,
+          "oracle_standardized_error": 0.9285952110490693,
+          "independent_bias": 0.09251345213193565
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.07425080900486054,
+          "independent_expectation": 0.12050217712117899,
+          "mc_mean": 0.07555,
+          "mc_standard_error": 0.0008700744481338667,
+          "oracle_standardized_error": 1.4931952063710914,
+          "independent_bias": 0.04625136811631844
+        },
+        "any2dif": {
+          "oracle_expectation": 0.07390659417182359,
+          "independent_expectation": 0.1201686781874408,
+          "mc_mean": 0.07374,
+          "mc_standard_error": 0.0008592039957513366,
+          "oracle_standardized_error": -0.19389361856715967,
+          "independent_bias": 0.04626208401561721
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.07390659417182359,
+          "independent_expectation": 0.1201686781874408,
+          "mc_mean": 0.07374,
+          "mc_standard_error": 0.0008592039957513366,
+          "oracle_standardized_error": -0.19389361856715967,
+          "independent_bias": 0.04626208401561721
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.017893220319879718,
+        "mc_rejection_fraction": 0.021,
+        "mc_interval95": [
+          0.017207250536944503,
+          0.02536536997697164
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.004220195767767606,
+        "mc_rejection_fraction": 0.0054,
+        "mc_interval95": [
+          0.003561560255752041,
+          0.007847061189558966
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.1493709862932479,
+        "mc_rejection_fraction": 0.1472,
+        "mc_interval95": [
+          0.13748742041257964,
+          0.15732639339200458
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.06332527233170696,
+        "mc_rejection_fraction": 0.0614,
+        "mc_interval95": [
+          0.05490354877945522,
+          0.06841411924215478
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 0.5,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.2759975206259826,
+          "independent_expectation": 0.1948667655096207,
+          "mc_mean": 0.27631,
+          "mc_standard_error": 0.0014897147483663826,
+          "oracle_standardized_error": 0.2097578575764715,
+          "independent_bias": -0.08113075511636189
+        },
+        "any2spe": {
+          "oracle_expectation": 0.1414810158946056,
+          "independent_expectation": 0.09811659342086576,
+          "mc_mean": 0.14219,
+          "mc_standard_error": 0.00113134116796322,
+          "oracle_standardized_error": 0.6266757769195405,
+          "independent_bias": -0.04336442247373984
+        },
+        "spe2any": {
+          "oracle_expectation": 0.2759975206259826,
+          "independent_expectation": 0.1948667655096207,
+          "mc_mean": 0.27631,
+          "mc_standard_error": 0.0014897147483663826,
+          "oracle_standardized_error": 0.2097578575764715,
+          "independent_bias": -0.08113075511636189
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.1414810158946056,
+          "independent_expectation": 0.09811659342086576,
+          "mc_mean": 0.14219,
+          "mc_standard_error": 0.00113134116796322,
+          "oracle_standardized_error": 0.6266757769195405,
+          "independent_bias": -0.04336442247373984
+        },
+        "any2dif": {
+          "oracle_expectation": 0.1345165047313769,
+          "independent_expectation": 0.09675017208875492,
+          "mc_mean": 0.13412,
+          "mc_standard_error": 0.0011018758538528617,
+          "oracle_standardized_error": -0.35984519489240957,
+          "independent_bias": -0.037766332642622
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.1345165047313769,
+          "independent_expectation": 0.09675017208875492,
+          "mc_mean": 0.13412,
+          "mc_standard_error": 0.0011018758538528617,
+          "oracle_standardized_error": -0.35984519489240957,
+          "independent_bias": -0.037766332642622
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.019046031955564292,
+        "mc_rejection_fraction": 0.0182,
+        "mc_interval95": [
+          0.014678167055287399,
+          0.022299108114531587
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.14690054081493054,
+        "mc_rejection_fraction": 0.14,
+        "mc_interval95": [
+          0.13049441773308385,
+          0.14992795857889218
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.14364372534002778,
+        "mc_rejection_fraction": 0.1402,
+        "mc_interval95": [
+          0.13068855419440994,
+          0.15013358407347377
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.45035503059569304,
+        "mc_rejection_fraction": 0.4422,
+        "mc_interval95": [
+          0.42837101020000756,
+          0.4560965293365468
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 0.5,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.20878347143409481,
+          "independent_expectation": 0.23113590610714807,
+          "mc_mean": 0.20725,
+          "mc_standard_error": 0.0013625685087104464,
+          "oracle_standardized_error": -1.1254270330569454,
+          "independent_bias": 0.022352434673053256
+        },
+        "any2spe": {
+          "oracle_expectation": 0.08656876606791067,
+          "independent_expectation": 0.09904033896051204,
+          "mc_mean": 0.08595,
+          "mc_standard_error": 0.0009030139142567481,
+          "oracle_standardized_error": -0.6852231822141559,
+          "independent_bias": 0.012471572892601368
+        },
+        "spe2any": {
+          "oracle_expectation": 0.15210892880541763,
+          "independent_expectation": 0.16930585248830696,
+          "mc_mean": 0.15106,
+          "mc_standard_error": 0.0011324405451130237,
+          "oracle_standardized_error": -0.9262550779766873,
+          "independent_bias": 0.01719692368288933
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.07566164488410825,
+          "independent_expectation": 0.08466001527819379,
+          "mc_mean": 0.07538,
+          "mc_standard_error": 0.0008348565899933104,
+          "oracle_standardized_error": -0.3373572030023735,
+          "independent_bias": 0.008998370394085548
+        },
+        "any2dif": {
+          "oracle_expectation": 0.12221470536618406,
+          "independent_expectation": 0.13209556714663603,
+          "mc_mean": 0.1213,
+          "mc_standard_error": 0.0010714824220423812,
+          "oracle_standardized_error": -0.8536821018869473,
+          "independent_bias": 0.009880861780451972
+        },
+        "dif2any": {
+          "oracle_expectation": 0.05667454262867715,
+          "independent_expectation": 0.06183005361884108,
+          "mc_mean": 0.05619,
+          "mc_standard_error": 0.0007282390694829708,
+          "oracle_standardized_error": -0.6653620342302811,
+          "independent_bias": 0.005155510990163925
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.010907121183802429,
+          "independent_expectation": 0.01438032368231824,
+          "mc_mean": 0.01057,
+          "mc_standard_error": 0.0003233941818245473,
+          "oracle_standardized_error": -1.0424466572046407,
+          "independent_bias": 0.003473202498515812
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.07644728392130935,
+          "independent_expectation": 0.08464583721011319,
+          "mc_mean": 0.07568,
+          "mc_standard_error": 0.0008363805182593106,
+          "oracle_standardized_error": -0.9173861711966225,
+          "independent_bias": 0.00819855328880384
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.04576742144487474,
+          "independent_expectation": 0.04744972993652284,
+          "mc_mean": 0.04562,
+          "mc_standard_error": 0.0006598427918262799,
+          "oracle_standardized_error": -0.22341904268850207,
+          "independent_bias": 0.0016823084916481046
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.027677266409166353,
+        "mc_rejection_fraction": 0.03,
+        "mc_interval95": [
+          0.02544772406323225,
+          0.03511132529540801
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.027677266409166353,
+        "mc_rejection_fraction": 0.03,
+        "mc_interval95": [
+          0.02544772406323225,
+          0.03511132529540801
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.22357351081250082,
+        "mc_rejection_fraction": 0.2202,
+        "mc_interval95": [
+          0.2087800833716752,
+          0.23194747818692185
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.22357351081250082,
+        "mc_rejection_fraction": 0.2202,
+        "mc_interval95": [
+          0.2087800833716752,
+          0.23194747818692185
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 1.5,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.5717578803559182,
+          "independent_expectation": 0.7194165546502247,
+          "mc_mean": 0.57017,
+          "mc_standard_error": 0.0022140484933955962,
+          "oracle_standardized_error": -0.717184090888187,
+          "independent_bias": 0.14765867429430646
+        },
+        "any2spe": {
+          "oracle_expectation": 0.28690904260819367,
+          "independent_expectation": 0.3607518590198671,
+          "mc_mean": 0.28453,
+          "mc_standard_error": 0.0016489857435829534,
+          "oracle_standardized_error": -1.4427308528601481,
+          "independent_bias": 0.07384281641167345
+        },
+        "spe2any": {
+          "oracle_expectation": 0.5717578803559182,
+          "independent_expectation": 0.7194165546502247,
+          "mc_mean": 0.57017,
+          "mc_standard_error": 0.0022140484933955962,
+          "oracle_standardized_error": -0.717184090888187,
+          "independent_bias": 0.14765867429430646
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.28690904260819367,
+          "independent_expectation": 0.3607518590198671,
+          "mc_mean": 0.28453,
+          "mc_standard_error": 0.0016489857435829534,
+          "oracle_standardized_error": -1.4427308528601481,
+          "independent_bias": 0.07384281641167345
+        },
+        "any2dif": {
+          "oracle_expectation": 0.2848488377477245,
+          "independent_expectation": 0.3586646956303576,
+          "mc_mean": 0.28564,
+          "mc_standard_error": 0.0016481277460350797,
+          "oracle_standardized_error": 0.48003697175707316,
+          "independent_bias": 0.07381585788263306
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.2848488377477245,
+          "independent_expectation": 0.3586646956303576,
+          "mc_mean": 0.28564,
+          "mc_standard_error": 0.0016481277460350797,
+          "oracle_standardized_error": 0.48003697175707316,
+          "independent_bias": 0.07381585788263306
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.028789993796369935,
+        "mc_rejection_fraction": 0.0236,
+        "mc_interval95": [
+          0.0195723808309045,
+          0.028196142524949702
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.012188146591147144,
+        "mc_rejection_fraction": 0.01,
+        "mc_interval95": [
+          0.007431046999410096,
+          0.013162738260201262
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.5913977065545463,
+        "mc_rejection_fraction": 0.5856,
+        "mc_interval95": [
+          0.5717988658675014,
+          0.5993011024342082
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.4601778143172837,
+        "mc_rejection_fraction": 0.4594,
+        "mc_interval95": [
+          0.44551383582571885,
+          0.4733336039070274
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 1.5,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.6979862383471334,
+          "independent_expectation": 0.6191028283114766,
+          "mc_mean": 0.69758,
+          "mc_standard_error": 0.0019942570563024377,
+          "oracle_standardized_error": -0.20370410416728796,
+          "independent_bias": -0.0788834100356568
+        },
+        "any2spe": {
+          "oracle_expectation": 0.3533178480677665,
+          "independent_expectation": 0.3129913096797424,
+          "mc_mean": 0.35091,
+          "mc_standard_error": 0.0016671381204012832,
+          "oracle_standardized_error": -1.4443002882010347,
+          "independent_bias": -0.04032653838802408
+        },
+        "spe2any": {
+          "oracle_expectation": 0.6979862383471334,
+          "independent_expectation": 0.6191028283114766,
+          "mc_mean": 0.69758,
+          "mc_standard_error": 0.0019942570563024377,
+          "oracle_standardized_error": -0.20370410416728796,
+          "independent_bias": -0.0788834100356568
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.3533178480677665,
+          "independent_expectation": 0.3129913096797424,
+          "mc_mean": 0.35091,
+          "mc_standard_error": 0.0016671381204012832,
+          "oracle_standardized_error": -1.4443002882010347,
+          "independent_bias": -0.04032653838802408
+        },
+        "any2dif": {
+          "oracle_expectation": 0.34466839027936685,
+          "independent_expectation": 0.3061115186317341,
+          "mc_mean": 0.34667,
+          "mc_standard_error": 0.0016497049209671596,
+          "oracle_standardized_error": 1.2133137842976525,
+          "independent_bias": -0.03855687164763277
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.34466839027936685,
+          "independent_expectation": 0.3061115186317341,
+          "mc_mean": 0.34667,
+          "mc_standard_error": 0.0016497049209671596,
+          "oracle_standardized_error": 1.2133137842976525,
+          "independent_bias": -0.03855687164763277
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.03650192321532766,
+        "mc_rejection_fraction": 0.0324,
+        "mc_interval95": [
+          0.02766687244186072,
+          0.03768878122746108
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.07861555833613343,
+        "mc_rejection_fraction": 0.0778,
+        "mc_interval95": [
+          0.07052365114916473,
+          0.08557366632575682
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.5992943714552521,
+        "mc_rejection_fraction": 0.6002,
+        "mc_interval95": [
+          0.5864668247052366,
+          0.6138160758153717
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.722483985885597,
+        "mc_rejection_fraction": 0.7258,
+        "mc_interval95": [
+          0.7132052559590625,
+          0.7381306129128072
+        ]
+      }
+    },
+    {
+      "coupling": 0.8,
+      "duration": 1.5,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.6268746096345252,
+          "independent_expectation": 0.686090329198662,
+          "mc_mean": 0.62738,
+          "mc_standard_error": 0.002103280198612619,
+          "oracle_standardized_error": 0.24028675105113473,
+          "independent_bias": 0.05921571956413674
+        },
+        "any2spe": {
+          "oracle_expectation": 0.24653872813847538,
+          "independent_expectation": 0.27594117018978737,
+          "mc_mean": 0.24715,
+          "mc_standard_error": 0.001470880827906904,
+          "oracle_standardized_error": 0.4155821803690782,
+          "independent_bias": 0.029402442051311983
+        },
+        "spe2any": {
+          "oracle_expectation": 0.3973567202436229,
+          "independent_expectation": 0.43916378204247936,
+          "mc_mean": 0.3972,
+          "mc_standard_error": 0.0015473672942955187,
+          "oracle_standardized_error": -0.10128186384749065,
+          "independent_bias": 0.04180706179885646
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.1981144425020097,
+          "independent_expectation": 0.21961334518982545,
+          "mc_mean": 0.19872,
+          "mc_standard_error": 0.0012618714432125768,
+          "oracle_standardized_error": 0.47988842385450614,
+          "independent_bias": 0.021498902687815735
+        },
+        "any2dif": {
+          "oracle_expectation": 0.3803358814960499,
+          "independent_expectation": 0.41014915900887483,
+          "mc_mean": 0.38023,
+          "mc_standard_error": 0.0017727895810921801,
+          "oracle_standardized_error": -0.059725924147560845,
+          "independent_bias": 0.02981327751282492
+        },
+        "dif2any": {
+          "oracle_expectation": 0.22951788939090237,
+          "independent_expectation": 0.24692654715618287,
+          "mc_mean": 0.23018,
+          "mc_standard_error": 0.0013311609203601035,
+          "oracle_standardized_error": 0.49739336467187895,
+          "independent_bias": 0.0174086577652805
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.04842428563646568,
+          "independent_expectation": 0.05632782499996188,
+          "mc_mean": 0.04843,
+          "mc_standard_error": 0.0006788593075885422,
+          "oracle_standardized_error": 0.00841759620946544,
+          "independent_bias": 0.0079035393634962
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.19924227774161307,
+          "independent_expectation": 0.21955043685265382,
+          "mc_mean": 0.19848,
+          "mc_standard_error": 0.0012612980633966134,
+          "oracle_standardized_error": -0.6043597177659227,
+          "independent_bias": 0.020308159111040752
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.18109360375443667,
+          "independent_expectation": 0.19059872215622095,
+          "mc_mean": 0.18175,
+          "mc_standard_error": 0.0012195016387206983,
+          "oracle_standardized_error": 0.5382495805843335,
+          "independent_bias": 0.00950511840178428
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.020911568880169124,
+        "mc_rejection_fraction": 0.0204,
+        "mc_interval95": [
+          0.016663614659086105,
+          0.024709979407044343
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.020911568880169124,
+        "mc_rejection_fraction": 0.0204,
+        "mc_interval95": [
+          0.016663614659086105,
+          0.024709979407044343
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.7218008608053847,
+        "mc_rejection_fraction": 0.7228,
+        "mc_interval95": [
+          0.7101652987903385,
+          0.7351740885765944
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.7218008608053847,
+        "mc_rejection_fraction": 0.7228,
+        "mc_interval95": [
+          0.7101652987903385,
+          0.7351740885765944
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 0.1,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.00408657605520821,
+          "independent_expectation": 0.012220414650516128,
+          "mc_mean": 0.00415,
+          "mc_standard_error": 0.00020622366566910508,
+          "oracle_standardized_error": 0.30754930374264805,
+          "independent_bias": 0.008133838595307918
+        },
+        "any2spe": {
+          "oracle_expectation": 0.0020464926136203507,
+          "independent_expectation": 0.006114650746911077,
+          "mc_mean": 0.00206,
+          "mc_standard_error": 0.00014476799914945213,
+          "oracle_standardized_error": 0.0933036752528785,
+          "independent_bias": 0.004068158133290726
+        },
+        "spe2any": {
+          "oracle_expectation": 0.00408657605520821,
+          "independent_expectation": 0.012220414650516128,
+          "mc_mean": 0.00415,
+          "mc_standard_error": 0.00020622366566910508,
+          "oracle_standardized_error": 0.30754930374264805,
+          "independent_bias": 0.008133838595307918
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.0020464926136203507,
+          "independent_expectation": 0.006114650746911077,
+          "mc_mean": 0.00206,
+          "mc_standard_error": 0.00014476799914945213,
+          "oracle_standardized_error": 0.0933036752528785,
+          "independent_bias": 0.004068158133290726
+        },
+        "any2dif": {
+          "oracle_expectation": 0.002040083441587859,
+          "independent_expectation": 0.006105763903605047,
+          "mc_mean": 0.00209,
+          "mc_standard_error": 0.0001444178921230872,
+          "oracle_standardized_error": 0.3456397104148081,
+          "independent_bias": 0.004065680462017188
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.002040083441587859,
+          "independent_expectation": 0.006105763903605047,
+          "mc_mean": 0.00209,
+          "mc_standard_error": 0.0001444178921230872,
+          "oracle_standardized_error": 0.3456397104148081,
+          "independent_bias": 0.004065680462017188
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.039960919430369474,
+        "mc_rejection_fraction": 0.0406,
+        "mc_interval95": [
+          0.035299284661780506,
+          0.04644518109611329
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.0009522380163056277,
+        "mc_rejection_fraction": 0.0006,
+        "mc_interval95": [
+          0.00012375152046931293,
+          0.0017524436033960471
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.06876112886937924,
+        "mc_rejection_fraction": 0.0692,
+        "mc_interval95": [
+          0.06231841851777094,
+          0.07658951475585256
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.00298021565682927,
+        "mc_rejection_fraction": 0.0034,
+        "mc_interval95": [
+          0.0019818344214052553,
+          0.005438165974488262
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 0.1,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.03400402569448553,
+          "independent_expectation": 0.009123651759750951,
+          "mc_mean": 0.03355,
+          "mc_standard_error": 0.0005706550897629099,
+          "oracle_standardized_error": -0.7956219135347806,
+          "independent_bias": -0.02488037393473458
+        },
+        "any2spe": {
+          "oracle_expectation": 0.01913320160285904,
+          "independent_expectation": 0.004578456491442006,
+          "mc_mean": 0.01904,
+          "mc_standard_error": 0.0004321766441705494,
+          "oracle_standardized_error": -0.21565626952820255,
+          "independent_bias": -0.014554745111417033
+        },
+        "spe2any": {
+          "oracle_expectation": 0.03400402569448553,
+          "independent_expectation": 0.009123651759750951,
+          "mc_mean": 0.03355,
+          "mc_standard_error": 0.0005706550897629099,
+          "oracle_standardized_error": -0.7956219135347806,
+          "independent_bias": -0.02488037393473458
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.01913320160285904,
+          "independent_expectation": 0.004578456491442006,
+          "mc_mean": 0.01904,
+          "mc_standard_error": 0.0004321766441705494,
+          "oracle_standardized_error": -0.21565626952820255,
+          "independent_bias": -0.014554745111417033
+        },
+        "any2dif": {
+          "oracle_expectation": 0.014870824091626482,
+          "independent_expectation": 0.004545195268308944,
+          "mc_mean": 0.01451,
+          "mc_standard_error": 0.0003786766865814815,
+          "oracle_standardized_error": -0.9528553101164878,
+          "independent_bias": -0.010325628823317539
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.014870824091626482,
+          "independent_expectation": 0.004545195268308944,
+          "mc_mean": 0.01451,
+          "mc_standard_error": 0.0003786766865814815,
+          "oracle_standardized_error": -0.9528553101164878,
+          "independent_bias": -0.010325628823317539
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.006346146447577076,
+        "mc_rejection_fraction": 0.0056,
+        "mc_interval95": [
+          0.0037242892661563365,
+          0.008083463298635135
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.0555662478239337,
+        "mc_rejection_fraction": 0.0558,
+        "mc_interval95": [
+          0.0495986057787252,
+          0.06252613335718017
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.012569766324495083,
+        "mc_rejection_fraction": 0.0118,
+        "mc_interval95": [
+          0.008994508277584447,
+          0.015195059023066242
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.0850112046381627,
+        "mc_rejection_fraction": 0.0842,
+        "mc_interval95": [
+          0.07664745781023828,
+          0.09224202122397668
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 0.1,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.1,
+        0.13
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.012644654727822448,
+          "independent_expectation": 0.011669063260995333,
+          "mc_mean": 0.01263,
+          "mc_standard_error": 0.00035426838140153094,
+          "oracle_standardized_error": -0.041366174888290995,
+          "independent_bias": -0.0009755914668271148
+        },
+        "any2spe": {
+          "oracle_expectation": 0.005271747378705071,
+          "independent_expectation": 0.00516743143775771,
+          "mc_mean": 0.0051,
+          "mc_standard_error": 0.00022569982145339426,
+          "oracle_standardized_error": -0.7609548718253439,
+          "independent_bias": -0.00010431594094736062
+        },
+        "spe2any": {
+          "oracle_expectation": 0.009826510865526094,
+          "independent_expectation": 0.009081968415841997,
+          "mc_mean": 0.00969,
+          "mc_standard_error": 0.00030977733716330217,
+          "oracle_standardized_error": -0.44067415252565706,
+          "independent_bias": -0.0007445424496840963
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.004866213397029079,
+          "independent_expectation": 0.004541558510827814,
+          "mc_mean": 0.00466,
+          "mc_standard_error": 0.0002153678430803408,
+          "oracle_standardized_error": -0.9574939047523138,
+          "independent_bias": -0.0003246548862012649
+        },
+        "any2dif": {
+          "oracle_expectation": 0.00737290734911738,
+          "independent_expectation": 0.006501631823237624,
+          "mc_mean": 0.00753,
+          "mc_standard_error": 0.0002737402789824752,
+          "oracle_standardized_error": 0.5738748110674555,
+          "independent_bias": -0.0008712755258797559
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0028181438622963575,
+          "independent_expectation": 0.0025870948451533365,
+          "mc_mean": 0.00294,
+          "mc_standard_error": 0.00017121290003551534,
+          "oracle_standardized_error": 0.7117228764793149,
+          "independent_bias": -0.00023104901714302104
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0004055339816759905,
+          "independent_expectation": 0.000625872926929897,
+          "mc_mean": 0.00044,
+          "mc_standard_error": 6.6318232644423e-05,
+          "oracle_standardized_error": 0.5197065263907918,
+          "independent_bias": 0.00022033894525390644
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.004960297468497013,
+          "independent_expectation": 0.004540409905014184,
+          "mc_mean": 0.00503,
+          "mc_standard_error": 0.00022371296671162076,
+          "oracle_standardized_error": 0.31157126262081064,
+          "independent_bias": -0.00041988756348282884
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0024126098806203674,
+          "independent_expectation": 0.0019612219182234395,
+          "mc_mean": 0.0025,
+          "mc_standard_error": 0.00015791690656004434,
+          "oracle_standardized_error": 0.5533930551407077,
+          "independent_bias": -0.0004513879623969279
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.005091690982576331,
+        "mc_rejection_fraction": 0.0054,
+        "mc_interval95": [
+          0.003561560255752041,
+          0.007847061189558966
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.005091690982576331,
+        "mc_rejection_fraction": 0.0054,
+        "mc_interval95": [
+          0.003561560255752041,
+          0.007847061189558966
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.012075967708459874,
+        "mc_rejection_fraction": 0.011,
+        "mc_interval95": [
+          0.008297157409989703,
+          0.01429422166899065
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.012075967708459874,
+        "mc_rejection_fraction": 0.011,
+        "mc_interval95": [
+          0.008297157409989703,
+          0.01429422166899065
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 0.5,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.07917175591260547,
+          "independent_expectation": 0.19063491833924073,
+          "mc_mean": 0.07902,
+          "mc_standard_error": 0.0009426384681694338,
+          "oracle_standardized_error": -0.1609905788166812,
+          "independent_bias": 0.11146316242663526
+        },
+        "any2spe": {
+          "oracle_expectation": 0.03966773767745236,
+          "independent_expectation": 0.09542116650163937,
+          "mc_mean": 0.0394,
+          "mc_standard_error": 0.0006594548876211988,
+          "oracle_standardized_error": -0.405998473099732,
+          "independent_bias": 0.05575342882418701
+        },
+        "spe2any": {
+          "oracle_expectation": 0.07917175591260547,
+          "independent_expectation": 0.19063491833924073,
+          "mc_mean": 0.07902,
+          "mc_standard_error": 0.0009426384681694338,
+          "oracle_standardized_error": -0.1609905788166812,
+          "independent_bias": 0.11146316242663526
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.03966773767745236,
+          "independent_expectation": 0.09542116650163937,
+          "mc_mean": 0.0394,
+          "mc_standard_error": 0.0006594548876211988,
+          "oracle_standardized_error": -0.405998473099732,
+          "independent_bias": 0.05575342882418701
+        },
+        "any2dif": {
+          "oracle_expectation": 0.03950401823515314,
+          "independent_expectation": 0.09521375183760136,
+          "mc_mean": 0.03962,
+          "mc_standard_error": 0.0006555202918815943,
+          "oracle_standardized_error": 0.176930853679523,
+          "independent_bias": 0.05570973360244822
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.03950401823515314,
+          "independent_expectation": 0.09521375183760136,
+          "mc_mean": 0.03962,
+          "mc_standard_error": 0.0006555202918815943,
+          "oracle_standardized_error": 0.176930853679523,
+          "independent_bias": 0.05570973360244822
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.012092194486902616,
+        "mc_rejection_fraction": 0.0104,
+        "mc_interval95": [
+          0.007776698667748369,
+          0.013616103196664241
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.0023017178212536345,
+        "mc_rejection_fraction": 0.002,
+        "mc_interval95": [
+          0.0009594813177485526,
+          0.0036749854808603728
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.09748791741610133,
+        "mc_rejection_fraction": 0.1036,
+        "mc_interval95": [
+          0.09528639034295677,
+          0.11237955908813488
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.03447331974940267,
+        "mc_rejection_fraction": 0.0336,
+        "mc_interval95": [
+          0.02877919797335984,
+          0.038974781946904756
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 0.5,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.35440321984801326,
+          "independent_expectation": 0.14827798412025373,
+          "mc_mean": 0.3536,
+          "mc_standard_error": 0.0015843912089364258,
+          "oracle_standardized_error": -0.5069580312506432,
+          "independent_bias": -0.20612523572775954
+        },
+        "any2spe": {
+          "oracle_expectation": 0.19630591356911695,
+          "independent_expectation": 0.07452116057951287,
+          "mc_mean": 0.19613,
+          "mc_standard_error": 0.0012825937320394226,
+          "oracle_standardized_error": -0.1371545523127044,
+          "independent_bias": -0.12178475298960408
+        },
+        "spe2any": {
+          "oracle_expectation": 0.35440321984801326,
+          "independent_expectation": 0.14827798412025373,
+          "mc_mean": 0.3536,
+          "mc_standard_error": 0.0015843912089364258,
+          "oracle_standardized_error": -0.5069580312506432,
+          "independent_bias": -0.20612523572775954
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.19630591356911695,
+          "independent_expectation": 0.07452116057951287,
+          "mc_mean": 0.19613,
+          "mc_standard_error": 0.0012825937320394226,
+          "oracle_standardized_error": -0.1371545523127044,
+          "independent_bias": -0.12178475298960408
+        },
+        "any2dif": {
+          "oracle_expectation": 0.15809730627889637,
+          "independent_expectation": 0.07375682354074084,
+          "mc_mean": 0.15747,
+          "mc_standard_error": 0.0011721543117087035,
+          "oracle_standardized_error": -0.535173801461276,
+          "independent_bias": -0.08434048273815553
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.15809730627889637,
+          "independent_expectation": 0.07375682354074084,
+          "mc_mean": 0.15747,
+          "mc_standard_error": 0.0011721543117087035,
+          "oracle_standardized_error": -0.535173801461276,
+          "independent_bias": -0.08434048273815553
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.032434933782168704,
+        "mc_rejection_fraction": 0.0332,
+        "mc_interval95": [
+          0.028408228636067064,
+          0.0385463075577792
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.3547130761327605,
+        "mc_rejection_fraction": 0.3518,
+        "mc_interval95": [
+          0.3385534480580825,
+          0.3652197898818165
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.12954476439259455,
+        "mc_rejection_fraction": 0.1344,
+        "mc_interval95": [
+          0.1250613350367454,
+          0.14416771142799223
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.5849163855306158,
+        "mc_rejection_fraction": 0.5836,
+        "mc_interval95": [
+          0.5697905225602019,
+          0.5973117835802502
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 0.5,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        0.5,
+        0.65
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.16816883562860188,
+          "independent_expectation": 0.18112817879136475,
+          "mc_mean": 0.16949,
+          "mc_standard_error": 0.0012652459869424897,
+          "oracle_standardized_error": 1.0441956623713617,
+          "independent_bias": 0.01295934316276287
+        },
+        "any2spe": {
+          "oracle_expectation": 0.06774483351803885,
+          "independent_expectation": 0.07830039803130742,
+          "mc_mean": 0.06707,
+          "mc_standard_error": 0.0008111243617518229,
+          "oracle_standardized_error": -0.8319729376410029,
+          "independent_bias": 0.01055556451326857
+        },
+        "spe2any": {
+          "oracle_expectation": 0.12152135316377069,
+          "independent_expectation": 0.13371981023292198,
+          "mc_mean": 0.12141,
+          "mc_standard_error": 0.0010328149815276018,
+          "oracle_standardized_error": -0.10781520965738446,
+          "independent_bias": 0.012198457069151292
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.06018617674234538,
+          "independent_expectation": 0.06687236533440119,
+          "mc_mean": 0.05924,
+          "mc_standard_error": 0.0007465331855436643,
+          "oracle_standardized_error": -1.267427571429828,
+          "independent_bias": 0.00668618859205581
+        },
+        "any2dif": {
+          "oracle_expectation": 0.10042400211056303,
+          "independent_expectation": 0.10282778076005737,
+          "mc_mean": 0.10242,
+          "mc_standard_error": 0.0010018540178662412,
+          "oracle_standardized_error": 1.9923041219997943,
+          "independent_bias": 0.0024037786494943425
+        },
+        "dif2any": {
+          "oracle_expectation": 0.04664748246483116,
+          "independent_expectation": 0.04740836855844278,
+          "mc_mean": 0.04808,
+          "mc_standard_error": 0.0006765262100444659,
+          "oracle_standardized_error": 2.1174605120985426,
+          "independent_bias": 0.0007608860936116207
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.007558656775693487,
+          "independent_expectation": 0.011428032696906194,
+          "mc_mean": 0.00783,
+          "mc_standard_error": 0.0002787251116725559,
+          "oracle_standardized_error": 0.9735155281784756,
+          "independent_bias": 0.0038693759212127064
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.0613351764214254,
+          "independent_expectation": 0.06684744489852082,
+          "mc_mean": 0.06217,
+          "mc_standard_error": 0.0007635802129098261,
+          "oracle_standardized_error": 1.0933017441524386,
+          "independent_bias": 0.0055122684770954194
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.039088825689137664,
+          "independent_expectation": 0.03598033586153659,
+          "mc_mean": 0.04025,
+          "mc_standard_error": 0.0006215329742116506,
+          "oracle_standardized_error": 1.8682424892020646,
+          "independent_bias": -0.003108489827601077
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.04715168063770411,
+        "mc_rejection_fraction": 0.0422,
+        "mc_interval95": [
+          0.03679624393839119,
+          0.048146095263231055
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.011653589316688409,
+        "mc_rejection_fraction": 0.0088,
+        "mc_interval95": [
+          0.006401167219498249,
+          0.011795768950453579
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.24573478051033767,
+        "mc_rejection_fraction": 0.2488,
+        "mc_interval95": [
+          0.2368663900708877,
+          0.2610275514957403
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.11430128151469686,
+        "mc_rejection_fraction": 0.11,
+        "mc_interval95": [
+          0.10145682902445365,
+          0.11900141534833734
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 1.5,
+      "background": "same_stable",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.3915051910448775,
+          "independent_expectation": 0.6512330111217614,
+          "mc_mean": 0.39131,
+          "mc_standard_error": 0.002116957641072806,
+          "oracle_standardized_error": -0.09220356661393236,
+          "independent_bias": 0.25972782007688383
+        },
+        "any2spe": {
+          "oracle_expectation": 0.19625020775975832,
+          "independent_expectation": 0.32630214793468953,
+          "mc_mean": 0.19545,
+          "mc_standard_error": 0.0015144358389047393,
+          "oracle_standardized_error": -0.5283867029566801,
+          "independent_bias": 0.1300519401749312
+        },
+        "spe2any": {
+          "oracle_expectation": 0.3915051910448775,
+          "independent_expectation": 0.6512330111217614,
+          "mc_mean": 0.39131,
+          "mc_standard_error": 0.002116957641072806,
+          "oracle_standardized_error": -0.09220356661393236,
+          "independent_bias": 0.25972782007688383
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.19625020775975832,
+          "independent_expectation": 0.32630214793468953,
+          "mc_mean": 0.19545,
+          "mc_standard_error": 0.0015144358389047393,
+          "oracle_standardized_error": -0.5283867029566801,
+          "independent_bias": 0.1300519401749312
+        },
+        "any2dif": {
+          "oracle_expectation": 0.19525498328511917,
+          "independent_expectation": 0.3249308631870719,
+          "mc_mean": 0.19586,
+          "mc_standard_error": 0.0015126174282067628,
+          "oracle_standardized_error": 0.3999799973203363,
+          "independent_bias": 0.12967587990195276
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.19525498328511917,
+          "independent_expectation": 0.3249308631870719,
+          "mc_mean": 0.19586,
+          "mc_standard_error": 0.0015126174282067628,
+          "oracle_standardized_error": 0.3999799973203363,
+          "independent_bias": 0.12967587990195276
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.02729331344858678,
+        "mc_rejection_fraction": 0.0324,
+        "mc_interval95": [
+          0.02766687244186072,
+          0.03768878122746108
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.0016017030969718092,
+        "mc_rejection_fraction": 0.0018,
+        "mc_interval95": [
+          0.0008233945861213902,
+          0.0034141984926102102
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.5236691878777512,
+        "mc_rejection_fraction": 0.5274,
+        "mc_interval95": [
+          0.5134491811057279,
+          0.5413188034615672
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.18939255977278568,
+        "mc_rejection_fraction": 0.1842,
+        "mc_interval95": [
+          0.17354189578125548,
+          0.19522809915919428
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 1.5,
+      "background": "same_mismatched",
+      "parents": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.7186381559601819,
+          "independent_expectation": 0.5409219126296921,
+          "mc_mean": 0.7181,
+          "mc_standard_error": 0.0018664829861499877,
+          "oracle_standardized_error": -0.2883262071903361,
+          "independent_bias": -0.17771624333048974
+        },
+        "any2spe": {
+          "oracle_expectation": 0.37388850865457246,
+          "independent_expectation": 0.27264471698214937,
+          "mc_mean": 0.37424,
+          "mc_standard_error": 0.0016943650529709729,
+          "oracle_standardized_error": 0.2074472350637998,
+          "independent_bias": -0.10124379167242309
+        },
+        "spe2any": {
+          "oracle_expectation": 0.7186381559601819,
+          "independent_expectation": 0.5409219126296921,
+          "mc_mean": 0.7181,
+          "mc_standard_error": 0.0018664829861499877,
+          "oracle_standardized_error": -0.2883262071903361,
+          "independent_bias": -0.17771624333048974
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.37388850865457246,
+          "independent_expectation": 0.27264471698214937,
+          "mc_mean": 0.37424,
+          "mc_standard_error": 0.0016943650529709729,
+          "oracle_standardized_error": 0.2074472350637998,
+          "independent_bias": -0.10124379167242309
+        },
+        "any2dif": {
+          "oracle_expectation": 0.34474964730560936,
+          "independent_expectation": 0.2682771956475427,
+          "mc_mean": 0.34386,
+          "mc_standard_error": 0.001605686391014093,
+          "oracle_standardized_error": -0.5540604383197741,
+          "independent_bias": -0.07647245165806665
+        },
+        "dif2any": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.34474964730560936,
+          "independent_expectation": 0.2682771956475427,
+          "mc_mean": 0.34386,
+          "mc_standard_error": 0.001605686391014093,
+          "oracle_standardized_error": -0.5540604383197741,
+          "independent_bias": -0.07647245165806665
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.0,
+          "independent_expectation": 0.0,
+          "mc_mean": 0.0,
+          "mc_standard_error": 0.0,
+          "oracle_standardized_error": 0.0,
+          "independent_bias": 0.0
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.022624712068671147,
+        "mc_rejection_fraction": 0.0208,
+        "mc_interval95": [
+          0.017025942580708022,
+          0.02514700115313986
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.19584625865682048,
+        "mc_rejection_fraction": 0.1938,
+        "mc_interval95": [
+          0.18292495280013996,
+          0.20503371111195107
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.41716380989320234,
+        "mc_rejection_fraction": 0.4246,
+        "mc_interval95": [
+          0.410846836788627,
+          0.43844127241314795
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.769361347620714,
+        "mc_rejection_fraction": 0.7778,
+        "mc_interval95": [
+          0.7660164816687608,
+          0.7892583100554029
+        ]
+      }
+    },
+    {
+      "coupling": 1.6,
+      "duration": 1.5,
+      "background": "different_parents",
+      "parents": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "branch_lengths": [
+        1.5,
+        1.9500000000000002
+      ],
+      "categories": {
+        "any2any": {
+          "oracle_expectation": 0.508686289761141,
+          "independent_expectation": 0.6138424636266422,
+          "mc_mean": 0.50825,
+          "mc_standard_error": 0.0020300641828784297,
+          "oracle_standardized_error": -0.21491426961804608,
+          "independent_bias": 0.10515617386550113
+        },
+        "any2spe": {
+          "oracle_expectation": 0.19800588290110716,
+          "independent_expectation": 0.25174261737111253,
+          "mc_mean": 0.19792,
+          "mc_standard_error": 0.0013871899577778775,
+          "oracle_standardized_error": -0.0619114207290813,
+          "independent_bias": 0.053736734470005376
+        },
+        "spe2any": {
+          "oracle_expectation": 0.3216214369487467,
+          "independent_expectation": 0.40211593568494697,
+          "mc_mean": 0.32171,
+          "mc_standard_error": 0.0014772097279959285,
+          "oracle_standardized_error": 0.059952929888615634,
+          "independent_bias": 0.08049449873620029
+        },
+        "spe2spe": {
+          "oracle_expectation": 0.1602686205586915,
+          "independent_expectation": 0.20112144193985165,
+          "mc_mean": 0.16059,
+          "mc_standard_error": 0.0011610434958346703,
+          "oracle_standardized_error": 0.27680224079586413,
+          "independent_bias": 0.04085282138116014
+        },
+        "any2dif": {
+          "oracle_expectation": 0.31068040686003406,
+          "independent_expectation": 0.3620998462555297,
+          "mc_mean": 0.31033,
+          "mc_standard_error": 0.0016736430090700998,
+          "oracle_standardized_error": -0.2093677433808064,
+          "independent_bias": 0.05141943939549565
+        },
+        "dif2any": {
+          "oracle_expectation": 0.1870648528123945,
+          "independent_expectation": 0.21172652794169528,
+          "mc_mean": 0.18654,
+          "mc_standard_error": 0.0012318455497482565,
+          "oracle_standardized_error": -0.42607030767918735,
+          "independent_bias": 0.024661675129300786
+        },
+        "dif2spe": {
+          "oracle_expectation": 0.03773726234241563,
+          "independent_expectation": 0.05062117543126091,
+          "mc_mean": 0.03733,
+          "mc_standard_error": 0.0005994733561077146,
+          "oracle_standardized_error": -0.6793668780542956,
+          "independent_bias": 0.012883913088845282
+        },
+        "spe2dif": {
+          "oracle_expectation": 0.16135281639005522,
+          "independent_expectation": 0.20099449374509523,
+          "mc_mean": 0.16112,
+          "mc_standard_error": 0.0011625906296584888,
+          "oracle_standardized_error": -0.20025655128804626,
+          "independent_bias": 0.03964167735504001
+        },
+        "dif2dif": {
+          "oracle_expectation": 0.14932759046997887,
+          "independent_expectation": 0.16110535251043434,
+          "mc_mean": 0.14921,
+          "mc_standard_error": 0.0011267104569340507,
+          "oracle_standardized_error": -0.10436618321520115,
+          "independent_bias": 0.01177776204045547
+        }
+      },
+      "oracle_null": {
+        "exact_rejection_probability": 0.04691401085320123,
+        "mc_rejection_fraction": 0.0472,
+        "mc_interval95": [
+          0.04148782302921224,
+          0.053447958036191845
+        ]
+      },
+      "independent_null": {
+        "exact_rejection_probability": 0.006781294704252158,
+        "mc_rejection_fraction": 0.0066,
+        "mc_interval95": [
+          0.004547364184852601,
+          0.009256476822484032
+        ]
+      },
+      "oracle_alternative": {
+        "exact_rejection_probability": 0.7320766623070447,
+        "mc_rejection_fraction": 0.7366,
+        "mc_interval95": [
+          0.7241549656090296,
+          0.748768232655515
+        ]
+      },
+      "independent_alternative": {
+        "exact_rejection_probability": 0.48369276452090837,
+        "mc_rejection_fraction": 0.4834,
+        "mc_interval95": [
+          0.4694617082862667,
+          0.4973576877508428
+        ]
+      }
+    }
+  ]
+}

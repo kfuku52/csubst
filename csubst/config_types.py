@@ -20,6 +20,8 @@ class InputConfig(TypedDict, total=False):
     infile_type: str
     input_data_type: str
     genetic_code: int
+    epistasis_context_file: str
+    epistasis_context_source: str
     resource: str
     resource_cache_dir: str
     resource_lock_poll: float
@@ -62,6 +64,14 @@ class ModelConfig(TypedDict, total=False):
     asrv_concentration: float | None
     asrv_report: bool
     urn_wallenius_expectation: str
+    epistasis_cv_clades: int
+    epistasis_beta_partition: str
+    epistasis_branch_depth_bins: int
+    epistasis_beta_auto: bool
+    epistasis_beta_value: float
+    epistasis_clip_auto: bool
+    epistasis_clip_value: float
+    epistasis_joint_auto: bool
     ml_anc: bool
     codon_orders: np.ndarray
     amino_acid_orders: list[str]
@@ -90,6 +100,9 @@ class AnalysisState(TypedDict, total=False):
     df_cb_stats: pd.DataFrame
     df_cb_stats_main: pd.DataFrame
     fg_ids: dict[str, np.ndarray]
+    epistasis_enabled: bool
+    _epistasis_state: dict[str, Any]
+    _epistasis_provenance: dict[str, Any]
 
 
 class OutputSwitches(TypedDict, total=False):

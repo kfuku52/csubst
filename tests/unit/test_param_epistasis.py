@@ -29,6 +29,8 @@ def test_get_global_parameters_parses_epistasis_auto_and_apply_to_s():
     g = param.get_global_parameters(
         _args(
             epistasis_apply_to="S",
+            expectation_method="urn", asrv="sn",
+            epistasis_context_file="external.tsv", epistasis_context_source="independent experiment",
             epistasis_site_metric="proximity",
             epistasis_beta="auto",
             epistasis_clip="auto",
@@ -54,7 +56,7 @@ def test_get_global_parameters_parses_epistasis_auto_and_apply_to_s():
 
 
 def test_get_global_parameters_auto_promotes_site_metric_when_epistasis_is_active():
-    g = param.get_global_parameters(_args(epistasis_beta="0.5"))
+    g = param.get_global_parameters(_args(epistasis_beta="0.5", expectation_method="urn", asrv="sn", epistasis_context_file="external.tsv", epistasis_context_source="external"))
     assert g["epistasis_beta_auto"] is False
     assert g["epistasis_beta_value"] == pytest.approx(0.5)
     assert g["epistasis_site_metric"] == "auto"
@@ -139,3 +141,15 @@ def test_get_global_parameters_rejects_invalid_pseudocount_options(kwargs, expec
 def test_get_global_parameters_rejects_removed_pseudocount_strength_option():
     with pytest.raises(ValueError, match="pseudocount_strength"):
         param.get_global_parameters(_args(pseudocount_strength=2.0))
+
+
+@pytest.mark.parametrize('options,message', [
+    ({}, 'epistasis_context_file'),
+    ({'epistasis_context_file': 'ctx.tsv'}, 'epistasis_context_source'),
+    ({'epistasis_context_file': 'ctx.tsv', 'epistasis_context_source': 'external'}, 'asrv sn'),
+    ({'epistasis_context_file': 'ctx.tsv', 'epistasis_context_source': 'external', 'asrv': 'sn',
+      'calc_omega_pvalue': True}, 'joint null'),
+])
+def test_epistasis_rejects_unverified_contracts(options, message):
+    with pytest.raises(ValueError, match=message):
+        param.get_global_parameters(_args(epistasis_beta='auto', expectation_method='urn', **options))

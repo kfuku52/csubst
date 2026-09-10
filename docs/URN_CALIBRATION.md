@@ -38,8 +38,8 @@ csubst search --alignment_file alignment.fa --rooted_tree_file tree.nwk \
 Excluding foreground branches removes their direct contribution to the site
 mass profile. It does not make ancestral-state estimates independent: ASR
 still uses the complete alignment and tree. Custom training/concentration with active
-epistasis is currently rejected because its separate fitting still uses all
-branches and per-site alpha (review ID 3). This is a sensitivity analysis,
+structure weighting is rejected because it defines its own clade-specific
+training sets and per-site alpha. See [structure weighting](STRUCTURE_WEIGHTING.md). This is a sensitivity analysis,
 not a claim of independence or proof of calibration. A site-rate file fitted
 to the tested alignment is also data-dependent.
 
