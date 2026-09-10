@@ -1,5 +1,9 @@
 # Choosing a 3Di predictor
 
+For residue-level accuracy and uncertainty measurements, see the
+[scientific validation workflow](STRUCTURAL_VALIDATION.md). These measurements
+do not by themselves calibrate ancestral events or structural omegaC.
+
 `--nonsyn_recode 3di20` converts amino-acid sequences to the 20-state Foldseek
 3Di alphabet. Choose the predictor with `--sa_backend`:
 

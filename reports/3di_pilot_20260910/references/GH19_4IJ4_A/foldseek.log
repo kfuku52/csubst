@@ -1,0 +1,22 @@
+structureto3didescriptor reports/3di_pilot_20260910/references/GH19_4IJ4_A/reference.pdb reports/3di_pilot_20260910/references/GH19_4IJ4_A/descriptors --threads 1 
+
+MMseqs Version:             	941cd33ff0771cd2e3f144e3293e22a2b87e9fda
+Use GPU                     	0
+Path to ProstT5             	
+Chain name mode             	0
+Createdb extraction mode    	0
+Interface distance threshold	8
+Write mapping file          	0
+Mask b-factor threshold     	0
+Coord store mode            	2
+Write lookup file           	1
+Input format                	0
+File Inclusion Regex        	.*
+File Exclusion Regex        	^$
+Threads                     	1
+Verbosity                   	3
+
+Output file: reports/3di_pilot_20260910/references/GH19_4IJ4_A/descriptors
+[=================================================================] 1 0s 0ms
+Time for merging to descriptors: 0h 0m 0s 8ms
+Time for processing: 0h 0m 0s 26ms

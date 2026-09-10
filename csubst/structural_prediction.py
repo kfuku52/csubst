@@ -128,6 +128,15 @@ class EncoderPredictor:
     classifier: Any = None
 
     def predict_batch(self, sequences):
+        return self._predict_batch(sequences, return_logits=False)
+
+    def predict_logits_batch(self, sequences):
+        """Return residue-by-state logits in ``self.labels`` order, not posteriors."""
+        return self._predict_batch(sequences, return_logits=True)
+
+    def _predict_batch(self, sequences, return_logits):
+        if not sequences:
+            return []
         if self.backend == "prostt5-cnn":
             prompts = ["<AA2fold> " + " ".join(seq) for seq in sequences]
         else:
@@ -154,8 +163,11 @@ class EncoderPredictor:
                 logits = output.logits[index, 1:len(seq) + 1]
             if not self.torch.isfinite(logits).all():
                 raise ValueError("{} produced non-finite 3Di logits.".format(self.backend))
-            indices = logits.argmax(dim=-1).cpu().tolist()
-            predictions.append("".join(self.labels[i] for i in indices))
+            if return_logits:
+                predictions.append(logits.detach().float().cpu().numpy())
+            else:
+                indices = logits.argmax(dim=-1).cpu().tolist()
+                predictions.append("".join(self.labels[i] for i in indices))
         return predictions
 
 
@@ -281,3 +293,54 @@ def predict_3di(aa_sequences, g):
                 timeout_seconds=float(g.get("resource_lock_timeout", resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS)),
             )
     return {key: predictions[seq] if seq else "" for key, seq in sequences.items()}
+
+
+def predict_3di_records(aa_sequences, g):
+    """Retain uncalibrated encoder logits for scientific validation.
+
+    This opt-in API bypasses the character-only cache: a cached argmax cannot
+    recover a distribution. It does not change the hard-state ASR path. The
+    autoregressive ProstT5 backend returns explicitly hard-only records, never
+    fabricated one-hot probabilities. Persist records with structural_validation.
+    """
+    from csubst.structural_validation import PredictionRecord, STATE_ORDER
+
+    backend = normalize_backend(g.get("sa_backend", DEFAULT_SA_BACKEND))
+    sequences = {key: sa._sanitize_aa_sequence_for_prostt5(seq) for key, seq in aa_sequences.items()}
+    model_key = get_model_cache_key(g)
+    if backend == "prostt5":
+        predictions = predict_3di(aa_sequences, dict(g, prostt5_cache=False))
+        return {key: PredictionRecord(seq, predictions[key], backend, model_key)
+                for key, seq in sequences.items()}
+
+    unique = sorted(set(seq for seq in sequences.values() if seq), key=lambda seq: (-len(seq), seq))
+    records = {}
+    if unique:
+        predictor = load_encoder_predictor(g)
+        batch_limit = _batch_limit(g, predictor.device)
+        offset = 0
+        with predictor.torch.inference_mode():
+            while offset < len(unique):
+                count = min(batch_limit, max(1, 4096 // (len(unique[offset]) + 2)))
+                chunk = unique[offset:offset + count]
+                try:
+                    logits_batch = predictor.predict_logits_batch(chunk)
+                except RuntimeError as exc:
+                    if sa._is_prostt5_oom_error(exc) and len(chunk) > 1:
+                        batch_limit = max(1, len(chunk) // 2)
+                        sa._clear_torch_device_cache(predictor.torch, predictor.device)
+                        continue
+                    raise
+                if len(logits_batch) != len(chunk):
+                    raise ValueError("{} returned the wrong number of 3Di logit arrays.".format(backend))
+                for seq, logits in zip(chunk, logits_batch):
+                    records[seq] = PredictionRecord.from_logits(
+                        seq, logits, predictor.labels, backend, model_key,
+                    )
+                offset += len(chunk)
+    if any(not seq for seq in sequences.values()):
+        import numpy as np
+        records[""] = PredictionRecord.from_logits(
+            "", np.empty((0, 20)), STATE_ORDER, backend, model_key,
+        )
+    return {key: records[seq] for key, seq in sequences.items()}

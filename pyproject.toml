@@ -52,6 +52,7 @@ simulate = []
 test = ["pytest", "pytest-cov", "pytest-xdist"]
 dev = ["pytest", "pytest-cov", "pytest-xdist", "ruff", "mypy", "build", "twine"]
 structure = ["pymol-open-source>=3.2.0a0,<3.3"]
+structural-validation = ["gemmi"]
 vep = ["huggingface-hub", "sentencepiece", "torch>=2.0", "transformers"]
 3di = ["huggingface-hub", "sentencepiece", "protobuf", "torch>=2.6", "transformers", "peft"]
 

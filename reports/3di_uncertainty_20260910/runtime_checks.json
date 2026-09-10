@@ -1,0 +1,41 @@
+{
+  "torch": "2.14.0",
+  "scope": "functional_checkpoint_and_artifact_checks_only",
+  "checks": [
+    {
+      "backend": "esm3di-35m",
+      "model_key": "esm3di-35m-v1:cactuskid13/esm2small_3di@2227cb08ffa533bc1a7f2b968fd6316f287134d1:base@6fbf070e65b0b7291e7bbcd451118c216cff79d8",
+      "unique_nonempty_residues": 41,
+      "hard_prediction_parity": true,
+      "finite_logits": true,
+      "normalized_softmax": true,
+      "artifact_roundtrip_exact": true,
+      "max_probability": 0.9997018596366789,
+      "scientific_accuracy_measured": false
+    },
+    {
+      "backend": "prostt5-cnn",
+      "model_key": "prostt5-cnn-v1:Rostlab/ProstT5@d7d097d5bf9a993ab8f68488b4681d6ca70db9e5:cnn@d2cb4150884de095dac3de81b8fe7842ab1265de41dd5e8c9970879a71e62f3e",
+      "unique_nonempty_residues": 41,
+      "hard_prediction_parity": true,
+      "finite_logits": true,
+      "normalized_softmax": true,
+      "artifact_roundtrip_exact": true,
+      "max_probability": 0.9911563215803815,
+      "scientific_accuracy_measured": false
+    }
+  ],
+  "inputs": {
+    "short": "M",
+    "sequence": "MKWVTFISLLFLFSSAYSRGVFRRDTHKSEIAHRFKDLGE",
+    "same": "MKWVTFISLLFLFSSAYSRGVFRRDTHKSEIAHRFKDLGE",
+    "empty": ""
+  },
+  "python": "3.12.14",
+  "packages": {
+    "numpy": "2.5.3",
+    "torch": "2.14.0",
+    "transformers": "5.16.1",
+    "peft": "0.20.0"
+  }
+}

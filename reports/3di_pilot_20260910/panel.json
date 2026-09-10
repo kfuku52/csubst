@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "structures": [
+    {"id":"PGK_2X15_A","path":"PGK/2x15.cif","label_asym_id":"A","family":"PGK","group":"PGK","split":"test"},
+    {"id":"GH19_4IJ4_A","path":"GH19_chitinase_tiny/4ij4.cif","label_asym_id":"A","family":"GH19","group":"GH19","split":"test"},
+    {"id":"GH19_4MCK_A","path":"GH19_chitinase_tiny/4mck.cif","label_asym_id":"A","family":"GH19","group":"GH19","split":"test"},
+    {"id":"AGT_5G4I_A","path":"AGT2/5g4i.cif","label_asym_id":"A","family":"A1RDF1","group":"AGT2_directory","split":"test"},
+    {"id":"AGT_5G4J_A","path":"AGT2/5g4j.cif","label_asym_id":"A","family":"A1RDF1","group":"AGT2_directory","split":"test"}
+  ]
+}

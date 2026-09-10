@@ -1,0 +1,141 @@
+{
+  "scope": "descriptive_pilot_only",
+  "families": 3,
+  "sequences": 5,
+  "summaries": [
+    {
+      "backend": "esm3di-35m",
+      "q20": 0.40493186242699547,
+      "macro_family_q20": 0.4028257479769255,
+      "log_loss": 1.8548618819936762,
+      "multiclass_brier": 0.7304510754328454,
+      "descriptive_family_bootstrap_percentiles": [
+        0.3862275449101797,
+        0.41369863013698627
+      ],
+      "family_metrics": [
+        {
+          "family": "A1RDF1",
+          "scored_residues": 842,
+          "q20": 0.4085510688836105
+        },
+        {
+          "family": "GH19",
+          "scored_residues": 334,
+          "q20": 0.38622754491017963
+        },
+        {
+          "family": "PGK",
+          "scored_residues": 365,
+          "q20": 0.41369863013698627
+        }
+      ],
+      "error_given_previous_error": 0.6583427922814983,
+      "eligible_previous_errors": 881,
+      "longest_error_run": 15
+    },
+    {
+      "backend": "prostt5-cnn",
+      "q20": 0.6041531473069436,
+      "macro_family_q20": 0.6126224107929003,
+      "log_loss": 1.083417982705161,
+      "multiclass_brier": 0.5218381639024008,
+      "descriptive_family_bootstrap_percentiles": [
+        0.5866983372921615,
+        0.6347305389221557
+      ],
+      "family_metrics": [
+        {
+          "family": "A1RDF1",
+          "scored_residues": 842,
+          "q20": 0.5866983372921615
+        },
+        {
+          "family": "GH19",
+          "scored_residues": 334,
+          "q20": 0.6347305389221557
+        },
+        {
+          "family": "PGK",
+          "scored_residues": 365,
+          "q20": 0.6164383561643836
+        }
+      ],
+      "error_given_previous_error": 0.46324786324786327,
+      "eligible_previous_errors": 585,
+      "longest_error_run": 10
+    },
+    {
+      "backend": "prostt5",
+      "q20": 0.6469824789097989,
+      "macro_family_q20": 0.6148033156346987,
+      "log_loss": null,
+      "multiclass_brier": null,
+      "descriptive_family_bootstrap_percentiles": [
+        0.4101796407185628,
+        0.7287671232876712
+      ],
+      "family_metrics": [
+        {
+          "family": "A1RDF1",
+          "scored_residues": 842,
+          "q20": 0.7054631828978623
+        },
+        {
+          "family": "GH19",
+          "scored_residues": 334,
+          "q20": 0.41017964071856283
+        },
+        {
+          "family": "PGK",
+          "scored_residues": 365,
+          "q20": 0.7287671232876712
+        }
+      ],
+      "error_given_previous_error": 0.5257142857142857,
+      "eligible_previous_errors": 525,
+      "longest_error_run": 16
+    }
+  ],
+  "predictor_common_errors": [
+    {
+      "first": "esm3di-35m",
+      "second": "prostt5-cnn",
+      "residues": 1541,
+      "both_wrong": 0.3199221284879948,
+      "marginal_product": 0.23555584939619262
+    },
+    {
+      "first": "esm3di-35m",
+      "second": "prostt5",
+      "residues": 1541,
+      "both_wrong": 0.2537313432835821,
+      "marginal_product": 0.2100694788057849
+    },
+    {
+      "first": "prostt5-cnn",
+      "second": "prostt5",
+      "residues": 1541,
+      "both_wrong": 0.2381570408825438,
+      "marginal_product": 0.13974087466906082
+    }
+  ],
+  "same_sequence_structure_pairs": [
+    {
+      "first": "AGT_5G4I_A",
+      "second": "AGT_5G4J_A",
+      "identical_sequence": true,
+      "comparable_residues": 421,
+      "reference_disagreement": 0.09263657957244656
+    }
+  ],
+  "structural_omega_calibrated": false,
+  "bootstrap_seed": 9,
+  "bootstrap_repeats": 10000,
+  "limitations": [
+    "Few families: bootstrap percentiles are descriptive, not a population guarantee.",
+    "Training overlap is unknown; no calibrator was fitted.",
+    "Multiple structures of one sequence are correlated references.",
+    "Adjacent/common-error summaries are descriptive, not independence tests."
+  ]
+}
