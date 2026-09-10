@@ -116,3 +116,9 @@ likelihood on variable sites. It does not replace this downstream selection/null
 contract; full-site fitting here should not receive `+ASC` merely because a
 post-fit analysis filter is requested. See the
 [IQ-TREE model documentation](https://www.iqtree.org/doc/Substitution-Models#ascertainment-bias-correction).
+
+Site selection and `--site_filter_report yes` require full-tree state loading,
+even in foreground-only searches. Thus the audit's tip counts and zero-mass
+criterion include the same input branches whether or not branch tables are
+written. This can use more memory than a foreground-only run without selection
+or auditing.

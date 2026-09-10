@@ -145,3 +145,42 @@ def test_resolve_state_loading_disables_selective_mode_when_full_tree_outputs_re
     out = parser_misc.resolve_state_loading(g)
     assert out["is_state_selective_loading"] is False
     assert out["state_loaded_branch_ids"] is None
+
+
+@pytest.mark.parametrize('asrv', ['pool', 'sn', 'each', 'file_each'])
+@pytest.mark.parametrize('training', ['all', 'background', '1'])
+def test_empirical_asrv_loads_background_states_even_without_branch_outputs(asrv, training):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('((A:1,B:1)X:1,C:1)R;', format=1))
+    ids = {n.name: int(ete.get_prop(n, 'numerical_label')) for n in tr.traverse()}
+    g = dict(tree=tr, num_node=5, exhaustive_until=1, foreground='fg.tsv', cb=True,
+             target_ids={'trait': np.array([ids['A']])}, expectation_method='urn',
+             asrv=asrv, asrv_training_branches=training)
+    out = parser_misc.resolve_state_loading(g)
+    assert out['state_loaded_branch_ids'] is None
+    assert not out['is_state_selective_loading']
+
+
+@pytest.mark.parametrize('options', [
+    {'site_filter_report': True},
+    {'drop_invariant_tip_sites': True, 'drop_invariant_tip_sites_mode': 'tip_invariant'},
+    {'drop_invariant_tip_sites': True, 'drop_invariant_tip_sites_mode': 'zero_sub_mass'},
+])
+def test_site_audit_loads_all_tips_and_background_branches(options):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('((A:1,B:1)X:1,C:1)R;', format=1))
+    ids = {n.name: int(ete.get_prop(n, 'numerical_label')) for n in tr.traverse()}
+    g = dict(tree=tr, num_node=5, exhaustive_until=1, foreground='fg.tsv', cb=True,
+             target_ids={'trait': np.array([ids['A']])}, **options)
+    out = parser_misc.resolve_state_loading(g)
+    assert out['state_loaded_branch_ids'] is None
+    assert not out['is_state_selective_loading']
+
+
+@pytest.mark.parametrize('asrv', ['no', 'file'])
+def test_fixed_site_weights_keep_foreground_only_loading(asrv):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('((A:1,B:1)X:1,C:1)R;', format=1))
+    ids = {n.name: int(ete.get_prop(n, 'numerical_label')) for n in tr.traverse()}
+    g = dict(tree=tr, num_node=5, exhaustive_until=1, foreground='fg.tsv', cb=True,
+             target_ids={'trait': np.array([ids['A']])}, expectation_method='urn', asrv=asrv)
+    out = parser_misc.resolve_state_loading(g)
+    assert out['is_state_selective_loading']
+    assert ids['B'] not in out['state_loaded_branch_ids']

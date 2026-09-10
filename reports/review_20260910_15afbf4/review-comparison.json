@@ -1,0 +1,64 @@
+{
+  "selective": {
+    "training_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "S_training_mass": 0.0,
+    "cb": [
+      {
+        "branch_id_1": 0,
+        "branch_id_2": 7,
+        "ECNany2any": 6.3091,
+        "ECSany2any": 0.0394,
+        "omegaCany2spe": 1091.8701
+      }
+    ],
+    "tip_count_range": [
+      2,
+      2
+    ],
+    "sites": 100
+  },
+  "full": {
+    "training_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "S_training_mass": 64.4467068774,
+    "cb": [
+      {
+        "branch_id_1": 0,
+        "branch_id_2": 7,
+        "ECNany2any": 7.2153,
+        "ECSany2any": 0.047,
+        "omegaCany2spe": 1095.9118
+      }
+    ],
+    "tip_count_range": [
+      8,
+      8
+    ],
+    "sites": 100
+  }
+}

@@ -1,0 +1,114 @@
+CSUBST start: 2026-09-10 12:39:54.719201+00:00
+csubst search start: 2026-09-10 12:39:54.719632+00:00
+OS: Linux-6.12.76-linuxkit-aarch64-with-glibc2.39
+Python version: 3.12.14 (main, Sep  2 2026, 23:29:55) [GCC 15.3.0]
+CSUBST version: 1.15.1
+CSUBST dependency versions: ete4=4.4.0, requests=2.34.2, numpy=1.26.4, scipy=1.17.1, pandas=3.0.5, cython=3.3.0, matplotlib=3.10.9
+CSUBST missing dependency packages: none
+CSUBST command: /work/csubst/__main__.py search --alignment_file inputs/input.fa --rooted_tree_file inputs/tree.nwk --foreground inputs/foreground.tsv --iqtree_model GY+FQ --threads 1 --exhaustive_until 1 --site_filter_report yes --b yes --s no --bs no --cs no --cbs no --cb yes --outdir review-sites-full
+CSUBST working directory: /work
+CSUBST bug report: https://github.com/kfuku52/csubst/issues
+Reading and parsing input files.
+Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.
+IQ-TREE's inferred intermediate files and provenance manifest are compatible.
+The model in the IQ-TREE's output (GY+FQ) matched --iqtree_model (GY+FQ). Skipping IQ-TREE.
+Total branch length of --rooted_tree_file: 3.6000
+Total branch length of --iqtree_treefile: 3.7640
+
+Reading the state file: /work/csubst_iqtree/input.fa.4461f7ed6fc8e87b.state
+
+Instantaneous substitution rate matrix will be generated using the base model: GY+FQ
+Transition matrix will be generated using the model in the ancestral state reconstruction: GY+FQ
+Selective state loading disabled: full-tree outputs are enabled (b)
+Ancestral states were not estimated on the root node. Excluding sub-root nodes from the analysis.
+Generated packed sparse substitution tensor (Cython two-pass): shape=(15, 100, 1, 20, 20), density=0.044450 (26,670/600,000), storage=320,104 bytes, compression=15.0x
+Generated packed sparse substitution tensor (Cython two-pass): shape=(15, 100, 20, 6, 6), density=0.006781 (7,323/1,080,000), storage=87,940 bytes, compression=98.2x
+Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, rather than nucleotide-substitutions/codon-site.
+Total branch length before rescaling: 3.764 nucleotide substitutions / codon site
+Total S+N branch length after rescaling: 2.951 codon substitutions / codon site
+Total S branch length after rescaling: 0.796 codon substitutions / codon site
+Total N branch length after rescaling: 2.156 codon substitutions / codon site
+Synonymous substitutions / tree = 79.6
+Nonsynonymous substitutions / tree = 215.6
+Synonymous substitutions / branch = 5.7
+Nonsynonymous substitutions / branch = 15.4
+Synonymous substitutions / site = 0.8
+Nonsynonymous substitutions / site = 2.2
+Elapsed time: 0.0 sec
+
+Generating s table
+Time elapsed for merging tables: 0 sec
+Memory consumption of s table: 0.0 Mbytes (dtype=float64)
+Elapsed time: 0.0 sec
+
+Generating b table
+Time elapsed for merging tables: 0 sec
+Number of S_sub patterns among 15 branches=13, min=0.0, max=9.2
+Number of N_sub patterns among 15 branches=13, min=0.0, max=30.1
+Memory consumption of b table: 0.0 Mbytes (dtype=object)
+Elapsed time: 0.0 sec
+
+Arity (K) = 2: Generating cb table
+Arity (K) = 2: Targeted search of foreground branch combinations
+Number of all branches: 14
+Number of branch combinations before independency check for PLACEHOLDER: 1
+Number of branch combinations generated with global independence constraints: 1
+Number of non-independent foreground branch combinations to be non-foreground-marked for PLACEHOLDER: 0 / 1
+Time elapsed for generating branch combinations: 0 sec
+Number of independent branch combinations to be analyzed: 1
+Preparing OCS table with up to 1 process(es).
+cb reducer scheduler: combinations=1, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=1, branches=15, arity=2)
+Sparse cb projection product: stat=any2any, arity=2, shape=(15, 2000), nnz=1,802, density=0.060067, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=2, shape=(15, 12000), nnz=3,342, density=0.018567, backend=sparse_intersection
+Preparing OCN table with up to 1 process(es).
+cb reducer scheduler: combinations=1, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=1, branches=15, arity=2)
+Sparse cb projection product: stat=any2any, arity=2, shape=(15, 100), nnz=1,200, density=0.800000, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=2, shape=(15, 2000), nnz=3,836, density=0.127867, backend=sparse_intersection
+Time elapsed for merging tables: 0 sec
+Tensor-free expected reducer (mode=nsy): backend=eigen_reversible, branches=12, projections=any2any,any2spe
+Generated tensor-free expected projections: storage=302,528 bytes, total=479.113921
+Released peptide/nonsynonymous state storage (240,000 bytes).
+Number of total empirically expected nonsynonymous substitutions in the tree: 479.11
+Preparing the ECN table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(15, 100), nnz=1,200, density=0.800000, backend=projection_product (pair_coverage=0.010, threshold=0.250)
+Expected sparse reducer: stat=any2spe, shape=(15, 2000), nnz=24,000, density=0.800000, backend=projection_product (pair_coverage=0.010, threshold=0.250)
+Time elapsed for merging tables: 0 sec
+Released final-arity EN sparse projections (302,528 bytes).
+Tensor-free expected reducer (mode=cdn): backend=eigen_reversible, branches=12, projections=any2any,any2spe
+Generated tensor-free expected projections: storage=426,080 bytes, total=92.569857
+Released codon state storage (732,000 bytes).
+Number of total empirically expected synonymous substitutions in the tree: 92.57
+Preparing the ECS table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(15, 2000), nnz=8,718, density=0.290600, backend=projection_product (pair_coverage=0.010, threshold=0.250)
+Expected sparse reducer: stat=any2spe, shape=(15, 12000), nnz=26,778, density=0.148767, backend=projection_product (pair_coverage=0.010, threshold=0.149)
+Time elapsed for merging tables: 0 sec
+Released final-arity ES sparse projections (426,080 bytes).
+Writing fixed-model site-filter count report: /work/review-sites-full/csubst_site_filter_counts_2.tsv
+Arity = 2, cb: median omegaCany2any (non-corrected for dNc vs dSc distribution ranges): 0.286
+Arity = 2, cb: median omegaCany2dif (non-corrected for dNc vs dSc distribution ranges): 0.052
+Arity = 2, cb: median omegaCany2spe (non-corrected for dNc vs dSc distribution ranges): 2366.876
+Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no
+Branch-distance scheduler: combinations=1, workers=1 (threads=1, direct)
+Inter-branch distance: 0th in the id range 0-1: 0 sec
+Time elapsed for calculating inter-branch distances: 0 sec
+Time elapsed for the linear regression of C ~ D: 0 sec
+Arity (K) = 2: Foreground branch combinations with cutoff conditions OCNany2spe,2.0|omegaCany2spe,5.0 for PLACEHOLDER = 100% (1/1, total examined = 1, enrichment factor = 1.0)
+Time elapsed for obtaining foreground branch numbers in the cb table: 0 sec
+Time elapsed for sorting cb table: 0 sec
+Memory consumption of cb table: 0.0 Mbytes (dtype=object)
+Total OCNany2any/ECNany2any = 9.0/25.4 (expectation = 282.1% of observation)
+Total OCNany2dif/ECNany2dif = 2.1/23.3 (expectation = 1,100.1% of observation)
+Total OCNany2spe/ECNany2spe = 6.9/2.1 (expectation = 30.2% of observation)
+Total OCSany2any/ECSany2any = 0.8/0.6 (expectation = 80.8% of observation)
+Total OCSany2dif/ECSany2dif = 0.8/0.5 (expectation = 57.2% of observation)
+Total OCSany2spe/ECSany2spe = 0.0/0.2 (expectation = 71,488.5% of observation)
+Elapsed time for arity = 2: 0.0 sec
+
+Maximum arity (K = 2) reached. Ending higher-order search of branch combinations.
+Writing /work/review-sites-full/csubst_cb_stats.tsv
+csubst search: Time elapsed: 0 sec
+csubst search end: 2026-09-10 12:39:55.402497+00:00
+
+CSUBST end: 2026-09-10 12:39:55.402851+00:00, Elapsed time = 0.0 sec

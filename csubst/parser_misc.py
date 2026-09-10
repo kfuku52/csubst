@@ -621,6 +621,16 @@ def _can_use_selective_state_loading(g):
         return False, None
     if not bool(g.get('cb', False)):
         return False, '--cb is disabled.'
+    # Foreground counts alone are insufficient for empirical site weights:
+    # training (including background/explicit IDs and clade cross-fitting)
+    # consumes substitution states outside the foreground loading plan.
+    if (g.get('expectation_method', 'codon_model') == 'urn'
+            and g.get('asrv', 'each') in ('pool', 'sn', 'each', 'file_each')):
+        return False, 'empirical ASRV training requires full-tree states.'
+    # Selection also emits the site audit. Its tip counts and zero-mass mask
+    # must describe the input tree, independently of requested output tables.
+    if g.get('site_filter_report', False) or g.get('drop_invariant_tip_sites', False):
+        return False, 'site selection/auditing requires full-tree states.'
     blocking_outputs = [name for name in ['b', 's', 'bs', 'cs', 'cbs'] if bool(g.get(name, False))]
     if len(blocking_outputs) > 0:
         txt = 'full-tree outputs are enabled ({})'

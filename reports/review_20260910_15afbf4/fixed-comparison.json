@@ -1,0 +1,36 @@
+{
+  "training-selective": {
+    "S_training_mass": 64.4467068774,
+    "cb": [
+      {
+        "branch_id_1": 0,
+        "branch_id_2": 7,
+        "ECNany2any": 7.2153,
+        "ECSany2any": 0.047,
+        "omegaCany2spe": 1095.9118
+      }
+    ]
+  },
+  "sites-selective": {
+    "tip_counts": [
+      8
+    ]
+  },
+  "training-full": {
+    "S_training_mass": 64.4467068774,
+    "cb": [
+      {
+        "branch_id_1": 0,
+        "branch_id_2": 7,
+        "ECNany2any": 7.2153,
+        "ECSany2any": 0.047,
+        "omegaCany2spe": 1095.9118
+      }
+    ]
+  },
+  "sites-full": {
+    "tip_counts": [
+      8
+    ]
+  }
+}

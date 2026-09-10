@@ -240,3 +240,9 @@ This change supplies controlled training, provenance, a numerical correction
 and a repeatable full-pipeline validation mechanism. It does not designate a
 new default alpha/tau, assert uniform FPR/power guarantees, or certify
 automatic recoding from numerical unit tests alone.
+
+Empirical ASRV modes (`pool`, `sn`, `each`, `file_each`) load full-tree states,
+including in foreground-only searches with branch output disabled. Training
+branches and their parent states must be available independently of output
+options; this also applies to background/explicit training sets and structure
+cross-fitting. Fixed weights (`no`, `file`) can still use selective loading.
