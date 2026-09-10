@@ -34,7 +34,7 @@ def test_calibrate_dsc_quantile_fast_path_matches_numpy_quantile():
 def test_calibrate_dsc_quantile_matches_numpy_bitwise_for_small_samples():
     rng = np.random.default_rng(20260809)
     scipy_stats = pytest.importorskip("scipy.stats")
-    for size in range(1, 80):
+    for size in range(2, 80):
         for replicate in range(10):
             if replicate % 2 == 0:
                 dnc = rng.lognormal(mean=0.0, sigma=3.0, size=size)

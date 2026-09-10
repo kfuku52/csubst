@@ -1,0 +1,13 @@
+case	method	focal_omega
+Focal row only	Uncalibrated	10.0
+Focal row only	Legacy empirical	1.0
+Focal row only	Frozen empirical	10.0
+Focal row only	Independent null	10.0
++ 3 low-N rows	Uncalibrated	10.0
++ 3 low-N rows	Legacy empirical	10.0
++ 3 low-N rows	Frozen empirical	10.0
++ 3 low-N rows	Independent null	10.0
++ 3 high-N rows	Uncalibrated	10.0
++ 3 high-N rows	Legacy empirical	0.1
++ 3 high-N rows	Frozen empirical	10.0
++ 3 high-N rows	Independent null	10.0

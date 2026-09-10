@@ -75,6 +75,10 @@ csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --for
 ```
 
 ## Usage
+Long-tail calibration is off by default; when enabled, its default method is
+`independent_null`. For empirical and independently sampled
+null sensitivity analyses, see [long-tail calibration](docs/LONGTAIL_CALIBRATION.md).
+
 CSUBST provides ten main subcommands:
 
 - [`csubst dataset`](https://github.com/kfuku52/csubst/wiki/csubst-dataset): generate built-in example datasets such as `PGK` and `PEPC`.

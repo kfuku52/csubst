@@ -1728,9 +1728,21 @@ def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_re
     if g['calibrate_longtail'] and (g['exhaustive_until'] >= g['current_arity']):
         cb_missing = omega.calibrate_dsc(
             cb_missing,
+            g=g,
+            ON_tensor=ON_tensor_reducer,
+            OS_tensor=OS_tensor_reducer,
+            reuse_reference=True,
             output_stats=g.get('output_stats'),
             float_tol=g.get('float_tol', 1e-12),
         )
+        if g.get('longtail_method', 'independent_null') == 'independent_null' and g.get('calc_omega_pvalue', False):
+            cb_missing = omega.add_omega_empirical_pvalues(cb_missing, ON_tensor_reducer, OS_tensor_reducer, g)
+            # P values are marginal per row. Q values from this missing batch
+            # cannot be mixed with the original table's testing family.
+            for sub in g.get('output_stats', []):
+                if 'qomegaC' + sub in cb_missing:
+                    cb_missing['qomegaC' + sub] = np.nan
+                    cb_missing['calibration_qvalue_status_' + sub] = 'unavailable_complete_testing_family'
     if g['branch_dist']:
         cb_missing = tree.get_node_distance(
             tree=g['tree'],

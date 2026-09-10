@@ -50,6 +50,10 @@ class NumericConfig(TypedDict, total=False):
 
 
 class ModelConfig(TypedDict, total=False):
+    calibrate_longtail: bool
+    longtail_method: str
+    longtail_null_niter: int
+    longtail_test_block_size: int
     expectation_method: str
     expected_state_backend: str
     nonsyn_recode: str

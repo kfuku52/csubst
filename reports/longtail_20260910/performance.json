@@ -1,0 +1,86 @@
+{
+  "rows": [
+    0,
+    4154,
+    8307
+  ],
+  "draws": 1000,
+  "exact_equality": true,
+  "results": [
+    {
+      "model": "poisson",
+      "repeat": 0,
+      "path": "baseline",
+      "seconds": 31.135619708016748
+    },
+    {
+      "model": "poisson",
+      "repeat": 0,
+      "path": "cached",
+      "seconds": 13.661215166997863
+    },
+    {
+      "model": "poisson",
+      "repeat": 1,
+      "path": "baseline",
+      "seconds": 31.289055208006175
+    },
+    {
+      "model": "poisson",
+      "repeat": 1,
+      "path": "cached",
+      "seconds": 11.594681375019718
+    },
+    {
+      "model": "hypergeom",
+      "repeat": 0,
+      "path": "baseline",
+      "seconds": 5.048640583001543
+    },
+    {
+      "model": "hypergeom",
+      "repeat": 0,
+      "path": "cached",
+      "seconds": 5.061472667002818
+    },
+    {
+      "model": "hypergeom",
+      "repeat": 1,
+      "path": "baseline",
+      "seconds": 4.921981708990643
+    },
+    {
+      "model": "hypergeom",
+      "repeat": 1,
+      "path": "cached",
+      "seconds": 5.33896208301303
+    }
+  ],
+  "python": "3.10.14",
+  "numpy": "1.26.4",
+  "platform": "macOS-26.6.2-x86_64-i386-64bit",
+  "full_calibration_seconds": 79.28379320798558,
+  "combinations": 8308,
+  "settings": {
+    "asrv": "each",
+    "urn_model": "wallenius",
+    "random_seed": 20260910,
+    "foreground": null,
+    "output_stats": [
+      "any2spe",
+      "any2any"
+    ],
+    "calc_omega_pvalue": false,
+    "threads": 1,
+    "drop_invariant_tip_sites": "no"
+  },
+  "input_sha256": {
+    "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+    "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+    "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0",
+    "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+    "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+    "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+    "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4"
+  }
+}

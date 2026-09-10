@@ -235,6 +235,9 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             if (g['exhaustive_until'] >= current_arity):
                 cb = omega.calibrate_dsc(
                     cb,
+                    g=g,
+                    ON_tensor=ON_tensor_reducer,
+                    OS_tensor=OS_tensor_reducer,
                     output_stats=g.get('output_stats'),
                     float_tol=g.get('float_tol', 1e-12),
                 )
@@ -247,7 +250,10 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                         OS_tensor=OS_tensor_reducer,
                         g=g,
                     )
-                g['df_cb_stats'].at[0, 'dSC_calibration'] = 'Y'
+                status_cols = [c for c in cb.columns if str(c).startswith('calibration_status_')]
+                applied = any((cb[c] == 'applied').any() for c in status_cols) if status_cols else True
+                g['df_cb_stats'].at[0, 'dSC_calibration'] = 'Y' if applied else 'N'
+                g['df_cb_stats'].at[0, 'longtail_method'] = g.get('longtail_method', 'independent_null')
             else:
                 txt = '--calibrate_longtail is deactivated for arity = {}. '
                 txt += 'This option is effective for the arity range specified by --exhaustive_until.\n'

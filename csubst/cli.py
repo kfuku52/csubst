@@ -409,7 +409,7 @@ def _add_search_subcommand_args(parser, show_advanced=False):
     parser.add_argument('--calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
                              'P values of omega_C by substitution randomization (--expectation_method urn only). '
-                             'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib".')
+                             'When --calibrate_longtail is active, uncalibrated P/Q columns are retained as "_nocalib" and calibrated P/Q values are recomputed.')
     advanced_statistics = parser.add_argument_group('advanced statistical tuning')
     _add_advanced_argument(advanced_statistics, '--urn_wallenius_expectation', show_advanced=show_advanced,
                         choices=['auto', 'exact'], default='auto',
@@ -588,9 +588,16 @@ def _add_search_subcommand_args(parser, show_advanced=False):
     _add_advanced_argument(advanced_statistics, '--pseudocount_report', show_advanced=show_advanced,
                         action='store_true',
                         help='Write pseudocount configuration and pre-smoothing sparsity diagnostics to logs and outputs.')
-    parser.add_argument('--calibrate_longtail', metavar='yes|no', default='yes', type=strtobool,
+    parser.add_argument('--calibrate_longtail', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Calibrate dS_C to match the distribution range of dS_C with dN_C '
-                             'by quantile-based transformation.')
+                             'by quantile-based transformation. This sensitivity analysis is off by default; '
+                             'it changes higher-arity candidate selection when enabled.')
+    parser.add_argument('--longtail_method', default='independent_null', choices=['empirical', 'independent_null'],
+                        help='default=%(default)s: Empirical full-table reference or per-combination independent fitted-null reference. Requires --calibrate_longtail yes. Independent null also requires urn expectations, base output stats, and zero pseudocounts.')
+    _add_advanced_argument(advanced_statistics, '--longtail_null_niter', show_advanced=show_advanced,
+                          default=1000, type=int, help='default=%(default)s: Independent calibration draws per combination (>=100); distinct from p-value draws.')
+    _add_advanced_argument(advanced_statistics, '--longtail_test_block_size', show_advanced=show_advanced,
+                          default=256, type=int, help='default=%(default)s: Calibrated test-statistic block size; does not change the random draws.')
 
 
 def _add_scan_subcommand_args(parser, show_advanced=False):

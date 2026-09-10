@@ -2783,7 +2783,8 @@ def joblib_calc_hypergeom(
             sampling_model=_resolve_urn_model(g=g),
         )
         txt = '{}: {}/{} matrix_group/ancestral_state/derived_state combinations. Time elapsed for {:,} permutation: {:,} [sec]'
-        print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
+        if '_longtail_count_components' not in g:
+            print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
 
 
 def _calc_hypergeom_chunk_local(
@@ -3618,18 +3619,26 @@ def _calc_poisson_count_matrix(
     for i, sg, a, d in list_igad:
         if a == d:
             continue
-        if static_sub_sites is None:
-            sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
-        else:
-            sub_sites = static_sub_sites
-        sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        mean_count = _calc_urn_expected_overlap(
-            cb_ids=cb_ids,
-            sub_sites=sub_sites,
-            sub_branches=sub_branches,
-            g=g,
-            float_type=np.float64,
-        )
+        cache = g.get('_longtail_poisson_means')
+        key = (obs_col, int(i), int(sg), str(a), str(d))
+        if cache is None or key not in cache:
+            if static_sub_sites is None:
+                sub_sites = _resolve_sub_sites(g=g, sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d, obs_col=obs_col)
+            else:
+                sub_sites = static_sub_sites
+            sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
+            mean_count = _calc_urn_expected_overlap(
+                cb_ids=cb_ids if cache is None else g['_longtail_count_ids'],
+                sub_sites=sub_sites,
+                sub_branches=sub_branches,
+                g=g,
+                float_type=np.float64,
+            )
+            if cache is not None:
+                cache[key] = np.asarray(mean_count, dtype=np.float64).reshape(-1)
+        if cache is not None:
+            positions = [g['_longtail_count_index'][tuple(row)] for row in np.sort(cb_ids, axis=1)]
+            mean_count = cache[key][positions]
         mean_count = np.asarray(mean_count, dtype=np.float64).reshape(-1)
         if mean_count.shape[0] != cb_ids.shape[0]:
             txt = 'mean_count rows ({}) and cb_ids rows ({}) should match.'
@@ -3653,7 +3662,8 @@ def _calc_poisson_count_matrix(
         ).astype(np.float64, copy=False)
         txt = '{} (poisson): {}/{} matrix_group/ancestral_state/derived_state combinations. '
         txt += 'Time elapsed for {:,} permutation: {:,} [sec]'
-        print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
+        if '_longtail_count_components' not in g:
+            print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
     return out
 
 
@@ -3895,17 +3905,23 @@ def _calc_poisson_full_count_matrix(
         ).astype(np.float64, copy=False)
         txt = '{} (poisson_full): {}/{} matrix_group/ancestral_state/derived_state combinations. '
         txt += 'Time elapsed for {:,} permutation: {:,} [sec]'
-        print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
+        if '_longtail_count_components' not in g:
+            print(txt.format(obs_col, i + 1, num_gad_combinat, niter, int(time.time() - pm_start)), flush=True)
     return out
 
 
 def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, obs_count=None):
-    sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = _prepare_substitution_permutation_components(
-        sub_tensor=sub_tensor,
-        mode=mode,
-        SN=SN,
-        g=g,
-    )
+    # This cache is owned by one calibration pass and one output statistic.
+    # It is discarded before inputs, training branches, or ASRV can change.
+    cache = g.get('_longtail_count_components')
+    key = (id(sub_tensor), SN, mode)
+    if cache is not None and key in cache:
+        components = cache[key]
+    else:
+        components = _prepare_substitution_permutation_components(sub_tensor, mode, SN, g)
+        if cache is not None:
+            cache[key] = components
+    sub_bg, sub_sg, list_igad, obs_col, num_gad_combinat = components
     static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
     null_model = _resolve_omega_pvalue_null_model(g=g)
     operation_seed = randomness.next_seed(
@@ -3926,7 +3942,8 @@ def _get_mode_permutation_count_matrix(cb_ids, sub_tensor, mode, SN, niter, g, o
         model_label = 'poisson-full-rate'
     if null_model == 'nbinom':
         model_label = 'nbinom-rate'
-    print(txt.format(SN, mode, model_label, cb_ids.shape[0], int(niter), int(num_gad_combinat)), flush=True)
+    if '_longtail_count_components' not in g:
+        print(txt.format(SN, mode, model_label, cb_ids.shape[0], int(niter), int(num_gad_combinat)), flush=True)
     if null_model == 'hypergeom':
         return _calc_hypergeom_count_matrix(
             mode=mode,
@@ -4006,6 +4023,10 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
         txt = 'Skipping --calc_omega_pvalue because --expectation_method is not "urn".\n'
         sys.stderr.write(txt)
         return cb
+    if (g.get('longtail_method', 'independent_null') == 'independent_null'
+            and any(str(col).startswith('calibration_reference_') for col in cb.columns)):
+        from csubst import omega_calibration
+        return omega_calibration.add_independent_null_pvalues(cb, ON_tensor, OS_tensor, g)
     null_model = _resolve_omega_pvalue_null_model(g=g)
     txt = 'omega_C empirical p-value null model: {}'
     print(txt.format(null_model), flush=True)
@@ -4147,6 +4168,10 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
         col_q = 'qomegaC' + sub
         qvalue = _calc_bh_fdr_qvalues(pvalue)
         cb.loc[:, col_q] = qvalue
+        if 'calibration_reference_' + sub in cb:
+            cb['calibration_pvalue_status_' + sub] = 'empirical_full_population'
+            cb['calibration_test_n_' + sub] = valid_niter
+            cb['calibration_test_undefined_' + sub] = int(pvalue_schedule[-1]) - valid_niter
         finite = np.isfinite(pvalue)
         if finite.any():
             txt = 'Arity = {:,}, cb: median {} = {:.4f} ({:,}/{:,} finite)'
@@ -4203,7 +4228,16 @@ def calc_omega(cb, OS_tensor, ON_tensor, g):
     return(cb, g)
 
 
-def calibrate_dsc(cb, transformation='quantile', output_stats=None, float_tol=1e-12):
+def calibrate_dsc(cb, transformation='quantile', output_stats=None, float_tol=1e-12,
+                  g=None, ON_tensor=None, OS_tensor=None, reuse_reference=False):
+    if g is not None:
+        if transformation != 'quantile':
+            raise ValueError('Frozen long-tail references currently support quantile transformation only.')
+        from csubst import omega_calibration
+        return omega_calibration.apply_calibration(
+            cb, g, ON_tensor=ON_tensor, OS_tensor=OS_tensor,
+            reuse_reference=reuse_reference,
+        )
     prefix='cb'
     arity = cb.columns.str.startswith('branch_id_').sum()
     hd = 'Arity = {:,}, {}:'.format(arity, prefix)
@@ -4253,7 +4287,7 @@ def calibrate_dsc(cb, transformation='quantile', output_stats=None, float_tol=1e
         calibrated_omega[~fit_mask] = noncalibrated_omega_values[~fit_mask]
         cb.loc[:, col_omega] = calibrated_omega
         median_value = cb.loc[:,col_omega].median()
-        corrected_count = int(fit_mask.sum() - is_nocalib_higher[fit_mask].sum())
+        corrected_count = int(np.sum(fit_mask & (calibrated_dSc_values > uncorrected_dSc_values)))
         txt = '{} median {} ({:,}/{:,} branch combinations were corrected for dNc vs dSc distribution ranges): {:.3f}'
         print(txt.format(hd, col_omega, corrected_count, cb.shape[0], median_value), flush=True)
     return cb

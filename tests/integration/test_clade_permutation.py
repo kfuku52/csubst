@@ -344,11 +344,13 @@ def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(mo
 
     original_calibrate_dsc = foreground.omega.calibrate_dsc
 
-    def capture_calibrate_dsc(cb_missing, output_stats=None, float_tol=1e-12):
+    def capture_calibrate_dsc(cb_missing, output_stats=None, float_tol=1e-12, **kwargs):
         captured["float_tol"] = float(float_tol)
         captured["output_stats"] = output_stats
+        captured["reuse_reference"] = kwargs["reuse_reference"]
         return original_calibrate_dsc(
             cb=cb_missing,
+            **kwargs,
             output_stats=output_stats,
             float_tol=float_tol,
         )
@@ -374,6 +376,7 @@ def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(mo
         "output_stats": ["any2spe"],
         "output_base_stats": ["any2spe"],
         "calibrate_longtail": True,
+        "longtail_method": "empirical",
         "exhaustive_until": 2,
         "current_arity": 2,
         "branch_dist": False,
@@ -381,6 +384,8 @@ def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(mo
         "threads": 1,
         "float_type": np.float64,
     }
+    from csubst.longtail import QuantileMap
+    g['_longtail_references'] = {(2, 'any2spe'): QuantileMap.fit([1., 1.], [1., 1.])}
     out, returned_g = foreground._recompute_missing_permutation_rows(
         g=g,
         missing_id_combinations=missing_id_combinations,
@@ -391,6 +396,7 @@ def test_recompute_missing_rows_passes_float_tol_and_preserves_infinite_omega(mo
     assert captured["site_filter_report"] is False
     assert g["site_filter_report"] is True
     assert returned_g["site_filter_report"] is True
+    assert captured["reuse_reference"] is True
     assert captured["float_tol"] == pytest.approx(1e-7)
     assert captured["output_stats"] == ["any2spe"]
     assert "omegaCany2spe_nocalib" in out.columns

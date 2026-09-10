@@ -187,7 +187,7 @@ def test_cb_search_recomputes_empirical_pvalues_after_calibration(monkeypatch):
         out["qomegaCany2spe"] = [0.2]
         return out, g
 
-    def fake_calibrate_dsc(cb, output_stats=None, float_tol=1e-12):
+    def fake_calibrate_dsc(cb, output_stats=None, float_tol=1e-12, **kwargs):
         out = cb.copy(deep=True)
         out = out.rename(
             columns={
@@ -236,6 +236,7 @@ def test_cb_search_recomputes_empirical_pvalues_after_calibration(monkeypatch):
         "threads": 1,
         "float_tol": 1e-12,
         "calibrate_longtail": True,
+        "longtail_method": "empirical",
         "calc_omega_pvalue": True,
         "branch_dist": False,
         "float_format": "%.6f",

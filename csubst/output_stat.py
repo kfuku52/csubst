@@ -224,6 +224,10 @@ def drop_unrequested_stat_columns(df, output_stats):
     drop_cols = []
     for col in df.columns:
         col_str = str(col)
+        if col_str.startswith('calibration_'):
+            if any(col_str.endswith('_' + stat) for stat in ALL_OUTPUT_STATS if stat not in requested):
+                drop_cols.append(col)
+            continue
         for prefix in STAT_COLUMN_PREFIXES:
             if not col_str.startswith(prefix):
                 continue

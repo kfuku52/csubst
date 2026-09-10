@@ -1,0 +1,16 @@
+{
+  "seed": 20260910,
+  "replicates": 1000,
+  "fit_draws": 1000,
+  "test_draws": 999,
+  "python": "3.10.14",
+  "numpy": "1.26.4",
+  "scipy": "1.15.2",
+  "matplotlib": "3.9.3",
+  "model": "Independent Poisson counts, known E_N=8 and E_S in {0.5,8}; no tree/ASR/model refitting.",
+  "sources": {
+    "csubst/longtail.py": "c73efdc99a8a95025e454684f334b474c162d73a313a5bf1f85746ad7468af82",
+    "csubst/omega_statistics.py": "f20410ec0c8245cfebdef9f9f64fb546df038782793a88559abf5ecea72f6c2d",
+    ".github/scripts/longtail_comparison.py": "c0b0c22abd8905a8f20b66f8eb667dc17ea8c484323b8a24a6150f4c121463ca"
+  }
+}
