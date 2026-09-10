@@ -25,6 +25,7 @@ def worker():
     p.add_argument("--exhaustive", type=int, default=2)
     p.add_argument("--foreground", action="store_true")
     p.add_argument("--branch-table", action="store_true")
+    p.add_argument("--cutoff-stat")
     a = p.parse_args()
     sys.path.insert(0, str(a.root))
     b = runpy.run_path(str(a.root / ".github/scripts/benchmark_endpoints.py"))
@@ -36,6 +37,8 @@ def worker():
     ]:
         cmd[cmd.index(flag) + 1] = str(val)
     cmd += ["--exhaustive_until", str(a.exhaustive)]
+    if a.cutoff_stat is not None:
+        cmd += ["--cutoff_stat", a.cutoff_stat]
     if a.branch_table:
         cmd[cmd.index("--b") + 1] = "yes"
     if a.foreground:
@@ -107,7 +110,15 @@ def main():
     p.add_argument(
         "--scenarios",
         nargs="+",
-        choices=["pair", "pair_b", "foreground4", "exhaustive3", "default4"],
+        choices=[
+            "pair",
+            "pair_b",
+            "foreground4",
+            "exhaustive3",
+            "default4",
+            "heuristic6",
+            "heuristic6_b",
+        ],
         default=["pair", "foreground4", "exhaustive3"],
     )
     p.add_argument("--cpus", nargs="+", type=int, default=[1, 2, 4])
@@ -122,6 +133,19 @@ def main():
         "foreground4": ["--arity", "4", "--exhaustive", "1", "--foreground"],
         "exhaustive3": ["--arity", "3", "--exhaustive", "3"],
         "default4": ["--arity", "4"],
+        "heuristic6": [
+            "--arity",
+            "6",
+            "--cutoff-stat",
+            "OCNany2spe,2.0|omegaCany2spe,5.0",
+        ],
+        "heuristic6_b": [
+            "--arity",
+            "6",
+            "--cutoff-stat",
+            "OCNany2spe,2.0|omegaCany2spe,5.0",
+            "--branch-table",
+        ],
     }
     helper = runpy.run_path(
         str(root / ".github/scripts/benchmark_endpoint_optimization.py")
@@ -129,6 +153,15 @@ def main():
     result = {
         "environment": {
             "platform": platform.platform(),
+            "cpu_model": subprocess.check_output(
+                ["sysctl", "-n", "machdep.cpu.brand_string"], text=True
+            ).strip()
+            if sys.platform == "darwin"
+            else platform.processor(),
+            "memory_gib": psutil.virtual_memory().total / 1024**3,
+            "source_commit": subprocess.check_output(
+                ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+            ).strip(),
             "python": sys.version,
             "logical_cpus": psutil.cpu_count(),
             "repeats": a.repeats,
@@ -142,6 +175,26 @@ def main():
         "runs": [],
         "summary": {},
     }
+
+    def background_test_jobs():
+        found = []
+        for process in psutil.process_iter(["pid", "cmdline"]):
+            try:
+                command = process.info["cmdline"] or []
+                if not command:
+                    continue
+                binary = Path(command[0]).name
+                docker_test = (
+                    binary == "docker"
+                    and "run" in command
+                    and ("pytest" in command or "tools/check.py" in command)
+                )
+                python_test = binary.startswith("python") and "pytest" in command
+                if docker_test or python_test:
+                    found.append(process.pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        return sorted(found)
 
     def save():
         a.result.parent.mkdir(parents=True, exist_ok=True)
@@ -181,6 +234,8 @@ def main():
                     )
                     peak = 0
                     max_children = 0
+                    other_jobs_before = background_test_jobs()
+                    host_start = psutil.cpu_times()
                     wall_start = time.perf_counter()
                     with Path(str(out) + ".log").open("w") as log:
                         proc = subprocess.Popen(
@@ -209,7 +264,16 @@ def main():
                             raise RuntimeError(
                                 f"{tag}: exit {proc.returncode}; see log"
                             )
+                    host_end = psutil.cpu_times()
+                    host_wall = time.perf_counter() - wall_start
+                    host_active = sum(
+                        getattr(host_end, field) - getattr(host_start, field)
+                        for field in ("user", "nice", "system")
+                    )
                     row = json.loads(Path(str(out) + ".json").read_text())
+                    row["host_active_cpu_cores"] = host_active / host_wall
+                    row["background_test_jobs_before"] = other_jobs_before
+                    row["background_test_jobs_after"] = background_test_jobs()
                     row.update(
                         scenario=scenario,
                         threads=cpu,
@@ -233,6 +297,8 @@ def main():
                         "foreground4": 4,
                         "exhaustive3": 3,
                         "default4": 2,
+                        "heuristic6": 6,
+                        "heuristic6_b": 6,
                     }[scenario]
                     if (
                         row["tables"].get(
@@ -243,6 +309,18 @@ def main():
                         raise AssertionError(
                             f"{tag}: requested arity was not actually computed"
                         )
+                    if scenario.startswith("heuristic6"):
+                        final = pd.read_pickle(out / "csubst_cb_6.tsv.unrounded.pkl")
+                        ids = final.filter(regex="^branch_id_").to_numpy().tolist()
+                        if ids != [[1, 26, 33, 35, 40, 102]]:
+                            raise AssertionError(
+                                f"{tag}: arity 6 detection changed: {ids}"
+                            )
+                        if not (
+                            (final["OCNany2spe"] >= 2) & (final["omegaCany2spe"] >= 5)
+                        ).all():
+                            raise AssertionError(f"{tag}: arity 6 thresholds failed")
+                        row["arity6_verified"] = True
                     result["runs"].append(row)
                     save()
                     print(

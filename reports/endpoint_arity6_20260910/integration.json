@@ -1,0 +1,26 @@
+{
+  "commit": "2361ccdfd3c4d29f03b9f60de69db2d0d0f8f466",
+  "python": "3.10.14",
+  "numpy": "1.26.4",
+  "scipy": "1.15.2",
+  "machine": "x86_64",
+  "build_python": "3.10.14",
+  "build_setuptools": "84.0.0",
+  "tests": {
+    "full_passed": 2018,
+    "skipped": 5,
+    "strict_native_passed": 8
+  },
+  "benchmark_script_sha256": "21e0cfde374bfbf47dfe318e5da7039ee56e65031c92b5ae43b2bf838399e10e",
+  "verifier_sha256": "9cc317b16b13ce728a801227690515612f36256c4310d2e35f0da504e570e50d",
+  "accepted_runs": 48,
+  "measured_runs": 36,
+  "arity6_verified_runs": 48,
+  "max_children_observed": 0,
+  "background_test_jobs_in_accepted_runs": 0,
+  "host_active_cpu_cores_range": [
+    4.7900426885569924,
+    9.009382335946096
+  ],
+  "all_arity_detection_count_checks": 240
+}

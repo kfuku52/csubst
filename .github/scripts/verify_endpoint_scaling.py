@@ -62,6 +62,11 @@ for file in args.reports:
                 refs[key] = (tag, df)
                 continue
             reftag, ref = refs[key]
+            if row["scenario"].startswith("heuristic6"):
+                np.testing.assert_array_equal(
+                    (ref["OCNany2spe"] >= 2) & (ref["omegaCany2spe"] >= 5),
+                    (df["OCNany2spe"] >= 2) & (df["omegaCany2spe"] >= 5),
+                )
             try:
                 details = compare(ref, df)
             except AssertionError as exc:
@@ -80,10 +85,11 @@ for file in args.reports:
             out["within_method_parity"].append(
                 dict(reference=reftag, candidate=tag, table=f.name, **details)
             )
-for mode in ("marginal", "joint"):
-    name = "csubst_cb_2.tsv.unrounded.pkl"
-    reference = refs.get(("pair", mode, name))
-    candidate = refs.get(("pair_b", mode, name))
+for scenario, mode, name in list(refs):
+    if not scenario.endswith("_b"):
+        continue
+    reference = refs.get((scenario[:-2], mode, name))
+    candidate = refs.get((scenario, mode, name))
     if reference is None or candidate is None:
         continue
     details = compare(reference[1], candidate[1])
