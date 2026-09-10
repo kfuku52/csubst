@@ -1789,6 +1789,29 @@ def _run_sparse_cb_projection_product(
     return selected_df.astype(float_type, copy=False)
 
 
+
+def get_cb_from_pairwise_grams(id_combinations, pairwise, attr, selected_base_stats=None):
+    selected = _resolve_cb_base_substitutions(selected_base_stats=selected_base_stats)
+    ids = np.asarray(id_combinations, dtype=np.int64)
+    if ids.ndim != 2 or ids.shape[1] != 2:
+        raise ValueError('Streaming endpoint scores require arity=2.')
+    n = next(iter(pairwise.values())).shape[0]
+    if ids.size and (ids.min() < 0 or ids.max() >= n):
+        raise IndexError('Branch ID is out of range for streaming endpoint scores.')
+    out = np.empty((len(ids), 2 + len(selected)))
+    out[:, :2] = ids
+    for i, stat in enumerate(selected):
+        out[:, 2 + i] = pairwise[stat][ids[:, 0], ids[:, 1]]
+    columns = _build_branch_id_columns(arity=2) + [attr + stat for stat in selected]
+    return table.set_substitution_dtype(table.sort_branch_ids(pd.DataFrame(out, columns=columns)))
+
+
+def get_cb_from_expected_reducer(id_combinations, reducer, attr, g, selected_base_stats=None):
+    if 'pairwise' in reducer:
+        return get_cb_from_pairwise_grams(id_combinations, reducer['pairwise'], attr, selected_base_stats)
+    return get_cb_from_sparse_projections(id_combinations=id_combinations, projections=reducer['projections'],
+                                          attr=attr, g=g, selected_base_stats=selected_base_stats)
+
 def get_cb_from_sparse_projections(
     id_combinations,
     projections,
@@ -2146,6 +2169,8 @@ def _run_cb_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, selecte
 
 
 def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
+    if isinstance(sub_tensor, substitution_sparse.PairwiseSubstitutionSummary):
+        return get_cb_from_pairwise_grams(id_combinations, sub_tensor.pairwise, attr, selected_base_stats)
     if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
         return get_cb_from_sparse_projections(id_combinations, sub_tensor.projections,
                                               attr, g, selected_base_stats)

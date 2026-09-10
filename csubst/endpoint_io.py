@@ -103,6 +103,55 @@ class _Spool:
         return result
 
 
+
+class _PairwiseAccumulator:
+    """Accumulate a branch Gram matrix, retaining one site block of features."""
+
+    def __init__(self, rows, block_size, feature_indices):
+        self.features = np.asarray(feature_indices, dtype=int)
+        self.block = np.zeros((rows, block_size, len(self.features)))
+        self.gram = np.zeros((rows, rows))
+        self.start = None
+
+    def _flush(self):
+        if self.start is not None and self.features.size:
+            matrix = self.block.reshape(self.block.shape[0], -1)
+            self.gram += matrix @ matrix.T
+
+    def append(self, row, block, start, num_site):
+        if start != self.start:
+            self._flush()
+            self.block.fill(0)
+            self.start = start
+        values = np.asarray(block).reshape(block.shape[0], -1)
+        self.block[row, :len(values)] = values[:, self.features]
+
+    def finish(self):
+        self._flush()
+        self.start = None
+        return self.gram
+
+
+
+def _pairwise_storage_bound(n, num_site, shapes, kinds, stats, block_size, g):
+    observed = set(stats) | {'any2any'}
+    streams = [(kind, stat) for kind in kinds for stat in observed]
+    streams += [(kind, stat) for kind in kinds if kind != 'AA' for stat in stats]
+    features = sum(len(_pairwise_features(kind, stat, shapes[kind], g)) for kind, stat in streams)
+    return 8 * ((len(streams) + 1) * n * n + n * min(block_size, num_site) * features
+                + len(kinds) * n * num_site * (3 if g.get('b', False) else 1))
+
+def _pairwise_features(kind, stat, shape, g):
+    ng, ns = shape[2:4]
+    if kind != 'S':
+        return np.arange(ng if stat == 'any2any' else ng * ns)
+    # Omit padding and singleton synonymous groups, whose change mass is zero.
+    sizes = [len(g['synonymous_indices'][aa]) for aa in g['amino_acid_orders']]
+    if stat == 'any2any':
+        return [sg for sg, size in enumerate(sizes) if size > 1]
+    return [sg * ns + state for sg, size in enumerate(sizes) if size > 1
+            for state in range(size)]
+
 def _tree_arrays(g, structural):
     nodes = list(g['tree'].traverse())
     n = len(nodes)
@@ -274,7 +323,13 @@ def _build(g, structural=False):
     from csubst import omega, output_stat
     selected_stats = output_stat.get_required_base_stats(omega._resolve_requested_output_stats(g))
     projected = _use_projected_search(g, selected_stats)
+    pairwise = (projected and int(g.get('max_arity', 0)) == 2
+                and not g.get('site_filter_report', False)
+                and int(g.get('fg_clade_permutation', 0)) == 0)
     observed_stats = set(selected_stats) | {'any2any'}
+    if pairwise:
+        pairwise = _pairwise_storage_bound(n, num_site, shapes, kinds, selected_stats,
+                                           int(g.get('endpoint_block_size', 64)), g) <= 64 * 1024 * 1024
     direct = projected and not g.get('b', False) and 'AA' not in kinds
     transform = _projection_transform(g, kinds, mappings, observed_stats) if direct else None
     with ExitStack() as stack:
@@ -282,12 +337,21 @@ def _build(g, structural=False):
                     for kind, shape in shapes.items()} if not projected else {}
         obuilders = {}
         maxima = {}
+        branch_sites = {}
+        block_size = min(int(g.get('endpoint_block_size', 64)), num_site)
+
+        def builder(kind, stat, count):
+            if pairwise:
+                return _PairwiseAccumulator(n, block_size, _pairwise_features(kind, stat, shapes[kind], g))
+            return _Spool(stack, n, num_site * count, source.dtype)
         if projected:
             for kind, shape in shapes.items():
                 ng, ns = shape[2:4]
                 features = {'any2any': ng, 'spe2any': ng * ns, 'any2spe': ng * ns}
-                obuilders[kind] = {stat: _Spool(stack, n, num_site * features[stat], source.dtype)
+                obuilders[kind] = {stat: builder(kind, stat, features[stat])
                                    for stat in observed_stats}
+                if pairwise:
+                    branch_sites[kind] = np.zeros((n, num_site))
                 if g.get('b', False):
                     maxima[kind] = (np.zeros((n, num_site)), np.zeros((n, num_site), dtype=np.int32),
                                     np.zeros((n, num_site), dtype=np.int32))
@@ -297,7 +361,7 @@ def _build(g, structural=False):
             if expected and kind != 'AA':
                 ng, ns = shapes[kind][2:4]
                 features = {'any2any': ng, 'spe2any': ng * ns, 'any2spe': ng * ns, 'spe2spe': ng * ns * ns}
-                ebuilders[kind] = {stat: _Spool(stack, n, num_site * count, source.dtype)
+                ebuilders[kind] = {stat: builder(kind, stat, count)
                                    for stat, count in features.items() if stat in selected_stats}
         for record in model.iter_blocks(tips, block_size=g.get('endpoint_block_size', 64), predictive=expected, transform=transform):
             sl = slice(record.start, record.stop)
@@ -327,8 +391,10 @@ def _build(g, structural=False):
                     events = _events(record.joint, kind, g, mappings[kind])
                     projections = _projections(events)
                 if projected:
-                    for stat, builder in obuilders[kind].items():
-                        builder.append(node, projections[stat], record.start, num_site)
+                    if pairwise:
+                        branch_sites[kind][node, sl] = projections['any2any'].sum(axis=1)
+                    for stat, accumulator in obuilders[kind].items():
+                        accumulator.append(node, projections[stat], record.start, num_site)
                     if kind in maxima:
                         flat = events.reshape(events.shape[0], -1)
                         index = flat.argmax(axis=1)
@@ -348,10 +414,15 @@ def _build(g, structural=False):
                         prediction = _events(record.predictive, kind, g, mappings[kind])
                         prediction_projections = _projections(prediction)
                     totals[kind] += float(prediction_projections['any2any'].sum())
-                    for stat, builder in ebuilders[kind].items():
-                        builder.append(node, prediction_projections[stat], record.start, num_site)
+                    for stat, accumulator in ebuilders[kind].items():
+                        accumulator.append(node, prediction_projections[stat], record.start, num_site)
         for kind in kinds:
-            if projected:
+            if pairwise:
+                cache[kind] = substitution_sparse.PairwiseSubstitutionSummary(
+                    shapes[kind], source.dtype,
+                    {stat: accumulator.finish() for stat, accumulator in obuilders[kind].items()},
+                    branch_sites[kind], maxima.get(kind))
+            elif projected:
                 cache[kind] = substitution_sparse.ProjectedSubstitutionTensor(
                     shapes[kind], source.dtype,
                     {stat: builder.finish() for stat, builder in obuilders[kind].items()},
@@ -362,16 +433,18 @@ def _build(g, structural=False):
             if kind in ebuilders:
                 projections = {stat: builder.finish() for stat, builder in ebuilders[kind].items()}
                 expected_cache[kind] = {
-                    'projections': projections,
+                    'projections': {} if pairwise else projections,
+                    **({'pairwise': projections} if pairwise else {}),
                     'total': totals[kind],
-                    'storage': sum(x.data.nbytes + x.indices.nbytes + x.indptr.nbytes for x in projections.values()),
+                    'storage': sum(x.nbytes if pairwise else x.data.nbytes + x.indices.nbytes + x.indptr.nbytes
+                                   for x in projections.values()),
                     'mode': 'nsy' if kind == 'N' else 'cdn',
                 }
     if not structural and g.get('nonsyn_recode', 'no') == 'no':
         cache['AA'] = cache['N']
     manifest = g.setdefault('_endpoint_manifest', {})
     manifest['3di' if structural else 'codon'] = {
-        'observed_storage': 'projections' if projected else 'full_events',
+        'observed_storage': 'pairwise' if pairwise else ('projections' if projected else 'full_events'),
         'direct_projection': direct,
         'rates': np.asarray(rates).tolist(), 'weights': np.asarray(weights).tolist(),
         'branch_lengths': lengths.tolist(),
@@ -431,5 +504,13 @@ def expected_reducer(g, mode, selected):
     if kind not in g['_endpoint_reducers']:
         raise ValueError('Joint endpoint model expectations were not prepared for this analysis.')
     result = dict(g['_endpoint_reducers'][kind])
-    result['projections'] = {stat: result['projections'][stat] for stat in selected}
+    key = 'pairwise' if 'pairwise' in result else 'projections'
+    result[key] = {stat: result[key][stat] for stat in selected}
     return result
+
+
+def release_expected(g, kind):
+    """Drop the endpoint cache's final reference once no subsequent reuse is needed."""
+    if (enabled(g) and g.get('_release_state_after_expected_reducer', False)
+            and int(g.get('fg_clade_permutation', 0)) == 0):
+        g.get('_endpoint_reducers', {}).pop(kind, None)

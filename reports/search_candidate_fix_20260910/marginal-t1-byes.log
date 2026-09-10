@@ -1,0 +1,312 @@
+CSUBST start: 2026-09-10 07:24:19.411949+00:00
+csubst search start: 2026-09-10 07:24:19.413723+00:00
+${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+OS: macOS-26.6.2-x86_64-i386-64bit
+Python version: 3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]
+CSUBST version: 1.15.0
+CSUBST dependency versions: ete4=4.4.0, requests=2.32.5, numpy=1.26.4, scipy=1.15.2, pandas=2.2.3, cython=3.0.11, matplotlib=3.9.3
+CSUBST missing dependency packages: none
+CSUBST command: ${HOME}/.codex/worktrees/35a9/csubst/csubst/__main__.py search --alignment_file ${HOME}/.codex/worktrees/35a9/csubst/csubst/dataset/PEPC.alignment.fa --rooted_tree_file ${HOME}/.codex/worktrees/35a9/csubst/csubst/dataset/PEPC.tree.nwk --outdir /tmp/endpoint-search-fix/marginal-t1-byes --threads 1 --blas_threads 1 --max_arity 6 --calibrate_longtail no --b yes --s no --cs no --bs no --cbs no --random_seed 8 --substitution_posterior marginal --endpoint_block_size 64 --iqtree_treefile ${HOME}/.codex/worktrees/35a9/csubst/csubst/dataset/PEPC.alignment.fa.treefile --iqtree_state ${HOME}/.codex/worktrees/35a9/csubst/csubst/dataset/PEPC.alignment.fa.state --iqtree_rate ${HOME}/.codex/worktrees/35a9/csubst/csubst/dataset/PEPC.alignment.fa.rate --iqtree_iqtree ${HOME}/.codex/worktrees/35a9/csubst/csubst/dataset/PEPC.alignment.fa.iqtree --iqtree_log ${HOME}/.codex/worktrees/35a9/csubst/csubst/dataset/PEPC.alignment.fa.log --cutoff_stat OCNany2spe,2.0|omegaCany2spe,5.0
+CSUBST working directory: ${HOME}/.codex/worktrees/35a9/csubst
+CSUBST bug report: https://github.com/kfuku52/csubst/issues
+Reading and parsing input files.
+Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.
+All IQ-TREE intermediate files were explicitly specified. A provenance manifest is not required.
+The model in the IQ-TREE's output (ECMK07+F+R4) matched --iqtree_model (ECMK07+F+R4). Skipping IQ-TREE.
+Total branch length of --rooted_tree_file: 7.7049
+Total branch length of --iqtree_treefile: 17.5501
+
+Reading the state file: ${HOME}/.codex/worktrees/35a9/csubst/csubst/dataset/PEPC.alignment.fa.state
+
+Instantaneous substitution rate matrix will be generated using the base model: ECMK07+F
+Transition matrix will be generated using the model in the ancestral state reconstruction: ECMK07+F+R4
+Applying estimated codon frequencies to obtain the instantaneous rate matrix.
+Ancestral states were not estimated on the root node. Excluding sub-root nodes from the analysis.
+Generated packed sparse substitution tensor (Cython two-pass): shape=(141, 971, 1, 20, 20), density=0.005908 (323,568/54,764,400), storage=3,883,384 bytes, compression=112.8x
+Generated packed sparse substitution tensor (Cython two-pass): shape=(141, 971, 20, 6, 6), density=0.006017 (593,096/98,575,920), storage=7,117,720 bytes, compression=110.8x
+Branch lengths of the IQ-TREE output are rescaled to match observed-codon-substitutions/codon-site, rather than nucleotide-substitutions/codon-site.
+Total branch length before rescaling: 17.550 nucleotide substitutions / codon site
+Total S+N branch length after rescaling: 18.891 codon substitutions / codon site
+Total S branch length after rescaling: 14.690 codon substitutions / codon site
+Total N branch length after rescaling: 4.201 codon substitutions / codon site
+Synonymous substitutions / tree = 12,255.4
+Nonsynonymous substitutions / tree = 3,403.3
+Synonymous substitutions / branch = 87.5
+Nonsynonymous substitutions / branch = 24.3
+Synonymous substitutions / site = 12.6
+Nonsynonymous substitutions / site = 3.5
+Elapsed time: 1.0 sec
+
+Generating s table
+Time elapsed for merging tables: 0 sec
+Memory consumption of s table: 0.0 Mbytes (dtype=float64)
+Elapsed time: 0.0 sec
+
+Generating b table
+Time elapsed for merging tables: 0 sec
+Number of S_sub patterns among 141 branches=139, min=0.0, max=323.3
+Number of N_sub patterns among 141 branches=139, min=0.0, max=116.1
+Memory consumption of b table: 0.0 Mbytes (dtype=object)
+Elapsed time: 0.0 sec
+
+Arity (K) = 2: Generating cb table
+Arity (K) = 2: Exhaustive search with all independent branch combinations
+Number of all branches: 140
+Number of branch combinations generated with global independence constraints: 8,308
+Number of non-independent foreground branch combinations to be non-foreground-marked for PLACEHOLDER: 0 / 8,308
+Time elapsed for generating branch combinations: 0 sec
+Number of independent branch combinations to be analyzed: 8,308
+Preparing OCS table with up to 1 process(es).
+cb reducer scheduler: combinations=8308, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_gram (combinations=8308, branches=141)
+Sparse cb projection: stat=any2any, shape=(141, 19420), nnz=107,208, density=0.039152, gram=sparse
+Sparse cb projection: stat=any2spe, shape=(141, 116520), nnz=229,839, density=0.013990, gram=sparse
+Preparing OCN table with up to 1 process(es).
+cb reducer scheduler: combinations=8308, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_gram (combinations=8308, branches=141)
+Sparse cb projection: stat=any2any, shape=(141, 971), nnz=35,913, density=0.262309, gram=sparse
+Sparse cb projection: stat=any2spe, shape=(141, 19420), nnz=82,391, density=0.030089, gram=sparse
+Time elapsed for merging tables: 0 sec
+Tensor-free expected reducer (mode=nsy): backend=eigen_general, branches=138, projections=any2any,any2spe
+Generated tensor-free expected projections: storage=26,857,064 bytes, total=5,551.079843
+Released peptide/nonsynonymous state storage (21,905,760 bytes).
+Number of total empirically expected nonsynonymous substitutions in the tree: 5,551.08
+Preparing the ECN table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 971), nnz=110,106, density=0.804216, backend=projection_gram/sparse (pair_coverage=0.842, threshold=0.250)
+Expected sparse reducer: stat=any2spe, shape=(141, 19420), nnz=2,127,888, density=0.777106, backend=projection_gram/sparse (pair_coverage=0.842, threshold=0.250)
+Time elapsed for merging tables: 0 sec
+Tensor-free expected reducer (mode=cdn): backend=eigen_reversible, branches=138, projections=any2any,any2spe
+Generated tensor-free expected projections: storage=10,536,128 bytes, total=14,186.491140
+Released codon state storage (66,812,568 bytes).
+Number of total empirically expected synonymous substitutions in the tree: 14,186.49
+Preparing the ECS table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 19420), nnz=207,632, density=0.075827, backend=projection_gram/sparse (pair_coverage=0.842, threshold=0.076)
+Expected sparse reducer: stat=any2spe, shape=(141, 116520), nnz=670,284, density=0.040798, backend=projection_gram/sparse (pair_coverage=0.842, threshold=0.041)
+Time elapsed for merging tables: 0 sec
+Arity = 2, cb: median omegaCany2any (non-corrected for dNc vs dSc distribution ranges): 0.922
+Arity = 2, cb: median omegaCany2dif (non-corrected for dNc vs dSc distribution ranges): 0.801
+Arity = 2, cb: median omegaCany2spe (non-corrected for dNc vs dSc distribution ranges): 0.438
+Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no
+Branch-distance scheduler: combinations=8308, workers=1 (threads=1, direct)
+Inter-branch distance: 0th in the id range 0-8,308: 0 sec
+Time elapsed for calculating inter-branch distances: 0 sec
+Time elapsed for the linear regression of C ~ D: 0 sec
+Arity (K) = 2: Foreground branch combinations with cutoff conditions OCNany2spe,2.0|omegaCany2spe,5.0 for PLACEHOLDER = 0% (0/107, total examined = 8,308, enrichment factor = 0.0)
+Time elapsed for obtaining foreground branch numbers in the cb table: 0 sec
+Time elapsed for sorting cb table: 0 sec
+Memory consumption of cb table: 2.5 Mbytes (dtype=object)
+Total OCNany2any/ECNany2any = 15,002.8/18,137.3 (expectation = 120.9% of observation)
+Total OCNany2dif/ECNany2dif = 11,303.9/15,689.8 (expectation = 138.8% of observation)
+Total OCNany2spe/ECNany2spe = 3,698.8/2,447.5 (expectation = 66.2% of observation)
+Total OCSany2any/ECSany2any = 77,673.8/100,749.8 (expectation = 129.7% of observation)
+Total OCSany2dif/ECSany2dif = 53,998.7/72,124.5 (expectation = 133.6% of observation)
+Total OCSany2spe/ECSany2spe = 23,675.1/28,625.3 (expectation = 120.9% of observation)
+Elapsed time for arity = 2: 1.0 sec
+
+Arity (K) = 3: Generating cb table
+Arity (K) = 3: Heuristic search with 107 K-1 branch combinations that passed cutoff stats (OCNany2spe,2.0|omegaCany2spe,5.0)
+Number of all branches: 140
+Number of redundant branch combination unions for all: 5,671
+Number of branch combinations generated with global independence constraints: 446
+Time elapsed for generating branch combinations: 0 sec
+Number of independent branch combinations to be analyzed: 446
+Preparing OCS table with up to 1 process(es).
+cb reducer scheduler: combinations=446, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=446, branches=141, arity=3)
+Sparse cb projection product: stat=any2any, arity=3, shape=(141, 19420), nnz=107,208, density=0.039152, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=3, shape=(141, 116520), nnz=229,839, density=0.013990, backend=sparse_intersection
+Preparing OCN table with up to 1 process(es).
+cb reducer scheduler: combinations=446, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=446, branches=141, arity=3)
+Sparse cb projection product: stat=any2any, arity=3, shape=(141, 971), nnz=35,913, density=0.262309, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=3, shape=(141, 19420), nnz=82,391, density=0.030089, backend=sparse_intersection
+Time elapsed for merging tables: 0 sec
+Reusing expected nonsynonymous sparse projections.
+Number of total empirically expected nonsynonymous substitutions in the tree: 5,551.08
+Preparing the ECN table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 971), nnz=110,106, density=0.804216, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Expected sparse reducer: stat=any2spe, shape=(141, 19420), nnz=2,127,888, density=0.777106, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Time elapsed for merging tables: 0 sec
+Reusing expected synonymous sparse projections.
+Number of total empirically expected synonymous substitutions in the tree: 14,186.49
+Preparing the ECS table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 19420), nnz=207,632, density=0.075827, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Expected sparse reducer: stat=any2spe, shape=(141, 116520), nnz=670,284, density=0.040798, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Time elapsed for merging tables: 0 sec
+Arity = 3, cb: median omegaCany2any (non-corrected for dNc vs dSc distribution ranges): 4.398
+Arity = 3, cb: median omegaCany2dif (non-corrected for dNc vs dSc distribution ranges): 2.598
+Arity = 3, cb: median omegaCany2spe (non-corrected for dNc vs dSc distribution ranges): 149.687
+Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no
+Branch-distance scheduler: combinations=446, workers=1 (threads=1, direct)
+Inter-branch distance: 0th in the id range 0-446: 0 sec
+Time elapsed for calculating inter-branch distances: 0 sec
+Time elapsed for the linear regression of C ~ D: 0 sec
+Arity (K) = 3: Foreground branch combinations with cutoff conditions OCNany2spe,2.0|omegaCany2spe,5.0 for PLACEHOLDER = 0% (0/39, total examined = 446, enrichment factor = 0.0)
+Time elapsed for obtaining foreground branch numbers in the cb table: 0 sec
+Time elapsed for sorting cb table: 0 sec
+Memory consumption of cb table: 0.1 Mbytes (dtype=object)
+Total OCNany2any/ECNany2any = 883.1/297.6 (expectation = 33.7% of observation)
+Total OCNany2dif/ECNany2dif = 531.0/290.6 (expectation = 54.7% of observation)
+Total OCNany2spe/ECNany2spe = 352.1/7.0 (expectation = 2.0% of observation)
+Total OCSany2any/ECSany2any = 613.9/934.2 (expectation = 152.2% of observation)
+Total OCSany2dif/ECSany2dif = 562.2/856.8 (expectation = 152.4% of observation)
+Total OCSany2spe/ECSany2spe = 51.7/77.4 (expectation = 149.6% of observation)
+Elapsed time for arity = 3: 0.0 sec
+
+Arity (K) = 4: Generating cb table
+Arity (K) = 4: Heuristic search with 39 K-1 branch combinations that passed cutoff stats (OCNany2spe,2.0|omegaCany2spe,5.0)
+Number of all branches: 140
+Number of redundant branch combination unions for all: 741
+Number of branch combinations generated with global independence constraints: 66
+Time elapsed for generating branch combinations: 0 sec
+Number of independent branch combinations to be analyzed: 66
+Preparing OCS table with up to 1 process(es).
+cb reducer scheduler: combinations=66, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=66, branches=141, arity=4)
+Sparse cb projection product: stat=any2any, arity=4, shape=(141, 19420), nnz=107,208, density=0.039152, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=4, shape=(141, 116520), nnz=229,839, density=0.013990, backend=sparse_intersection
+Preparing OCN table with up to 1 process(es).
+cb reducer scheduler: combinations=66, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=66, branches=141, arity=4)
+Sparse cb projection product: stat=any2any, arity=4, shape=(141, 971), nnz=35,913, density=0.262309, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=4, shape=(141, 19420), nnz=82,391, density=0.030089, backend=sparse_intersection
+Time elapsed for merging tables: 0 sec
+Reusing expected nonsynonymous sparse projections.
+Number of total empirically expected nonsynonymous substitutions in the tree: 5,551.08
+Preparing the ECN table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 971), nnz=110,106, density=0.804216, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Expected sparse reducer: stat=any2spe, shape=(141, 19420), nnz=2,127,888, density=0.777106, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Time elapsed for merging tables: 0 sec
+Reusing expected synonymous sparse projections.
+Number of total empirically expected synonymous substitutions in the tree: 14,186.49
+Preparing the ECS table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 19420), nnz=207,632, density=0.075827, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Expected sparse reducer: stat=any2spe, shape=(141, 116520), nnz=670,284, density=0.040798, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Time elapsed for merging tables: 0 sec
+Arity = 4, cb: median omegaCany2any (non-corrected for dNc vs dSc distribution ranges): 22.501
+Arity = 4, cb: median omegaCany2dif (non-corrected for dNc vs dSc distribution ranges): 5.056
+Arity = 4, cb: median omegaCany2spe (non-corrected for dNc vs dSc distribution ranges): 13022156.793
+Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no
+Branch-distance scheduler: combinations=66, workers=1 (threads=1, vectorized, nodes=17)
+Time elapsed for calculating inter-branch distances: 0 sec
+Time elapsed for the linear regression of C ~ D: 0 sec
+Arity (K) = 4: Foreground branch combinations with cutoff conditions OCNany2spe,2.0|omegaCany2spe,5.0 for PLACEHOLDER = 0% (0/20, total examined = 66, enrichment factor = 0.0)
+Time elapsed for obtaining foreground branch numbers in the cb table: 0 sec
+Time elapsed for sorting cb table: 0 sec
+Memory consumption of cb table: 0.0 Mbytes (dtype=object)
+Total OCNany2any/ECNany2any = 152.9/8.9 (expectation = 5.8% of observation)
+Total OCNany2dif/ECNany2dif = 53.9/8.8 (expectation = 16.4% of observation)
+Total OCNany2spe/ECNany2spe = 99.0/0.0 (expectation = 0.0% of observation)
+Total OCSany2any/ECSany2any = 26.9/22.3 (expectation = 82.8% of observation)
+Total OCSany2dif/ECSany2dif = 24.9/21.6 (expectation = 87.1% of observation)
+Total OCSany2spe/ECSany2spe = 2.0/0.6 (expectation = 30.7% of observation)
+Elapsed time for arity = 4: 0.0 sec
+
+Arity (K) = 5: Generating cb table
+Arity (K) = 5: Heuristic search with 20 K-1 branch combinations that passed cutoff stats (OCNany2spe,2.0|omegaCany2spe,5.0)
+Number of all branches: 140
+Number of redundant branch combination unions for all: 190
+Number of branch combinations generated with global independence constraints: 13
+Time elapsed for generating branch combinations: 0 sec
+Number of independent branch combinations to be analyzed: 13
+Preparing OCS table with up to 1 process(es).
+cb reducer scheduler: combinations=13, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=13, branches=141, arity=5)
+Sparse cb projection product: stat=any2any, arity=5, shape=(141, 19420), nnz=107,208, density=0.039152, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=5, shape=(141, 116520), nnz=229,839, density=0.013990, backend=sparse_intersection
+Preparing OCN table with up to 1 process(es).
+cb reducer scheduler: combinations=13, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=13, branches=141, arity=5)
+Sparse cb projection product: stat=any2any, arity=5, shape=(141, 971), nnz=35,913, density=0.262309, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=5, shape=(141, 19420), nnz=82,391, density=0.030089, backend=sparse_intersection
+Time elapsed for merging tables: 0 sec
+Reusing expected nonsynonymous sparse projections.
+Number of total empirically expected nonsynonymous substitutions in the tree: 5,551.08
+Preparing the ECN table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 971), nnz=110,106, density=0.804216, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Expected sparse reducer: stat=any2spe, shape=(141, 19420), nnz=2,127,888, density=0.777106, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Time elapsed for merging tables: 0 sec
+Reusing expected synonymous sparse projections.
+Number of total empirically expected synonymous substitutions in the tree: 14,186.49
+Preparing the ECS table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 19420), nnz=207,632, density=0.075827, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Expected sparse reducer: stat=any2spe, shape=(141, 116520), nnz=670,284, density=0.040798, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Time elapsed for merging tables: 0 sec
+Arity = 5, cb: median omegaCany2any (non-corrected for dNc vs dSc distribution ranges): 35224.886
+Arity = 5, cb: median omegaCany2dif (non-corrected for dNc vs dSc distribution ranges): 1102.696
+Arity = 5, cb: median omegaCany2spe (non-corrected for dNc vs dSc distribution ranges): inf
+Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no
+Branch-distance scheduler: combinations=13, workers=1 (threads=1, vectorized, nodes=11)
+Time elapsed for calculating inter-branch distances: 0 sec
+Time elapsed for the linear regression of C ~ D: 0 sec
+Arity (K) = 5: Foreground branch combinations with cutoff conditions OCNany2spe,2.0|omegaCany2spe,5.0 for PLACEHOLDER = 0% (0/6, total examined = 13, enrichment factor = 0.0)
+Time elapsed for obtaining foreground branch numbers in the cb table: 0 sec
+Time elapsed for sorting cb table: 0 sec
+Memory consumption of cb table: 0.0 Mbytes (dtype=object)
+Total OCNany2any/ECNany2any = 27.8/0.2 (expectation = 0.7% of observation)
+Total OCNany2dif/ECNany2dif = 3.1/0.2 (expectation = 5.9% of observation)
+Total OCNany2spe/ECNany2spe = 24.7/0.0 (expectation = 0.0% of observation)
+Total OCSany2any/ECSany2any = 1.5/0.6 (expectation = 38.6% of observation)
+Total OCSany2dif/ECSany2dif = 1.5/0.6 (expectation = 38.3% of observation)
+Total OCSany2spe/ECSany2spe = 0.0/0.0 (expectation = 19,771.8% of observation)
+Elapsed time for arity = 5: 0.0 sec
+
+Arity (K) = 6: Generating cb table
+Arity (K) = 6: Heuristic search with 6 K-1 branch combinations that passed cutoff stats (OCNany2spe,2.0|omegaCany2spe,5.0)
+Number of all branches: 140
+Number of redundant branch combination unions for all: 15
+Number of branch combinations generated with global independence constraints: 1
+Time elapsed for generating branch combinations: 0 sec
+Number of independent branch combinations to be analyzed: 1
+Preparing OCS table with up to 1 process(es).
+cb reducer scheduler: combinations=1, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=1, branches=141, arity=6)
+Sparse cb projection product: stat=any2any, arity=6, shape=(141, 19420), nnz=107,208, density=0.039152, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=6, shape=(141, 116520), nnz=229,839, density=0.013990, backend=sparse_intersection
+Preparing OCN table with up to 1 process(es).
+cb reducer scheduler: combinations=1, workers=1 (threads=1)
+Sparse cb backend: resolved=projection_product (combinations=1, branches=141, arity=6)
+Sparse cb projection product: stat=any2any, arity=6, shape=(141, 971), nnz=35,913, density=0.262309, backend=sparse_intersection
+Sparse cb projection product: stat=any2spe, arity=6, shape=(141, 19420), nnz=82,391, density=0.030089, backend=sparse_intersection
+Time elapsed for merging tables: 0 sec
+Reusing expected nonsynonymous sparse projections.
+Number of total empirically expected nonsynonymous substitutions in the tree: 5,551.08
+Preparing the ECN table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 971), nnz=110,106, density=0.804216, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Expected sparse reducer: stat=any2spe, shape=(141, 19420), nnz=2,127,888, density=0.777106, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Time elapsed for merging tables: 0 sec
+Released final-arity EN sparse projections (26,857,064 bytes).
+Reusing expected synonymous sparse projections.
+Number of total empirically expected synonymous substitutions in the tree: 14,186.49
+Preparing the ECS table with up to 1 process(es).
+Expected sparse reducer: stat=any2any, shape=(141, 19420), nnz=207,632, density=0.075827, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Expected sparse reducer: stat=any2spe, shape=(141, 116520), nnz=670,284, density=0.040798, backend=projection_product (pair_coverage=0.000, threshold=1.000)
+Time elapsed for merging tables: 0 sec
+Released final-arity ES sparse projections (10,536,128 bytes).
+Arity = 6, cb: median omegaCany2any (non-corrected for dNc vs dSc distribution ranges): 1603660.124
+Arity = 6, cb: median omegaCany2dif (non-corrected for dNc vs dSc distribution ranges): 19561.700
+Arity = 6, cb: median omegaCany2spe (non-corrected for dNc vs dSc distribution ranges): inf
+Starting branch distance calculation. If it takes too long, disable this step by --branch_dist no
+Branch-distance scheduler: combinations=1, workers=1 (threads=1, direct)
+Inter-branch distance: 0th in the id range 0-1: 0 sec
+Time elapsed for calculating inter-branch distances: 0 sec
+Time elapsed for the linear regression of C ~ D: 0 sec
+Arity (K) = 6: Foreground branch combinations with cutoff conditions OCNany2spe,2.0|omegaCany2spe,5.0 for PLACEHOLDER = 0% (0/1, total examined = 1, enrichment factor = 0.0)
+Time elapsed for obtaining foreground branch numbers in the cb table: 0 sec
+Time elapsed for sorting cb table: 0 sec
+Memory consumption of cb table: 0.0 Mbytes (dtype=object)
+Total OCNany2any/ECNany2any = 2.5/0.0 (expectation = 0.0% of observation)
+Total OCNany2dif/ECNany2dif = 0.0/0.0 (expectation = 3.3% of observation)
+Total OCNany2spe/ECNany2spe = 2.5/0.0 (expectation = 0.0% of observation)
+Total OCSany2any/ECSany2any = 0.0/0.0 (expectation = 64,961.0% of observation)
+Total OCSany2dif/ECSany2dif = 0.0/0.0 (expectation = 64,777.1% of observation)
+Total OCSany2spe/ECSany2spe = 0.0/0.0 (expectation = 4,967,277,373,457,398.0% of observation)
+Elapsed time for arity = 6: 0.0 sec
+
+Maximum arity (K = 6) reached. Ending higher-order search of branch combinations.
+Writing /tmp/endpoint-search-fix/marginal-t1-byes/csubst_cb_stats.tsv
+csubst search: Time elapsed: 5 sec
+csubst search end: 2026-09-10 07:24:24.640700+00:00
+
+CSUBST end: 2026-09-10 07:24:24.641423+00:00, Elapsed time = 5.0 sec

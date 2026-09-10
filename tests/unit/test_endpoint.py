@@ -107,3 +107,43 @@ def test_inactive_structural_states_and_missing_tips():
 def test_invalid_tree_rejected(parents, lengths):
     with pytest.raises(ValueError):
         EndpointModel(parents, lengths, [[-1, 1], [1, -1]], [.5, .5])
+
+
+@pytest.mark.parametrize('length', [0, 1e-10, 1e-5, .1, 1, 10, 100])
+def test_shared_transition_powers_match_expm_for_rare_events(length):
+    # A chain forces transitions across many jumps, exercising tiny entries
+    # that can lose relative accuracy under spectral reconstruction.
+    k = 8
+    q = np.zeros((k, k))
+    for i in range(k - 1):
+        q[i, i + 1] = q[i + 1, i] = .7
+    np.fill_diagonal(q, -q.sum(axis=1))
+    model = EndpointModel([-1, 0], [0, length], q, np.ones(k) / k)
+    expected = expm(q * length)
+    if 0 < length < .01:
+        # Pade is not an entrywise-relative reference for these tiny multi-hop
+        # probabilities. Independently sum exp(Qt) in decimal arithmetic.
+        from decimal import Decimal, localcontext
+        with localcontext() as ctx:
+            ctx.prec = 110
+            operator = [[Decimal(str(q[i, j])) * Decimal(str(length)) for j in range(k)] for i in range(k)]
+            term = [[Decimal(int(i == j)) for j in range(k)] for i in range(k)]
+            total = [row.copy() for row in term]
+            for n in range(1, 50):
+                term = [[sum(term[i][z] * operator[z][j] for z in range(k)) / n
+                         for j in range(k)] for i in range(k)]
+                total = [[total[i][j] + term[i][j] for j in range(k)] for i in range(k)]
+                if max(abs(x) for row in term for x in row) < Decimal('1e-100'):
+                    break
+            expected = np.array(total, dtype=float)
+    np.testing.assert_allclose(model.transition(1, 0), expected, atol=1e-300, rtol=3e-14)
+    assert model._uniform_powers.nbytes <= 8 * 1024 * 1024
+
+
+def test_shared_transition_nonreversible_and_zero_generator():
+    q = np.array([[-1., 1, 0], [0, -1., 1], [1, 0, -1.]])
+    model = EndpointModel([-1, 0, 0], [0, .3, .8], q, np.ones(3) / 3)
+    for branch in [1, 2]:
+        np.testing.assert_allclose(model.transition(branch, 0), expm(q * model.lengths[branch]), atol=1e-15)
+    zero = EndpointModel([-1, 0], [0, 10], np.zeros((3, 3)), np.ones(3) / 3)
+    np.testing.assert_array_equal(zero.transition(1, 0), np.eye(3))

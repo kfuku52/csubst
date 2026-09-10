@@ -335,3 +335,20 @@ def test_get_state_tensor_rejects_invalid_probability_rows(tmp_path):
     g["path_iqtree_state"] = str(state_file)
     with pytest.raises(ValueError, match="Invalid probability"):
         parser_iqtree.get_state_tensor(g)
+
+
+def test_joint_search_reads_tips_without_loading_recomputed_internal_posteriors(tmp_path, monkeypatch):
+    g = _make_state_tensor_g(tmp_path, '>A\nAAAAAC\n>B\nAAGAAG\n')
+    expected = parser_iqtree.get_state_tensor(g)
+    g.update(subcommand='search', substitution_posterior='joint', nonsyn_recode='no')
+    def unexpected_read(**kwargs):
+        raise AssertionError('Joint search should not parse unused internal probabilities.')
+    monkeypatch.setattr(parser_iqtree, '_load_internal_state_rows_one_pass', unexpected_read)
+    actual = parser_iqtree.get_state_tensor(g)
+    for node in g['tree'].traverse():
+        i = int(ete.get_prop(node, 'numerical_label'))
+        if ete.is_leaf(node):
+            np.testing.assert_array_equal(actual[i], expected[i])
+        else:
+            assert not actual[i].any()
+    assert g['_endpoint_tip_only_input']

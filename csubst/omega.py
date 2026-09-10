@@ -3029,9 +3029,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         txt = 'Number of total empirically expected nonsynonymous substitutions in the tree: {:,.2f}'
         print(txt.format(g['EN_reducer']['total']))
         print('Preparing the ECN table with up to {:,} process(es).'.format(g['threads']), flush=True)
-        cbEN = substitution.get_cb_from_sparse_projections(
+        cbEN = substitution.get_cb_from_expected_reducer(
             id_combinations=cb.loc[:, id_cols].values,
-            projections=g['EN_reducer']['projections'],
+            reducer=g['EN_reducer'],
             attr='ECN',
             g=g,
             selected_base_stats=base_stats,
@@ -3045,6 +3045,8 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         if is_final_arity:
             released_nbytes = int(g['EN_reducer']['storage'])
             del g['EN_reducer']
+            from csubst import endpoint_io
+            endpoint_io.release_expected(g, 'N')
             print(
                 'Released final-arity EN sparse projections ({:,} bytes).'.format(released_nbytes),
                 flush=True,
@@ -3068,9 +3070,9 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
         print(txt.format(g['ES_reducer']['total']))
         print('Preparing the ECS table with up to {:,} process(es).'.format(g['threads']), flush=True)
-        cbES = substitution.get_cb_from_sparse_projections(
+        cbES = substitution.get_cb_from_expected_reducer(
             id_combinations=cb.loc[:, id_cols].values,
-            projections=g['ES_reducer']['projections'],
+            reducer=g['ES_reducer'],
             attr='ECS',
             g=g,
             selected_base_stats=base_stats,
@@ -3083,6 +3085,8 @@ def get_E(cb, g, ON_tensor, OS_tensor):
         if is_final_arity:
             released_nbytes = int(g['ES_reducer']['storage'])
             del g['ES_reducer']
+            from csubst import endpoint_io
+            endpoint_io.release_expected(g, 'S')
             print(
                 'Released final-arity ES sparse projections ({:,} bytes).'.format(released_nbytes),
                 flush=True,

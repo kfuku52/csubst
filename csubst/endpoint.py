@@ -73,13 +73,58 @@ class EndpointModel:
             raise ValueError('Endpoint tree is disconnected.')
         self.leaves = {i for i, children in enumerate(self.children) if not children}
         self._transitions = OrderedDict()
+        self._uniform_rate = float(np.max(-np.diag(self.q)))
+        # Share nonnegative uniformization powers across all edge lengths and
+        # categories. Cap this cache independently of the transition cache.
+        capacity = min(256, max(1, (8 * 1024 * 1024) // (8 * k * k)))
+        self._uniform_powers = np.empty((capacity, k, k))
+        self._uniform_powers[0] = np.eye(k)
+        self._uniform_count = 1
+        self._uniform_kernel = (np.eye(k) + self.q / self._uniform_rate
+                                if self._uniform_rate > 0 else np.eye(k))
         # Cap the transition cache independently of the number of sites/nodes.
         self._cache_items = max(1, (32 * 1024 * 1024) // (8 * k * k))
+
+    def _uniform_transition(self, t):
+        """exp(Qt) = exp(-mu*t) sum_n (mu*t)^n/n! (I + Q/mu)^n.
+
+        All terms are nonnegative. The omitted Poisson tail bounds every
+        matrix entry; compare it with the smallest positive partial entry to
+        protect relative accuracy even for rare transitions. Use expm outside
+        the bounded power workspace, without changing the model or threshold.
+        """
+        tau = self._uniform_rate * t
+        if tau == 0:
+            return np.eye(self.pi.size)
+        capacity = self._uniform_powers.shape[0]
+        if tau > 32 or capacity < self.pi.size:
+            return None
+        coefficients = np.empty(capacity)
+        coefficients[0] = np.exp(-tau)
+        target = 1e-18
+        for n in range(1, capacity):
+            coefficients[n] = coefficients[n - 1] * tau / n
+            if n < self.pi.size - 1 or n + 1 <= tau:
+                continue
+            tail = coefficients[n] * tau / (n + 1 - tau)
+            if tail > target:
+                continue
+            while self._uniform_count <= n:
+                i = self._uniform_count
+                self._uniform_powers[i] = self._uniform_powers[i - 1] @ self._uniform_kernel
+                self._uniform_count += 1
+            matrix = (coefficients[:n + 1] @ self._uniform_powers[:n + 1].reshape(n + 1, -1)).reshape(self.q.shape)
+            target = float(matrix[matrix > 0].min() * np.finfo(float).eps * 0.25)
+            if tail <= target:
+                return matrix
+        return None
 
     def transition(self, child, category):
         t = float(self.lengths[child] * self.rates[category])
         if t not in self._transitions:
-            matrix = expm(self.q * t)
+            matrix = self._uniform_transition(t)
+            if matrix is None:
+                matrix = expm(self.q * t)
             if matrix.min() < -1e-12 or not np.allclose(matrix.sum(axis=1), 1, atol=1e-10):
                 raise ValueError('Invalid CTMC transition matrix.')
             matrix = np.maximum(matrix, 0)

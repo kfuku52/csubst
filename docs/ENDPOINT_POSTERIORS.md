@@ -53,8 +53,10 @@ This is a fitted conditional endpoint prediction with the same S/N
 classification as the observed joint. It retains the parent state in the
 transition calculation, rather than multiplying it by an already mixed child
 marginal. Fitted lengths are used; diagnostic lengths rescaled from observed
-counts do not replace them. The endpoint engine uses SciPy `expm`;
-`--expected_state_backend` controls the legacy marginal route.
+counts do not replace them. The endpoint engine shares nonnegative transition
+powers across lengths/categories (uniformization), and uses SciPy `expm` when
+the bounded power cache is insufficient. `--expected_state_backend` controls
+the legacy marginal route.
 
 Production model expectations share the joint sparse reducer. Legacy
 `get_exp_state` and the legacy fused parent/child-marginal helper reject joint
@@ -73,12 +75,17 @@ Thresholding posterior events is data-dependent selection; the analytical
 prediction does not calibrate that selection. Scan exposure and scan P-value
 calibration are unchanged.
 
+Higher-order candidate selection is shared by both estimators; see the
+[higher-order search guide](HIGHER_ORDER_SEARCH.md) for foreground handling,
+cutoff priority, and the candidate cap.
+
 ## Memory and time
 
 For N nodes, C categories, K states and block size B, the principal inference
 workspace is O(N C B K). Parent-to-child marginals use matrix multiplication;
 they do not need a site × from × to array. The transition cache is capped at
-approximately 32 MiB. No ancestral scenarios are sampled.
+approximately 32 MiB, with an additional power cache of at most 8 MiB for the
+supported codon/3Di state spaces. No ancestral scenarios are sampled.
 
 Search with codon-model expectations retains only the requested observed
 projections and branch/site counts when individual events are unnecessary.
@@ -94,6 +101,44 @@ the extension is unavailable. Both sum nonnegative terms, avoiding subtraction
 of near-unit unchanged probabilities and preserving tiny changes. No posterior
 probability is discarded for the optimization.
 
+For arity=2, the engine can go one step further: accumulate branch-pair Gram
+matrices for each site block and discard the block's projections. This avoids
+all-site projection CSR storage, its sorting/index buffers, and temporary disk
+payloads. Branch/site counts and optional branch substitution strings are still
+available. The pair matrices, block features, counts and temporary product are
+estimated before allocation; this route is used only within a 64 MiB workspace
+budget. This budget does not include input state arrays or pruning workspace.
+Large trees exceeding it retain the projection route, avoiding an uncontrolled
+quadratic allocation. Higher arities, site-filter reports and clade permutations
+also retain projections because their later consumers can need them.
+
+Near-marginal runtime is currently limited to the measured arity=2 search
+without branch or site tables. Disabling site tables alone is insufficient:
+`--b yes` needs individual event maxima for branch substitution strings, and
+higher arities retain larger projections. PEPC measurements found joint about
+1.5–2.2 times slower for exhaustive arity=3, 3.5–4.1 times slower for targeted
+arity=4, and 3.7 times slower for arity=2 with the branch table enabled.
+`--threads` alone does not parallelize the projected joint reducer;
+`--blas_threads` can accelerate its matrix products. See the
+[arity/CPU/output benchmark](../reports/endpoint_scaling_20260910/README.md)
+for the workload, timing ranges, numerical checks and platform limitations.
+
+Ordinary unrecoded joint search reads tip observations and the state-file header,
+skipping the internal probability rows that pruning will overwrite. Existing
+model/input checks and tip ambiguity handling still apply. Other recoding and
+site/scan paths retain their existing loading contracts.
+
+Once the final expected reducer is consumed, both the active reducer and its
+endpoint-cache reference are released when the analysis declares there will be
+no further reuse. Clade permutations retain their reusable cache.
+
+Transition powers use `R = I + Q/mu`, where `mu = max(-diag(Q))`. The engine
+forms `exp(-mu*t) sum_n (mu*t)^n/n! R^n`. Reusing the powers avoids a matrix
+exponential per length/category, while nonnegative terms preserve rare
+transition probabilities. The remaining Poisson tail is checked against the
+smallest positive partial matrix entry. Very large times or insufficient cache
+capacity use `expm`; no branch length or posterior probability is truncated.
+
 Consumers needing full events or additional summaries retain the full sparse
 representation: sites/scan, `spe2spe`, CS/CBS tables, positive `min_sub_pp`, urn,
 P-values, long-tail calibration, epistasis, ASRV diagnostics, and restricted ASRV
@@ -104,8 +149,8 @@ search representation yet.
 CSR outputs are spooled to temporary files and allocated once. Temporary disk
 must accommodate those payloads. Final projections (or full sparse outputs),
 ordinary state arrays, and downstream reduction buffers still occupy RAM.
-`*_endpoint_model.json` records `observed_storage` and `direct_projection` for
-each fitted model so the selected route can be inspected.
+`*_endpoint_model.json` records `observed_storage` (`pairwise`, `projections`, or `full_events`) and
+`direct_projection` for each fitted model so the selected route can be inspected.
 
 Optimization comparison against a saved pre-change source tree:
 
@@ -119,7 +164,11 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 
 Both source trees must have compatible built extensions. This benchmark
 alternates old marginal, pre-optimization joint, and optimized joint in isolated
-processes and checks the full CB table for numerical agreement. Add
+processes and captures the unrounded CB table as well as the normal TSV. Counts
+and annotations are checked directly; ratio differences are checked against
+the numerical differences in their already-validated numerator/denominator.
+Ratios with a very small denominator can amplify floating-point summation
+differences, including changes in the final displayed digit. Add
 `--branch-table` to include the default branch substitution strings.
 
 Reproduce isolated-process measurements (one warmup, three measured runs):

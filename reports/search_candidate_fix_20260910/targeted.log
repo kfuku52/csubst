@@ -1,0 +1,8 @@
+........................................................                 [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+56 passed, 1 warning in 1.05s

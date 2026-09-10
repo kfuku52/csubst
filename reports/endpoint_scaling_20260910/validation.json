@@ -1,0 +1,6430 @@
+{
+  "within_method_parity": [
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t1-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t1-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t1-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t1-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t2-b1-joint-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t2-b1-marginal-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t2-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t2-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t2-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t2-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t4-b1-joint-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t4-b1-marginal-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t4-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t4-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t4-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t4-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t1-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t1-b1-marginal-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t1-b1-marginal-r2",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t1-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t1-b1-joint-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t1-b1-joint-r2",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t1-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t1-b1-joint-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t1-b1-joint-r3",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t1-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t1-b1-marginal-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t1-b1-marginal-r3",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r1",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r1",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r1",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r1",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r2",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r2",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t2-b1-joint-r3",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t2-b1-marginal-r3",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r1",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r1",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r1",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r1",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r2",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r2",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-joint-r1",
+      "candidate": "foreground4-t4-b1-joint-r3",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        64,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        200,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "foreground4-t1-b1-marginal-r1",
+      "candidate": "foreground4-t4-b1-marginal-r3",
+      "table": "csubst_cb_4.tsv.unrounded.pkl",
+      "shape": [
+        406,
+        45
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t1-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t1-b1-marginal-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        307432,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t1-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t1-b1-joint-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        315740,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t1-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t1-b1-joint-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        315740,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t1-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t1-b1-marginal-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        307432,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b1-joint-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b1-joint-r1",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        315740,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b1-marginal-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b1-marginal-r1",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        307432,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b1-marginal-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        307432,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b1-joint-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        315740,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b1-joint-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        315740,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b1-marginal-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        307432,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t4-b4-joint-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 9.094947017729282e-13,
+          "max_relative_difference": 1.5992959150988182e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 6.821210263296962e-13,
+          "max_relative_difference": 1.1716369558204316e-13
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 5.820766091346741e-11,
+          "max_relative_difference": 1.9097244228154933e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 1.2742501502706605e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 9.328979345087226e-14
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 1.5485051945547121e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 1.0658141036401503e-14,
+          "max_relative_difference": 1.525916627332917e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 1.4210854715202004e-14,
+          "max_relative_difference": 1.1756850802035697e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 2.1997766996803617e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 5.331912689143792e-11,
+          "max_relative_difference": 9.367198276209637e-14
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 9.913492249324918e-11,
+          "max_relative_difference": 1.1762008945929697e-13
+        }
+      },
+      "max_count_absolute_difference": 2.842170943040401e-14
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t4-b4-marginal-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 3.4580125429783948e-09,
+          "max_relative_difference": 9.883839868629027e-12
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.2237819646543358e-09,
+          "max_relative_difference": 1.0350960713591349e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 3.7431163946166635e-07,
+          "max_relative_difference": 6.408038302796046e-12
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.575540029667536e-12,
+          "max_relative_difference": 9.882550545001695e-12
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 6.184830425581822e-12,
+          "max_relative_difference": 1.0349553549891938e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 4.490630090003833e-11,
+          "max_relative_difference": 6.407276616142257e-12
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 6.217248937900877e-15,
+          "max_relative_difference": 3.132013371989083e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 7.105427357601002e-15,
+          "max_relative_difference": 2.595768199580895e-15
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7763568394002505e-15,
+          "max_relative_difference": 5.662453903494161e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 6.394884621840902e-14
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t4-b4-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 3.4580125429783948e-09,
+          "max_relative_difference": 9.883839868629027e-12
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.2237819646543358e-09,
+          "max_relative_difference": 1.0350960713591349e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 3.7431163946166635e-07,
+          "max_relative_difference": 6.408038302796046e-12
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.575540029667536e-12,
+          "max_relative_difference": 9.882550545001695e-12
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 6.184830425581822e-12,
+          "max_relative_difference": 1.0349553549891938e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 4.490630090003833e-11,
+          "max_relative_difference": 6.407276616142257e-12
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 6.217248937900877e-15,
+          "max_relative_difference": 3.132013371989083e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 7.105427357601002e-15,
+          "max_relative_difference": 2.595768199580895e-15
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7763568394002505e-15,
+          "max_relative_difference": 5.662453903494161e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 6.394884621840902e-14
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t4-b4-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 9.094947017729282e-13,
+          "max_relative_difference": 1.5992959150988182e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 6.821210263296962e-13,
+          "max_relative_difference": 1.1716369558204316e-13
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 5.820766091346741e-11,
+          "max_relative_difference": 1.9097244228154933e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 1.2742501502706605e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 9.328979345087226e-14
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 1.5485051945547121e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 1.0658141036401503e-14,
+          "max_relative_difference": 1.525916627332917e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 1.4210854715202004e-14,
+          "max_relative_difference": 1.1756850802035697e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 2.1997766996803617e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 5.331912689143792e-11,
+          "max_relative_difference": 9.367198276209637e-14
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 9.913492249324918e-11,
+          "max_relative_difference": 1.1762008945929697e-13
+        }
+      },
+      "max_count_absolute_difference": 2.842170943040401e-14
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair-t4-b4-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 9.094947017729282e-13,
+          "max_relative_difference": 1.5992959150988182e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 6.821210263296962e-13,
+          "max_relative_difference": 1.1716369558204316e-13
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 5.820766091346741e-11,
+          "max_relative_difference": 1.9097244228154933e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 1.2742501502706605e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 9.328979345087226e-14
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 1.5485051945547121e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 1.0658141036401503e-14,
+          "max_relative_difference": 1.525916627332917e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 1.4210854715202004e-14,
+          "max_relative_difference": 1.1756850802035697e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 2.1997766996803617e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 5.331912689143792e-11,
+          "max_relative_difference": 9.367198276209637e-14
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 9.913492249324918e-11,
+          "max_relative_difference": 1.1762008945929697e-13
+        }
+      },
+      "max_count_absolute_difference": 2.842170943040401e-14
+    },
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair-t4-b4-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 3.4580125429783948e-09,
+          "max_relative_difference": 9.883839868629027e-12
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.2237819646543358e-09,
+          "max_relative_difference": 1.0350960713591349e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 3.7431163946166635e-07,
+          "max_relative_difference": 6.408038302796046e-12
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.575540029667536e-12,
+          "max_relative_difference": 9.882550545001695e-12
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 6.184830425581822e-12,
+          "max_relative_difference": 1.0349553549891938e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 4.490630090003833e-11,
+          "max_relative_difference": 6.407276616142257e-12
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 6.217248937900877e-15,
+          "max_relative_difference": 3.132013371989083e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 7.105427357601002e-15,
+          "max_relative_difference": 2.595768199580895e-15
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7763568394002505e-15,
+          "max_relative_difference": 5.662453903494161e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 6.394884621840902e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b4-joint-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 1.0913936421275139e-11,
+          "max_relative_difference": 1.6526552216651187e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 4.5929482439532876e-11,
+          "max_relative_difference": 1.093408440519963e-13
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 2.9103830456733704e-11,
+          "max_relative_difference": 2.1395575055870277e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 1.279526950702298e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 3.6109658207297224e-14
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 1.3050351661662834e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 1.0658141036401503e-14,
+          "max_relative_difference": 1.4481677248949677e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 1.4210854715202004e-14,
+          "max_relative_difference": 1.0949325677621727e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 2.3689902919634624e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 6.45172804070171e-12,
+          "max_relative_difference": 3.6398344686568526e-14
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 5.650235834764317e-11,
+          "max_relative_difference": 1.097975976684904e-13
+        }
+      },
+      "max_count_absolute_difference": 2.842170943040401e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b4-joint-r1",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        315740,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 1.6763806343078613e-08,
+          "max_relative_difference": 3.7357056954993664e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.6763806343078613e-08,
+          "max_relative_difference": 6.157654757672652e-10
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 4.76837158203125e-07,
+          "max_relative_difference": 4.4023013249561475e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 1.0231815394945443e-12,
+          "max_relative_difference": 3.165039957875447e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 1.1368683772161603e-12,
+          "max_relative_difference": 6.157655572653159e-10
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.7284841053187847e-12,
+          "max_relative_difference": 3.025377461789241e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 2.2737367544323206e-13,
+          "max_relative_difference": 2.91911464095547e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 2.8421709430404007e-13,
+          "max_relative_difference": 9.67398913495456e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7053025658242404e-12,
+          "max_relative_difference": 4.244508735055557e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0006596413441002369,
+          "max_relative_difference": 6.157648574357851e-10
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 7.494236342608929e-09,
+          "max_relative_difference": 9.669480686171205e-13
+        }
+      },
+      "max_count_absolute_difference": 1.4210854715202004e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b4-marginal-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 3.4580125429783948e-09,
+          "max_relative_difference": 9.883839868629027e-12
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.2237819646543358e-09,
+          "max_relative_difference": 1.0350960713591349e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 3.7431163946166635e-07,
+          "max_relative_difference": 6.408038302796046e-12
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.575540029667536e-12,
+          "max_relative_difference": 9.882550545001695e-12
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 6.184830425581822e-12,
+          "max_relative_difference": 1.0349553549891938e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 4.490630090003833e-11,
+          "max_relative_difference": 6.407276616142257e-12
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 6.217248937900877e-15,
+          "max_relative_difference": 3.132013371989083e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 7.105427357601002e-15,
+          "max_relative_difference": 2.595768199580895e-15
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7763568394002505e-15,
+          "max_relative_difference": 5.662453903494161e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 6.394884621840902e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b4-marginal-r1",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        307432,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 4.607019945979118e-06,
+          "max_relative_difference": 1.804426258501787e-11
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 4.547648131847382e-06,
+          "max_relative_difference": 1.837496552620761e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.00044536590576171875,
+          "max_relative_difference": 1.531822483935233e-11
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.277911441226024e-11,
+          "max_relative_difference": 1.804372144022791e-11
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 5.4367177426684066e-11,
+          "max_relative_difference": 1.8374307945990013e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 1.434500518371351e-09,
+          "max_relative_difference": 1.5398918677782167e-11
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 4.263256414560601e-14,
+          "max_relative_difference": 1.655370595318575e-14
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 4.973799150320701e-14,
+          "max_relative_difference": 1.575725073330959e-14
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.1368683772161603e-13,
+          "max_relative_difference": 3.1325671967887026e-14
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 1.3322676295501878e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b4-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 3.4580125429783948e-09,
+          "max_relative_difference": 9.883839868629027e-12
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.2237819646543358e-09,
+          "max_relative_difference": 1.0350960713591349e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 3.7431163946166635e-07,
+          "max_relative_difference": 6.408038302796046e-12
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.575540029667536e-12,
+          "max_relative_difference": 9.882550545001695e-12
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 6.184830425581822e-12,
+          "max_relative_difference": 1.0349553549891938e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 4.490630090003833e-11,
+          "max_relative_difference": 6.407276616142257e-12
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 6.217248937900877e-15,
+          "max_relative_difference": 3.132013371989083e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 7.105427357601002e-15,
+          "max_relative_difference": 2.595768199580895e-15
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7763568394002505e-15,
+          "max_relative_difference": 5.662453903494161e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 6.394884621840902e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b4-marginal-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        307432,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 4.607019945979118e-06,
+          "max_relative_difference": 1.804426258501787e-11
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 4.547648131847382e-06,
+          "max_relative_difference": 1.837496552620761e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.00044536590576171875,
+          "max_relative_difference": 1.531822483935233e-11
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.277911441226024e-11,
+          "max_relative_difference": 1.804372144022791e-11
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 5.4367177426684066e-11,
+          "max_relative_difference": 1.8374307945990013e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 1.434500518371351e-09,
+          "max_relative_difference": 1.5398918677782167e-11
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 4.263256414560601e-14,
+          "max_relative_difference": 1.655370595318575e-14
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 4.973799150320701e-14,
+          "max_relative_difference": 1.575725073330959e-14
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.1368683772161603e-13,
+          "max_relative_difference": 3.1325671967887026e-14
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 1.3322676295501878e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b4-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 1.0913936421275139e-11,
+          "max_relative_difference": 1.6526552216651187e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 4.5929482439532876e-11,
+          "max_relative_difference": 1.093408440519963e-13
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 2.9103830456733704e-11,
+          "max_relative_difference": 2.1395575055870277e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 1.279526950702298e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 3.6109658207297224e-14
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 1.3050351661662834e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 1.0658141036401503e-14,
+          "max_relative_difference": 1.4481677248949677e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 1.4210854715202004e-14,
+          "max_relative_difference": 1.0949325677621727e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 2.3689902919634624e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 6.45172804070171e-12,
+          "max_relative_difference": 3.6398344686568526e-14
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 5.650235834764317e-11,
+          "max_relative_difference": 1.097975976684904e-13
+        }
+      },
+      "max_count_absolute_difference": 2.842170943040401e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b4-joint-r2",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        315740,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 1.6763806343078613e-08,
+          "max_relative_difference": 3.7357056954993664e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.6763806343078613e-08,
+          "max_relative_difference": 6.157654757672652e-10
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 4.76837158203125e-07,
+          "max_relative_difference": 4.4023013249561475e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 1.0231815394945443e-12,
+          "max_relative_difference": 3.165039957875447e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 1.1368683772161603e-12,
+          "max_relative_difference": 6.157655572653159e-10
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.7284841053187847e-12,
+          "max_relative_difference": 3.025377461789241e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 2.2737367544323206e-13,
+          "max_relative_difference": 2.91911464095547e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 2.8421709430404007e-13,
+          "max_relative_difference": 9.67398913495456e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7053025658242404e-12,
+          "max_relative_difference": 4.244508735055557e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0006596413441002369,
+          "max_relative_difference": 6.157648574357851e-10
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 7.494236342608929e-09,
+          "max_relative_difference": 9.669480686171205e-13
+        }
+      },
+      "max_count_absolute_difference": 1.4210854715202004e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b4-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 1.0913936421275139e-11,
+          "max_relative_difference": 1.6526552216651187e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 4.5929482439532876e-11,
+          "max_relative_difference": 1.093408440519963e-13
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 2.9103830456733704e-11,
+          "max_relative_difference": 2.1395575055870277e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 1.279526950702298e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 3.6109658207297224e-14
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 1.3050351661662834e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 1.0658141036401503e-14,
+          "max_relative_difference": 1.4481677248949677e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 1.4210854715202004e-14,
+          "max_relative_difference": 1.0949325677621727e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 2.3689902919634624e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 6.45172804070171e-12,
+          "max_relative_difference": 3.6398344686568526e-14
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 5.650235834764317e-11,
+          "max_relative_difference": 1.097975976684904e-13
+        }
+      },
+      "max_count_absolute_difference": 2.842170943040401e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-joint-r1",
+      "candidate": "exhaustive3-t4-b4-joint-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        315740,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 1.6763806343078613e-08,
+          "max_relative_difference": 3.7357056954993664e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.6763806343078613e-08,
+          "max_relative_difference": 6.157654757672652e-10
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 4.76837158203125e-07,
+          "max_relative_difference": 4.4023013249561475e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 1.0231815394945443e-12,
+          "max_relative_difference": 3.165039957875447e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 1.1368683772161603e-12,
+          "max_relative_difference": 6.157655572653159e-10
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 2.7284841053187847e-12,
+          "max_relative_difference": 3.025377461789241e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 2.2737367544323206e-13,
+          "max_relative_difference": 2.91911464095547e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 2.8421709430404007e-13,
+          "max_relative_difference": 9.67398913495456e-13
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7053025658242404e-12,
+          "max_relative_difference": 4.244508735055557e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0006596413441002369,
+          "max_relative_difference": 6.157648574357851e-10
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 7.494236342608929e-09,
+          "max_relative_difference": 9.669480686171205e-13
+        }
+      },
+      "max_count_absolute_difference": 1.4210854715202004e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b4-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 3.4580125429783948e-09,
+          "max_relative_difference": 9.883839868629027e-12
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 1.2237819646543358e-09,
+          "max_relative_difference": 1.0350960713591349e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 3.7431163946166635e-07,
+          "max_relative_difference": 6.408038302796046e-12
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.575540029667536e-12,
+          "max_relative_difference": 9.882550545001695e-12
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 6.184830425581822e-12,
+          "max_relative_difference": 1.0349553549891938e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 4.490630090003833e-11,
+          "max_relative_difference": 6.407276616142257e-12
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 6.217248937900877e-15,
+          "max_relative_difference": 3.132013371989083e-15
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 7.105427357601002e-15,
+          "max_relative_difference": 2.595768199580895e-15
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.7763568394002505e-15,
+          "max_relative_difference": 5.662453903494161e-15
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 6.394884621840902e-14
+    },
+    {
+      "reference": "exhaustive3-t1-b1-marginal-r1",
+      "candidate": "exhaustive3-t4-b4-marginal-r3",
+      "table": "csubst_cb_3.tsv.unrounded.pkl",
+      "shape": [
+        307432,
+        42
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 4.607019945979118e-06,
+          "max_relative_difference": 1.804426258501787e-11
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 4.547648131847382e-06,
+          "max_relative_difference": 1.837496552620761e-11
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.00044536590576171875,
+          "max_relative_difference": 1.531822483935233e-11
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 5.277911441226024e-11,
+          "max_relative_difference": 1.804372144022791e-11
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 5.4367177426684066e-11,
+          "max_relative_difference": 1.8374307945990013e-11
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 1.434500518371351e-09,
+          "max_relative_difference": 1.5398918677782167e-11
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 4.263256414560601e-14,
+          "max_relative_difference": 1.655370595318575e-14
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 4.973799150320701e-14,
+          "max_relative_difference": 1.575725073330959e-14
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.1368683772161603e-13,
+          "max_relative_difference": 3.1325671967887026e-14
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 1.3322676295501878e-14
+    },
+    {
+      "reference": "pair_b-t1-b1-marginal-r1",
+      "candidate": "pair_b-t1-b1-marginal-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair_b-t1-b1-joint-r1",
+      "candidate": "pair_b-t1-b1-joint-r2",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair_b-t1-b1-joint-r1",
+      "candidate": "pair_b-t1-b1-joint-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair_b-t1-b1-marginal-r1",
+      "candidate": "pair_b-t1-b1-marginal-r3",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    }
+  ],
+  "branch_table_toggle_parity": [
+    {
+      "reference": "pair-t1-b1-marginal-r1",
+      "candidate": "pair_b-t1-b1-marginal-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8308,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 0.0,
+          "max_relative_difference": 0.0
+        }
+      },
+      "max_count_absolute_difference": 0.0
+    },
+    {
+      "reference": "pair-t1-b1-joint-r1",
+      "candidate": "pair_b-t1-b1-joint-r1",
+      "table": "csubst_cb_2.tsv.unrounded.pkl",
+      "shape": [
+        8446,
+        39
+      ],
+      "count_rtol": 1e-10,
+      "count_atol": 1e-10,
+      "ratio_input_error_propagation": true,
+      "ratios": {
+        "omegaCany2any": {
+          "max_absolute_difference": 3.637978807091713e-12,
+          "max_relative_difference": 1.6341965756528158e-15
+        },
+        "omegaCany2dif": {
+          "max_absolute_difference": 2.2450308279076125e-10,
+          "max_relative_difference": 8.649077271797495e-12
+        },
+        "omegaCany2spe": {
+          "max_absolute_difference": 5.820766091346741e-11,
+          "max_relative_difference": 1.82355313830846e-15
+        },
+        "dNCany2any": {
+          "max_absolute_difference": 1.7763568394002505e-14,
+          "max_relative_difference": 1.8815293581099435e-15
+        },
+        "dNCany2dif": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 8.649416771147877e-12
+        },
+        "dNCany2spe": {
+          "max_absolute_difference": 7.105427357601002e-14,
+          "max_relative_difference": 1.84760937734239e-15
+        },
+        "dSCany2any": {
+          "max_absolute_difference": 2.1316282072803006e-14,
+          "max_relative_difference": 7.947111099670836e-16
+        },
+        "dSCany2dif": {
+          "max_absolute_difference": 2.842170943040401e-14,
+          "max_relative_difference": 1.0571910983550028e-12
+        },
+        "dSCany2spe": {
+          "max_absolute_difference": 1.4210854715202004e-14,
+          "max_relative_difference": 7.039190690283392e-16
+        },
+        "OCNCoD": {
+          "max_absolute_difference": 4.597677616402507e-07,
+          "max_relative_difference": 8.64952355069596e-12
+        },
+        "OCSCoD": {
+          "max_absolute_difference": 9.809809853322804e-09,
+          "max_relative_difference": 1.0571967453896888e-12
+        }
+      },
+      "max_count_absolute_difference": 2.842170943040401e-14
+    }
+  ],
+  "method_branch_set_counts": {
+    "pair/csubst_cb_2.tsv.unrounded.pkl": {
+      "marginal": 8308,
+      "joint": 8446,
+      "shared": 8308,
+      "marginal_only": 0,
+      "joint_only": 138
+    },
+    "foreground4/csubst_cb_2.tsv.unrounded.pkl": {
+      "marginal": 64,
+      "joint": 64,
+      "shared": 64,
+      "marginal_only": 0,
+      "joint_only": 0
+    },
+    "foreground4/csubst_cb_3.tsv.unrounded.pkl": {
+      "marginal": 200,
+      "joint": 200,
+      "shared": 200,
+      "marginal_only": 0,
+      "joint_only": 0
+    },
+    "foreground4/csubst_cb_4.tsv.unrounded.pkl": {
+      "marginal": 406,
+      "joint": 406,
+      "shared": 406,
+      "marginal_only": 0,
+      "joint_only": 0
+    },
+    "exhaustive3/csubst_cb_2.tsv.unrounded.pkl": {
+      "marginal": 8308,
+      "joint": 8446,
+      "shared": 8308,
+      "marginal_only": 0,
+      "joint_only": 138
+    },
+    "exhaustive3/csubst_cb_3.tsv.unrounded.pkl": {
+      "marginal": 307432,
+      "joint": 315740,
+      "shared": 307432,
+      "marginal_only": 0,
+      "joint_only": 8308
+    },
+    "pair_b/csubst_cb_2.tsv.unrounded.pkl": {
+      "marginal": 8308,
+      "joint": 8446,
+      "shared": 8308,
+      "marginal_only": 0,
+      "joint_only": 138
+    }
+  },
+  "source_hashes_match": true
+}

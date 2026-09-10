@@ -24,6 +24,15 @@ def worker(args):
     bench = runpy.run_path(str(args.source_root / '.github/scripts/benchmark_endpoints.py'))
     command = bench['cli_args'](args.dataset, args.mode, 64, args.outdir)
     command[command.index('--b') + 1] = 'yes' if args.branch_table else 'no'
+    # Preserve the unrounded table for verification. Both versions pay the
+    # same capture cost; performance runs retain normal user-facing TSVs.
+    from csubst import tsv
+    original_writer = tsv.write_dataframe
+    def capture(dataframe, output_path, **kwargs):
+        if Path(output_path).name in ('csubst_cb_2.tsv', 'csubst_b.tsv'):
+            dataframe.to_pickle(str(output_path) + '.unrounded.pkl')
+        return original_writer(dataframe, output_path, **kwargs)
+    tsv.write_dataframe = capture
     start = time.perf_counter()
     sys.argv = command
     runpy.run_module('csubst', run_name='__main__')
@@ -40,6 +49,50 @@ def hashes(root):
             if p.is_file() and (p.suffix in ('.py', '.pyx', '.so') or
                                (p.parent.name == 'dataset' and p.name.startswith(('PGK.', 'PEPC.'))))}
 
+
+
+def compare_frames(reference, candidate):
+    """Check counts strictly and propagate their rounding differences to ratios.
+
+    CoD divides by any2any-any2spe, so tiny summation differences can be
+    amplified. This checks that ratio changes are fully explained by their
+    already-validated inputs, not an arbitrary looser tolerance for all output.
+    """
+    import numpy as np
+    import pandas as pd
+    ratios = {}
+    for name in reference.columns:
+        for prefix, numerator, denominator in [('dNC', 'OCN', 'ECN'), ('dSC', 'OCS', 'ECS'),
+                                                ('omegaC', 'dNC', 'dSC')]:
+            if name.startswith(prefix):
+                suffix = name[len(prefix):]
+                ratios[name] = (numerator + suffix, denominator + suffix)
+        if name in ('OCNCoD', 'OCSCoD'):
+            ratios[name] = (name[:3] + 'any2spe', name[:3] + 'any2dif')
+    pd.testing.assert_frame_equal(reference.drop(columns=list(ratios)), candidate.drop(columns=list(ratios)),
+                                  check_exact=False, rtol=1e-10, atol=1e-10)
+    details = {}
+    for name, (numerator, denominator) in ratios.items():
+        a, b = reference[name].to_numpy(), candidate[name].to_numpy()
+        np.testing.assert_array_equal(np.isnan(a), np.isnan(b))
+        np.testing.assert_array_equal(np.isposinf(a), np.isposinf(b))
+        np.testing.assert_array_equal(np.isneginf(a), np.isneginf(b))
+        # Identical masked zeros can have undefined rate inputs (0 / NaN).
+        # They need no error propagation; changed outputs still must pass it.
+        finite = np.isfinite(a) & np.isfinite(b) & (a != b)
+        x, y = reference[numerator].to_numpy()[finite], candidate[numerator].to_numpy()[finite]
+        u, v = reference[denominator].to_numpy()[finite], candidate[denominator].to_numpy()[finite]
+        delta = np.abs(a[finite] - b[finite])
+        bound = 8 * np.finfo(float).eps * np.maximum(1, np.maximum(np.abs(a[finite]), np.abs(b[finite])))
+        positive = (u != 0) & (v != 0)
+        bound[positive] += (np.abs(x[positive] - y[positive]) / np.abs(u[positive])
+                            + np.abs(y[positive] / v[positive]) * np.abs((u[positive] - v[positive]) / u[positive]))
+        if not np.all(delta <= bound):
+            raise AssertionError('Unexplained ratio difference in ' + name)
+        details[name] = {'max_absolute_difference': float(np.max(delta, initial=0)),
+                         'max_relative_difference': float(np.max(delta / np.maximum(np.abs(a[finite]), 1e-300), initial=0))}
+    return {'shape': list(reference.shape), 'count_rtol': 1e-10, 'count_atol': 1e-10,
+            'ratio_input_error_propagation': True, 'ratios': details}
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -97,14 +150,21 @@ def main():
         parity = {}
         files = ['csubst_cb_2.tsv'] + (['csubst_b.tsv'] if args.branch_table else [])
         for name in files:
-            a = pd.read_csv(args.workdir / (dataset + '-joint_before-1') / name, sep='\t')
-            b = pd.read_csv(args.workdir / (dataset + '-joint_after-1') / name, sep='\t')
-            pd.testing.assert_frame_equal(a, b, check_exact=False, rtol=1e-10, atol=1e-10)
-            numeric = a.select_dtypes(include='number').columns
-            delta = (a[numeric] - b[numeric]).to_numpy()
+            before_path = args.workdir / (dataset + '-joint_before-1') / name
+            after_path = args.workdir / (dataset + '-joint_after-1') / name
+            # These pickles are created by the local workers above, never read
+            # from downloaded or user-supplied files.
+            a = pd.read_pickle(str(before_path) + '.unrounded.pkl')
+            b = pd.read_pickle(str(after_path) + '.unrounded.pkl')
+            parity[name] = compare_frames(a, b)
+            rounded_a = pd.read_csv(before_path, sep='\t')
+            rounded_b = pd.read_csv(after_path, sep='\t')
+            numeric = rounded_a.select_dtypes(include='number').columns
+            with np.errstate(invalid='ignore'):
+                delta = (rounded_a[numeric] - rounded_b[numeric]).to_numpy()
             finite = np.isfinite(delta)
-            parity[name] = {'shape': list(a.shape), 'rtol': 1e-10, 'atol': 1e-10,
-                            'max_absolute_difference_finite': float(np.max(np.abs(delta[finite]), initial=0))}
+            parity[name]['rounded_numeric_cells_different'] = int(np.count_nonzero(delta[finite]))
+            parity[name]['rounded_max_absolute_difference'] = float(np.max(np.abs(delta[finite]), initial=0))
         output['datasets'][dataset] = {'runs': runs, 'summary': summary, 'joint_output_parity': parity}
     # Keep exported evidence independent of a particular user's home directory.
     text = json.dumps(output, indent=2).replace(str(Path.home()) + '/', '${HOME}/')
