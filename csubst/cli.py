@@ -409,15 +409,33 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'P values of omega_C by substitution randomization (--expectation_method urn only). '
                              'When --calibrate_longtail is active, p-value columns are suffixed with "_nocalib".')
     advanced_statistics = parser.add_argument_group('advanced statistical tuning')
+    _add_advanced_argument(advanced_statistics, '--urn_wallenius_expectation', show_advanced=show_advanced,
+                        choices=['auto', 'exact'], default='auto',
+                        help='auto uses exact special cases/bounded enumeration, then an approximate mean. '
+                             'exact rejects cases exceeding the enumeration budget instead of approximating.')
+    _add_advanced_argument(advanced_statistics, '--asrv_training_branches', show_advanced=show_advanced,
+                        default='all', metavar='all|background|IDS',
+                        help='Branches used to learn empirical site weights. background excludes the union '
+                             'of foreground and marginal target branches. IDS are comma-separated branch IDs. '
+                             'Evaluation branch totals are unchanged; ASR can still share information.')
+    _add_advanced_argument(advanced_statistics, '--asrv_concentration', show_advanced=show_advanced,
+                        default=None, type=float, metavar='FLOAT',
+                        help='Optional total uniform-prior mass for sn/each/file_each. Overrides per-site '
+                             'asrv_dirichlet_alpha; fixed total mass does not grow with valid site count.')
+    _add_advanced_argument(advanced_statistics, '--asrv_report', show_advanced=show_advanced,
+                        default='no', type=strtobool, metavar='yes|no',
+                        help='Write detailed per-category weight diagnostics in urn_provenance.json. '
+                             'Basic provenance is always written for urn analyses.')
+
     _add_advanced_argument(advanced_statistics, '--omega_pvalue_null_model', show_advanced=show_advanced,
                         metavar='hypergeom|poisson|poisson_full|nbinom', default='hypergeom', type=str,
                         choices=['hypergeom', 'poisson', 'poisson_full', 'nbinom'],
                         help='default=%(default)s: Experimental feature. Null count generator for --calc_omega_pvalue. '
                              '"hypergeom" uses legacy site-subset randomization with integer draw sizes. '
                              '"poisson" uses factorized branch/site continuous-rate nulls (Poisson sampling from expected counts). '
-                             '"poisson_full" uses branch-specific site masses without branch-site factorization; '
+                             '"poisson_full" uses observed branch-specific site masses to obtain an urn-overlap mean, then samples counts; '
                              '"nbinom" adds Gamma-Poisson overdispersion on factorized mean counts. '
-                             'Both Poisson-based models reduce sensitivity to --min_sub_pp.')
+                             'These are fitted count nulls, not full phylogenetic simulations; calibration is not established.')
     _add_advanced_argument(advanced_statistics, '--omega_pvalue_nbinom_alpha', show_advanced=show_advanced,
                         metavar='auto|FLOAT', default='auto', type=str,
                         help='default=%(default)s: Experimental feature. Overdispersion coefficient for '
@@ -757,6 +775,10 @@ def _make_recoding_parser(show_advanced):
                              'Use "no" for standard 20 amino-acid states. '
                              '"3di20" enables structural-alphabet (3Di) recoding using --sa_backend. '
                              '"srchisq6" and "kgbauto6" infer 6-state groupings from alignment composition.')
+    psr_rc.add_argument('--nonsyn_recode_training_alignment', default='', metavar='PATH',
+                        help='Optional separate codon alignment for learning srchisq6/kgbauto6 groups. '
+                             'The groups are applied to alignment_file. Separate input alone does not '
+                             'establish statistical independence or calibrate selection across schemes.')
     psr_rc.add_argument('--sa_asr_mode', metavar='translate|direct', default='direct', type=str,
                         help='default=%(default)s: Structural-alphabet ancestral-state mode for --nonsyn_recode 3di20. '
                              '"translate" converts ML amino-acid states to 3Di using --sa_backend, then one-hot encodes '

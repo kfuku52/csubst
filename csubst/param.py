@@ -8,6 +8,7 @@ import sys
 from typing import Any
 from importlib import metadata as importlib_metadata
 
+from csubst import asrv
 from csubst import __version__
 from csubst import output_stat
 from csubst import pseudocount
@@ -317,6 +318,8 @@ def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
         g['asrv_dirichlet_alpha'] = 1.0
     if g['asrv_dirichlet_alpha'] < 0:
         raise ValueError('--asrv_dirichlet_alpha should be >= 0.')
+    g['asrv_report'] = _parse_bool_like(g.get('asrv_report', False), '--asrv_report')
+    asrv.validate_options(g)
     return g
 
 
@@ -873,6 +876,10 @@ def _normalize_recoding_parameters(g: dict[str, Any]) -> dict[str, Any]:
         g['nonsyn_recode'] = recoding_config.normalize_nonsyn_recode(g['nonsyn_recode'])
     else:
         g['nonsyn_recode'] = 'no'
+    training_alignment = str(g.get('nonsyn_recode_training_alignment', '') or '').strip()
+    if training_alignment and g['nonsyn_recode'] not in recoding_config.AUTO_RECODING_SCHEMES:
+        raise ValueError('--nonsyn_recode_training_alignment requires srchisq6 or kgbauto6.')
+    g['nonsyn_recode_training_alignment'] = training_alignment
     if 'sa_asr_mode' in g.keys():
         g['sa_asr_mode'] = str(g['sa_asr_mode']).strip().lower()
     else:
@@ -1028,6 +1035,7 @@ def get_global_parameters(args: Any) -> runtime.RunContext:
     g = _normalize_model_parameters(g)
     g = _normalize_epistasis_parameters(g)
     g = _normalize_epistasis_structure_parameters(g)
+    asrv.validate_epistasis_compatibility(g)
     g = _normalize_search_parameters(g)
     g = _normalize_state_parameters(g)
     g = _normalize_simulation_parameters(g)

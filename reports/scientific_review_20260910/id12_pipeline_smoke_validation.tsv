@@ -1,0 +1,6 @@
+id	role	truth	selected_statistic	score_each_all	score_each_background	score_auto_background	pipeline_p	rejected
+rep00003	validation	null	0.1394	0.029	0.1394	0.0827	0.75	False
+rep00004	validation	null	0.4149	0.0695	0.3095	0.4149	0.5	False
+rep00005	validation	null	-inf	-inf	-inf	-inf	1.0	False
+rep00006	validation	alternative	-inf	-inf	-inf	-inf	1.0	False
+rep00007	validation	alternative	0.4803	0.1046	0.4803	0.4151	0.5	False

@@ -2476,11 +2476,13 @@ def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, 
             continue
         row_weights = nonadjusted_sub_sites[site_indices]
         total_sub_sites = row_weights.sum(dtype=g['float_type'])
-        if dirichlet_alpha > 0:
-            total_sub_sites = total_sub_sites + (dirichlet_alpha * site_indices.shape[0])
+        tau = g.get('asrv_concentration')
+        row_alpha = dirichlet_alpha if tau is None else float(tau) / site_indices.shape[0]
+        if row_alpha > 0:
+            total_sub_sites = total_sub_sites + (row_alpha * site_indices.shape[0])
             if total_sub_sites <= 0:
                 continue
-            out[nl, site_indices] = (row_weights + dirichlet_alpha) / total_sub_sites
+            out[nl, site_indices] = (row_weights + row_alpha) / total_sub_sites
             continue
         if total_sub_sites <= 0:
             continue
@@ -2492,9 +2494,12 @@ def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=
     dirichlet_alpha = _resolve_asrv_dirichlet_alpha({'asrv_dirichlet_alpha': dirichlet_alpha})
     branch_ids = _get_asrv_branch_ids(g=g, num_branch=g['is_site_nonmissing'].shape[0])
     nonadjusted_sub_sites = np.asarray(nonadjusted_sub_sites, dtype=g['float_type']).reshape(-1)
-    if nonadjusted_sub_sites.ndim != 1:
-        raise ValueError('Site weights should be one-dimensional.')
-    if g['float_type'] == np.float64:
+    if not np.isfinite(nonadjusted_sub_sites).all() or (nonadjusted_sub_sites < 0).any():
+        raise ValueError('Site weights should be finite and non-negative.')
+    tau = g.get('asrv_concentration')
+    if tau is not None and (not np.isfinite(float(tau)) or float(tau) < 0):
+        raise ValueError('--asrv_concentration must be finite and nonnegative.')
+    if g['float_type'] == np.float64 and g.get('asrv_concentration') is None:
         is_site_nonmissing_u8 = _get_asrv_is_site_nonmissing_uint8(g=g)
         nonadjusted_sub_sites64 = nonadjusted_sub_sites.astype(np.float64, copy=False)
         if _can_use_cython_site_weight_normalization(
@@ -2543,7 +2548,7 @@ def _get_file_site_rates(g, num_site):
     return rate_values
 
 
-def get_sub_sites(g, sS, sN, state_tensor):
+def get_sub_sites(g, sS, sN, state_tensor, OS_tensor=None, ON_tensor=None):
     num_site = sS.shape[0]
     num_branch = int(state_tensor.shape[0])
     asrv_mode = _resolve_asrv_mode(g)
@@ -2564,9 +2569,23 @@ def get_sub_sites(g, sS, sN, state_tensor):
         for nl in g['_asrv_branch_ids'].tolist()
     )
     g['_asrv_is_site_nonmissing_uint8'] = None
+    from csubst import asrv
+    asrv.resolve_training_ids(g, num_branch)
+    g['_asrv_diagnostics'] = {}
+    g['_urn_expectation_methods'] = {}
+    if g.get('asrv_training_branches', 'all') != 'all':
+        if OS_tensor is None or ON_tensor is None:
+            raise ValueError('ASRV training branches require N and S substitution tensors.')
+        ids = g['_asrv_training_ids']
+        sS = sS.copy()
+        sN = sN.copy()
+        sS['S_sub'] = asrv.training_site_summary(OS_tensor, 'any2any', ids).sum(axis=1)
+        sN['N_sub'] = asrv.training_site_summary(ON_tensor, 'any2any', ids).sum(axis=1)
     g['sub_sites'] = dict()
+    g['_asrv_static_mass'] = {}
     if asrv_mode == 'no':
         sub_sites = np.ones(shape=[num_site,]) / num_site
+        g['_asrv_static_mass'][asrv_mode] = np.array(sub_sites, copy=True)
         g['sub_sites'][asrv_mode] = _normalize_site_weights_by_branch(
             nonadjusted_sub_sites=sub_sites,
             g=g,
@@ -2574,6 +2593,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
         )
     elif asrv_mode == 'pool':
         sub_sites = sS['S_sub'].values + sN['N_sub'].values
+        g['_asrv_static_mass'][asrv_mode] = np.array(sub_sites, copy=True)
         g['sub_sites'][asrv_mode] = _normalize_site_weights_by_branch(
             nonadjusted_sub_sites=sub_sites,
             g=g,
@@ -2581,6 +2601,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
         )
     elif asrv_mode == 'file':
         sub_sites = _get_file_site_rates(g=g, num_site=num_site)
+        g['_asrv_static_mass'][asrv_mode] = np.array(sub_sites, copy=True)
         g['sub_sites'][asrv_mode] = _normalize_site_weights_by_branch(
             nonadjusted_sub_sites=sub_sites,
             g=g,
@@ -2589,6 +2610,7 @@ def get_sub_sites(g, sS, sN, state_tensor):
     elif asrv_mode == 'sn':
         for SN, df in zip(['S', 'N'], [sS, sN]):
             sub_sites = df[SN + '_sub'].values
+            g['_asrv_static_mass'][SN] = np.array(sub_sites, copy=True)
             g['sub_sites'][SN] = _normalize_site_weights_by_branch(
                 nonadjusted_sub_sites=sub_sites,
                 g=g,

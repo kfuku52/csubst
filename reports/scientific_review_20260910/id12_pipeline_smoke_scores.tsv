@@ -1,0 +1,9 @@
+id	role	truth	selected_statistic	score_each_all	score_each_background	score_auto_background
+rep00000	calibration	null	0.281	0.0398	0.1657	0.281
+rep00001	calibration	null	-inf	-inf	-inf	-inf
+rep00002	calibration	null	0.8069	0.1234	0.4509	0.8069
+rep00003	validation	null	0.1394	0.029	0.1394	0.0827
+rep00004	validation	null	0.4149	0.0695	0.3095	0.4149
+rep00005	validation	null	-inf	-inf	-inf	-inf
+rep00006	validation	alternative	-inf	-inf	-inf	-inf
+rep00007	validation	alternative	0.4803	0.1046	0.4803	0.4151

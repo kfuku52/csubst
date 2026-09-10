@@ -29,6 +29,7 @@ from csubst.omega_statistics import (
     _calibrate_dsc_vector as _calibrate_dsc_vector,
     _needs_omega_pvalue_upper_tail_edge_refinement as _needs_omega_pvalue_upper_tail_edge_refinement,
 )
+from csubst import urn_expectation
 from csubst import parallel
 from csubst import randomness
 from csubst import substitution
@@ -1474,12 +1475,14 @@ def _prepare_permutation_branch_sizes(sub_branches, niter, g, rng=None):
     return out
 
 
-def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=np.float64):
+def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=np.float64, policy="auto"):
     site_weights = np.asarray(site_weights, dtype=np.float64).reshape(-1)
     if site_weights.ndim != 1:
         raise ValueError('site_weights should be a 1D array.')
-    if (site_weights < 0).any():
-        raise ValueError('site_weights should be non-negative.')
+    if not np.isfinite(site_weights).all() or (site_weights < 0).any():
+        raise ValueError('Site weights should be finite and non-negative.')
+    if policy not in ('auto', 'exact'):
+        raise ValueError('Wallenius expectation policy must be auto or exact.')
     draw_size = int(draw_size)
     if draw_size < 0:
         raise ValueError('draw_size should be >= 0.')
@@ -1493,20 +1496,32 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
         out[positive_mask] = 1.0
         return out.astype(float_type, copy=False)
     if draw_size == 1:
-        out[positive_mask] = positive_weights / positive_weights.sum(dtype=np.float64)
+        scaled = positive_weights / positive_weights.max()
+        out[positive_mask] = scaled / scaled.sum(dtype=np.float64)
         return out.astype(float_type, copy=False)
-    if num_positive <= 20 and math.comb(num_positive, draw_size) <= 250000:
+    method = urn_expectation.wallenius_method(positive_weights, draw_size)
+    if method == 'exact_uniform':
+        out[positive_mask] = draw_size / num_positive
+        return out.astype(float_type, copy=False)
+    if draw_size == 2:
+        out[positive_mask] = urn_expectation.two_draw_inclusion(positive_weights)
+        return out.astype(float_type, copy=False)
+    if method == 'approximate_mean' and policy == 'exact':
+        raise ValueError('Exact Wallenius expectation exceeds the enumeration budget; '
+                         'auto permits an approximate mean (see urn provenance).')
+    # Normalize odds before enumeration/root finding: scaling all odds cannot
+    # alter an urn distribution and must not alter numerical convergence.
+    positive_weights = positive_weights / positive_weights.max()
+    if method == 'exact_enumeration':
         distribution = {0: 1.0}
-        total_weight = float(positive_weights.sum(dtype=np.float64))
         for _ in range(draw_size):
             next_distribution = {}
             for mask, probability in distribution.items():
-                selected_weight = sum(
+                remaining_weight = float(sum(
                     positive_weights[index]
                     for index in range(num_positive)
-                    if mask & (1 << index)
-                )
-                remaining_weight = total_weight - float(selected_weight)
+                    if not (mask & (1 << index))
+                ))
                 for index, weight in enumerate(positive_weights):
                     bit = 1 << index
                     if mask & bit:
@@ -1695,13 +1710,23 @@ def _calc_weighted_urn_expected_overlap(
 
 
 def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
+    def inclusion(site_weights, draw_size, float_type):
+        result = _calc_wallenius_inclusion_probabilities(
+            site_weights, draw_size, float_type,
+            policy=g.get('urn_wallenius_expectation', 'auto'),
+        )
+        positive = np.asarray(site_weights)[np.asarray(site_weights) > 0]
+        method = urn_expectation.wallenius_method(positive, draw_size)
+        g.setdefault('_urn_expectation_methods', {})[method] = True
+        return result
+
     return _calc_weighted_urn_expected_overlap(
         cb_ids=cb_ids,
         sub_sites=sub_sites,
         sub_branches=sub_branches,
         g=g,
         float_type=float_type,
-        inclusion_probability_func=_calc_wallenius_inclusion_probabilities,
+        inclusion_probability_func=inclusion,
     )
 
 
@@ -2787,6 +2812,12 @@ def _prepare_substitution_permutation_components(sub_tensor, mode, SN, g):
             sub_bg = sub_tensor.sum(axis=(1, 3, 4)) # branch, matrix_group
             sub_sg = sub_tensor.sum(axis=(0, 3, 4)) # site, matrix_group
         list_gad = list(itertools.product(np.arange(sub_tensor.shape[2]), ['any2',], ['2any',]))
+    if g.get('asrv_training_branches', 'all') != 'all':
+        from csubst import asrv
+        ids = g.get('_asrv_training_ids')
+        if ids is None:
+            ids = asrv.resolve_training_ids(g, sub_tensor.shape[0])
+        sub_sg = asrv.training_site_summary(sub_tensor, mode, ids)
     num_gad_combinat = len(list_gad)
     list_igad = [ [i,]+list(items) for i,items in zip(range(num_gad_combinat), list_gad) ]
     obs_col = 'OC'+SN+mode

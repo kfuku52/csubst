@@ -53,6 +53,11 @@ class ModelConfig(TypedDict, total=False):
     expectation_method: str
     expected_state_backend: str
     nonsyn_recode: str
+    nonsyn_recode_training_alignment: str
+    asrv_training_branches: str
+    asrv_concentration: float | None
+    asrv_report: bool
+    urn_wallenius_expectation: str
     ml_anc: bool
     codon_orders: np.ndarray
     amino_acid_orders: list[str]

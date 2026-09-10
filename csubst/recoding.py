@@ -1,4 +1,7 @@
 from collections import OrderedDict
+import hashlib
+import json
+from pathlib import Path
 import warnings
 
 import numpy as np
@@ -96,7 +99,7 @@ def _build_codon_to_aa_map(g, aa_to_index):
 
 
 def _encode_alignment_as_aa_matrix(g, aa_orders):
-    alignment_file = g.get("alignment_file", "")
+    alignment_file = g.get("nonsyn_recode_training_alignment") or g.get("alignment_file", "")
     if alignment_file is None or str(alignment_file).strip() == "":
         raise ValueError(
             'Auto recoding requires "alignment_file". '
@@ -152,18 +155,35 @@ def _encode_alignment_as_aa_matrix(g, aa_orders):
 def _get_alignment_aa_statistics(g, aa_orders):
     cache = g.get(_AA_ALIGNMENT_CACHE_KEY, None)
     aa_orders_tuple = tuple(aa_orders)
-    alignment_file = str(g.get("alignment_file", ""))
+    training_file = g.get("nonsyn_recode_training_alignment")
+    alignment_file = str(training_file or g.get("alignment_file", ""))
+    # Hash content, not only the pathname: bootstrap replicates can reuse a
+    # filename. The genetic code also changes the translated training data.
+    fingerprint = None
+    if alignment_file:
+        digest = hashlib.sha256()
+        with open(alignment_file, 'rb') as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b''):
+                digest.update(block)
+        fingerprint = digest.hexdigest()
+    code_key = tuple(tuple(row) for row in g.get('codon_table', []))
+    g['_nonsyn_recode_training_provenance'] = {
+        'path': str(Path(alignment_file).resolve()) if alignment_file else '',
+        'sha256': fingerprint,
+        'source': 'separate_alignment' if training_file else 'analysis_alignment',
+        'independence': 'not_established',
+    }
     if isinstance(cache, dict):
-        if (cache.get("alignment_file", None) == alignment_file) and (cache.get("aa_orders", None) == aa_orders_tuple):
+        if (cache.get("alignment_file") == alignment_file
+                and cache.get("aa_orders") == aa_orders_tuple
+                and cache.get('sha256') == fingerprint
+                and cache.get('codon_table', ()) == code_key):
             return cache["aa_matrix"], cache["fmat"], cache["fr"], cache["nsitev"]
     aa_matrix, fmat, fr, nsitev = _encode_alignment_as_aa_matrix(g=g, aa_orders=aa_orders)
     g[_AA_ALIGNMENT_CACHE_KEY] = {
-        "alignment_file": alignment_file,
-        "aa_orders": aa_orders_tuple,
-        "aa_matrix": aa_matrix,
-        "fmat": fmat,
-        "fr": fr,
-        "nsitev": nsitev,
+        "alignment_file": alignment_file, "aa_orders": aa_orders_tuple,
+        'sha256': fingerprint, 'codon_table': code_key,
+        "aa_matrix": aa_matrix, "fmat": fmat, "fr": fr, "nsitev": nsitev,
     }
     return aa_matrix, fmat, fr, nsitev
 
@@ -1055,6 +1075,17 @@ def write_nonsyn_recoding_table(g, output_path="csubst_nonsyn_recoding.tsv"):
         )
     with open(output_path, "w") as f:
         f.write("\n".join(lines) + "\n")
+    metadata = {
+        'schema_version': 1, 'recode': recode,
+        'data_adaptive': recode in AUTO_RECODING_SCHEMES,
+        'training': g.get('_nonsyn_recode_training_provenance') if recode in AUTO_RECODING_SCHEMES else None,
+        'groups': state_orders,
+        'objective_score': g.get('nonsyn_recode_auto_score') if recode in AUTO_RECODING_SCHEMES else None,
+        'seed': g.get('nonsyn_recode_auto_seed') if recode in AUTO_RECODING_SCHEMES else None,
+        'random_starts': g.get('nonsyn_recode_auto_random_starts') if recode in AUTO_RECODING_SCHEMES else None,
+        'selection_calibrated': False,
+    }
+    Path(output_path).with_suffix('.metadata.json').write_text(json.dumps(metadata, indent=2, allow_nan=False) + '\n')
     return output_path
 
 

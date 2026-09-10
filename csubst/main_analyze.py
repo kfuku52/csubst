@@ -5,6 +5,7 @@ import os
 import sys
 import time
 
+from csubst import asrv
 from csubst import combination
 from csubst.config_types import AnalysisConfig
 from csubst import foreground
@@ -624,6 +625,7 @@ def _prepare_epistasis_configuration(g, ON_tensor, OS_tensor):
     if not bool(g.get('epistasis_requested', False)):
         g['epistasis_enabled'] = False
         return g
+    asrv.validate_epistasis_compatibility(g)
     if _resolve_expectation_method(g) != 'urn':
         raise ValueError('--epistasis_beta should be used with --expectation_method "urn".')
     num_site = int(ON_tensor.shape[1])
@@ -721,7 +723,7 @@ def main_analyze(g: AnalysisConfig) -> None:
         sOS = substitution.get_s(OS_tensor, attr='S')
         sON = substitution.get_s(ON_tensor, attr='N')
         s = table.merge_tables(sOS, sON)
-        g = substitution.get_sub_sites(g, sOS, sON, state_tensor=g['state_cdn'])
+        g = substitution.get_sub_sites(g, sOS, sON, state_tensor=g['state_cdn'], OS_tensor=OS_tensor, ON_tensor=ON_tensor)
         g = _prepare_epistasis_configuration(g=g, ON_tensor=ON_tensor, OS_tensor=OS_tensor)
         del sOS, sON
         if (g['s']):
@@ -857,4 +859,8 @@ def main_analyze(g: AnalysisConfig) -> None:
         )
         g['df_cb_stats_main'].columns = column_original
 
+    if _resolve_expectation_method(g) == 'urn':
+        if bool(g.get('asrv_report', False)) and g.get('sub_sites') is not None:
+            asrv.collect_diagnostics(g, OS_tensor, ON_tensor)
+        asrv.write_provenance(g, runtime.output_path(g, 'urn_provenance.json'))
     runtime.cleanup_legacy_temp_artifacts()

@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from csubst import main_analyze
+from csubst import asrv
 from csubst import output_manifest
 from csubst import pseudocount
 from csubst import recoding
@@ -246,6 +247,8 @@ def _prepare_run_context(base_g, config, run_dir):
     local_g["log_file"] = os.path.join(local_g["outdir"], local_g["output_prefix"] + ".log")
     local_g["expectation_method"] = config["expectation_method"]
     local_g["asrv"] = config["asrv"]
+    asrv.validate_options(local_g)
+    asrv.validate_epistasis_compatibility(local_g)
     local_g["nonsyn_recode"] = recoding.normalize_nonsyn_recode(config["nonsyn_recode"])
     local_g["sa_asr_mode"] = config["sa_asr_mode"]
     local_g["pseudocount_mode"] = config["pseudocount_mode"]

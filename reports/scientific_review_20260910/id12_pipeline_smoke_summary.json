@@ -1,0 +1,31 @@
+{
+  "inference_scope": "independent_simulator_reference",
+  "level": 0.05,
+  "fpr_limit": 0.06,
+  "calibration_datasets": 3,
+  "minimum_p": 0.25,
+  "validation": {
+    "null": {
+      "independent_datasets": 3,
+      "rejections": 0,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.7075982261787133
+      ],
+      "empty_families": 1
+    },
+    "alternative": {
+      "independent_datasets": 2,
+      "rejections": 0,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.841886116991581
+      ],
+      "empty_families": 1
+    }
+  },
+  "fpr_criterion_met": false,
+  "scope_note": "Conditional on the simulator and fixed reference sample; not a universal calibration claim."
+}
