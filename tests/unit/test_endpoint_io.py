@@ -123,6 +123,40 @@ def test_rate_mixture_is_not_mean_site_rate():
         endpoint_io.read_rate_mixture('Model of rate heterogeneity: unknown')
 
 
+def test_iqtree_invar_zero_without_category_table_is_unit_rate():
+    # IQ-TREE 2.3.6 real-output layout for GY+FQ+I with p_inv fitted to zero.
+    report = ('Model of substitution: GY+FQ+I\n\n'
+              'Model of rate heterogeneity: Invar\n'
+              'Proportion of invariable sites: 0.000000\n\n'
+              'USER TREE\n---------\n')
+    rates, weights = endpoint_io.read_rate_mixture(report)
+    np.testing.assert_array_equal(rates, [1.])
+    np.testing.assert_array_equal(weights, [1.])
+
+
+@pytest.mark.parametrize('model,proportion', [
+    ('Invar', '.2'), ('Invar', '0.000001'), ('Invar', '-.1'),
+    ('Invar', 'nan'), ('Invar', 'inf'), ('Invar', 'unknown'),
+    ('Invar+Gamma with 4 categories', '0.000000'),
+])
+def test_invar_without_table_cannot_hide_other_rate_models(model, proportion):
+    report = ('Model of rate heterogeneity: ' + model + '\n'
+              'Proportion of invariable sites: ' + proportion + '\n')
+    with pytest.raises(ValueError, match='rate-category table'):
+        endpoint_io.read_rate_mixture(report)
+
+
+def test_invar_category_table_retains_positive_invariant_component():
+    report = ('Model of rate heterogeneity: Invar\n'
+              'Proportion of invariable sites: 0.499942\n\n'
+              ' Category  Relative_rate  Proportion\n'
+              '  0         0              0.499942\n'
+              '  1         1.999766       0.500058\n')
+    rates, weights = endpoint_io.read_rate_mixture(report)
+    np.testing.assert_array_equal(rates, [0., 1.999766])
+    np.testing.assert_allclose(weights, [.499942, .500058])
+
+
 def test_scan_and_vesm_use_joint_values_not_separate_outer_products(tmp_path):
     g, ids = toy_context(tmp_path)
     endpoint_io.prepare(g)

@@ -1,0 +1,17 @@
+{
+  "workdir": "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-review-invariant-1kwhxmbh",
+  "results": [
+    {
+      "mode": "joint",
+      "exit": 0
+    },
+    {
+      "mode": "marginal",
+      "exit": 0
+    }
+  ],
+  "reported_rate_model": [
+    "Model of rate heterogeneity: Invar",
+    "Proportion of invariable sites: 0.000000"
+  ]
+}

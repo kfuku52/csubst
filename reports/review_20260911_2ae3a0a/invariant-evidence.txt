@@ -1,0 +1,7 @@
+IQ-TREE 2.3.6, GY+FQ+I, four tips, 100 independently sampled sense codons per tip, seed=123 for data / 5 for fitting.
+Model of rate heterogeneity: Invar
+Proportion of invariable sites: 0.000000
+No Category / Relative_rate / Proportion table is written.
+CSUBST joint exit=2: Joint endpoints require an IQ-TREE uniform model or rate-category table.
+CSUBST marginal exit=0 with the same fitted files.
+Control with 100 additional invariant AAA sites: fitted proportion 0.499942, category table is present.

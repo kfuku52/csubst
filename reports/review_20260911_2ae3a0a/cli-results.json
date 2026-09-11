@@ -1,0 +1,51 @@
+[
+  {
+    "case": "default",
+    "exit": 0
+  },
+  {
+    "case": "all_tables",
+    "exit": 0
+  },
+  {
+    "case": "urn",
+    "exit": 0
+  },
+  {
+    "case": "urn_p",
+    "exit": 2,
+    "interpretation": "Expected configuration rejection: default dif statistics need Poisson joint null; retested any2spe successfully."
+  },
+  {
+    "case": "filter",
+    "exit": 0
+  },
+  {
+    "case": "audit",
+    "exit": 0
+  },
+  {
+    "case": "recoding",
+    "exit": 0
+  },
+  {
+    "case": "threshold",
+    "exit": 0
+  },
+  {
+    "case": "urn_p_valid",
+    "exit": 0
+  },
+  {
+    "case": "scan_joint",
+    "exit": 0
+  },
+  {
+    "case": "scan_analytic",
+    "exit": 0
+  },
+  {
+    "case": "sites",
+    "exit": 0
+  }
+]

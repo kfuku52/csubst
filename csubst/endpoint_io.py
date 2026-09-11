@@ -69,6 +69,19 @@ def read_rate_mixture(report):
     if re.search(r'Model of rate heterogeneity:\s*Uniform\b', report, re.I):
         return np.ones(1), np.ones(1)
     header = re.search(r'Category\s+Relative_rate\s+Proportion\s*\n', report)
+    # IQ-TREE omits the category table for a pure +I model when its fitted
+    # invariant proportion is zero. This is the unit-rate model, although
+    # the report still calls it "Invar". Do not discard a positive invariant
+    # component or mistake Invar+Gamma/FreeRate for this degenerate case.
+    if header is None and re.search(r'^Model of rate heterogeneity:\s*Invar\s*$', report, re.M | re.I):
+        proportion = re.search(r'^Proportion of invariable sites:\s*(\S+)\s*$', report, re.M | re.I)
+        if proportion is not None:
+            try:
+                invariant = float(proportion[1])
+            except ValueError:
+                invariant = np.nan
+            if invariant == 0:
+                return np.ones(1), np.ones(1)
     if header is None:
         raise ValueError('Joint endpoints require an IQ-TREE uniform model or rate-category table.')
     rows = []

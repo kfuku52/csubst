@@ -1,0 +1,37 @@
+CSUBST start: 2026-09-11 02:34:27.205396+00:00
+csubst scan start: 2026-09-11 02:34:27.206348+00:00
+OS: macOS-26.6.2-x86_64-i386-64bit
+Python version: 3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]
+CSUBST version: 1.15.2
+CSUBST dependency versions: ete4=4.4.0, requests=2.32.5, numpy=1.26.4, scipy=1.15.2, pandas=2.2.3, cython=3.0.11, matplotlib=3.9.3
+CSUBST missing dependency packages: none
+CSUBST command: /private/tmp/csubst-resource-review-20260911/after/csubst/__main__.py scan --alignment_file /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.alignment.fa --rooted_tree_file /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.tree.nwk --outdir /tmp/csubst-resource-review-20260911/runs/pepc_scan_defaults-after-1 --threads 1 --blas_threads 1 --random_seed 8 --float_digit 12 --iqtree_treefile /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.alignment.fa.treefile --iqtree_state /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.alignment.fa.state --iqtree_rate /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.alignment.fa.rate --iqtree_iqtree /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.alignment.fa.iqtree --iqtree_log /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.alignment.fa.log --foreground /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.foreground.txt --scan_site_plot no --scan_pvalue_calibration none
+CSUBST working directory: /private/tmp/csubst-resource-review-20260911/after
+CSUBST bug report: https://github.com/kfuku52/csubst/issues
+Scan foreground unit mode: clade
+Reading and parsing input files.
+Using internal node names and branch lengths in --iqtree_treefile and the root position in --rooted_tree_file.
+All IQ-TREE intermediate files were explicitly specified. A provenance manifest is not required.
+Using the model in the explicitly supplied IQ-TREE fit: ECMK07+F+R4. Use --iqtree_redo to refit.
+Total branch length of --rooted_tree_file: 7.7049
+Total branch length of --iqtree_treefile: 17.5501
+
+Reading the state file: /tmp/csubst-resource-review-20260911/before/csubst/dataset/PEPC.alignment.fa.state
+
+Instantaneous substitution rate matrix will be generated using the base model: ECMK07+F
+Transition matrix will be generated using the model in the ancestral state reconstruction: ECMK07+F+R4
+Applying estimated codon frequencies to obtain the instantaneous rate matrix.
+Generating nonsynonymous substitution tensor for scan.
+Scanning recurrent foreground substitution patterns.
+Scan asymptotic P and trait-by-match BH values are exploratory diagnostics; they do not correct candidate discovery selection.
+Writing /tmp/csubst-resource-review-20260911/runs/pepc_scan_defaults-after-1/csubst_scan.tsv
+Writing /tmp/csubst-resource-review-20260911/runs/pepc_scan_defaults-after-1/csubst_scan_units.tsv
+Writing /tmp/csubst-resource-review-20260911/runs/pepc_scan_defaults-after-1/csubst_scan_calibration.json
+Skipping scan site visualization (--scan_site_plot no).
+Scan candidates: 103 rows, 9 foreground units.
+Elapsed time: 19.0 sec
+
+csubst scan: Time elapsed: 21 sec
+csubst scan end: 2026-09-11 02:34:48.452362+00:00
+
+CSUBST end: 2026-09-11 02:34:48.452921+00:00, Elapsed time = 21.0 sec

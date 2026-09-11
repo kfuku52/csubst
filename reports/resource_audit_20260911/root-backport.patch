@@ -1,0 +1,58 @@
+--- a/csubst/tree.py
++++ b/csubst/tree.py
+@@ -187,0 +188,15 @@
++def _internal_node_partition_names(tree_obj):
++    """Identify vertices by incident leaf partitions, independent of rooting."""
++    all_leaves = frozenset(ete.get_leaf_names(tree_obj))
++    result = {}
++    for node in tree_obj.traverse():
++        if ete.is_leaf(node):
++            continue
++        parts = [frozenset(ete.get_leaf_names(child)) for child in ete.get_children(node)]
++        outside = all_leaves - frozenset(ete.get_leaf_names(node))
++        if outside:
++            parts.append(outside)
++        result[frozenset(parts)] = node.name
++    return result
++
++
+@@ -202 +217 @@
+-    original_root_name = tree_to.name
++    original_node_names = _internal_node_partition_names(tree_to)
+@@ -214,3 +229,5 @@
+-    total_subroot_length_from = sum([(n.dist or 0) for n in subroot_from])
+-    if total_subroot_length_from == 0:
+-        total_subroot_length_from = 1
++    source_lengths = np.array([float(n.dist or 0) for n in subroot_from])
++    if not np.isfinite(source_lengths).all() or np.any(source_lengths < 0):
++        raise ValueError('Root-adjacent input branch lengths must be finite and nonnegative.')
++    total_subroot_length_from = source_lengths.sum()
++    proportions = source_lengths / total_subroot_length_from if total_subroot_length_from > 0 else np.full(2, .5)
+@@ -218,7 +235,20 @@
+-        for n_from in subroot_from:
+-            if (set(ete.get_leaf_names(n_to)) == set(ete.get_leaf_names(n_from))):
+-                n_to.dist = total_subroot_length_to * ((n_from.dist or 0) / total_subroot_length_from)
+-    if original_root_name:
+-        tree_to.name = original_root_name
+-    elif not tree_to.name:
+-        tree_to.name = 'Root'
++        for n_from, proportion in zip(subroot_from, proportions):
++            if set(ete.get_leaf_names(n_to)) == set(ete.get_leaf_names(n_from)):
++                n_to.dist = total_subroot_length_to * proportion
++    # ETE rerooting can move the root's name to a newly inserted vertex. Restore
++    # names from unrooted vertex identity, so ASR rows still refer to the same node.
++    all_leaves = frozenset(ete.get_leaf_names(tree_to))
++    for node in tree_to.traverse():
++        if ete.is_leaf(node):
++            continue
++        parts = [frozenset(ete.get_leaf_names(child)) for child in ete.get_children(node)]
++        outside = all_leaves - frozenset(ete.get_leaf_names(node))
++        if outside:
++            parts.append(outside)
++        node.name = original_node_names.get(frozenset(parts), '')
++    if not tree_to.name:
++        used_names = {n.name for n in tree_to.traverse()}
++        root_name = 'Root'
++        while root_name in used_names:
++            root_name = '_' + root_name
++        tree_to.name = root_name

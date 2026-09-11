@@ -1,0 +1,72 @@
+<home>/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  3%]
+................................s....................................... [  6%]
+........................................................................ [  9%]
+...................................................................s.... [ 13%]
+..................................................ssssssss.............. [ 16%]
+........................................................................ [ 19%]
+............................................................s........... [ 22%]
+........................................................................ [ 26%]
+........................................................................ [ 29%]
+........................................................................ [ 32%]
+........................................................................ [ 36%]
+........................................................................ [ 39%]
+...........................................ssssssss...........sss....... [ 42%]
+.......s.....s.........................................................s [ 45%]
+.s.s.................ss................................................. [ 49%]
+...............ssss..........................s.......................... [ 52%]
+........................................................................ [ 55%]
+........................................................................ [ 58%]
+........................................................................ [ 62%]
+........................................................................ [ 65%]
+....................................................sss.....ss.......... [ 68%]
+........................................................................ [ 72%]
+........................................................................ [ 75%]
+........................................................................ [ 78%]
+........................................................................ [ 81%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 91%]
+........................................................................ [ 94%]
+...................s.....................sss.sss........................ [ 98%]
+.......................................                                  [100%]
+=============================== warnings summary ===============================
+../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  <home>/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/unit/test_combination_dependencies.py:46: Cython dependency-bitset fast path is unavailable
+SKIPPED [1] tests/unit/test_endpoint_io.py:239: Endpoint Cython projection is not built.
+SKIPPED [8] tests/unit/test_endpoint_io.py:363: Endpoint event extension is not built.
+SKIPPED [1] tests/unit/test_iqtree_state_tensor.py:56: Cython parser_iqtree fast path is unavailable
+SKIPPED [8] tests/unit/test_sparse_projection.py:137: Cython CSR Gram extension is unavailable
+SKIPPED [1] tests/unit/test_sparse_reducers.py:145: Cython sparse-summary accumulator is unavailable
+SKIPPED [1] tests/unit/test_sparse_reducers.py:168: Cython sparse-summary CSR accumulator is unavailable
+SKIPPED [1] tests/unit/test_sparse_reducers.py:193: Cython sitewise max scan kernel is unavailable
+SKIPPED [1] tests/unit/test_sparse_tensor_primitives.py:67: Cython substitution_sparse fast path is unavailable
+SKIPPED [1] tests/unit/test_sparse_tensor_primitives.py:165: Cython packed sitewise scan is unavailable
+SKIPPED [3] tests/unit/test_structural_prediction.py:156: module 'torch' has __version__ '2.2.2', required is: '2.6'
+SKIPPED [1] tests/unit/test_structural_reference.py:89: could not import 'gemmi': No module named 'gemmi'
+SKIPPED [1] tests/unit/test_structural_reference.py:105: could not import 'gemmi': No module named 'gemmi'
+SKIPPED [1] tests/unit/test_substitution_dense_reducers.py:63: Cython dense reducer fast path is unavailable
+SKIPPED [1] tests/unit/test_substitution_dense_reducers.py:79: Cython dense reducer fast path is unavailable
+SKIPPED [1] tests/unit/test_substitution_dense_reducers.py:95: Cython dense reducer fast path is unavailable
+SKIPPED [1] tests/unit/test_substitution_dense_reducers.py:117: Cython dense reducer fast path is unavailable
+SKIPPED [1] tests/unit/test_substitution_dense_tensor.py:288: Cython branch-site normalization fast path is unavailable
+SKIPPED [1] tests/unit/test_recoding_chisq.py:159: recoding_cy is unavailable
+SKIPPED [1] tests/unit/test_recoding_chisq.py:201: recoding_cy is unavailable
+SKIPPED [1] tests/unit/test_recoding_chisq.py:247: recoding_cy is unavailable
+SKIPPED [1] tests/unit/test_recoding_conductance.py:125: recoding_cy is unavailable
+SKIPPED [1] tests/unit/test_recoding_conductance.py:162: recoding_cy is unavailable
+SKIPPED [1] tests/parity/test_omega_expected_state_parity.py:98: Cython expected projection-row builder is unavailable
+SKIPPED [6] tests/parity/test_site_weight_normalization.py:16: Compiled substitution extension is unavailable
+2153 passed, 46 skipped, 4 warnings in 24.82s

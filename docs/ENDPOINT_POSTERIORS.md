@@ -33,9 +33,12 @@ were previously excluded because the root had no ASR row.
 
 - Codons: ECMK07, ECMrest, GY, MG and MGK, with uniform rates or an IQ-TREE discrete
   rate-category table. Categories use posterior weights given the whole site,
-  not a posterior-mean site rate. Mixtures of different Q matrices and
-  ascertainment-corrected models are rejected. MG/MGK require counted F1X4/F3X4
-  nucleotide frequencies; other MG variants and frequency schemes are rejected.
+  not a posterior-mean site rate.
+  A pure `+I` fit with zero invariant proportion is read as a single unit-rate
+  category when IQ-TREE omits its category table.
+  Mixtures of different Q matrices and ascertainment-corrected models are rejected.
+  MG/MGK require counted F1X4/F3X4 nucleotide frequencies; other MG variants and
+  frequency schemes are rejected.
 - Conventional and recoded N sum the codon joint over both state axes. S contains
   distinct codons within the same synonymous group. Recoding does not assume a
   Markov process on the reduced alphabet.
