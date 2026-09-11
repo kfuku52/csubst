@@ -1125,7 +1125,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         df_dist = get_df_dist(sub_tensor=sub_tensor, g=g, mode=mode)
         df_ad = pd.merge(df_ad, df_dist, on=['group','state_from','state_to'])
         out_path = os.path.join(g['site_outdir'], outfile)
-        tsv.write_dataframe(df_ad, out_path, float_format=g['float_format'], chunksize=10000)
+        tsv.write_dataframe(df_ad, out_path, report_context=g, float_format=g['float_format'], chunksize=10000)
         output_paths.append(out_path)
         df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '->' + df_ad.loc[:,'state_to']
         ax = axes[0,ax_col]
@@ -2142,7 +2142,7 @@ def plot_vesm_tree_site(events, df, g, outbase):
         plot_order.get(int(site), np.nan)
         for site in plot_events['codon_site_alignment'].astype(int).tolist()
     ]
-    tsv.write_dataframe(plot_events, table_path, float_format=g['float_format'])
+    tsv.write_dataframe(plot_events, table_path, report_context=g, float_format=g['float_format'])
     print('Writing VESM tree + site table: {}'.format(table_path), flush=True)
     if (not bool(g.get('vep_plot', True))) or len(selected_sites) == 0:
         if len(selected_sites) == 0:
@@ -2342,6 +2342,8 @@ def main_sites(g):
         df = remap_codon_site_columns_to_alignment(df=df, g=g)
         is_site_col = df.columns.str.startswith('codon_site_')
         df.loc[:,is_site_col] += 1
+        from csubst import event_reporting
+        df = event_reporting.annotate(df, g)
         if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
             export2chimera(df, g)
         if g['run_pdb_sequence_search']:
@@ -2402,7 +2404,7 @@ def main_sites(g):
             tsv.write_dataframe(
                 vep_output_events,
                 vep_table_path,
-                float_format=g['float_format'],
+                report_context=g, float_format=g['float_format'],
             )
             print('Writing VESM event table: {}'.format(vep_table_path), flush=True)
             add_site_output_manifest_row(
@@ -2561,7 +2563,7 @@ def main_sites(g):
         if g['single_branch_mode']:
             df = combinatorial2single_columns(df)
         df_out = expand_site_table_to_alignment(df=df, g=g)
-        tsv.write_dataframe(df_out, out_path, float_format=g['float_format'], chunksize=10000)
+        tsv.write_dataframe(df_out, out_path, report_context=g, float_format=g['float_format'], chunksize=10000)
         add_site_output_manifest_row(
             manifest_rows=manifest_rows,
             output_path=out_path,

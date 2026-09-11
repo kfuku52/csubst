@@ -262,3 +262,10 @@ def test_read_rate_rejects_duplicate_or_out_of_range_site_labels(tmp_path):
     g = {"path_iqtree_rate": str(rate_file), "num_input_site": 2}
     with pytest.raises(ValueError, match="each integer"):
         parser_iqtree.read_rate(g)
+
+
+@pytest.mark.parametrize('model', ['GY+F3X4', 'GY+FO', 'ECMK07'])
+def test_missing_frequencies_never_replace_another_scheme_with_codon_counts(tmp_path, model):
+    g = _get_base_g(tmp_path, 'IQ-TREE multicore version 3.0.1\nModel of substitution: '+model+'\n', '')
+    with pytest.raises(AssertionError):
+        parser_iqtree.read_iqtree(g)

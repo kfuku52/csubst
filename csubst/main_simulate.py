@@ -566,6 +566,8 @@ def _build_mechanistic_background_Q(g):
         'kappa': kappa,
         'equilibrium_frequency': np.asarray(g['eq_freq'], dtype=float),
         'float_type': g.get('float_type', np.float64),
+        'substitution_model': g.get('substitution_model', g.get('iqtree_model', 'GY')),
+        'mg_nucleotide_frequencies': g.get('mg_nucleotide_frequencies'),
     }
     return parser_misc.get_mechanistic_instantaneous_rate_matrix(local_g)
 
@@ -594,6 +596,9 @@ def _resolve_simulation_eq_freq(g):
     mode = str(g.get('simulate_eq_freq', 'auto')).strip().lower()
     if mode not in ['auto', 'iqtree', 'alignment']:
         raise ValueError('Unsupported --simulate_eq_freq mode: {}'.format(mode))
+    if mode == 'alignment' and str(g.get('substitution_model', '')).startswith('MG'):
+        raise ValueError('--simulate_eq_freq alignment is not supported for MG models; '
+                         'use auto or iqtree to preserve fitted nucleotide frequencies.')
     eq_freq_iqtree = None
     if ('equilibrium_frequency' in g) and (g['equilibrium_frequency'] is not None):
         eq_freq_iqtree = np.asarray(g['equilibrium_frequency'], dtype=float).reshape(-1)
@@ -616,7 +621,7 @@ def _resolve_simulation_eq_freq(g):
             if not (total > 0):
                 raise ValueError('IQ-TREE equilibrium frequencies should sum to a positive value.')
             eq_freq_iqtree = eq_freq_iqtree / total
-    if (mode in ['auto', 'iqtree']) and (eq_freq_iqtree is not None):
+    if mode in ['auto', 'iqtree'] and eq_freq_iqtree is not None:
         txt = 'Simulation codon equilibrium frequencies: using IQ-TREE output ({} mode).'
         print(txt.format(mode), flush=True)
         return eq_freq_iqtree
@@ -809,6 +814,13 @@ def write_true_asr_bundle(g, anc_fasta, prefix):
     with open(iqtree_file, 'w') as f:
         f.write('IQ-TREE multicore version 2.2.6\n')
         f.write('Model of substitution: {}\n'.format(model_txt))
+        if model_txt.startswith('MG'):
+            frequencies = np.asarray(g.get('mg_nucleotide_frequencies'), dtype=float)
+            if frequencies.shape != (3, 4):
+                raise ValueError('MG simulation export requires nucleotide frequencies.')
+            for position, values in enumerate(frequencies, 1):
+                f.write('CSUBST MG nucleotide frequencies position {}: {}\n'.format(
+                    position, ' '.join(format(v, '.17g') for v in values)))
         for codon, freq in zip(codon_order.tolist(), eq_freq.tolist()):
             f.write('pi({}) = {:.10f}\n'.format(codon, float(freq)))
     with open(log_file, 'w') as f:

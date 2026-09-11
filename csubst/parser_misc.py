@@ -369,6 +369,9 @@ def generate_intermediate_files(g, force_notree_run=False):
                 g = parser_iqtree.read_iqtree(g, eq=False)
                 iqtree_model = g['substitution_model']
                 g['substitution_model'] = None
+                if explicit_paths:
+                    print('Using the model in the explicitly supplied IQ-TREE fit: {}. Use --iqtree_redo to refit.'.format(iqtree_model))
+                    return g
                 if iqtree_model == g['iqtree_model']:
                     txt = 'The model in the IQ-TREE\'s output ({}) matched --iqtree_model ({}). Skipping IQ-TREE.'
                     print(txt.format(iqtree_model, g['iqtree_model']))
@@ -434,6 +437,8 @@ def read_input(g, state_metadata_only=False):
     else:
         txt = 'Unsupported substitution model for --expectation_method codon_model: {}'
         raise ValueError(txt.format(g['substitution_model']))
+    from csubst import fitted_model
+    fitted_model.prepare(g)
     g = _initialize_and_report_nonsyn_recode(g)
     g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
     g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
@@ -497,7 +502,24 @@ def get_mechanistic_instantaneous_rate_matrix(g):
                     diff_nucs = [ cp1+cp2 for cp1,cp2 in zip(c1,c2) if cp1!=cp2 ][0]
                     if diff_nucs in transition_pairs:
                         inst[i1,i2] *= g['kappa'] # multiply kappa to transition substitutions
-    inst = inst.dot(np.diag(g['equilibrium_frequency'])).astype(g['float_type']) # pi_j * q_ij
+    if str(g.get('substitution_model', '')).startswith('MG'):
+        frequencies = np.asarray(g.get('mg_nucleotide_frequencies'), dtype=float)
+        if (frequencies.shape != (3, 4) or not np.isfinite(frequencies).all()
+                or (frequencies < 0).any() or not np.allclose(frequencies.sum(axis=1), 1)):
+            raise ValueError('MG requires fitted position-specific nucleotide frequencies.')
+        stationary = np.array([np.prod([frequencies[p, 'ACGT'.index(c[p])] for p in range(3)])
+                               for c in g['codon_orders']])
+        stationary /= stationary.sum()
+        if not np.allclose(stationary, g['equilibrium_frequency'], atol=1e-10, rtol=1e-8):
+            raise ValueError('MG codon equilibrium frequencies must match its nucleotide frequency products.')
+        for i, source in enumerate(g['codon_orders']):
+            for j, target in enumerate(g['codon_orders']):
+                if inst[i, j] != 0:
+                    position = next(p for p in range(3) if source[p] != target[p])
+                    inst[i, j] *= frequencies[position, 'ACGT'.index(target[position])]
+        inst = inst.astype(g['float_type'])
+    else:
+        inst = inst.dot(np.diag(g['equilibrium_frequency'])).astype(g['float_type']) # pi_j * q_ij
     inst = scale_instantaneous_rate_matrix(inst, g['equilibrium_frequency'])
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst

@@ -9,8 +9,12 @@ def write_dataframe(
     chunksize=10000,
     header=True,
     mode='w',
+    report_context=None,
 ):
     """Write a DataFrame as a pandas-compatible, bounded-memory UTF-8 TSV."""
+    if report_context is not None:
+        from csubst import event_reporting
+        dataframe = event_reporting.annotate(dataframe, report_context)
     if chunksize is None:
         chunksize = max(1, int(dataframe.shape[0]))
     chunksize = max(1, int(chunksize))
@@ -29,5 +33,6 @@ def write_dataframe(
         header=header,
         mode=mode,
         encoding='utf-8',
+        na_rep='NA' if report_context is not None else '',
     )
     return None

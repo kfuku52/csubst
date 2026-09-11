@@ -1,0 +1,638 @@
+{
+  "packing_trial": {
+    "environment": {
+      "python": "3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]",
+      "platform": "macOS-26.6.2-x86_64-i386-64bit",
+      "memory_gib": 64.0,
+      "numpy": "1.26.4",
+      "logical_cpus": 12,
+      "source_commit": "72c3c4543e66e21ae48aaa7bec80b66e953d18da",
+      "warmups": 1,
+      "repeats": 3,
+      "profile": false
+    },
+    "summary": {
+      "pgk_pair": {
+        "before": {
+          "seconds": {
+            "median": 1.919112125004176,
+            "min": 1.8949837500113063,
+            "max": 1.9340795840253122
+          },
+          "peak_rss_mib": {
+            "median": 207.3671875,
+            "min": 206.640625,
+            "max": 207.63671875
+          },
+          "process_wall_seconds": {
+            "median": 2.0945981250260957,
+            "min": 2.064900833007414,
+            "max": 2.116846666962374
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 1.9131246670149267,
+            "min": 1.900813291023951,
+            "max": 1.9205461249803193
+          },
+          "peak_rss_mib": {
+            "median": 204.96484375,
+            "min": 199.67578125,
+            "max": 210.546875
+          },
+          "process_wall_seconds": {
+            "median": 2.0791743329609744,
+            "min": 2.068711041996721,
+            "max": 2.085918332973961
+          }
+        }
+      },
+      "pgk_sites": {
+        "before": {
+          "seconds": {
+            "median": 6.757459917047527,
+            "min": 6.685588750056922,
+            "max": 6.762036166968755
+          },
+          "peak_rss_mib": {
+            "median": 501.90234375,
+            "min": 477.4296875,
+            "max": 506.98828125
+          },
+          "process_wall_seconds": {
+            "median": 6.934798667032737,
+            "min": 6.861962208990008,
+            "max": 6.938831917010248
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 5.6485836249776185,
+            "min": 5.640524958027527,
+            "max": 6.90445837500738
+          },
+          "peak_rss_mib": {
+            "median": 466.73046875,
+            "min": 466.2109375,
+            "max": 486.53515625
+          },
+          "process_wall_seconds": {
+            "median": 5.824300125008449,
+            "min": 5.814253749966156,
+            "max": 7.0763446249766275
+          }
+        }
+      },
+      "pgk_full": {
+        "before": {
+          "seconds": {
+            "median": 10.040903999994043,
+            "min": 9.539864666003268,
+            "max": 11.575166666007135
+          },
+          "peak_rss_mib": {
+            "median": 840.53515625,
+            "min": 832.92578125,
+            "max": 857.71484375
+          },
+          "process_wall_seconds": {
+            "median": 10.24073383299401,
+            "min": 9.726266000012401,
+            "max": 11.763793708989397
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 7.337499500019476,
+            "min": 7.024292166985106,
+            "max": 8.754683332983404
+          },
+          "peak_rss_mib": {
+            "median": 791.71484375,
+            "min": 790.5859375,
+            "max": 818.60546875
+          },
+          "process_wall_seconds": {
+            "median": 7.528298374963924,
+            "min": 7.206099083996378,
+            "max": 8.94771212496562
+          }
+        }
+      },
+      "pgk_recode": {
+        "before": {
+          "seconds": {
+            "median": 3.828463957994245,
+            "min": 3.78839225001866,
+            "max": 3.8301389580010436
+          },
+          "peak_rss_mib": {
+            "median": 306.46875,
+            "min": 301.9296875,
+            "max": 310.34765625
+          },
+          "process_wall_seconds": {
+            "median": 3.9994097920134664,
+            "min": 3.9650665409862995,
+            "max": 4.003201624960639
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 3.094080250011757,
+            "min": 2.979228125012014,
+            "max": 3.103079958993476
+          },
+          "peak_rss_mib": {
+            "median": 237.6796875,
+            "min": 220.34765625,
+            "max": 240.50390625
+          },
+          "process_wall_seconds": {
+            "median": 3.2662630419945344,
+            "min": 3.134779707994312,
+            "max": 3.276786250004079
+          }
+        }
+      },
+      "pepc_pair": {
+        "before": {
+          "seconds": {
+            "median": 4.827432041987777,
+            "min": 4.76090087502962,
+            "max": 4.834147250046954
+          },
+          "peak_rss_mib": {
+            "median": 372.94140625,
+            "min": 369.5859375,
+            "max": 389.671875
+          },
+          "process_wall_seconds": {
+            "median": 4.99813995801378,
+            "min": 4.932458708994091,
+            "max": 5.006926958041731
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 4.789251666981727,
+            "min": 4.7480149589828216,
+            "max": 4.831882334023248
+          },
+          "peak_rss_mib": {
+            "median": 378.828125,
+            "min": 365.6484375,
+            "max": 392.10546875
+          },
+          "process_wall_seconds": {
+            "median": 4.980887708021328,
+            "min": 4.915103083010763,
+            "max": 5.004136625037063
+          }
+        }
+      },
+      "pepc_branch": {
+        "before": {
+          "seconds": {
+            "median": 6.299937916977797,
+            "min": 5.90100449998863,
+            "max": 6.324968083004933
+          },
+          "peak_rss_mib": {
+            "median": 377.55859375,
+            "min": 353.9453125,
+            "max": 405.88671875
+          },
+          "process_wall_seconds": {
+            "median": 6.48741754097864,
+            "min": 6.087685792008415,
+            "max": 6.499655583000276
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 6.6412585839862,
+            "min": 6.389284249977209,
+            "max": 6.833541875006631
+          },
+          "peak_rss_mib": {
+            "median": 396.5625,
+            "min": 385.32421875,
+            "max": 408.7421875
+          },
+          "process_wall_seconds": {
+            "median": 6.823823875049129,
+            "min": 6.5764048749697395,
+            "max": 7.000852041004691
+          }
+        }
+      }
+    },
+    "completed_runs": 55,
+    "source_changes": {
+      "csubst/endpoint_io.py": "23303145b43e51a8524c0fbcfa64053f2db14a717e908a6e2d66001f7b08c5d0",
+      "csubst/substitution.py": "93748ec14e35fc2840c630e83dff78d4620af057e806de208f5085962fbf93b4"
+    }
+  },
+  "pre_cache_matrix": {
+    "environment": {
+      "python": "3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]",
+      "platform": "macOS-26.6.2-x86_64-i386-64bit",
+      "memory_gib": 64.0,
+      "numpy": "1.26.4",
+      "logical_cpus": 12,
+      "source_commit": "72c3c4543e66e21ae48aaa7bec80b66e953d18da",
+      "warmups": 1,
+      "repeats": 3,
+      "profile": false
+    },
+    "summary": {
+      "pepc_branch": {
+        "before": {
+          "seconds": {
+            "median": 6.154207832994871,
+            "min": 5.916394083003979,
+            "max": 6.271078083955217
+          },
+          "peak_rss_mib": {
+            "median": 385.65234375,
+            "min": 382.96484375,
+            "max": 400.875
+          },
+          "process_wall_seconds": {
+            "median": 6.331233707955107,
+            "min": 6.08573512500152,
+            "max": 6.439092290995177
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 6.199130666966084,
+            "min": 6.006428083986975,
+            "max": 6.24503170902608
+          },
+          "peak_rss_mib": {
+            "median": 386.328125,
+            "min": 379.0703125,
+            "max": 397.04296875
+          },
+          "process_wall_seconds": {
+            "median": 6.382551082991995,
+            "min": 6.183076833025552,
+            "max": 6.434153999958653
+          }
+        }
+      },
+      "pepc_arity6": {
+        "before": {
+          "seconds": {
+            "median": 10.371977041999344,
+            "min": 9.785748624999542,
+            "max": 10.570159040973522
+          },
+          "peak_rss_mib": {
+            "median": 755.6171875,
+            "min": 747.140625,
+            "max": 760.32421875
+          },
+          "process_wall_seconds": {
+            "median": 10.554533916991204,
+            "min": 9.983014125027694,
+            "max": 10.765129083010834
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 9.832551250001416,
+            "min": 9.751990624994505,
+            "max": 9.95888599997852
+          },
+          "peak_rss_mib": {
+            "median": 748.4921875,
+            "min": 740.59765625,
+            "max": 760.25390625
+          },
+          "process_wall_seconds": {
+            "median": 10.024288292042911,
+            "min": 9.949547666998114,
+            "max": 10.155726041994058
+          }
+        }
+      },
+      "pgk_pair": {
+        "before": {
+          "seconds": {
+            "median": 1.9429933330393396,
+            "min": 1.9174557080259547,
+            "max": 1.9897203340078704
+          },
+          "peak_rss_mib": {
+            "median": 204.23828125,
+            "min": 201.2109375,
+            "max": 209.19140625
+          },
+          "process_wall_seconds": {
+            "median": 2.1158682910026982,
+            "min": 2.078218500013463,
+            "max": 2.1711220829747617
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 1.8998446249752305,
+            "min": 1.8879806670011021,
+            "max": 1.9638538329745643
+          },
+          "peak_rss_mib": {
+            "median": 206.1171875,
+            "min": 199.90234375,
+            "max": 208.52734375
+          },
+          "process_wall_seconds": {
+            "median": 2.073302125034388,
+            "min": 2.06306900002528,
+            "max": 2.140502457972616
+          }
+        }
+      },
+      "pgk_sites": {
+        "before": {
+          "seconds": {
+            "median": 6.756114249990787,
+            "min": 6.701127000036649,
+            "max": 7.053278582985513
+          },
+          "peak_rss_mib": {
+            "median": 483.73046875,
+            "min": 478.5625,
+            "max": 488.2578125
+          },
+          "process_wall_seconds": {
+            "median": 6.9399232499999925,
+            "min": 6.88611562497681,
+            "max": 7.240013875009026
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 5.418798415979836,
+            "min": 5.395777500001714,
+            "max": 5.5407468330231495
+          },
+          "peak_rss_mib": {
+            "median": 462.6171875,
+            "min": 453.9921875,
+            "max": 462.99609375
+          },
+          "process_wall_seconds": {
+            "median": 5.60894104198087,
+            "min": 5.5698321249801666,
+            "max": 5.726392957963981
+          }
+        }
+      },
+      "pgk_full": {
+        "before": {
+          "seconds": {
+            "median": 11.455948209040798,
+            "min": 9.429319707967807,
+            "max": 12.914821666025091
+          },
+          "peak_rss_mib": {
+            "median": 860.16015625,
+            "min": 851.15234375,
+            "max": 893.22265625
+          },
+          "process_wall_seconds": {
+            "median": 11.689238791004755,
+            "min": 9.631622416956816,
+            "max": 13.114264458999969
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 6.916357167006936,
+            "min": 6.895867458952125,
+            "max": 7.035846124985255
+          },
+          "peak_rss_mib": {
+            "median": 807.8046875,
+            "min": 798.81640625,
+            "max": 845.375
+          },
+          "process_wall_seconds": {
+            "median": 7.151434875035193,
+            "min": 7.1160264579812065,
+            "max": 7.238074749999214
+          }
+        }
+      },
+      "pgk_recode": {
+        "before": {
+          "seconds": {
+            "median": 3.875452290987596,
+            "min": 3.832301332964562,
+            "max": 3.883936166006606
+          },
+          "peak_rss_mib": {
+            "median": 292.5390625,
+            "min": 263.76953125,
+            "max": 313.58203125
+          },
+          "process_wall_seconds": {
+            "median": 4.0569108329946175,
+            "min": 4.00037591700675,
+            "max": 4.061203916964587
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 2.8992479169974104,
+            "min": 2.863280959019903,
+            "max": 2.9481000000378117
+          },
+          "peak_rss_mib": {
+            "median": 235.97265625,
+            "min": 232.6484375,
+            "max": 237.1328125
+          },
+          "process_wall_seconds": {
+            "median": 3.0707714579766616,
+            "min": 3.0322889169910923,
+            "max": 3.129428624990396
+          }
+        }
+      },
+      "pepc_pair": {
+        "before": {
+          "seconds": {
+            "median": 4.801903042010963,
+            "min": 4.5673141250154,
+            "max": 4.806891624990385
+          },
+          "peak_rss_mib": {
+            "median": 393.921875,
+            "min": 383.5859375,
+            "max": 398.03515625
+          },
+          "process_wall_seconds": {
+            "median": 4.994585875014309,
+            "min": 4.7417470419895835,
+            "max": 5.001242625003215
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 4.6320420409902,
+            "min": 4.628728208015673,
+            "max": 4.633113624993712
+          },
+          "peak_rss_mib": {
+            "median": 382.2734375,
+            "min": 382.03125,
+            "max": 390.01171875
+          },
+          "process_wall_seconds": {
+            "median": 4.812581999984104,
+            "min": 4.809075833007228,
+            "max": 4.813697625009809
+          }
+        }
+      },
+      "pepc_block8": {
+        "before": {
+          "seconds": {
+            "median": 11.511444624979049,
+            "min": 11.137112667027395,
+            "max": 16.758514999994077
+          },
+          "peak_rss_mib": {
+            "median": 370.453125,
+            "min": 363.6796875,
+            "max": 373.05078125
+          },
+          "process_wall_seconds": {
+            "median": 11.698564666963648,
+            "min": 11.32965783396503,
+            "max": 16.995449459005613
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 12.702001457975712,
+            "min": 12.107474291988183,
+            "max": 16.31907675002003
+          },
+          "peak_rss_mib": {
+            "median": 387.82421875,
+            "min": 352.12109375,
+            "max": 391.4921875
+          },
+          "process_wall_seconds": {
+            "median": 12.873886584013235,
+            "min": 12.294080291001592,
+            "max": 17.68867499998305
+          }
+        }
+      },
+      "pepc_block256": {
+        "before": {
+          "seconds": {
+            "median": 5.728401750035118,
+            "min": 5.319209999986924,
+            "max": 5.757119707996026
+          },
+          "peak_rss_mib": {
+            "median": 601.73046875,
+            "min": 568.96484375,
+            "max": 625.40625
+          },
+          "process_wall_seconds": {
+            "median": 5.930565708957147,
+            "min": 5.50553287495859,
+            "max": 5.948335624998435
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 5.352449709025677,
+            "min": 5.300168792018667,
+            "max": 5.695303125015926
+          },
+          "peak_rss_mib": {
+            "median": 557.84375,
+            "min": 506.875,
+            "max": 579.87109375
+          },
+          "process_wall_seconds": {
+            "median": 5.544750958040822,
+            "min": 5.487302083987743,
+            "max": 5.884252917021513
+          }
+        }
+      }
+    },
+    "completed_runs": 72,
+    "source_changes": {
+      "csubst/endpoint_io.py": "72a13f823e0a7dcdef3462f01a1871ee7461c4c8f46533d45028394e5ffd35df",
+      "csubst/substitution.py": "93748ec14e35fc2840c630e83dff78d4620af057e806de208f5085962fbf93b4"
+    }
+  },
+  "pre_cache_block8_recheck": {
+    "environment": {
+      "python": "3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]",
+      "platform": "macOS-26.6.2-x86_64-i386-64bit",
+      "memory_gib": 64.0,
+      "numpy": "1.26.4",
+      "logical_cpus": 12,
+      "source_commit": "72c3c4543e66e21ae48aaa7bec80b66e953d18da",
+      "warmups": 1,
+      "repeats": 5,
+      "profile": false
+    },
+    "summary": {
+      "pepc_block8": {
+        "before": {
+          "seconds": {
+            "median": 11.44588549999753,
+            "min": 11.241320958011784,
+            "max": 12.290759624971543
+          },
+          "peak_rss_mib": {
+            "median": 358.61328125,
+            "min": 334.5703125,
+            "max": 371.17578125
+          },
+          "process_wall_seconds": {
+            "median": 11.645608374965377,
+            "min": 11.431267415988259,
+            "max": 12.489281874964945
+          }
+        },
+        "after": {
+          "seconds": {
+            "median": 12.107175333017949,
+            "min": 11.520500291022472,
+            "max": 12.17471879196819
+          },
+          "peak_rss_mib": {
+            "median": 376.3828125,
+            "min": 353.83203125,
+            "max": 384.29296875
+          },
+          "process_wall_seconds": {
+            "median": 12.286635750031564,
+            "min": 11.734172500029672,
+            "max": 12.374304166994989
+          }
+        }
+      }
+    },
+    "completed_runs": 12,
+    "source_changes": {
+      "csubst/endpoint_io.py": "72a13f823e0a7dcdef3462f01a1871ee7461c4c8f46533d45028394e5ffd35df",
+      "csubst/substitution.py": "93748ec14e35fc2840c630e83dff78d4620af057e806de208f5085962fbf93b4"
+    }
+  }
+}

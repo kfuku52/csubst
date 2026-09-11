@@ -96,6 +96,9 @@ def test_prepare_freezes_family_before_filter_and_annotation_uses_only_tips(tmp_
     g['scan_tip_emissions'] = g['state_cdn'].copy()
     g['state_cdn'][:] = .25
     np.testing.assert_array_equal(scan_analytic.annotate(g, frame, units, engine)['p_endpoint_enrichment_analytic'], original)
+    g['event_eligible'] = np.zeros(g['state_cdn'].shape[:2], dtype=bool)
+    masked = scan_analytic.annotate(g, frame, units, engine)
+    np.testing.assert_allclose(masked['p_endpoint_enrichment_analytic'], 1.)
     empty = scan_analytic.annotate(g, frame.iloc[:0], units, engine)
     assert 'p_endpoint_enrichment_analytic' in empty
     assert g['scan_analytic_summary']['family_size'] == 2

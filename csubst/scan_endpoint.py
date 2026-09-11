@@ -5,12 +5,10 @@ Exponentiate the full generator before aggregating destination state groups;
 the grouped instantaneous matrix is generally not a lumped CTMC generator.
 """
 
-import re
-
 import numpy as np
 from scipy.linalg import expm
 
-from csubst import ete
+from csubst import endpoint_io, ete
 
 
 def validate_options(g):
@@ -27,10 +25,11 @@ def validate_options(g):
 def build_context(g, branch_meta, codon_state_ids):
     validate_options(g)
     model = str(g.get("substitution_model", ""))
-    if not re.fullmatch(r"(?:GY|MG|ECMK07|ECMrest)(?:\+F(?:1X4|3X4|Q)?)?", model):
-        raise ValueError("Scan endpoint exposure requires a uniform GY/MG/ECMK07/ECMrest "
-                         "codon model, optionally with +F/+F1X4/+F3X4/+FQ; "
-                         "rate mixtures are not supported.")
+    rates, priors = endpoint_io.model_rates(g)
+    if len(rates) > 1 and g.get('scan_observation', 'marginal') != 'joint':
+        raise ValueError('Discrete-rate endpoint exposure requires joint observations.')
+    if g.get('scan_observation') == 'bridge' and (len(rates) != 1 or rates[0] != 1):
+        raise ValueError('Bridge exposure requires uniform unit rates.')
     state = np.asarray(g["state_cdn"])
     q = np.asarray(g["instantaneous_codon_rate_matrix"], dtype=np.float64)
     ids = np.asarray(codon_state_ids, dtype=np.int64)
@@ -53,9 +52,6 @@ def build_context(g, branch_meta, codon_state_ids):
             length = float(node.dist or 0)
             if not np.isfinite(length) or length < 0:
                 raise ValueError("Scan endpoint requires finite nonnegative model branch lengths.")
-    rates = np.asarray(g.get("iqtree_rate_values", []), dtype=float)
-    if rates.shape != (state.shape[1],) or not np.all(rates == 1):
-        raise ValueError("Scan endpoint requires one unit fitted site rate per analyzed site.")
     lengths = branch_meta["raw_length"].to_numpy(dtype=float)
     if not np.isfinite(lengths).all() or (lengths < 0).any():
         raise ValueError("Scan endpoint requires finite nonnegative model branch lengths.")
@@ -70,15 +66,17 @@ def build_context(g, branch_meta, codon_state_ids):
         reachable |= reachable[:, via, None] & reachable[None, via, :]
     reachable_groups = (reachable.astype(int) @ group_projection) > 0
     unique_lengths, inverse = np.unique(lengths, return_inverse=True)
-    projected = np.empty((len(unique_lengths), len(q), num_group), dtype=float)
-    for index, length in enumerate(unique_lengths):
-        p = expm(q * length)
-        if (not np.isfinite(p).all() or (p < -1e-12).any()
-                or not np.allclose(p.sum(axis=1), 1, atol=1e-10, rtol=0)):
-            raise ValueError("Invalid scan endpoint transition probabilities.")
-        # Remove only negative floating-point roundoff; preserve tiny positive paths.
-        projected[index] = np.maximum(p, 0) @ group_projection
-    extra = {}
+    projected = np.empty((len(rates), len(unique_lengths), len(q), num_group), dtype=float)
+    for category, rate in enumerate(rates):
+        for index, length in enumerate(unique_lengths):
+            p = expm(q * length * rate)
+            if (not np.isfinite(p).all() or (p < -1e-12).any()
+                    or not np.allclose(p.sum(axis=1), 1, atol=1e-10, rtol=0)):
+                raise ValueError("Invalid scan endpoint transition probabilities.")
+            projected[category, index] = np.maximum(p, 0) @ group_projection
+    extra: dict = {}
+    if len(rates) > 1:
+        extra.update(category_groups=projected, category_states=g.get('scan_category_states'))
     if g.get("scan_observation") == "bridge":
         # Integral of transition probabilities, computed without inverting singular Q.
         occupation = []
@@ -92,7 +90,10 @@ def build_context(g, branch_meta, codon_state_ids):
                 raise ValueError("Invalid integrated CTMC transition probabilities.")
             occupation.append(np.maximum(integrated, 0))
         extra = {"occupation": np.asarray(occupation), "jump_q": off, "reachable_states": reachable}
-    return {**extra, "transition_groups": projected, "length_indices": inverse,
+    if "event_eligible" in g:
+        extra["eligible"] = g["event_eligible"]
+    return {**extra, "transition_groups": projected[0], "length_indices": inverse,
+            "category_rates": rates, "category_priors": priors,
             "raw_lengths": lengths, "reachable_groups": reachable_groups,
             "branch_ids": branch_meta["branch_id"].to_numpy(dtype=np.int64),
             "parent_ids": branch_meta["parent_id"].to_numpy(dtype=np.int64),
@@ -129,8 +130,21 @@ def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids):
             raise ValueError("Scan endpoint posterior rows must sum to one (or zero for missing states).")
     mass = parent.sum(axis=1)
     missing = (mass == 0) | (child.sum(axis=1) == 0) | (nsy_parent.sum(axis=1) == 0) | (nsy_child.sum(axis=1) == 0)
+    if "eligible" in context:
+        missing |= ~context["eligible"][context["branch_ids"], int(site)]
     normalized = np.divide(parent, mass[:, None], out=np.zeros_like(parent), where=mass[:, None] > 0)
-    if "occupation" in context:
+    if 'category_groups' in context:
+        category_states = context.get('category_states')
+        if category_states is None:
+            raise ValueError('Mixture exposure requires category-conditional joint posteriors.')
+        weighted_parent = category_states[:, context['parent_ids'], int(site), :]
+        if (not np.isfinite(weighted_parent).all() or (weighted_parent < 0).any()
+                or not np.allclose(weighted_parent.sum(axis=0), parent, atol=1e-10, rtol=1e-8)):
+            raise ValueError('Category posterior states do not match scan parent marginals.')
+        category_weights = np.einsum('clig,ig->cli', context['category_groups'][:, :, :, to_ids], candidate_mask)
+        expected = np.einsum('cbi,cbi->b', weighted_parent,
+                             category_weights[:, context['length_indices']])
+    elif "occupation" in context:
         jump_rates = (context["jump_q"][:, np.isin(ids, to_ids)] *
                       (ids[:, None] != ids[np.isin(ids, to_ids)][None, :])).sum(axis=1) * allowed
         jump_weights = context["occupation"] @ jump_rates

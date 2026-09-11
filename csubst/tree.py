@@ -2290,7 +2290,9 @@ def rescale_branch_length(g, OS_tensor, ON_tensor, denominator='L'):
             ete.set_prop(node, "SNdist", 0)
             continue
         parent = ete.get_prop(parent_node, "numerical_label")
-        num_nonmissing_codon = (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum()
+        eligible = getattr(OS_tensor, 'eligible', None)
+        num_nonmissing_codon = (int(eligible[nl].sum()) if eligible is not None else
+                               (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum())
         if num_nonmissing_codon==0:
             ete.set_prop(node, "Sdist", 0)
             ete.set_prop(node, "Ndist", 0)

@@ -1,0 +1,181 @@
+{
+  "mg_likelihood_checks": [
+    {
+      "model": "MG+F1X4",
+      "reported": -2671.52462,
+      "reproduced": -2671.524620424828,
+      "absolute_error": 4.248277036822401e-07
+    },
+    {
+      "model": "MG+F3X4",
+      "reported": -2606.648615,
+      "reproduced": -2606.648614924255,
+      "absolute_error": 7.57449925004039e-08
+    },
+    {
+      "model": "MGK+F3X4",
+      "reported": -2594.066532,
+      "reproduced": -2594.0665320836943,
+      "absolute_error": 8.369443094125018e-08
+    }
+  ],
+  "cli_checks": [
+    {
+      "command": "search",
+      "model": "MG+F1X4",
+      "posterior": "joint",
+      "rows": 8
+    },
+    {
+      "command": "search",
+      "model": "MG+F1X4",
+      "posterior": "marginal",
+      "rows": 4
+    },
+    {
+      "command": "search",
+      "model": "MG+F3X4",
+      "posterior": "joint",
+      "rows": 8
+    },
+    {
+      "command": "search",
+      "model": "MG+F3X4",
+      "posterior": "marginal",
+      "rows": 4
+    },
+    {
+      "command": "search",
+      "model": "MGK+F3X4",
+      "posterior": "joint",
+      "rows": 8
+    },
+    {
+      "command": "search",
+      "model": "MGK+F3X4",
+      "posterior": "marginal",
+      "rows": 4
+    },
+    {
+      "command": "scan",
+      "case": "default",
+      "model": "ECMK07+F+R4",
+      "rows": 46,
+      "observation": [
+        "joint_endpoint_posterior"
+      ]
+    },
+    {
+      "command": "scan",
+      "case": "explicit_joint",
+      "model": "ECMK07+F+R4",
+      "rows": 46,
+      "observation": [
+        "joint_endpoint_posterior"
+      ]
+    },
+    {
+      "command": "scan",
+      "case": "legacy",
+      "model": "ECMK07+F+R4",
+      "rows": 46,
+      "observation": [
+        "marginal_posterior_product"
+      ]
+    },
+    {
+      "command": "scan",
+      "case": "workers",
+      "model": "ECMK07+F+R4",
+      "rows": 46,
+      "observation": [
+        "joint_endpoint_posterior"
+      ]
+    },
+    {
+      "command": "scan",
+      "case": "fixed_bootstrap",
+      "model": "ECMK07+F+R4",
+      "rows": 46,
+      "observation": [
+        "joint_endpoint_posterior"
+      ]
+    },
+    {
+      "command": "scan",
+      "model": "MG+F3X4",
+      "case": "default_options"
+    },
+    {
+      "command": "sites",
+      "model": "MG+F3X4",
+      "case": "default_options"
+    },
+    {
+      "command": "inspect",
+      "model": "MG+F3X4",
+      "case": "default_options"
+    },
+    {
+      "command": "benchmark",
+      "model": "MG+F3X4",
+      "case": "default_options"
+    },
+    {
+      "command": "simulate",
+      "model": "MG+F3X4",
+      "case": "default_options"
+    }
+  ],
+  "default_explicit_and_workers_identical": true,
+  "fixed_model_mixture_bootstrap": {
+    "success_count": 3,
+    "failure_count": 0,
+    "endpoint_model": {
+      "model": "ECMK07+F+R4",
+      "rates": [
+        0.996949,
+        0.998633,
+        1.001044,
+        1.00121
+      ],
+      "weights": [
+        0.121185,
+        0.250085,
+        0.297362,
+        0.331368
+      ],
+      "category_weighting": "posterior_given_all_tips",
+      "missing_tip_events": "latent_events_integrated",
+      "parameter_source": "parsed_iqtree_model_and_category_table"
+    }
+  },
+  "pepc_default_scan": {
+    "rows": 99,
+    "model": [
+      "ECMK07+F+R4"
+    ],
+    "observation": [
+      "joint_endpoint_posterior"
+    ]
+  },
+  "environment": {
+    "python": "3.10.14",
+    "platform": "macOS-26.6.2-x86_64-i386-64bit",
+    "numpy": "1.26.4",
+    "iqtree": "2.3.6"
+  },
+  "source_sha256": {
+    "cli.py": "059567a97e403c38a7521aaf4151f1cb440aecc414a8af5bfbadc51c99e2b2cf",
+    "param.py": "8723ef849e3b403339745c4f3ee52e6756edf690fa4d0b36f635fa0bd823b97c",
+    "endpoint.py": "ff27a9d959f292e04b5561aa609288c4ed2f6212a1582967cc8ab90419fe1323",
+    "endpoint_io.py": "f3d3d32d6e33ff0981f9c73df52002972859db7fe0c71195066f64cc0ce00a82",
+    "parser_iqtree.py": "bd1ec5ff946b708c2e14e66aaa5a049407831733b9d5e6766b347f006d33b8a1",
+    "parser_misc.py": "21c147974035f8e6878c6794351167e119fd177ff1a068111ead66d265558166",
+    "main_simulate.py": "38ddcd574ec543f31932d676c2ce9cada67896548170a7de1a605df674af1f40",
+    "scan_ctmc.py": "d2be69e969bd9a3e0c9cac8933f804fc5f30da42c64a6647a967e8a80b916376",
+    "scan_endpoint.py": "47028192859d86afc72f7d5a0f2823a0a26ce054548eef4246ae3ee9294575a0",
+    "scan_analytic.py": "bdd22fd6326daf9324e8b05710c77ac65f25f3dfbec1383205b16a1eb0a6af0b",
+    "substitution_scan.py": "ec7ebae10ffdc8ea12c19a9678efa507142fd74509436b85c8e6231972a04c0e"
+  }
+}

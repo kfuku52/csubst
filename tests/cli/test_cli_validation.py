@@ -384,9 +384,9 @@ def test_scan_help_is_available():
     assert re.search(r"--scan_unit(?![A-Za-z0-9_])", help_text) is None
     assert "--scan_rate_exposure" in help_text
     assert "q_weighted" in help_text
-    assert "default=q_weighted" in help_text
+    assert "endpoint for joint/bridge" in help_text
     assert "endpoint" in help_text
-    assert "uniform codon site rates" in " ".join(help_text.split())
+    assert "fitted discrete rate categories" in " ".join(help_text.split())
     assert "--scan_rate_event_mode" in help_text
     assert "--scan_other_scope" in help_text
     assert "all|sister" in help_text
@@ -403,7 +403,7 @@ def test_scan_help_is_available():
     assert "--tree_site_fig_max_height" not in help_text
     assert "--scan_permutation_mode" not in help_text
     assert "--scan_rate_length" in help_text
-    assert "default=n_rescaled" in help_text
+    assert "raw for joint/bridge" in help_text
     assert "--nonsyn_recode" in help_text
     assert "--scan_report_targets" not in help_text
     assert "--scan_candidate_target" not in help_text

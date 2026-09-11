@@ -128,8 +128,11 @@ The procedure is:
 2. Read kappa/omega from the retained IQ-TREE checkpoint, and empirical
    frequencies from the verbose log (or use equal frequencies for `+FQ`).
    Reconstruct the generator in the explicit codon order. Independently
-   recompute the alignment likelihood by scaled pruning; reject a mismatch
-   with IQ-TREE's reported likelihood. Old cached runs without the required
+   recompute the alignment likelihood by scaled pruning. A finite mismatch
+   with IQ-TREE's reported likelihood emits a warning and bootstrap continues
+   with the reconstructed generator. Record both likelihoods, their absolute
+   difference, tolerance and check status in provenance. Nonfinite likelihoods
+   remain errors. Old cached runs without the required
    precise model output are refitted.
 3. Generate each complete alignment by the CTMC transition `exp(Q × length)`;
    include invariant sites. Fix topology, root position, foreground,

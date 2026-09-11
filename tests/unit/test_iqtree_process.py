@@ -91,4 +91,4 @@ def test_scan_fit_passes_seed_and_retains_checkpoint_for_precise_models(tmp_path
     monkeypatch.setattr(parser_iqtree.runtime, 'run_subprocess_tee', fake_fit)
     monkeypatch.setattr(parser_iqtree, '_write_iqtree_manifest', lambda g: None)
     parser_iqtree.run_iqtree_ancestral(g)
-    assert created[0].exists() == (calibration == 'parametric_bootstrap' or observation != 'marginal')
+    assert created[0].exists()  # GY sidecars are shared by every estimator and command.

@@ -1,0 +1,135 @@
+/tmp/csubst-endpoint-test-venv/bin/python -m pytest -q -n auto --dist worksteal -m "not process"
+${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  3%]
+........................................................................ [  6%]
+........................................................................ [ 10%]
+........................................................................ [ 13%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 40%]
+........................................................................ [ 44%]
+.................................sss.............ss..................... [ 47%]
+........................................................................ [ 51%]
+........................................................................ [ 54%]
+........................................................................ [ 58%]
+........................................................................ [ 61%]
+........................................................................ [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 71%]
+........................................................................ [ 75%]
+........................................................................ [ 78%]
+........................................................................ [ 81%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 99%]
+....................                                                     [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [3] tests/unit/test_structural_prediction.py:156: module 'torch' has __version__ '2.2.2', required is: '2.6'
+SKIPPED [1] tests/unit/test_structural_reference.py:89: could not import 'gemmi': No module named 'gemmi'
+SKIPPED [1] tests/unit/test_structural_reference.py:105: could not import 'gemmi': No module named 'gemmi'
+2103 passed, 5 skipped, 4 warnings in 23.48s
+/tmp/csubst-endpoint-test-venv/bin/python -m pytest -q -m process
+....                                                                     [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+4 passed, 2108 deselected, 1 warning in 4.71s
+CSUBST_STRICT_EXTENSIONS=1 /tmp/csubst-endpoint-test-venv/bin/python -m pytest -q -m native
+.........                                                                [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+9 passed, 2103 deselected, 1 warning in 1.67s
+/tmp/csubst-endpoint-test-venv/bin/python -m ruff check csubst tests setup.py .github/scripts
+All checks passed!
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/repository_hygiene_check.py
+Repository hygiene checks passed.
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/documentation_check.py
+Documentation checks passed: 21 documents, 23 commands, 1 help examples, 2 templates, 65 local links.
+Pass --wiki-dir to also check Wiki pages and links (15 references not checked).
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+csubst/endpoint_io.py:271: error: Need type annotation for "specs" (hint: "specs: dict[<type>, <type>] = ...")  [var-annotated]
+csubst/endpoint_io.py:283: error: Incompatible types in assignment (expression has type "None", target has type "tuple[Any, int, Any]")  [assignment]
+Found 2 errors in 1 file (checked 1 source file)
+make: *** [typecheck] Error 1
+
+Type annotation correction and rerun:
+/tmp/csubst-endpoint-test-venv/bin/python -m ruff check csubst tests setup.py .github/scripts
+All checks passed!
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/repository_hygiene_check.py
+Repository hygiene checks passed.
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/documentation_check.py
+Documentation checks passed: 21 documents, 23 commands, 1 help examples, 2 templates, 65 local links.
+Pass --wiki-dir to also check Wiki pages and links (15 references not checked).
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+
+Final documentation and harness lint:
+/tmp/csubst-endpoint-test-venv/bin/python -m ruff check csubst tests setup.py .github/scripts
+All checks passed!
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/repository_hygiene_check.py
+Repository hygiene checks passed.
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/documentation_check.py
+Documentation checks passed: 21 documents, 23 commands, 1 help examples, 2 templates, 65 local links.
+Pass --wiki-dir to also check Wiki pages and links (15 references not checked).

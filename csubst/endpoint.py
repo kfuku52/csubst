@@ -24,6 +24,7 @@ class EndpointBlock:
     predictive: np.ndarray | None
     reduced: dict | None = None
     reduced_predictive: dict | None = None
+    category_node: np.ndarray | None = None
 
 
 class EndpointModel:
@@ -135,13 +136,16 @@ class EndpointModel:
         self._transitions.move_to_end(t)
         return self._transitions[t]
 
-    def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None):
+    def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None,
+                    predictive_transform=None, category_nodes=False):
         """Yield one edge/site block; root records only contain a node marginal.
 
         Tips are observation likelihoods, NOT posterior probabilities. Missing
         observations have likelihood one for every state. Predictive records
         use sum_c P(c|D) P(parent=a|D,c) P_c(a,d), a fitted conditional
         endpoint prediction; they are not unconditional null probabilities.
+        A separate predictive transform can omit observed-only summaries. Each
+        transform's outputs are summed over rate categories before yielding.
         """
         if isinstance(block_size, bool) or int(block_size) != block_size or block_size < 1:
             raise ValueError('Endpoint block size must be a positive integer.')
@@ -166,6 +170,7 @@ class EndpointModel:
             stop = min(start + int(block_size), first.shape[0])
             size = stop - start
             inside = inside_buffer[:, :, :size]
+            post = post_buffer[:, :, :size]
             scales = scale_buffer[:, :, :size]
             inside.fill(1)
             scales.fill(0)
@@ -175,14 +180,16 @@ class EndpointModel:
                         inside[c, node] = arrays[node][start:stop]
                     else:
                         for child in self.children[node]:
-                            inside[c, node] *= inside[c, child] @ self.transition(child, c).T
+                            post[c, child] = inside[c, child] @ self.transition(child, c).T
+                            inside[c, node] *= post[c, child]
                             scales[c, node] += scales[c, child]
                             norm = inside[c, node].max(axis=1)
                             inside[c, node] /= np.where(norm > 0, norm, 1)[:, None]
                             with np.errstate(divide='ignore'):
                                 scales[c, node] += np.log(norm)
-            post = post_buffer[:, :, :size]
-            post.fill(0)
+            # Child slots hold pruning messages until the forward traversal
+            # consumes them, then the same storage holds node posteriors.
+            post[:, self.root].fill(0)
             root_unnormalized = inside[:, self.root] * self.pi
             root_sum = root_unnormalized.sum(axis=2)
             with np.errstate(divide='ignore'):
@@ -195,7 +202,9 @@ class EndpointModel:
             np.divide(root_unnormalized, root_sum[:, :, None],
                       out=post[:, self.root], where=root_sum[:, :, None] > 0)
             yield EndpointBlock(start, stop, self.root, -1,
-                                np.einsum('cs,csk->sk', class_weight, post[:, self.root]), None, None)
+                                np.einsum('cs,csk->sk', class_weight, post[:, self.root]), None, None,
+                                category_node=(class_weight[:, :, None] * post[:, self.root]
+                                               if category_nodes else None))
             for child in self.order[1:]:
                 parent = int(self.parents[child])
                 wanted = child in selected
@@ -205,7 +214,7 @@ class EndpointModel:
                 reduced_pred: dict = {}
                 for c in range(nc):
                     transition = self.transition(child, c)
-                    denominator = inside[c, child] @ transition.T
+                    denominator = post[c, child]
                     # Conditioning the child on its parent avoids retaining
                     # outside likelihoods or a joint for every branch.
                     left = np.divide(post[c, parent], denominator,
@@ -219,12 +228,13 @@ class EndpointModel:
                         pred += (class_weight[c, :, None, None]
                                  * post[c, parent, :, :, None] * transition)
                     if transform is not None and wanted:
-                        for target, lvalues, rvalues in (
-                                (reduced, left, right),
-                                (reduced_pred, post[c, parent], np.ones_like(right))):
+                        for target, lvalues, rvalues, reducer in (
+                                (reduced, left, right, transform),
+                                (reduced_pred, post[c, parent], np.ones_like(right),
+                                 predictive_transform or transform)):
                             if target is reduced_pred and not predictive:
                                 continue
-                            values = transform(lvalues * class_weight[c, :, None], rvalues, transition)
+                            values = reducer(lvalues * class_weight[c, :, None], rvalues, transition)
                             for key, value in values.items():
                                 if key not in target:
                                     target[key] = value
@@ -232,4 +242,5 @@ class EndpointModel:
                                     target[key] += value
                 yield EndpointBlock(start, stop, child, parent,
                                     np.einsum('cs,csk->sk', class_weight, post[:, child]), edge, pred,
-                                    reduced, reduced_pred)
+                                    reduced, reduced_pred,
+                                    class_weight[:, :, None] * post[:, child] if category_nodes else None)

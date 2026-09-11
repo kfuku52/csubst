@@ -302,3 +302,39 @@ def test_get_mechanistic_instantaneous_rate_matrix_supports_zero_omega_without_n
     assert out[1, 2] == pytest.approx(0.0, abs=1e-12)
     assert out[2, 0] == pytest.approx(0.0, abs=1e-12)
     assert out[2, 1] == pytest.approx(0.0, abs=1e-12)
+
+
+@pytest.mark.parametrize('scheme', ['F1X4', 'F3X4'])
+def test_mg_uses_target_nucleotide_frequencies_and_stationary_products(tmp_path, scheme):
+    from csubst import parser_iqtree
+    codons = parser_misc.get_exchangeability_codon_order()
+    path = tmp_path / 'a.fa'
+    path.write_text('>A\n' + ''.join(codons) + 'AAA' * 9 + 'CCA' * 20 + 'NNN---AAR\n')
+    g = dict(substitution_model='MG+' + scheme, codon_orders=codons, alignment_file=str(path),
+             float_type=np.float64, iqtree_parser='iqtree2', omega=.2, kappa=None,
+             amino_acid_orders=['X'], synonymous_indices={'X': list(range(len(codons)))})
+    parser_iqtree._read_mg_frequencies(g, '')
+    q = parser_misc.get_mechanistic_instantaneous_rate_matrix(g)
+    index = {c: i for i, c in enumerate(codons)}
+    # Same target nucleotide/position, different unchanged codon context.
+    assert q[index['AAA'], index['AAG']] == pytest.approx(q[index['CAA'], index['CAG']])
+    np.testing.assert_allclose(g['equilibrium_frequency'] @ q, 0, atol=1e-14)
+    assert -g['equilibrium_frequency'] @ q.diagonal() == pytest.approx(1)
+    assert q[index['AAA'], index['ACC']] == 0
+    legacy = parser_misc.get_mechanistic_instantaneous_rate_matrix(dict(g, substitution_model='GY'))
+    assert not np.allclose(q, legacy)
+    malformed = dict(g, equilibrium_frequency=np.ones(len(codons)) / len(codons))
+    with pytest.raises(ValueError, match='products'):
+        parser_misc.get_mechanistic_instantaneous_rate_matrix(malformed)
+
+
+def test_mg_rejects_mismatched_report_frequencies(tmp_path):
+    from csubst import parser_iqtree
+    path = tmp_path / 'a.fa'
+    path.write_text('>A\nAAACCCGGGTTTAAA\n')
+    codons = parser_misc.get_exchangeability_codon_order()
+    report = ' '.join('pi(' + c + ') = 0.01639344' for c in codons)
+    g = dict(substitution_model='MG+F3X4', codon_orders=codons, alignment_file=str(path),
+             float_type=np.float64, iqtree_parser='iqtree2')
+    with pytest.raises(ValueError, match='do not match'):
+        parser_iqtree._read_mg_frequencies(g, report)

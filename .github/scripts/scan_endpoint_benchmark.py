@@ -40,7 +40,7 @@ def write_record(path, record):
 
 def command(args, mode, outdir):
     data = ROOT / "csubst/dataset"
-    result = ["csubst", "scan", "--alignment_file", str(data / "PEPC.alignment.fa"),
+    result = ["csubst", "scan", "--scan_observation", "marginal", "--alignment_file", str(data / "PEPC.alignment.fa"),
               "--rooted_tree_file", str(data / "PEPC.tree.nwk"),
               "--foreground", str(ROOT / "reports/csubst_scan_pepc_20260625/PEPC.foreground.independent.txt"),
               "--iqtree_model", "ECMK07+F", "--iqtree_outdir", str(args.fit_dir),

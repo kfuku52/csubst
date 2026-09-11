@@ -9,7 +9,6 @@ mass is treated as an integer observation and no null simulations are used.
 
 import json
 import math
-import re
 
 import numpy as np
 from scipy.special import logsumexp
@@ -190,10 +189,7 @@ def prepare(g):
     if not validate_options(g):
         return None
     name = str(g.get('substitution_model', ''))
-    if not re.fullmatch(r'(?:ECMK07|ECMrest|GY)(?:\+(?:F(?:O|Q|1X4|3X4)?|G\d*|R\d*|I))*', name):
-        raise ValueError('Unsupported codon model for endpoint analytical scan.')
-    with open(g['path_iqtree_iqtree'], encoding='utf-8') as handle:
-        rates, weights = endpoint_io.read_rate_mixture(handle.read())
+    rates, weights = endpoint_io.model_rates(g)
     parents, lengths = endpoint_io._tree_arrays(g, False)
     model = endpoint.EndpointModel(parents, lengths, g['instantaneous_codon_rate_matrix'],
                                    g.get('equilibrium_frequency', g.get('empirical_eq_freq')), rates, weights)
@@ -240,6 +236,8 @@ def annotate(g, frame, units, engine):
             obs = np.asarray(emissions[leaf, site], dtype=float)
             tips[leaf] = obs if obs.sum() else np.ones(engine.model.pi.size)
         branches = substitution_scan._target_branch_ids_from_maps(rate_fg, row['trait'], row['target_class'], valid)
+        if "event_eligible" in g:
+            branches = branches[g["event_eligible"][branches, site]]
         p, log_e = engine.test(tips, branches,
             [int(v) for v in str(row['from_state_ids']).split(',') if v],
             [int(v) for v in str(row['to_state_ids']).split(',') if v])

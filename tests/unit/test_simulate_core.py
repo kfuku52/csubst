@@ -765,3 +765,29 @@ def test_rescale_branch_length_adjusted_site_accumulates_distance_across_state_l
     assert ete.get_prop(b_node, "Sdist") == pytest.approx(0.0, abs=1e-12)
     assert ete.get_prop(b_node, "Ndist") == pytest.approx(expected_dist, abs=1e-12)
     assert ete.get_prop(b_node, "SNdist") == pytest.approx(expected_dist, abs=1e-12)
+
+
+def test_mg_true_asr_preserves_generator_frequencies(tmp_path):
+    from csubst import parser_iqtree, parser_misc
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('(A:1,B:1)R;', format=1))
+    anc = tmp_path / 'anc.fa'
+    anc.write_text('>R\nAAA\n')
+    codons = parser_misc.get_exchangeability_codon_order()
+    frequencies = np.array([[.1, .2, .3, .4], [.4, .3, .2, .1], [.2, .4, .1, .3]])
+    pi = np.array([np.prod([frequencies[p, 'ACGT'.index(c[p])] for p in range(3)]) for c in codons])
+    pi /= pi.sum()
+    # Writer uses Pyvolve's lexicographic codon order.
+    g = dict(tree=tr, eq_freq=pi[np.argsort(codons)], substitution_model='MG+F3X4',
+             genetic_code=1, background_omega=.2, mg_nucleotide_frequencies=frequencies)
+    paths = main_simulate.write_true_asr_bundle(g, str(anc), str(tmp_path / 'true'))
+    context = dict(path_iqtree_iqtree=paths['iqtree'], codon_orders=np.sort(codons), float_type=np.float64,
+                   alignment_file=str(anc))
+    parser_iqtree.read_iqtree(context)
+    np.testing.assert_allclose(context['mg_nucleotide_frequencies'], frequencies)
+    np.testing.assert_allclose(context['equilibrium_frequency'], pi[np.argsort(codons)])
+
+
+def test_mg_alignment_frequency_override_is_rejected():
+    with pytest.raises(ValueError, match='not supported for MG'):
+        main_simulate._resolve_simulation_eq_freq({
+            'simulate_eq_freq': 'alignment', 'substitution_model': 'MG+F3X4'})

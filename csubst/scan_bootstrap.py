@@ -7,7 +7,6 @@ This is model-conditional bootstrap inference, not finite-sample exact testing.
 """
 
 import copy
-import gzip
 import json
 import os
 from pathlib import Path
@@ -16,12 +15,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.linalg import expm
 
-from csubst import __version__, cli_io, ete, parser_misc, runtime, scan_statistics, sequence
+from csubst import __version__, cli_io, ete, runtime, scan_statistics, sequence
 
 
 def capture_options(args, parser):
@@ -59,9 +59,7 @@ def validate_options(g):
 
 
 def requires_precise_model(g):
-    return (g.get('scan_pvalue_calibration') == 'parametric_bootstrap'
-            or (g.get('scan_observation', 'marginal') != 'marginal'
-                and str(g.get('iqtree_model', '')).upper() in ('GY+F', 'GY+FQ')))
+    return g.get('scan_pvalue_calibration') == 'parametric_bootstrap'
 
 
 def require_precise_fit(g):
@@ -83,21 +81,9 @@ def require_precise_fit(g):
 
 
 def prepare_observation_model(g):
-    """Use the fitted report's model, including explicitly supplied ASR files."""
-    if g.get('scan_observation', 'marginal') == 'marginal':
-        return
-    model = str(g.get('substitution_model', '')).upper()
-    if model not in ('GY+F', 'GY+FQ'):
-        return
-    # With supplied intermediates, iqtree_model may still be the CLI default.
-    # The report's frequency scheme is authoritative for the existing fit.
-    local = dict(g, iqtree_model=model)
-    state_path = Path(g['path_iqtree_state'])
-    if not Path(str(state_path).removesuffix('.state') + '.ckp.gz').is_file():
-        raise ValueError('Precise joint/bridge GY observations require the matching IQ-TREE checkpoint; refit the supplied model.')
-    q, pi, provenance = _fitted_generator(local, np.asarray(g['codon_orders']))
-    g.update(instantaneous_codon_rate_matrix=q, equilibrium_frequency=pi,
-             scan_ctmc_model_precision=provenance)
+    """Compatibility entry point; all commands use the shared fitted loader."""
+    from csubst import fitted_model
+    fitted_model.prepare(g, strict=g.get('scan_pvalue_calibration') == 'parametric_bootstrap')
 
 
 def _precise_newick(tr):
@@ -111,39 +97,8 @@ def _precise_newick(tr):
 
 
 def _fitted_generator(g, codons):
-    state_path = Path(g['path_iqtree_state'])
-    checkpoint = Path(str(state_path).removesuffix('.state') + '.ckp.gz')
-    with gzip.open(checkpoint, 'rt') as handle:
-        text = handle.read()
-    block = re.search(r'^ModelCodon:\n((?:[ \t].*\n)+)', text, flags=re.MULTILINE)
-    if block is None:
-        raise ValueError('Missing ModelCodon checkpoint for the fitted bootstrap null.')
-    parameters = {}
-    for name in ('omega', 'kappa'):
-        value = re.search(r'^\s+' + name + r':\s+(\S+)', block[1], flags=re.MULTILINE)
-        if value is None or not np.isfinite(float(value[1])) or float(value[1]) <= 0:
-            raise ValueError('Invalid checkpoint parameter: ' + name)
-        parameters[name] = float(value[1])
-    if str(g['iqtree_model']).upper() == 'GY+FQ':
-        pi = np.full(len(codons), 1/len(codons))
-    else:
-        log = Path(g['path_iqtree_log']).read_text()
-        matches = re.findall(r'^Empirical state frequencies:\s*([^\n]+)', log, flags=re.MULTILINE)
-        if not matches:
-            raise ValueError('Missing full-precision empirical frequencies for the fitted bootstrap null.')
-        frequencies = np.array([float(v) for v in matches[-1].split()])
-        if frequencies.size != len(codons):
-            raise ValueError('IQ-TREE empirical frequency order/size does not match the sense codon alphabet.')
-        # IQ-TREE's sense-codon alphabet is lexicographic A,C,G,T. Explicitly
-        # remap it to the state-file axis; never assume an incidental row order.
-        mapping = dict(zip(sorted(codons.tolist()), frequencies.tolist()))
-        pi = np.array([mapping[c] for c in codons])
-        if not np.isfinite(pi).all() or (pi < 0).any() or not np.isclose(pi.sum(), 1., rtol=0, atol=1e-8):
-            raise ValueError('Invalid full-precision fitted codon frequencies.')
-        pi /= pi.sum()  # log serialization roundoff only
-    local = dict(g, **parameters, equilibrium_frequency=pi, float_type=np.float64)
-    q = parser_misc.get_mechanistic_instantaneous_rate_matrix(local)
-    return q, pi, dict(parameters, checkpoint=str(checkpoint), frequency_source='verbose_log_or_FQ')
+    from csubst import fitted_model
+    return fitted_model._fitted_generator(g, codons)
 
 
 def alignment_loglikelihood(model, sequences):
@@ -219,9 +174,20 @@ def prepare_model(g):
         raise ValueError('Missing IQ-TREE likelihood to validate the bootstrap generator.')
     reported = float(match[1])
     reproduced = alignment_loglikelihood(model, sequences)
-    if not np.isfinite(reproduced) or abs(reported - reproduced) > max(.001, 1e-8*model['sites']):
-        raise ValueError('Bootstrap generator does not reproduce the fitted IQ-TREE likelihood: {} versus {}.'.format(reproduced, reported))
-    model['provenance'] = dict(provenance, reported_loglik=reported, reproduced_loglik=reproduced)
+    if not np.isfinite(reported) or not np.isfinite(reproduced):
+        raise ValueError('Bootstrap likelihoods must be finite.')
+    tolerance = max(.001, 1e-8*model['sites'])
+    difference = abs(reported - reproduced)
+    mismatch = difference > tolerance
+    if mismatch:
+        warnings.warn(
+            'Bootstrap generator does not reproduce the fitted IQ-TREE likelihood: {} versus {}. '
+            'Continuing bootstrap with the reconstructed generator; likelihood mismatch is recorded in provenance.'.format(reproduced, reported),
+            RuntimeWarning, stacklevel=2,
+        )
+    model['provenance'] = dict(provenance, reported_loglik=reported, reproduced_loglik=reproduced,
+                              likelihood_check='warning' if mismatch else 'matched',
+                              likelihood_absolute_difference=difference, likelihood_tolerance=tolerance)
     return model
 
 

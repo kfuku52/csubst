@@ -556,6 +556,14 @@ def _normalize_search_parameters(g: dict[str, Any]) -> dict[str, Any]:
 
 def _normalize_state_parameters(g: dict[str, Any]) -> dict[str, Any]:
     from csubst import endpoint_io
+    if g.get('subcommand') == 'scan':
+        observation = g.get('scan_observation') or g.get('substitution_posterior', 'joint')
+        g['scan_observation'] = observation
+        g['substitution_posterior'] = 'marginal' if observation == 'marginal' else 'joint'
+        if g.get('scan_rate_exposure') is None:
+            g['scan_rate_exposure'] = 'q_weighted' if observation == 'marginal' else 'endpoint'
+        if g.get('scan_rate_length') is None:
+            g['scan_rate_length'] = 'n_rescaled' if observation == 'marginal' else 'raw'
     endpoint_io.validate_options(g)
     g['float_type'] = np.float64
     g['float_tol'] = 10**-9

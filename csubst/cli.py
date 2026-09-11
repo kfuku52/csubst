@@ -636,17 +636,17 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                              'Integer tokens (including "1") are counts; decimal/scientific values <=1 are fractions.')
     parser.add_argument('--scan_min_event_count', type=float, default=0.5,
                         help='Minimum posterior mean jump count for bridge discovery/support; may exceed one.')
-    parser.add_argument('--scan_observation', choices=['marginal', 'joint', 'bridge'], default='marginal',
-                        help='Observed events: marginal product, true joint endpoint posterior, or posterior mean CTMC jump count. Joint/bridge require endpoint exposure and raw lengths.')
-    parser.add_argument('--scan_rate_exposure', metavar='q_weighted|state_aware|raw_branch_length|endpoint', default='q_weighted', type=str,
+    parser.add_argument('--scan_observation', choices=['marginal', 'joint', 'bridge'], default=None,
+                        help='Scan-specific override of --substitution_posterior (default: joint). Bridge selects posterior mean CTMC jump counts. Joint/bridge require endpoint exposure and raw lengths.')
+    parser.add_argument('--scan_rate_exposure', metavar='q_weighted|state_aware|raw_branch_length|endpoint', default=None, type=str,
                         choices=['state_aware', 'raw_branch_length', 'q_weighted', 'endpoint'],
-                        help='default=%(default)s: Exposure model for the exploratory scan rate score. '
+                        help='Default: endpoint for joint/bridge, q_weighted for marginal. Exposure model for the exploratory scan rate score. '
                              '"state_aware" counts only branch length whose parent state can produce the candidate substitution; '
                              '"q_weighted" integrates candidate codon-transition rates over the parent codon posterior '
                              'or, with --scan_rate_length n_rescaled, uses their conditional probability among outgoing nonsynonymous transitions. '
                              'For --nonsyn_recode 3di20, q_weighted resolves to state_aware because a codon-model Q is not a 3Di Q. '
                              '"endpoint" uses finite-time codon endpoint probabilities and requires raw model lengths, '
-                             'posterior_sum events and uniform codon site rates. Its exposure is expected endpoint events; '
+                             'posterior_sum events. Joint supports fitted discrete rate categories. Its exposure is expected endpoint events; '
                              'With bridge observations, it instead integrates expected jump counts. Analytical P values use a Poisson approximation.')
     parser.add_argument('--scan_rate_event_mode', metavar='called|posterior_sum', default='posterior_sum', type=str,
                         choices=['called', 'posterior_sum'],
@@ -657,9 +657,9 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                         choices=['all', 'sister'],
                         help='default=%(default)s: Non-target branch set used as the control in scan rate P values. '
                              '"all" uses all non-foreground branches; "sister" uses sister branches for foreground rows.')
-    parser.add_argument('--scan_rate_length', metavar='raw|sn_rescaled|n_rescaled', default='n_rescaled', type=str,
+    parser.add_argument('--scan_rate_length', metavar='raw|sn_rescaled|n_rescaled', default=None, type=str,
                         choices=['raw', 'sn_rescaled', 'n_rescaled'],
-                        help='default=%(default)s: Branch-length scale used for the exploratory scan rate score. '
+                        help='Default: raw for joint/bridge, n_rescaled for marginal. Branch-length scale used for the exploratory scan rate score. '
                              '"n_rescaled" uses CSUBST nonsynonymous-substitution branch lengths; '
                              '"raw" uses IQ-TREE/tree branch lengths; "sn_rescaled" uses CSUBST S+N branch lengths.')
     parser.add_argument('--scan_analytic_pvalue', choices=['none', 'endpoint_mixture'], default='none',
@@ -759,6 +759,7 @@ def _make_iqtree_parser(show_advanced):
                         help='default=%(default)s: Shared directory used when --iqtree_* paths are "infer".')
     psr_iq.add_argument('--iqtree_model', metavar='STR', default='ECMK07+F+R4', type=str, required=False,
                         help='default=%(default)s: Codon substitution model for ancestral state reconstruction. '
+                             'An explicitly supplied complete fit keeps its reported model unless --iqtree_redo yes. '
                              'Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. '
                              'Among-site rate heterogeneity and codon frequencies can be specified. '
                              'See here for details: https://iqtree.github.io/doc/Substitution-Models')
@@ -790,10 +791,10 @@ def _make_iqtree_parser(show_advanced):
 
 def _make_ancestral_parser():
     psr_as = argparse.ArgumentParser(add_help=False)
-    psr_as.add_argument('--substitution_posterior', choices=['marginal', 'joint'], default='marginal',
+    psr_as.add_argument('--substitution_posterior', choices=['marginal', 'joint'], default='joint',
                         help='default=%(default)s: marginal multiplies node marginals; joint computes '
                              'CTMC endpoint posteriors and matched conditional model predictions. '
-                             'Joint supports ECM/GY codons and direct uniform-GTR 3Di.')
+                             'Joint supports ECM/GY/MG codons and direct uniform-GTR 3Di (3Di scan is not yet supported).')
     psr_as.add_argument('--endpoint_block_size', metavar='INTEGER', type=int, default=64,
                         help='default=%(default)s: Sites per joint-endpoint inference block; '
                              'smaller values reduce temporary RAM without changing the estimator.')
@@ -1077,7 +1078,7 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
                           help='default=%(default)s: Source of codon equilibrium frequencies for simulation Q. '
                                '"auto" prefers IQ-TREE frequencies and falls back to alignment frequencies; '
                                '"iqtree" requires parsed IQ-TREE frequencies; '
-                               '"alignment" always re-estimates from alignment.')
+                               '"alignment" re-estimates from alignment (unsupported for MG models).')
     simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
                           help='default=%(default)s: Export true ancestral-state bundle from simulation '
                                '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for search-time evaluation.')

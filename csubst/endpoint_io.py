@@ -1,21 +1,47 @@
 """Model/input and sparse-output adapters for joint endpoint inference."""
 
+from collections import OrderedDict
 from contextlib import ExitStack
 import json
+import hashlib
 import re
 import tempfile
 
 import numpy as np
 from scipy import sparse
 
-from csubst import endpoint, ete, runtime, substitution_sparse
+from csubst import endpoint, ete, fitted_model, runtime, substitution_sparse
 
 
 BASE_STATS = ('any2any', 'spe2any', 'any2spe', 'spe2spe')
 
 
 def enabled(g):
-    return str(g.get('substitution_posterior', 'marginal')).lower() == 'joint'
+    return (g.get('subcommand') != 'scan'
+            and str(g.get('substitution_posterior', 'marginal')).lower() == 'joint')
+
+
+def validate_codon_model(name):
+    pattern = r'(?:ECMK07|ECMrest|GY)(?:\+(?:F(?:O|Q|1X4|3X4)?|G\d*|R\d*|I))*'
+    mg_pattern = r'MGK?(?:\+(?:F1X4|F3X4|G\d*|R\d*|I))*'
+    if not re.fullmatch(pattern, name) and not re.fullmatch(mg_pattern, name):
+        raise ValueError('Joint codon endpoints support ECMK07, ECMrest, GY and MG/MGK with counted F1X4/F3X4; unsupported modifiers and mixtures of Q matrices require their own verified likelihood models.')
+
+
+def model_rates(g):
+    """Fitted category rates/priors, never posterior mean rates from .rate."""
+    name = str(g.get('substitution_model', ''))
+    validate_codon_model(name)
+    path = g.get('path_iqtree_iqtree')
+    if path:
+        with open(path) as handle:
+            return read_rate_mixture(handle.read())
+    if re.search(r'\+(?:G\d*|R\d*|I)(?:\+|$)', name):
+        raise ValueError('Rate mixtures require the fitted IQ-TREE rate-category table.')
+    values = np.asarray(g.get('iqtree_rate_values', [1.]), dtype=float)
+    if not np.all(values == 1):
+        raise ValueError('Uniform endpoint models require unit site rates.')
+    return np.ones(1), np.ones(1)
 
 
 def validate_options(g):
@@ -218,11 +244,12 @@ def _use_projected_search(g, selected_stats):
             and 'spe2spe' not in selected_stats)
 
 
-def _projection_transform(g, kinds, mappings, stats):
+def _projection_transform(g, kinds, mappings, stats, predictive=False, cache_bytes=32 * 1024**2):
     """Contract only within-S pairs and cross-group N transition marginals.
 
     The cross-group mask sums positive terms directly, avoiding cancellation
-    from subtracting the (often almost unit) unchanged probability.
+    from subtracting the (often almost unit) unchanged probability. Predictive
+    calls require unit right likelihoods and immutable transition arrays.
     """
     syn_indices = [np.asarray(g['synonymous_indices'][aa], dtype=int)
                    for aa in g['amino_acid_orders']] if 'S' in kinds else []
@@ -234,6 +261,27 @@ def _projection_transform(g, kinds, mappings, stats):
     cython_project = getattr(substitution_sparse.substitution_sparse_cy, 'project_endpoint_syn_double', None)
     masks = {kind: (mapping @ mapping.T == 0) for kind, mapping in mappings.items()
              if mapping is not None}
+    kernels: OrderedDict = OrderedDict()
+    cached_bytes = 0
+
+    def prediction_kernel(kind, transition):
+        # EndpointModel transition arrays are immutable during inference. Keep
+        # the object with the key so Python cannot reuse its identity in cache.
+        nonlocal cached_bytes
+        key = (kind, id(transition))
+        if key in kernels:
+            kernels.move_to_end(key)
+            return kernels[key][1:3]
+        cross = transition * masks[kind]
+        derived = cross @ mappings[kind]
+        ancestral = cross.sum(axis=1)
+        size = transition.nbytes + derived.nbytes + ancestral.nbytes
+        if size <= cache_bytes:
+            while kernels and (cached_bytes + size > cache_bytes or len(kernels) >= 1024):
+                cached_bytes -= kernels.popitem(last=False)[1][3]
+            kernels[key] = (transition, derived, ancestral, size)
+            cached_bytes += size
+        return derived, ancestral
 
     def transform(left, right, transition):
         out = {}
@@ -255,15 +303,64 @@ def _projection_transform(g, kinds, mappings, stats):
                 out.update({(kind, stat): value for stat, value in _projections(events).items()
                             if stat in stats})
             else:
-                cross = transition * masks[kind]
-                derived = ((left @ cross) * right) @ mappings[kind]
+                if predictive:
+                    # Predictive right likelihoods are one. Contract constant
+                    # transition/group axes once instead of at every site block.
+                    kernel, ancestral = prediction_kernel(kind, transition)
+                    derived = left @ kernel
+                else:
+                    cross = transition * masks[kind]
+                    derived = ((left @ cross) * right) @ mappings[kind]
                 out[kind, 'any2any'] = derived.sum(axis=1, keepdims=True)
                 if 'any2spe' in stats:
                     out[kind, 'any2spe'] = derived[:, None, :]
                 if 'spe2any' in stats:
-                    out[kind, 'spe2any'] = (((right @ cross.T) * left) @ mappings[kind])[:, None, :]
+                    if predictive:
+                        values = (left * ancestral) @ mappings[kind]
+                    else:
+                        values = ((right @ cross.T) * left) @ mappings[kind]
+                    out[kind, 'spe2any'] = values[:, None, :]
         return out
     return transform
+
+def _event_transform(g, kinds, mappings):
+    """Accumulate only classified events; maxima must follow rate mixing."""
+    native = getattr(substitution_sparse.substitution_sparse_cy, 'project_endpoint_events_double', None)
+    specs: dict = {}
+    for kind in kinds:
+        if kind == 'S':
+            ng, ns = len(g['amino_acid_orders']), g['max_synonymous_size']
+            pairs = [(group * ns * ns + a * ns + d, int(ca), int(cd))
+                     for group, aa in enumerate(g['amino_acid_orders'])
+                     for a, ca in enumerate(g['synonymous_indices'][aa])
+                     for d, cd in enumerate(g['synonymous_indices'][aa]) if a != d]
+        else:
+            mapping = mappings[kind]
+            ng, ns = 1, mapping.shape[1]
+            if not np.all((mapping == 0) | (mapping == 1)) or not np.all(mapping.sum(axis=1) == 1):
+                specs[kind] = None
+                continue
+            groups = mapping.argmax(axis=1)
+            pairs = [(int(a * ns + d), ca, cd)
+                     for ca, a in enumerate(groups) for cd, d in enumerate(groups) if a != d]
+        specs[kind] = (np.asarray(pairs, dtype=np.int64).reshape(-1, 3), ng, ns)
+
+    def transform(left, right, transition):
+        out = {}
+        raw = None
+        for kind in kinds:
+            spec = specs[kind]
+            if native is not None and spec is not None:
+                pairs, ng, ns = spec
+                events = native(left, right, transition, pairs, ng, ns)
+            else:
+                if raw is None:
+                    raw = left[:, :, None] * transition * right[:, None, :]
+                events = _events(raw, kind, g, mappings[kind])
+            out[kind, 'events'] = events
+        return out
+    return transform
+
 
 def _build(g, structural=False):
     source = g['state_nsy'] if structural else g['state_cdn']
@@ -281,15 +378,10 @@ def _build(g, structural=False):
         kinds = ['N']
         mappings = {'N': np.eye(k)}
     else:
-        model_name = str(g.get('substitution_model', ''))
-        if not re.fullmatch(r'(?:ECMK07|ECMrest|GY)(?:\+(?:F(?:O|Q|1X4|3X4)?|G\d*|R\d*|I))*', model_name):
-            raise ValueError('Joint codon endpoints currently support ECMK07, ECMrest and GY models; '
-                             'unsupported modifiers, MG, model mixtures and ascertainment schemes '
-                             'require their own verified likelihood models.')
+        validate_codon_model(str(g.get('substitution_model', '')))
         q = g['instantaneous_codon_rate_matrix']
         pi = g.get('equilibrium_frequency', g.get('empirical_eq_freq'))
-        with open(g['path_iqtree_iqtree']) as handle:
-            rates, weights = read_rate_mixture(handle.read())
+        rates, weights = model_rates(g)
         kinds = ['S']
         mappings = {'S': None}
         if g.get('nonsyn_recode', 'no') != '3di20':
@@ -301,15 +393,11 @@ def _build(g, structural=False):
             mappings['AA'] = _mapping(g, 'AA', k)
     model = endpoint.EndpointModel(parents, lengths, q, pi, rates, weights)
     tips = {}
-    observed = np.zeros((n, num_site), dtype=bool)
+    observed, eligible = fitted_model.observation_masks(g["tree"], source)
     for leaf in model.leaves:
         values = np.array(source[leaf], dtype=float)
-        observed[leaf] = values.sum(axis=1) > 0
         values[~observed[leaf]] = 1
         tips[leaf] = values
-    for node in reversed(model.order):
-        for child in model.children[node]:
-            observed[node] |= observed[child]
     expected = (str(g.get('expectation_method', 'codon_model')) == 'codon_model'
                 and g.get('subcommand', 'search') in ('search', 'analyze', 'benchmark'))
     cache = g.setdefault('_endpoint_tensors', {})
@@ -330,8 +418,12 @@ def _build(g, structural=False):
     if pairwise:
         pairwise = _pairwise_storage_bound(n, num_site, shapes, kinds, selected_stats,
                                            int(g.get('endpoint_block_size', 64)), g) <= 64 * 1024 * 1024
-    direct = projected and not g.get('b', False) and 'AA' not in kinds
-    transform = _projection_transform(g, kinds, mappings, observed_stats) if direct else None
+    direct = projected and 'AA' not in kinds
+    classified = not direct or g.get('b', False)
+    coarse_transform = _projection_transform(g, kinds, mappings, observed_stats) if direct else None
+    transform = _event_transform(g, kinds, mappings) if classified else coarse_transform
+    predictive_transform = (_projection_transform(g, kinds, mappings, observed_stats, predictive=True)
+                            if direct else transform)
     with ExitStack() as stack:
         builders = {kind: _Spool(stack, n, int(np.prod(shape[1:])), source.dtype)
                     for kind, shape in shapes.items()} if not projected else {}
@@ -363,7 +455,9 @@ def _build(g, structural=False):
                 features = {'any2any': ng, 'spe2any': ng * ns, 'any2spe': ng * ns, 'spe2spe': ng * ns * ns}
                 ebuilders[kind] = {stat: builder(kind, stat, count)
                                    for stat, count in features.items() if stat in selected_stats}
-        for record in model.iter_blocks(tips, block_size=g.get('endpoint_block_size', 64), predictive=expected, transform=transform):
+        for record in model.iter_blocks(tips, block_size=g.get('endpoint_block_size', 64), predictive=expected,
+                                        transform=transform,
+                                        predictive_transform=predictive_transform):
             sl = slice(record.start, record.stop)
             node = record.child
             if node not in model.leaves:
@@ -377,19 +471,20 @@ def _build(g, structural=False):
                         g['state_nsy'][node, sl] = pp @ mappings['N']
             if record.parent < 0:
                 continue
-            valid = observed[node, sl] & observed[record.parent, sl]
+            valid = eligible[node, sl]
             if record.joint is not None:
                 record.joint[~valid] = 0
             if record.predictive is not None:
                 record.predictive[~valid] = 0
             for kind in kinds:
-                if direct:
+                if classified:
+                    events = record.reduced[kind, 'events']
+                    events[~valid] = 0
+                    projections = _projections(events)
+                else:
                     projections = {stat: record.reduced[kind, stat] for stat in observed_stats}
                     for values in projections.values():
                         values[~valid] = 0
-                else:
-                    events = _events(record.joint, kind, g, mappings[kind])
-                    projections = _projections(events)
                 if projected:
                     if pairwise:
                         branch_sites[kind][node, sl] = projections['any2any'].sum(axis=1)
@@ -411,7 +506,8 @@ def _build(g, structural=False):
                         for values in prediction_projections.values():
                             values[~valid] = 0
                     else:
-                        prediction = _events(record.predictive, kind, g, mappings[kind])
+                        prediction = record.reduced_predictive[kind, 'events']
+                        prediction[~valid] = 0
                         prediction_projections = _projections(prediction)
                     totals[kind] += float(prediction_projections['any2any'].sum())
                     for stat, accumulator in ebuilders[kind].items():
@@ -440,6 +536,8 @@ def _build(g, structural=False):
                                    for x in projections.values()),
                     'mode': 'nsy' if kind == 'N' else 'cdn',
                 }
+    for kind in kinds:
+        cache[kind].eligible = eligible
     if not structural and g.get('nonsyn_recode', 'no') == 'no':
         cache['AA'] = cache['N']
     manifest = g.setdefault('_endpoint_manifest', {})
@@ -448,16 +546,57 @@ def _build(g, structural=False):
         'direct_projection': direct,
         'rates': np.asarray(rates).tolist(), 'weights': np.asarray(weights).tolist(),
         'branch_lengths': lengths.tolist(),
-        'parameter_source': '3di_checkpoint' if structural else 'iqtree_report_and_model_matrix',
+        'parameter_source': '3di_checkpoint' if structural else g.get('fitted_model_provenance', 'provided_model_matrix'),
+        'missing_events': 'excluded_from_reporting; latent_states_integrated',
     }
+
+
+def _input_fingerprint(g):
+    """Invalidate in-process outputs when model, emissions or projection change."""
+    digest = hashlib.sha256()
+    def add(value, sparse=False):
+        array = np.asarray(value)
+        digest.update(str((array.shape, array.dtype, sparse)).encode())
+        if sparse:
+            # Tip emissions are mostly exact zeros. Hash their lossless packed
+            # support and values, avoiding repeated hashing of a dense codon axis.
+            support = array != 0
+            digest.update(np.packbits(support).tobytes())
+            digest.update(np.ascontiguousarray(array[support]).tobytes())
+        else:
+            digest.update(np.ascontiguousarray(array).tobytes())
+    add(g['instantaneous_codon_rate_matrix'])
+    add(g.get('equilibrium_frequency', g.get('empirical_eq_freq')))
+    for structural in ([False, True] if g.get('nonsyn_recode') == '3di20' else [False]):
+        for value in _tree_arrays(g, structural):
+            add(value)
+        source = g['state_nsy'] if structural else g['state_cdn']
+        for node in g['tree'].traverse():
+            if ete.is_leaf(node):
+                add(source[int(ete.get_prop(node, 'numerical_label'))], sparse=True)
+        if structural:
+            add(g['3di_q'])
+            add(g['3di_pi'])
+    for value in model_rates(g):
+        add(value)
+    for key in ('subcommand', 'expectation_method', 'nonsyn_recode', 'nonsynonymous_indices',
+                'synonymous_indices', 'amino_acid_orders', 'nonsyn_state_orders', 'output_stats',
+                'b', 'cs', 'cbs', 'max_arity', 'calibrate_longtail', 'min_sub_pp',
+                'calc_omega_pvalue', 'asrv_report', 'epistasis_requested', 'asrv_training_branches',
+                'site_filter_report', 'fg_clade_permutation', 'max_synonymous_size'):
+        digest.update(str((key, g.get(key))).encode())
+    return digest.hexdigest()
 
 
 def prepare(g):
     if not enabled(g):
         return
     validate_options(g)
+    fingerprint = _input_fingerprint(g)
     if '_endpoint_tensors' in g:
-        return
+        if fingerprint == g.get('_endpoint_input_fingerprint'):
+            return
+        invalidate(g)
     print('Joint endpoint inference: blocked pruning, block_size={}; no ancestral-history sampling.'.format(
         g.get('endpoint_block_size', 64)), flush=True)
     try:
@@ -467,21 +606,22 @@ def prepare(g):
     except Exception:
         invalidate(g)
         raise
+    g['_endpoint_input_fingerprint'] = fingerprint
     if g.get('outdir'):
         manifest = dict(g['_endpoint_manifest'])
-        manifest.update({'schema_version': 1, 'substitution_posterior': 'joint',
+        manifest.update({'schema_version': 2, 'input_sha256': fingerprint, 'substitution_posterior': 'joint',
                          'quantity': 'endpoint_state_difference',
                          'expectation': 'fitted_parent_and_rate_posterior_predictive',
                          'branch_combinations': 'factorized_edge_scores',
                          'block_size': int(g.get('endpoint_block_size', 64)),
-                         'codon_parameter_precision': 'rounded_IQ_TREE_report; conditional_on_parsed_parameters'})
+                         'codon_parameter_precision': g.get('fitted_model_provenance', 'provided_model_matrix')})
         with open(runtime.output_path(g, 'endpoint_model.json'), 'w') as handle:
             json.dump(manifest, handle, indent=2)
             handle.write('\n')
 
 
 def invalidate(g):
-    for key in ('_endpoint_tensors', '_endpoint_reducers', '_endpoint_manifest', 'EN_reducer', 'ES_reducer'):
+    for key in ('_endpoint_tensors', '_endpoint_reducers', '_endpoint_manifest', '_endpoint_input_fingerprint', 'EN_reducer', 'ES_reducer'):
         g.pop(key, None)
 
 

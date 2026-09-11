@@ -111,6 +111,8 @@ def test_parametric_bootstrap_repeats_asr_and_candidate_selection(monkeypatch):
     assert (frame['p_rate_enrichment_empirical_maxT'] >= .25).all()
     assert frame['p_rate_enrichment_empirical'].isna().all()
     assert set(frame['scan_observation_method']) == {'joint_endpoint_posterior'}
+    assert updated['scan_calibration_diagnostics']['endpoint_model']['rates'] == [1.]
+    assert 'rate_categories_and_priors' in updated['scan_calibration_diagnostics']['fixed']
 
 
 def test_bridge_exposure_unconditioned_expected_jumps():
@@ -139,7 +141,7 @@ def test_parametric_simulation_replays_partial_ambiguity_and_missingness():
     emissions[ids['B'], :, 0] = 1
     q = (np.ones((4, 4)) - np.eye(4)*4) / 3
     g = dict(tree=tr, state_cdn=emissions, instantaneous_codon_rate_matrix=q,
-             equilibrium_frequency=np.ones(4)/4, codon_orders=['AAA', 'AAC', 'AAG', 'AAT'])
+             equilibrium_frequency=np.ones(4)/4, codon_orders=['AAA', 'AAC', 'AAG', 'AAT'], substitution_model='GY')
     partitions = scan_ctmc.validate_parametric_inputs(g)
     simulated = scan_ctmc.simulate_tips(g, np.random.default_rng(109), partitions)['state_cdn']
     assert not simulated[ids['C']].any()
@@ -223,3 +225,46 @@ def test_joint_kernel_agrees_with_shared_endpoint_engine():
         if record.joint is not None:
             record.joint[:, np.arange(2), np.arange(2)] = 0
             np.testing.assert_allclose(record.joint, tensor[record.child, record.start:record.stop, 0], atol=1e-12)
+
+
+@pytest.mark.parametrize('block_size', [1, 3, 64])
+def test_mixture_joint_and_exposure_match_complete_enumeration(tmp_path, block_size):
+    import pandas as pd
+    from csubst import scan_endpoint
+    tr, ids, states, q = fixture(.7, 3)
+    # A zero-rate component has zero likelihood at discordant sites, but survives
+    # at a completely missing site. Use varying posterior category weights.
+    states[:, 1] = 0
+    states[ids['B'], 2] = [1, 0]
+    rates = np.array([0., .2, 2.])
+    priors = np.array([.15, .35, .5])
+    summaries = {'synonymous_mask': np.zeros((2, 2))}
+    post, tensor = scan_ctmc.infer(tr, states, q, [.5, .5], [0, 1],
+                                   block_size=block_size, summaries=summaries, rates=rates, weights=priors)
+    report = tmp_path / 'mixture.iqtree'
+    report.write_text('Category Relative_rate Proportion\n1 0 .15\n2 .2 .35\n3 2 .5\n')
+    g = dict(scan_rate_length='raw', scan_observation='joint', substitution_model='GY+R3',
+             state_cdn=post, state_nsy=post.copy(), instantaneous_codon_rate_matrix=q,
+             equilibrium_frequency=np.array([.5, .5]), path_iqtree_iqtree=str(report),
+             scan_category_states=summaries['category_states'])
+    meta = pd.DataFrame(dict(branch_id=[ids['X']], parent_id=[ids['R']], raw_length=[.7]))
+    ctx = scan_endpoint.build_context(g, meta, [0, 1])
+    for site in range(3):
+        joint = np.zeros((3, 2, 2))
+        for c, rate in enumerate(rates):
+            p = expm(q * rate * .7)
+            for r, x, a, b, leaf_c in itertools.product(range(2), repeat=5):
+                mass = priors[c] * .5 * p[r,x] * p[x,a] * p[x,b] * p[r,leaf_c]
+                for name, value in [('A', a), ('B', b), ('C', leaf_c)]:
+                    emission = states[ids[name], site]
+                    mass *= emission[value] if emission.sum() else 1
+                joint[c, r, x] += mass
+        joint /= joint.sum()
+        np.testing.assert_allclose(tensor[ids['X'], site, 0, 0, 1], joint[:, 0, 1].sum(), atol=1e-14)
+        np.testing.assert_allclose(summaries['category_states'][:, ids['R'], site], joint.sum(axis=2), atol=1e-14)
+        expected = sum(joint[c, 0].sum() * expm(q * rate * .7)[0, 1] for c, rate in enumerate(rates))
+        actual, missing, _ = scan_endpoint.expected_events(ctx, post, post, site, [0], [1])
+        assert not missing.any()
+        np.testing.assert_allclose(actual, [expected], atol=1e-14)
+    with pytest.raises(ValueError, match='uniform'):
+        scan_ctmc.infer(tr, states, q, [.5, .5], [0, 1], mode='bridge', rates=rates, weights=priors)

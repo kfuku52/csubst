@@ -15,7 +15,7 @@ csubst scan --alignment_file alignment.fa --rooted_tree_file rooted.nwk \
 ```
 
 The initial implementation accepts the codon models supported by joint endpoint
-inference (GY, ECMK07, ECMrest, supported frequency modifiers and discrete
+inference (GY, ECMK07, ECMrest, counted-frequency MG/MGK, supported frequency modifiers and discrete
 G/R/I rate mixtures), and fixed amino-acid recodings, with `--ml_anc no`. It supports `any2any`,
 `any2spe`, `spe2any`, and `spe2spe`. `dif` contrasts and 3Di require separate
 verified models and are rejected. The reported IQ-TREE category distribution

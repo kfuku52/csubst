@@ -16,9 +16,12 @@ python -m csubst scan \
 ```
 
 Use `--scan_observation joint --scan_min_event_pp 0.5` for joint endpoint
-probabilities. The default `marginal` observation and `q_weighted` exposure
-retain the legacy calculation. These methods estimate different quantities;
-their event counts need not agree.
+probabilities. Joint observations with endpoint exposure and raw lengths are
+the default, including the default ECMK07+F+R4 fit. Use
+`--substitution_posterior marginal` (or `--scan_observation marginal`) to select
+the legacy estimator and its default q_weighted/n_rescaled exposure settings.
+An explicit `--scan_observation` overrides the common posterior switch.
+These methods estimate different quantities; their event counts need not agree.
 
 ## Observation and exposure definitions
 
@@ -34,11 +37,9 @@ Scaled Felsenstein pruning computes these messages from leaf emissions. The
 internal-node posterior values imported from IQ-TREE are ignored in this
 calculation. The root prior is the parsed fitted stationary codon distribution. The result
 is the exact joint posterior for the supplied Q and emission likelihoods;
-GY+F and GY+FQ scans read checkpoint parameters and full-precision log
-frequencies, including each bootstrap refit. Other supported codon families
-retain the existing report-based input precision. Explicit GY intermediate
-files require their matching checkpoint/log; automatic inputs are refitted
-when these are absent.
+All commands share the fitted model loader: GY+F/GY+FQ use matching precise
+sidecars when available, and otherwise use reported precision consistently.
+Only fitted bootstrap requires precise sidecars and its likelihood check.
 Codon-pair masses are grouped only after calculation. Same reported-state
 endpoints are excluded from the joint nonsynonymous event tensor.
 
@@ -122,7 +123,9 @@ repeated. This is model-conditional inference, not an exact test or a guarantee
 under model misspecification.
 
 The second mode is retained for controlled fixed-model experiments, including
-uniform ECM models. It replays missingness and the explicit partial-ambiguity
+ECM/MG models and joint discrete-rate models. A category is drawn from its fitted
+prior once per simulated site and shared across the tree; each replicate
+recomputes posterior category weights from its own simulated tips. It replays missingness and the explicit partial-ambiguity
 observation model described below. It does not quantify model/branch-length
 estimation uncertainty. Candidate-wise empirical columns are undefined in this
 mode; use the global maxT column directly, without another BH correction.
@@ -134,21 +137,26 @@ All simulation modes run serially and have minimum Monte Carlo P `1/(B+1)`.
 
 ## Supported data and explicit limits
 
-The same uniform GY/MG/ECMK07/ECMrest codon-model restrictions as
-[endpoint exposure](SCAN_ENDPOINT.md#supported-inputs) apply. Bridge requires
-reversibility and positive stationary frequencies. Mixture models and native
-3Di are not supported. Raw model lengths, `--ml_anc no` and `--min_sub_pp 0` are required.
-Use `--scan_observation` for scan; the separate `--substitution_posterior`
-option controls search/analyze and must remain `marginal` here. IQ-TREE documents
+Joint supports GY, MG/MGK, ECMK07 and ECMrest with fitted discrete G/R/I
+rate categories. It uses the shared endpoint engine and integrates categories
+with P(category | all tip data); expectations retain the category-conditional
+parent state. It never exponentiates a posterior mean site rate. MG/MGK use
+counted F1X4/F3X4 frequencies; see the [MG correction](ENDPOINT_POSTERIORS.md#mg-model-correction).
+Bridge remains limited to uniform rates, reversible Q and positive stationary
+frequencies. Mixtures of different Q matrices and native 3Di scan remain
+unsupported; select marginal explicitly for legacy 3Di scan. Raw model lengths,
+`--ml_anc no` and `--min_sub_pp 0` are required for joint/bridge.
+IQ-TREE documents
 codon-model lengths per codon site, rather than the DNA per-nucleotide scale
 ([model documentation](https://iqtree.github.io/doc/Substitution-Models#codon-models)).
 
 A completely missing leaf/site has an all-ones emission likelihood and is
-integrated out. Its latent branch events can have positive posterior mass;
-missing tips are not assigned a zero substitution count. Bootstrap simulations
-preserve these missing entries. Conservation annotations summarize the
-recomputed tip posteriors; `*_valid_tip_count` counts posterior rows with mass,
-including imputed missing tips, rather than the number of resolved input calls.
+integrated out. Its latent events can have positive posterior mass, but the
+shared observation mask excludes these branch/sites from reported events,
+exposure, synonymous counts and analytical target branches. Bootstrap preserves
+missing entries and repeats this eligibility decision. Conservation annotations
+use original tip observations; `*_valid_tip_count` excludes imputed missing tips.
+Search and sites use the same rule; their unavailable table entries are `NA`.
 
 For fixed-model `parametric` calibration, partial IUPAC ambiguity is handled
 as a specified nucleotide-coarsening model:
@@ -209,3 +217,29 @@ comparison; it is not the legacy foreground-label permutation procedure.
 The shared calibration reference introduces uncertainty beyond the conditional
 binomial intervals. This experiment does not substitute for codon-model
 misspecification validation.
+
+Joint scan retains category-weighted node posteriors for conditional exposure
+(O(categories × nodes × sites × codon states)), in addition to the grouped event
+tensor. Pruning and raw codon-pair temporaries are blocked by `--endpoint_block_size`.
+Worker processes share retained category arrays through the scan array transport.
+
+`*_scan_calibration.json` records the resolved observation switch, fitted rate
+category priors, posterior category weighting and missing-tip policy, including
+empty scan results. The calibration method itself is unchanged by joint
+defaults: `full_scan` still permutes foreground clades at fixed posteriors.
+`parametric` now supports joint rate mixtures; fitted `parametric_bootstrap`
+still requires uniform GY+F/GY+FQ and preserves the selected observation options
+in child runs. Joint defaults do not broaden that fitted-bootstrap model contract.
+
+### Fitted-likelihood guard with fully missing sites
+
+A finite mismatch in the fitted IQ-TREE likelihood emits a `RuntimeWarning`
+and bootstrap continues with the reconstructed generator. Reported/reproduced
+likelihoods, their absolute difference, tolerance and `likelihood_check` status
+are retained in bootstrap provenance. Nonfinite likelihoods remain errors. A verified IQ-TREE 2.3.6 GY+F fit with a zero-frequency codon
+reported `log(2)` for a site missing in every tip, where the normalized CTMC
+likelihood is one (log likelihood zero). Its informative site likelihoods
+agreed at the precision of the site-likelihood report. This fit produces a warning;
+CSUBST does not subtract a guessed correction or change the comparison tolerance.
+Joint inference and the shared reporting mask still handle fully missing sites.
+See the [verification report](../reports/event_unification_20260911/README.md).

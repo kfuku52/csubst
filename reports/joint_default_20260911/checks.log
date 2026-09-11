@@ -1,0 +1,134 @@
+/tmp/csubst-endpoint-test-venv/bin/python -m pytest -q -n auto --dist worksteal -m "not process"
+${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  3%]
+........................................................................ [  6%]
+........................................................................ [ 10%]
+........................................................................ [ 13%]
+........................................................................ [ 16%]
+........................................................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 26%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 40%]
+........................................................................ [ 43%]
+........................................................................ [ 46%]
+........................................................................ [ 50%]
+........................................................................ [ 53%]
+..........................................sss.........s.s............... [ 56%]
+........................................................................ [ 60%]
+........................................................................ [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 70%]
+........................................................................ [ 73%]
+........................................................................ [ 76%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 93%]
+........................................................................ [ 97%]
+...............................................................          [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [3] tests/unit/test_structural_prediction.py:156: module 'torch' has __version__ '2.2.2', required is: '2.6'
+SKIPPED [1] tests/unit/test_structural_reference.py:89: could not import 'gemmi': No module named 'gemmi'
+SKIPPED [1] tests/unit/test_structural_reference.py:105: could not import 'gemmi': No module named 'gemmi'
+2146 passed, 5 skipped, 4 warnings in 19.24s
+/tmp/csubst-endpoint-test-venv/bin/python -m pytest -q -m process
+....                                                                     [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+4 passed, 2151 deselected, 1 warning in 4.20s
+CSUBST_STRICT_EXTENSIONS=1 /tmp/csubst-endpoint-test-venv/bin/python -m pytest -q -m native
+................                                                         [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+16 passed, 2139 deselected, 1 warning in 1.47s
+/tmp/csubst-endpoint-test-venv/bin/python -m ruff check csubst tests setup.py .github/scripts
+All checks passed!
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/repository_hygiene_check.py
+Repository hygiene checks passed.
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/documentation_check.py
+Documentation checks passed: 21 documents, 23 commands, 1 help examples, 2 templates, 66 local links.
+Pass --wiki-dir to also check Wiki pages and links (15 references not checked).
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+
+....................                                                     [100%]
+=============================== warnings summary ===============================
+../../../../miniforge3/lib/python3.10/site-packages/requests/__init__.py:113
+  ${HOME}/miniforge3/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+20 passed, 1 warning in 3.15s
+
+/tmp/csubst-endpoint-test-venv/bin/python -m ruff check csubst tests setup.py .github/scripts
+All checks passed!
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/repository_hygiene_check.py
+Repository hygiene checks passed.
+/tmp/csubst-endpoint-test-venv/bin/python .github/scripts/documentation_check.py
+Documentation checks passed: 21 documents, 23 commands, 1 help examples, 2 templates, 66 local links.
+Pass --wiki-dir to also check Wiki pages and links (15 references not checked).
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file
+Success: no issues found in 1 source file

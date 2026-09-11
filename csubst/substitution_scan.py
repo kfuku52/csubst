@@ -278,8 +278,10 @@ def scan_event_threshold(g):
 
 def validate_scan_configuration(g):
     scan_event_threshold(g)
-    if g.get("substitution_posterior", "marginal") != "marginal":
-        raise ValueError("For scan use --scan_observation joint or bridge; --substitution_posterior joint is for search/analyze.")
+    # The CLI resolves the common posterior switch and scan-specific override.
+    # Mark programmatic scan contexts too so shared event builders cannot take
+    # the search route while preparing/filtering scan input.
+    g['subcommand'] = 'scan'
     if g.get("scan_observation", "marginal") != "marginal" and bool(g.get("ml_anc", False)):
         raise ValueError("Joint/bridge scan requires --ml_anc no.")
     observation = str(g.get("scan_observation", "marginal"))
@@ -499,7 +501,8 @@ def _pack_scan_worker_context(g, scan_static):
         )
         worker_g["state_cdn"] = packed_state_cdn
         q_context["state_cdn"] = packed_state_cdn
-    for unused_key in ["state_nuc", "state_pep", "_3di_alignment_by_branch_id", "_3di_tip_alignment_by_leaf"]:
+    for unused_key in ["state_nuc", "state_pep", "_3di_alignment_by_branch_id", "_3di_tip_alignment_by_leaf",
+                       "scan_category_states", "scan_tip_emissions"]:
         worker_g.pop(unused_key, None)
     worker_static = dict(scan_static)
     endpoint_context = q_context.get("endpoint_context")
@@ -1925,10 +1928,10 @@ def build_site_annotations(g, trait_name, fg_leaf_names_map=None):
     float_tol = float(g.get("float_tol", 1e-12))
     state_orders = sequence.get_nonsyn_state_orders(g)
     aa_orders = np.asarray(g.get("amino_acid_orders", []), dtype=object)
-    state_all = _calc_conservation(g["state_nsy"], state_orders, tip_ids, float_tol)
-    state_bg = _calc_conservation(g["state_nsy"], state_orders, bg_tip_ids, float_tol)
-    aa_all = _calc_conservation(g["state_pep"], aa_orders, tip_ids, float_tol)
-    aa_bg = _calc_conservation(g["state_pep"], aa_orders, bg_tip_ids, float_tol)
+    state_all = _calc_conservation(g.get("scan_observed_state_nsy", g["state_nsy"]), state_orders, tip_ids, float_tol)
+    state_bg = _calc_conservation(g.get("scan_observed_state_nsy", g["state_nsy"]), state_orders, bg_tip_ids, float_tol)
+    aa_all = _calc_conservation(g.get("scan_observed_state_pep", g["state_pep"]), aa_orders, tip_ids, float_tol)
+    aa_bg = _calc_conservation(g.get("scan_observed_state_pep", g["state_pep"]), aa_orders, bg_tip_ids, float_tol)
     for label, values in [
         ("state_all", state_all),
         ("state_bg", state_bg),
@@ -2089,6 +2092,13 @@ def build_scan_site_plot_table(scan_df, g, ON_tensor):
             out.at[row_index, col] = max(float(out.at[row_index, col]), value)
             max_event = max(max_event, value)
         out.at[row_index, "OCNany2spe"] = max(float(out.at[row_index, "OCNany2spe"]), max_event)
+    if 'event_eligible' in g:
+        alignment_to_internal = dict(zip(plot_rows['codon_site_alignment'].astype(int), plot_rows['site'].astype(int)))
+        selected_sites = [alignment_to_internal[int(site)] for site in site_numbers]
+        for branch_id in branch_ids:
+            eligible = g['event_eligible'][branch_id, selected_sites]
+            out['N_eligible_{}'.format(branch_id)] = eligible
+            out.loc[~eligible, 'N_sub_{}'.format(branch_id)] = np.nan
     return out, branch_ids
 
 
@@ -2737,6 +2747,8 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         "original_foreground_included": True,
         "trials": [],
         "settings": {
+            "substitution_posterior": str(g.get("substitution_posterior", "marginal")),
+            "scan_observation": str(g.get("scan_observation", "marginal")),
             "scan_match": normalize_scan_matches(g.get("scan_match", "any2spe")),
             "scan_min_support": str(g.get("scan_min_support", "2")),
             "scan_min_event_pp": float(g.get("scan_min_event_pp", 0.5)),
@@ -2750,6 +2762,7 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         },
         "resolved_rate_exposure": scan_static["rate_exposure"],
         "state_tensor_shape": list(np.asarray(g["state_nsy"]).shape),
+        "endpoint_model": g.get("scan_endpoint_metadata"),
     }
     if calibration == "parametric":
         from csubst import scan_ctmc

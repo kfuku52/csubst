@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark PEPC arity/CPU scaling against marginal inference. Requires psutil and threadpoolctl.
+"""Benchmark PEPC arity/CPU scaling against marginal or saved joint inference. Requires psutil and threadpoolctl.
 
 Run sequentially with no other benchmark/test processes. Output JSON contains
 commands, source hashes, warmups, every timed run, and summary ranges.
@@ -66,7 +66,7 @@ def worker():
     orig = tsv.write_dataframe
 
     def capture(df, path, **kwargs):
-        if Path(path).name.startswith("csubst_cb_"):
+        if Path(path).name.startswith("csubst_cb_") or Path(path).name == "csubst_b.tsv":
             df.to_pickle(str(path) + ".unrounded.pkl")
         return orig(df, path, **kwargs)
 
@@ -104,6 +104,7 @@ def main():
     root = Path(__file__).resolve().parents[2]
     p = argparse.ArgumentParser(description=main.__doc__)
     p.add_argument("--baseline-root", type=Path, default=root)
+    p.add_argument("--baseline-mode", choices=["marginal", "joint"], default="marginal")
     p.add_argument("--workdir", type=Path, required=True)
     p.add_argument("--result", type=Path, required=True)
     p.add_argument("--repeats", type=int, default=3)
@@ -205,7 +206,8 @@ def main():
 
     for scenario in a.scenarios:
         for cpu in a.cpus:
-            configs = [("marginal", a.baseline_root), ("joint", root)]
+            baseline_label = "marginal" if a.baseline_mode == "marginal" else "baseline_joint"
+            configs = [(baseline_label, a.baseline_root), ("joint", root)]
             for repeat in range(a.repeats + 1):
                 for mode, source in configs if repeat % 2 == 0 else configs[::-1]:
                     tag = f"{scenario}-t{cpu}-b{a.blas}-{mode}-r{repeat}"
@@ -219,7 +221,7 @@ def main():
                         "--out",
                         str(out),
                         "--mode",
-                        mode,
+                        "joint" if mode == "baseline_joint" else mode,
                         "--threads",
                         str(cpu),
                         "--blas",

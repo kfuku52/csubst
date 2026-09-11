@@ -186,3 +186,19 @@ def test_get_cbs_grouped_sum_matches_get_cb():
             merged[f"{col}_cbs"].to_numpy(),
             atol=1e-12,
         )
+
+
+@pytest.mark.parametrize('layout', ['C', 'F', 'strided'])
+def test_wide_gram_pair_values_match_accurate_scalar_sums(layout):
+    import math
+    from csubst import substitution
+    rng = np.random.default_rng(141)
+    matrix = rng.random((4, 20004))[:, ::2]
+    matrix[0] = 0
+    if layout != 'strided':
+        matrix = np.array(matrix, order=layout)
+    rows, cols = np.array([0, 1, 3, 2]), np.array([2, 3, 1, 2])
+    expected = [math.fsum(float(a) * float(b) for a, b in zip(matrix[r], matrix[c]))
+                for r, c in zip(rows, cols)]
+    np.testing.assert_allclose(substitution._calc_dense_gram_pair_values(matrix, rows, cols),
+                               expected, rtol=2e-14, atol=1e-14)

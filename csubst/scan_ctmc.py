@@ -1,6 +1,6 @@
 """Scaled pruning, exact edge posteriors, and posterior CTMC jump counts.
 
-Uniform stationary reversible codon models, conditional on fitted Q/tree.
+Stationary codon models with discrete rate categories, conditional on fitted Q/tree.
 No sampled ancestral states or products of separately inferred marginals.
 """
 import numpy as np
@@ -51,7 +51,60 @@ def _integrals(values, length):
     return length * np.exp(np.maximum(x, y)) * ratio
 
 
-def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summaries=None):
+def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights):
+    from csubst import endpoint
+    nodes = list(tree.traverse("preorder"))
+    n, sites, states = tip_states.shape
+    parents = np.full(n, -1, dtype=int)
+    lengths = np.zeros(n)
+    tips = {}
+    for node in nodes:
+        i = int(ete.get_prop(node, "numerical_label"))
+        if not ete.is_root(node):
+            parents[i] = int(ete.get_prop(node.up, "numerical_label"))
+            lengths[i] = float(node.dist)
+        if not ete.get_children(node):
+            values = np.asarray(tip_states[i], float).copy()
+            values[values.sum(axis=1) == 0] = 1
+            tips[i] = values
+    model = endpoint.EndpointModel(parents, lengths, q, pi, rates, weights)
+    groups = np.asarray(groups, int)
+    projection = np.eye(int(groups.max()) + 1)[groups]
+    posterior = np.zeros_like(tip_states, dtype=float)
+    tensor = np.zeros((n, sites, 1, projection.shape[1], projection.shape[1]))
+    category_states = (np.zeros((len(rates), n, sites, states))
+                       if summaries is not None and len(rates) > 1 else None)
+    if summaries is not None:
+        summaries['synonymous_counts'] = np.zeros(n)
+
+    def transform(left, right, transition):
+        mass = left[:, :, None] * transition * right[:, None, :]
+        grouped = np.einsum('ig,sij,jh->sgh', projection, mass, projection, optimize=True)
+        ix = np.arange(projection.shape[1])
+        grouped[:, ix, ix] = 0
+        result = {'events': grouped}
+        if summaries is not None:
+            result['synonymous'] = np.einsum('sij,ij->s', mass, summaries['synonymous_mask'])
+        return result
+
+    for record in model.iter_blocks(tips, block_size, transform=transform,
+                                    category_nodes=category_states is not None):
+        sl = slice(record.start, record.stop)
+        posterior[record.child, sl] = record.node
+        if category_states is not None:
+            category_states[:, record.child, sl] = record.category_node
+        if record.parent >= 0:
+            valid = summaries['eligible'][record.child, sl] if summaries is not None and 'eligible' in summaries else np.ones(record.stop-record.start, dtype=bool)
+            tensor[record.child, sl, 0] = record.reduced['events'] * valid[:, None, None]
+            if summaries is not None:
+                summaries['synonymous_counts'][record.child] += (record.reduced['synonymous'] * valid).sum()
+    if summaries is not None:
+        summaries['category_states'] = category_states
+    return posterior, tensor
+
+
+def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summaries=None,
+          rates=(1.,), weights=(1.,)):
     """Return all-node marginals and a branch/site/group-pair event tensor.
 
     Input leaf rows are emission likelihoods; zero rows mean missing (ones).
@@ -60,6 +113,10 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
     """
     if mode not in ("joint", "bridge"):
         raise ValueError("Unknown CTMC observation mode.")
+    if mode == 'joint':
+        return _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights)
+    if len(rates) != 1 or float(rates[0]) != 1 or len(weights) != 1 or float(weights[0]) != 1:
+        raise ValueError('CTMC bridge currently requires uniform unit rates; use joint for discrete rate mixtures.')
     q, pi = np.asarray(q, float), np.asarray(pi, float)
     nodes = list(tree.traverse("preorder"))
     def label(node):
@@ -126,6 +183,8 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
                 mass /= denom[start:stop, None, None]
                 if mass.min() < -1e-8 or not np.isfinite(mass).all():
                     raise ValueError("Numerically invalid CTMC posterior event mass.")
+                if summaries is not None and "eligible" in summaries:
+                    mass[~summaries["eligible"][j, start:stop]] = 0
                 if summaries is not None:
                     summaries["synonymous_counts"][j] += np.einsum("sij,ij->", np.maximum(mass, 0), summaries["synonymous_mask"])
                 grouped = np.einsum("ig,sij,jh->sgh", projection, np.maximum(mass, 0), projection, optimize=True)
@@ -136,7 +195,7 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
 
 
 def prepare(g):
-    from csubst import scan_endpoint, substitution_scan
+    from csubst import endpoint_io, fitted_model, scan_endpoint, substitution_scan
     groups = substitution_scan._build_codon_state_ids(g)
     context = scan_endpoint.build_context(g, substitution_scan.build_branch_metadata(g), groups)
     aa_groups = np.full(len(groups), -1)
@@ -147,12 +206,18 @@ def prepare(g):
         aa_groups = groups
     if (aa_groups < 0).any():
         raise ValueError("CTMC scan requires the complete codon-to-amino-acid map.")
-    summaries = {"synonymous_mask": (aa_groups[:, None] == aa_groups[None, :]) & ~np.eye(len(groups), dtype=bool)}
+    observed, eligible = fitted_model.observation_masks(g["tree"], g["state_cdn"])
+    summaries = {"eligible": eligible, "synonymous_mask": (aa_groups[:, None] == aa_groups[None, :]) & ~np.eye(len(groups), dtype=bool)}
+    rates, weights = endpoint_io.model_rates(g)
     posterior, tensor = infer(g["tree"], g["state_cdn"], g["instantaneous_codon_rate_matrix"],
-                              g["equilibrium_frequency"], groups, g["scan_observation"], summaries=summaries)
+                              g["equilibrium_frequency"], groups, g["scan_observation"], summaries=summaries,
+                              rates=rates, weights=weights, block_size=g.get('endpoint_block_size', 64))
     updated = dict(g)
+    updated["event_eligible"] = eligible
+    updated["scan_tip_emissions"] = g["state_cdn"]
     updated["state_cdn"] = posterior
     projection = np.eye(g["state_nsy"].shape[2])[groups]
+    updated["scan_observed_state_nsy"] = (g["state_cdn"] @ projection) * observed[:, :, None]
     updated["state_nsy"] = posterior @ projection
     if g.get("nonsyn_recode", "no") == "no":
         updated["state_pep"] = updated["state_nsy"]
@@ -161,8 +226,17 @@ def prepare(g):
         for index, aa in enumerate(g["amino_acid_orders"]):
             aa_projection[g["synonymous_indices"][aa], index] = 1
         updated["state_pep"] = posterior @ aa_projection
+    aa_projection = np.eye(len(g["amino_acid_orders"]))[aa_groups]
+    updated["scan_observed_state_pep"] = (g["state_cdn"] @ aa_projection) * observed[:, :, None]
     updated["scan_ctmc_synonymous_counts"] = summaries["synonymous_counts"]
     updated["scan_ctmc_model"] = context["model"]
+    updated['scan_category_states'] = summaries.get('category_states')
+    updated['scan_endpoint_metadata'] = {
+        'model': context['model'], 'rates': rates.tolist(), 'weights': weights.tolist(),
+        'category_weighting': 'posterior_given_all_tips',
+        'missing_tip_events': 'excluded_from_reporting; latent_states_integrated',
+        'parameter_source': g.get('scan_ctmc_model_precision', 'parsed_iqtree_model_and_category_table'),
+    }
     return updated, tensor
 
 
@@ -170,12 +244,12 @@ def set_branch_length_summaries(g, tensor):
     """Populate reporting-only S/N lengths from the same posterior event model."""
     count_n = tensor.sum(axis=(1, 2, 3, 4))
     count_s = g["scan_ctmc_synonymous_counts"]
-    sites = tensor.shape[1]
+    sites = g["event_eligible"].sum(axis=1) if "event_eligible" in g else np.full(tensor.shape[0], tensor.shape[1])
     for node in g["tree"].traverse():
         i = int(ete.get_prop(node, "numerical_label"))
-        ete.set_prop(node, "Ndist", float(count_n[i] / sites))
-        ete.set_prop(node, "Sdist", float(count_s[i] / sites))
-        ete.set_prop(node, "SNdist", float((count_s[i] + count_n[i]) / sites))
+        ete.set_prop(node, "Ndist", float(count_n[i] / sites[i]) if sites[i] else 0.)
+        ete.set_prop(node, "Sdist", float(count_s[i] / sites[i]) if sites[i] else 0.)
+        ete.set_prop(node, "SNdist", float((count_s[i] + count_n[i]) / sites[i]) if sites[i] else 0.)
     return g
 
 
@@ -189,6 +263,9 @@ def simulate_tips(g, rng, ambiguity_partitions=None):
     nsite = original.shape[1]
     q = g["instantaneous_codon_rate_matrix"]
     pi = g["equilibrium_frequency"]
+    from csubst import endpoint_io
+    rates, weights = endpoint_io.model_rates(g)
+    categories = rng.choice(len(rates), size=nsite, p=weights) if len(rates) > 1 else np.zeros(nsite, dtype=int)
     draws = {}
     for node in g["tree"].traverse("preorder"):
         i = int(ete.get_prop(node, "numerical_label"))
@@ -196,9 +273,12 @@ def simulate_tips(g, rng, ambiguity_partitions=None):
             draws[i] = rng.choice(len(pi), size=nsite, p=pi)
         else:
             parent = int(ete.get_prop(node.up, "numerical_label"))
-            p = np.maximum(expm(q * float(node.dist)), 0)
-            p /= p.sum(axis=1, keepdims=True)
-            draws[i] = (rng.random(nsite)[:, None] > np.cumsum(p[draws[parent]], axis=1)).sum(axis=1)
+            draws[i] = np.zeros(nsite, dtype=int)
+            for category, rate in enumerate(rates):
+                selected = np.flatnonzero(categories == category)
+                p = np.maximum(expm(q * float(node.dist) * rate), 0)
+                p /= p.sum(axis=1, keepdims=True)
+                draws[i][selected] = (rng.random(len(selected))[:, None] > np.cumsum(p[draws[parent][selected]], axis=1)).sum(axis=1)
         if not ete.get_children(node):
             state[i, np.arange(nsite), draws[i]] = 1
             state[i, original[i].sum(axis=1) == 0] = 0
@@ -263,7 +343,8 @@ def calibrate(g, observed):
     diagnostic = dict(schema_version=1, calibration="parametric", status="fixed_model_parametric_bootstrap",
                       null="fixed_codon_ctmc", sampling="monte_carlo", scope=scan_statistics.MAXIMUM_SCOPE,
                       requested_count=count, seed=int(g.get("scan_permutation_seed", 1)),
-                      trials=trials, fixed=["Q", "tree", "branch_lengths", "foreground"],
+                      trials=trials, fixed=["Q", "tree", "branch_lengths", "rate_categories_and_priors", "foreground"],
+                      endpoint_model=g.get('scan_endpoint_metadata'),
                       repeated=["ASR", "candidate_discovery", "support_filter", "maximum_score"])
     result = observed.copy()
     result["p_rate_enrichment_empirical"] = np.nan

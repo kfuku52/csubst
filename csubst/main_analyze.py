@@ -90,7 +90,7 @@ def _write_cbs_stream(id_combinations, OS_tensor, ON_tensor, g, output_path):
         tsv.write_dataframe(
             cbs,
             output_path,
-            float_format=g['float_format'],
+            report_context=g, float_format=g['float_format'],
             header=(not wrote_header),
             mode='w' if not wrote_header else 'a',
         )
@@ -284,7 +284,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             file_name = runtime.output_path(g, "cb_" + str(current_arity) + ".tsv")
             cb_column_original = cb.columns.tolist()
             cb.columns = cb.columns.str.replace('_PLACEHOLDER', '')
-            tsv.write_dataframe(cb, file_name, float_format=g['float_format'], chunksize=10000)
+            tsv.write_dataframe(cb, file_name, report_context=g, float_format=g['float_format'], chunksize=10000)
             cb.columns = cb_column_original
             txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
@@ -605,7 +605,7 @@ def _compute_epistasis_degree_from_structure(g, num_site):
     tsv.write_dataframe(
         df.loc[:, degree_cols_existing],
         degree_outfile,
-        float_format=g['float_format'],
+        report_context=g, float_format=g['float_format'],
     )
     print('Writing epistasis structure degree table: {}'.format(degree_outfile), flush=True)
     profile_map = _resolve_epistasis_profile_map_from_df(df=df, g=g, num_site=num_site)
@@ -729,7 +729,7 @@ def main_analyze(g: AnalysisConfig) -> None:
         tsv.write_dataframe(
             bs,
             runtime.output_path(g, "bs.tsv"),
-            float_format=g['float_format'],
+            report_context=g, float_format=g['float_format'],
             chunksize=10000,
         )
         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
@@ -760,7 +760,7 @@ def main_analyze(g: AnalysisConfig) -> None:
             tsv.write_dataframe(
                 s,
                 runtime.output_path(g, "s.tsv"),
-                float_format=g['float_format'],
+                report_context=g, float_format=g['float_format'],
                 chunksize=10000,
             )
         txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
@@ -796,7 +796,7 @@ def main_analyze(g: AnalysisConfig) -> None:
             tsv.write_dataframe(
                 b,
                 runtime.output_path(g, "b.tsv"),
-                float_format=g['float_format'],
+                report_context=g, float_format=g['float_format'],
                 chunksize=10000,
             )
             b.columns = b_column_original
@@ -826,7 +826,7 @@ def main_analyze(g: AnalysisConfig) -> None:
         tsv.write_dataframe(
             cs,
             runtime.output_path(g, "cs.tsv"),
-            float_format=g['float_format'],
+            report_context=dict(g, report_combinations=id_combinations), float_format=g['float_format'],
             chunksize=10000,
         )
         txt = 'Memory consumption of cs table: {:,.1f} Mbytes (dtype={})'
@@ -875,7 +875,7 @@ def main_analyze(g: AnalysisConfig) -> None:
         tsv.write_dataframe(
             g['df_cb_stats_main'],
             runtime.output_path(g, 'cb_stats.tsv'),
-            float_format=g['float_format'],
+            report_context=g, float_format=g['float_format'],
             chunksize=10000,
         )
         g['df_cb_stats_main'].columns = column_original

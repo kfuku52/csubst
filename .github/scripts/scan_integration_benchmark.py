@@ -31,8 +31,9 @@ def run(source, mode, calibration, args, out):
                '--scan_pvalue_calibration', calibration, '--scan_n_permutations', str(args.niter),
                '--scan_permutation_seed', '19051', '--scan_site_plot', 'no', '--threads', '1',
                '--blas_threads', '1', '--float_digit', '10', '--outdir', str(out)]
+    command += ['--scan_observation', mode]
     if mode != 'marginal':
-        command += ['--scan_observation', mode, '--scan_rate_exposure', 'endpoint', '--scan_rate_length', 'raw']
+        command += ['--scan_rate_exposure', 'endpoint', '--scan_rate_length', 'raw']
     out.mkdir(parents=True)
     start = time.perf_counter()
     peak = 0

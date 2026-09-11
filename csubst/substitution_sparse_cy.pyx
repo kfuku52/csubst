@@ -889,3 +889,43 @@ cpdef project_endpoint_syn_double(
                 if need_to:
                     to_mv[s, g, d] += value
     return total, ancestral, derived
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef project_endpoint_events_double(
+    const double[:, :] left,
+    const double[:, :] right,
+    const double[:, :] transition,
+    const numpy.int64_t[:, :] pairs,
+    Py_ssize_t num_group,
+    Py_ssize_t num_state,
+):
+    """Scatter classified endpoint pairs into their final S/N event axes."""
+    cdef Py_ssize_t size = left.shape[0]
+    cdef Py_ssize_t k = left.shape[1]
+    cdef Py_ssize_t features = num_group * num_state * num_state
+    cdef Py_ssize_t s, p, target, a, d
+    if (right.shape[0] != size or right.shape[1] != k or
+            transition.shape[0] != k or transition.shape[1] != k or
+            pairs.shape[1] != 3 or num_group < 1 or num_state < 1):
+        raise ValueError('Invalid endpoint event dimensions.')
+    for p in range(pairs.shape[0]):
+        if (pairs[p, 0] < 0 or pairs[p, 0] >= features or
+                pairs[p, 1] < 0 or pairs[p, 1] >= k or
+                pairs[p, 2] < 0 or pairs[p, 2] >= k):
+            raise ValueError('Invalid endpoint event pair indices.')
+    # Traverse contiguous sites inside each codon pair. Besides reusing pair
+    # metadata and transition weights, this gives the compiler a vector loop.
+    cdef const double[:, ::1] left_sites = numpy.ascontiguousarray(numpy.asarray(left).T)
+    cdef const double[:, ::1] right_sites = numpy.ascontiguousarray(numpy.asarray(right).T)
+    cdef object events = numpy.zeros((features, size))
+    cdef double[:, ::1] output = events
+    cdef double weight
+    with nogil:
+        for p in range(pairs.shape[0]):
+            target, a, d = pairs[p, 0], pairs[p, 1], pairs[p, 2]
+            weight = transition[a, d]
+            for s in range(size):
+                output[target, s] += left_sites[a, s] * weight * right_sites[d, s]
+    return numpy.ascontiguousarray(events.T).reshape(size, num_group, num_state, num_state)

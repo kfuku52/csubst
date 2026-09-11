@@ -43,6 +43,7 @@ def test_model_snapshot_uses_full_alignment_and_checks_stationarity(tmp_path, mo
         config['instantaneous_codon_rate_matrix'].copy(), config['equilibrium_frequency'].copy(), {},
     ))
     snapshot = boot.prepare_model(g)
+    assert snapshot['provenance']['likelihood_check'] == 'matched'
     g['instantaneous_codon_rate_matrix'][:] = 0
     assert snapshot['q'][0, 0] == -1
     assert snapshot['sites'] == 2 and snapshot['missing']['B'].tolist() == [False, True]
@@ -52,7 +53,13 @@ def test_model_snapshot_uses_full_alignment_and_checks_stationarity(tmp_path, mo
         boot.prepare_model(g)
     g['equilibrium_frequency'] = np.array([.5, .5])
     report.write_text('Log-likelihood of the tree: 0\n')
-    with pytest.raises(ValueError, match='does not reproduce'):
+    with pytest.warns(RuntimeWarning, match='Continuing bootstrap'):
+        warned = boot.prepare_model(g)
+    assert warned['provenance']['likelihood_check'] == 'warning'
+    assert warned['provenance']['likelihood_absolute_difference'] > warned['provenance']['likelihood_tolerance']
+    assert warned['sites'] == 2
+    monkeypatch.setattr(boot, 'alignment_loglikelihood', lambda *args: float('nan'))
+    with pytest.raises(ValueError, match='must be finite'):
         boot.prepare_model(g)
 
 
@@ -179,7 +186,7 @@ def test_seed_is_index_based_and_manifest_serializes_empty_reference(tmp_path, m
 
 
 def test_precise_fit_distinguishes_resolved_auto_paths_from_explicit_inputs(tmp_path):
-    g = dict(scan_observation='joint', iqtree_model='GY+FQ', alignment_file=str(tmp_path/'input.fa'),
+    g = dict(scan_observation='joint', scan_pvalue_calibration='parametric_bootstrap', iqtree_model='GY+FQ', alignment_file=str(tmp_path/'input.fa'),
              iqtree_outdir=str(tmp_path/'iqtree'), iqtree_state=str(tmp_path/'future.state'),
              iqtree_log=str(tmp_path/'future.log'), scan_cli_options={'iqtree_state':'infer'})
     boot.require_precise_fit(g)
@@ -193,11 +200,13 @@ def test_joint_precision_uses_reported_frequency_scheme_for_supplied_fit(tmp_pat
     state = tmp_path/'input.state'
     (tmp_path/'input.ckp.gz').write_bytes(b'provided checkpoint')
     g = dict(scan_observation='joint', substitution_model='GY+FQ', iqtree_model='GY+F',
-             path_iqtree_state=str(state), codon_orders=np.array(['AAA','AAC']))
+             path_iqtree_state=str(state), codon_orders=np.array(['AAA','AAC']),
+             equilibrium_frequency=np.array([.5,.5]), instantaneous_codon_rate_matrix=np.array([[-1.,1.],[1.,-1.]]))
     def generator(context, codons):
         assert context['iqtree_model'] == 'GY+FQ'
-        return np.array([[-1.,1.],[1.,-1.]]), np.array([.5,.5]), {'verified':True}
-    monkeypatch.setattr(boot,'_fitted_generator',generator)
+        return np.array([[-1.,1.],[1.,-1.]]), np.array([.5,.5]), {'verified':True, 'omega':1., 'kappa':1.}
+    from csubst import fitted_model
+    monkeypatch.setattr(fitted_model,'_fitted_generator',generator)
     boot.prepare_observation_model(g)
     np.testing.assert_array_equal(g['equilibrium_frequency'],[.5,.5])
     assert g['iqtree_model'] == 'GY+F'  # original CLI procedure is not rewritten

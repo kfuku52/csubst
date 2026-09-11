@@ -1,0 +1,32 @@
+numpy [0.04971783299697563, 0.04937362496275455, 0.04934054199839011, 0.0489140409626998]
+syrk_trans1 [1.3755218340083957, 0.04971050005406141, 0.04985179199138656, 0.05258970899740234]
+syrk_trans0 [0.05752604198642075, 0.044433292001485825, 0.04345966695109382, 0.04681099997833371]
+[
+  {
+    "user_api": "blas",
+    "internal_api": "openblas",
+    "num_threads": 1,
+    "prefix": "libopenblas",
+    "filepath": "${HOME}/miniforge3/lib/python3.10/site-packages/numpy/.dylibs/libopenblas64_.0.dylib",
+    "version": "0.3.23.dev",
+    "threading_layer": "pthreads",
+    "architecture": "Nehalem"
+  },
+  {
+    "user_api": "blas",
+    "internal_api": "mkl",
+    "num_threads": 1,
+    "prefix": "libmkl_rt",
+    "filepath": "${HOME}/miniforge3/lib/libmkl_rt.dylib",
+    "version": "2020.0.4",
+    "threading_layer": "intel"
+  },
+  {
+    "user_api": "openmp",
+    "internal_api": "openmp",
+    "num_threads": 1,
+    "prefix": "libomp",
+    "filepath": "${HOME}/miniforge3/lib/libomp.dylib",
+    "version": null
+  }
+]

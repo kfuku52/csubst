@@ -82,13 +82,16 @@ Long-tail calibration is off by default; when enabled, its default method is
 `independent_null`. For empirical and independently sampled
 null sensitivity analyses, see [long-tail calibration](docs/LONGTAIL_CALIBRATION.md).
 
+Analysis commands default to [joint endpoint posteriors](docs/ENDPOINT_POSTERIORS.md).
+Use `--substitution_posterior marginal` for the legacy estimator.
+
 CSUBST provides ten main subcommands:
 
 - [`csubst dataset`](https://github.com/kfuku52/csubst/wiki/csubst-dataset): generate built-in example datasets such as `PGK` and `PEPC`.
 - [`csubst download`](https://github.com/kfuku52/csubst/wiki/csubst-download): prepare model resources without an input alignment; VESM files are always SHA-256 checked.
 - [`csubst doctor`](https://github.com/kfuku52/csubst/wiki/csubst-doctor): validate input files, inferred IQ-TREE paths, and optional 3Di settings before longer runs.
 - [`csubst search`](https://github.com/kfuku52/csubst/wiki/csubst-search) (legacy alias: `csubst analyze`): run convergence analysis and report metrics such as `omegaC`, `dNC`, and `dSC`.
-- [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): find recurrent foreground substitutions and compare rates. See [scores and bootstrap inference](docs/SCAN_INFERENCE.md) and [clade calibration](docs/SCAN_CALIBRATION.md). [Joint／CTMC bridge](docs/SCAN_CTMC.md) supports uniform codon models.
+- [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): find recurrent foreground substitutions and compare rates. See [scores and bootstrap inference](docs/SCAN_INFERENCE.md) and [clade calibration](docs/SCAN_CALIBRATION.md). [Joint／CTMC bridge](docs/SCAN_CTMC.md): joint is the default and supports discrete codon-rate categories; bridge requires uniform rates.
 - [`csubst inspect`](https://github.com/kfuku52/csubst/wiki/csubst-inspect): summarize branch mappings, inspect ancestral states, and report exact topology-derived independent branch-combination counts without enumerating combinations.
 - [`csubst sites`](https://github.com/kfuku52/csubst/wiki/csubst-sites) (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree and site-summary plots, and optionally map sites to protein structures.
 - [`csubst simulate`](https://github.com/kfuku52/csubst/wiki/csubst-simulate): simulate codon sequence evolution under user-defined convergence scenarios.

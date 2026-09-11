@@ -1,0 +1,88 @@
+{
+  "status": [
+    "model_conditional_parametric_bootstrap"
+  ],
+  "candidate_count": 57,
+  "bootstrap": {
+    "schema_version": 1,
+    "csubst_version": "1.15.2",
+    "status": "model_conditional_parametric_bootstrap",
+    "null": "fitted_uniform_codon_ctmc",
+    "requested": 3,
+    "seed": 1,
+    "success_count": 3,
+    "failure_count": 0,
+    "fixed": [
+      "topology",
+      "root_position",
+      "foreground",
+      "alignment_length",
+      "missing_codon_mask"
+    ],
+    "refitted": [
+      "codon_model_parameters",
+      "branch_lengths",
+      "ASR",
+      "automatic_recoding_if_requested"
+    ],
+    "repeated": [
+      "site_filtering",
+      "exposure",
+      "candidate_discovery",
+      "support_filter",
+      "maximum_score"
+    ],
+    "observation": "joint",
+    "score_method": "negative_log10_one_sided_poisson_asymptotic_tail",
+    "maximum_scope": "all_testable_selected_candidates_all_traits_matches_in_this_run",
+    "fitted_model_validation": {
+      "omega": 0.04588576029,
+      "kappa": 1.696801655,
+      "checkpoint": "$WORKDIR/bootstrap-fit/tips.fa.0c01ca580ccec524.ckp.gz",
+      "parameter_tokens": {
+        "omega": "0.04588576029",
+        "kappa": "1.696801655"
+      },
+      "frequency_source": "verbose_log_or_FQ",
+      "reported_loglik": -2517.741511,
+      "reproduced_loglik": -2518.4346583171637,
+      "likelihood_check": "warning",
+      "likelihood_absolute_difference": 0.6931473171634934,
+      "likelihood_tolerance": 0.001
+    },
+    "inference": "model_conditional_parametric_bootstrap_not_exact",
+    "replicates": [
+      {
+        "index": 0,
+        "seed": 2080620106,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.131947111938296
+      },
+      {
+        "index": 1,
+        "seed": 1666826666,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.2485041732162276
+      },
+      {
+        "index": 2,
+        "seed": 1821025799,
+        "status": "success",
+        "empty": false,
+        "maximum_score": 1.0666422475213304
+      }
+    ],
+    "minimum_p": 0.25,
+    "directory": "/private$WORKDIR/bootstrap-warning/csubst_scan_bootstrap_jjlwvq0g"
+  },
+  "checks": {
+    "passed": 2175,
+    "skipped": 5,
+    "native_passed": 16,
+    "lint": "pass",
+    "typecheck": "pass"
+  },
+  "source_sha256": "4dcde8c4f4c0e3a52d3908645507dce175188f7cfbee3a0aab8eba3a447a3cab"
+}

@@ -528,7 +528,8 @@ def run_iqtree_ancestral(g, force_notree_run=False):
                 raise ValueError('--rooted_tree and --alignment_file are not consistent.')
         if g.get('random_seed') is not None:
             command.extend(['-seed', str(int(g['random_seed']))])
-        if g.get('subcommand') == 'scan' or g.get('scan_pvalue_calibration') == 'parametric_bootstrap':
+        if (g.get('subcommand') == 'scan' or g.get('scan_pvalue_calibration') == 'parametric_bootstrap'
+                or str(g.get('iqtree_model', '')).startswith(('GY', 'MG'))):
             command.append('-v')  # Preserve empirical frequencies at full log precision.
         returncode = runtime.run_subprocess_tee(command)
         if returncode != 0:
@@ -540,7 +541,8 @@ def run_iqtree_ancestral(g, force_notree_run=False):
         ckp_paths = [g['alignment_file']+'.ckp.gz', iqtree_prefix+'.ckp.gz']
         for ckp_path in ckp_paths:
             if (os.path.exists(ckp_path) and g.get('scan_pvalue_calibration') != 'parametric_bootstrap'
-                    and g.get('scan_observation', 'marginal') == 'marginal'):
+                    and g.get('scan_observation', 'marginal') == 'marginal'
+                    and not str(g.get('iqtree_model', '')).startswith(('GY', 'MG'))):
                 os.remove(ckp_path)
     finally:
         if os.path.exists(file_tree):
@@ -639,6 +641,52 @@ def read_rate(g):
         g['iqtree_categorized_rate_values'] = None
     return rate_sites
 
+def _read_mg_frequencies(g, report):
+    """Rebuild counted F1X4/F3X4 from the fitted alignment, excluding unknown codons.
+
+    Codon marginals cannot be summed to recover nucleotide frequencies because
+    stop codons have been excluded. Check against the rounded report to detect
+    a mismatched alignment or externally supplied frequency parameters.
+    """
+    model = g['substitution_model']
+    if not re.fullmatch(r'MGK?(?:\+(?:F1X4|F3X4|G\d*|R\d*|I))*', model):
+        raise ValueError('MG supports counted F1X4/F3X4 frequencies; other MG variants/frequency schemes require a verified model.')
+    codons = np.asarray(g['codon_orders'], dtype=str)
+    serialized = re.findall(r'^CSUBST MG nucleotide frequencies position ([123]): ([^\n]+)$', report, re.M)
+    if serialized:
+        if len(serialized) != 3 or len({row[0] for row in serialized}) != 3:
+            raise ValueError('Incomplete MG nucleotide frequencies in the simulation bundle.')
+        frequencies = np.array([[float(v) for v in text.split()] for _, text in sorted(serialized)])
+        if (frequencies.shape != (3, 4) or not np.isfinite(frequencies).all()
+                or (frequencies < 0).any() or not np.allclose(frequencies.sum(axis=1), 1)):
+            raise ValueError('Invalid MG nucleotide frequencies in the simulation bundle.')
+    else:
+        lookup = {c: i for i, c in enumerate(codons)}
+        counts = np.zeros(len(codons))
+        for seq in sequence.read_fasta(g['alignment_file']).values():
+            seq = seq.upper().replace('U', 'T')
+            for start in range(0, len(seq), 3):
+                index = lookup.get(seq[start:start + 3])
+                if index is not None:
+                    counts[index] += 1
+        letters = np.array([list(c) for c in codons])
+        frequencies = np.array([[counts[letters[:, p] == base].sum() for base in 'ACGT'] for p in range(3)])
+        if '+F1X4' in model:
+            frequencies[:] = frequencies.sum(axis=0)
+        if (frequencies.sum(axis=1) == 0).any():
+            raise ValueError('MG frequencies require observed sense codons in the fitted alignment.')
+        frequencies /= frequencies.sum(axis=1, keepdims=True)
+    pi = np.prod([[frequencies[p, 'ACGT'.index(c[p])] for p in range(3)] for c in codons], axis=1)
+    pi /= pi.sum()
+    if re.search(r'pi\(', report):
+        reported = _parse_equilibrium_frequency(report, codons, g['iqtree_parser'], np.float64)
+        if not np.allclose(pi, reported, atol=1.2e-4, rtol=0):
+            raise ValueError('MG counted frequencies do not match the IQ-TREE report; use the original fitted alignment and F1X4/F3X4 settings.')
+    g['mg_nucleotide_frequencies'] = frequencies
+    g['equilibrium_frequency'] = pi.astype(g['float_type'])
+    return g
+
+
 def read_iqtree(g, eq=True):
     iqtree_txt = _read_text(g['path_iqtree_iqtree'])
     g = detect_iqtree_output_version(g)
@@ -655,6 +703,8 @@ def read_iqtree(g, eq=True):
     if g['substitution_model'] is None:
         raise AssertionError('Failed to parse substitution model from IQ-TREE output.')
     if eq:
+        if g['substitution_model'].startswith('MG'):
+            return _read_mg_frequencies(g, iqtree_txt)
         if re.search(r'(?:^|\+)FQ(?:\+|$)', g['substitution_model']):
             # Equal frequencies are part of the model definition; IQ-TREE
             # legitimately omits pi(...) entries for this case.
@@ -672,7 +722,7 @@ def read_iqtree(g, eq=True):
             )
         except AssertionError as e:
             # IQ-TREE 3 may omit codon pi(...) entries from .iqtree outputs for codon models.
-            if parser_name == 'iqtree3':
+            if parser_name == 'iqtree3' and re.search(r'(?:^|\+)F(?:\+|$)', g['substitution_model']):
                 txt = 'Could not parse codon frequencies from IQ-TREE 3 output. '
                 txt += 'Estimating empirical codon frequencies from alignment: {}'
                 print(txt.format(g['alignment_file']), flush=True)

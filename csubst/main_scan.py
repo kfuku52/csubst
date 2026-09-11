@@ -156,7 +156,6 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     )
     substitution_scan.validate_scan_configuration(g)
     g = parser_misc.prep_state(g, apply_site_filtering=False)
-    scan_bootstrap.prepare_observation_model(g)
     bootstrap_model = scan_bootstrap.prepare_model(g) if g.get("scan_pvalue_calibration") == "parametric_bootstrap" else None
     analytic_engine = scan_analytic.prepare(g)
     no_sites = False

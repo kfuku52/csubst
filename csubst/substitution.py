@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from scipy.linalg import blas as scipy_blas
 
 import os
 import re
@@ -24,7 +23,6 @@ _CB_BASE_SUBSTITUTIONS = ("any2any", "spe2any", "any2spe", "spe2spe")
 _CYTHON_FALLBACK_WARNED = set()
 _SPARSE_CB_SUMMARY_GRAM_MIN_COMBINATIONS = 512
 _SPARSE_CB_SUMMARY_GRAM_MAX_BRANCHES = 512
-_SPARSE_CB_SUMMARY_SYRK_MIN_FEATURES = 10000
 # CSR Gram remained faster on the representative expected-N tensor at about
 # 78% projected density. Densify only when the projection is nearly full; this
 # still caps CSR's worst-case storage overhead for genuinely dense inputs.
@@ -1619,20 +1617,11 @@ def _get_sparse_matrix_density(mat):
 
 
 def _calc_dense_gram_pair_values(matrix_2d, row_ids, col_ids):
-    if matrix_2d.shape[1] < _SPARSE_CB_SUMMARY_SYRK_MIN_FEATURES:
-        gram = matrix_2d @ matrix_2d.T
-        return np.asarray(gram[row_ids, col_ids], dtype=np.float64).reshape(-1)
-    try:
-        # dsyrk computes A*A^T while exploiting symmetry; only requested
-        # branch-pair entries are copied out of the dense Gram matrix.
-        matrix_ft = np.asfortranarray(matrix_2d.T, dtype=np.float64)
-        gram_upper = scipy_blas.dsyrk(alpha=1.0, a=matrix_ft, trans=1, lower=0)
-        upper_rows = np.minimum(row_ids, col_ids)
-        upper_cols = np.maximum(row_ids, col_ids)
-        return np.asarray(gram_upper[upper_rows, upper_cols], dtype=np.float64).reshape(-1)
-    except Exception:
-        gram = matrix_2d @ matrix_2d.T
-        return np.asarray(gram[row_ids, col_ids], dtype=np.float64).reshape(-1)
+    # Use the same BLAS runtime as pruning and pairwise accumulation. Calling
+    # SciPy's BLAS here can initialize a second, independently linked runtime
+    # for a single Gram product (e.g. NumPy OpenBLAS plus SciPy MKL).
+    gram = matrix_2d @ matrix_2d.T
+    return np.asarray(gram[row_ids, col_ids], dtype=np.float64).reshape(-1)
 
 
 def _calc_projection_gram_pair_values(projection, row_ids, col_ids):

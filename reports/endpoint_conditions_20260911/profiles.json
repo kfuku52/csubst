@@ -1,0 +1,1823 @@
+{
+  "baseline": {
+    "pepc_arity6-before-0": {
+      "seconds": 11.454118949999978,
+      "top_own_time": [
+        {
+          "file": "endpoint_io.py",
+          "line": 290,
+          "function": "transform",
+          "calls": 8960,
+          "own_seconds": 1.43606276,
+          "total_seconds": 1.43606276
+        },
+        {
+          "file": "substitution.py",
+          "line": 1638,
+          "function": "_calc_projection_gram_pair_values",
+          "calls": 8,
+          "own_seconds": 1.3146696640000002,
+          "total_seconds": 1.325770708
+        },
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 2257,
+          "own_seconds": 1.067021652,
+          "total_seconds": 3.6108526000000003
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 238,
+          "function": "transform",
+          "calls": 8960,
+          "own_seconds": 0.811217092,
+          "total_seconds": 0.845792368
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 45496,
+          "own_seconds": 0.7341958590000001,
+          "total_seconds": 0.7341991090000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method scipy.sparse._sparsetools.csr_sort_indices>",
+          "calls": 6,
+          "own_seconds": 0.6786073770000001,
+          "total_seconds": 0.6786073770000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.5595152050000001,
+          "total_seconds": 0.565676788
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'tofile' of 'numpy.ndarray' objects>",
+          "calls": 30528,
+          "own_seconds": 0.557389007,
+          "total_seconds": 0.569579566
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'nonzero' of 'numpy.ndarray' objects>",
+          "calls": 18788,
+          "own_seconds": 0.4638257,
+          "total_seconds": 0.4638257
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.fromfile>",
+          "calls": 30528,
+          "own_seconds": 0.284721133,
+          "total_seconds": 0.292722663
+        },
+        {
+          "file": "substitution.py",
+          "line": 1575,
+          "function": "_calc_sparse_projection_products",
+          "calls": 32,
+          "own_seconds": 0.236794301,
+          "total_seconds": 0.23717099900000002
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 75,
+          "function": "append",
+          "calls": 17920,
+          "own_seconds": 0.202853988,
+          "total_seconds": 1.28441076
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 307,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.176130594,
+          "total_seconds": 6.949272583000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 222,
+          "own_seconds": 0.14096803700000002,
+          "total_seconds": 0.14096803700000002
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 89,
+          "function": "finish",
+          "calls": 8,
+          "own_seconds": 0.106655463,
+          "total_seconds": 1.0965232070000002
+        },
+        {
+          "file": "ete.py",
+          "line": 114,
+          "function": "get_distance",
+          "calls": 20322,
+          "own_seconds": 0.093048565,
+          "total_seconds": 0.093048565
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'argmax' of 'numpy.ndarray' objects>",
+          "calls": 4481,
+          "own_seconds": 0.07862210600000001,
+          "total_seconds": 0.07862210600000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.07194525,
+          "total_seconds": 0.07194525
+        },
+        {
+          "file": "format.py",
+          "line": 1305,
+          "function": "base_formatter",
+          "calls": 268855,
+          "own_seconds": 0.070705906,
+          "total_seconds": 0.292642493
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.array>",
+          "calls": 3442,
+          "own_seconds": 0.06655344,
+          "total_seconds": 0.06660848100000001
+        }
+      ]
+    },
+    "pepc_block256-before-0": {
+      "seconds": 6.074321708999993,
+      "top_own_time": [
+        {
+          "file": "endpoint_io.py",
+          "line": 290,
+          "function": "transform",
+          "calls": 2240,
+          "own_seconds": 1.159164514,
+          "total_seconds": 1.159164514
+        },
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 565,
+          "own_seconds": 0.768973931,
+          "total_seconds": 2.7749338580000003
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 238,
+          "function": "transform",
+          "calls": 2240,
+          "own_seconds": 0.659346073,
+          "total_seconds": 0.6722970340000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 16474,
+          "own_seconds": 0.640523327,
+          "total_seconds": 0.6405267020000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.540848138,
+          "total_seconds": 0.546448428
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 116,
+          "function": "_flush",
+          "calls": 40,
+          "own_seconds": 0.221106296,
+          "total_seconds": 0.221118629
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 222,
+          "own_seconds": 0.14009033,
+          "total_seconds": 0.14009033
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.07191759,
+          "total_seconds": 0.07191759
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'argmax' of 'numpy.ndarray' objects>",
+          "calls": 1121,
+          "own_seconds": 0.07121081700000001,
+          "total_seconds": 0.07121081700000001
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 307,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.070973563,
+          "total_seconds": 3.792625375
+        },
+        {
+          "file": "ete.py",
+          "line": 114,
+          "function": "get_distance",
+          "calls": 16892,
+          "own_seconds": 0.066353769,
+          "total_seconds": 0.066353769
+        },
+        {
+          "file": "format.py",
+          "line": 1305,
+          "function": "base_formatter",
+          "calls": 251795,
+          "own_seconds": 0.064594412,
+          "total_seconds": 0.27052934
+        },
+        {
+          "file": "format.py",
+          "line": 1437,
+          "function": "<lambda>",
+          "calls": 251795,
+          "own_seconds": 0.060705245000000005,
+          "total_seconds": 0.060705245000000005
+        },
+        {
+          "file": "missing.py",
+          "line": 380,
+          "function": "notna",
+          "calls": 251809,
+          "own_seconds": 0.055434928,
+          "total_seconds": 0.146324015
+        },
+        {
+          "file": "missing.py",
+          "line": 184,
+          "function": "_isna",
+          "calls": 252322,
+          "own_seconds": 0.046170100000000006,
+          "total_seconds": 0.048759927
+        },
+        {
+          "file": "csvs.py",
+          "line": 315,
+          "function": "_save_chunk",
+          "calls": 3,
+          "own_seconds": 0.045151574,
+          "total_seconds": 0.41255074900000005
+        },
+        {
+          "file": "format.py",
+          "line": 1352,
+          "function": "<listcomp>",
+          "calls": 83,
+          "own_seconds": 0.043176414,
+          "total_seconds": 0.313705754
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.array>",
+          "calls": 1441,
+          "own_seconds": 0.042923002,
+          "total_seconds": 0.042941585000000004
+        },
+        {
+          "file": "endpoint.py",
+          "line": 88,
+          "function": "_uniform_transition",
+          "calls": 560,
+          "own_seconds": 0.042044523,
+          "total_seconds": 0.045322423
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 121,
+          "function": "append",
+          "calls": 4480,
+          "own_seconds": 0.039794902,
+          "total_seconds": 0.216062404
+        }
+      ]
+    },
+    "pepc_block8-before-0": {
+      "seconds": 14.052805503000004,
+      "top_own_time": [
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 17203,
+          "own_seconds": 3.094580424,
+          "total_seconds": 9.011241696
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 290,
+          "function": "transform",
+          "calls": 68320,
+          "own_seconds": 2.994727348,
+          "total_seconds": 2.994727348
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 238,
+          "function": "transform",
+          "calls": 68320,
+          "own_seconds": 1.581375545,
+          "total_seconds": 1.767046117
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 314424,
+          "own_seconds": 1.149207557,
+          "total_seconds": 1.149211141
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 307,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.8518464520000001,
+          "total_seconds": 11.744994542
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.537421426,
+          "total_seconds": 0.543535588
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 121,
+          "function": "append",
+          "calls": 136640,
+          "own_seconds": 0.441115566,
+          "total_seconds": 0.740697916
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 116,
+          "function": "_flush",
+          "calls": 984,
+          "own_seconds": 0.24128833400000002,
+          "total_seconds": 0.241536788
+        },
+        {
+          "file": "endpoint.py",
+          "line": 122,
+          "function": "transition",
+          "calls": 136640,
+          "own_seconds": 0.14427926800000002,
+          "total_seconds": 0.24645684
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 222,
+          "own_seconds": 0.137475371,
+          "total_seconds": 0.137475371
+        },
+        {
+          "file": "numeric.py",
+          "line": 67,
+          "function": "zeros_like",
+          "calls": 68322,
+          "own_seconds": 0.122965815,
+          "total_seconds": 0.155018917
+        },
+        {
+          "file": "numeric.py",
+          "line": 203,
+          "function": "ones_like",
+          "calls": 68320,
+          "own_seconds": 0.120956856,
+          "total_seconds": 0.133718422
+        },
+        {
+          "file": "_ufunc_config.py",
+          "line": 33,
+          "function": "seterr",
+          "calls": 138366,
+          "own_seconds": 0.12058760600000001,
+          "total_seconds": 0.259199171
+        },
+        {
+          "file": "_ufunc_config.py",
+          "line": 132,
+          "function": "geterr",
+          "calls": 138366,
+          "own_seconds": 0.09492676700000001,
+          "total_seconds": 0.10240818700000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'argmax' of 'numpy.ndarray' objects>",
+          "calls": 34161,
+          "own_seconds": 0.090093165,
+          "total_seconds": 0.090093165
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'sum' of 'numpy.ndarray' objects>",
+          "calls": 241963,
+          "own_seconds": 0.07337529400000001,
+          "total_seconds": 1.1317421570000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.071334198,
+          "total_seconds": 0.071334198
+        },
+        {
+          "file": "format.py",
+          "line": 1305,
+          "function": "base_formatter",
+          "calls": 251795,
+          "own_seconds": 0.06714036300000001,
+          "total_seconds": 0.276586594
+        },
+        {
+          "file": "format.py",
+          "line": 1437,
+          "function": "<lambda>",
+          "calls": 251795,
+          "own_seconds": 0.063300573,
+          "total_seconds": 0.063300573
+        },
+        {
+          "file": "ete.py",
+          "line": 114,
+          "function": "get_distance",
+          "calls": 16892,
+          "own_seconds": 0.062961218,
+          "total_seconds": 0.062961218
+        }
+      ]
+    },
+    "pepc_branch-before-0": {
+      "seconds": 7.280459457999991,
+      "top_own_time": [
+        {
+          "file": "endpoint_io.py",
+          "line": 290,
+          "function": "transform",
+          "calls": 8960,
+          "own_seconds": 1.462281839,
+          "total_seconds": 1.462281839
+        },
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 2257,
+          "own_seconds": 1.059538,
+          "total_seconds": 3.6434040230000004
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 238,
+          "function": "transform",
+          "calls": 8960,
+          "own_seconds": 0.8243894810000001,
+          "total_seconds": 0.8600037070000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 46774,
+          "own_seconds": 0.743247369,
+          "total_seconds": 0.7432507020000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.5509262,
+          "total_seconds": 0.557609284
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 116,
+          "function": "_flush",
+          "calls": 136,
+          "own_seconds": 0.24002387900000002,
+          "total_seconds": 0.24006341800000003
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 307,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.171603154,
+          "total_seconds": 4.932468500000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 222,
+          "own_seconds": 0.141856125,
+          "total_seconds": 0.141856125
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 121,
+          "function": "append",
+          "calls": 17920,
+          "own_seconds": 0.084785608,
+          "total_seconds": 0.323914158
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'argmax' of 'numpy.ndarray' objects>",
+          "calls": 4481,
+          "own_seconds": 0.080516292,
+          "total_seconds": 0.080516292
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.07237037,
+          "total_seconds": 0.07237037
+        },
+        {
+          "file": "ete.py",
+          "line": 114,
+          "function": "get_distance",
+          "calls": 16892,
+          "own_seconds": 0.066265535,
+          "total_seconds": 0.066265535
+        },
+        {
+          "file": "format.py",
+          "line": 1305,
+          "function": "base_formatter",
+          "calls": 251795,
+          "own_seconds": 0.06455195600000001,
+          "total_seconds": 0.264885527
+        },
+        {
+          "file": "format.py",
+          "line": 1437,
+          "function": "<lambda>",
+          "calls": 251795,
+          "own_seconds": 0.062280924,
+          "total_seconds": 0.062280924
+        },
+        {
+          "file": "missing.py",
+          "line": 380,
+          "function": "notna",
+          "calls": 251809,
+          "own_seconds": 0.053396967000000004,
+          "total_seconds": 0.139251025
+        },
+        {
+          "file": "format.py",
+          "line": 1352,
+          "function": "<listcomp>",
+          "calls": 83,
+          "own_seconds": 0.046418469000000004,
+          "total_seconds": 0.311303996
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.array>",
+          "calls": 1489,
+          "own_seconds": 0.045750932,
+          "total_seconds": 0.045810771
+        },
+        {
+          "file": "csvs.py",
+          "line": 315,
+          "function": "_save_chunk",
+          "calls": 3,
+          "own_seconds": 0.043097667,
+          "total_seconds": 0.413683334
+        },
+        {
+          "file": "missing.py",
+          "line": 184,
+          "function": "_isna",
+          "calls": 252322,
+          "own_seconds": 0.042675429,
+          "total_seconds": 0.045248676
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method io.open_code>",
+          "calls": 1109,
+          "own_seconds": 0.037981513,
+          "total_seconds": 0.037981513
+        }
+      ]
+    },
+    "pepc_pair-before-0": {
+      "seconds": 5.365366768999983,
+      "top_own_time": [
+        {
+          "file": "endpoint_io.py",
+          "line": 238,
+          "function": "transform",
+          "calls": 17920,
+          "own_seconds": 1.4423535360000002,
+          "total_seconds": 1.495021734
+        },
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 2257,
+          "own_seconds": 0.848324061,
+          "total_seconds": 2.579467529
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.566947831,
+          "total_seconds": 0.572819457
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 116,
+          "function": "_flush",
+          "calls": 136,
+          "own_seconds": 0.22021680200000002,
+          "total_seconds": 0.220253675
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 222,
+          "own_seconds": 0.143623669,
+          "total_seconds": 0.143623669
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 42288,
+          "own_seconds": 0.111759205,
+          "total_seconds": 0.111762497
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 307,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.10474349300000001,
+          "total_seconds": 3.0194665840000003
+        },
+        {
+          "file": "format.py",
+          "line": 1305,
+          "function": "base_formatter",
+          "calls": 251372,
+          "own_seconds": 0.072553476,
+          "total_seconds": 0.300280003
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 121,
+          "function": "append",
+          "calls": 17920,
+          "own_seconds": 0.06965816600000001,
+          "total_seconds": 0.28682609400000003
+        },
+        {
+          "file": "format.py",
+          "line": 1437,
+          "function": "<lambda>",
+          "calls": 251372,
+          "own_seconds": 0.06892403700000001,
+          "total_seconds": 0.06892403700000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.067403197,
+          "total_seconds": 0.067403197
+        },
+        {
+          "file": "ete.py",
+          "line": 114,
+          "function": "get_distance",
+          "calls": 16892,
+          "own_seconds": 0.06410146900000001,
+          "total_seconds": 0.06410146900000001
+        },
+        {
+          "file": "missing.py",
+          "line": 380,
+          "function": "notna",
+          "calls": 251386,
+          "own_seconds": 0.060810297000000006,
+          "total_seconds": 0.159880865
+        },
+        {
+          "file": "missing.py",
+          "line": 184,
+          "function": "_isna",
+          "calls": 251888,
+          "own_seconds": 0.049954732,
+          "total_seconds": 0.052490843
+        },
+        {
+          "file": "csvs.py",
+          "line": 315,
+          "function": "_save_chunk",
+          "calls": 2,
+          "own_seconds": 0.047965543000000006,
+          "total_seconds": 0.453680542
+        },
+        {
+          "file": "format.py",
+          "line": 1352,
+          "function": "<listcomp>",
+          "calls": 81,
+          "own_seconds": 0.047824746,
+          "total_seconds": 0.34810474900000005
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.array>",
+          "calls": 1479,
+          "own_seconds": 0.043913191000000004,
+          "total_seconds": 0.043964986000000005
+        },
+        {
+          "file": "endpoint.py",
+          "line": 88,
+          "function": "_uniform_transition",
+          "calls": 560,
+          "own_seconds": 0.041091079,
+          "total_seconds": 0.044291451
+        },
+        {
+          "file": "missing.py",
+          "line": 101,
+          "function": "isna",
+          "calls": 251888,
+          "own_seconds": 0.037406979,
+          "total_seconds": 0.089896657
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.exec_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.03737376,
+          "total_seconds": 0.164009457
+        }
+      ]
+    },
+    "pgk_full-before-0": {
+      "seconds": 23.12576167799999,
+      "top_own_time": [
+        {
+          "file": "substitution.py",
+          "line": 1621,
+          "function": "_calc_dense_gram_pair_values",
+          "calls": 6,
+          "own_seconds": 14.359664752,
+          "total_seconds": 14.359691002000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method scipy.sparse._sparsetools.csr_sort_indices>",
+          "calls": 393,
+          "own_seconds": 2.0160882090000003,
+          "total_seconds": 2.0160882090000003
+        },
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 456,
+          "own_seconds": 1.236086293,
+          "total_seconds": 1.351112866
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'nonzero' of 'numpy.ndarray' objects>",
+          "calls": 4656,
+          "own_seconds": 0.849337172,
+          "total_seconds": 0.849337172
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 184,
+          "function": "_events",
+          "calls": 1792,
+          "own_seconds": 0.7343918060000001,
+          "total_seconds": 0.7586937
+        },
+        {
+          "file": "substitution.py",
+          "line": 1638,
+          "function": "_calc_projection_gram_pair_values",
+          "calls": 16,
+          "own_seconds": 0.6676219600000001,
+          "total_seconds": 15.068593375
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.585967291,
+          "total_seconds": 0.592572745
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 12838,
+          "own_seconds": 0.26345474900000004,
+          "total_seconds": 0.263462915
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'tofile' of 'numpy.ndarray' objects>",
+          "calls": 8960,
+          "own_seconds": 0.190016541,
+          "total_seconds": 0.193726416
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 75,
+          "function": "append",
+          "calls": 4480,
+          "own_seconds": 0.15444412700000001,
+          "total_seconds": 1.2201296970000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 222,
+          "own_seconds": 0.14253859000000002,
+          "total_seconds": 0.14253859000000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.fromfile>",
+          "calls": 8960,
+          "own_seconds": 0.112114737,
+          "total_seconds": 0.114479522
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 89,
+          "function": "finish",
+          "calls": 10,
+          "own_seconds": 0.100076705,
+          "total_seconds": 1.363234628
+        },
+        {
+          "file": "substitution_sparse.py",
+          "line": 106,
+          "function": "decode_event_ids",
+          "calls": 390,
+          "own_seconds": 0.09065157800000001,
+          "total_seconds": 0.09563183700000001
+        },
+        {
+          "file": "substitution_sparse.py",
+          "line": 235,
+          "function": "project",
+          "calls": 8,
+          "own_seconds": 0.076499156,
+          "total_seconds": 1.107129915
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.073756949,
+          "total_seconds": 0.073756949
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.zeros>",
+          "calls": 3767,
+          "own_seconds": 0.052032763,
+          "total_seconds": 0.052032763
+        },
+        {
+          "file": "contextlib.py",
+          "line": 533,
+          "function": "__exit__",
+          "calls": 3,
+          "own_seconds": 0.040163248000000006,
+          "total_seconds": 0.040193333000000005
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.exec_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.038563147,
+          "total_seconds": 0.17155345300000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method io.open_code>",
+          "calls": 1109,
+          "own_seconds": 0.038324917,
+          "total_seconds": 0.038324917
+        }
+      ]
+    },
+    "pgk_pair-before-0": {
+      "seconds": 4.920934457000023,
+      "top_own_time": [
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 3.0730794190000004,
+          "total_seconds": 3.079211041
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 238,
+          "function": "transform",
+          "calls": 3584,
+          "own_seconds": 0.295218209,
+          "total_seconds": 0.306952014
+        },
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 456,
+          "own_seconds": 0.178962321,
+          "total_seconds": 0.5565769230000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 222,
+          "own_seconds": 0.14096262,
+          "total_seconds": 0.14096262
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.07202058700000001,
+          "total_seconds": 0.07202058700000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method io.open_code>",
+          "calls": 1109,
+          "own_seconds": 0.037038086000000005,
+          "total_seconds": 0.037038086000000005
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.exec_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.036967868,
+          "total_seconds": 0.168477164
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 11025,
+          "own_seconds": 0.029039818000000002,
+          "total_seconds": 0.029043068000000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'sub' of 're.Pattern' objects>",
+          "calls": 2957,
+          "own_seconds": 0.026338958000000003,
+          "total_seconds": 0.026595539
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 116,
+          "function": "_flush",
+          "calls": 64,
+          "own_seconds": 0.025166916,
+          "total_seconds": 0.025182205000000003
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method posix.stat>",
+          "calls": 5412,
+          "own_seconds": 0.022408262,
+          "total_seconds": 0.022419887000000003
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 307,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.021873103,
+          "total_seconds": 0.6323268750000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.exec>",
+          "calls": 1390,
+          "own_seconds": 0.021163982,
+          "total_seconds": 4.921383667000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'findall' of 're.Pattern' objects>",
+          "calls": 1193,
+          "own_seconds": 0.019604510000000002,
+          "total_seconds": 0.019604510000000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.__build_class__>",
+          "calls": 2271,
+          "own_seconds": 0.019584609000000003,
+          "total_seconds": 0.083887872
+        },
+        {
+          "file": "doccer.py",
+          "line": 29,
+          "function": "docformat",
+          "calls": 431,
+          "own_seconds": 0.018531056,
+          "total_seconds": 0.048630871000000006
+        },
+        {
+          "file": "endpoint.py",
+          "line": 88,
+          "function": "_uniform_transition",
+          "calls": 256,
+          "own_seconds": 0.018064324,
+          "total_seconds": 0.019427385000000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'read' of '_io.BufferedReader' objects>",
+          "calls": 1076,
+          "own_seconds": 0.016668369000000002,
+          "total_seconds": 0.016668369000000002
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 121,
+          "function": "append",
+          "calls": 3584,
+          "own_seconds": 0.015125019000000002,
+          "total_seconds": 0.038704431000000004
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _posixsubprocess.fork_exec>",
+          "calls": 2,
+          "own_seconds": 0.0146995,
+          "total_seconds": 0.0146995
+        }
+      ]
+    },
+    "pgk_recode-before-0": {
+      "seconds": 4.998623404999995,
+      "top_own_time": [
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 456,
+          "own_seconds": 1.2768670720000002,
+          "total_seconds": 1.3915011240000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 188,
+          "own_seconds": 1.063231787,
+          "total_seconds": 1.068793369
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 184,
+          "function": "_events",
+          "calls": 2240,
+          "own_seconds": 0.6399022040000001,
+          "total_seconds": 0.663872364
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 53157,
+          "own_seconds": 0.312900587,
+          "total_seconds": 0.31290404600000005
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 223,
+          "own_seconds": 0.161538796,
+          "total_seconds": 0.161538796
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.fromstring>",
+          "calls": 12927,
+          "own_seconds": 0.08995778900000001,
+          "total_seconds": 0.08995778900000001
+        },
+        {
+          "file": "parser_iqtree.py",
+          "line": 888,
+          "function": "_load_internal_state_rows_one_pass",
+          "calls": 1,
+          "own_seconds": 0.080751528,
+          "total_seconds": 0.29552683300000004
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.071696245,
+          "total_seconds": 0.071696245
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.zeros>",
+          "calls": 3709,
+          "own_seconds": 0.055711083,
+          "total_seconds": 0.055711083
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.exec_dynamic>",
+          "calls": 188,
+          "own_seconds": 0.038833233,
+          "total_seconds": 0.163814795
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method io.open_code>",
+          "calls": 1111,
+          "own_seconds": 0.036364456,
+          "total_seconds": 0.036364456
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 307,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.035685286000000004,
+          "total_seconds": 2.417088959
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 116,
+          "function": "_flush",
+          "calls": 80,
+          "own_seconds": 0.025876917000000003,
+          "total_seconds": 0.025898877
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'sub' of 're.Pattern' objects>",
+          "calls": 2957,
+          "own_seconds": 0.025828438000000002,
+          "total_seconds": 0.026046191000000003
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method posix.stat>",
+          "calls": 5420,
+          "own_seconds": 0.021375854,
+          "total_seconds": 0.021399687
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.exec>",
+          "calls": 1391,
+          "own_seconds": 0.020773575000000002,
+          "total_seconds": 4.999061417
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'findall' of 're.Pattern' objects>",
+          "calls": 1193,
+          "own_seconds": 0.019763401,
+          "total_seconds": 0.019763401
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 121,
+          "function": "append",
+          "calls": 4480,
+          "own_seconds": 0.019525542,
+          "total_seconds": 0.044857222
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.__build_class__>",
+          "calls": 2271,
+          "own_seconds": 0.019466712,
+          "total_seconds": 0.082613035
+        },
+        {
+          "file": "parser_iqtree.py",
+          "line": 259,
+          "function": "_iter_state_rows",
+          "calls": 12928,
+          "own_seconds": 0.018350133,
+          "total_seconds": 0.027781884000000003
+        }
+      ]
+    },
+    "pgk_sites-before-0": {
+      "seconds": 7.473259948999988,
+      "top_own_time": [
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method scipy.sparse._sparsetools.csr_sort_indices>",
+          "calls": 389,
+          "own_seconds": 1.297284369,
+          "total_seconds": 1.297284369
+        },
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 456,
+          "own_seconds": 1.2292623070000002,
+          "total_seconds": 1.342363365
+        },
+        {
+          "file": "substitution.py",
+          "line": 1575,
+          "function": "_calc_sparse_projection_products",
+          "calls": 8,
+          "own_seconds": 0.738594376,
+          "total_seconds": 0.738754291
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 184,
+          "function": "_events",
+          "calls": 1792,
+          "own_seconds": 0.7261758030000001,
+          "total_seconds": 0.75027502
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.575772088,
+          "total_seconds": 0.5820957920000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'nonzero' of 'numpy.ndarray' objects>",
+          "calls": 2847,
+          "own_seconds": 0.32599954600000003,
+          "total_seconds": 0.32599954600000003
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 13379,
+          "own_seconds": 0.255244333,
+          "total_seconds": 0.255251624
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.compile>",
+          "calls": 222,
+          "own_seconds": 0.141065292,
+          "total_seconds": 0.141065292
+        },
+        {
+          "file": "substitution.py",
+          "line": 1638,
+          "function": "_calc_projection_gram_pair_values",
+          "calls": 8,
+          "own_seconds": 0.12569079600000002,
+          "total_seconds": 0.130520585
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'tofile' of 'numpy.ndarray' objects>",
+          "calls": 5376,
+          "own_seconds": 0.098259394,
+          "total_seconds": 0.100766852
+        },
+        {
+          "file": "substitution_sparse.py",
+          "line": 106,
+          "function": "decode_event_ids",
+          "calls": 390,
+          "own_seconds": 0.09146564700000001,
+          "total_seconds": 0.09667860900000001
+        },
+        {
+          "file": "substitution_sparse.py",
+          "line": 235,
+          "function": "project",
+          "calls": 8,
+          "own_seconds": 0.07864605300000001,
+          "total_seconds": 1.1170811680000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1023,
+          "own_seconds": 0.07088944500000001,
+          "total_seconds": 0.07088944500000001
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 75,
+          "function": "append",
+          "calls": 2688,
+          "own_seconds": 0.06695253100000001,
+          "total_seconds": 0.505129354
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.fromfile>",
+          "calls": 5376,
+          "own_seconds": 0.060418753000000006,
+          "total_seconds": 0.061821140000000004
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method numpy.zeros>",
+          "calls": 3838,
+          "own_seconds": 0.052694765000000005,
+          "total_seconds": 0.052694765000000005
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method io.open_code>",
+          "calls": 1109,
+          "own_seconds": 0.0383598,
+          "total_seconds": 0.0383598
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 89,
+          "function": "finish",
+          "calls": 6,
+          "own_seconds": 0.037827855,
+          "total_seconds": 0.525826251
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.exec_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.037196465000000005,
+          "total_seconds": 0.16954745400000001
+        },
+        {
+          "file": "format.py",
+          "line": 1305,
+          "function": "base_formatter",
+          "calls": 107972,
+          "own_seconds": 0.031699772,
+          "total_seconds": 0.13037457800000002
+        }
+      ]
+    }
+  },
+  "block8_before": {
+    "pepc_block8-before-0": {
+      "seconds": 13.779497668,
+      "top_own_time": [
+        {
+          "file": "endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 17203,
+          "own_seconds": 3.0338525450000002,
+          "total_seconds": 8.880653325
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 290,
+          "function": "transform",
+          "calls": 68320,
+          "own_seconds": 2.961777409,
+          "total_seconds": 2.961777409
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 238,
+          "function": "transform",
+          "calls": 68320,
+          "own_seconds": 1.570205246,
+          "total_seconds": 1.7539277370000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 314424,
+          "own_seconds": 1.1199888580000001,
+          "total_seconds": 1.1199917750000001
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 307,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.8363795540000001,
+          "total_seconds": 11.540043500000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.561458965,
+          "total_seconds": 0.568186921
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 121,
+          "function": "append",
+          "calls": 136640,
+          "own_seconds": 0.426760073,
+          "total_seconds": 0.722556148
+        },
+        {
+          "file": "endpoint_io.py",
+          "line": 116,
+          "function": "_flush",
+          "calls": 984,
+          "own_seconds": 0.23885962000000002,
+          "total_seconds": 0.23912491500000002
+        },
+        {
+          "file": "endpoint.py",
+          "line": 122,
+          "function": "transition",
+          "calls": 136640,
+          "own_seconds": 0.138049829,
+          "total_seconds": 0.23242788
+        },
+        {
+          "file": "numeric.py",
+          "line": 67,
+          "function": "zeros_like",
+          "calls": 68322,
+          "own_seconds": 0.11942978100000001,
+          "total_seconds": 0.15068663000000002
+        },
+        {
+          "file": "numeric.py",
+          "line": 203,
+          "function": "ones_like",
+          "calls": 68320,
+          "own_seconds": 0.118386055,
+          "total_seconds": 0.13151659400000001
+        },
+        {
+          "file": "_ufunc_config.py",
+          "line": 33,
+          "function": "seterr",
+          "calls": 138366,
+          "own_seconds": 0.11729800200000001,
+          "total_seconds": 0.25311869800000003
+        },
+        {
+          "file": "_ufunc_config.py",
+          "line": 132,
+          "function": "geterr",
+          "calls": 138366,
+          "own_seconds": 0.09346382900000001,
+          "total_seconds": 0.10073824
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'argmax' of 'numpy.ndarray' objects>",
+          "calls": 34161,
+          "own_seconds": 0.08896295600000001,
+          "total_seconds": 0.08896295600000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1063,
+          "own_seconds": 0.077487758,
+          "total_seconds": 0.077487758
+        },
+        {
+          "file": "ete.py",
+          "line": 114,
+          "function": "get_distance",
+          "calls": 16892,
+          "own_seconds": 0.07549088400000001,
+          "total_seconds": 0.07549088400000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'sum' of 'numpy.ndarray' objects>",
+          "calls": 241963,
+          "own_seconds": 0.07288322500000001,
+          "total_seconds": 1.098765991
+        },
+        {
+          "file": "format.py",
+          "line": 1305,
+          "function": "base_formatter",
+          "calls": 251795,
+          "own_seconds": 0.07175978200000001,
+          "total_seconds": 0.297725682
+        },
+        {
+          "file": "format.py",
+          "line": 1437,
+          "function": "<lambda>",
+          "calls": 251795,
+          "own_seconds": 0.07149150400000001,
+          "total_seconds": 0.07149150400000001
+        },
+        {
+          "file": "missing.py",
+          "line": 380,
+          "function": "notna",
+          "calls": 251809,
+          "own_seconds": 0.058959554000000004,
+          "total_seconds": 0.15584235400000002
+        }
+      ]
+    }
+  },
+  "block8_cached": {
+    "csubst-cached-prediction-probe": {
+      "seconds": 13.079780479000023,
+      "top_own_time": [
+        {
+          "file": "csubst/endpoint.py",
+          "line": 138,
+          "function": "iter_blocks",
+          "calls": 17203,
+          "own_seconds": 2.980214772,
+          "total_seconds": 8.221875896
+        },
+        {
+          "file": "csubst/endpoint_io.py",
+          "line": 323,
+          "function": "transform",
+          "calls": 68320,
+          "own_seconds": 2.918065621,
+          "total_seconds": 2.918065621
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "calls": 314984,
+          "own_seconds": 1.188423824,
+          "total_seconds": 1.188427157
+        },
+        {
+          "file": "csubst/endpoint_io.py",
+          "line": 261,
+          "function": "transform",
+          "calls": 68320,
+          "own_seconds": 0.9378583,
+          "total_seconds": 1.215671624
+        },
+        {
+          "file": "csubst/endpoint_io.py",
+          "line": 340,
+          "function": "_build",
+          "calls": 1,
+          "own_seconds": 0.8302548780000001,
+          "total_seconds": 10.935586916
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _imp.create_dynamic>",
+          "calls": 187,
+          "own_seconds": 0.5379969560000001,
+          "total_seconds": 0.543638626
+        },
+        {
+          "file": "csubst/endpoint_io.py",
+          "line": 122,
+          "function": "append",
+          "calls": 136640,
+          "own_seconds": 0.42495201600000004,
+          "total_seconds": 0.7146151860000001
+        },
+        {
+          "file": "csubst/endpoint_io.py",
+          "line": 117,
+          "function": "_flush",
+          "calls": 984,
+          "own_seconds": 0.23440743400000003,
+          "total_seconds": 0.23467985400000002
+        },
+        {
+          "file": "csubst/endpoint.py",
+          "line": 122,
+          "function": "transition",
+          "calls": 136640,
+          "own_seconds": 0.133175955,
+          "total_seconds": 0.22289212000000003
+        },
+        {
+          "file": "_ufunc_config.py",
+          "line": 33,
+          "function": "seterr",
+          "calls": 138366,
+          "own_seconds": 0.11776502900000001,
+          "total_seconds": 0.255677602
+        },
+        {
+          "file": "numeric.py",
+          "line": 203,
+          "function": "ones_like",
+          "calls": 68320,
+          "own_seconds": 0.11703084100000001,
+          "total_seconds": 0.129945122
+        },
+        {
+          "file": "numeric.py",
+          "line": 67,
+          "function": "zeros_like",
+          "calls": 68322,
+          "own_seconds": 0.11519751,
+          "total_seconds": 0.14709401900000002
+        },
+        {
+          "file": "_ufunc_config.py",
+          "line": 132,
+          "function": "geterr",
+          "calls": 138366,
+          "own_seconds": 0.095225522,
+          "total_seconds": 0.102338365
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method marshal.loads>",
+          "calls": 1063,
+          "own_seconds": 0.09038119700000001,
+          "total_seconds": 0.09038119700000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'argmax' of 'numpy.ndarray' objects>",
+          "calls": 34161,
+          "own_seconds": 0.087925785,
+          "total_seconds": 0.087925785
+        },
+        {
+          "file": "csubst/endpoint_io.py",
+          "line": 242,
+          "function": "prediction_kernel",
+          "calls": 68320,
+          "own_seconds": 0.077483203,
+          "total_seconds": 0.095646651
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'sum' of 'numpy.ndarray' objects>",
+          "calls": 242523,
+          "own_seconds": 0.06800716500000001,
+          "total_seconds": 1.166217389
+        },
+        {
+          "file": "format.py",
+          "line": 1305,
+          "function": "base_formatter",
+          "calls": 251795,
+          "own_seconds": 0.06470168300000001,
+          "total_seconds": 0.267119673
+        },
+        {
+          "file": "csubst/ete.py",
+          "line": 114,
+          "function": "get_distance",
+          "calls": 16892,
+          "own_seconds": 0.063392424,
+          "total_seconds": 0.063392424
+        },
+        {
+          "file": "format.py",
+          "line": 1437,
+          "function": "<lambda>",
+          "calls": 251795,
+          "own_seconds": 0.06272965800000001,
+          "total_seconds": 0.06272965800000001
+        }
+      ]
+    }
+  }
+}

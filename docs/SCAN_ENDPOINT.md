@@ -3,15 +3,19 @@
 `--scan_rate_exposure endpoint --scan_rate_length raw` compares observed endpoint
 changes with their finite-time codon-model expectation. It accounts for paths
 through intermediate codons even when the direct instantaneous rate is zero.
-This is an opt-in exposure definition; the default remains `q_weighted`.
+This is the default exposure for joint scan. Explicit marginal observation
+requests default to the legacy `q_weighted` exposure instead.
 
 ## Supported inputs
 
-Use a **uniform-rate fitted codon model**: GY, MG, ECMK07 or ECMrest, optionally
-with `+F`, `+F1X4`, `+F3X4` or `+FQ`. The parsed site rates must all be one.
-Rate mixtures (`+G`, `+R`, `+I`, etc.) are rejected: exponentiating a posterior
-mean rate does not integrate a rate mixture. The full codon Q, stationary
-frequencies, codon/group order and posterior states must be available.
+Joint observations support fitted GY, MG/MGK, ECMK07 and ECMrest models,
+including discrete G/R/I rates. MG/MGK use counted F1X4/F3X4 frequencies.
+For each site the expectation is summed over P(category | all tips) times the
+category-conditional parent posterior and exp(Q × category rate × length).
+The fitted category table is required; posterior mean rates cannot replace it.
+Marginal/bridge endpoint exposure remains limited to uniform unit rates.
+The full codon Q, stationary frequencies, codon/group order and posterior
+states must be available.
 
 The model's raw IQ-TREE branch lengths are required. `n_rescaled` and
 `sn_rescaled` use observed-change summaries and are not the time parameter of
@@ -62,8 +66,10 @@ sites, candidates and foreground permutations. The stored transition array has
 length x codon x reported-state axes, not branch x site x codon-pair axes.
 Workers can share large arrays through the existing scan memmap mechanism.
 
-Only branch/site pairs with nonmissing codon and reported-state posteriors at
-both endpoints contribute exposure. Nonmissing rows must sum to one within ASR
+For joint/bridge observations, eligibility is derived from original tip
+emissions, before missing tips are imputed. The same mask excludes observed
+event mass and exposure. For explicit marginal observations, only branch/site
+pairs with nonmissing codon and reported-state rows at both endpoints contribute. Nonmissing rows must sum to one within ASR
 text precision; parent codon rows are normalized to absorb that rounding.
 Very small positive transition probabilities are retained. Negative numerical
 roundoff is removed only after validating the transition matrix.
@@ -75,7 +81,7 @@ roundoff is removed only after validating the transition matrix.
 | `target_exposure`, `other_exposure` | Denominators actually used, for all exposure modes |
 | `scan_exposure_units` | `expected_endpoint_events` or `legacy_weighted_branch_length` |
 | `scan_endpoint_model` | Fitted codon model used by endpoint exposure |
-| `scan_observation_method` | `marginal_posterior_product` for the default observation mode |
+| `scan_observation_method` | `joint_endpoint_posterior` by default; `marginal_posterior_product` for explicit marginal |
 | `scan_inference_method` | `exploratory_poisson_lrt` |
 | `rate_status` | `ok`, `positive_event_zero_exposure`, `zero_target_exposure` or `zero_other_exposure` |
 | `{target,other}_zero_exposure_branch_count` | Nonmissing branches with zero exposure |
@@ -105,14 +111,14 @@ existing output; exclusion of failed configurations is not a calibration proof.
 
 ## Interpretation and remaining limits
 
-With the default `--scan_observation marginal`, this changes only the finite-time
+With explicit `--scan_observation marginal`, this changes only the finite-time
 opportunity. Observations remain products of marginal posteriors, and analytical
 P/q values are exploratory. Legacy foreground permutations keep ASR fixed.
 
 For true joint parent/child posteriors, hidden within-edge jumps, and a
 parametric bootstrap that repeats ASR and candidate selection, see
-[Joint posterior and CTMC bridge scan](SCAN_CTMC.md). These are separate opt-in
-observation and calibration modes; uniform-model and fitting limitations are
+[Joint posterior and CTMC bridge scan](SCAN_CTMC.md). Bridge and calibration are separate opt-in
+modes; their rate-model and fitting limitations are
 explicitly documented there.
 
 ## Reproduce the runtime comparison

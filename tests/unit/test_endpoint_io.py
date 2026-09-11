@@ -153,7 +153,7 @@ def test_legacy_expected_helpers_cannot_silently_use_marginals_in_joint_mode():
         omega._get_fused_expected_sparse_substitution_tensor({'substitution_posterior': 'joint'}, 'cdn')
 
 
-@pytest.mark.parametrize('model_name', ['MG+F3X4', 'GY+C20', 'ECMK07+ASC', 'GY+H4', 'GY+unknown'])
+@pytest.mark.parametrize('model_name', ['MG+FO', 'GY+C20', 'ECMK07+ASC', 'GY+H4', 'GY+unknown'])
 def test_unverified_model_modifiers_fail_closed(tmp_path, model_name):
     g, _ = toy_context(tmp_path)
     g['substitution_model'] = model_name
@@ -252,11 +252,12 @@ def test_native_syn_projection_matches_numpy(tmp_path, monkeypatch):
         cy.project_endpoint_syn_double(left, right, transition, np.array([[0, 0, 1, -1, 2]]), 2, 2, True, True)
 
 
-def test_direct_projections_mixture_and_recoding(tmp_path):
+@pytest.mark.parametrize("branch_table", [False, True])
+def test_direct_projections_mixture_and_recoding(tmp_path, branch_table):
     g, _ = toy_context(tmp_path)
     report = tmp_path / 'model.iqtree'
     report.write_text('Category Relative_rate Proportion\n1 0 0.1\n2 0.5 0.3\n3 2.0 0.6\n')
-    g.update(output_stats=['any2any', 'any2spe', 'spe2any'])
+    g.update(output_stats=['any2any', 'any2spe', 'spe2any'], b=branch_table)
     compact = copy.deepcopy(g)
     compact['subcommand'] = 'search'
     endpoint_io.prepare(g)
@@ -267,6 +268,16 @@ def test_direct_projections_mixture_and_recoding(tmp_path):
                                        compact['_endpoint_tensors'][kind].project(stat).toarray(), atol=1e-14)
             np.testing.assert_allclose(g['_endpoint_reducers'][kind]['projections'][stat].toarray(),
                                        compact['_endpoint_reducers'][kind]['projections'][stat].toarray(), atol=1e-14)
+
+        if branch_table:
+            for branch in range(5):
+                for threshold in [0, 0.05, 0.5]:
+                    expected = substitution._get_sparse_branch_sitewise_max_indices(
+                        g['_endpoint_tensors'][kind], branch, threshold)
+                    actual = substitution._get_sparse_branch_sitewise_max_indices(
+                        compact['_endpoint_tensors'][kind], branch, threshold)
+                    for a, b in zip(expected, actual):
+                        np.testing.assert_array_equal(a, b)
 
 
 @pytest.mark.parametrize('structural', [False, True])
@@ -341,3 +352,214 @@ def test_streamed_pair_workspace_bound_accounts_for_quadratic_branch_axis(tmp_pa
     shapes = {'S': (10000, 3, 2, 2, 2), 'N': (10000, 3, 1, 2, 2)}
     assert endpoint_io._pairwise_storage_bound(10000, 3, shapes, kinds, stats, 64, g) > 64 * 1024**2
     assert endpoint_io._pairwise_storage_bound(5, 3, shapes, kinds, stats, 64, g) < 64 * 1024**2
+
+
+@pytest.mark.native
+@pytest.mark.parametrize('size', [1, 7, 64, 129])
+@pytest.mark.parametrize('strided', [False, True])
+def test_native_classified_events_match_full_mapping(tmp_path, monkeypatch, size, strided):
+    cy = endpoint_io.substitution_sparse.substitution_sparse_cy
+    if cy is None or not hasattr(cy, 'project_endpoint_events_double'):
+        pytest.skip('Endpoint event extension is not built.')
+    g, _ = toy_context(tmp_path)
+    rng = np.random.default_rng(315)
+    if strided:
+        left, right = rng.random((size * 2, 6))[::2, ::2], rng.random((size * 2, 6))[::2, ::2]
+        transition = rng.random((6, 6))[::2, ::2]
+    else:
+        left, right = rng.random((size, 3)), rng.random((size, 3))
+        transition = rng.random((3, 3))
+    mappings = {'S': None, 'N': endpoint_io._mapping(g, 'N', 3)}
+    actual = endpoint_io._event_transform(g, ['S', 'N'], mappings)(left, right, transition)
+    with monkeypatch.context() as patch:
+        patch.setattr(endpoint_io.substitution_sparse, 'substitution_sparse_cy', None)
+        expected = endpoint_io._event_transform(g, ['S', 'N'], mappings)(left, right, transition)
+    for key in actual:
+        np.testing.assert_allclose(actual[key], expected[key], rtol=1e-14, atol=1e-15)
+    for pairs in (np.array([[0, -1, 0]]), np.array([[100, 0, 0]]), np.zeros((1, 2), dtype=np.int64)):
+        with pytest.raises(ValueError):
+            cy.project_endpoint_events_double(left, right, transition, pairs, 2, 2)
+
+
+@pytest.mark.parametrize('structural', [False, True])
+@pytest.mark.parametrize('recoded', [False, True])
+def test_full_classified_stream_matches_python_events(tmp_path, monkeypatch, structural, recoded):
+    g, _ = toy_context(tmp_path, structural)
+    g.update(subcommand='search', b=True, num_node=5)
+    if recoded and not structural:
+        g.update(nonsyn_recode='dayhoff6', nonsyn_state_orders=['A', 'B'],
+                 nonsynonymous_indices={'A': [0], 'B': [1, 2]})
+        g['state_nsy'] = np.stack([g['state_cdn'][:, :, 0], g['state_cdn'][:, :, 1:].sum(2)], axis=2)
+    (tmp_path / 'model.iqtree').write_text('Category Relative_rate Proportion\n1 0 0.1\n2 0.5 0.3\n3 2.0 0.6\n')
+    reference = copy.deepcopy(g)
+    with monkeypatch.context() as patch:
+        patch.setattr(endpoint_io.substitution_sparse, 'substitution_sparse_cy', None)
+        endpoint_io.prepare(reference)
+    endpoint_io.prepare(g)
+    for kind, tensor in g['_endpoint_tensors'].items():
+        np.testing.assert_allclose(tensor.to_dense(), reference['_endpoint_tensors'][kind].to_dense(),
+                                   atol=1e-14, rtol=1e-13)
+    for kind, reducer in g['_endpoint_reducers'].items():
+        for stat, projection in reducer['projections'].items():
+            np.testing.assert_allclose(projection.toarray(),
+                                       reference['_endpoint_reducers'][kind]['projections'][stat].toarray(),
+                                       atol=1e-14, rtol=1e-13)
+
+
+@pytest.mark.parametrize('cache_bytes', [0, 144, 32 * 1024**2])
+def test_cached_prediction_projection_matches_full_contraction(tmp_path, cache_bytes):
+    g, _ = toy_context(tmp_path)
+    rng = np.random.default_rng(3141)
+    left, right = rng.random((9, 3)), np.ones((9, 3))
+    mapping = {'S': None, 'N': endpoint_io._mapping(g, 'N', 3)}
+    stats = {'any2any', 'any2spe', 'spe2any'}
+    full = endpoint_io._projection_transform(g, ['S', 'N'], mapping, stats)
+    cached = endpoint_io._projection_transform(g, ['S', 'N'], mapping, stats,
+                                               predictive=True, cache_bytes=cache_bytes)
+    matrices = [rng.random((3, 3)), np.eye(3), rng.random((3, 3))]
+    for matrix in matrices + matrices[::-1] + matrices:
+        expected, actual = full(left, right, matrix), cached(left, right, matrix)
+        for key in expected:
+            np.testing.assert_allclose(actual[key], expected[key], rtol=1e-14, atol=1e-15)
+
+
+def test_prediction_projection_cache_releases_evicted_transitions(tmp_path):
+    import weakref
+    g, _ = toy_context(tmp_path)
+    mapping = {'N': endpoint_io._mapping(g, 'N', 3)}
+    transform = endpoint_io._projection_transform(g, ['N'], mapping, {'any2any'},
+                                                  predictive=True, cache_bytes=144)
+    matrix = np.eye(3)
+    reference = weakref.ref(matrix)
+    transform(np.ones((1, 3)), np.ones((1, 3)), matrix)
+    del matrix
+    assert reference() is not None
+    transform(np.ones((1, 3)), np.ones((1, 3)), np.ones((3, 3)))
+    assert reference() is None
+
+
+@pytest.mark.parametrize('block_size', [1, 2, 64])
+@pytest.mark.parametrize('mixture', [False, True])
+def test_scan_and_search_share_all_event_probabilities_and_missing_exposure(tmp_path, block_size, mixture):
+    from csubst import scan_ctmc, scan_endpoint
+    g, ids = toy_context(tmp_path)
+    g.update(endpoint_block_size=block_size, scan_observation='joint', scan_rate_length='raw')
+    if mixture:
+        g['substitution_model'] = 'GY+F+R2'
+        (tmp_path/'model.iqtree').write_text('Category Relative_rate Proportion\n1 0.2 0.4\n2 1.5333333333333333 0.6\n')
+    scan_g, scan_tensor = scan_ctmc.prepare(copy.deepcopy(g))
+    endpoint_io.prepare(g)
+    np.testing.assert_allclose(g['_endpoint_tensors']['N'].to_dense(), scan_tensor, atol=1e-12, rtol=1e-10)
+    np.testing.assert_allclose(substitution.get_branch_sub_counts(g['_endpoint_tensors']['S']),
+                               scan_g['scan_ctmc_synonymous_counts'], atol=1e-12, rtol=1e-10)
+    tree.rescale_branch_length(g, g['_endpoint_tensors']['S'], g['_endpoint_tensors']['N'])
+    scan_ctmc.set_branch_length_summaries(scan_g, scan_tensor)
+    for first, second in zip(g['tree'].traverse(), scan_g['tree'].traverse()):
+        for attr in ('Sdist', 'Ndist', 'SNdist'):
+            assert ete.get_prop(first, attr) == pytest.approx(ete.get_prop(second, attr), abs=1e-12)
+    mask = g['_endpoint_tensors']['N'].eligible
+    np.testing.assert_array_equal(scan_g['event_eligible'], mask)
+    assert not mask[ids['C']].any()
+    assert not mask[:, 2].any()
+    # Missingness excludes output; it does not erase the inferred latent state.
+    np.testing.assert_allclose(scan_g['state_cdn'][ids['C']].sum(axis=1), 1)
+    context = scan_endpoint.build_context(scan_g, substitution_scan.build_branch_metadata(scan_g), np.array([0,0,1]))
+    for site in range(3):
+        expected, missing, _ = scan_endpoint.expected_events(context, scan_g['state_cdn'], scan_g['state_nsy'], site, [0], [1])
+        np.testing.assert_array_equal(missing, ~mask[context['branch_ids'], site])
+        assert not expected[missing].any()
+
+
+def test_reporting_preserves_true_zero_and_marks_missing_with_coverage(tmp_path):
+    import pandas as pd
+    from csubst import event_reporting, tsv
+    g, ids = toy_context(tmp_path)
+    endpoint_io.prepare(g)
+    frame = pd.DataFrame({'branch_id':[ids['U'],ids['C'],ids['A']], 'site':[0,0,2], 'N_sub':[0.,0.,0.], 'S_sub':[0.,0.,0.]})
+    result = event_reporting.annotate(frame, g)
+    assert result['N_sub'].iloc[0] == 0  # true zero-length edge
+    assert result['N_sub'].iloc[1:].isna().all()
+    assert result['N_eligible_count'].tolist() == [1,0,0]
+    assert frame['N_sub'].notna().all()  # numerical input is untouched
+    path = tmp_path/'events.tsv'
+    tsv.write_dataframe(frame, path, report_context=g)
+    assert '\tNA\tNA\t' in path.read_text()
+    g['site_index_alignment'] = np.array([2,5,9])
+    sites = pd.DataFrame({'codon_site_alignment':[3,6,10,13], f'N_sub_{ids["A"]}':[0.,0.,0.,0.]})
+    result = event_reporting.annotate(sites, g)
+    assert result[f'N_eligible_{ids["A"]}'].tolist() == [True,True,False,False]
+
+
+def test_endpoint_cache_rebuilds_after_original_tip_or_model_change(tmp_path):
+    g, ids = toy_context(tmp_path)
+    endpoint_io.prepare(g)
+    previous = g['_endpoint_tensors']['N']
+    fingerprint = g['_endpoint_input_fingerprint']
+    endpoint_io.prepare(g)
+    assert g['_endpoint_tensors']['N'] is previous
+    g['state_cdn'][ids['C'], 0] = [1,0,0]
+    endpoint_io.prepare(g)
+    assert g['_endpoint_input_fingerprint'] != fingerprint
+    assert g['_endpoint_tensors']['N'].eligible[ids['C'], 0]
+    assert g['_endpoint_tensors']['N'] is not previous
+    previous = g['_endpoint_tensors']['N'].to_dense()
+    next(ete.iter_leaves(g['tree'])).dist *= .5
+    endpoint_io.prepare(g)
+    assert not np.allclose(previous, g['_endpoint_tensors']['N'].to_dense())
+
+
+def test_combination_reporting_requires_joint_observation_support(tmp_path):
+    import pandas as pd
+    from csubst import event_reporting
+    g, ids = toy_context(tmp_path)
+    endpoint_io.prepare(g)
+    frame = pd.DataFrame({'site':[0,1,2], 'OCNany2any':[0.,0.,0.],
+                          'OCSany2any':[0.,0.,0.], 'omegaCany2any':[1.,1.,1.]})
+    result = event_reporting.annotate(frame, dict(g, report_combinations=[[ids['A'],ids['C']]]))
+    assert result['OCNany2any'].isna().all()
+    assert result['N_combination_eligible_count'].tolist() == [0,0,0]
+    assert result['omegaCany2any'].isna().all()
+
+
+def test_bridge_scan_applies_same_mask_without_erasing_latent_states(tmp_path):
+    from csubst import scan_ctmc
+    g, ids = toy_context(tmp_path)
+    g.update(scan_observation='bridge', scan_rate_length='raw')
+    updated, tensor = scan_ctmc.prepare(g)
+    assert not tensor[ids['C']].any()
+    assert not tensor[:,2].any()
+    assert updated['scan_ctmc_synonymous_counts'][ids['C']] == 0
+    np.testing.assert_allclose(updated['state_cdn'][ids['C']].sum(1), 1)
+    assert tensor[ids['A'],0].sum() > 0
+
+
+def test_combination_branch_subtotals_use_slot_branch_ids(tmp_path):
+    import pandas as pd
+    from csubst import event_reporting
+    g, ids = toy_context(tmp_path)
+    endpoint_io.prepare(g)
+    frame = pd.DataFrame({'branch_id_1': [ids['C'], ids['U']],
+                          'branch_id_2': [ids['A'], ids['C']],
+                          'N_sub_1': [0., 0.], 'N_sub_2': [0., 0.]})
+    out = event_reporting.annotate(frame, g)
+    assert out['N_eligible_count_1'].tolist() == [0, 2]
+    assert out['N_eligible_count_2'].tolist() == [2, 0]
+    assert np.isnan(out.loc[0, 'N_sub_1'])
+    assert out.loc[1, 'N_sub_1'] == 0
+    assert out.loc[0, 'N_sub_2'] == 0
+    assert np.isnan(out.loc[1, 'N_sub_2'])
+
+
+@pytest.mark.parametrize('option,value', [('asrv_report', True), ('calc_omega_pvalue', True),
+    ('epistasis_requested', True), ('asrv_training_branches', 'foreground'),
+    ('site_filter_report', True), ('fg_clade_permutation', 1)])
+def test_endpoint_cache_rebuilds_when_consumer_changes(tmp_path, option, value):
+    g, _ = toy_context(tmp_path)
+    g.update(subcommand='search', max_arity=2, output_stats=['any2any'])
+    endpoint_io.prepare(g)
+    previous = g['_endpoint_tensors']['N']
+    g[option] = value
+    endpoint_io.prepare(g)
+    assert g['_endpoint_tensors']['N'] is not previous
+    assert g['_endpoint_manifest']['codon']['observed_storage'] == (
+        'projections' if option in ('site_filter_report', 'fg_clade_permutation') else 'full_events')

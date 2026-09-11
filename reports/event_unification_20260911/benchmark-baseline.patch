@@ -1,0 +1,314 @@
+--- a/csubst/endpoint_io.py
++++ b/csubst/endpoint_io.py
+@@ -3,14 +3,13 @@
+ from collections import OrderedDict
+ from contextlib import ExitStack
+ import json
+-import hashlib
+ import re
+ import tempfile
+ 
+ import numpy as np
+ from scipy import sparse
+ 
+-from csubst import endpoint, ete, fitted_model, runtime, substitution_sparse
++from csubst import endpoint, ete, runtime, substitution_sparse
+ 
+ 
+ BASE_STATS = ('any2any', 'spe2any', 'any2spe', 'spe2spe')
+@@ -393,11 +392,15 @@
+             mappings['AA'] = _mapping(g, 'AA', k)
+     model = endpoint.EndpointModel(parents, lengths, q, pi, rates, weights)
+     tips = {}
+-    observed, eligible = fitted_model.observation_masks(g["tree"], source)
++    observed = np.zeros((n, num_site), dtype=bool)
+     for leaf in model.leaves:
+         values = np.array(source[leaf], dtype=float)
++        observed[leaf] = values.sum(axis=1) > 0
+         values[~observed[leaf]] = 1
+         tips[leaf] = values
++    for node in reversed(model.order):
++        for child in model.children[node]:
++            observed[node] |= observed[child]
+     expected = (str(g.get('expectation_method', 'codon_model')) == 'codon_model'
+                 and g.get('subcommand', 'search') in ('search', 'analyze', 'benchmark'))
+     cache = g.setdefault('_endpoint_tensors', {})
+@@ -471,7 +474,7 @@
+                         g['state_nsy'][node, sl] = pp @ mappings['N']
+             if record.parent < 0:
+                 continue
+-            valid = eligible[node, sl]
++            valid = observed[node, sl] & observed[record.parent, sl]
+             if record.joint is not None:
+                 record.joint[~valid] = 0
+             if record.predictive is not None:
+@@ -536,8 +539,6 @@
+                                    for x in projections.values()),
+                     'mode': 'nsy' if kind == 'N' else 'cdn',
+                 }
+-    for kind in kinds:
+-        cache[kind].eligible = eligible
+     if not structural and g.get('nonsyn_recode', 'no') == 'no':
+         cache['AA'] = cache['N']
+     manifest = g.setdefault('_endpoint_manifest', {})
+@@ -546,55 +547,16 @@
+         'direct_projection': direct,
+         'rates': np.asarray(rates).tolist(), 'weights': np.asarray(weights).tolist(),
+         'branch_lengths': lengths.tolist(),
+-        'parameter_source': '3di_checkpoint' if structural else g.get('fitted_model_provenance', 'provided_model_matrix'),
+-        'missing_events': 'excluded_from_reporting; latent_states_integrated',
++        'parameter_source': '3di_checkpoint' if structural else 'iqtree_report_and_model_matrix',
+     }
+ 
+ 
+-def _input_fingerprint(g):
+-    """Invalidate in-process outputs when model, emissions or projection change."""
+-    digest = hashlib.sha256()
+-    def add(value, sparse=False):
+-        array = np.asarray(value)
+-        digest.update(str((array.shape, array.dtype, sparse)).encode())
+-        if sparse:
+-            # Tip emissions are mostly exact zeros. Hash their lossless packed
+-            # support and values, avoiding repeated hashing of a dense codon axis.
+-            support = array != 0
+-            digest.update(np.packbits(support).tobytes())
+-            digest.update(np.ascontiguousarray(array[support]).tobytes())
+-        else:
+-            digest.update(np.ascontiguousarray(array).tobytes())
+-    add(g['instantaneous_codon_rate_matrix'])
+-    add(g.get('equilibrium_frequency', g.get('empirical_eq_freq')))
+-    for structural in ([False, True] if g.get('nonsyn_recode') == '3di20' else [False]):
+-        for value in _tree_arrays(g, structural):
+-            add(value)
+-        source = g['state_nsy'] if structural else g['state_cdn']
+-        for node in g['tree'].traverse():
+-            if ete.is_leaf(node):
+-                add(source[int(ete.get_prop(node, 'numerical_label'))], sparse=True)
+-        if structural:
+-            add(g['3di_q'])
+-            add(g['3di_pi'])
+-    for value in model_rates(g):
+-        add(value)
+-    for key in ('subcommand', 'expectation_method', 'nonsyn_recode', 'nonsynonymous_indices',
+-                'synonymous_indices', 'amino_acid_orders', 'nonsyn_state_orders', 'output_stats',
+-                'b', 'cs', 'cbs', 'max_arity', 'calibrate_longtail', 'min_sub_pp'):
+-        digest.update(str((key, g.get(key))).encode())
+-    return digest.hexdigest()
+-
+-
+ def prepare(g):
+     if not enabled(g):
+         return
+     validate_options(g)
+-    fingerprint = _input_fingerprint(g)
+     if '_endpoint_tensors' in g:
+-        if fingerprint == g.get('_endpoint_input_fingerprint'):
+-            return
+-        invalidate(g)
++        return
+     print('Joint endpoint inference: blocked pruning, block_size={}; no ancestral-history sampling.'.format(
+         g.get('endpoint_block_size', 64)), flush=True)
+     try:
+@@ -604,22 +566,21 @@
+     except Exception:
+         invalidate(g)
+         raise
+-    g['_endpoint_input_fingerprint'] = fingerprint
+     if g.get('outdir'):
+         manifest = dict(g['_endpoint_manifest'])
+-        manifest.update({'schema_version': 2, 'input_sha256': fingerprint, 'substitution_posterior': 'joint',
++        manifest.update({'schema_version': 1, 'substitution_posterior': 'joint',
+                          'quantity': 'endpoint_state_difference',
+                          'expectation': 'fitted_parent_and_rate_posterior_predictive',
+                          'branch_combinations': 'factorized_edge_scores',
+                          'block_size': int(g.get('endpoint_block_size', 64)),
+-                         'codon_parameter_precision': g.get('fitted_model_provenance', 'provided_model_matrix')})
++                         'codon_parameter_precision': 'rounded_IQ_TREE_report; conditional_on_parsed_parameters'})
+         with open(runtime.output_path(g, 'endpoint_model.json'), 'w') as handle:
+             json.dump(manifest, handle, indent=2)
+             handle.write('\n')
+ 
+ 
+ def invalidate(g):
+-    for key in ('_endpoint_tensors', '_endpoint_reducers', '_endpoint_manifest', '_endpoint_input_fingerprint', 'EN_reducer', 'ES_reducer'):
++    for key in ('_endpoint_tensors', '_endpoint_reducers', '_endpoint_manifest', 'EN_reducer', 'ES_reducer'):
+         g.pop(key, None)
+ 
+ 
+--- a/csubst/parser_misc.py
++++ b/csubst/parser_misc.py
+@@ -369,9 +369,6 @@
+                 g = parser_iqtree.read_iqtree(g, eq=False)
+                 iqtree_model = g['substitution_model']
+                 g['substitution_model'] = None
+-                if explicit_paths:
+-                    print('Using the model in the explicitly supplied IQ-TREE fit: {}. Use --iqtree_redo to refit.'.format(iqtree_model))
+-                    return g
+                 if iqtree_model == g['iqtree_model']:
+                     txt = 'The model in the IQ-TREE\'s output ({}) matched --iqtree_model ({}). Skipping IQ-TREE.'
+                     print(txt.format(iqtree_model, g['iqtree_model']))
+@@ -437,8 +434,6 @@
+     else:
+         txt = 'Unsupported substitution model for --expectation_method codon_model: {}'
+         raise ValueError(txt.format(g['substitution_model']))
+-    from csubst import fitted_model
+-    fitted_model.prepare(g)
+     g = _initialize_and_report_nonsyn_recode(g)
+     g['instantaneous_aa_rate_matrix'] = cdn2pep_matrix(inst_cdn=g['instantaneous_codon_rate_matrix'], g=g)
+     g['rate_syn_tensor'] = get_rate_tensor(inst=g['instantaneous_codon_rate_matrix'], mode='syn', g=g)
+--- a/csubst/main_analyze.py
++++ b/csubst/main_analyze.py
+@@ -90,7 +90,7 @@
+         tsv.write_dataframe(
+             cbs,
+             output_path,
+-            report_context=g, float_format=g['float_format'],
++            float_format=g['float_format'],
+             header=(not wrote_header),
+             mode='w' if not wrote_header else 'a',
+         )
+@@ -284,7 +284,7 @@
+             file_name = runtime.output_path(g, "cb_" + str(current_arity) + ".tsv")
+             cb_column_original = cb.columns.tolist()
+             cb.columns = cb.columns.str.replace('_PLACEHOLDER', '')
+-            tsv.write_dataframe(cb, file_name, report_context=g, float_format=g['float_format'], chunksize=10000)
++            tsv.write_dataframe(cb, file_name, float_format=g['float_format'], chunksize=10000)
+             cb.columns = cb_column_original
+             txt = 'Memory consumption of cb table: {:,.1f} Mbytes (dtype={})'
+             print(txt.format(cb.values.nbytes/1024/1024, cb.values.dtype), flush=True)
+@@ -605,7 +605,7 @@
+     tsv.write_dataframe(
+         df.loc[:, degree_cols_existing],
+         degree_outfile,
+-        report_context=g, float_format=g['float_format'],
++        float_format=g['float_format'],
+     )
+     print('Writing epistasis structure degree table: {}'.format(degree_outfile), flush=True)
+     profile_map = _resolve_epistasis_profile_map_from_df(df=df, g=g, num_site=num_site)
+@@ -729,7 +729,7 @@
+         tsv.write_dataframe(
+             bs,
+             runtime.output_path(g, "bs.tsv"),
+-            report_context=g, float_format=g['float_format'],
++            float_format=g['float_format'],
+             chunksize=10000,
+         )
+         txt = 'Memory consumption of bs table: {:,.1f} Mbytes (dtype={})'
+@@ -760,7 +760,7 @@
+             tsv.write_dataframe(
+                 s,
+                 runtime.output_path(g, "s.tsv"),
+-                report_context=g, float_format=g['float_format'],
++                float_format=g['float_format'],
+                 chunksize=10000,
+             )
+         txt = 'Memory consumption of s table: {:,.1f} Mbytes (dtype={})'
+@@ -796,7 +796,7 @@
+             tsv.write_dataframe(
+                 b,
+                 runtime.output_path(g, "b.tsv"),
+-                report_context=g, float_format=g['float_format'],
++                float_format=g['float_format'],
+                 chunksize=10000,
+             )
+             b.columns = b_column_original
+@@ -826,7 +826,7 @@
+         tsv.write_dataframe(
+             cs,
+             runtime.output_path(g, "cs.tsv"),
+-            report_context=dict(g, report_combinations=id_combinations), float_format=g['float_format'],
++            float_format=g['float_format'],
+             chunksize=10000,
+         )
+         txt = 'Memory consumption of cs table: {:,.1f} Mbytes (dtype={})'
+@@ -875,7 +875,7 @@
+         tsv.write_dataframe(
+             g['df_cb_stats_main'],
+             runtime.output_path(g, 'cb_stats.tsv'),
+-            report_context=g, float_format=g['float_format'],
++            float_format=g['float_format'],
+             chunksize=10000,
+         )
+         g['df_cb_stats_main'].columns = column_original
+--- a/csubst/main_sites.py
++++ b/csubst/main_sites.py
+@@ -1125,7 +1125,7 @@
+         df_dist = get_df_dist(sub_tensor=sub_tensor, g=g, mode=mode)
+         df_ad = pd.merge(df_ad, df_dist, on=['group','state_from','state_to'])
+         out_path = os.path.join(g['site_outdir'], outfile)
+-        tsv.write_dataframe(df_ad, out_path, report_context=g, float_format=g['float_format'], chunksize=10000)
++        tsv.write_dataframe(df_ad, out_path, float_format=g['float_format'], chunksize=10000)
+         output_paths.append(out_path)
+         df_ad.loc[:,'xlabel'] = df_ad.loc[:,'state_from'] + '->' + df_ad.loc[:,'state_to']
+         ax = axes[0,ax_col]
+@@ -2142,7 +2142,7 @@
+         plot_order.get(int(site), np.nan)
+         for site in plot_events['codon_site_alignment'].astype(int).tolist()
+     ]
+-    tsv.write_dataframe(plot_events, table_path, report_context=g, float_format=g['float_format'])
++    tsv.write_dataframe(plot_events, table_path, float_format=g['float_format'])
+     print('Writing VESM tree + site table: {}'.format(table_path), flush=True)
+     if (not bool(g.get('vep_plot', True))) or len(selected_sites) == 0:
+         if len(selected_sites) == 0:
+@@ -2342,8 +2342,6 @@
+         df = remap_codon_site_columns_to_alignment(df=df, g=g)
+         is_site_col = df.columns.str.startswith('codon_site_')
+         df.loc[:,is_site_col] += 1
+-        from csubst import event_reporting
+-        df = event_reporting.annotate(df, g)
+         if (g['untrimmed_cds'] is not None)|(g['export2chimera']):
+             export2chimera(df, g)
+         if g['run_pdb_sequence_search']:
+@@ -2404,7 +2402,7 @@
+             tsv.write_dataframe(
+                 vep_output_events,
+                 vep_table_path,
+-                report_context=g, float_format=g['float_format'],
++                float_format=g['float_format'],
+             )
+             print('Writing VESM event table: {}'.format(vep_table_path), flush=True)
+             add_site_output_manifest_row(
+@@ -2563,7 +2561,7 @@
+         if g['single_branch_mode']:
+             df = combinatorial2single_columns(df)
+         df_out = expand_site_table_to_alignment(df=df, g=g)
+-        tsv.write_dataframe(df_out, out_path, report_context=g, float_format=g['float_format'], chunksize=10000)
++        tsv.write_dataframe(df_out, out_path, float_format=g['float_format'], chunksize=10000)
+         add_site_output_manifest_row(
+             manifest_rows=manifest_rows,
+             output_path=out_path,
+--- a/csubst/tree.py
++++ b/csubst/tree.py
+@@ -2290,9 +2290,7 @@
+             ete.set_prop(node, "SNdist", 0)
+             continue
+         parent = ete.get_prop(parent_node, "numerical_label")
+-        eligible = getattr(OS_tensor, 'eligible', None)
+-        num_nonmissing_codon = (int(eligible[nl].sum()) if eligible is not None else
+-                               (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum())
++        num_nonmissing_codon = (g['state_cdn'][(nl,parent),:,:].sum(axis=2).sum(axis=0)!=0).sum()
+         if num_nonmissing_codon==0:
+             ete.set_prop(node, "Sdist", 0)
+             ete.set_prop(node, "Ndist", 0)
+--- a/csubst/tsv.py
++++ b/csubst/tsv.py
+@@ -9,12 +9,8 @@
+     chunksize=10000,
+     header=True,
+     mode='w',
+-    report_context=None,
+ ):
+     """Write a DataFrame as a pandas-compatible, bounded-memory UTF-8 TSV."""
+-    if report_context is not None:
+-        from csubst import event_reporting
+-        dataframe = event_reporting.annotate(dataframe, report_context)
+     if chunksize is None:
+         chunksize = max(1, int(dataframe.shape[0]))
+     chunksize = max(1, int(chunksize))
+@@ -33,6 +29,5 @@
+         header=header,
+         mode=mode,
+         encoding='utf-8',
+-        na_rep='NA' if report_context is not None else '',
+     )
+     return None
