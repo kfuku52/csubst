@@ -19,22 +19,24 @@ from csubst import tree  # noqa: E402 - repository path is inserted above
 from _safe_workdir import prepare_owned_workdir  # noqa: E402
 
 
+# Current defaults: joint substitution posteriors and no invariant-tip filter.
+# The earlier marginal/filtered snapshots are not equivalent analyses.
 EXPECTED = {
     "PGK": {
         "branch_id_1": 23,
         "branch_id_2": 51,
-        "omegaCany2spe": 1.975050,
+        "omegaCany2spe": 1.910709,
         "convergent": 5,
         "divergent": 7,
-        "blank": 390,
+        "blank": 405,
     },
     "PEPC": {
         "branch_id_1": 9,
         "branch_id_2": 108,
-        "omegaCany2spe": 0.049466,
+        "omegaCany2spe": 0.030734,
         "convergent": 0,
         "divergent": 2,
-        "blank": 954,
+        "blank": 969,
     },
 }
 

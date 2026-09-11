@@ -99,6 +99,15 @@ a successful, representative Linux hosted-runner result and review numerical
 parity at the same time. Absolute ceilings remain as a safety net; baseline
 ratios catch smaller regressions.
 
+After an intentional inference-default change, first verify the scientific
+reference values. Dispatch `Pytest` with `record_performance_baseline=true`
+to collect three numerically checked Linux runs in the separate
+`record-parity-baseline` job. Its `parity-baseline-measurements` artifact can
+support a reviewed baseline update; use per-dataset median wall time and peak
+RSS across replicates. The ordinary `parity` job still enforces all existing
+performance limits during this dispatch. Never update a baseline to hide an
+unexplained regression.
+
 ## Testing the installed wheel
 
 Source tests normally select the checkout. Artifact tests must use a separate,

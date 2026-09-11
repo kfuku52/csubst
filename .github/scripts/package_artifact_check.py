@@ -51,6 +51,13 @@ required_test_support = [
     "/tests/conftest.py",
     "/tests/support/process_workers.py",
     "/tools/evaluate_epistasis_simulation.py",
+    "/tools/evaluate_urn_pipeline.py",
+    "/tools/scan_evolution_benchmark.py",
+    "/tools/validate_scan_calibration.py",
+    "/tools/compare_3di_validation.py",
+    "/tools/validate_3di_fixed_gtr.py",
+    "/tools/validate_3di_predictions.py",
+    "/reports/scientific_review_20260910/calibrate_site_selection.py",
     "/.github/scripts/_safe_workdir.py",
     "/.github/scripts/_installed_package.py",
 ]

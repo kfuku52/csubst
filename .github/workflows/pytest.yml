@@ -5,6 +5,11 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
+    inputs:
+      record_performance_baseline:
+        description: Collect validated Linux timings separately from the normal performance gate
+        type: boolean
+        default: false
   schedule:
     - cron: "17 3 * * 1"
 
@@ -179,6 +184,41 @@ jobs:
           python -c "from csubst._extensions import load_optional_extension; assert load_optional_extension('combination_cy') is None"
           python .github/scripts/run_sdist_tests.py
 
+  record-parity-baseline:
+    if: github.event_name == 'workflow_dispatch' && inputs.record_performance_baseline
+    needs: packaging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CSUBST_STRICT_EXTENSIONS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python312-packages
+          path: dist
+      - name: Install this run's wheel
+        run: python .github/scripts/install_test_artifact.py
+      - name: Measure three runs after checking scientific parity
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p baseline-measurements
+          for replicate in 1 2 3; do
+            python "$GITHUB_WORKSPACE/.github/scripts/sites_parity_check.py" \
+              --installed --numerical-only \
+              --output "baseline-measurements/replicate-${replicate}.tsv" \
+              --workdir "baseline-runs-${replicate}"
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: parity-baseline-measurements
+          path: ${{ runner.temp }}/baseline-measurements/*.tsv
+          retention-days: 14
+          if-no-files-found: error
+
   parity:
     needs: packaging
     runs-on: ubuntu-latest
@@ -326,5 +366,6 @@ jobs:
           ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
-          export LD_PRELOAD="$(gcc -print-file-name=libasan.so)"
+          LD_PRELOAD="$(gcc -print-file-name=libasan.so)"
+          export LD_PRELOAD
           python -m pytest -q tests/parity/test_expected_sparse.py tests/parity/test_omega_*.py tests/unit/test_sparse_*.py tests/parity/test_site_weight_normalization.py

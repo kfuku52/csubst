@@ -12,9 +12,8 @@ recursive-include csubst *.pyx
 recursive-include csubst/dataset *
 recursive-include csubst/substitution_matrix *.dat
 recursive-include tests *.py
-include tools/evaluate_epistasis_simulation.py
-include tools/validate_epistasis.py
-include tools/validate_pair_epistasis.py
+recursive-include tools *.py
+include reports/scientific_review_20260910/calibrate_site_selection.py
 include csubst/_vendor/pyvolve/LICENSE.txt
 include csubst/_vendor/pyvolve/README.csubst.md
 recursive-include docs *.md
