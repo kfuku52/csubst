@@ -118,6 +118,25 @@ def test_parametric_bootstrap_repeats_asr_and_candidate_selection(monkeypatch, d
     assert 'rate_categories_and_priors' in updated['scan_calibration_diagnostics']['fixed']
 
 
+def test_prepare_joint_accepts_unloaded_internal_states_and_shares_identical_observation_alphabets():
+    from scan_fixtures import make_scan_context
+    g, _ = make_scan_context()
+    g.update(scan_rate_exposure='endpoint', scan_observation='joint',
+             state_cdn=g['state_nsy'].copy(),
+             instantaneous_codon_rate_matrix=np.array([[-1., 1.], [1., -1.]]),
+             equilibrium_frequency=np.array([.5, .5]), substitution_model='GY',
+             nonsynonymous_indices={'A': [0], 'K': [1]}, iqtree_rate_values=np.ones(1))
+    for node in g['tree'].traverse():
+        if not ete.is_leaf(node):
+            i = int(ete.get_prop(node, 'numerical_label'))
+            g['state_cdn'][i] = 0
+            g['state_nsy'][i] = 0
+    updated, tensor = scan_ctmc.prepare(g)
+    assert updated['scan_observed_state_pep'] is updated['scan_observed_state_nsy']
+    np.testing.assert_allclose(updated['state_cdn'].sum(axis=2), 1.)
+    assert tensor.sum() > 0
+
+
 def test_bridge_exposure_unconditioned_expected_jumps():
     context = runpy.run_path(str(Path(__file__).with_name("test_scan_endpoint.py")))["context"]
     from csubst import scan_endpoint
@@ -228,6 +247,53 @@ def test_joint_kernel_agrees_with_shared_endpoint_engine():
         if record.joint is not None:
             record.joint[:, np.arange(2), np.arange(2)] = 0
             np.testing.assert_allclose(record.joint, tensor[record.child, record.start:record.stop, 0], atol=1e-12)
+
+
+@pytest.mark.parametrize('native', [True, False])
+def test_grouped_joint_and_synonymous_counts_match_full_codon_events(monkeypatch, native):
+    from csubst import endpoint, substitution_sparse
+    if not native:
+        monkeypatch.setattr(substitution_sparse, 'substitution_sparse_cy', None)
+    tr, ids, _, _ = fixture(.6, 3)
+    states = np.zeros((len(ids), 3, 4))
+    states[ids['A'], :, [0, 1]] = .5
+    states[ids['B'], :, 2] = 1
+    states[ids['C'], :, 3] = 1
+    states[ids['C'], 1] = 0
+    q = (np.ones((4, 4)) - np.eye(4) * 4) / 3
+    groups = np.array([0, 0, 1, 2])
+    mapping = np.eye(3)[groups]
+    aa = np.array([0, 1, 1, 2])
+    mask = (aa[:, None] == aa[None, :]) & ~np.eye(4, dtype=bool)
+    valid = np.ones(states.shape[:2], dtype=bool)
+    valid[ids['B'], 2] = False
+    summaries = dict(synonymous_mask=mask, eligible=valid)
+    rates, weights = [.25, 1.75], [.5, .5]
+    post, tensor = scan_ctmc.infer(tr, states, q, np.ones(4) / 4, groups,
+                                   block_size=2, summaries=summaries, rates=rates, weights=weights)
+    parents = np.full(len(ids), -1, dtype=int)
+    lengths = np.zeros(len(ids))
+    tips = {}
+    for node in tr.traverse():
+        i = ids[node.name]
+        if node.up is not None:
+            parents[i], lengths[i] = ids[node.up.name], node.dist
+        if ete.is_leaf(node):
+            tips[i] = states[i].copy()
+            tips[i][tips[i].sum(axis=1) == 0] = 1
+    expected_syn = np.zeros(len(ids))
+    model = endpoint.EndpointModel(parents, lengths, q, np.ones(4) / 4, rates, weights)
+    for record in model.iter_blocks(tips, block_size=2):
+        sl = slice(record.start, record.stop)
+        np.testing.assert_allclose(post[record.child, sl], record.node, atol=1e-14)
+        if record.joint is None:
+            continue
+        joint = record.joint * valid[record.child, sl, None, None]
+        grouped = mapping.T @ joint @ mapping
+        grouped[:, np.arange(3), np.arange(3)] = 0
+        np.testing.assert_allclose(tensor[record.child, sl, 0], grouped, atol=1e-14)
+        expected_syn[record.child] += (joint * mask).sum()
+    np.testing.assert_allclose(summaries['synonymous_counts'], expected_syn, atol=1e-14)
 
 
 @pytest.mark.parametrize('block_size', [1, 3, 64])

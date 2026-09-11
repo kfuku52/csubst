@@ -22,7 +22,8 @@ def validate_options(g):
                          "native 3Di endpoint context is not yet supported.")
 
 
-def build_context(g, branch_meta, codon_state_ids):
+def validate_model(g, branch_meta, codon_state_ids):
+    """Validate the fitted model without constructing exposure transitions."""
     validate_options(g)
     model = str(g.get("substitution_model", ""))
     rates, priors = endpoint_io.model_rates(g)
@@ -52,12 +53,24 @@ def build_context(g, branch_meta, codon_state_ids):
             length = float(node.dist or 0)
             if not np.isfinite(length) or length < 0:
                 raise ValueError("Scan endpoint requires finite nonnegative model branch lengths.")
-    lengths = branch_meta["raw_length"].to_numpy(dtype=float)
+    # Before joint reconstruction, internal state rows may intentionally be
+    # empty. Validate model lengths directly, without filtering branches by
+    # their not-yet-inferred posterior states.
+    if branch_meta is None:
+        lengths = np.asarray([float(node.dist or 0) for node in g['tree'].traverse()
+                              if not ete.is_root(node)])
+    else:
+        lengths = branch_meta["raw_length"].to_numpy(dtype=float)
     if not np.isfinite(lengths).all() or (lengths < 0).any():
         raise ValueError("Scan endpoint requires finite nonnegative model branch lengths.")
     num_group = np.asarray(g["state_nsy"]).shape[2]
     if (ids < 0).any() or (ids >= num_group).any():
         raise ValueError("Scan endpoint has invalid codon state groups.")
+    return model, rates, priors, q, ids, num_group, lengths, off
+
+
+def build_context(g, branch_meta, codon_state_ids):
+    model, rates, priors, q, ids, num_group, lengths, off = validate_model(g, branch_meta, codon_state_ids)
     # Only a branch x codon x group tensor: no branch x site x codon-pair tensor.
     group_projection = np.eye(num_group, dtype=float)[ids]
     reachable = off > 0

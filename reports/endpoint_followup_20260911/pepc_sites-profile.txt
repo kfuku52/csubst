@@ -1,0 +1,61 @@
+         3238062 function calls (3234090 primitive calls) in 8.061 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2271 to 55 due to restriction <55>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    8.061    8.061 runpy.py:199(run_module)
+        1    0.000    0.000    8.061    8.061 runpy.py:63(_run_code)
+     17/1    0.001    0.000    8.061    8.061 {built-in method builtins.exec}
+        1    0.000    0.000    8.059    8.059 __main__.py:1(<module>)
+        1    0.000    0.000    8.058    8.058 cli.py:1462(main)
+        1    0.000    0.000    8.031    8.031 cli.py:1434(_main)
+        1    0.000    0.000    8.026    8.026 cli.py:268(command_sites)
+        1    0.013    0.013    7.922    7.922 main_sites.py:2257(main_sites)
+      5/2    0.000    0.000    7.357    3.678 profile_cli.py:22(call)
+        1    0.000    0.000    7.286    7.286 parser_misc.py:1141(prep_state)
+        3    0.000    0.000    4.732    1.577 endpoint_io.py:639(prepare)
+        1    0.127    0.127    4.694    4.694 endpoint_io.py:389(_build)
+     2257    1.351    0.001    3.592    0.002 endpoint.py:139(iter_blocks)
+        1    0.012    0.012    2.530    2.530 parser_iqtree.py:1036(get_state_tensor)
+        1    0.665    0.665    2.325    2.325 parser_iqtree.py:938(_load_internal_state_rows_one_pass)
+     8960    1.859    0.000    1.859    0.000 endpoint_io.py:372(transform)
+   243159    1.356    0.000    1.356    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+    87331    0.034    0.000    1.060    0.000 {method 'sum' of 'numpy.ndarray' objects}
+    87331    0.026    0.000    1.026    0.000 _methods.py:47(_sum)
+     4480    0.007    0.000    0.798    0.000 endpoint_io.py:243(_projections)
+    66999    0.609    0.000    0.609    0.000 {built-in method numpy.fromstring}
+    67089    0.049    0.000    0.296    0.000 fromnumeric.py:2322(any)
+    67000    0.192    0.000    0.273    0.000 parser_iqtree.py:259(_iter_state_rows)
+    68868    0.083    0.000    0.254    0.000 fromnumeric.py:71(_wrapreduction)
+        2    0.000    0.000    0.194    0.097 main_sites.py:1323(add_cs_info)
+        1    0.015    0.015    0.192    0.192 main_sites.py:868(add_states)
+    67171    0.024    0.000    0.187    0.000 {method 'all' of 'numpy.ndarray' objects}
+        2    0.000    0.000    0.187    0.093 substitution.py:1119(get_cs)
+        2    0.000    0.000    0.187    0.093 substitution.py:964(get_cs_sparse)
+        8    0.000    0.000    0.177    0.022 substitution.py:1459(_get_sparse_cb_projection)
+        8    0.000    0.000    0.176    0.022 substitution.py:1451(_build_sparse_cb_projection)
+        8    0.016    0.002    0.176    0.022 substitution_sparse.py:235(project)
+    67738    0.026    0.000    0.165    0.000 _methods.py:61(_all)
+     7728    0.008    0.000    0.128    0.000 indexing.py:2577(__setitem__)
+    17920    0.038    0.000    0.123    0.000 endpoint.py:123(transition)
+       14    0.000    0.000    0.118    0.008 _compressed.py:1275(sort_indices)
+       14    0.117    0.008    0.117    0.008 {built-in method scipy.sparse._sparsetools.csr_sort_indices}
+        1    0.002    0.002    0.114    0.114 parser_iqtree.py:884(mask_missing_sites)
+     7749    0.017    0.000    0.114    0.000 indexing.py:2529(__setitem__)
+        1    0.070    0.070    0.106    0.106 parser_iqtree.py:896(get_internal_site_nonzero_masks)
+        1    0.000    0.000    0.099    0.099 cli.py:231(get_global_parameters_or_exit)
+        1    0.000    0.000    0.099    0.099 param.py:1028(get_global_parameters)
+    66999    0.064    0.000    0.089    0.000 parser_iqtree.py:280(_parse_state_site_label)
+      846    0.001    0.000    0.085    0.000 _compressed.py:1228(sum_duplicates)
+    17603    0.007    0.000    0.085    0.000 {method 'max' of 'numpy.ndarray' objects}
+     7728    0.011    0.000    0.084    0.000 frame.py:4540(_set_value)
+        1    0.000    0.000    0.080    0.080 tsv.py:4(write_dataframe)
+        1    0.000    0.000    0.079    0.079 platform.py:1181(platform)
+    17603    0.006    0.000    0.078    0.000 _methods.py:39(_amax)
+        1    0.000    0.000    0.070    0.070 parser_misc.py:103(prepare_input_context)
+        4    0.000    0.000    0.067    0.017 _decorators.py:325(wrapper)
+        4    0.000    0.000    0.067    0.017 generic.py:3797(to_csv)
+        4    0.000    0.000    0.067    0.017 format.py:965(to_csv)
+     7784    0.008    0.000    0.064    0.000 managers.py:1298(column_setitem)
+        4    0.000    0.000    0.064    0.016 csvs.py:246(save)

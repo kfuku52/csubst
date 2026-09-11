@@ -128,6 +128,8 @@ def test_scan_worker_context_memmaps_large_state_arrays_and_drops_unused_states(
         "state_cdn": state_cdn,
         "state_pep": np.ones((128, 128, 16), dtype=np.float64),
         "state_nuc": np.ones((1,), dtype=np.float64),
+        "scan_observed_state_nsy": state_nsy,
+        "scan_observed_state_pep": state_nsy,
     }
     scan_static = {
         "q_context": {
@@ -148,6 +150,8 @@ def test_scan_worker_context_memmaps_large_state_arrays_and_drops_unused_states(
         assert worker_g["state_cdn"]["__scan_memmap__"] is True
         assert "state_pep" not in worker_g
         assert "state_nuc" not in worker_g
+        assert "scan_observed_state_nsy" not in worker_g
+        assert "scan_observed_state_pep" not in worker_g
         assert worker_static["observed_site_annotations"] == {}
         unpacked_g, unpacked_static = substitution_scan._unpack_scan_worker_context(
             g=worker_g,

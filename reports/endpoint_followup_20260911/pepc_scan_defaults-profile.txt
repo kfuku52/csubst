@@ -1,0 +1,61 @@
+         10991816 function calls (10917385 primitive calls) in 30.494 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2376 to 55 due to restriction <55>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000   30.494   30.494 runpy.py:199(run_module)
+        1    0.000    0.000   30.493   30.493 runpy.py:63(_run_code)
+     21/1    0.000    0.000   30.493   30.493 {built-in method builtins.exec}
+        1    0.000    0.000   30.493   30.493 __main__.py:1(<module>)
+        1    0.000    0.000   30.480   30.480 cli.py:1462(main)
+        1    0.000    0.000   30.461   30.461 cli.py:1434(_main)
+        1    0.000    0.000   30.458   30.458 cli.py:295(command_scan)
+        1    0.000    0.000   30.206   30.206 main_scan.py:134(main_scan)
+     10/5    0.001    0.000   30.170    6.034 profile_cli.py:22(call)
+        1    0.091    0.091   23.398   23.398 scan_ctmc.py:240(prepare)
+        1    0.000    0.000   20.277   20.277 scan_ctmc.py:149(infer)
+        1    0.359    0.359   20.277   20.277 scan_ctmc.py:56(_joint_infer)
+     3103    1.496    0.000   19.452    0.006 endpoint.py:139(iter_blocks)
+    12320    3.622    0.000   17.446    0.001 scan_ctmc.py:93(transform)
+    28121    0.304    0.000   13.832    0.000 einsumfunc.py:1009(einsum)
+    24641    8.496    0.000   10.640    0.000 numeric.py:932(tensordot)
+        1    0.000    0.000    4.115    4.115 substitution_scan.py:2896(scan_substitutions)
+        1    0.028    0.028    3.625    3.625 substitution_scan.py:2168(_scan_substitutions_core)
+        2    0.045    0.023    3.167    1.583 scan_endpoint.py:25(build_context)
+     1112    0.019    0.000    3.047    0.003 _matfuncs.py:217(expm)
+     1112    2.897    0.003    2.897    0.003 {built-in method scipy.linalg._matfuncs_expm.pick_pade_structure}
+        1    0.000    0.000    2.545    2.545 parser_misc.py:1141(prep_state)
+        1    0.018    0.018    2.504    2.504 parser_iqtree.py:1036(get_state_tensor)
+        1    0.668    0.668    2.290    2.290 parser_iqtree.py:938(_load_internal_state_rows_one_pass)
+    89738    1.799    0.000    1.799    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+    12320    0.383    0.000    1.555    0.000 einsumfunc.py:706(einsum_path)
+    39881    1.258    0.000    1.258    0.000 {built-in method numpy.core._multiarray_umath.c_einsum}
+      649    0.039    0.000    1.060    0.002 substitution_scan.py:1366(_summarize_unit_support)
+   293331    0.894    0.000    0.894    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+      546    0.023    0.000    0.767    0.001 substitution_scan.py:1337(_event_mask_for_candidate)
+        1    0.011    0.011    0.700    0.700 substitution_scan.py:1294(build_candidates)
+10247/10245    0.092    0.000    0.654    0.000 series.py:389(__init__)
+    66999    0.612    0.000    0.612    0.000 {built-in method numpy.fromstring}
+     1844    0.008    0.000    0.566    0.000 groupby.py:3082(sum)
+    12320    0.144    0.000    0.551    0.000 einsumfunc.py:312(_greedy_path)
+     1844    0.005    0.000    0.540    0.000 groupby.py:1896(_agg_general)
+     1844    0.006    0.000    0.524    0.000 groupby.py:1957(_cython_agg_general)
+     7037    0.020    0.000    0.511    0.000 frame.py:1505(iterrows)
+     1844    0.005    0.000    0.472    0.000 base.py:365(grouped_reduce)
+     1092    0.011    0.000    0.469    0.000 substitution_scan.py:421(_state_distribution_label)
+        1    0.000    0.000    0.465    0.465 substitution_scan.py:2127(_build_scan_static_context)
+     1844    0.005    0.000    0.440    0.000 groupby.py:1971(array_func)
+     1844    0.009    0.000    0.434    0.000 ops.py:812(_cython_operation)
+       22    0.001    0.000    0.391    0.018 scan_ctmc.py:106(flush_block)
+      103    0.016    0.000    0.377    0.004 substitution_scan.py:1712(_rate_summary)
+       44    0.001    0.000    0.373    0.008 site_storage.py:38(write_block)
+      546    0.055    0.000    0.344    0.001 substitution_scan.py:703(extract_candidate_posterior_events)
+     2734    0.005    0.000    0.327    0.000 common.py:62(new_method)
+    75666    0.097    0.000    0.301    0.000 fromnumeric.py:71(_wrapreduction)
+    67085    0.051    0.000    0.301    0.000 fromnumeric.py:2322(any)
+     1844    0.012    0.000    0.285    0.000 ops.py:735(has_dropped_na)
+    16050    0.077    0.000    0.283    0.000 construction.py:517(sanitize_array)
+    36960    0.067    0.000    0.281    0.000 einsumfunc.py:215(_parse_possible_contraction)
+    77138    0.029    0.000    0.271    0.000 {method 'sum' of 'numpy.ndarray' objects}
+        1    0.149    0.149    0.268    0.268 substitution_scan.py:541(extract_atomic_events)

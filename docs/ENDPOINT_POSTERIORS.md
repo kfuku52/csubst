@@ -187,10 +187,12 @@ arity=4, and 3.7 times slower for arity=2 with the branch table enabled.
 [arity/CPU/output benchmark](../reports/endpoint_scaling_20260910/README.md)
 for the workload, timing ranges, numerical checks and platform limitations.
 
-Ordinary unrecoded joint search reads tip observations and the state-file header,
+Ordinary unrecoded joint search and sites read tip observations and the state-file header,
 skipping the internal probability rows that pruning will overwrite. Existing
-model/input checks and tip ambiguity handling still apply. Other recoding and
-site/scan paths retain their existing loading contracts.
+model/input checks and tip ambiguity handling still apply. Joint scan uses the
+same loading route unless its pre-inference `zero_sub_mass` site filter needs
+the imported ancestral states. Other recoding and marginal/bridge scan paths
+retain their existing loading contracts.
 
 Once the final expected reducer is consumed, both the active reducer and its
 endpoint-cache reference are released when the analysis declares there will be
@@ -228,6 +230,8 @@ For joint `sites` without the state-category plot, positive `min_sub_pp`, VEP,
 or a set expression containing the all-other-branches token `A`, detailed events
 are retained only for the union of requested branches. Small branch/site totals
 are still accumulated over every branch, preserving global site summaries.
+Non-target branches compute these totals directly, without constructing their
+detailed event arrays.
 Other sites configurations retain the complete events needed by their outputs.
 The endpoint manifest lists `retained_branches` when this route is used.
 
@@ -242,6 +246,18 @@ This trades disk I/O and temporary space for lower peak RAM. The files are
 cleaned up with their owning arrays/run; `CSUBST_TMPDIR` selects the run's
 temporary directory. Scan endpoint metadata records `storage` as `memory` or
 `site_files`. CTMC bridge mode retains its existing storage implementation.
+
+Joint scan uses the same classified-event reducer as search to avoid expanding
+every codon pair before amino-acid aggregation. Synonymous totals are contracted
+directly from the masked transition matrix. Model validation runs before
+inference; exposure transitions are constructed when the subsequent scan needs
+them, avoiding a second unused set. Identical observed AA and nonsynonymous
+alphabets share their array. The CLI releases original codon emissions after
+inference when neither parametric calibration nor analytical likelihoods need
+them, updating the caller's configuration so it cannot retain the old arrays.
+Permutation workers omit observed-state arrays whose annotations have
+already been computed. These changes retain float64 probabilities and all
+requested statistics.
 
 Optimization comparison against a saved pre-change source tree:
 

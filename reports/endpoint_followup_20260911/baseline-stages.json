@@ -1,0 +1,311 @@
+{
+  "pepc_scan_defaults": [
+    {
+      "stage": "parser_misc.prepare_input_context",
+      "seconds": 0.11121804203139618,
+      "rss_before_mib": 164.359375,
+      "rss_after_mib": 166.78515625,
+      "arrays": {}
+    },
+    {
+      "stage": "parser_iqtree.get_state_tensor",
+      "seconds": 2.5036478340043686,
+      "rss_before_mib": 166.78515625,
+      "rss_after_mib": 372.37890625,
+      "arrays": {}
+    },
+    {
+      "stage": "parser_misc.prep_state",
+      "seconds": 2.5454024170176126,
+      "rss_before_mib": 166.78515625,
+      "rss_after_mib": 393.2890625,
+      "arrays": {}
+    },
+    {
+      "stage": "parser_misc.apply_site_filters",
+      "seconds": 1.4708028174936771e-05,
+      "rss_before_mib": 393.2890625,
+      "rss_after_mib": 393.2890625,
+      "arrays": {}
+    },
+    {
+      "stage": "scan_ctmc.infer",
+      "seconds": 20.277506667014677,
+      "rss_before_mib": 414.3046875,
+      "rss_after_mib": 555.79296875,
+      "arrays": {}
+    },
+    {
+      "stage": "scan_ctmc.prepare",
+      "seconds": 23.39786812500097,
+      "rss_before_mib": 393.2890625,
+      "rss_after_mib": 618.4765625,
+      "arrays": {
+        "state_cdn": {
+          "shape": [
+            141,
+            971,
+            61
+          ],
+          "mib": 63.717430114746094
+        },
+        "state_pep": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        },
+        "state_nsy": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375,
+          "shared_with": "state_pep"
+        },
+        "scan_tip_emissions": {
+          "shape": [
+            141,
+            971,
+            61
+          ],
+          "mib": 63.717430114746094
+        },
+        "scan_observed_state_nsy": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        },
+        "scan_observed_state_pep": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        }
+      }
+    },
+    {
+      "stage": "substitution_scan._build_scan_static_context",
+      "seconds": 0.46520612499443814,
+      "rss_before_mib": 618.50390625,
+      "rss_after_mib": 657.54296875,
+      "arrays": {}
+    },
+    {
+      "stage": "substitution_scan._scan_substitutions_core",
+      "seconds": 3.625557249994017,
+      "rss_before_mib": 657.54296875,
+      "rss_after_mib": 658.54296875,
+      "arrays": {
+        "state_cdn": {
+          "shape": [
+            141,
+            971,
+            61
+          ],
+          "mib": 63.717430114746094
+        },
+        "state_pep": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        },
+        "state_nsy": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375,
+          "shared_with": "state_pep"
+        },
+        "scan_tip_emissions": {
+          "shape": [
+            141,
+            971,
+            61
+          ],
+          "mib": 63.717430114746094
+        },
+        "scan_observed_state_nsy": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        },
+        "scan_observed_state_pep": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        }
+      }
+    },
+    {
+      "stage": "substitution_scan._calibrate_scan_pvalues",
+      "seconds": 0.0017284579807892442,
+      "rss_before_mib": 658.54296875,
+      "rss_after_mib": 658.55078125,
+      "arrays": {
+        "state_cdn": {
+          "shape": [
+            141,
+            971,
+            61
+          ],
+          "mib": 63.717430114746094
+        },
+        "state_pep": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        },
+        "state_nsy": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375,
+          "shared_with": "state_pep"
+        },
+        "scan_tip_emissions": {
+          "shape": [
+            141,
+            971,
+            61
+          ],
+          "mib": 63.717430114746094
+        },
+        "scan_observed_state_nsy": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        },
+        "scan_observed_state_pep": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        }
+      }
+    },
+    {
+      "stage": "substitution_scan.scan_substitutions",
+      "seconds": 4.115104333031923,
+      "rss_before_mib": 618.50390625,
+      "rss_after_mib": 658.58984375,
+      "arrays": {
+        "state_cdn": {
+          "shape": [
+            141,
+            971,
+            61
+          ],
+          "mib": 63.717430114746094
+        },
+        "state_pep": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        },
+        "state_nsy": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375,
+          "shared_with": "state_pep"
+        },
+        "scan_tip_emissions": {
+          "shape": [
+            141,
+            971,
+            61
+          ],
+          "mib": 63.717430114746094
+        },
+        "scan_observed_state_nsy": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        },
+        "scan_observed_state_pep": {
+          "shape": [
+            141,
+            971,
+            20
+          ],
+          "mib": 20.890960693359375
+        }
+      }
+    }
+  ],
+  "pepc_sites": [
+    {
+      "stage": "parser_misc.prepare_input_context",
+      "seconds": 0.07035670801997185,
+      "rss_before_mib": 131.390625,
+      "rss_after_mib": 134.75390625,
+      "arrays": {}
+    },
+    {
+      "stage": "parser_iqtree.get_state_tensor",
+      "seconds": 2.53050783398794,
+      "rss_before_mib": 134.77734375,
+      "rss_after_mib": 356.72265625,
+      "arrays": {}
+    },
+    {
+      "stage": "endpoint_io._build",
+      "seconds": 4.693791833007708,
+      "rss_before_mib": 377.6640625,
+      "rss_after_mib": 443.85546875,
+      "arrays": {}
+    },
+    {
+      "stage": "parser_misc.apply_site_filters",
+      "seconds": 2.7166970539838076e-05,
+      "rss_before_mib": 443.87890625,
+      "rss_after_mib": 443.87890625,
+      "arrays": {}
+    },
+    {
+      "stage": "parser_misc.prep_state",
+      "seconds": 7.286514749983326,
+      "rss_before_mib": 134.7734375,
+      "rss_after_mib": 443.87890625,
+      "arrays": {}
+    }
+  ]
+}

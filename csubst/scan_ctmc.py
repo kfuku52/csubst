@@ -54,7 +54,7 @@ def _integrals(values, length):
 
 
 def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights, disk_backed=False):
-    from csubst import endpoint, site_storage
+    from csubst import endpoint, endpoint_io, site_storage
     nodes = list(tree.traverse("preorder"))
     n, sites, states = tip_states.shape
     parents = np.full(n, -1, dtype=int)
@@ -90,14 +90,15 @@ def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, 
     if summaries is not None:
         summaries['synonymous_counts'] = np.zeros(n)
 
+    # Reuse the classified endpoint reducer instead of materializing every
+    # codon pair and contracting it through two one-hot matrices.
+    event_transform = endpoint_io._event_transform({}, ['N'], {'N': projection})
+
     def transform(left, right, transition):
-        mass = left[:, :, None] * transition * right[:, None, :]
-        grouped = np.einsum('ig,sij,jh->sgh', projection, mass, projection, optimize=True)
-        ix = np.arange(projection.shape[1])
-        grouped[:, ix, ix] = 0
+        grouped = event_transform(left, right, transition)['N', 'events'][:, 0]
         result = {'events': grouped}
         if summaries is not None:
-            result['synonymous'] = np.einsum('sij,ij->s', mass, summaries['synonymous_mask'])
+            result['synonymous'] = ((left @ (transition * summaries['synonymous_mask'])) * right).sum(axis=1)
         return result
 
     block_start = None
@@ -240,7 +241,7 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
 def prepare(g):
     from csubst import endpoint_io, fitted_model, scan_endpoint, substitution_scan
     groups = substitution_scan._build_codon_state_ids(g)
-    context = scan_endpoint.build_context(g, substitution_scan.build_branch_metadata(g), groups)
+    model_name = scan_endpoint.validate_model(g, None, groups)[0]
     aa_groups = np.full(len(groups), -1)
     if "synonymous_indices" in g:
         for index, aa in enumerate(g["amino_acid_orders"]):
@@ -276,12 +277,14 @@ def prepare(g):
             aa_projection[g["synonymous_indices"][aa], index] = 1
         updated["state_pep"] = posterior @ aa_projection
     aa_projection = np.eye(len(g["amino_acid_orders"]))[aa_groups]
-    updated["scan_observed_state_pep"] = (g["state_cdn"] @ aa_projection) * observed[:, :, None]
+    updated["scan_observed_state_pep"] = (updated["scan_observed_state_nsy"]
+                                           if np.array_equal(groups, aa_groups) else
+                                           (g["state_cdn"] @ aa_projection) * observed[:, :, None])
     updated["scan_ctmc_synonymous_counts"] = summaries["synonymous_counts"]
-    updated["scan_ctmc_model"] = context["model"]
+    updated["scan_ctmc_model"] = model_name
     updated['scan_category_states'] = summaries.get('category_states')
     updated['scan_endpoint_metadata'] = {
-        'model': context['model'], 'rates': rates.tolist(), 'weights': weights.tolist(),
+        'model': model_name, 'rates': rates.tolist(), 'weights': weights.tolist(),
         'category_weighting': 'posterior_given_all_tips',
         'missing_tip_events': 'excluded_from_reporting; latent_states_integrated',
         'parameter_source': g.get('scan_ctmc_model_precision', 'parsed_iqtree_model_and_category_table'),

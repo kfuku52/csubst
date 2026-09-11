@@ -337,10 +337,11 @@ def test_get_state_tensor_rejects_invalid_probability_rows(tmp_path):
         parser_iqtree.get_state_tensor(g)
 
 
-def test_joint_search_reads_tips_without_loading_recomputed_internal_posteriors(tmp_path, monkeypatch):
+@pytest.mark.parametrize('subcommand', ['search', 'sites', 'scan'])
+def test_joint_reads_tips_without_loading_recomputed_internal_posteriors(tmp_path, monkeypatch, subcommand):
     g = _make_state_tensor_g(tmp_path, '>A\nAAAAAC\n>B\nAAGAAG\n')
     expected = parser_iqtree.get_state_tensor(g)
-    g.update(subcommand='search', substitution_posterior='joint', nonsyn_recode='no')
+    g.update(subcommand=subcommand, substitution_posterior='joint', nonsyn_recode='no', scan_observation='joint')
     def unexpected_read(**kwargs):
         raise AssertionError('Joint search should not parse unused internal probabilities.')
     monkeypatch.setattr(parser_iqtree, '_load_internal_state_rows_one_pass', unexpected_read)
@@ -352,3 +353,20 @@ def test_joint_search_reads_tips_without_loading_recomputed_internal_posteriors(
         else:
             assert not actual[i].any()
     assert g['_endpoint_tip_only_input']
+
+
+@pytest.mark.parametrize('options', [
+    dict(scan_observation='marginal'),
+    dict(scan_observation='bridge'),
+    dict(scan_observation='joint', drop_invariant_tip_sites=True,
+         drop_invariant_tip_sites_mode='zero_sub_mass'),
+    dict(scan_observation='joint', nonsyn_recode='SR6'),
+])
+def test_scan_imports_ancestral_states_when_pre_inference_consumers_need_them(tmp_path, options):
+    g = _make_state_tensor_g(tmp_path, '>A\nAAAAAC\n>B\nAAGAAG\n')
+    expected = parser_iqtree.get_state_tensor(g)
+    g.update(subcommand='scan', substitution_posterior='joint', nonsyn_recode='no')
+    g.update(options)
+    actual = parser_iqtree.get_state_tensor(g)
+    np.testing.assert_array_equal(actual, expected)
+    assert not g['_endpoint_tip_only_input']

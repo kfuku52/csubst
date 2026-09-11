@@ -192,6 +192,37 @@ def test_main_scan_all_sites_filtered_writes_no_test_result(monkeypatch, tmp_pat
     assert report["status"] == ["no_observed_candidates"]
 
 
+@pytest.mark.parametrize('calibration,analytic', [
+    ('none', 'none'), ('parametric', 'none'), ('none', 'endpoint_mixture'),
+])
+def test_main_scan_replaces_callers_states_and_retains_only_needed_emissions(monkeypatch, tmp_path, calibration, analytic):
+    import weakref
+    g, _ = _toy_scan_context()
+    g.update(foreground='foreground.tsv', outdir=str(tmp_path), output_prefix='csubst',
+             float_format='%.12g', drop_invariant_tip_sites=False, scan_site_plot=False,
+             state_cdn=g['state_nsy'].copy(), min_sub_pp=0,
+             scan_rate_exposure='endpoint', scan_observation='joint',
+             instantaneous_codon_rate_matrix=np.array([[-1., 1.], [1., -1.]]),
+             equilibrium_frequency=np.array([.5, .5]), substitution_model='GY',
+             nonsynonymous_indices={'A': [0], 'K': [1]},
+             iqtree_rate_values=np.ones(1),
+             scan_pvalue_calibration=calibration, scan_n_permutations=2,
+             scan_analytic_pvalue=analytic)
+    emissions = weakref.ref(g['state_cdn'])
+    old_nsy = weakref.ref(g['state_nsy'])
+    monkeypatch.setattr(main_scan.parser_misc, 'prepare_input_context', lambda g, **kw: g)
+    monkeypatch.setattr(main_scan.parser_misc, 'prep_state', lambda g, **kw: g)
+    updated, frame, _ = main_scan.main_scan(g)
+    assert updated is g
+    assert old_nsy() is None
+    if calibration == 'parametric' or analytic != 'none':
+        assert g['scan_tip_emissions'] is emissions()
+    else:
+        assert emissions() is None
+        assert 'scan_tip_emissions' not in g
+    assert not frame.empty
+
+
 @pytest.mark.parametrize("setting", [dict(scan_min_event_pp=np.nan), dict(scan_min_event_pp=1.1),
                                      dict(scan_min_support="1.2"), dict(scan_match="invalid")])
 def test_main_scan_rejects_invalid_discovery_settings_before_loading_asr(monkeypatch, tmp_path, setting):

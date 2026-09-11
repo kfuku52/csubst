@@ -457,6 +457,8 @@ def _build(g, structural=False):
     classified = not direct or g.get('b', False)
     coarse_transform = _projection_transform(g, kinds, mappings, observed_stats) if direct else None
     transform = _event_transform(g, kinds, mappings) if classified else coarse_transform
+    totals_transform = (_projection_transform(g, kinds, mappings, {'any2any'})
+                        if retained_branches is not None else None)
     predictive_transform = (_projection_transform(g, kinds, mappings, observed_stats, predictive=True)
                             if direct else transform)
     with ExitStack() as stack:
@@ -494,7 +496,8 @@ def _build(g, structural=False):
                                    for stat, count in features.items() if stat in selected_stats}
         for record in model.iter_blocks(tips, block_size=block_size, predictive=expected,
                                         transform=transform,
-                                        predictive_transform=predictive_transform):
+                                        predictive_transform=predictive_transform,
+                                        branch_ids=retained_branches, unselected_transform=totals_transform):
             sl = slice(record.start, record.stop)
             node = record.child
             if node not in model.leaves:
@@ -514,10 +517,14 @@ def _build(g, structural=False):
             if record.predictive is not None:
                 record.predictive[~valid] = 0
             for kind in kinds:
+                if retained_branches is not None and node not in retained_branches:
+                    branch_sites[kind][node, sl] = record.reduced[kind, 'any2any'].sum(axis=1) * valid
+                    continue
                 if classified:
                     events = record.reduced[kind, 'events']
                     events[~valid] = 0
-                    projections = _projections(events)
+                    if projected:
+                        projections = _projections(events)
                 else:
                     projections = {stat: record.reduced[kind, stat] for stat in observed_stats}
                     for values in projections.values():

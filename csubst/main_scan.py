@@ -178,7 +178,15 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
         g.update(scan_tip_emissions=np.asarray(g["state_cdn"]))
         if g.get("scan_pvalue_calibration") == "parametric":
             scan_ctmc.validate_parametric_inputs(g)
-        g, ON_tensor_rate = scan_ctmc.prepare(g)
+        updated_g, ON_tensor_rate = scan_ctmc.prepare(g)
+        # The CLI also holds this configuration. Replace its old state
+        # references instead of leaving the caller's input arrays alive.
+        g.update(updated_g)
+        del updated_g
+        if g.get("scan_pvalue_calibration") != "parametric" and analytic_engine is None:
+            # Only model-based simulation and analytical likelihoods reuse
+            # the original codon emissions after joint reconstruction.
+            g.pop("scan_tip_emissions", None)
     else:
         ON_tensor_rate = substitution.get_substitution_tensor(
             state_tensor=g["state_nsy"],

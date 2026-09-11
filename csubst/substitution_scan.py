@@ -503,7 +503,8 @@ def _pack_scan_worker_context(g, scan_static):
         worker_g["state_cdn"] = packed_state_cdn
         q_context["state_cdn"] = packed_state_cdn
     for unused_key in ["state_nuc", "state_pep", "_3di_alignment_by_branch_id", "_3di_tip_alignment_by_leaf",
-                       "scan_category_states", "scan_tip_emissions"]:
+                       "scan_category_states", "scan_tip_emissions",
+                       "scan_observed_state_nsy", "scan_observed_state_pep"]:
         worker_g.pop(unused_key, None)
     worker_static = dict(scan_static)
     endpoint_context = q_context.get("endpoint_context")

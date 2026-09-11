@@ -137,7 +137,7 @@ class EndpointModel:
         return self._transitions[t]
 
     def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None,
-                    predictive_transform=None, category_nodes=False):
+                    predictive_transform=None, category_nodes=False, unselected_transform=None):
         """Yield one edge/site block; root records only contain a node marginal.
 
         Tips are observation likelihoods, NOT posterior probabilities. Missing
@@ -146,6 +146,8 @@ class EndpointModel:
         endpoint prediction; they are not unconditional null probabilities.
         A separate predictive transform can omit observed-only summaries. Each
         transform's outputs are summed over rate categories before yielding.
+        An optional unselected transform retains coarse summaries on branches
+        outside branch_ids without constructing their detailed joint events.
         """
         if isinstance(block_size, bool) or int(block_size) != block_size or block_size < 1:
             raise ValueError('Endpoint block size must be a positive integer.')
@@ -208,6 +210,7 @@ class EndpointModel:
             for child in self.order[1:]:
                 parent = int(self.parents[child])
                 wanted = child in selected
+                observed_transform = transform if wanted else unselected_transform
                 edge = np.zeros((size, k, k)) if joint and wanted and transform is None else None
                 pred = np.zeros((size, k, k)) if predictive and wanted and transform is None else None
                 reduced: dict = {}
@@ -227,11 +230,11 @@ class EndpointModel:
                     if pred is not None:
                         pred += (class_weight[c, :, None, None]
                                  * post[c, parent, :, :, None] * transition)
-                    if transform is not None and wanted:
+                    if observed_transform is not None:
                         for target, lvalues, rvalues, reducer in (
-                                (reduced, left, right, transform),
+                                (reduced, left, right, observed_transform),
                                 (reduced_pred, post[c, parent], np.ones_like(right),
-                                 predictive_transform or transform)):
+                                 predictive_transform or observed_transform)):
                             if target is reduced_pred and not predictive:
                                 continue
                             values = reducer(lvalues * class_weight[c, :, None], rvalues, transition)

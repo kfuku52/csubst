@@ -1051,9 +1051,15 @@ def get_state_tensor(g, selected_branch_ids=None):
               'Delete intermediate files and rerun.'
     if num_alignment_site != g['num_input_site']:
         raise AssertionError(err_txt)
-    tip_only = (g.get('substitution_posterior') == 'joint'
+    joint_endpoints = (g.get('substitution_posterior') == 'joint'
+                       and g.get('subcommand') in ('search', 'analyze', 'benchmark', 'sites'))
+    # Scan filters sites before reconstructing its joint states. The
+    # zero-substitution filter still needs the imported ancestral states.
+    joint_scan = (g.get('subcommand') == 'scan' and g.get('scan_observation') == 'joint'
+                  and not (g.get('drop_invariant_tip_sites', False)
+                           and g.get('drop_invariant_tip_sites_mode') == 'zero_sub_mass'))
+    tip_only = ((joint_endpoints or joint_scan)
                 and g.get('nonsyn_recode', 'no') == 'no'
-                and g.get('subcommand') in ('search', 'analyze', 'benchmark')
                 and selected_branch_ids is None)
     g['_endpoint_tip_only_input'] = tip_only
     use_state_cache = bool(g.get('_cache_state_tensor', False)) and not tip_only
