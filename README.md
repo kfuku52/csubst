@@ -76,7 +76,7 @@ csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --for
 
 ## Usage
 For joint branch-endpoint probabilities and their memory/time tradeoffs, see
-[joint endpoint posteriors](docs/ENDPOINT_POSTERIORS.md).
+[joint endpoint posteriors](https://github.com/kfuku52/csubst/wiki/Joint-endpoint-posteriors).
 
 Long-tail calibration is off by default; when enabled, its default method is
 `independent_null`. For empirical and independently sampled
