@@ -71,3 +71,31 @@ def test_direct_urn_cache_restores_full_site_selection_mask(tmp_path):
     np.testing.assert_array_equal(fresh['_precomputed_tip_invariant_site_mask'], [True, False])
     _rewrite(g, lambda fields: fields.pop('tip_invariant_mask'))
     assert parser_misc._try_load_3di_state_cache(fresh, None, shape)[0] is None
+
+
+def test_3di_cache_relocation_preserves_content_validation(tmp_path):
+    import shutil
+    g, shape = _cache(tmp_path)
+    moved = tmp_path / 'relocated.fa'
+    shutil.copyfile(g['alignment_file'], moved)
+    relocated = dict(g, alignment_file=str(moved))
+    assert parser_misc._try_load_3di_state_cache(relocated, None, shape)[2] is None
+    moved.write_text('>A\nATGATA\n')
+    assert parser_misc._try_load_3di_state_cache(relocated, None, shape)[2] == 'cache metadata mismatch.'
+    assert parser_misc._try_load_3di_state_cache(dict(g, genetic_code=2), None, shape)[0] is None
+
+
+def test_3di_cache_resolves_path_executable_before_relocation(tmp_path, monkeypatch):
+    executable = tmp_path / 'bin' / 'iqtree'
+    executable.parent.mkdir()
+    executable.write_text('#!/bin/sh\nexit 0\n')
+    executable.chmod(0o755)
+    monkeypatch.setenv('PATH', str(executable.parent))
+    g, shape = _cache(tmp_path)
+    g['iqtree_exe'] = 'iqtree'
+    before = parser_misc._get_3di_state_cache_context(g, None, shape)
+    moved = tmp_path / 'other'
+    moved.mkdir()
+    monkeypatch.chdir(moved)
+    after = parser_misc._get_3di_state_cache_context(g, None, shape)
+    assert before['iqtree_exe'] == after['iqtree_exe'] == str(executable)

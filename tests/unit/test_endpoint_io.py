@@ -641,3 +641,49 @@ def test_endpoint_cache_rebuilds_when_consumer_changes(tmp_path, option, value):
     assert g['_endpoint_tensors']['N'] is not previous
     assert g['_endpoint_manifest']['codon']['observed_storage'] == (
         'projections' if option in ('site_filter_report', 'fg_clade_permutation') else 'full_events')
+
+
+def test_3di_expected_table_survives_early_state_release(tmp_path):
+    import pandas as pd
+    g, ids = toy_context(tmp_path, structural=True)
+    released = copy.deepcopy(g)
+    released['_release_state_after_expected_reducer'] = True
+    cb = pd.DataFrame({'branch_id_1': [ids['A']], 'branch_id_2': [ids['B']]})
+    outputs = []
+    for config in (g, released):
+        n = substitution.get_substitution_tensor(config['state_nsy'], mode='asis', g=config)
+        s = substitution.get_substitution_tensor(config['state_cdn'], mode='syn', g=config)
+        outputs.append(omega.get_E(cb.copy(), config, n, s))
+    pd.testing.assert_frame_equal(outputs[0], outputs[1])
+    assert all(released[key] is None for key in ('state_cdn', 'state_pep', 'state_nsy'))
+
+
+def test_native_3di_scan_uses_structural_lengths_and_independent_synonymous_model(tmp_path):
+    from scipy.linalg import expm
+    from csubst import scan_ctmc, scan_endpoint
+    g, ids = toy_context(tmp_path, structural=True)
+    g.update(subcommand='scan', scan_observation='joint', scan_rate_exposure='endpoint',
+             scan_rate_length='raw', scan_rate_event_mode='posterior_sum', scan_pvalue_calibration='none')
+    # Make structural branch lengths differ materially from the codon fit.
+    g['3di_branch_lengths'] *= 0.3
+    original = copy.deepcopy(g)
+    updated, tensor = scan_ctmc.prepare(g)
+    reference = copy.deepcopy(original)
+    endpoint_io._build(reference, structural=True)
+    np.testing.assert_allclose(tensor, reference['_endpoint_tensors']['N'].to_dense(), atol=1e-13)
+    codon_reference = copy.deepcopy(original)
+    codon_reference.update(nonsyn_recode='no', state_nsy=codon_reference['state_pep'])
+    codon_result, _ = scan_ctmc.prepare(codon_reference)
+    np.testing.assert_allclose(updated['scan_ctmc_synonymous_counts'], codon_result['scan_ctmc_synonymous_counts'])
+    np.testing.assert_allclose(updated['state_cdn'], codon_result['state_cdn'])
+    meta = substitution_scan.build_branch_metadata(updated)
+    context = substitution_scan._build_scan_q_context(updated, 'endpoint', meta)
+    expected, missing, _ = scan_endpoint.expected_events(
+        context['endpoint_context'], updated['state_nsy'], updated['state_nsy'], 0, [0], [1])
+    for row, value, absent in zip(meta.itertuples(), expected, missing):
+        if absent:
+            assert value == 0
+        else:
+            p = expm(original['3di_q'] * original['3di_branch_lengths'][row.branch_id])
+            assert value == pytest.approx(updated['state_nsy'][row.parent_id, 0, 0] * p[0, 1])
+    assert next(node.dist for node in original['tree'].traverse() if node.name == 'A') == 1

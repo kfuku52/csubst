@@ -1525,6 +1525,10 @@ def _build_scan_q_context(g, rate_exposure, branch_meta=None):
     codon_state_ids = _build_codon_state_ids(g)
     q_matrix = g.get("instantaneous_nsy_rate_matrix", None)
     if rate_exposure == "endpoint":
+        if g.get("nonsyn_recode") == "3di20":
+            codon_q = g.get("3di_q")
+            state_cdn = g["state_nsy"]
+            codon_state_ids = np.arange(state_cdn.shape[2])
         if codon_q is None or state_cdn is None or codon_state_ids is None:
             raise ValueError("Scan endpoint exposure requires codon posterior states, codon Q and state groups.")
         if branch_meta is None:

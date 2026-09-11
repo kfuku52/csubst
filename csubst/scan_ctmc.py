@@ -238,7 +238,55 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
     return posterior, tensor
 
 
+def _prepare_3di(g):
+    """Infer N on the native structural model and S on the independent codon fit."""
+    from csubst import endpoint_io, fitted_model, scan_endpoint
+    state = np.asarray(g['state_nsy'])
+    groups = np.arange(state.shape[2])
+    scan_endpoint.validate_model(g, None, groups)
+    structural_tree = g['tree'].copy()
+    for node in structural_tree.traverse():
+        node.dist = float(g['3di_branch_lengths'][int(ete.get_prop(node, 'numerical_label'))])
+    observed, eligible = fitted_model.observation_masks(structural_tree, state)
+    summaries = {'eligible': eligible, 'synonymous_mask': np.zeros((len(groups), len(groups)), dtype=bool)}
+    disk_backed = state.shape[0] * state.shape[1] * len(groups)**2 * 8 > _SCAN_IN_MEMORY_BYTES
+    posterior, tensor = infer(structural_tree, state, g['3di_q'], g['3di_pi'], groups, 'joint',
+                              summaries=summaries, rates=np.ones(1), weights=np.ones(1),
+                              block_size=g.get('endpoint_block_size', 64), disk_backed=disk_backed)
+    # Codon synonymous counts retain their own topology lengths, Q and rate mixture.
+    codon = np.asarray(g['state_cdn'])
+    aa_groups = np.full(codon.shape[2], -1, dtype=int)
+    for index, aa in enumerate(g['amino_acid_orders']):
+        aa_groups[g['synonymous_indices'][aa]] = index
+    if (aa_groups < 0).any():
+        raise ValueError('CTMC scan requires the complete codon-to-amino-acid map.')
+    codon_observed, codon_eligible = fitted_model.observation_masks(g['tree'], codon)
+    codon_summary = {'eligible': codon_eligible,
+                     'synonymous_mask': (aa_groups[:, None] == aa_groups[None, :]) & ~np.eye(len(aa_groups), dtype=bool)}
+    rates, weights = endpoint_io.model_rates(g)
+    codon_posterior, _ = infer(g['tree'], codon, g['instantaneous_codon_rate_matrix'],
+                               g['equilibrium_frequency'], np.zeros(len(aa_groups), dtype=int), 'joint',
+                               summaries=codon_summary, rates=rates, weights=weights,
+                               block_size=g.get('endpoint_block_size', 64))
+    aa_projection = np.eye(len(g['amino_acid_orders']))[aa_groups]
+    updated = dict(g)
+    updated.update(tree=structural_tree, state_nsy=posterior, state_cdn=codon_posterior,
+                   state_pep=codon_posterior @ aa_projection, event_eligible=eligible,
+                   scan_observed_state_nsy=state * observed[:, :, None],
+                   scan_observed_state_pep=(codon @ aa_projection) * codon_observed[:, :, None],
+                   scan_ctmc_synonymous_counts=codon_summary['synonymous_counts'],
+                   scan_ctmc_model='GTRX+FQ (3Di)', scan_category_states=None,
+                   scan_endpoint_metadata={'model': 'GTRX+FQ (3Di)', 'rates': [1.], 'weights': [1.],
+                                           'category_weighting': 'posterior_given_all_tips',
+                                           'missing_tip_events': 'excluded_from_reporting; latent_states_integrated',
+                                           'parameter_source': '3di_checkpoint',
+                                           'storage': 'site_files' if disk_backed else 'memory'})
+    return updated, tensor
+
+
 def prepare(g):
+    if g.get('nonsyn_recode') == '3di20':
+        return _prepare_3di(g)
     from csubst import endpoint_io, fitted_model, scan_endpoint, substitution_scan
     groups = substitution_scan._build_codon_state_ids(g)
     model_name = scan_endpoint.validate_model(g, None, groups)[0]

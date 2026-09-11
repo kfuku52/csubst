@@ -23,10 +23,15 @@ the fitted CTMC. `posterior_sum` events are required; `called` would compare
 thresholded observations with an unthresholded expectation. Discovery and
 foreground support still use the configured event/support thresholds.
 
-Codon-derived amino-acid/reduced states are supported. Native 3Di endpoint
-models are not yet connected to scan; an explicit endpoint request with
-`3di20` is rejected. Existing 3Di `q_weighted` requests still resolve to
-`state_aware`.
+Codon-derived amino-acid/reduced states and native `3di20` joint observations
+are supported. Native 3Di uses the independently fitted uniform GTRX+FQ
+20-state generator, stationary frequencies and structural branch lengths;
+its state-group mapping is the identity. Codon synonymous counts retain their
+independent codon fit and rate mixture. Direct ASR is required. Analytical,
+parametric and bridge 3Di scan routes remain unsupported and are rejected.
+Use `--scan_pvalue_calibration none --scan_n_permutations 0` for exploratory
+scores without calibration. Explicit legacy 3Di `q_weighted` requests still
+resolve to `state_aware`.
 
 For example, fit a uniform model and run scan with independent foreground units:
 

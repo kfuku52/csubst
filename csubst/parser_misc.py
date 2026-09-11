@@ -7,6 +7,7 @@ import json
 import os
 import pkgutil
 import re
+import shutil
 import sys
 import tempfile
 from collections import OrderedDict
@@ -188,9 +189,12 @@ def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
         drop_mode = 'tip_invariant'
     elif drop_mode in ['0', 'false', 'off']:
         drop_mode = 'no'
+    iqtree_exe = str(g.get('iqtree_exe', '')).strip()
+    iqtree_path = shutil.which(iqtree_exe) or iqtree_exe
     context = {
         'format_version': int(_THREEDI_STATE_CACHE_FORMAT_VERSION),
         'nonsyn_recode': '3di20',
+        'genetic_code': int(g.get('genetic_code', 1)),
         'model_expectations': expectation_3di.required(g),
         'sa_asr_mode': str(g.get('sa_asr_mode', 'direct')).strip().lower(),
         'infile_type': str(g.get('infile_type', '')).strip().lower(),
@@ -205,7 +209,7 @@ def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
         # identifies the selected predictor, encoder and classifier weights.
         'prostt5_model_cache_key': structural_alphabet.get_3di_model_cache_key(g),
         'sa_iqtree_model': str(g.get('sa_iqtree_model', 'GTR')).strip(),
-        'iqtree_exe': os.path.realpath(str(g.get('iqtree_exe', ''))),
+        'iqtree_exe': os.path.realpath(iqtree_path) if iqtree_path else '',
         'iqtree_version': str(
             g.get('iqtree_version', g.get('iqtree_output_version', ''))
         ),
@@ -222,6 +226,21 @@ def _get_3di_state_cache_context(g, selected_branch_ids, state_cdn_shape):
     else:
         context['rooted_tree_sha256'] = ''
     return context
+
+
+def _3di_state_cache_context_matches(cached, expected):
+    """Relocating identical inputs does not change the fitted state model."""
+    def semantic_context(context):
+        context = dict(context)
+        for key in ('full_cds_alignment', 'iqtree_state'):
+            signature = dict(context.get(key, {}))
+            # Keep content SHA-256 and size; paths/timestamps are provenance,
+            # not model inputs. All other inference settings must still match.
+            signature.pop('path', None)
+            signature.pop('mtime_ns', None)
+            context[key] = signature
+        return context
+    return semantic_context(cached) == semantic_context(expected)
 
 
 def _try_load_3di_state_cache(g, selected_branch_ids, state_cdn_shape):
@@ -247,7 +266,7 @@ def _try_load_3di_state_cache(g, selected_branch_ids, state_cdn_shape):
                 selected_branch_ids=selected_branch_ids,
                 state_cdn_shape=state_cdn_shape,
             )
-            if cached_context != expected_context:
+            if not _3di_state_cache_context_matches(cached_context, expected_context):
                 return None, None, 'cache metadata mismatch.'
             state_nsy = np.asarray(cache['state_nsy'], dtype=g['float_type'])
             state_orders = np.asarray(cache['state_orders'], dtype=object).reshape(-1)

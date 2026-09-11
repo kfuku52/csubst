@@ -107,10 +107,10 @@ and still uses the existing marginal-posterior expected-count approximation.
 GTR estimates many parameters and may be poorly determined by short alignments.
 See the [IQ-TREE morphological model definitions](https://www.iqtree.org/doc/Substitution-Models#binary-and-morphological-models).
 
-The codon-only [endpoint exposure option](SCAN_ENDPOINT.md) is not yet available
-for native 3Di states. `scan` does not compute omegaC expectations and continues to use `state_aware`
-exposure for 3Di. Codon and amino-acid model contexts remain available to
-`scan`, `inspect` and `sites`; they are not used as a 3Di Q.
+The [endpoint exposure option](SCAN_ENDPOINT.md) supports native 3Di joint
+scan with its independent fitted uniform GTRX+FQ model. Structural observations
+and exposure use structural branch lengths; synonymous summaries use the codon
+fit. Analytical, parametric and bridge 3Di scans remain unsupported.
 
 Use a codon alignment and matching rooted tree. Supply a full CDS alignment
 when the analysis alignment has been trimmed:
@@ -137,7 +137,11 @@ backend-neutral aliases of the existing `--prostt5_device`,
 The legacy sequence cache filename `csubst_prostt5_cache.tsv` is retained.
 Sequence and derived 3Di-state caches distinguish the backend and model
 weights, so a cached prediction from another model is never reused.
-State caches also validate the 20-state order and posterior probabilities.
+State caches also validate the genetic code, 20-state order and posterior probabilities.
+Identical full-CDS and IQ-TREE state files may be relocated: cache matching
+uses their content hashes and sizes, while retaining path/timestamp provenance.
+The IQ-TREE executable is resolved through PATH before its location is recorded.
+Other model, tree, selected-branch and program-version checks remain required.
 An invalid cache is recomputed in `--sa_state_cache auto` mode and rejected in
 `--sa_state_cache yes` mode; missing/unloaded rows may contain all zeros.
 

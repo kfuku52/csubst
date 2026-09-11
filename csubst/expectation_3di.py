@@ -17,9 +17,11 @@ CONTEXT_KEYS = ('3di_q', '3di_pi', '3di_rates', '3di_branch_lengths', '3di_order
 
 def required(g):
     from csubst import endpoint_io
-    return ((endpoint_io.enabled(g) or g.get('subcommand', 'search') in ('search', 'analyze', 'benchmark'))
+    return ((endpoint_io.enabled(g) or g.get('subcommand', 'search') in ('search', 'analyze', 'benchmark')
+             or (g.get('subcommand') == 'scan' and g.get('scan_rate_exposure') == 'endpoint'))
             and g.get('nonsyn_recode') == '3di20'
-            and (endpoint_io.enabled(g) or str(g.get('expectation_method', 'codon_model')).lower() == 'codon_model'))
+            and (endpoint_io.enabled(g) or g.get('subcommand') == 'scan'
+                 or str(g.get('expectation_method', 'codon_model')).lower() == 'codon_model'))
 
 
 def validate_options(g):

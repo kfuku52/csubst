@@ -1,6 +1,6 @@
-"""Finite-time codon endpoint opportunities for scan (not Markov jump counts).
+"""Finite-time fitted endpoint opportunities for scan (not Markov jump counts).
 
-The first implementation deliberately uses uniform fitted codon models only.
+Codon models support fitted rate mixtures; native 3Di uses uniform GTR.
 Exponentiate the full generator before aggregating destination state groups;
 the grouped instantaneous matrix is generally not a lumped CTMC generator.
 """
@@ -8,7 +8,7 @@ the grouped instantaneous matrix is generally not a lumped CTMC generator.
 import numpy as np
 from scipy.linalg import expm
 
-from csubst import endpoint_io, ete, site_storage
+from csubst import endpoint_io, ete, expectation_3di, site_storage
 
 
 def validate_options(g):
@@ -18,13 +18,30 @@ def validate_options(g):
     if str(g.get("scan_rate_event_mode", "posterior_sum")) != "posterior_sum":
         raise ValueError("--scan_rate_exposure endpoint requires --scan_rate_event_mode posterior_sum.")
     if str(g.get("nonsyn_recode", "no")) == "3di20":
-        raise ValueError("Scan endpoint exposure currently supports codon-derived states only; "
-                         "native 3Di endpoint context is not yet supported.")
+        expectation_3di.validate_options(g)
+        if g.get("scan_observation") != "joint":
+            raise ValueError("Native 3Di endpoint exposure requires joint observations.")
+        if g.get("scan_pvalue_calibration") in ("parametric", "parametric_bootstrap"):
+            raise ValueError("Native 3Di scan does not yet support parametric calibration.")
 
 
 def validate_model(g, branch_meta, codon_state_ids):
     """Validate the fitted model without constructing exposure transitions."""
     validate_options(g)
+    if g.get("nonsyn_recode") == "3di20":
+        state = np.asarray(g["state_nsy"])
+        expectation_3di.validate_context(g, *state.shape[:2])
+        q = np.asarray(g["3di_q"], dtype=float)
+        ids = np.arange(state.shape[2])
+        if not np.array_equal(codon_state_ids, ids):
+            raise ValueError("Native 3Di endpoint groups must use the fitted state order.")
+        indices = ([int(ete.get_prop(node, "numerical_label")) for node in g["tree"].traverse()
+                    if not ete.is_root(node)] if branch_meta is None else
+                   branch_meta["branch_id"].to_numpy(dtype=int))
+        lengths = np.asarray(g["3di_branch_lengths"])[indices]
+        off = q.copy()
+        np.fill_diagonal(off, 0)
+        return "GTRX+FQ (3Di)", np.ones(1), np.ones(1), q, ids, len(ids), lengths, off
     model = str(g.get("substitution_model", ""))
     rates, priors = endpoint_io.model_rates(g)
     if len(rates) > 1 and g.get('scan_observation', 'marginal') != 'joint':
@@ -71,7 +88,7 @@ def validate_model(g, branch_meta, codon_state_ids):
 
 def build_context(g, branch_meta, codon_state_ids):
     model, rates, priors, q, ids, num_group, lengths, off = validate_model(g, branch_meta, codon_state_ids)
-    # Only a branch x codon x group tensor: no branch x site x codon-pair tensor.
+    # Only a branch x model-state x group tensor: no branch x site x codon-pair tensor.
     group_projection = np.eye(num_group, dtype=float)[ids]
     reachable = off > 0
     np.fill_diagonal(reachable, True)
@@ -116,7 +133,7 @@ def build_context(g, branch_meta, codon_state_ids):
 def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids):
     """Return expected endpoint mass and branch/site missingness.
 
-    Normalize nonmissing parent codon rows to absorb ASR text rounding. Both
+    Normalize nonmissing parent model-state rows to absorb ASR text rounding. Both
     endpoints must have posterior mass on this site, as on the observed side.
     """
     ids = context["codon_state_ids"]

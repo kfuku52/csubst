@@ -2318,6 +2318,14 @@ def get_E(cb, g, ON_tensor, OS_tensor):
             cb['ECS'+st] = calc_E_stat(cb, OS_tensor, mode=st, stat='mean', SN='S', g=g)
     elif expectation_method == 'codon_model':
         id_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
+        # Joint 3Di fingerprinting needs both codon and structural tip states.
+        # Acquire S while both are alive, before the N reducer releases states.
+        from csubst import endpoint_io
+        if (endpoint_io.enabled(g) and g.get('nonsyn_recode') == '3di20'
+                and 'ES_reducer' not in g):
+            g['ES_reducer'] = _get_fused_expected_sparse_reducer(
+                g=g, mode='cdn', selected_base_stats=base_stats,
+            )
         if 'EN_reducer' not in g:
             g['EN_reducer'] = _get_fused_expected_sparse_reducer(
                 g=g,
@@ -2373,16 +2381,16 @@ def get_E(cb, g, ON_tensor, OS_tensor):
                 mode='cdn',
                 selected_base_stats=base_stats,
             )
-            if bool(g.get('_release_state_after_expected_reducer', False)):
-                state_cdn = g.get('state_cdn')
-                released_nbytes = int(state_cdn.nbytes) if isinstance(state_cdn, np.ndarray) else 0
-                g['state_cdn'] = None
-                print(
-                    'Released codon state storage ({:,} bytes).'.format(released_nbytes),
-                    flush=True,
-                )
         else:
             print('Reusing expected synonymous sparse projections.', flush=True)
+        state_cdn = g.get('state_cdn')
+        if bool(g.get('_release_state_after_expected_reducer', False)) and isinstance(state_cdn, np.ndarray):
+            released_nbytes = int(state_cdn.nbytes)
+            g['state_cdn'] = None
+            print(
+                'Released codon state storage ({:,} bytes).'.format(released_nbytes),
+                flush=True,
+            )
         txt = 'Number of total empirically expected synonymous substitutions in the tree: {:,.2f}'
         print(txt.format(g['ES_reducer']['total']))
         print('Preparing the ECS table with up to {:,} process(es).'.format(g['threads']), flush=True)
