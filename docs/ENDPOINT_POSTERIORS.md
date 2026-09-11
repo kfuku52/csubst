@@ -164,16 +164,17 @@ the extension is unavailable. Both sum nonnegative terms, avoiding subtraction
 of near-unit unchanged probabilities and preserving tiny changes. No posterior
 probability is discarded for the optimization.
 
-For arity=2, the engine can go one step further: accumulate branch-pair Gram
+For arity=2, including `spe2spe`, the engine can go one step further: accumulate branch-pair Gram
 matrices for each site block and discard the block's projections. This avoids
 all-site projection CSR storage, its sorting/index buffers, and temporary disk
 payloads. Branch/site counts and optional branch substitution strings are still
 available. The pair matrices, block features, counts and temporary product are
 estimated before allocation; this route is used only within a 64 MiB workspace
-budget. This budget does not include input state arrays or pruning workspace.
-Large trees exceeding it retain the projection route, avoiding an uncontrolled
+budget. The site block is reduced automatically when necessary. This budget
+does not include input state arrays or pruning workspace. Large trees exceeding
+it retain projections (or full events for `spe2spe`), avoiding an uncontrolled
 quadratic allocation. Higher arities, site-filter reports and clade permutations
-also retain projections because their later consumers can need them.
+also retain the site information their later consumers need.
 
 Near-marginal runtime is currently limited to the measured arity=2 search
 without branch or site tables. Disabling site tables alone is insufficient:
@@ -202,13 +203,13 @@ transition probabilities. The remaining Poisson tail is checked against the
 smallest positive partial matrix entry. Very large times or insufficient cache
 capacity use `expm`; no branch length or posterior probability is truncated.
 
-Consumers needing full events or additional summaries retain the full sparse
-representation: sites/scan, `spe2spe`, CS/CBS tables, positive `min_sub_pp`, urn,
+Search consumers needing full events or additional summaries retain the full sparse
+representation: `spe2spe` outside the bounded arity-2 route, CS/CBS tables, positive `min_sub_pp`, urn,
 P-values, long-tail calibration, epistasis, ASRV diagnostics, and restricted ASRV
 training branches. Observed and predictive events are accumulated directly
 in the requested S/N/AA event spaces using native accumulation.
 Full sparse event storage is retained for these consumers; no event probabilities
-are dropped to obtain this speedup. Temporary space remains bounded by the site
+are dropped to obtain this speedup. Inference workspace remains bounded by the site
 block size and event axes. Dense Gram products use NumPy, sharing its BLAS
 runtime with inference instead of potentially initializing a second runtime
 through SciPy. Projected predictive N summaries cache the transition-to-group
@@ -219,8 +220,28 @@ its transition arrays are never modified during inference.
 CSR outputs are spooled to temporary files and allocated once. Temporary disk
 must accommodate those payloads. Final projections (or full sparse outputs),
 ordinary state arrays, and downstream reduction buffers still occupy RAM.
-`*_endpoint_model.json` records `observed_storage` (`pairwise`, `projections`, or `full_events`) and
-`direct_projection` for each fitted model so the selected route can be inspected.
+`*_endpoint_model.json` records `observed_storage` (`pairwise`, `projections`,
+`selected_branches`, or `full_events`), `direct_projection`, and the effective
+`block_size` for each fitted model so the selected route can be inspected.
+
+For joint `sites` without the state-category plot, positive `min_sub_pp`, VEP,
+or a set expression containing the all-other-branches token `A`, detailed events
+are retained only for the union of requested branches. Small branch/site totals
+are still accumulated over every branch, preserving global site summaries.
+Other sites configurations retain the complete events needed by their outputs.
+The endpoint manifest lists `retained_branches` when this route is used.
+
+Joint `scan` stores event tensors and category-conditional states in site-major
+temporary files when their combined payload exceeds 64 MiB. Only small site
+blocks are written and read; files are not mapped into the process address space.
+Ordinary node marginals and branch/site totals remain in RAM. No event or rate
+category is dropped, and thresholded event views share the same raw file.
+Parallel calibration workers read the parent's completed files, which remain
+alive until their work finishes. Small inputs retain the in-memory route.
+This trades disk I/O and temporary space for lower peak RAM. The files are
+cleaned up with their owning arrays/run; `CSUBST_TMPDIR` selects the run's
+temporary directory. Scan endpoint metadata records `storage` as `memory` or
+`site_files`. CTMC bridge mode retains its existing storage implementation.
 
 Optimization comparison against a saved pre-change source tree:
 

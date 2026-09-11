@@ -344,6 +344,25 @@ def summarize_sparse_sub_tensor(sparse_tensor, mode):
     return sub_bg, sub_sg
 
 
+class SelectedBranchSubstitutionTensor(SparseSubstitutionTensor):
+    """Detailed events for requested sites branches, totals for every branch.
+
+    Only the sites consumer without global event-category plots uses this
+    representation. Its per-site totals include all branches, while its event
+    operations are restricted to the requested branches.
+    """
+
+    def __init__(self, shape, dtype, matrix, branch_site, retained_branches):
+        super().__init__(shape, dtype, matrix=matrix)
+        self.branch_site = branch_site
+        self.branch_site.flags.writeable = False
+        self.retained_branches = frozenset(retained_branches)
+
+    @property
+    def nbytes(self):
+        return super().nbytes + self.branch_site.nbytes
+
+
 class ProjectedSubstitutionTensor(SparseSubstitutionTensor):
     """Search reducer containing projections, not individual substitution events.
 

@@ -11,7 +11,7 @@ from scan_fixtures import make_scan_context as _toy_scan_context
 
 @pytest.mark.parametrize("calibration", ["candidate_fixed", "full_scan"])
 def test_endpoint_scan_dense_sparse_and_parallel_permutations_agree(calibration):
-    from csubst import substitution
+    from csubst import substitution, site_storage
 
     g, on_tensor = _toy_scan_context()
     g.update(scan_rate_exposure="endpoint", state_cdn=g["state_nsy"].copy(),
@@ -25,6 +25,11 @@ def test_endpoint_scan_dense_sparse_and_parallel_permutations_agree(calibration)
         g=dict(g, threads=2), ON_tensor=substitution.dense_to_sparse_sub_tensor(on_tensor))
     cols = [c for c in dense if c not in ["scan_permutation_n_jobs", "scan_permutation_backend"]]
     pd.testing.assert_frame_equal(dense[cols], sparse[cols])
+    stored = site_storage.SiteEventTensor(on_tensor.shape)
+    stored.write_block(0, np.moveaxis(on_tensor, 1, 0))
+    stored.seal()
+    disk, _ = substitution_scan.scan_substitutions(g=dict(g, threads=2), ON_tensor=stored)
+    pd.testing.assert_frame_equal(dense[cols], disk[cols])
     assert dense.iloc[0]["scan_permutation_success_count"] == 4
     assert dense.iloc[0]["scan_exposure_units"] == "expected_endpoint_events"
 

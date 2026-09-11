@@ -2268,18 +2268,31 @@ def main_sites(g):
         include_foreground=False,
         include_marginal=False,
         resolve_state_subset=False,
-        prepare_state=(not vep_enabled),
+        prepare_state=False,
     )
+    g = resolve_site_jobs(g)
+    from csubst import endpoint_io
+    # Global site totals remain available; these jobs only inspect detailed
+    # events on their selected branches. Global category plots and set A need
+    # the other branches' detailed events as well.
+    if (endpoint_io.enabled(g) and not g.get('site_state_plot', True)
+            and not vep_enabled and float(g.get('min_sub_pp', 0)) == 0
+            and not (g['mode'] == 'set' and 'A' in _tokenize_set_expression(g['mode_expression']))):
+        g['_endpoint_retained_branches'] = sorted({
+            int(bid) for job in g['site_jobs'] for bid in job['branch_ids']})
+    else:
+        g.pop('_endpoint_retained_branches', None)
     if vep_enabled:
         # Preserve a compact full-length ancestral context before ordinary site filtering.
         g = parser_misc.prep_state(g, apply_site_filtering=False)
         variant_effect.prepare_ancestral_contexts(g=g)
         g = parser_misc.apply_site_filters(g)
+    else:
+        g = parser_misc.prep_state(g)
     ON_tensor = substitution.get_substitution_tensor(state_tensor=g['state_nsy'], mode='asis', g=g, mmap_attr='N')
     ON_tensor = substitution.apply_min_sub_pp(g, ON_tensor)
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
-    g = resolve_site_jobs(g)
     g = _maybe_relocate_site_log_file(g)
     for site_job in g['site_jobs']:
         branch_ids = _normalize_branch_ids(site_job['branch_ids'])

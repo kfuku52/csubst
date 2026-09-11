@@ -78,7 +78,10 @@ def test_missing_data_and_group_aggregation():
     assert grouped.sum() == 0
 
 
-def test_parametric_bootstrap_repeats_asr_and_candidate_selection(monkeypatch):
+@pytest.mark.parametrize('disk_backed', [False, True])
+def test_parametric_bootstrap_repeats_asr_and_candidate_selection(monkeypatch, disk_backed):
+    if disk_backed:
+        monkeypatch.setattr(scan_ctmc, '_SCAN_IN_MEMORY_BYTES', 0)
     _toy_scan_context = runpy.run_path(str(Path(__file__).with_name("test_scan_permutations.py")))["_toy_scan_context"]
     from csubst import substitution_scan
     g, _ = _toy_scan_context()
@@ -228,7 +231,8 @@ def test_joint_kernel_agrees_with_shared_endpoint_engine():
 
 
 @pytest.mark.parametrize('block_size', [1, 3, 64])
-def test_mixture_joint_and_exposure_match_complete_enumeration(tmp_path, block_size):
+@pytest.mark.parametrize('disk_backed', [False, True])
+def test_mixture_joint_and_exposure_match_complete_enumeration(tmp_path, block_size, disk_backed):
     import pandas as pd
     from csubst import scan_endpoint
     tr, ids, states, q = fixture(.7, 3)
@@ -240,7 +244,8 @@ def test_mixture_joint_and_exposure_match_complete_enumeration(tmp_path, block_s
     priors = np.array([.15, .35, .5])
     summaries = {'synonymous_mask': np.zeros((2, 2))}
     post, tensor = scan_ctmc.infer(tr, states, q, [.5, .5], [0, 1],
-                                   block_size=block_size, summaries=summaries, rates=rates, weights=priors)
+                                   block_size=block_size, summaries=summaries, rates=rates, weights=priors,
+                                   disk_backed=disk_backed)
     report = tmp_path / 'mixture.iqtree'
     report.write_text('Category Relative_rate Proportion\n1 0 .15\n2 .2 .35\n3 2 .5\n')
     g = dict(scan_rate_length='raw', scan_observation='joint', substitution_model='GY+R3',
@@ -249,6 +254,15 @@ def test_mixture_joint_and_exposure_match_complete_enumeration(tmp_path, block_s
              scan_category_states=summaries['category_states'])
     meta = pd.DataFrame(dict(branch_id=[ids['X']], parent_id=[ids['R']], raw_length=[.7]))
     ctx = scan_endpoint.build_context(g, meta, [0, 1])
+    if disk_backed:
+        import pickle
+        from csubst import substitution_scan
+        worker_g, worker_static, paths = substitution_scan._pack_scan_worker_context(
+            g, {'q_context': {'state_cdn': post, 'endpoint_context': ctx}})
+        worker_g, worker_static = pickle.loads(pickle.dumps((worker_g, worker_static)))
+        _, worker_static = substitution_scan._unpack_scan_worker_context(worker_g, worker_static)
+        ctx = worker_static['q_context']['endpoint_context']
+        assert paths == []  # Tiny ordinary states; site files are borrowed.
     for site in range(3):
         joint = np.zeros((3, 2, 2))
         for c, rate in enumerate(rates):
@@ -260,8 +274,11 @@ def test_mixture_joint_and_exposure_match_complete_enumeration(tmp_path, block_s
                     mass *= emission[value] if emission.sum() else 1
                 joint[c, r, x] += mass
         joint /= joint.sum()
-        np.testing.assert_allclose(tensor[ids['X'], site, 0, 0, 1], joint[:, 0, 1].sum(), atol=1e-14)
-        np.testing.assert_allclose(summaries['category_states'][:, ids['R'], site], joint.sum(axis=2), atol=1e-14)
+        value = tensor.read_site(site)[ids['X'], 0, 0, 1] if disk_backed else tensor[ids['X'], site, 0, 0, 1]
+        categories = summaries['category_states']
+        category_value = categories.read_site(site)[:, ids['R']] if disk_backed else categories[:, ids['R'], site]
+        np.testing.assert_allclose(value, joint[:, 0, 1].sum(), atol=1e-14)
+        np.testing.assert_allclose(category_value, joint.sum(axis=2), atol=1e-14)
         expected = sum(joint[c, 0].sum() * expm(q * rate * .7)[0, 1] for c, rate in enumerate(rates))
         actual, missing, _ = scan_endpoint.expected_events(ctx, post, post, site, [0], [1])
         assert not missing.any()

@@ -15,6 +15,7 @@ from csubst import substitution_sparse
 from csubst import ete
 from csubst import output_stat
 from csubst import sequence
+from csubst import site_storage
 
 substitution_cy = load_optional_extension('substitution_cy')
 substitution_sparse_cy = load_optional_extension('substitution_sparse_cy')
@@ -664,7 +665,9 @@ def _can_use_cython_sitewise_max_scan(branch_tensor):
 
 
 def get_branch_sub_counts(sub_tensor):
-    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+    if isinstance(sub_tensor, (substitution_sparse.ProjectedSubstitutionTensor,
+                               substitution_sparse.SelectedBranchSubstitutionTensor,
+                               site_storage.SiteEventTensor)):
         return sub_tensor.branch_site.sum(axis=1)
     if _is_sparse_sub_tensor(sub_tensor):
         return np.asarray(sub_tensor.matrix.sum(axis=1), dtype=np.float64).reshape(-1)
@@ -672,7 +675,9 @@ def get_branch_sub_counts(sub_tensor):
 
 
 def get_site_sub_counts(sub_tensor):
-    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+    if isinstance(sub_tensor, (substitution_sparse.ProjectedSubstitutionTensor,
+                               substitution_sparse.SelectedBranchSubstitutionTensor,
+                               site_storage.SiteEventTensor)):
         return sub_tensor.branch_site.sum(axis=0)
     if _is_sparse_sub_tensor(sub_tensor):
         out = np.zeros(shape=(sub_tensor.num_site,), dtype=np.float64)
@@ -682,7 +687,9 @@ def get_site_sub_counts(sub_tensor):
 
 
 def get_branch_site_sub_counts(sub_tensor, branch_id):
-    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+    if isinstance(sub_tensor, (substitution_sparse.ProjectedSubstitutionTensor,
+                               substitution_sparse.SelectedBranchSubstitutionTensor,
+                               site_storage.SiteEventTensor)):
         return sub_tensor.branch_site[int(branch_id)]
     if _is_sparse_sub_tensor(sub_tensor):
         out = np.zeros(shape=(sub_tensor.num_site,), dtype=np.float64)
@@ -774,7 +781,9 @@ def aggregate_sparse_branches(sub_tensor, branch_ids, operation):
 
 
 def get_total_substitution(sub_tensor):
-    if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
+    if isinstance(sub_tensor, (substitution_sparse.ProjectedSubstitutionTensor,
+                               substitution_sparse.SelectedBranchSubstitutionTensor,
+                               site_storage.SiteEventTensor)):
         return float(sub_tensor.branch_site.sum())
     if _is_sparse_sub_tensor(sub_tensor):
         return float(sub_tensor.matrix.data.sum())
@@ -994,6 +1003,8 @@ def apply_min_sub_pp(g, sub_tensor):
     if _parse_bool_like(g.get('ml_anc', False), 'ml_anc'):
         print('--ml_anc is set. --min_sub_pp will not be applied.')
     else:
+        if isinstance(sub_tensor, site_storage.SiteEventTensor):
+            return sub_tensor.thresholded(g['min_sub_pp'])
         if _is_sparse_sub_tensor(sub_tensor):
             threshold = g['min_sub_pp']
             new_matrix = sub_tensor.matrix.copy()

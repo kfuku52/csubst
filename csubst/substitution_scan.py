@@ -22,6 +22,7 @@ from csubst import scan_permutation
 from csubst import sequence
 from csubst import scan_statistics
 from csubst import substitution
+from csubst import site_storage
 
 
 SCAN_MATCHES = (
@@ -540,7 +541,20 @@ def _unpack_scan_worker_context(g, scan_static):
 def extract_atomic_events(sub_tensor, min_event_pp=0.5, float_tol=1e-12):
     threshold = max(float(min_event_pp), float(float_tol))
     rows = []
-    if _is_sparse_sub_tensor(sub_tensor):
+    if isinstance(sub_tensor, site_storage.SiteEventTensor):
+        for start, values in sub_tensor.iter_site_blocks():
+            site, branch, _sg, anc, der = np.where(values >= threshold)
+            keep = anc != der
+            if keep.any():
+                site, branch, anc, der = site[keep], branch[keep], anc[keep], der[keep]
+                rows.append(pd.DataFrame({
+                    'branch_id': branch.astype(np.int64, copy=False),
+                    'site': (start + site).astype(np.int64, copy=False),
+                    'from_state_id': anc.astype(np.int64, copy=False),
+                    'to_state_id': der.astype(np.int64, copy=False),
+                    'event_pp': values[site, branch, 0, anc, der].astype(np.float64, copy=False),
+                }))
+    elif _is_sparse_sub_tensor(sub_tensor):
         branch, site, _sg, anc, der, event_pp = sub_tensor._coordinates()
         keep = (anc != der) & np.asarray(event_pp >= threshold, dtype=bool)
         if keep.any():
@@ -583,6 +597,9 @@ def extract_atomic_events(sub_tensor, min_event_pp=0.5, float_tol=1e-12):
             columns=["branch_id", "site", "from_state_id", "to_state_id", "event_pp"]
         )
     out = pd.concat(rows, ignore_index=True)
+    if isinstance(sub_tensor, site_storage.SiteEventTensor):
+        out = out.sort_values(['branch_id', 'site', 'from_state_id', 'to_state_id'],
+                              kind='stable').reset_index(drop=True)
     return out
 
 
@@ -692,9 +709,14 @@ def extract_candidate_posterior_events(
     projection=None,
 ):
     site = int(site)
+    array_site = site
     from_ids = np.array(sorted(set(np.asarray(from_ids, dtype=np.int64).reshape(-1).tolist())), dtype=np.int64)
     to_ids = np.array(sorted(set(np.asarray(to_ids, dtype=np.int64).reshape(-1).tolist())), dtype=np.int64)
-    if _is_sparse_sub_tensor(sub_tensor):
+    if isinstance(sub_tensor, site_storage.SiteEventTensor):
+        num_branch, num_site, num_group, num_from, num_to = sub_tensor.shape
+        arr = sub_tensor.read_site(site)[:, np.newaxis]
+        array_site = 0
+    elif _is_sparse_sub_tensor(sub_tensor):
         num_branch = int(sub_tensor.shape[0])
         num_site = int(sub_tensor.shape[1])
         num_group = int(sub_tensor.shape[2])
@@ -730,7 +752,7 @@ def extract_candidate_posterior_events(
                         continue
                     np.add.at(branch_values, col.row.astype(np.int64, copy=False), col.data.astype(np.float64, copy=False))
                 else:
-                    branch_values += arr[:, site, 0, int(anc), int(der)].astype(np.float64, copy=False)
+                    branch_values += arr[:, array_site, 0, int(anc), int(der)].astype(np.float64, copy=False)
     keep = np.where(branch_values > float(float_tol))[0]
     if keep.shape[0] == 0:
         return pd.DataFrame(

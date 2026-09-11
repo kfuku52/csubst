@@ -189,7 +189,7 @@ def main_scan(g: AnalysisConfig) -> tuple[AnalysisConfig, pd.DataFrame, pd.DataF
     rate_event_mode = substitution_scan.normalize_scan_rate_event_mode(g.get("scan_rate_event_mode", "posterior_sum"))
     ON_tensor_called = ON_tensor_rate
     if float(g.get("min_sub_pp", 0)) != 0:
-        if (rate_event_mode == "posterior_sum") and (not substitution._is_sparse_sub_tensor(ON_tensor_rate)):
+        if (rate_event_mode == "posterior_sum") and isinstance(ON_tensor_rate, np.ndarray):
             called_path = runtime.temp_path("tmp.csubst.sub_tensor.scan_N_called.mmap")
             ON_tensor_called = np.memmap(
                 called_path,

@@ -8,6 +8,8 @@ from scipy.linalg import eigh, expm, expm_frechet
 
 from csubst import ete
 
+_SCAN_IN_MEMORY_BYTES = 64 * 1024**2
+
 
 def _normalize(x):
     total = x.sum(axis=-1, keepdims=True)
@@ -51,8 +53,8 @@ def _integrals(values, length):
     return length * np.exp(np.maximum(x, y)) * ratio
 
 
-def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights):
-    from csubst import endpoint
+def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights, disk_backed=False):
+    from csubst import endpoint, site_storage
     nodes = list(tree.traverse("preorder"))
     n, sites, states = tip_states.shape
     parents = np.full(n, -1, dtype=int)
@@ -71,9 +73,20 @@ def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, 
     groups = np.asarray(groups, int)
     projection = np.eye(int(groups.max()) + 1)[groups]
     posterior = np.zeros_like(tip_states, dtype=float)
-    tensor = np.zeros((n, sites, 1, projection.shape[1], projection.shape[1]))
-    category_states = (np.zeros((len(rates), n, sites, states))
-                       if summaries is not None and len(rates) > 1 else None)
+    event_shape = (n, sites, 1, projection.shape[1], projection.shape[1])
+    category_shape = (len(rates), n, sites, states)
+    retain_categories = summaries is not None and len(rates) > 1
+    if disk_backed:
+        # Bound the writing workspace independently of alignment length.
+        per_site = n * (projection.shape[1]**2 + (len(rates) * states if retain_categories else 0)) * 8
+        block_size = min(block_size, max(1, (32 * 1024**2) // per_site))
+        tensor = site_storage.SiteEventTensor(event_shape)
+        category_states = site_storage.SiteArray(category_shape, np.float64, 2) if retain_categories else None
+        event_block = np.zeros((block_size, n, 1, projection.shape[1], projection.shape[1]))
+        category_block = np.zeros((block_size, len(rates), n, states)) if retain_categories else None
+    else:
+        tensor = np.zeros(event_shape)
+        category_states = np.zeros(category_shape) if retain_categories else None
     if summaries is not None:
         summaries['synonymous_counts'] = np.zeros(n)
 
@@ -87,24 +100,54 @@ def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, 
             result['synonymous'] = np.einsum('sij,ij->s', mass, summaries['synonymous_mask'])
         return result
 
+    block_start = None
+    block_length = 0
+
+    def flush_block():
+        tensor.write_block(block_start, event_block[:block_length])
+        if category_states is not None:
+            assert category_block is not None
+            category_states.write_block(block_start, category_block[:block_length])
+
     for record in model.iter_blocks(tips, block_size, transform=transform,
                                     category_nodes=category_states is not None):
+        if disk_backed and record.start != block_start:
+            if block_start is not None:
+                flush_block()
+            block_start, block_length = record.start, record.stop - record.start
+            event_block.fill(0)
+            if category_block is not None:
+                category_block.fill(0)
         sl = slice(record.start, record.stop)
         posterior[record.child, sl] = record.node
         if category_states is not None:
-            category_states[:, record.child, sl] = record.category_node
+            if disk_backed:
+                assert category_block is not None
+                category_block[:block_length, :, record.child] = record.category_node.transpose(1, 0, 2)
+            else:
+                category_states[:, record.child, sl] = record.category_node
         if record.parent >= 0:
             valid = summaries['eligible'][record.child, sl] if summaries is not None and 'eligible' in summaries else np.ones(record.stop-record.start, dtype=bool)
-            tensor[record.child, sl, 0] = record.reduced['events'] * valid[:, None, None]
+            events = record.reduced['events'] * valid[:, None, None]
+            if disk_backed:
+                event_block[:block_length, record.child, 0] = events
+            else:
+                tensor[record.child, sl, 0] = events
             if summaries is not None:
                 summaries['synonymous_counts'][record.child] += (record.reduced['synonymous'] * valid).sum()
+    if disk_backed:
+        if block_start is not None:
+            flush_block()
+        tensor.seal()
+        if category_states is not None:
+            category_states.seal()
     if summaries is not None:
         summaries['category_states'] = category_states
     return posterior, tensor
 
 
 def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summaries=None,
-          rates=(1.,), weights=(1.,)):
+          rates=(1.,), weights=(1.,), disk_backed=False):
     """Return all-node marginals and a branch/site/group-pair event tensor.
 
     Input leaf rows are emission likelihoods; zero rows mean missing (ones).
@@ -114,7 +157,7 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
     if mode not in ("joint", "bridge"):
         raise ValueError("Unknown CTMC observation mode.")
     if mode == 'joint':
-        return _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights)
+        return _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights, disk_backed)
     if len(rates) != 1 or float(rates[0]) != 1 or len(weights) != 1 or float(weights[0]) != 1:
         raise ValueError('CTMC bridge currently requires uniform unit rates; use joint for discrete rate mixtures.')
     q, pi = np.asarray(q, float), np.asarray(pi, float)
@@ -209,9 +252,15 @@ def prepare(g):
     observed, eligible = fitted_model.observation_masks(g["tree"], g["state_cdn"])
     summaries = {"eligible": eligible, "synonymous_mask": (aa_groups[:, None] == aa_groups[None, :]) & ~np.eye(len(groups), dtype=bool)}
     rates, weights = endpoint_io.model_rates(g)
+    n, sites, states = g['state_cdn'].shape
+    stored_bytes = n * sites * (int(groups.max() + 1)**2 + (len(rates) * states if len(rates) > 1 else 0)) * 8
+    disk_backed = g['scan_observation'] == 'joint' and stored_bytes > _SCAN_IN_MEMORY_BYTES
+    if disk_backed:
+        print('Scan endpoints: storing {:,} bytes in site-major temporary files; bounded site reads.'.format(stored_bytes), flush=True)
     posterior, tensor = infer(g["tree"], g["state_cdn"], g["instantaneous_codon_rate_matrix"],
                               g["equilibrium_frequency"], groups, g["scan_observation"], summaries=summaries,
-                              rates=rates, weights=weights, block_size=g.get('endpoint_block_size', 64))
+                              rates=rates, weights=weights, block_size=g.get('endpoint_block_size', 64),
+                              disk_backed=disk_backed)
     updated = dict(g)
     updated["event_eligible"] = eligible
     updated["scan_tip_emissions"] = g["state_cdn"]
@@ -236,13 +285,15 @@ def prepare(g):
         'category_weighting': 'posterior_given_all_tips',
         'missing_tip_events': 'excluded_from_reporting; latent_states_integrated',
         'parameter_source': g.get('scan_ctmc_model_precision', 'parsed_iqtree_model_and_category_table'),
+        'storage': 'site_files' if disk_backed else 'memory',
     }
     return updated, tensor
 
 
 def set_branch_length_summaries(g, tensor):
     """Populate reporting-only S/N lengths from the same posterior event model."""
-    count_n = tensor.sum(axis=(1, 2, 3, 4))
+    from csubst import substitution
+    count_n = substitution.get_branch_sub_counts(tensor)
     count_s = g["scan_ctmc_synonymous_counts"]
     sites = g["event_eligible"].sum(axis=1) if "event_eligible" in g else np.full(tensor.shape[0], tensor.shape[1])
     for node in g["tree"].traverse():

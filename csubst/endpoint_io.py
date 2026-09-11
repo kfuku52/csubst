@@ -183,11 +183,16 @@ def _pairwise_storage_bound(n, num_site, shapes, kinds, stats, block_size, g):
 def _pairwise_features(kind, stat, shape, g):
     ng, ns = shape[2:4]
     if kind != 'S':
+        if stat == 'spe2spe':
+            return [a * ns + d for a in range(ns) for d in range(ns) if a != d]
         return np.arange(ng if stat == 'any2any' else ng * ns)
     # Omit padding and singleton synonymous groups, whose change mass is zero.
     sizes = [len(g['synonymous_indices'][aa]) for aa in g['amino_acid_orders']]
     if stat == 'any2any':
         return [sg for sg, size in enumerate(sizes) if size > 1]
+    if stat == 'spe2spe':
+        return [sg * ns * ns + a * ns + d for sg, size in enumerate(sizes)
+                for a in range(size) for d in range(size) if a != d]
     return [sg * ns + state for sg, size in enumerate(sizes) if size > 1
             for state in range(size)]
 
@@ -243,6 +248,12 @@ def _projections(events):
 
 
 
+def _pairwise_search(g):
+    return (int(g.get('max_arity', 0)) == 2
+            and not g.get('site_filter_report', False)
+            and int(g.get('fg_clade_permutation', 0)) == 0)
+
+
 def _use_projected_search(g, selected_stats):
     # These consumers require individual events or additional null summaries.
     # Keep their full, exact representation rather than approximate a missing
@@ -254,7 +265,7 @@ def _use_projected_search(g, selected_stats):
             and not g.get('epistasis_requested', False)
             and g.get('asrv_training_branches', 'all') == 'all'
             and float(g.get('min_sub_pp', 0)) == 0
-            and 'spe2spe' not in selected_stats)
+            and ('spe2spe' not in selected_stats or _pairwise_search(g)))
 
 
 def _projection_transform(g, kinds, mappings, stats, predictive=False, cache_bytes=32 * 1024**2):
@@ -424,14 +435,25 @@ def _build(g, structural=False):
     from csubst import omega, output_stat
     selected_stats = output_stat.get_required_base_stats(omega._resolve_requested_output_stats(g))
     projected = _use_projected_search(g, selected_stats)
-    pairwise = (projected and int(g.get('max_arity', 0)) == 2
-                and not g.get('site_filter_report', False)
-                and int(g.get('fg_clade_permutation', 0)) == 0)
+    pairwise = projected and _pairwise_search(g)
+    block_size = min(int(g.get('endpoint_block_size', 64)), max(1, num_site))
     observed_stats = set(selected_stats) | {'any2any'}
     if pairwise:
+        # A full from/to channel is larger than a marginal channel. Reduce
+        # the site workspace before giving up the streaming pair reducer.
+        while block_size > 1 and _pairwise_storage_bound(
+                n, num_site, shapes, kinds, selected_stats, block_size, g) > 64 * 1024 * 1024:
+            block_size = max(1, block_size // 2)
         pairwise = _pairwise_storage_bound(n, num_site, shapes, kinds, selected_stats,
-                                           int(g.get('endpoint_block_size', 64)), g) <= 64 * 1024 * 1024
-    direct = projected and 'AA' not in kinds
+                                           block_size, g) <= 64 * 1024 * 1024
+    if 'spe2spe' in selected_stats and not pairwise:
+        projected = False
+    direct = projected and 'AA' not in kinds and 'spe2spe' not in selected_stats
+    retained_branches = g.get('_endpoint_retained_branches') if g.get('subcommand') == 'sites' else None
+    if retained_branches is not None:
+        retained_branches = frozenset(int(v) for v in retained_branches)
+        if projected or float(g.get('min_sub_pp', 0)) != 0:
+            raise ValueError('Selected endpoint branches require unthresholded sites events.')
     classified = not direct or g.get('b', False)
     coarse_transform = _projection_transform(g, kinds, mappings, observed_stats) if direct else None
     transform = _event_transform(g, kinds, mappings) if classified else coarse_transform
@@ -443,7 +465,8 @@ def _build(g, structural=False):
         obuilders = {}
         maxima = {}
         branch_sites = {}
-        block_size = min(int(g.get('endpoint_block_size', 64)), num_site)
+        if retained_branches is not None:
+            branch_sites = {kind: np.zeros((n, num_site)) for kind in kinds}
 
         def builder(kind, stat, count):
             if pairwise:
@@ -452,7 +475,8 @@ def _build(g, structural=False):
         if projected:
             for kind, shape in shapes.items():
                 ng, ns = shape[2:4]
-                features = {'any2any': ng, 'spe2any': ng * ns, 'any2spe': ng * ns}
+                features = {'any2any': ng, 'spe2any': ng * ns, 'any2spe': ng * ns,
+                            'spe2spe': ng * ns * ns}
                 obuilders[kind] = {stat: builder(kind, stat, features[stat])
                                    for stat in observed_stats}
                 if pairwise:
@@ -468,7 +492,7 @@ def _build(g, structural=False):
                 features = {'any2any': ng, 'spe2any': ng * ns, 'any2spe': ng * ns, 'spe2spe': ng * ns * ns}
                 ebuilders[kind] = {stat: builder(kind, stat, count)
                                    for stat, count in features.items() if stat in selected_stats}
-        for record in model.iter_blocks(tips, block_size=g.get('endpoint_block_size', 64), predictive=expected,
+        for record in model.iter_blocks(tips, block_size=block_size, predictive=expected,
                                         transform=transform,
                                         predictive_transform=predictive_transform):
             sl = slice(record.start, record.stop)
@@ -511,7 +535,10 @@ def _build(g, structural=False):
                         maxima[kind][1][node, sl] = (index // ns) % ns
                         maxima[kind][2][node, sl] = index % ns
                 else:
-                    builders[kind].append(node, events, record.start, num_site)
+                    if retained_branches is not None:
+                        branch_sites[kind][node, sl] = events.sum(axis=(1, 2, 3))
+                    if retained_branches is None or node in retained_branches:
+                        builders[kind].append(node, events, record.start, num_site)
                 if kind in ebuilders:
                     if direct:
                         prediction_projections = {stat: record.reduced_predictive[kind, stat]
@@ -537,8 +564,13 @@ def _build(g, structural=False):
                     {stat: builder.finish() for stat, builder in obuilders[kind].items()},
                     maxima.get(kind))
             else:
-                cache[kind] = substitution_sparse.SparseSubstitutionTensor(
-                    shapes[kind], source.dtype, matrix=builders[kind].finish())
+                matrix = builders[kind].finish()
+                if retained_branches is not None:
+                    cache[kind] = substitution_sparse.SelectedBranchSubstitutionTensor(
+                        shapes[kind], source.dtype, matrix, branch_sites[kind], retained_branches)
+                else:
+                    cache[kind] = substitution_sparse.SparseSubstitutionTensor(
+                        shapes[kind], source.dtype, matrix=matrix)
             if kind in ebuilders:
                 projections = {stat: builder.finish() for stat, builder in ebuilders[kind].items()}
                 expected_cache[kind] = {
@@ -555,8 +587,11 @@ def _build(g, structural=False):
         cache['AA'] = cache['N']
     manifest = g.setdefault('_endpoint_manifest', {})
     manifest['3di' if structural else 'codon'] = {
-        'observed_storage': 'pairwise' if pairwise else ('projections' if projected else 'full_events'),
+        'observed_storage': ('selected_branches' if retained_branches is not None else
+                             ('pairwise' if pairwise else ('projections' if projected else 'full_events'))),
+        'retained_branches': sorted(retained_branches) if retained_branches is not None else None,
         'direct_projection': direct,
+        'block_size': block_size,
         'rates': np.asarray(rates).tolist(), 'weights': np.asarray(weights).tolist(),
         'branch_lengths': lengths.tolist(),
         'parameter_source': '3di_checkpoint' if structural else g.get('fitted_model_provenance', 'provided_model_matrix'),
@@ -594,7 +629,7 @@ def _input_fingerprint(g):
         add(value)
     for key in ('subcommand', 'expectation_method', 'nonsyn_recode', 'nonsynonymous_indices',
                 'synonymous_indices', 'amino_acid_orders', 'nonsyn_state_orders', 'output_stats',
-                'b', 'cs', 'cbs', 'max_arity', 'calibrate_longtail', 'min_sub_pp',
+                'b', 'cs', 'cbs', 'max_arity', 'calibrate_longtail', 'min_sub_pp', '_endpoint_retained_branches',
                 'calc_omega_pvalue', 'asrv_report', 'epistasis_requested', 'asrv_training_branches',
                 'site_filter_report', 'fg_clade_permutation', 'max_synonymous_size'):
         digest.update(str((key, g.get(key))).encode())

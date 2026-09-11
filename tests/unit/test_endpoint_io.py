@@ -317,12 +317,15 @@ def test_direct_projections_mixture_and_recoding(tmp_path, branch_table):
 @pytest.mark.parametrize('structural', [False, True])
 @pytest.mark.parametrize('sitewise', [False, True])
 @pytest.mark.parametrize('block_size', [1, 2, 64])
-def test_streamed_pairs_match_retained_projections(tmp_path, structural, sitewise, block_size):
+@pytest.mark.parametrize('full_stats', [False, True])
+def test_streamed_pairs_match_retained_projections(tmp_path, structural, sitewise, block_size, full_stats):
     import pandas as pd
     from csubst.substitution_sparse import PairwiseSubstitutionSummary
     retained, ids = toy_context(tmp_path, structural)
     retained.update(subcommand='search', max_arity=3, num_node=5, b=sitewise,
                     output_stats=['any2any', 'spe2any', 'any2spe'], endpoint_block_size=block_size)
+    if full_stats:
+        retained['output_stats'].append('spe2spe')
     streamed = copy.deepcopy(retained)
     streamed['max_arity'] = 2
     endpoint_io.prepare(retained)
@@ -332,7 +335,9 @@ def test_streamed_pairs_match_retained_projections(tmp_path, structural, sitewis
         a, b = retained['_endpoint_tensors'][kind], streamed['_endpoint_tensors'][kind]
         assert isinstance(b, PairwiseSubstitutionSummary)
         assert b.projections == {}
-        np.testing.assert_allclose(a.branch_site, b.branch_site, atol=1e-14)
+        for branch in range(5):
+            np.testing.assert_allclose(substitution.get_branch_site_sub_counts(a, branch),
+                                       b.branch_site[branch], atol=1e-14)
         for stat in streamed['output_stats']:
             projection = a.project(stat)
             np.testing.assert_allclose(b.pairwise[stat], (projection @ projection.T).toarray(), atol=1e-14)
@@ -369,6 +374,34 @@ def test_endpoint_expected_cache_releases_last_reference(tmp_path):
     assert ref() is None
 
 
+@pytest.mark.parametrize('structural', [False, True])
+def test_selected_sites_branches_keep_global_totals(tmp_path, structural):
+    import pandas as pd
+    from csubst import main_sites
+    full, ids = toy_context(tmp_path, structural)
+    full['subcommand'] = 'sites'
+    selected = copy.deepcopy(full)
+    branches = np.array([ids['A'], ids['B']])
+    selected['_endpoint_retained_branches'] = branches.tolist()
+    endpoint_io.prepare(full)
+    endpoint_io.prepare(selected)
+    for kind in ['S', 'N']:
+        a, b = full['_endpoint_tensors'][kind], selected['_endpoint_tensors'][kind]
+        np.testing.assert_allclose(substitution.get_site_sub_counts(a), substitution.get_site_sub_counts(b), atol=1e-14)
+        np.testing.assert_allclose(substitution.get_branch_sub_counts(a), substitution.get_branch_sub_counts(b), atol=1e-14)
+        np.testing.assert_allclose(substitution.get_branches_sub_tensor(a, branches),
+                                   substitution.get_branches_sub_tensor(b, branches), atol=1e-14)
+        before = main_sites.add_cs_info(main_sites.initialize_site_df(3), branches, a, kind)
+        after = main_sites.add_cs_info(main_sites.initialize_site_df(3), branches, b, kind)
+        pd.testing.assert_frame_equal(before, after, check_exact=False, rtol=1e-12, atol=1e-14)
+        assert b.retained_branches == frozenset(branches)
+        assert b.matrix.getrow(ids['U']).nnz == 0
+    old = selected['_endpoint_tensors']['N']
+    selected['_endpoint_retained_branches'] = [ids['C']]
+    endpoint_io.prepare(selected)
+    assert selected['_endpoint_tensors']['N'] is not old
+
+
 @pytest.mark.parametrize('key,value', [('max_arity', 3), ('site_filter_report', True), ('fg_clade_permutation', 1)])
 def test_streaming_retains_projections_when_later_consumers_need_them(tmp_path, key, value):
     from csubst.substitution_sparse import PairwiseSubstitutionSummary
@@ -386,6 +419,17 @@ def test_streamed_pair_workspace_bound_accounts_for_quadratic_branch_axis(tmp_pa
     shapes = {'S': (10000, 3, 2, 2, 2), 'N': (10000, 3, 1, 2, 2)}
     assert endpoint_io._pairwise_storage_bound(10000, 3, shapes, kinds, stats, 64, g) > 64 * 1024**2
     assert endpoint_io._pairwise_storage_bound(5, 3, shapes, kinds, stats, 64, g) < 64 * 1024**2
+
+
+def test_streamed_full_statistics_accept_empty_site_axis(tmp_path):
+    g, _ = toy_context(tmp_path)
+    g.update(subcommand='search', max_arity=2)
+    for key in ['state_cdn', 'state_pep', 'state_nsy']:
+        g[key] = g[key][:, :0]
+    endpoint_io.prepare(g)
+    for kind in ['S', 'N']:
+        for values in g['_endpoint_tensors'][kind].pairwise.values():
+            np.testing.assert_array_equal(values, np.zeros((5, 5)))
 
 
 @pytest.mark.native

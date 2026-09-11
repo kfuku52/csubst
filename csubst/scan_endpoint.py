@@ -8,7 +8,7 @@ the grouped instantaneous matrix is generally not a lumped CTMC generator.
 import numpy as np
 from scipy.linalg import expm
 
-from csubst import endpoint_io, ete
+from csubst import endpoint_io, ete, site_storage
 
 
 def validate_options(g):
@@ -137,7 +137,9 @@ def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids):
         category_states = context.get('category_states')
         if category_states is None:
             raise ValueError('Mixture exposure requires category-conditional joint posteriors.')
-        weighted_parent = category_states[:, context['parent_ids'], int(site), :]
+        weighted_parent = (category_states.read_site(site)[:, context['parent_ids'], :]
+                           if isinstance(category_states, site_storage.SiteArray) else
+                           category_states[:, context['parent_ids'], int(site), :])
         if (not np.isfinite(weighted_parent).all() or (weighted_parent < 0).any()
                 or not np.allclose(weighted_parent.sum(axis=0), parent, atol=1e-10, rtol=1e-8)):
             raise ValueError('Category posterior states do not match scan parent marginals.')
