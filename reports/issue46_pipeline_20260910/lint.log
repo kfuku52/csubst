@@ -1,0 +1,7 @@
+python -m ruff check csubst tests setup.py .github/scripts
+All checks passed!
+python .github/scripts/repository_hygiene_check.py
+Repository hygiene checks passed.
+python .github/scripts/documentation_check.py
+Documentation checks passed: 21 documents, 23 commands, 1 help examples, 2 templates, 67 local links.
+Pass --wiki-dir to also check Wiki pages and links (15 references not checked).

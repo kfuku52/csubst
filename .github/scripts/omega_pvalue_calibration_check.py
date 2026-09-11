@@ -17,7 +17,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATASET_NAME = "PGK"
 OUTPUT_STATS = ("any2spe", "any2any")
 KINDS = ("nocalib", "calib")
-MIN_SUB_PP_MAX_FPR = {
+# Historical PGK rejection-fraction regression limits, NOT nominal FPR limits:
+# PGK is an observed alignment and its branch combinations are dependent.
+MIN_SUB_PP_MAX_REJECTION_FRACTION = {
     ("any2spe", "nocalib"): 0.40,
     ("any2spe", "calib"): 0.50,
     ("any2any", "nocalib"): 0.20,
@@ -28,7 +30,7 @@ MIN_SUB_PP_MAX_FPR = {
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Run a lightweight omega p-value calibration regression sweep and "
+            "Run a historical PGK p-value sensitivity regression sweep and "
             "capture runtime + peak RAM."
         )
     )
@@ -235,6 +237,10 @@ def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter, installed=F
         "round",
         "--calibrate_longtail",
         "yes",
+        "--longtail_method",
+        "empirical",
+        "--random_seed",
+        "46",
         "--threads",
         "1",
         "--iqtree_treefile",
@@ -315,7 +321,7 @@ def run_setting(repo_root, run_root, output_stat, min_sub_pp, niter, installed=F
     return summary_rows, runtime_row
 
 
-def _select_fpr(df, output_stat, kind, min_sub_pp):
+def _select_rejection_fraction(df, output_stat, kind, min_sub_pp):
     tol = 1e-12
     picked = df.loc[
         (df["output_stat"] == output_stat)
@@ -336,13 +342,13 @@ def validate_summary(summary_df, baseline_min_sub_pp, guarded_min_sub_pp):
     errors = []
     for output_stat in OUTPUT_STATS:
         for kind in KINDS:
-            baseline = _select_fpr(
+            baseline = _select_rejection_fraction(
                 summary_df,
                 output_stat=output_stat,
                 kind=kind,
                 min_sub_pp=baseline_min_sub_pp,
             )
-            guarded = _select_fpr(
+            guarded = _select_rejection_fraction(
                 summary_df,
                 output_stat=output_stat,
                 kind=kind,
@@ -350,14 +356,14 @@ def validate_summary(summary_df, baseline_min_sub_pp, guarded_min_sub_pp):
             )
             if (not np.isfinite(baseline)) or (not np.isfinite(guarded)):
                 errors.append(
-                    "{} {}: non-finite fpr baseline={} guarded={}".format(
+                    "{} {}: non-finite rejection fraction baseline={} guarded={}".format(
                         output_stat, kind, baseline, guarded
                     )
                 )
                 continue
             if guarded > baseline + 1e-12:
                 errors.append(
-                    "{} {}: guarded min_sub_pp={} fpr {} should not exceed baseline min_sub_pp={} fpr {}".format(
+                    "{} {}: guarded min_sub_pp={} rejection fraction {} should not exceed baseline min_sub_pp={} rejection fraction {}".format(
                         output_stat,
                         kind,
                         guarded_min_sub_pp,
@@ -366,10 +372,10 @@ def validate_summary(summary_df, baseline_min_sub_pp, guarded_min_sub_pp):
                         baseline,
                     )
                 )
-            cap = MIN_SUB_PP_MAX_FPR[(output_stat, kind)]
+            cap = MIN_SUB_PP_MAX_REJECTION_FRACTION[(output_stat, kind)]
             if guarded > cap:
                 errors.append(
-                    "{} {}: guarded min_sub_pp={} fpr {} exceeds cap {}".format(
+                    "{} {}: guarded min_sub_pp={} rejection fraction {} exceeds cap {}".format(
                         output_stat,
                         kind,
                         guarded_min_sub_pp,

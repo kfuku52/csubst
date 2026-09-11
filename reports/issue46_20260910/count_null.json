@@ -1,0 +1,197 @@
+{
+  "scope": "Known-mean independent Poisson atoms, joint any2spe/any2dif inference; rejection diagnostics use any2spe. No ASR, fractional posterior mass, fitted-mean uncertainty, search selection, or q-value guarantee.",
+  "independent_unit": "One IID log-uniform exposure and independently generated Poisson atoms with disjoint branch IDs; fixed smoothing and independent per-row calibration maps. Intervals average over the exposure distribution.",
+  "seeds": {
+    "observed": 460910,
+    "inference": 460911
+  },
+  "platform": "macOS-26.6.2-x86_64-i386-64bit",
+  "python": "3.10.14",
+  "numpy": "1.26.4",
+  "pandas": "2.2.3",
+  "scipy": "1.15.2",
+  "peak_rss_bytes": 350642176,
+  "memory_scope": "Peak of entire warmed-up benchmark process, not per setting.",
+  "results": [
+    {
+      "setting": "raw",
+      "regime": "sparse_S",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 0,
+      "rate": 0.0,
+      "interval_95": [
+        0.0,
+        0.007178950026259338
+      ],
+      "excess_rejection_p": 1.0,
+      "pvalue_sha256": "e8c8e1387eac86d7ec48c011b709a5c5df6a8c7c1c8bc28d5f693b47812d5fda",
+      "seconds": 0.45923366700299084,
+      "seconds_repeats": [
+        0.45923366700299084,
+        0.48202404199400917,
+        0.4798227499704808
+      ]
+    },
+    {
+      "setting": "raw",
+      "regime": "dense",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 27,
+      "rate": 0.052734375,
+      "interval_95": [
+        0.035036268645150144,
+        0.07580107979067126
+      ],
+      "excess_rejection_p": 0.41610764699725733,
+      "pvalue_sha256": "f347b03f1e9159a60ed9c089fb1b4569b6faf19b2da6891fb49e4a1c56802142",
+      "seconds": 0.6426791670382954,
+      "seconds_repeats": [
+        0.6426791670382954,
+        0.6003222920116968,
+        0.58561887498945
+      ]
+    },
+    {
+      "setting": "raw",
+      "regime": "enriched",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 424,
+      "rate": 0.828125,
+      "interval_95": [
+        0.7925993590886041,
+        0.8598073326973076
+      ],
+      "excess_rejection_p": 0.0,
+      "pvalue_sha256": "c57b4a886cd5e35162d6c2f0c16a8a914293048cce87fabf57c81daae3f61351",
+      "seconds": 0.5790104999905452,
+      "seconds_repeats": [
+        0.5790104999905452,
+        0.5726095419959165,
+        0.5748572919983417
+      ]
+    },
+    {
+      "setting": "symmetric",
+      "regime": "sparse_S",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 18,
+      "rate": 0.03515625,
+      "interval_95": [
+        0.020966408701387048,
+        0.0549942886048387
+      ],
+      "excess_rejection_p": 0.9559218973223719,
+      "pvalue_sha256": "71971eff60ed51e8c26d02aeb73d0149ca5e185703cf2521f3b2c67ce546db7d",
+      "seconds": 0.4349799590418115,
+      "seconds_repeats": [
+        0.4349799590418115,
+        0.4233964169980027,
+        0.41711254202527925
+      ]
+    },
+    {
+      "setting": "symmetric",
+      "regime": "dense",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 25,
+      "rate": 0.048828125,
+      "interval_95": [
+        0.03184475219643662,
+        0.07123865584128512
+      ],
+      "excess_rejection_p": 0.5768250830542151,
+      "pvalue_sha256": "715e9c10ba51b1dc7ad093e59d94c37bc85e512315a068c9f20fa7b60a67e9eb",
+      "seconds": 0.5858710000175051,
+      "seconds_repeats": [
+        0.5858710000175051,
+        0.5797145420219749,
+        0.5911620419938117
+      ]
+    },
+    {
+      "setting": "symmetric",
+      "regime": "enriched",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 467,
+      "rate": 0.912109375,
+      "interval_95": [
+        0.8841631724494643,
+        0.935170225380049
+      ],
+      "excess_rejection_p": 0.0,
+      "pvalue_sha256": "907b9670a717d43b0ac25b8bbfca679cf4298d140ef6a33f04c5255854f880c7",
+      "seconds": 0.5664724169764668,
+      "seconds_repeats": [
+        0.5664724169764668,
+        0.5857492919894867,
+        0.6398405419895425
+      ]
+    },
+    {
+      "setting": "independent_null",
+      "regime": "sparse_S",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 18,
+      "rate": 0.03515625,
+      "interval_95": [
+        0.020966408701387048,
+        0.0549942886048387
+      ],
+      "excess_rejection_p": 0.9559218973223719,
+      "pvalue_sha256": "f03ddf26f7a0cc659757b7403d9e12feffc04a533609dcb381fffba6be674c7e",
+      "seconds": 9.565449333982542,
+      "seconds_repeats": [
+        9.565449333982542,
+        8.552873790962622,
+        8.80343820800772
+      ]
+    },
+    {
+      "setting": "independent_null",
+      "regime": "dense",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 23,
+      "rate": 0.044921875,
+      "interval_95": [
+        0.028686453406096456,
+        0.06664470087314198
+      ],
+      "excess_rejection_p": 0.7290611915996073,
+      "pvalue_sha256": "037008fd6351bcd2a587ef7862e1158e93d4c23786c4a202bb66a32166924708",
+      "seconds": 9.956008374982048,
+      "seconds_repeats": [
+        9.956008374982048,
+        9.769223875016905,
+        9.409844833018724
+      ]
+    },
+    {
+      "setting": "independent_null",
+      "regime": "enriched",
+      "trials": 512,
+      "draws": 999,
+      "rejected": 471,
+      "rate": 0.919921875,
+      "interval_95": [
+        0.8929317736687176,
+        0.9419238241595843
+      ],
+      "excess_rejection_p": 0.0,
+      "pvalue_sha256": "5520e2bbe12208f6a5c2d8bae412c8212cbf24717923cda042d8270fc33b053c",
+      "seconds": 10.18425308301812,
+      "seconds_repeats": [
+        10.18425308301812,
+        9.792839958972763,
+        9.76445508300094
+      ]
+    }
+  ]
+}

@@ -35,3 +35,6 @@ def test_run_setting_uses_supported_module_entrypoint(tmp_path, monkeypatch):
         )
 
     assert captured["cmd"][:4] == [sys.executable, "-m", "csubst", "analyze"]
+    cmd = captured["cmd"]
+    assert cmd[cmd.index('--longtail_method') + 1] == 'empirical'
+    assert cmd[cmd.index('--random_seed') + 1] == '46'

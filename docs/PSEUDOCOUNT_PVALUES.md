@@ -140,3 +140,26 @@ refitting, and real dense/sparse urn means. A reproducible
 uses independently generated observed datasets. Its intervals quantify that
 experiment only; biological false-positive calibration still needs independent
 full-pipeline simulations, including ASR and any data-driven selection.
+
+The CI-collected `tests/unit/test_omega_count_null_script.py` also checks
+known-mean joint Poisson counts with sparse/dense S, fixed symmetric smoothing,
+and independent-null long-tail maps. It tests excess rejection and a fourfold
+N-count alternative using independent observations and inference streams.
+Run `.github/scripts/omega_count_null_check.py` for repeated timing and binomial
+intervals. This count experiment does not establish biological calibration.
+The older `omega_pvalue_calibration_check.py` instead measures sensitivity on
+the observed PGK alignment, explicitly using empirical long-tail calibration
+and a fixed seed. Its rejection-fraction limits are historical regression
+limits, not false-positive-rate guarantees. See the
+[Issue #46 status and evaluation](../reports/issue46_20260910/README.md).
+
+A subsequent [full-pipeline null experiment](../reports/issue46_pipeline_20260910/README.md)
+generated 400 independent eight-tip codon alignments and refitted branch lengths,
+model parameters, ASR and search selection. With long branches, hypergeom and
+`min_sub_pp=0.05`, reporting cutoff-selected pairs at unadjusted P<=0.05 produced
+26 false-positive searches out of 200 (13%; 95% CI 8.67–18.47%). Production
+Q<=0.05 produced 0/200 in every tested setting/regime (each 95% CI 0–1.83%),
+including before effect-size filtering. These are separate reporting rules;
+thresholding substitution posteriors does not correct for searching many pairs.
+No eligible K=3 candidate was generated, and power, larger trees, topology/model
+selection and model misspecification remain outside that experiment.

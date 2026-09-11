@@ -1,0 +1,11 @@
+<PYTHON_ENV>/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.5.1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+raw sparse_S 0.0
+raw dense 0.052734375
+raw enriched 0.828125
+symmetric sparse_S 0.03515625
+symmetric dense 0.048828125
+symmetric enriched 0.912109375
+independent_null sparse_S 0.03515625
+independent_null dense 0.044921875
+independent_null enriched 0.919921875

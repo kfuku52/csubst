@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "<REPO>/.github/scripts/omega_pvalue_calibration_check.py", line 466, in <module>
+    print("Wrote calibration summary: {}".format(str(out_path)))
+  File "<REPO>/.github/scripts/omega_pvalue_calibration_check.py", line 428, in main
+    run_root = prepare_owned_workdir(args.workdir, repo_root=repo_root)
+  File "<REPO>/.github/scripts/omega_pvalue_calibration_check.py", line 269, in run_setting
+    "no",
+  File "<REPO>/.github/scripts/omega_pvalue_calibration_check.py", line 125, in run_timed_command
+    stderr_path.write_text(proc.stderr, encoding="utf-8")
+RuntimeError: Command failed (-2): <PYTHON_ENV>/bin/python -m csubst analyze --outdir . --output_prefix csubst --alignment_file <REPO>/csubst/dataset/PGK.alignment.fa --rooted_tree_file <REPO>/csubst/dataset/PGK.tree.nwk --foreground <REPO>/csubst/dataset/PGK.foreground.txt --expectation_method urn --output_stat any2spe --calc_omega_pvalue yes --min_sub_pp 0 --omega_pvalue_niter_schedule 100 --omega_pvalue_rounding round --calibrate_longtail yes --threads 1 --iqtree_treefile <REPO>/csubst/dataset/PGK.alignment.fa.treefile --iqtree_state <REPO>/csubst/dataset/PGK.alignment.fa.state --iqtree_rate <REPO>/csubst/dataset/PGK.alignment.fa.rate --iqtree_iqtree <REPO>/csubst/dataset/PGK.alignment.fa.iqtree --iqtree_log <REPO>/csubst/dataset/PGK.alignment.fa.log --iqtree_model ECMK07+F+R4 --branch_dist no --b no --s no --cs no --bs no --cbs no --cb yes
+See /private/tmp/csubst_issue46_20260910/any2spe_min_sub_pp_0/analyze.stdout.log
+/private/tmp/csubst_issue46_20260910/any2spe_min_sub_pp_0/analyze.stderr.log

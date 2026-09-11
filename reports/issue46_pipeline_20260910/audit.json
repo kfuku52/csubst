@@ -1,0 +1,12 @@
+{
+  "independent_alignments": 400,
+  "fitted_models": 400,
+  "search_runs": 1600,
+  "output_tables": 1600,
+  "tested_rows": 83200,
+  "failures": 0,
+  "independent_BH_agreement": true,
+  "production_selection_agreement": true,
+  "fitted_artifact_hashes_verified": true,
+  "csubst_output_hashes_verified": true
+}

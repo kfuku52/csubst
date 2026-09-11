@@ -1,0 +1,605 @@
+{
+  "elapsed_seconds": 1804.5355181250488,
+  "rows": [
+    {
+      "regime": "long",
+      "setting": "hypergeom_pp0",
+      "any_p05": {
+        "rejections": 62,
+        "replicates": 200,
+        "rate": 0.31,
+        "interval_95": [
+          0.24665803744172535,
+          0.3790770405203471
+        ]
+      },
+      "any_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_p05": {
+        "rejections": 14,
+        "replicates": 200,
+        "rate": 0.07,
+        "interval_95": [
+          0.03879557042956298,
+          0.11465973353712218
+        ]
+      },
+      "selected_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "top_selected_p05": {
+        "rejections": 14,
+        "replicates": 200,
+        "rate": 0.07,
+        "interval_95": [
+          0.03879557042956298,
+          0.11465973353712218
+        ]
+      },
+      "datasets_with_candidates": 14,
+      "fixed_pair_finite": 200,
+      "fixed_pair_unconditional": {
+        "rejections": 1,
+        "replicates": 200,
+        "rate": 0.005,
+        "interval_95": [
+          0.0001265810280094039,
+          0.027541898457558386
+        ]
+      },
+      "fixed_pair_conditional": {
+        "rejections": 1,
+        "replicates": 200,
+        "rate": 0.005,
+        "interval_95": [
+          0.0001265810280094039,
+          0.027541898457558386
+        ]
+      },
+      "median_search_seconds": 7.116405062522972,
+      "max_search_rss_bytes": 319193088,
+      "total_evaluated_rows": 10400,
+      "total_finite_p_rows": 10400,
+      "total_selected_rows": 16,
+      "datasets_with_k3": 0
+    },
+    {
+      "regime": "long",
+      "setting": "hypergeom_pp005",
+      "any_p05": {
+        "rejections": 77,
+        "replicates": 200,
+        "rate": 0.385,
+        "interval_95": [
+          0.3172245253628674,
+          0.4562386927830855
+        ]
+      },
+      "any_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_p05": {
+        "rejections": 26,
+        "replicates": 200,
+        "rate": 0.13,
+        "interval_95": [
+          0.08670835276857529,
+          0.18465233052341248
+        ]
+      },
+      "selected_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "top_selected_p05": {
+        "rejections": 26,
+        "replicates": 200,
+        "rate": 0.13,
+        "interval_95": [
+          0.08670835276857529,
+          0.18465233052341248
+        ]
+      },
+      "datasets_with_candidates": 26,
+      "fixed_pair_finite": 200,
+      "fixed_pair_unconditional": {
+        "rejections": 2,
+        "replicates": 200,
+        "rate": 0.01,
+        "interval_95": [
+          0.0012133490137476008,
+          0.035654668397239866
+        ]
+      },
+      "fixed_pair_conditional": {
+        "rejections": 2,
+        "replicates": 200,
+        "rate": 0.01,
+        "interval_95": [
+          0.0012133490137476008,
+          0.035654668397239866
+        ]
+      },
+      "median_search_seconds": 3.3433963959978428,
+      "max_search_rss_bytes": 217124864,
+      "total_evaluated_rows": 10400,
+      "total_finite_p_rows": 10400,
+      "total_selected_rows": 27,
+      "datasets_with_k3": 0
+    },
+    {
+      "regime": "long",
+      "setting": "poisson_symmetric_pp005",
+      "any_p05": {
+        "rejections": 18,
+        "replicates": 200,
+        "rate": 0.09,
+        "interval_95": [
+          0.05421425445606032,
+          0.13850820847379608
+        ]
+      },
+      "any_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_p05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "top_selected_p05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "datasets_with_candidates": 0,
+      "fixed_pair_finite": 200,
+      "fixed_pair_unconditional": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "fixed_pair_conditional": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "median_search_seconds": 2.7863401464710478,
+      "max_search_rss_bytes": 167755776,
+      "total_evaluated_rows": 10400,
+      "total_finite_p_rows": 10400,
+      "total_selected_rows": 0,
+      "datasets_with_k3": 0
+    },
+    {
+      "regime": "long",
+      "setting": "poisson_independent_pp005",
+      "any_p05": {
+        "rejections": 11,
+        "replicates": 200,
+        "rate": 0.055,
+        "interval_95": [
+          0.02777225455217507,
+          0.09627764443388101
+        ]
+      },
+      "any_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_p05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "top_selected_p05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "datasets_with_candidates": 0,
+      "fixed_pair_finite": 200,
+      "fixed_pair_unconditional": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "fixed_pair_conditional": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "median_search_seconds": 4.958208604512038,
+      "max_search_rss_bytes": 169717760,
+      "total_evaluated_rows": 10400,
+      "total_finite_p_rows": 10400,
+      "total_selected_rows": 0,
+      "datasets_with_k3": 0
+    },
+    {
+      "regime": "short",
+      "setting": "hypergeom_pp0",
+      "any_p05": {
+        "rejections": 58,
+        "replicates": 200,
+        "rate": 0.29,
+        "interval_95": [
+          0.22815698936341705,
+          0.35818745216229103
+        ]
+      },
+      "any_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_p05": {
+        "rejections": 2,
+        "replicates": 200,
+        "rate": 0.01,
+        "interval_95": [
+          0.0012133490137476008,
+          0.035654668397239866
+        ]
+      },
+      "selected_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "top_selected_p05": {
+        "rejections": 2,
+        "replicates": 200,
+        "rate": 0.01,
+        "interval_95": [
+          0.0012133490137476008,
+          0.035654668397239866
+        ]
+      },
+      "datasets_with_candidates": 4,
+      "fixed_pair_finite": 200,
+      "fixed_pair_unconditional": {
+        "rejections": 1,
+        "replicates": 200,
+        "rate": 0.005,
+        "interval_95": [
+          0.0001265810280094039,
+          0.027541898457558386
+        ]
+      },
+      "fixed_pair_conditional": {
+        "rejections": 1,
+        "replicates": 200,
+        "rate": 0.005,
+        "interval_95": [
+          0.0001265810280094039,
+          0.027541898457558386
+        ]
+      },
+      "median_search_seconds": 3.27913520851871,
+      "max_search_rss_bytes": 248692736,
+      "total_evaluated_rows": 10400,
+      "total_finite_p_rows": 10400,
+      "total_selected_rows": 4,
+      "datasets_with_k3": 0
+    },
+    {
+      "regime": "short",
+      "setting": "hypergeom_pp005",
+      "any_p05": {
+        "rejections": 69,
+        "replicates": 200,
+        "rate": 0.345,
+        "interval_95": [
+          0.279365475971564,
+          0.41530723901038924
+        ]
+      },
+      "any_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_p05": {
+        "rejections": 1,
+        "replicates": 200,
+        "rate": 0.005,
+        "interval_95": [
+          0.0001265810280094039,
+          0.027541898457558386
+        ]
+      },
+      "selected_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "top_selected_p05": {
+        "rejections": 1,
+        "replicates": 200,
+        "rate": 0.005,
+        "interval_95": [
+          0.0001265810280094039,
+          0.027541898457558386
+        ]
+      },
+      "datasets_with_candidates": 4,
+      "fixed_pair_finite": 200,
+      "fixed_pair_unconditional": {
+        "rejections": 1,
+        "replicates": 200,
+        "rate": 0.005,
+        "interval_95": [
+          0.0001265810280094039,
+          0.027541898457558386
+        ]
+      },
+      "fixed_pair_conditional": {
+        "rejections": 1,
+        "replicates": 200,
+        "rate": 0.005,
+        "interval_95": [
+          0.0001265810280094039,
+          0.027541898457558386
+        ]
+      },
+      "median_search_seconds": 2.506226416968275,
+      "max_search_rss_bytes": 218599424,
+      "total_evaluated_rows": 10400,
+      "total_finite_p_rows": 10400,
+      "total_selected_rows": 4,
+      "datasets_with_k3": 0
+    },
+    {
+      "regime": "short",
+      "setting": "poisson_symmetric_pp005",
+      "any_p05": {
+        "rejections": 14,
+        "replicates": 200,
+        "rate": 0.07,
+        "interval_95": [
+          0.03879557042956298,
+          0.11465973353712218
+        ]
+      },
+      "any_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_p05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "top_selected_p05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "datasets_with_candidates": 0,
+      "fixed_pair_finite": 200,
+      "fixed_pair_unconditional": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "fixed_pair_conditional": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "median_search_seconds": 2.426717541500693,
+      "max_search_rss_bytes": 164278272,
+      "total_evaluated_rows": 10400,
+      "total_finite_p_rows": 10400,
+      "total_selected_rows": 0,
+      "datasets_with_k3": 0
+    },
+    {
+      "regime": "short",
+      "setting": "poisson_independent_pp005",
+      "any_p05": {
+        "rejections": 10,
+        "replicates": 200,
+        "rate": 0.05,
+        "interval_95": [
+          0.02423416547210829,
+          0.09002753770155869
+        ]
+      },
+      "any_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_p05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "selected_q05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "top_selected_p05": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "datasets_with_candidates": 0,
+      "fixed_pair_finite": 200,
+      "fixed_pair_unconditional": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "fixed_pair_conditional": {
+        "rejections": 0,
+        "replicates": 200,
+        "rate": 0.0,
+        "interval_95": [
+          0.0,
+          0.0182753403551488
+        ]
+      },
+      "median_search_seconds": 3.959114145982312,
+      "max_search_rss_bytes": 169676800,
+      "total_evaluated_rows": 10400,
+      "total_finite_p_rows": 10400,
+      "total_selected_rows": 0,
+      "datasets_with_k3": 0
+    }
+  ]
+}

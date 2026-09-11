@@ -1,0 +1,16 @@
+{
+  "python": "3.10.14",
+  "python_build": "3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:53:34) [Clang 16.0.6 ]",
+  "machine": "x86_64",
+  "cpu": "Apple M2 Max",
+  "numpy": "1.26.4",
+  "pandas": "2.2.3",
+  "scipy": "1.15.2",
+  "iqtree_version": "IQ-TREE version 3.1.4 for MacOS ARM 64-bit built Sep 10 2026",
+  "iqtree_sha256": "c5bc5423664cde56253cf58c8c07dfce86fec8177daf55c50d799e275d0b7a9f",
+  "source_commit": "72c3c4543e66e21ae48aaa7bec80b66e953d18da",
+  "source_script_sha256": "cf27e6b889271006966fa45faa6930fad3fccff78887307c9cf70f75e06cf4fd",
+  "source_snapshot_manifest_sha256": "5cb4e15c4251543ad5762a372cac29acf4ccf622eff1f6920d2f5f9c5f24d1bf",
+  "runtime_scope": "Shared host. Four independent workers. Numerical threads set to one. Python runs as x86_64; the official IQ-TREE binary is native macOS arm64.",
+  "tracked_snapshot_files_matching_commit": 101
+}
