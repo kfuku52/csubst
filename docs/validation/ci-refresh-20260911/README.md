@@ -33,3 +33,24 @@ A separate, explicitly requested `record-parity-baseline` job collects three
 Linux hosted-runner measurements after verifying the current scientific
 references. The normal parity job retains its absolute and baseline-relative
 limits throughout baseline collection. See TESTING.md for the procedure.
+
+## Linux baseline
+
+The [manual run](https://github.com/kfuku52/csubst/actions/runs/34592796250)
+on commit `7a4079d195101c009eeb71b0c50fc298335d2856` completed
+`record-parity-baseline` successfully. All three installed-wheel replicates
+passed the scientific checks on Ubuntu/Python 3.12. The raw artifacts are
+`replicate-1.tsv` through `replicate-3.tsv`; the versioned baseline uses
+median wall times and maximum peak RSS from these three runs.
+
+| Dataset | Analyze median seconds | Analyze peak KiB | Sites median seconds | Sites peak KiB |
+| --- | ---: | ---: | ---: | ---: |
+| PGK | 2.62 | 214116 | 7.11 | 371364 |
+| PEPC | 7.28 | 358772 | 17.17 | 908180 |
+
+The historical baseline was measured for different inference/filter defaults,
+so this is a new reference workload, not a performance improvement claim.
+The normal parity job in that same run passed the scientific checks but
+rejected the old PEPC time/RSS baseline; it was not bypassed by collection.
+All absolute limits and the 2.0 wall-time/1.75 RSS multipliers remain unchanged.
+All other CI jobs, including full native and fallback suites, passed.
