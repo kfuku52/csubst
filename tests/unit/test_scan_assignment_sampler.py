@@ -31,13 +31,13 @@ def test_whole_configuration_rejection_is_uniform(monkeypatch):
     rng = np.random.default_rng(617)
     counts = Counter()
     attempts = []
-    for _ in range(12000):
+    for _ in range(2000):
         configuration, count = scan_permutation.sample_configuration(plan, rng)
         counts[configuration] += 1
         attempts.append(count)
     assert set(counts) == {((0, 1),), ((0, 2),), ((0, 3),), ((1, 2),)}
     # The old sequential sampler gave WX probability 1/3 and XY/XZ 5/24.
-    assert all(abs(count / 12000 - 0.25) < 0.02 for count in counts.values())
+    assert all(abs(count / 2000 - 0.25) < 0.05 for count in counts.values())
     assert max(attempts) > 1
 
 

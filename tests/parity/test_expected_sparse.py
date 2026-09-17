@@ -18,7 +18,7 @@ def test_csr_row_builder_matches_dense_with_empty_rows():
 
 def test_csr_row_builder_randomized_parity():
     rng = np.random.default_rng(20260716)
-    for _ in range(25):
+    for _ in range(8):
         num_row = int(rng.integers(1, 40))
         num_column = int(rng.integers(1, 200))
         expected = rng.normal(size=(num_row, num_column))

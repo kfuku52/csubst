@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 from csubst import structural_alphabet
 
 
@@ -115,31 +117,14 @@ def test_predict_3di_with_prostt5_batches_and_reuses_duplicates(monkeypatch):
     assert len(_FakeBatchTokenizer.decode_calls) == 3
 
 
-def test_resolve_prostt5_auto_batch_size_uses_threads_by_default():
+@pytest.mark.parametrize("device,threads,expected", [("cpu", 3, 3), ("cuda", 4, 32)])
+def test_resolve_prostt5_auto_batch_size(device, threads, expected):
     batch_size = structural_alphabet._resolve_prostt5_auto_batch_size(
-        threads=3,
-        device="cpu",
+        threads=threads,
+        device=device,
         unique_sequence_count=100,
     )
-    assert batch_size == 3
-
-
-def test_resolve_prostt5_auto_batch_size_can_expand_on_cuda():
-    batch_size = structural_alphabet._resolve_prostt5_auto_batch_size(
-        threads=4,
-        device="cuda",
-        unique_sequence_count=100,
-    )
-    assert batch_size == 32
-
-
-def test_resolve_prostt5_auto_batch_size_can_expand_on_mps():
-    batch_size = structural_alphabet._resolve_prostt5_auto_batch_size(
-        threads=2,
-        device="mps",
-        unique_sequence_count=100,
-    )
-    assert batch_size == 16
+    assert batch_size == expected
 
 
 def test_local_prostt5_cache_key_does_not_hash_model_contents(tmp_path, monkeypatch):

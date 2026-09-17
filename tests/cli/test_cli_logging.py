@@ -2,13 +2,26 @@ import pytest
 from cli_runner import run_csubst as _run_csubst
 
 
-def test_cli_help_has_no_log_side_effect(tmp_path):
-    result = _run_csubst(["--help"], cwd=tmp_path)
+@pytest.mark.parametrize(
+    ("args", "subcommand_log_dir"),
+    [
+        (("--help",), None),
+        (("inspect", "-h"), "csubst_inspect"),
+        (("sites", "--help-advanced"), "csubst_sites"),
+        (("analyze", "-h"), "csubst_search"),
+    ],
+)
+def test_help_has_no_log_side_effect(tmp_path, args, subcommand_log_dir):
+    result = _run_csubst(list(args), cwd=tmp_path)
     assert result.returncode == 0
-    log_file = tmp_path / "csubst.log"
-    assert not log_file.exists()
     assert "CSUBST start:" not in result.stdout
     assert "usage:" in result.stdout.lower()
+    assert not (tmp_path / "csubst.log").exists()
+    if subcommand_log_dir is not None:
+        assert not (tmp_path / subcommand_log_dir / "csubst.log").exists()
+    if args == ("sites", "--help-advanced"):
+        assert "--expected_state_backend" in result.stdout
+        assert "--parallel_" not in result.stdout
 
 
 def test_cli_version_has_no_log_side_effect(tmp_path):
@@ -19,8 +32,9 @@ def test_cli_version_has_no_log_side_effect(tmp_path):
     assert not (tmp_path / "csubst.log").exists()
 
 
-def test_cli_writes_stderr_output_to_csubst_log(tmp_path):
-    result = _run_csubst(["search", "--does_not_exist"], cwd=tmp_path)
+@pytest.mark.parametrize("command", ["search", "analyze"])
+def test_cli_writes_stderr_output_to_csubst_log(tmp_path, command):
+    result = _run_csubst([command, "--does_not_exist"], cwd=tmp_path)
     assert result.returncode != 0
     log_file = tmp_path / "csubst_search" / "csubst.log"
     assert log_file.exists()
@@ -31,40 +45,19 @@ def test_cli_writes_stderr_output_to_csubst_log(tmp_path):
     assert "--does_not_exist" in log_text
 
 
-def test_legacy_analyze_alias_still_writes_to_csubst_search_log(tmp_path):
-    result = _run_csubst(["analyze", "--does_not_exist"], cwd=tmp_path)
-    assert result.returncode != 0
-    log_file = tmp_path / "csubst_search" / "csubst.log"
-    assert log_file.exists()
-    log_text = log_file.read_text(encoding="utf-8")
-    assert "error:" in result.stderr.lower()
-    assert "--does_not_exist" in result.stderr
-    assert "error:" in log_text.lower()
-    assert "--does_not_exist" in log_text
-
-
-def test_cli_ignores_custom_log_file_for_help(tmp_path):
-    custom_log = tmp_path / "logs" / "custom-help.log"
-    result = _run_csubst(["--log_file", str(custom_log), "--help"], cwd=tmp_path)
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("--log_file", "custom-help.log", "--help"),
+        ("inspect", "--log_file", "inspect.log", "-h"),
+    ],
+)
+def test_help_ignores_custom_log_file(tmp_path, args):
+    custom_log = tmp_path / "logs" / args[-2]
+    argv = [str(custom_log) if token == args[-2] else token for token in args]
+    result = _run_csubst(argv, cwd=tmp_path)
     assert result.returncode == 0
     assert not custom_log.exists()
-    assert not (tmp_path / "csubst.log").exists()
-
-
-def test_cli_ignores_custom_log_file_for_subcommand_help(tmp_path):
-    custom_log = tmp_path / "logs" / "inspect.log"
-    result = _run_csubst(["inspect", "--log_file", str(custom_log), "-h"], cwd=tmp_path)
-    assert result.returncode == 0
-    assert not custom_log.exists()
-    assert not (tmp_path / "csubst.log").exists()
-
-
-def test_cli_advanced_help_has_no_log_side_effect(tmp_path):
-    result = _run_csubst(["sites", "--help-advanced"], cwd=tmp_path)
-    assert result.returncode == 0
-    assert "--expected_state_backend" in result.stdout
-    assert "--parallel_" not in result.stdout
-    assert not (tmp_path / "csubst_sites" / "csubst.log").exists()
     assert not (tmp_path / "csubst.log").exists()
 
 
@@ -80,91 +73,28 @@ def test_download_no_download_missing_resource_fails_cleanly(tmp_path):
     assert "Traceback" not in result.stderr
 
 
-def test_simulate_help_has_no_log_side_effect(tmp_path):
-    result = _run_csubst(["simulate", "-h"], cwd=tmp_path)
-    assert result.returncode == 0
-    log_file = tmp_path / "csubst_simulate" / "csubst.log"
-    assert not log_file.exists()
-    assert not (tmp_path / "csubst.log").exists()
-
-
-def test_benchmark_help_has_no_log_side_effect(tmp_path):
-    result = _run_csubst(["benchmark", "-h"], cwd=tmp_path)
-    assert result.returncode == 0
-    log_file = tmp_path / "csubst_benchmark" / "csubst.log"
-    assert not log_file.exists()
-    assert not (tmp_path / "csubst.log").exists()
-
-
-def test_benchmark_plot_help_has_no_log_side_effect(tmp_path):
-    result = _run_csubst(["benchmark-plot", "-h"], cwd=tmp_path)
-    assert result.returncode == 0
-    log_file = tmp_path / "csubst_benchmark_plot" / "csubst.log"
-    assert not log_file.exists()
-    assert not (tmp_path / "csubst.log").exists()
-
-
-def test_doctor_help_has_no_log_side_effect(tmp_path):
-    result = _run_csubst(["doctor", "-h"], cwd=tmp_path)
-    assert result.returncode == 0
-    log_file = tmp_path / "csubst_doctor" / "csubst.log"
-    assert not log_file.exists()
-    assert not (tmp_path / "csubst.log").exists()
-
-
-def test_sites_help_has_no_log_side_effect(tmp_path):
-    result = _run_csubst(["sites", "-h"], cwd=tmp_path)
-    assert result.returncode == 0
-    log_file = tmp_path / "csubst_sites" / "csubst.log"
-    assert not log_file.exists()
-    assert not (tmp_path / "csubst.log").exists()
-
-
-def test_legacy_site_help_has_no_log_side_effect(tmp_path):
-    result = _run_csubst(["site", "-h"], cwd=tmp_path)
-    assert result.returncode == 0
-    log_file = tmp_path / "csubst_sites" / "csubst.log"
-    assert not log_file.exists()
-    assert not (tmp_path / "csubst.log").exists()
-
-
-def test_subcommand_output_namespace_defaults_are_command_specific():
+@pytest.mark.parametrize(
+    ("command", "outdir"),
+    [
+        ("search", "csubst_search"),
+        ("analyze", "csubst_search"),
+        ("inspect", "csubst_inspect"),
+        ("benchmark", "csubst_benchmark"),
+        ("benchmark-plot", "csubst_benchmark_plot"),
+        ("doctor", "csubst_doctor"),
+        ("simulate", "csubst_simulate"),
+        ("sites", "csubst_sites"),
+    ],
+)
+def test_subcommand_output_namespace_defaults_are_command_specific(command, outdir):
     from csubst import cli
 
     parser = cli._build_parser()
-
-    search = parser.parse_args(["search"])
-    assert search.outdir == "csubst_search"
-    assert search.output_prefix == "csubst"
-
-    analyze = parser.parse_args(["analyze"])
-    assert analyze.outdir == "csubst_search"
-    assert analyze.output_prefix == "csubst"
-
-    inspect = parser.parse_args(["inspect"])
-    assert inspect.outdir == "csubst_inspect"
-    assert inspect.output_prefix == "csubst"
-    assert inspect.combination_count_max_arity == 10
-
-    benchmark = parser.parse_args(["benchmark"])
-    assert benchmark.outdir == "csubst_benchmark"
-    assert benchmark.output_prefix == "csubst"
-
-    benchmark_plot = parser.parse_args(["benchmark-plot"])
-    assert benchmark_plot.outdir == "csubst_benchmark_plot"
-    assert benchmark_plot.output_prefix == "csubst"
-
-    doctor = parser.parse_args(["doctor"])
-    assert doctor.outdir == "csubst_doctor"
-    assert doctor.output_prefix == "csubst"
-
-    simulate = parser.parse_args(["simulate"])
-    assert simulate.outdir == "csubst_simulate"
-    assert simulate.output_prefix == "csubst"
-
-    sites = parser.parse_args(["sites"])
-    assert sites.outdir == "csubst_sites"
-    assert sites.output_prefix == "csubst"
+    parsed = parser.parse_args([command])
+    assert parsed.outdir == outdir
+    assert parsed.output_prefix == "csubst"
+    if command == "inspect":
+        assert parsed.combination_count_max_arity == 10
 
 
 def test_advanced_options_remain_parseable_in_normal_execution_mode():

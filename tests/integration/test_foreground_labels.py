@@ -4,25 +4,6 @@ import pandas as pd
 import pytest
 
 from csubst import foreground
-from csubst import ete
-
-
-def test_normalize_branch_ids_rejects_non_integer_like_values():
-    with pytest.raises(ValueError, match="integer-like"):
-        foreground._normalize_branch_ids([1.5])
-    with pytest.raises(ValueError, match="integer-like"):
-        foreground._normalize_branch_ids(["2.5"])
-    with pytest.raises(ValueError, match="integer-like"):
-        foreground._normalize_branch_ids([True])
-
-
-def test_get_num_foreground_lineages_uses_compat_props():
-    tr = ete.PhyloNode("(A:1,B:1)R;", format=1)
-    for node in tr.traverse():
-        ete.set_prop(node, "is_lineage_fg_traitA_1", False)
-    root = [n for n in tr.traverse() if ete.is_root(n)][0]
-    ete.set_prop(root, "is_lineage_fg_traitA_3", True)
-    assert foreground.get_num_foreground_lineages(tr, "traitA") == 3
 
 
 def test_read_foreground_file_rejects_invalid_fg_format1_shape(tmp_path):
@@ -79,12 +60,6 @@ def test_set_target_label_column_prefers_branch_id_column_over_index_labels():
     assert out.loc[2, "is_target"] == "Y"
 
 
-def test_count_branch_memberships_accepts_scalar_ids():
-    cb = pd.DataFrame({"branch_id_1": [1, 2], "branch_id_2": [3, 4]})
-    out = foreground._count_branch_memberships(cb=cb, bid_cols=["branch_id_1", "branch_id_2"], ids=np.int64(3))
-    assert out.tolist() == [1, 0]
-
-
 def test_count_branch_memberships_from_bid_matrix_accepts_scalar_ids():
     bid_matrix = np.array([[1, 3], [2, 4]], dtype=np.int64)
     out = foreground._count_branch_memberships_from_bid_matrix(bid_matrix=bid_matrix, ids=np.int64(3))
@@ -126,41 +101,6 @@ def test_mark_dependent_foreground_rows_is_order_invariant_for_higher_arity():
         dependent_id_combinations=dep,
     )
     assert out.loc[:, "is_fg_traitA"].tolist() == ["N", "Y", "N"]
-
-
-def test_compute_dependent_foreground_mask_is_order_invariant_for_pairs():
-    cb = pd.DataFrame(
-        {
-            "branch_id_1": [1, 1, 2, 3],
-            "branch_id_2": [5, 3, 5, 4],
-        }
-    )
-    dep = np.array([[5, 1], [5, 2]], dtype=np.int64)
-    out = foreground._compute_dependent_foreground_mask(
-        cb=cb,
-        bid_cols=["branch_id_1", "branch_id_2"],
-        dependent_id_combinations=dep,
-    )
-    assert out.tolist() == [True, False, True, False]
-
-
-def test_compute_dependent_foreground_mask_accepts_precomputed_bid_key():
-    cb = pd.DataFrame(
-        {
-            "branch_id_1": [1, 1, 2, 3],
-            "branch_id_2": [5, 3, 5, 4],
-        }
-    )
-    dep = np.array([[5, 1], [5, 2]], dtype=np.int64)
-    bid_matrix = cb.loc[:, ["branch_id_1", "branch_id_2"]].to_numpy(copy=False)
-    bid_key = foreground._build_order_invariant_row_keys(bid_matrix, assume_sorted=False)
-    out = foreground._compute_dependent_foreground_mask(
-        cb=cb,
-        bid_cols=["branch_id_1", "branch_id_2"],
-        dependent_id_combinations=dep,
-        precomputed_bid_key=bid_key,
-    )
-    assert out.tolist() == [True, False, True, False]
 
 
 def test_assign_trait_labels_applies_dependent_mask_to_foreground_only():

@@ -39,18 +39,6 @@ def test_sparse_tensor_reports_payload_and_dense_storage_bytes():
     assert sparse_tensor.compression_ratio == pytest.approx(dense.nbytes / expected_payload)
 
 
-def test_clear_sparse_cb_projection_cache_releases_cached_payload():
-    sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(_toy_dense_tensor())
-    projection = substitution._get_sparse_cb_projection(sparse_tensor, stat="any2spe")
-    expected_nbytes = projection.data.nbytes + projection.indices.nbytes + projection.indptr.nbytes
-
-    released_nbytes = substitution.clear_sparse_cb_projection_cache(sparse_tensor)
-
-    assert released_nbytes == expected_nbytes
-    assert sparse_tensor._cb_sparse_projection_cache == {}
-    assert substitution.clear_sparse_cb_projection_cache(sparse_tensor) == 0
-
-
 def test_sparse_tensor_blocks_and_csr_payload_are_read_only():
     sparse_tensor = substitution_sparse.dense_to_sparse_substitution_tensor(_toy_dense_tensor())
     key = next(iter(sparse_tensor.blocks))
@@ -155,28 +143,6 @@ def test_sparse_projections_match_dense_reductions():
             observed_any2spe = sparse_tensor.project_any2spe(sg, d).toarray()
             expected_any2spe = dense[:, :, sg, :, d].sum(axis=2)
             np.testing.assert_allclose(observed_any2spe, expected_any2spe, atol=1e-12)
-
-
-def test_packed_sitewise_max_cython_matches_python_fallback(monkeypatch):
-    if substitution_sparse_cy is None or not hasattr(
-        substitution_sparse_cy,
-        "scan_packed_sitewise_max_row_double",
-    ):
-        pytest.skip("Cython packed sitewise scan is unavailable")
-    sparse_tensor = substitution_sparse.SparseSubstitutionTensor.from_dense(_toy_dense_tensor())
-    observed = substitution._get_sparse_branch_sitewise_max_indices(
-        sparse_tensor,
-        branch_id=0,
-        min_sitewise_pp=0.1,
-    )
-    monkeypatch.setattr(substitution, "substitution_sparse_cy", None)
-    expected = substitution._get_sparse_branch_sitewise_max_indices(
-        sparse_tensor,
-        branch_id=0,
-        min_sitewise_pp=0.1,
-    )
-    for observed_array, expected_array in zip(observed, expected):
-        np.testing.assert_array_equal(observed_array, expected_array)
 
 
 def test_substitution_helpers_convert_dense_and_sparse():

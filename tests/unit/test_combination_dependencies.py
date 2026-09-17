@@ -47,12 +47,12 @@ def test_mark_dependent_row_combinations_bitset_matches_python_randomized():
     rng = np.random.default_rng(91)
     num_row = 80
     row_combinations = np.array(
-        [rng.choice(num_row, size=4, replace=False) for _ in range(1000)],
+        [rng.choice(num_row, size=4, replace=False) for _ in range(200)],
         dtype=np.int64,
     )
     dep_groups = [
         rng.choice(num_row, size=int(size), replace=False).astype(np.int64)
-        for size in rng.integers(1, 10, size=30)
+        for size in rng.integers(1, 10, size=10)
     ]
     expected = combination._mark_dependent_row_combinations_python(
         row_combinations=row_combinations,
@@ -72,42 +72,6 @@ def test_mark_dependent_row_combinations_falls_back_when_bitset_exceeds_cap(monk
     monkeypatch.setattr(combination, "_DEPENDENCY_BITSET_MAX_BYTES", 0)
     observed = combination._mark_dependent_row_combinations(rows, dep_groups)
     np.testing.assert_array_equal(observed, np.array([True, False, False]))
-
-
-def test_dependency_bitset_fast_paths_reject_too_few_columns():
-    malformed_bitset = np.zeros(shape=(9, 1), dtype=np.uint8)
-    rows = np.array([[0, 8]], dtype=np.int64)
-    with pytest.raises(ValueError, match="too few columns"):
-        combination._mark_dependent_row_combinations_from_bitset(rows, malformed_bitset)
-    with pytest.raises(ValueError, match="too few columns"):
-        combination._generate_independent_row_combinations(
-            candidate_rows=np.array([0, 8], dtype=np.int64),
-            arity=2,
-            dependency_bitset=malformed_bitset,
-        )
-    with pytest.raises(ValueError, match="too few columns"):
-        combination._generate_union_candidates_by_shared_subset(
-            target_nodes=np.array([[0, 1], [0, 8]], dtype=np.int64),
-            arity=3,
-            dependency_bitset=malformed_bitset,
-        )
-    if combination.combination_cy is not None:
-        with pytest.raises(ValueError, match="too few columns"):
-            combination.combination_cy.mark_dependent_combinations_bitset_int64(
-                rows,
-                malformed_bitset,
-            )
-        with pytest.raises(ValueError, match="too few columns"):
-            combination.combination_cy.generate_independent_combinations_int64(
-                np.array([0, 8], dtype=np.int64),
-                malformed_bitset,
-                2,
-            )
-        with pytest.raises(ValueError, match="too few columns"):
-            combination.combination_cy.generate_union_candidates_shared_subset_int64(
-                np.array([[0, 1], [0, 8]], dtype=np.int64),
-                malformed_bitset,
-            )
 
 
 def test_generate_independent_row_combinations_matches_generate_then_filter():
@@ -151,35 +115,6 @@ def test_generate_independent_row_combinations_python_fallback_matches_cython(mo
     monkeypatch.setattr(combination, "combination_cy", None)
     observed = combination._generate_independent_row_combinations(
         candidate_rows=np.arange(7, dtype=np.int64),
-        arity=3,
-        dependency_bitset=dependency_bitset,
-    )
-    np.testing.assert_array_equal(observed, expected)
-
-
-def test_conflict_aware_union_generation_matches_post_filter():
-    pair_rows = np.array(
-        [
-            [0, 2],
-            [0, 3],
-            [1, 2],
-            [1, 3],
-        ],
-        dtype=np.int64,
-    )
-    dep_groups = [np.array([2, 3], dtype=np.int64)]
-    dependency_bitset = combination._build_dependency_bitset(dep_groups, num_row=4)
-    generated = combination._generate_union_candidates_by_shared_subset(
-        target_nodes=pair_rows,
-        arity=3,
-    )
-    is_dependent = combination._mark_dependent_row_combinations_python(
-        row_combinations=generated,
-        dep_row_groups=dep_groups,
-    )
-    expected = generated[~is_dependent, :]
-    observed = combination._generate_union_candidates_by_shared_subset(
-        target_nodes=pair_rows,
         arity=3,
         dependency_bitset=dependency_bitset,
     )

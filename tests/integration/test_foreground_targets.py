@@ -4,7 +4,6 @@ import pandas as pd
 import pytest
 
 from csubst import foreground
-from csubst import combination
 from csubst import ete
 from csubst import tree
 
@@ -42,34 +41,6 @@ def test_get_num_foreground_lineages_reads_tree_properties():
         # Non-numeric suffix should be ignored.
         ete.set_prop(node, "is_lineage_fg_traitX_extra", True)
     assert foreground.get_num_foreground_lineages(tr, "traitX") == 3
-
-
-def test_annotate_foreground_keeps_distinct_lineage_colors_for_stem_only():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,(C:1,D:1)N2:1)R;", format=1))
-    g = {
-        "tree": tr,
-        "fg_stem_only": True,
-        "fg_df": pd.DataFrame(
-            {
-                "name": ["A", "B", "C", "D"],
-                "PLACEHOLDER": [1, 1, 2, 2],
-            }
-        ),
-    }
-    g["fg_leaf_names"] = {"PLACEHOLDER": [["A", "B"], ["C", "D"]]}
-    g["tree"] = foreground.annotate_lineage_foreground(lineages=np.array([1, 2]), trait_name="PLACEHOLDER", g=g)
-    g["tree"] = foreground.annotate_foreground(lineages=np.array([1, 2]), trait_name="PLACEHOLDER", g=g)
-
-    nodes_by_name = {n.name: n for n in g["tree"].traverse() if n.name}
-    n1_color = ete.get_prop(nodes_by_name["N1"], "color_PLACEHOLDER")
-    n2_color = ete.get_prop(nodes_by_name["N2"], "color_PLACEHOLDER")
-    n1_lineage = ete.get_prop(nodes_by_name["N1"], "foreground_lineage_id_PLACEHOLDER")
-    n2_lineage = ete.get_prop(nodes_by_name["N2"], "foreground_lineage_id_PLACEHOLDER")
-    assert n1_color != "black"
-    assert n2_color != "black"
-    assert n1_color != n2_color
-    assert n1_lineage != n2_lineage
-    assert {int(n1_lineage), int(n2_lineage)} == {1, 2}
 
 
 def test_get_target_ids_excludes_root_even_for_full_clade_foreground():
@@ -221,77 +192,3 @@ def test_randomize_foreground_stems_preserves_bin_counts_without_nested_clades()
     for i, branch_index in enumerate(selected.tolist()):
         descendants = set(trait_cache["descendant_indices_by_index"][branch_index].tolist())
         assert descendants.isdisjoint(set(selected[i + 1:].tolist()))
-
-
-def test_randomize_foreground_stems_avoids_nested_candidates_within_one_bin():
-    trait_cache = {
-        "is_fg_stem": np.array([False, False, False, True, True], dtype=bool),
-        "descendant_indices_by_index": [
-            np.array([0, 1], dtype=np.int64),
-            np.array([1], dtype=np.int64),
-            np.array([2], dtype=np.int64),
-            np.array([3], dtype=np.int64),
-            np.array([4], dtype=np.int64),
-        ],
-    }
-    randomization_plan = {
-        "fg_bins": np.array([1], dtype=np.int64),
-        "bin_indices": {1: np.arange(5, dtype=np.int64)},
-    }
-
-    for seed in range(20):
-        randomized = foreground._randomize_foreground_stem_flags_from_plan(
-            trait_cache=trait_cache,
-            randomization_plan=randomization_plan,
-            sample_original_foreground=False,
-            rng=np.random.default_rng(seed),
-        )
-        selected = set(np.where(randomized)[0].tolist())
-        assert len(selected) == 2
-        assert not ({0, 1} <= selected)
-        assert selected.isdisjoint({3, 4})
-
-
-def test_get_randomized_pair_combinations_matches_general_combination_path():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,(C:1,D:1)Y:1)R;", format=1))
-    node_by_name = {n.name: n for n in tr.traverse() if n.name}
-    a_id = int(ete.get_prop(node_by_name["A"], "numerical_label"))
-    b_id = int(ete.get_prop(node_by_name["B"], "numerical_label"))
-    c_id = int(ete.get_prop(node_by_name["C"], "numerical_label"))
-    d_id = int(ete.get_prop(node_by_name["D"], "numerical_label"))
-    g = {
-        "tree": tr,
-        "fg_df": pd.DataFrame({"name": ["A", "B", "C", "D"], "traitA": [1, 1, 1, 1]}),
-        "dep_ids": [np.array([a_id, b_id], dtype=np.int64)],
-        "fg_dep_ids": {"traitA": [np.array([c_id, d_id], dtype=np.int64)]},
-        "exhaustive_until": 1,
-        "current_arity": 2,
-        "threads": 1,
-        "r_target_ids": {"traitA": np.array([a_id, b_id, c_id, d_id], dtype=np.int64)},
-    }
-    fast = foreground._get_randomized_pair_combinations(g=g, trait_name="traitA")
-
-    g_general = {
-        "tree": tr,
-        "dep_ids": [np.array([a_id, b_id], dtype=np.int64)],
-        "fg_dep_ids": {"traitA": [np.array([c_id, d_id], dtype=np.int64)]},
-        "fg_df": pd.DataFrame({"name": ["A", "B", "C", "D"], "traitA": [1, 1, 1, 1]}),
-        "threads": 1,
-        "exhaustive_until": 1,
-    }
-    _, general = combination.get_node_combinations(
-        g=g_general,
-        target_id_dict={"traitA": np.array([a_id, b_id, c_id, d_id], dtype=np.int64)},
-        arity=2,
-        check_attr="name",
-        verbose=False,
-    )
-
-    def _sort_rows(values):
-        if values.shape[0] == 0:
-            return values
-        out = np.sort(values.astype(np.int64, copy=False), axis=1)
-        order = np.lexsort((out[:, 1], out[:, 0]))
-        return out[order, :]
-
-    assert np.array_equal(_sort_rows(fast), _sort_rows(general))

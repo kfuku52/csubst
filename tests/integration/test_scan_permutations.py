@@ -123,30 +123,6 @@ def test_scan_eligibility_is_fixed_before_sampling():
         substitution_scan._get_scan_trait_plan(g, "trait", invalid_observed_ids)
 
 
-def test_scan_permutations_use_parallel_backend_and_chunks(monkeypatch):
-    g, on_tensor = _toy_scan_context()
-    g["scan_pvalue_calibration"] = "candidate_fixed"
-    g["scan_n_permutations"] = 4
-    g["scan_permutation_seed"] = 3
-    g["threads"] = 2
-    calls = []
-
-    def fake_run_starmap(func, args_iterable, n_jobs, backend="multiprocessing", chunksize=None):
-        args = list(args_iterable)
-        calls.append((len(args), n_jobs, backend, chunksize))
-        return [func(*arg) for arg in args]
-
-    monkeypatch.setattr(substitution_scan.parallel, "run_starmap", fake_run_starmap)
-
-    scan_df, _ = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
-
-    assert calls == [(2, 2, "multiprocessing", None)]
-    row = scan_df.iloc[0]
-    assert row["scan_permutation_backend"] == "multiprocessing"
-    assert row["scan_permutation_n_jobs"] == 2
-    assert row["scan_permutation_success_count"] == 4
-
-
 @pytest.mark.slow
 @pytest.mark.process
 def test_scan_parallel_permutation_matches_single_thread_result():

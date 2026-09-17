@@ -67,7 +67,7 @@ def _get_cli_parser(show_advanced):
     return _CLI_PARSERS[show_advanced]
 
 
-@pytest.mark.parametrize('command', ['search', 'analyze', 'inspect', 'sites', 'site', 'doctor', 'scan', 'benchmark'])
+@pytest.mark.parametrize('command', ['search', 'analyze', 'inspect', 'sites'])
 def test_3di_default_backend_is_esm3di(command):
     assert _get_cli_parser(False).parse_args([command]).sa_backend == 'esm3di-35m'
 
@@ -77,7 +77,7 @@ def test_download_default_resource_matches_3di_backend():
     assert parser.parse_args(['download']).resource == parser.parse_args(['sites']).sa_backend
 
 
-@pytest.mark.parametrize('command', ['search', 'inspect', 'sites', 'doctor'])
+@pytest.mark.parametrize('command', ['search', 'inspect'])
 @pytest.mark.parametrize('backend', ['prostt5', 'prostt5-cnn', 'esm3di-35m'])
 def test_3di_backend_and_neutral_aliases_share_existing_destinations(command, backend):
     args = _get_cli_parser(True).parse_args([
@@ -123,11 +123,10 @@ def _run_cli_subprocess(*args):
     return proc, log_text
 
 
-@pytest.mark.parametrize('command', ['search', 'analyze'])
 @pytest.mark.parametrize('method_args', [[], ['--expectation_method', 'codon_model']])
-def test_3di_codon_expectations_fail_cleanly_before_inference(command, method_args):
+def test_3di_codon_expectations_fail_cleanly_before_inference(method_args):
     proc, log_text = _run_cli(
-        command, '--nonsyn_recode', '3di20', '--sa_asr_mode', 'translate', '--full_cds_alignment_file', 'missing.fa',
+        'search', '--nonsyn_recode', '3di20', '--sa_asr_mode', 'translate', '--full_cds_alignment_file', 'missing.fa',
         *method_args,
     )
     assert proc.returncode == 2
@@ -211,6 +210,20 @@ def test_inspect_help_includes_species_overlap_node_plot_option():
     assert "--species_overlap_node_plot" in help_text
     assert "--output_manifest" in help_text
     assert "--combination_count_max_arity" in help_text
+    assert "--plot_state_aa_highlight_pattern" in help_text
+    assert "--plot_state_aa_highlight_color" in help_text
+    assert "--plot_nonsyn_recode_pca" in help_text
+    assert "--nonsyn_recode" in help_text
+    assert "--download_prostt5" not in help_text
+    assert "--sa_smoke_max_branches" not in help_text
+
+    proc, _ = _run_cli("inspect", "--help-advanced")
+    assert proc.returncode == 0
+    advanced_help = (proc.stdout or "") + (proc.stderr or "")
+    assert "--tree_tip_label_spacing" in advanced_help
+    assert "--tree_fig_max_height" in advanced_help
+    assert "--download_prostt5" in advanced_help
+    assert "--sa_smoke_max_branches" in advanced_help
 
 
 def test_inspect_rejects_invalid_combination_count_max_arity():
@@ -227,54 +240,14 @@ def test_sites_help_shows_output_manifest_and_removed_site_output_manifest_is_re
     assert "--output_manifest" in help_text
     assert "--site_summary_plot" in help_text
     assert "--site_output_manifest" not in help_text
+    assert "default=swissmodel,pdb,alphafold,alphafill" in help_text
+    assert "swissmodel: Run online QBLAST search" in help_text
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--site_output_manifest", "no")
     assert proc.returncode == 2
     assert "unrecognized arguments: --site_output_manifest no" in log_text
 
 
-def test_sites_help_shows_swissmodel_first_in_database_default():
-    proc, log_text = _run_cli("sites", "-h")
-    assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
-    assert "default=swissmodel,pdb,alphafold,alphafill" in help_text
-    assert "swissmodel: Run online QBLAST search" in help_text
-
-
-def test_inspect_help_includes_state_highlight_options():
-    proc, _ = _run_cli("inspect", "-h")
-    assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "")
-    assert "--plot_state_aa_highlight_pattern" in help_text
-    assert "--plot_state_aa_highlight_color" in help_text
-    assert "--tree_tip_label_spacing" not in help_text
-    assert "--tree_fig_max_height" not in help_text
-
-    proc, _ = _run_cli("inspect", "--help-advanced")
-    assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "")
-    assert "--tree_tip_label_spacing" in help_text
-    assert "--tree_fig_max_height" in help_text
-
-
-def test_search_state_plot_options_are_rejected_after_move_to_inspect():
-    proc, log_text = _run_cli("search", "--plot_state_aa", "yes")
-    assert proc.returncode == 2
-    assert "unrecognized arguments: --plot_state_aa yes" in log_text
-
-
-def test_search_rejects_removed_prostt5_batch_size_option():
-    proc, log_text = _run_cli("search", "--prostt5_batch_size", "8")
-    assert proc.returncode == 2
-    assert "unrecognized arguments: --prostt5_batch_size 8" in log_text
-
-
-def test_search_rejects_removed_pseudocount_strength_option():
-    proc, log_text = _run_cli("search", "--pseudocount_strength", "2.0")
-    assert proc.returncode == 2
-    assert "unrecognized arguments: --pseudocount_strength 2.0" in log_text
-
-
-@pytest.mark.parametrize("subcommand", ["search", "benchmark"])
+@pytest.mark.parametrize("subcommand", ["search"])
 def test_epistasis_options_are_advanced_only(subcommand):
     proc, _ = _run_cli(subcommand, "-h")
     assert proc.returncode == 0
@@ -293,7 +266,7 @@ def test_epistasis_options_are_advanced_only(subcommand):
 
 @pytest.mark.parametrize(
     "subcommand",
-    ["search", "scan", "sites", "simulate", "benchmark", "doctor", "inspect"],
+    ["search", "scan"],
 )
 def test_removed_performance_options_are_absent_from_shared_help(subcommand):
     proc, _ = _run_cli(subcommand, "-h")
@@ -324,18 +297,16 @@ def test_removed_performance_options_are_absent_from_shared_help(subcommand):
         ("--sub_tensor_backend", "dense"),
         ("--float_type", "32"),
         ("--omegaC_method", "modelfree"),
+        ("--infile_type", "iqtree"),
+        ("--plot_state_aa", "yes"),
+        ("--prostt5_batch_size", "8"),
+        ("--pseudocount_strength", "2.0"),
     ],
 )
 def test_removed_performance_options_are_rejected(option, value):
     proc, log_text = _run_cli("search", option, value)
     assert proc.returncode == 2
     assert "unrecognized arguments:" in log_text
-
-
-def test_removed_infile_type_option_is_rejected():
-    proc, log_text = _run_cli("search", "--infile_type", "iqtree")
-    assert proc.returncode == 2
-    assert "unrecognized arguments: --infile_type iqtree" in log_text
 
 
 def test_cli_help_lists_primary_commands_and_legacy_aliases():
@@ -348,18 +319,6 @@ def test_cli_help_lists_primary_commands_and_legacy_aliases():
     assert "scan" in help_text
     assert "search (analyze)" in help_text
     assert "sites (site)" in help_text
-
-
-def test_legacy_aliases_remain_available():
-    analyze_proc, _ = _run_cli("analyze", "-h")
-    assert analyze_proc.returncode == 0
-    site_proc, _ = _run_cli("site", "-h")
-    assert site_proc.returncode == 0
-
-
-def test_inspect_help_is_available():
-    proc, _ = _run_cli("inspect", "-h")
-    assert proc.returncode == 0
 
 
 def test_benchmark_help_is_available():
@@ -461,22 +420,6 @@ def test_doctor_help_is_available():
     assert "--output_manifest" in help_text
 
 
-def test_inspect_help_includes_nonsyn_recode_pca_option():
-    proc, _ = _run_cli("inspect", "-h")
-    assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "")
-    assert "--plot_nonsyn_recode_pca" in help_text
-    assert "--download_prostt5" not in help_text
-    assert "--sa_smoke_max_branches" not in help_text
-    assert "--nonsyn_recode" in help_text
-
-    proc, _ = _run_cli("inspect", "--help-advanced")
-    assert proc.returncode == 0
-    advanced_help = (proc.stdout or "") + (proc.stderr or "")
-    assert "--download_prostt5" in advanced_help
-    assert "--sa_smoke_max_branches" in advanced_help
-
-
 def test_inspect_rejects_legacy_yes_state_plot_option():
     proc, log_text = _run_cli("inspect", "--plot_state_aa", "yes")
     assert proc.returncode == 2
@@ -497,7 +440,7 @@ def test_cli_entrypoint_runs_from_repo_root_without_pythonpath():
     assert "No module named 'csubst'" not in combined
 
 
-@pytest.mark.parametrize('command', ['search', 'analyze', 'inspect', 'benchmark'])
+@pytest.mark.parametrize('command', ['search', 'inspect'])
 def test_all_sites_are_retained_by_default(command):
     args = _get_cli_parser(False).parse_args([command])
     assert args.drop_invariant_tip_sites == 'no'

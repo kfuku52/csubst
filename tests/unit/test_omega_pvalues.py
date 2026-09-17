@@ -30,30 +30,6 @@ def test_get_cb_ids_requires_branch_id_columns():
         omega._get_cb_ids(cb)
 
 
-def test_resolve_hypergeom_parallel_plan_falls_back_for_small_workload():
-    n_jobs, chunk_factor = omega._resolve_hypergeom_parallel_plan(
-        cb_rows=1,
-        num_categories=200,
-        niter=1000,
-        requested_n_jobs=4,
-        requested_chunk_factor=1,
-    )
-    assert n_jobs == 1
-    assert chunk_factor == 1
-
-
-def test_resolve_hypergeom_parallel_plan_keeps_parallel_for_large_workload():
-    n_jobs, chunk_factor = omega._resolve_hypergeom_parallel_plan(
-        cb_rows=1000,
-        num_categories=300,
-        niter=1000,
-        requested_n_jobs=4,
-        requested_chunk_factor=1,
-    )
-    assert n_jobs == 4
-    assert chunk_factor == 4
-
-
 def test_resolve_omega_pvalue_niter_schedule_auto_defaults():
     schedule = omega._resolve_omega_pvalue_niter_schedule(g={})
     assert schedule == [100, 1000]

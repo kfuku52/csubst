@@ -217,22 +217,18 @@ def test_add_uniprot_site_annotations_with_feature_filter(monkeypatch):
     assert out.loc[1, "uniprot_feature_descriptions_P04421_A"] == ""
 
 
-def test_get_mapped_sites_skips_non_numeric_values():
-    df = pd.DataFrame({"codon_site_demo": [1, "", None, "foo", "3", 0, -2]})
+@pytest.mark.parametrize(
+    "values, expected",
+    [
+        ([1, "", None, "foo", "3", 0, -2], {1, 3}),
+        ([True, False, 2], {2}),
+        ([1.5, "2.5", "3.0", 4.0], {3, 4}),
+    ],
+)
+def test_get_mapped_sites_skips_non_integer_values(values, expected):
+    df = pd.DataFrame({"codon_site_demo": values})
     out = parser_uniprot._get_mapped_sites(df=df, col_site="codon_site_demo")
-    assert out == {1, 3}
-
-
-def test_get_mapped_sites_skips_boolean_values():
-    df = pd.DataFrame({"codon_site_demo": [True, False, 2]})
-    out = parser_uniprot._get_mapped_sites(df=df, col_site="codon_site_demo")
-    assert out == {2}
-
-
-def test_get_mapped_sites_skips_fractional_values_without_truncating():
-    df = pd.DataFrame({"codon_site_demo": [1.5, "2.5", "3.0", 4.0]})
-    out = parser_uniprot._get_mapped_sites(df=df, col_site="codon_site_demo")
-    assert out == {3, 4}
+    assert out == expected
 
 
 def test_add_uniprot_site_annotations_tolerates_non_numeric_site_values(monkeypatch):

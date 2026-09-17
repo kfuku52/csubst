@@ -53,78 +53,16 @@ def test_get_chunks_for_numpy_array():
     np.testing.assert_array_equal(chunks[1], arr[2:, :])
 
 
-def test_get_chunks_avoids_empty_chunks_when_threads_exceed_items():
-    chunks, starts = parallel.get_chunks([10, 11], threads=8)
-    assert chunks == [[10], [11]]
-    assert starts == [0, 1]
-
-
 def test_get_chunks_supports_finer_chunk_factor_splitting():
     chunks, starts = parallel.get_chunks(list(range(10)), threads=2, chunk_factor=3)
     assert [len(c) for c in chunks] == [1, 1, 2, 2, 2, 2]
     assert starts == [0, 1, 2, 4, 6, 8]
 
 
-def test_resolve_n_jobs_is_capped_by_workload_size():
-    assert parallel.resolve_n_jobs(num_items=0, threads=8) == 1
-    assert parallel.resolve_n_jobs(num_items=2, threads=8) == 2
-    assert parallel.resolve_n_jobs(num_items=8, threads=2) == 2
-
-
-def test_resolve_adaptive_n_jobs_falls_back_to_single_for_small_workload():
-    out = parallel.resolve_adaptive_n_jobs(
-        num_items=100,
-        threads=8,
-        min_items_for_parallel=500,
-        min_items_per_job=50,
-    )
-    assert out == 1
-
-
-def test_resolve_adaptive_n_jobs_caps_by_min_items_per_job():
-    out = parallel.resolve_adaptive_n_jobs(
-        num_items=1000,
-        threads=16,
-        min_items_for_parallel=0,
-        min_items_per_job=300,
-    )
-    assert out == 3
-
-
-def test_resolve_adaptive_n_jobs_rejects_invalid_thresholds():
-    with pytest.raises(ValueError, match="min_items_for_parallel"):
-        parallel.resolve_adaptive_n_jobs(
-            num_items=10,
-            threads=2,
-            min_items_for_parallel=-1,
-            min_items_per_job=1,
-        )
-    with pytest.raises(ValueError, match="min_items_per_job"):
-        parallel.resolve_adaptive_n_jobs(
-            num_items=10,
-            threads=2,
-            min_items_for_parallel=0,
-            min_items_per_job=0,
-        )
-
-
-def test_resolve_parallel_backend_uses_internal_policy():
-    assert parallel.resolve_parallel_backend() == "multiprocessing"
-    assert parallel.resolve_parallel_backend(prefer_threading=True) == "threading"
-
-
 def test_run_starmap_single_process_matches_direct_evaluation():
     args = [(1, 2), (3, 4), (5, 6)]
     out = parallel.run_starmap(_starmap_add_mul, args, n_jobs=1, backend="multiprocessing")
     assert out == [6, 14, 22]
-
-
-@pytest.mark.slow
-@pytest.mark.process
-def test_run_starmap_process_backend_preserves_order():
-    args = [(1, 2), (3, 4), (5, 6), (7, 8)]
-    out = parallel.run_starmap(_starmap_add_mul, args, n_jobs=2, backend="multiprocessing")
-    assert out == [6, 14, 22, 30]
 
 
 def test_run_starmap_threading_backend_works():

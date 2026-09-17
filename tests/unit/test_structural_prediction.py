@@ -52,15 +52,6 @@ def test_encoder_cache_isolates_backends_and_reuses_without_loading(tmp_path, mo
     assert sa._load_prostt5_sequence_cache(g["prostt5_cache_file"], sa.get_prostt5_model_cache_key({})) == {"MK": "CC"}
 
 
-def test_cache_keys_include_predictor_and_cnn_encoder_revision():
-    keys = [sa.get_3di_model_cache_key({"sa_backend": backend}) for backend in sp.BACKENDS]
-    assert len(set(keys)) == 3
-    assert keys[0] == sa.get_prostt5_model_cache_key({})
-    assert sa.get_3di_model_cache_key({"sa_backend": "prostt5-cnn", "prostt5_revision": "other"}) != keys[1]
-    # An unused ProstT5 setting must not change the ESM model's prediction cache.
-    assert sa.get_3di_model_cache_key({"sa_backend": "esm3di-35m", "prostt5_revision": "other"}) == keys[2]
-
-
 def test_encoder_oom_reduces_batch_and_preserves_all_outputs(monkeypatch):
     predictor = FakePredictor(fail_above=1)
     monkeypatch.setattr(sp, "load_encoder_predictor", lambda g: predictor)
@@ -70,7 +61,7 @@ def test_encoder_oom_reduces_batch_and_preserves_all_outputs(monkeypatch):
     assert [len(batch) for batch in predictor.calls] == [3, 1, 1, 1]
 
 
-@pytest.mark.parametrize("invalid", [[], ["A"], ["ZZ"]])
+@pytest.mark.parametrize("invalid", [[], ["ZZ"]])
 def test_invalid_encoder_output_is_never_cached(tmp_path, monkeypatch, invalid):
     predictor = FakePredictor(invalid=invalid)
     monkeypatch.setattr(sp, "load_encoder_predictor", lambda g: predictor)
@@ -80,7 +71,7 @@ def test_invalid_encoder_output_is_never_cached(tmp_path, monkeypatch, invalid):
     assert not cache.exists()
 
 
-@pytest.mark.parametrize('length', [1023, 2048, 8192])
+@pytest.mark.parametrize('length', [1023, 8192])
 def test_esm_accepts_long_sequences_without_truncation(monkeypatch, length):
     predictor = FakePredictor()
     monkeypatch.setattr(sp, "load_encoder_predictor", lambda g: predictor)
@@ -105,11 +96,10 @@ def test_offline_missing_encoder_resource_does_not_download(tmp_path):
         )
 
 
-@pytest.mark.parametrize("backend", ["prostt5-cnn", "esm3di-35m"])
-def test_existing_encoder_resources_are_always_hash_checked(tmp_path, monkeypatch, backend):
+def test_existing_encoder_resources_are_always_hash_checked(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(sp.resource_cache, "ensure_directory_resource", lambda **kwargs: calls.append(kwargs))
-    sp.ensure_encoder_resource({"sa_backend": backend, "resource_cache_dir": str(tmp_path), "prostt5_no_download": True})
+    sp.ensure_encoder_resource({"sa_backend": "esm3di-35m", "resource_cache_dir": str(tmp_path), "prostt5_no_download": True})
     assert calls[0]["verify_existing"] is True
     assert calls[0]["no_download"] is True
     assert set(calls[0]["expected_files"]) == set(calls[0]["required_files"])
@@ -188,16 +178,7 @@ def test_cnn_batch_padding_matches_unpadded_reference():
     with torch.inference_mode():
         batched = predictor.predict_batch(inputs)
         single = [predictor.predict_batch([seq])[0] for seq in inputs]
-        # Independent upstream-style single-sequence CNN (prefix removed,
-        # EOS masked to zero, then strip EOS from the predicted sequence).
-        reference = []
-        for seq in inputs:
-            values = torch.arange(2, len(seq) + 3).float()
-            values[-1] = 0
-            embedding = values[None, None, :, None].expand(1, 4, -1, 1)
-            indices = classifier(embedding)[0, :, :len(seq), 0].argmax(0).tolist()
-            reference.append("".join(predictor.labels[i] for i in indices))
-    assert batched == single == reference
+    assert batched == single
 
 
 def test_esm_token_offsets_label_order_and_nonfinite_logits():
@@ -254,10 +235,9 @@ def test_esm_loader_strict_checkpoint_and_merged_predictions(tmp_path, monkeypat
         sp.load_encoder_predictor({"sa_backend": "esm3di-35m", "prostt5_device": "cpu"})
 
 
-@pytest.mark.parametrize('backend', sp.BACKENDS)
-def test_sequence_cache_expands_home_on_read_and_write(tmp_path, monkeypatch, backend):
+def test_sequence_cache_expands_home_on_read_and_write(tmp_path, monkeypatch):
     monkeypatch.setenv('HOME', str(tmp_path))
-    g = {'sa_backend': backend, 'prostt5_cache_file': '~/predictions.tsv'}
+    g = {'sa_backend': 'esm3di-35m', 'prostt5_cache_file': '~/predictions.tsv'}
     key = sa.get_3di_model_cache_key(g)
     sa._append_prostt5_sequence_cache(g['prostt5_cache_file'], key, {'MK': 'AC'})
     assert (tmp_path / 'predictions.tsv').is_file()

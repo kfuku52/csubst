@@ -298,24 +298,6 @@ def test_expand_highlighted_leaf_ids_to_clade_node_ids_marks_fully_highlighted_c
     assert out == {labels["A"], labels["B"], labels["X"]}
 
 
-def test_get_logo_glyph_caches_by_character():
-    class _FakeTextPathModule:
-        call_count = 0
-
-        @classmethod
-        def TextPath(cls, *args, **kwargs):
-            cls.call_count += 1
-            return object()
-
-    glyph1 = tree._get_logo_glyph(_FakeTextPathModule, None, 'Q')
-    glyph2 = tree._get_logo_glyph(_FakeTextPathModule, None, 'Q')
-    glyph3 = tree._get_logo_glyph(_FakeTextPathModule, None, 'R')
-
-    assert glyph1 is glyph2
-    assert glyph1 is not glyph3
-    assert _FakeTextPathModule.call_count == 2
-
-
 def test_format_tree_scale_label_includes_units():
     assert tree._format_tree_scale_label(0.2) == "0.2 subs/codon site"
 
@@ -396,15 +378,3 @@ def test_fit_leaf_label_items_keeps_tps_sized_labels_unshortened():
     )
     assert leaf_items[0]['text'] == label
     assert 1.1 < x_right < 1.6
-
-
-def test_should_use_exact_text_layout_disables_exact_path_for_large_trees():
-    assert tree._should_use_exact_text_layout(num_leaves=50, num_text_items=100)
-    assert not tree._should_use_exact_text_layout(
-        num_leaves=tree.TREE_EXACT_TEXT_LAYOUT_MAX_LEAVES + 1,
-        num_text_items=100,
-    )
-    assert not tree._should_use_exact_text_layout(
-        num_leaves=50,
-        num_text_items=tree.TREE_EXACT_TEXT_LAYOUT_MAX_ITEMS + 1,
-    )

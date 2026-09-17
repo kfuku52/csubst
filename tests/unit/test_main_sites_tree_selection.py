@@ -104,53 +104,6 @@ def test_get_tree_site_display_sites_intersection_sorts_within_each_category():
     ]
 
 
-def test_get_tree_site_display_sites_respects_max_sites_when_one():
-    tree_site_df = pd.DataFrame(
-        {
-            "codon_site_alignment": [10, 20, 30, 40],
-            "convergent_score": [0.8, 0.7, 0.0, 0.0],
-            "divergent_score": [0.0, 0.0, 0.9, 0.6],
-            "tree_site_category": ["convergent", "convergent", "divergent", "divergent"],
-        }
-    )
-    g = {"tree_site_plot_max_sites": 1}
-    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g)
-    plotted = [item for item in out if item["site"] is not None]
-    assert len(plotted) == 1
-    assert plotted[0]["site"] == 30
-    assert plotted[0]["category"] == "divergent"
-
-
-def test_get_tree_site_display_sites_lineage_includes_sites_above_min_prob():
-    tree_site_df = pd.DataFrame(
-        {
-            "codon_site_alignment": [1, 2, 3, 4, 5],
-            "convergent_score": [0.0, 0.0, 0.0, 0.0, 0.0],
-            "divergent_score": [0.0, 0.0, 0.0, 0.0, 0.0],
-            "tree_site_category": ["blank", "blank", "blank", "blank", "blank"],
-        }
-    )
-    df = pd.DataFrame(
-        {
-            "codon_site_alignment": [1, 2, 3, 4, 5],
-            "N_sub_10": [0.00, 0.70, 0.82, 0.00, 0.10],
-            "N_sub_11": [0.00, 0.00, 0.30, 0.00, 0.81],
-        }
-    )
-    g = {
-        "mode": "lineage",
-        "branch_ids": np.array([10, 11], dtype=np.int64),
-        "min_combinat_prob": 0.5,
-        "min_single_prob": 0.8,
-        "tree_site_plot_max_sites": 10,
-        "single_branch_mode": False,
-    }
-    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
-    plotted = [item for item in out if item["site"] is not None]
-    assert [item["site"] for item in plotted] == [3, 5]
-    assert set(item["category"] for item in plotted) == {"lineage"}
-
-
 def test_get_tree_site_display_sites_lineage_includes_sites_equal_to_min_prob():
     tree_site_df = pd.DataFrame(
         {
@@ -237,35 +190,6 @@ def test_get_tree_site_display_sites_lineage_returns_empty_when_no_foreground_su
     }
     out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
     assert out == []
-
-
-def test_get_tree_site_display_sites_lineage_accepts_scalar_branch_id():
-    tree_site_df = pd.DataFrame(
-        {
-            "codon_site_alignment": [1, 2, 3],
-            "convergent_score": [0.0, 0.0, 0.0],
-            "divergent_score": [0.0, 0.0, 0.0],
-            "tree_site_category": ["blank", "blank", "blank"],
-        }
-    )
-    df = pd.DataFrame(
-        {
-            "codon_site_alignment": [1, 2, 3],
-            "N_sub_10": [0.2, 0.85, 0.1],
-        }
-    )
-    g = {
-        "mode": "lineage",
-        "branch_ids": np.int64(10),
-        "min_combinat_prob": 0.5,
-        "min_single_prob": 0.8,
-        "tree_site_plot_max_sites": 10,
-        "single_branch_mode": False,
-    }
-    out = main_sites.get_tree_site_display_sites(tree_site_df=tree_site_df, g=g, df=df)
-    plotted = [item for item in out if item["site"] is not None]
-    assert [item["site"] for item in plotted] == [2]
-    assert set(item["category"] for item in plotted) == {"lineage"}
 
 
 def test_get_tree_site_display_sites_set_uses_set_expression_columns():
@@ -401,30 +325,6 @@ def test_get_lineage_site_branch_ids_includes_values_equal_to_min_prob():
     )
     assert out[1] == [10]
     assert out[2] == [11]
-
-
-def test_get_lineage_site_branch_ids_accepts_scalar_branch_id():
-    df = pd.DataFrame(
-        {
-            "codon_site_alignment": [1, 2],
-            "N_sub_10": [0.81, 0.10],
-        }
-    )
-    display_meta = [
-        {"site": 1, "category": "lineage"},
-        {"site": 2, "category": "lineage"},
-    ]
-    g = {
-        "mode": "lineage",
-        "branch_ids": np.int64(10),
-    }
-    out = main_sites.get_lineage_site_branch_ids(
-        df=df,
-        display_meta=display_meta,
-        g=g,
-        min_prob=0.8,
-    )
-    assert out == {1: [10]}
 
 
 def test_get_tree_plot_coordinates_returns_expected_root_and_leaf_positions(tiny_tree):

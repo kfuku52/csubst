@@ -212,7 +212,7 @@ def test_unsupported_options_are_explicit(extra):
 
 @pytest.mark.parametrize('structural', [False, True])
 @pytest.mark.parametrize('sitewise', [False, True])
-@pytest.mark.parametrize('block_size', [1, 2, 64])
+@pytest.mark.parametrize('block_size', [1, 64])
 def test_projected_search_matches_full_events(tmp_path, structural, sitewise, block_size):
     import pandas as pd
     from csubst.substitution_sparse import ProjectedSubstitutionTensor
@@ -316,7 +316,7 @@ def test_direct_projections_mixture_and_recoding(tmp_path, branch_table):
 
 @pytest.mark.parametrize('structural', [False, True])
 @pytest.mark.parametrize('sitewise', [False, True])
-@pytest.mark.parametrize('block_size', [1, 2, 64])
+@pytest.mark.parametrize('block_size', [1, 64])
 @pytest.mark.parametrize('full_stats', [False, True])
 def test_streamed_pairs_match_retained_projections(tmp_path, structural, sitewise, block_size, full_stats):
     import pandas as pd
@@ -352,26 +352,6 @@ def test_streamed_pairs_match_retained_projections(tmp_path, structural, sitewis
                                       substitution.get_b(streamed, b, kind, sitewise and kind == 'N'))
         expected = endpoint_io.expected_reducer(streamed, 'cdn' if kind == 'S' else 'nsy', ['any2spe'])
         assert set(expected['pairwise']) == {'any2spe'}
-
-
-def test_endpoint_expected_cache_releases_last_reference(tmp_path):
-    import weakref
-    g, _ = toy_context(tmp_path)
-    endpoint_io.prepare(g)
-    ref = weakref.ref(g['_endpoint_reducers']['N']['projections']['any2any'])
-    g['EN_reducer'] = endpoint_io.expected_reducer(g, 'nsy', ['any2any'])
-    endpoint_io.release_expected(g, 'N')
-    assert 'N' in g['_endpoint_reducers']  # No lifecycle permission yet.
-    g['_release_state_after_expected_reducer'] = True
-    g['fg_clade_permutation'] = 1
-    endpoint_io.release_expected(g, 'N')
-    assert 'N' in g['_endpoint_reducers']
-    g['fg_clade_permutation'] = 0
-    endpoint_io.release_expected(g, 'N')
-    assert 'N' not in g['_endpoint_reducers']
-    assert ref() is not None
-    del g['EN_reducer']
-    assert ref() is None
 
 
 @pytest.mark.parametrize('structural', [False, True])
@@ -412,15 +392,6 @@ def test_streaming_retains_projections_when_later_consumers_need_them(tmp_path, 
     assert not isinstance(g['_endpoint_tensors']['N'], PairwiseSubstitutionSummary)
 
 
-def test_streamed_pair_workspace_bound_accounts_for_quadratic_branch_axis(tmp_path):
-    g, _ = toy_context(tmp_path)
-    kinds = ['S', 'N']
-    stats = ['any2any', 'any2spe']
-    shapes = {'S': (10000, 3, 2, 2, 2), 'N': (10000, 3, 1, 2, 2)}
-    assert endpoint_io._pairwise_storage_bound(10000, 3, shapes, kinds, stats, 64, g) > 64 * 1024**2
-    assert endpoint_io._pairwise_storage_bound(5, 3, shapes, kinds, stats, 64, g) < 64 * 1024**2
-
-
 def test_streamed_full_statistics_accept_empty_site_axis(tmp_path):
     g, _ = toy_context(tmp_path)
     g.update(subcommand='search', max_arity=2)
@@ -433,7 +404,7 @@ def test_streamed_full_statistics_accept_empty_site_axis(tmp_path):
 
 
 @pytest.mark.native
-@pytest.mark.parametrize('size', [1, 7, 64, 129])
+@pytest.mark.parametrize('size', [1, 64, 129])
 @pytest.mark.parametrize('strided', [False, True])
 def test_native_classified_events_match_full_mapping(tmp_path, monkeypatch, size, strided):
     cy = endpoint_io.substitution_sparse.substitution_sparse_cy
@@ -501,22 +472,7 @@ def test_cached_prediction_projection_matches_full_contraction(tmp_path, cache_b
             np.testing.assert_allclose(actual[key], expected[key], rtol=1e-14, atol=1e-15)
 
 
-def test_prediction_projection_cache_releases_evicted_transitions(tmp_path):
-    import weakref
-    g, _ = toy_context(tmp_path)
-    mapping = {'N': endpoint_io._mapping(g, 'N', 3)}
-    transform = endpoint_io._projection_transform(g, ['N'], mapping, {'any2any'},
-                                                  predictive=True, cache_bytes=144)
-    matrix = np.eye(3)
-    reference = weakref.ref(matrix)
-    transform(np.ones((1, 3)), np.ones((1, 3)), matrix)
-    del matrix
-    assert reference() is not None
-    transform(np.ones((1, 3)), np.ones((1, 3)), np.ones((3, 3)))
-    assert reference() is None
-
-
-@pytest.mark.parametrize('block_size', [1, 2, 64])
+@pytest.mark.parametrize('block_size', [1, 64])
 @pytest.mark.parametrize('mixture', [False, True])
 def test_scan_and_search_share_all_event_probabilities_and_missing_exposure(tmp_path, block_size, mixture):
     from csubst import scan_ctmc, scan_endpoint

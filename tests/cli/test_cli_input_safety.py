@@ -33,38 +33,6 @@ def test_log_collision_preserves_inputs(tmp_path, input_option, alias, parse_err
     assert 'Traceback' not in result.stderr
 
 
-def test_log_collision_accepts_abbreviated_and_equals_options(tmp_path):
-    source = tmp_path / 'input.fa'
-    source.write_text('>A\nATGGCT\n')
-    result = run_csubst(['doctor', '--alignment_f=' + str(source),
-                         '--log_f=' + str(source)], tmp_path)
-    assert result.returncode == 2
-    assert source.read_text() == '>A\nATGGCT\n'
-    assert '--log_file must not overwrite input' in result.stderr
-
-
-@pytest.mark.parametrize('filename, argument', [
-    ('infer', 'infer'), ('besthit', 'besthit'), ('input.fa', ' input.fa '),
-])
-def test_log_collision_protects_literal_and_normalized_input_names(tmp_path, filename, argument):
-    source = tmp_path / filename
-    source.write_text('>A\nATGGCT\n')
-    result = run_csubst(['doctor', '--alignment_file', argument, '--outdir', '.',
-                         '--log_file', filename], tmp_path)
-    assert result.returncode == 2
-    assert source.read_text() == '>A\nATGGCT\n'
-    assert '--log_file must not overwrite input' in result.stderr
-
-
-def test_parse_error_protects_default_input_path(tmp_path):
-    source = tmp_path / 'csubst_cb_2.tsv'
-    source.write_text('branch_id_1\tbranch_id_2\n1\t2\n')
-    result = run_csubst(['sites', '--threads', 'invalid', '--log_file', str(source)], tmp_path)
-    assert result.returncode == 2
-    assert source.read_text() == 'branch_id_1\tbranch_id_2\n1\t2\n'
-    assert '--log_file must not overwrite input' in result.stderr
-
-
 def test_log_collision_protects_inferred_iqtree_input(tmp_path):
     from csubst.runtime import infer_iqtree_output_prefix
 

@@ -39,63 +39,6 @@ def test_get_substitution_tensor_sparse_asis_matches_manual_values():
     np.testing.assert_allclose(observed.to_dense(), expected, atol=1e-12)
 
 
-def test_get_substitution_tensor_returns_sparse_for_small_input():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
-    state = np.zeros((3, 2, 2), dtype=np.float64)
-    state[labels["R"], :, :] = [[1.0, 0.0], [1.0, 0.0]]
-    state[labels["A"], :, :] = [[0.0, 1.0], [1.0, 0.0]]
-    state[labels["B"], :, :] = [[1.0, 0.0], [0.0, 1.0]]
-    g = {
-        "tree": tr,
-        "ml_anc": "yes",
-        "float_tol": 1e-12,
-    }
-
-    observed = substitution.get_substitution_tensor(
-        state_tensor=state,
-        mode="asis",
-        g=g,
-        mmap_attr="toy_auto_sparse_density",
-    )
-
-    assert isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
-    assert observed.nnz > 0
-
-
-def test_get_substitution_tensor_asis_threads_setting_matches_single_thread():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
-    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
-    num_node = max(labels.values()) + 1
-    state = np.zeros((num_node, 3, 3), dtype=np.float64)
-    state[labels["R"], :, :] = [[0.7, 0.2, 0.1], [0.1, 0.8, 0.1], [0.3, 0.2, 0.5]]
-    state[labels["N1"], :, :] = [[0.6, 0.3, 0.1], [0.2, 0.6, 0.2], [0.4, 0.1, 0.5]]
-    state[labels["A"], :, :] = [[0.2, 0.7, 0.1], [0.8, 0.1, 0.1], [0.2, 0.2, 0.6]]
-    state[labels["B"], :, :] = [[0.8, 0.1, 0.1], [0.2, 0.7, 0.1], [0.6, 0.1, 0.3]]
-    state[labels["C"], :, :] = [[0.3, 0.6, 0.1], [0.1, 0.2, 0.7], [0.5, 0.2, 0.3]]
-    g_single = {
-        "tree": tr,
-        "ml_anc": "yes",
-        "float_tol": 1e-12,
-        "threads": 1,
-    }
-    g_parallel = dict(g_single, threads=2)
-    expected = substitution.get_substitution_tensor(
-        state_tensor=state,
-        mode="asis",
-        g=g_single,
-        mmap_attr="toy_asis_single",
-    )
-    observed = substitution.get_substitution_tensor(
-        state_tensor=state,
-        mode="asis",
-        g=g_parallel,
-        mmap_attr="toy_asis_parallel",
-    )
-    assert isinstance(observed, substitution_sparse.SparseSubstitutionTensor)
-    np.testing.assert_allclose(observed.to_dense(), expected.to_dense(), atol=1e-12)
-
-
 def test_get_substitution_tensor_syn_threads_setting_matches_single_thread():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}

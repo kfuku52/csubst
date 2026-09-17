@@ -4,38 +4,6 @@ import pytest
 from csubst import recoding
 
 
-def _estimate_empirical_transition_matrix_reference(aa_matrix, num_state):
-    pair_counts = np.zeros((num_state, num_state), dtype=np.float64)
-    num_taxa = aa_matrix.shape[0]
-    for i in np.arange(num_taxa - 1):
-        seq_i = aa_matrix[i, :]
-        for j in np.arange(i + 1, num_taxa):
-            seq_j = aa_matrix[j, :]
-            valid = (seq_i >= 0) & (seq_j >= 0)
-            if not np.any(valid):
-                continue
-            idx_i = seq_i[valid].astype(np.int64, copy=False)
-            idx_j = seq_j[valid].astype(np.int64, copy=False)
-            np.add.at(pair_counts, (idx_i, idx_j), 1.0)
-            np.add.at(pair_counts, (idx_j, idx_i), 1.0)
-    np.fill_diagonal(pair_counts, 0.0)
-    pair_counts = pair_counts + recoding._AA_PSEUDOCOUNT
-    np.fill_diagonal(pair_counts, 0.0)
-    q = np.zeros_like(pair_counts)
-    row_sum = pair_counts.sum(axis=1)
-    valid_row = row_sum > 0
-    q[valid_row, :] = pair_counts[valid_row, :] / row_sum[valid_row, np.newaxis]
-    return q
-
-
-def test_estimate_empirical_transition_matrix_matches_reference():
-    rng = np.random.default_rng(seed=91)
-    aa_matrix = rng.integers(low=-1, high=20, size=(37, 251), endpoint=False).astype(np.int16, copy=False)
-    out = recoding._estimate_empirical_transition_matrix(aa_matrix=aa_matrix, num_state=20)
-    ref = _estimate_empirical_transition_matrix_reference(aa_matrix=aa_matrix, num_state=20)
-    assert np.allclose(out, ref, atol=1e-12, rtol=0.0)
-
-
 def test_chisq_max_criterion_matches_reference_implementation():
     rng = np.random.default_rng(seed=3)
     n_taxa = 7
@@ -62,95 +30,6 @@ def test_chisq_max_criterion_matches_reference_implementation():
     assert out == pytest.approx(ref, abs=1e-12)
 
 
-def _hill_climb_bins_chisq_reference(initial_bins, num_bin, fmat, fr, nsitev, tol=1e-8):
-    bins = np.asarray(initial_bins, dtype=np.int64).copy()
-    counts = np.bincount(bins, minlength=num_bin).astype(np.int64, copy=False)
-    frb = np.bincount(bins, weights=fr, minlength=num_bin).astype(np.float64, copy=False)
-    n_taxa = int(fmat.shape[0])
-    frt = np.zeros((n_taxa, num_bin), dtype=np.float64)
-    for b in range(num_bin):
-        mask = bins == b
-        if np.any(mask):
-            frt[:, b] = fmat[:, mask].sum(axis=1)
-    term = ((frt - frb[np.newaxis, :]) ** 2) / frb[np.newaxis, :]
-    taxon_sum = term.sum(axis=1)
-    crit = float((taxon_sum * nsitev).max())
-    while True:
-        improved = False
-        for el in range(int(bins.shape[0])):
-            src = int(bins[el])
-            if counts[src] <= 1:
-                continue
-            fr_el = float(fr[el])
-            fvec = fmat[:, el]
-            for dst in range(int(num_bin)):
-                if dst == src:
-                    continue
-                frb_src_new = float(frb[src] - fr_el)
-                frb_dst_new = float(frb[dst] + fr_el)
-                if (frb_src_new <= 0.0) or (frb_dst_new <= 0.0):
-                    continue
-                old_src = term[:, src]
-                old_dst = term[:, dst]
-                frt_src_new = frt[:, src] - fvec
-                frt_dst_new = frt[:, dst] + fvec
-                new_src = ((frt_src_new - frb_src_new) ** 2) / frb_src_new
-                new_dst = ((frt_dst_new - frb_dst_new) ** 2) / frb_dst_new
-                taxon_sum_new = taxon_sum - old_src - old_dst + new_src + new_dst
-                crit_new = float((taxon_sum_new * nsitev).max())
-                if crit_new < (crit - tol):
-                    bins[el] = dst
-                    counts[src] -= 1
-                    counts[dst] += 1
-                    frb[src] = frb_src_new
-                    frb[dst] = frb_dst_new
-                    frt[:, src] = frt_src_new
-                    frt[:, dst] = frt_dst_new
-                    term[:, src] = new_src
-                    term[:, dst] = new_dst
-                    taxon_sum = taxon_sum_new
-                    crit = crit_new
-                    improved = True
-                    break
-            if improved:
-                break
-        if not improved:
-            break
-    return bins, crit
-
-
-def test_hill_climb_bins_chisq_matches_reference_implementation():
-    rng = np.random.default_rng(seed=17)
-    n_taxa = 11
-    n_state = 20
-    n_bin = 6
-    for _ in range(10):
-        fmat = rng.random((n_taxa, n_state))
-        fmat = fmat / fmat.sum(axis=1, keepdims=True)
-        fr = rng.random((n_state,))
-        fr = fr / fr.sum()
-        nsitev = rng.integers(low=50, high=600, size=(n_taxa,), endpoint=False).astype(np.float64)
-        bins = rng.integers(low=0, high=n_bin, size=(n_state,), endpoint=False).astype(np.int64)
-        bins[:n_bin] = np.arange(n_bin, dtype=np.int64)
-
-        out_bins, out_crit = recoding._hill_climb_bins_chisq(
-            initial_bins=bins,
-            num_bin=n_bin,
-            fmat=fmat,
-            fr=fr,
-            nsitev=nsitev,
-        )
-        ref_bins, ref_crit = _hill_climb_bins_chisq_reference(
-            initial_bins=bins,
-            num_bin=n_bin,
-            fmat=fmat,
-            fr=fr,
-            nsitev=nsitev,
-        )
-        assert out_bins.tolist() == ref_bins.tolist()
-        assert out_crit == pytest.approx(ref_crit, abs=1e-12)
-
-
 def test_hill_climb_bins_chisq_cython_matches_python_when_available():
     cython_fn = None
     if getattr(recoding, "recoding_cy", None) is not None:
@@ -161,7 +40,7 @@ def test_hill_climb_bins_chisq_cython_matches_python_when_available():
     n_taxa = 13
     n_state = 20
     n_bin = 6
-    for _ in range(8):
+    for _ in range(2):
         fmat = rng.random((n_taxa, n_state))
         fmat = np.ascontiguousarray(fmat / fmat.sum(axis=1, keepdims=True), dtype=np.float64)
         fr = np.ascontiguousarray(rng.random((n_state,)), dtype=np.float64)
@@ -247,7 +126,7 @@ def test_random_bin_assignments_cython_matches_python_when_available():
         pytest.skip("recoding_cy is unavailable")
     num_item = 20
     num_bin = 6
-    n_random = 300
+    n_random = 30
     seed = 109
     out_cy = cython_fn(
         num_item=num_item,

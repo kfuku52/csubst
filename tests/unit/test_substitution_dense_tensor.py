@@ -37,15 +37,9 @@ def test_get_substitution_tensor_asis_matches_manual_outer_products():
             mmap_file.unlink()
 
 
-def test_apply_min_sub_pp_threshold():
-    g = {"min_sub_pp": 0.3, "ml_anc": False}
-    sub = np.array([[[[[0.2, 0.4], [0.1, 0.5]]]]], dtype=float)
-    out = substitution.apply_min_sub_pp(g, sub)
-    np.testing.assert_allclose(out, [[[[[0.0, 0.4], [0.0, 0.5]]]]], atol=1e-12)
-
-
-def test_apply_min_sub_pp_parses_ml_anc_string_no_as_false():
-    g = {"min_sub_pp": 0.3, "ml_anc": "no"}
+@pytest.mark.parametrize("ml_anc", [False, "no"])
+def test_apply_min_sub_pp_threshold(ml_anc):
+    g = {"min_sub_pp": 0.3, "ml_anc": ml_anc}
     sub = np.array([[[[[0.2, 0.4], [0.1, 0.5]]]]], dtype=float)
     out = substitution.apply_min_sub_pp(g, sub)
     np.testing.assert_allclose(out, [[[[[0.0, 0.4], [0.0, 0.5]]]]], atol=1e-12)

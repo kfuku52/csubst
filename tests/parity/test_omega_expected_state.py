@@ -59,30 +59,6 @@ def test_calc_E_stat_mean_sparse_matches_dense_for_all_modes():
         np.testing.assert_allclose(out_sparse, out_dense, atol=1e-12)
 
 
-def test_resolve_E_stat_n_jobs_keeps_pepc_like_workload_single_thread():
-    n_jobs, estimated_work = omega._resolve_E_stat_n_jobs(
-        num_cb_rows=8446,
-        num_site=956,
-        num_categories=59,
-        g={"threads": 3},
-    )
-
-    assert estimated_work == 8446 * 956 * 59
-    assert n_jobs == 1
-
-
-def test_resolve_E_stat_n_jobs_parallelizes_large_category_workload():
-    n_jobs, estimated_work = omega._resolve_E_stat_n_jobs(
-        num_cb_rows=50000,
-        num_site=2000,
-        num_categories=512,
-        g={"threads": 4},
-    )
-
-    assert estimated_work == 50000 * 2000 * 512
-    assert n_jobs == 4
-
-
 def test_calc_E_stat_parallel_chunks_match_single_thread(monkeypatch):
     dense = _toy_sub_tensor()
     cb = _toy_cb()

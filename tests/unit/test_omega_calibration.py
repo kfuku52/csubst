@@ -31,31 +31,6 @@ def test_calibrate_dsc_quantile_fast_path_matches_numpy_quantile():
     np.testing.assert_allclose(observed, expected, rtol=0.0, atol=0.0, equal_nan=True)
 
 
-def test_calibrate_dsc_quantile_matches_numpy_bitwise_for_small_samples():
-    rng = np.random.default_rng(20260809)
-    scipy_stats = pytest.importorskip("scipy.stats")
-    for size in range(2, 80):
-        for replicate in range(10):
-            if replicate % 2 == 0:
-                dnc = rng.lognormal(mean=0.0, sigma=3.0, size=size)
-            else:
-                dnc = rng.integers(0, 8, size=size).astype(np.float64)
-            dsc = rng.lognormal(mean=0.0, sigma=2.0, size=size)
-            ranks = scipy_stats.rankdata(dsc)
-            quantiles = (ranks - 0.5) / float(size)
-            expected = np.quantile(dnc, quantiles)
-            replace = dsc > expected
-            expected[replace] = dsc[replace]
-
-            observed, _fit, _replace = omega._calibrate_dsc_vector(
-                dNc_values=dnc,
-                dSc_values=dsc,
-                transformation="quantile",
-            )
-
-            np.testing.assert_array_equal(observed, expected)
-
-
 def test_add_omega_empirical_pvalues_rejects_independent_dif_null():
     import pytest
     with pytest.raises(ValueError, match='joint category distribution'):

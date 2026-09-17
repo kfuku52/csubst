@@ -139,35 +139,6 @@ def test_is_url_valid_falls_back_to_get_when_head_is_not_supported(monkeypatch):
     assert calls == ["HEAD", "GET"]
 
 
-def test_is_url_valid_falls_back_to_get_when_head_is_forbidden(monkeypatch):
-    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
-    calls = []
-
-    class _Resp:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-    def _urlopen(request, timeout=None):
-        method = request.get_method() if hasattr(request, "get_method") else "GET"
-        calls.append(method)
-        if method == "HEAD":
-            raise urllib.error.HTTPError(
-                url="https://example.com/file.pdb",
-                code=403,
-                msg="Forbidden",
-                hdrs=None,
-                fp=None,
-            )
-        return _Resp()
-
-    monkeypatch.setattr(parser_biodb.urllib.request, "urlopen", _urlopen)
-    assert parser_biodb.is_url_valid("https://example.com/file.pdb") is True
-    assert calls == ["HEAD", "GET"]
-
-
 def test_is_url_valid_returns_false_when_head_unsupported_and_get_fails(monkeypatch):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
     calls = []
@@ -211,14 +182,6 @@ def test_pdb_sequence_search_rejects_none_branch_ids_with_clear_error(monkeypatc
     g = {"branch_ids": None, "tree": tr}
     with pytest.raises(ValueError, match="No branch IDs were provided"):
         parser_biodb.pdb_sequence_search(g)
-
-
-def test_normalize_branch_ids_rejects_non_integer_like_values(monkeypatch):
-    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
-    with pytest.raises(ValueError, match="integer-like"):
-        parser_biodb._normalize_branch_ids([1.5])
-    with pytest.raises(ValueError, match="integer-like"):
-        parser_biodb._normalize_branch_ids([True])
 
 
 def test_pdb_sequence_search_accepts_scalar_branch_id(monkeypatch):

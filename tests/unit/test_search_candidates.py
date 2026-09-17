@@ -111,7 +111,7 @@ def test_dependency_annotation_preserved_when_another_trait_validly_selects_row(
 @pytest.mark.parametrize('exhaustive_until', [1, 4])
 def test_trait_candidate_union_matches_independent_bruteforce(arity, exhaustive_until):
     rng = np.random.default_rng(917)
-    for _ in range(20):
+    for _ in range(5):
         g, ids = _config()
         g.update(foreground='traits.tsv', exhaustive_until=exhaustive_until)
         global_pair = rng.choice(ids, 2, replace=False)

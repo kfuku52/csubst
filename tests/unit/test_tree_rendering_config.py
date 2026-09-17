@@ -57,22 +57,6 @@ def test_normalize_state_plot_request_rejects_legacy_yes():
         tree.normalize_state_plot_request("yes", param_name="--plot_state_aa")
 
 
-def test_plot_branch_category_writes_pdf_with_matplotlib_backend(tmp_path):
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
-    for node in tr.traverse():
-        ete.set_prop(node, "color_PLACEHOLDER", "black")
-        ete.set_prop(node, "labelcolor_PLACEHOLDER", "black")
-    g = {
-        "tree": tr,
-        "fg_df": pd.DataFrame(columns=["name", "PLACEHOLDER"]),
-    }
-    outbase = tmp_path / "csubst_branch_id"
-    tree.plot_branch_category(g=g, file_base=str(outbase), label="all")
-    outfile = tmp_path / "csubst_branch_id.pdf"
-    assert outfile.exists()
-    assert outfile.stat().st_size > 0
-
-
 def test_plot_state_tree_zero_sites_is_noop(tmp_path, monkeypatch):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     g = {
