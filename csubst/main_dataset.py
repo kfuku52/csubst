@@ -29,19 +29,8 @@ def _copy_file_as_gzip(path_from, path_to_gz):
         shutil.copyfileobj(src, dst)
 
 
-def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, force=False):
-    name = str(name)
-    output_dir = os.path.abspath(str(output_dir))
-    if iqtree_outdir is None:
-        iqtree_outdir = os.path.join(output_dir, 'csubst_iqtree')
-    layout = runtime.ensure_iqtree_layout({'iqtree_outdir': iqtree_outdir}, create_dir=True)
-    iqtree_outdir = layout['iqtree_outdir']
-    alignment_target = os.path.join(output_dir, 'alignment.fa.gz')
-    iqtree_prefix = runtime.infer_iqtree_output_prefix(
-        alignment_file=alignment_target,
-        iqtree_outdir=iqtree_outdir,
-        base_dir=output_dir,
-    )
+def _build_dataset_copy_plan(name, dir_dataset, output_dir, iqtree_prefix):
+    """Resolve ordered destinations and operations without writing dataset files."""
     files = sorted([f for f in os.listdir(dir_dataset) if f.startswith(name + '.')])
     copy_plan = []
     for file in files:
@@ -60,12 +49,26 @@ def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, f
             path_to = iqtree_prefix + suffix
             operation = 'copy'
         else:
-            output_file_name = new_file_name
-            if _is_gzipped_fasta_file_name(new_file_name):
-                output_file_name = new_file_name
-            path_to = os.path.join(output_dir, output_file_name)
+            path_to = os.path.join(output_dir, new_file_name)
             operation = 'copy'
         copy_plan.append((path_from, path_to, operation))
+    return copy_plan
+
+
+def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, force=False):
+    name = str(name)
+    output_dir = os.path.abspath(str(output_dir))
+    if iqtree_outdir is None:
+        iqtree_outdir = os.path.join(output_dir, 'csubst_iqtree')
+    layout = runtime.ensure_iqtree_layout({'iqtree_outdir': iqtree_outdir}, create_dir=True)
+    iqtree_outdir = layout['iqtree_outdir']
+    alignment_target = os.path.join(output_dir, 'alignment.fa.gz')
+    iqtree_prefix = runtime.infer_iqtree_output_prefix(
+        alignment_file=alignment_target,
+        iqtree_outdir=iqtree_outdir,
+        base_dir=output_dir,
+    )
+    copy_plan = _build_dataset_copy_plan(name, dir_dataset, output_dir, iqtree_prefix)
     existing = [path_to for _, path_to, _ in copy_plan if os.path.lexists(path_to)]
     unsafe_existing = [
         path for path in existing if os.path.islink(path) or not os.path.isfile(path)
