@@ -1,9 +1,51 @@
 import gzip
+import json
+from pathlib import Path
 
 import pytest
 
 from csubst import main_dataset
 from csubst import runtime
+
+
+@pytest.mark.parametrize("kind", ["file", "directory", "symlink"])
+@pytest.mark.parametrize("force", [False, True])
+def test_dataset_preflights_generated_manifest(tmp_path, kind, force):
+    source = tmp_path / "source"
+    source.mkdir()
+    for name, content in {
+        "alignment.fa": ">A\nAAA\n>B\nAAG\n",
+        "tree.nwk": "(A:1,B:1);",
+        "alignment.fa.iqtree": "Model of substitution: MG\n",
+        "alignment.fa.state": "# state\n",
+    }.items():
+        (source / ("PGK." + name)).write_text(content)
+    out = tmp_path / "out"
+    out.mkdir()
+    iqtree = out / "csubst_iqtree"
+    iqtree.mkdir()
+    prefix = runtime.infer_iqtree_output_prefix(out / "alignment.fa.gz", iqtree, base_dir=out)
+    manifest = Path(prefix + ".state.csubst-manifest.json")
+    if kind == "file":
+        manifest.write_text("previous")
+    elif kind == "directory":
+        manifest.mkdir()
+    else:
+        manifest.symlink_to(tmp_path / "missing")
+    if kind == "file" and force:
+        main_dataset._copy_dataset_files("PGK", source, out, force=force)
+        assert isinstance(json.loads(manifest.read_text()), dict)
+    else:
+        with pytest.raises(FileExistsError):
+            main_dataset._copy_dataset_files("PGK", source, out, force=force)
+        assert not (out / "alignment.fa.gz").exists()
+        assert not (out / "tree.nwk").exists()
+        if kind == "file":
+            assert manifest.read_text() == "previous"
+        elif kind == "symlink":
+            assert manifest.is_symlink()
+        else:
+            assert manifest.is_dir()
 
 
 @pytest.mark.parametrize(

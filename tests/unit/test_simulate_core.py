@@ -6,6 +6,34 @@ import pytest
 from csubst import main_simulate
 from csubst import tree
 from csubst import ete
+from csubst import output_safety
+
+
+@pytest.mark.parametrize("suffix", ["state", "treefile", "rate", "iqtree", "log", "anc.fa"])
+@pytest.mark.parametrize("alias", ["direct", "symlink", "hardlink"])
+def test_true_asr_bundle_preserves_protected_files(tmp_path, suffix, alias):
+    import os
+
+    anc = tmp_path / "anc.fa"
+    anc.write_text(">R\nAAA\n")
+    target = tmp_path / ("export." + suffix)
+    protected = target if alias == "direct" else tmp_path / "input"
+    protected.write_text("original input or log\n")
+    if alias == "symlink":
+        target.symlink_to(protected)
+    elif alias == "hardlink":
+        os.link(protected, target)
+    g = {
+        "tree": tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1)),
+        "eq_freq": np.full(61, 1 / 61),
+        "genetic_code": 1,
+        "background_omega": 0.2,
+    }
+    with output_safety.output_context([("input or log", protected)]):
+        with pytest.raises(ValueError, match="must not overwrite"):
+            main_simulate.write_true_asr_bundle(g, str(anc), str(tmp_path / "export"))
+    assert protected.read_text() == "original input or log\n"
+    assert list(tmp_path.glob("export.*")) == [target]
 
 
 def test_get_num_adjusted_sites_does_not_mutate_parent_state_tensor():

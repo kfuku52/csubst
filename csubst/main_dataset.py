@@ -69,7 +69,17 @@ def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, f
         base_dir=output_dir,
     )
     copy_plan = _build_dataset_copy_plan(name, dir_dataset, output_dir, iqtree_prefix)
-    existing = [path_to for _, path_to, _ in copy_plan if os.path.lexists(path_to)]
+    rooted_tree_target = os.path.join(output_dir, 'tree.nwk')
+    iqtree_report_target = iqtree_prefix + '.iqtree'
+    state_target = iqtree_prefix + '.state'
+    destinations = [path_to for _, path_to, _ in copy_plan]
+    # The generated provenance file is an output too. Check it before copying
+    # anything, including when only an earlier manifest remains in the folder.
+    if all(path in destinations or os.path.isfile(path) for path in (
+        alignment_target, rooted_tree_target, iqtree_report_target, state_target
+    )):
+        destinations.append(state_target + '.csubst-manifest.json')
+    existing = [path for path in destinations if os.path.lexists(path)]
     unsafe_existing = [
         path for path in existing if os.path.islink(path) or not os.path.isfile(path)
     ]
@@ -91,9 +101,6 @@ def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, f
             _copy_file_as_gzip(path_from=path_from, path_to_gz=path_to)
         else:
             shutil.copy(path_from, path_to)
-    rooted_tree_target = os.path.join(output_dir, 'tree.nwk')
-    iqtree_report_target = iqtree_prefix + '.iqtree'
-    state_target = iqtree_prefix + '.state'
     if all(
         os.path.isfile(path)
         for path in [alignment_target, rooted_tree_target, iqtree_report_target, state_target]

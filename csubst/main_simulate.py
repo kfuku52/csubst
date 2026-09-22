@@ -12,6 +12,7 @@ from csubst import runtime
 from csubst import sequence_io
 from csubst import tree
 from csubst import ete
+from csubst import output_safety
 
 _PYVOLVE = None
 
@@ -769,6 +770,10 @@ def write_true_asr_bundle(g, anc_fasta, prefix):
     iqtree_file = prefix + '.iqtree'
     log_file = prefix + '.log'
     anc_file = prefix + '.anc.fa'
+    # Validate the concrete filenames, not just their shared prefix, before
+    # writing any bundle member so a late collision cannot leave partial output.
+    for path in (state_file, tree_file, rate_file, iqtree_file, log_file, anc_file):
+        output_safety.validate_destination(path)
     out_tree = copy.deepcopy(g['tree'])
     ete.write_tree(out_tree, format=1, outfile=tree_file)
     write_fasta(anc_seqs, anc_file)
