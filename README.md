@@ -36,7 +36,7 @@ The main features of **CSUBST** are:
 Bioconda builds can lag behind source support. For Python 3.14, use the GitHub
 source route below until a compatible Bioconda build is available. See the
 [installation guide](https://github.com/kfuku52/csubst/wiki/Installation-and-test-run)
-for the checked distribution versions and Python ranges.
+for distribution availability and version-selection guidance.
 
 #### Option 1: Install with `conda`
 ```
@@ -73,6 +73,13 @@ csubst dataset --name PGK
 # Run csubst search
 csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --foreground foreground.txt
 ```
+
+The bundled dataset includes a reusable IQ-TREE fit; a new fit requires the
+IQ-TREE executable (default name `iqtree`, configurable with `--iqtree_exe`).
+The main result is `csubst_search/csubst_cb_2.tsv`; check
+`csubst_search/csubst_search_run.json` for `complete` status before interpreting it.
+See [input, output, and rerun behavior](docs/CLI_SAFETY.md) for path resolution
+and preservation of earlier results.
 
 ## Usage
 For joint branch-endpoint probabilities and their memory/time tradeoffs, see
@@ -123,8 +130,9 @@ csubst download --resource esm3di-35m --no_download yes
 Omitting `--resource` also selects ESM3Di-35M. For variant-effect scoring,
 prepare VESM separately with `csubst download --resource vesm-35m`.
 
-ESM3Di and VESM files and structure downloads use the CSUBST cache (default
-`~/.cache/csubst`, overridable with `CSUBST_CACHE_DIR`). ProstT5 weights use
+ESM3Di and VESM files and structure downloads use the CSUBST cache: first
+`--resource_cache_dir`, then `CSUBST_CACHE_DIR`, then `$XDG_CACHE_HOME/csubst`
+when set, otherwise `~/.cache/csubst`. ProstT5 weights use
 Hugging Face's cache or `--prostt5_local_dir`, independently of that setting.
 See [model caches and offline use](https://github.com/kfuku52/csubst/wiki/csubst-download)
 and [VESM-35M scoring](https://github.com/kfuku52/csubst/wiki/csubst-sites#vesm-35m-variant-effect-scoring).

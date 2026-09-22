@@ -46,6 +46,33 @@ cases, the summary, per-run results, and failure logs are written before the
 command exits with status 2 if any run failed. All-success benchmarks exit 0.
 Automation should check the exit status and retain the summary for diagnosis.
 
+## Input paths and bundled examples
+
+Relative alignment, tree, foreground, and `--iqtree_outdir` paths are resolved
+from the working directory, independently of `--outdir`. The default IQ-TREE
+directory is `csubst_iqtree`; changing the analysis output directory does not
+move the fitted inputs.
+
+`dataset --name PGK` writes `alignment.fa.gz`, `tree.nwk`, `foreground.txt`,
+and bundled IQ-TREE intermediate files with a provenance manifest. Repeating
+it in the same directory refuses existing destinations unless `--force yes`
+is supplied. This is different from the search history behavior above.
+
+For analysis, inferred IQ-TREE files are reused only when all five files
+(`.iqtree`, `.log`, `.rate`, `.state`, `.treefile`), provenance, and model are
+compatible. Otherwise CSUBST attempts a new fit. Explicitly supplying all five
+`--iqtree_*` file paths uses their reported model without requiring the
+provenance manifest; `--iqtree_redo yes` requests a new fit.
+
+`doctor` checks the IQ-TREE executable by default even when a bundled fit can
+be reused. For a check of existing inputs without the executable check, use
+`--check_iqtree_exe no`; this does not verify that a future refit will work.
+
+`sites` selects branches with `--branch_id`, not `--foreground`. To select
+foreground combinations from search results, use `--branch_id fg` and supply
+`--cb_file csubst_search/csubst_cb_2.tsv` for the default search layout. The
+`--cb_file` default is `csubst_cb_2.tsv` in the working directory.
+
 ## Model resource checks
 
 `download --resource vesm-35m` always checks file sizes and SHA-256 hashes;
