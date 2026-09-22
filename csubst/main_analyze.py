@@ -17,6 +17,7 @@ from csubst import substitution
 from csubst import table
 from csubst import ete
 from csubst import output_stat
+from csubst import output_run
 from csubst import runtime
 from csubst import recoding_config
 from csubst import tree
@@ -675,6 +676,11 @@ def main_analyze(g: AnalysisConfig) -> None:
         g.get('nonsyn_recode', 'no'), _resolve_expectation_method(g),
         g.get('sa_asr_mode', 'direct'), g.get('sa_iqtree_model', 'GTR'),
     )
+    with output_run.search_run(g):
+        _main_analyze(g)
+
+
+def _main_analyze(g: AnalysisConfig) -> None:
     start = time.time()
     g = runtime.ensure_output_layout(g, create_dir=True)
     print("Reading and parsing input files.", flush=True)

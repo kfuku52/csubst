@@ -2,9 +2,10 @@
 
 import argparse
 import os
+import re
 from collections.abc import Iterator, Sequence
 
-from csubst import runtime
+from csubst import output_safety, runtime
 
 
 def _path_actions(parser: argparse.ArgumentParser) -> Iterator[argparse.Action]:
@@ -16,11 +17,11 @@ def _path_actions(parser: argparse.ArgumentParser) -> Iterator[argparse.Action]:
             yield action
 
 
-def validate_log_destination(
-    log_path: str, parser: argparse.ArgumentParser, args: argparse.Namespace,
+def input_paths(
+    parser: argparse.ArgumentParser, args: argparse.Namespace,
     argv: Sequence[str],
-) -> None:
-    """Reject aliases of inputs before either truncating or appending a log.
+) -> Iterator[tuple[str, str]]:
+    """Enumerate supplied and inferred inputs, including parse-error paths.
 
     Inspect raw path options too: argparse may stop before populating the
     namespace when an unrelated argument has an invalid value. Path metadata
@@ -67,7 +68,6 @@ def validate_log_destination(
 
     ignored = {'log_file', 'outdir', 'true_asr_prefix', 'epistasis_degree_outfile'}
     inferred_iqtree_inputs = {'iqtree_' + suffix for suffix in ('treefile', 'state', 'rate', 'iqtree', 'log')}
-    log_realpath = os.path.realpath(log_path)
     for dest, values in paths.items():
         if dest in ignored:
             continue
@@ -87,11 +87,32 @@ def validate_log_destination(
                                   for outdir in paths.get('outdir', {'.'})
                                   for candidate in base_candidates)
             for candidate in candidates:
-                same = os.path.realpath(candidate) == log_realpath
-                if not same:
-                    try:
-                        same = os.path.samefile(candidate, log_path)
-                    except (FileNotFoundError, NotADirectoryError):
-                        pass
-                if same:
-                    raise ValueError('--log_file must not overwrite input --{}: {}'.format(dest, candidate))
+                yield 'input --' + dest, candidate
+
+
+def validate_log_destination(log_path, parser, args, argv):
+    for label, candidate in input_paths(parser, args, argv):
+        if output_safety.same_path(candidate, log_path):
+            raise ValueError('--log_file must not overwrite {}: {}'.format(label, candidate))
+
+
+def validate_output_destinations(layout, args, protected):
+    command = getattr(args, 'subcommand', '')
+    suffixes = []
+    if command == 'doctor':
+        suffixes.extend(['doctor_summary.tsv', 'doctor_summary.json'])
+        if getattr(args, 'output_manifest', True):
+            suffixes.append('outputs.tsv')
+    elif command in ('search', 'analyze'):
+        suffixes.extend(['search_run.json', 'cb_stats.tsv', 'b.tsv', 'bs.tsv',
+                         's.tsv', 'cs.tsv', 'cbs.tsv'])
+        pattern = re.compile(re.escape(layout['output_prefix']) + r'_cb_[0-9]+\.tsv$')
+        candidates = [path for _, path in protected]
+        if os.path.isdir(layout['outdir']):
+            candidates.extend(os.path.join(layout['outdir'], name) for name in os.listdir(layout['outdir']))
+        for candidate in candidates:
+            name = os.path.basename(candidate)
+            if pattern.fullmatch(name):
+                output_safety.check_destination(os.path.join(layout['outdir'], name), protected)
+    for suffix in suffixes:
+        output_safety.check_destination(runtime.output_path(layout, suffix), protected)

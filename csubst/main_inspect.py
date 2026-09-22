@@ -13,6 +13,7 @@ from csubst import output_manifest
 from csubst import parser_iqtree
 from csubst import parser_misc
 from csubst import runtime
+from csubst import output_safety
 from csubst import sequence
 from csubst import structural_alphabet
 from csubst import tree
@@ -143,7 +144,8 @@ def _record_inspect_output_paths(g, output_paths, output_kind, note=''):
 
 def _record_inspect_foreground_branch_files(g):
     for trait_name in _get_trait_names(g):
-        output_path = runtime.output_path(g, "foreground_branch_" + str(trait_name) + ".txt")
+        suffix = '' if trait_name == 'PLACEHOLDER' else '_' + output_safety.trait_filename(trait_name)
+        output_path = runtime.output_path(g, "foreground_branch" + suffix + ".txt")
         if os.path.exists(output_path):
             _record_inspect_output_paths(g=g, output_paths=output_path, output_kind="foreground_branch_txt")
     return g
@@ -257,8 +259,8 @@ def _write_branch_maps(g):
     )
     output_paths.append(combined_path)
     for trait_name in trait_names:
-        out_file = runtime.output_path(g, "branch_map_" + str(trait_name) + ".tsv")
-        out_file = out_file.replace("_PLACEHOLDER", "")
+        suffix = '' if trait_name == 'PLACEHOLDER' else '_' + output_safety.trait_filename(trait_name)
+        out_file = runtime.output_path(g, "branch_map" + suffix + ".tsv")
         if out_file == combined_path:
             continue
         tsv.write_dataframe(_sanitize_placeholder_columns(trait_specific_frames[trait_name]), out_file)

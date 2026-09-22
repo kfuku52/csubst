@@ -11,6 +11,7 @@ import time
 from csubst import __version__
 from csubst import cli_io
 from csubst import runtime
+from csubst import output_safety
 from csubst.recoding_config import DEFAULT_SA_BACKEND, SA_BACKENDS
 
 
@@ -179,7 +180,7 @@ def _make_output_parent_parser(default_outdir='.', default_prefix='csubst'):
     return parser
 
 
-def _resolve_log_file_from_argv(argv):
+def _resolve_output_layout_from_argv(argv):
     defaults = _resolve_output_namespace_defaults(argv)
     values = {
         'outdir': defaults['outdir'],
@@ -217,9 +218,13 @@ def _resolve_log_file_from_argv(argv):
             'log_file': values['log_file'],
         }
         runtime.ensure_output_layout(layout, create_dir=True)
-        return layout['log_file']
+        return layout
     except Exception:
-        return os.path.abspath('csubst.log')
+        return runtime.ensure_output_layout({})
+
+
+def _resolve_log_file_from_argv(argv):
+    return _resolve_output_layout_from_argv(argv)['log_file']
 
 
 def _is_informational_invocation(argv):
@@ -1477,9 +1482,13 @@ def main(argv=None):
         ):
             preflight_args = preflight_parser.parse_args(normalized_argv, namespace=preflight_args)
     except SystemExit:
-        log_path = _resolve_log_file_from_argv(argv)
+        layout = _resolve_output_layout_from_argv(argv)
+        log_path = layout['log_file']
         try:
             cli_io.validate_log_destination(log_path, preflight_parser, preflight_args, argv)
+            cli_io.validate_output_destinations(
+                layout, preflight_args, [('log --log_file', log_path)],
+            )
         except (ValueError, OSError) as exc:
             sys.stderr.write(str(exc) + '\n')
         else:
@@ -1490,10 +1499,13 @@ def main(argv=None):
         layout = runtime.ensure_output_layout(vars(preflight_args).copy(), create_dir=False)
         log_path = layout['log_file']
         cli_io.validate_log_destination(log_path, preflight_parser, preflight_args, argv)
+        protected = list(cli_io.input_paths(preflight_parser, preflight_args, argv))
+        protected.append(('log --log_file', log_path))
+        cli_io.validate_output_destinations(layout, preflight_args, protected)
         runtime.ensure_output_layout(layout, create_dir=True)
     except (ValueError, OSError) as exc:
         preflight_parser.error(str(exc))
-    with open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
+    with output_safety.output_context(protected), open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
         stdout_tee = _TeeTextStream(sys.stdout, log_file)
         stderr_tee = _TeeTextStream(sys.stderr, log_file)
         with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):

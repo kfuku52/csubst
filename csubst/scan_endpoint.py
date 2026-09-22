@@ -187,7 +187,7 @@ def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids):
     if not np.isfinite(expected).all() or (expected < -1e-12).any() or ("occupation" not in context and (expected > 1 + 1e-10).any()):
         raise ValueError("Scan endpoint expected mass is outside [0, 1].")
     expected = np.maximum(expected, 0)
-    reasons = np.full(len(expected), "ok", dtype="U24")
+    reasons: np.ndarray = np.full(len(expected), "ok", dtype="U24")
     zero = expected == 0
     reachable_candidate = (context["reachable_groups"][:, to_ids] & candidate_mask).any(axis=1)
     if "occupation" in context:

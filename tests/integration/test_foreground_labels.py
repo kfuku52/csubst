@@ -2,8 +2,27 @@
 import numpy as np
 import pandas as pd
 import pytest
+from pathlib import Path
 
 from csubst import foreground
+from csubst import ete, tree
+
+
+def test_trait_labels_are_preserved_with_distinct_safe_output_names(tmp_path):
+    labels = ['C4/CAM', 'C4%2FCAM', 'C4_PLACEHOLDER', '../outside']
+    path = tmp_path / 'foreground.tsv'
+    path.write_text('name\t' + '\t'.join(labels) + '\nA\t1\t1\t1\t1\nB\t2\t2\t2\t2\n')
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('(A:0.1,B:0.1);', format=1))
+    g = dict(foreground=str(path), fg_format=2, tree=tr, fg_stem_only=True,
+             outdir=str(tmp_path), output_prefix='csubst')
+    result = foreground.get_foreground_branch(g)
+    assert result['fg_df'].columns.tolist() == ['name'] + labels
+    expected = ['C4%2FCAM', 'C4%252FCAM', 'C4_PLACEHOLDER', '..%2Foutside']
+    for name in expected:
+        assert (tmp_path / ('csubst_foreground_branch_' + name + '.txt')).is_file()
+    plots = tree.plot_branch_category(g, str(tmp_path / 'branch'))
+    assert {str(tmp_path / ('branch_' + name + '.pdf')) for name in expected} == set(plots)
+    assert all(Path(path).stat().st_size > 0 for path in plots)
 
 
 def test_read_foreground_file_rejects_invalid_fg_format1_shape(tmp_path):

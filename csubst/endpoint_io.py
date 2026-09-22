@@ -127,7 +127,7 @@ class _Spool:
 
     def finish(self):
         indptr = np.r_[0, np.cumsum(self.counts)]
-        index = np.empty(self.offset, dtype=self.index_dtype)
+        index: np.ndarray = np.empty(self.offset, dtype=self.index_dtype)
         data = np.empty(self.offset, dtype=self.dtype)
         cursor = indptr[:-1].copy()
         for row, offset, count in self.fragments:
@@ -202,7 +202,7 @@ def _tree_arrays(g, structural):
     labels = {int(ete.get_prop(node, 'numerical_label')) for node in nodes}
     if labels != set(range(n)):
         raise ValueError('Joint endpoints require a complete, contiguous tree node axis.')
-    parents = np.full(n, -1, dtype=int)
+    parents: np.ndarray = np.full(n, -1, dtype=int)
     lengths = np.zeros(n)
     for node in nodes:
         idx = int(ete.get_prop(node, 'numerical_label'))
@@ -280,7 +280,7 @@ def _projection_transform(g, kinds, mappings, stats, predictive=False, cache_byt
     syn_pairs = [(sg, a, d, int(ca), int(cd))
                  for sg, idx in enumerate(syn_indices)
                  for a, ca in enumerate(idx) for d, cd in enumerate(idx) if a != d]
-    pairs = np.asarray(syn_pairs, dtype=np.int64).reshape(-1, 5)
+    pairs: np.ndarray = np.asarray(syn_pairs, dtype=np.int64).reshape(-1, 5)
     syn_axes = pairs.T
     cython_project = getattr(substitution_sparse.substitution_sparse_cy, 'project_endpoint_syn_double', None)
     masks = {kind: (mapping @ mapping.T == 0) for kind, mapping in mappings.items()
@@ -400,7 +400,7 @@ def _build(g, structural=False):
         q, pi = g['3di_q'], g['3di_pi']
         rates, weights = np.ones(1), np.ones(1)
         kinds = ['N']
-        mappings = {'N': np.eye(k)}
+        mappings: dict[str, np.ndarray | None] = {'N': np.eye(k)}
     else:
         validate_codon_model(str(g.get('substitution_model', '')))
         q = g['instantaneous_codon_rate_matrix']
@@ -429,8 +429,13 @@ def _build(g, structural=False):
     shapes = {}
     aa_mapping = None if structural else _mapping(g, 'AA', k)
     for kind in kinds:
-        ng, ns = ((len(g['amino_acid_orders']), g['max_synonymous_size']) if kind == 'S'
-                  else (1, mappings[kind].shape[1]))
+        if kind == 'S':
+            ng, ns = len(g['amino_acid_orders']), g['max_synonymous_size']
+        else:
+            mapping = mappings[kind]
+            if mapping is None:
+                raise ValueError('Missing endpoint state mapping for ' + kind)
+            ng, ns = 1, mapping.shape[1]
         shapes[kind] = (n, num_site, ng, ns, ns)
     from csubst import omega, output_stat
     selected_stats = output_stat.get_required_base_stats(omega._resolve_requested_output_stats(g))

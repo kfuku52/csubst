@@ -7,6 +7,8 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from types import MappingProxyType
 
+from csubst import output_safety
+
 
 _RUN_TMPDIR_ENV = "CSUBST_RUN_TMPDIR"
 _RUN_TMPDIR_PREFIX = ".csubst_tmp_"
@@ -227,6 +229,7 @@ def output_path(g, suffix, separator="_", create_dir=False):
     else:
         file_name = prefix + str(separator) + suffix_txt
     path = os.path.join(outdir, file_name)
+    output_safety.validate_destination(path)
     if create_dir:
         os.makedirs(os.path.dirname(path), exist_ok=True)
     return path
@@ -244,6 +247,7 @@ def resolve_user_output_path(g, path, default_suffix=None, separator="_", create
         outdir = _normalize_outdir(g.get("outdir", _DEFAULT_OUTPUT_DIR))
         resolved = os.path.join(outdir, path_txt)
     resolved = os.path.abspath(resolved)
+    output_safety.validate_destination(resolved)
     if create_dir:
         parent = os.path.dirname(resolved)
         if parent != "":

@@ -6,6 +6,8 @@ import tempfile
 import numpy as np
 import pandas as pd
 
+from csubst import output_safety
+
 
 def _normalize_branch_ids(branch_ids):
     if branch_ids is None:
@@ -107,6 +109,7 @@ def _serialize_manifest(manifest_rows, sort_by=None):
 
 
 def _write_text_atomic(path, text):
+    output_safety.validate_destination(path)
     parent_dir = os.path.dirname(path) or os.getcwd()
     output_mode = (os.stat(path).st_mode & 0o777) if os.path.exists(path) else 0o644
     fd, temp_path = tempfile.mkstemp(prefix='.csubst_manifest_', suffix='.tmp', dir=parent_dir)
@@ -150,6 +153,21 @@ def write_output_manifest(
         file_size_bytes_override=0,
     )
     self_row = manifest_rows[-1]
+    def finalize():
+        for row in manifest_rows:
+            if row is self_row:
+                continue
+            path = row['output_path']
+            exists = os.path.exists(path)
+            row['file_exists'] = 'Y' if exists else 'N'
+            row['file_size_bytes'] = os.path.getsize(path) if exists else -1
+        _write_manifest_rows(manifest_rows, self_row, manifest_path_abs, sort_by)
+    _write_manifest_rows(manifest_rows, self_row, manifest_path_abs, sort_by)
+    output_safety.register_finalizer(manifest_path_abs, finalize)
+    return manifest_path_abs
+
+
+def _write_manifest_rows(manifest_rows, self_row, manifest_path_abs, sort_by):
     manifest_text = ''
     for _ in range(10):
         manifest_text = _serialize_manifest(manifest_rows=manifest_rows, sort_by=sort_by)

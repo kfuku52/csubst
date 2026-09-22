@@ -15,6 +15,8 @@ def write_dataframe(
     if report_context is not None:
         from csubst import event_reporting
         dataframe = event_reporting.annotate(dataframe, report_context)
+    from csubst import output_safety
+    output_safety.validate_destination(output_path)
     if chunksize is None:
         chunksize = max(1, int(dataframe.shape[0]))
     chunksize = max(1, int(chunksize))

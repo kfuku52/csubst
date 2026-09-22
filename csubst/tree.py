@@ -1,4 +1,5 @@
 import numpy as np
+from csubst import output_safety
 import copy
 import itertools
 import os
@@ -1724,8 +1725,8 @@ def plot_branch_category(g, file_base, label='all'):
     )
     out_files = list()
     for trait_name in trait_names:
-        file_name = file_base+'_'+trait_name+'.pdf'
-        file_name = file_name.replace('_PLACEHOLDER', '')
+        suffix = '' if trait_name == 'PLACEHOLDER' else '_' + output_safety.trait_filename(trait_name)
+        file_name = file_base + suffix + '.pdf'
         _render_tree_matplotlib_with_optional_node_types(
             tree=g['tree'],
             trait_name=trait_name,
@@ -1888,8 +1889,8 @@ def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, sta
                               tree_fig_max_height=TREE_FIG_MAX_HEIGHT, file_prefix='csubst'):
     from matplotlib.backends.backend_pdf import PdfPages
 
-    file_name = str(file_prefix) + '_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
-    file_name = file_name.replace('_PLACEHOLDER', '')
+    suffix = '' if trait_name == 'PLACEHOLDER' else '_' + output_safety.trait_filename(trait_name)
+    file_name = str(file_prefix) + '_state' + suffix + '_' + mode + '_' + str(output_token) + '.pdf'
     if output_dir is not None:
         file_name = os.path.join(output_dir, file_name)
     with PdfPages(file_name) as pdf_pages:
@@ -1931,8 +1932,8 @@ def _render_state_tree_concatenated(tree, trait_name, mode, orders, missing_stat
                                     highlighted_node_ids=None, highlight_color=None,
                                     tip_label_spacing_factor=TREE_TIP_LABEL_SPACING_FACTOR,
                                     tree_fig_max_height=TREE_FIG_MAX_HEIGHT, file_prefix='csubst'):
-    file_name = str(file_prefix) + '_state_' + trait_name + '_' + mode + '_' + str(output_token) + '.pdf'
-    file_name = file_name.replace('_PLACEHOLDER', '')
+    suffix = '' if trait_name == 'PLACEHOLDER' else '_' + output_safety.trait_filename(trait_name)
+    file_name = str(file_prefix) + '_state' + suffix + '_' + mode + '_' + str(output_token) + '.pdf'
     if output_dir is not None:
         file_name = os.path.join(output_dir, file_name)
     state_by_node,state_prob_by_node = _build_state_maps_for_concatenated_sites(

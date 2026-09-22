@@ -37,7 +37,7 @@ def annotate(frame, g):
                 continue
             slot = 'branch_id_' + match[1]
             if slot in out:
-                count = np.zeros(len(out), dtype=int)
+                count: np.ndarray = np.zeros(len(out), dtype=int)
                 for branch, rows in out.groupby(slot, sort=False).indices.items():
                     values = coverage([int(branch)])
                     count[rows] = values if sites is None else values[rows]
@@ -70,7 +70,7 @@ def annotate(frame, g):
         if combinations is None and g.get('branch_ids') is not None:
             combinations = [g['branch_ids']]
         if combo_cols and not branch_cols and combinations is not None:
-            joint_count = sum((coverage(branches) for branches in combinations), np.zeros(len(out), dtype=int))
+            joint_count: np.ndarray = sum((coverage(branches) for branches in combinations), np.zeros(len(out), dtype=int))
             out[kind + '_combination_eligible_count'] = joint_count
             out.loc[joint_count == 0, combo_cols] = np.nan
     if 'S_eligible_count' in out and 'N_eligible_count' in out:

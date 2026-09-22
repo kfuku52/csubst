@@ -15,6 +15,7 @@ from csubst import table
 from csubst import param
 from csubst import ete
 from csubst import runtime
+from csubst import output_safety
 from csubst import substitution
 from csubst import tree
 from csubst import output_stat
@@ -748,8 +749,8 @@ def get_foreground_ids(g, write=True):
         g['tree'] = annotate_foreground(lineages, trait_name, g)
         g['fg_ids'][trait_name] = copy.deepcopy(g['target_ids'][trait_name]) # marginal_ids may be added to target_id but fg_id won't be changed.
         if write:
-            file_name = runtime.output_path(g, 'foreground_branch_' + trait_name + '.txt')
-            file_name = file_name.replace('_PLACEHOLDER', '')
+            suffix = '' if trait_name == 'PLACEHOLDER' else '_' + output_safety.trait_filename(trait_name)
+            file_name = runtime.output_path(g, 'foreground_branch' + suffix + '.txt')
             with open(file_name, 'w') as f:
                 for x in g['target_ids'][trait_name]:
                     f.write(str(x)+'\n')
@@ -907,8 +908,8 @@ def get_marginal_branch(g):
                 ete.add_features(node, **{'is_marginal_'+trait_name: True})
             else:
                 ete.add_features(node, **{'is_marginal_'+trait_name: False})
-        file_name = runtime.output_path(g, 'marginal_branch_' + trait_name + '.txt')
-        file_name = file_name.replace('_PLACEHOLDER', '')
+        suffix = '' if trait_name == 'PLACEHOLDER' else '_' + output_safety.trait_filename(trait_name)
+        file_name = runtime.output_path(g, 'marginal_branch' + suffix + '.txt')
         if len(g['mg_ids'][trait_name]) > 0:
             with open(file_name, 'w') as f:
                 for x in g['mg_ids'][trait_name]:

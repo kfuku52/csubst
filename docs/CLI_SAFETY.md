@@ -8,6 +8,28 @@ collision exits with status 2 and leaves the input unchanged. Use a separate
 log filename; do not redirect the shell's stdout/stderr onto an input file,
 because shell redirection happens before CSUBST can check it.
 
+Doctor checks all report destinations before opening its log. Search reserves
+its table and run-record destinations before opening the log as well. Shared
+output-path and TSV/manifest writers reject input/log aliases for dynamically
+resolved outputs. A rejected destination exits with status 2.
+
+Search reruns preserve earlier tables in `.csubst_search_history/<run-id>/`
+inside the output directory, including tables from arities no longer reached.
+Unrelated files are left in place. `<prefix>_search_run.json` identifies the
+current tables, archived paths, and `running`, `complete`, or `failed` status.
+Only a `complete` run should be consumed as a finished analysis; partial tables
+from a failed run remain available for diagnosis. History is retained until the
+user removes it. Concurrent searches cannot write the same table namespace.
+
+Output manifests are refreshed after the CLI log closes, including on ordinary
+command failures, so recorded file sizes describe the final files. A forcibly
+terminated process cannot perform this finalization.
+
+Trait labels remain unchanged in input tables and plot labels. Filenames use
+percent encoding for unsafe characters: `C4/CAM` becomes `C4%2FCAM`, while a
+literal `C4%2FCAM` becomes `C4%252FCAM`. Simple existing filenames are unchanged;
+the encoding can be reversed with standard URL percent decoding.
+
 FASTA readers and IQ-TREE site-count inference share one streaming parser.
 Spaces, tabs, CRLF, and wrapped sequence lines do not add biological sites;
 gzip inputs use the same rules. Site-count inference stops after the first
