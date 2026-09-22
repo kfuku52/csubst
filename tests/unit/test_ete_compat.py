@@ -43,19 +43,6 @@ def test_get_distance_wrapper_for_branch_length_and_topology():
     assert ete.get_distance(a_node, b_node, topology_only=True) == pytest.approx(2.0)
 
 
-def test_link_to_alignment_maps_leaf_sequences(tmp_path):
-    tr = ete.PhyloNode("(A:1,B:1)R;", format=1)
-    aln = tmp_path / "toy.fa"
-    aln.write_text(">A description\nAAACCC\n>B extra\nGGGTTT\n", encoding="utf-8")
-
-    ete.link_to_alignment(tr, alignment=str(aln), alg_format="fasta")
-
-    a_node = [n for n in tr.traverse() if n.name == "A"][0]
-    b_node = [n for n in tr.traverse() if n.name == "B"][0]
-    assert ete.get_prop(a_node, "sequence") == "AAACCC"
-    assert ete.get_prop(b_node, "sequence") == "GGGTTT"
-
-
 @pytest.mark.parametrize("compressed", [False, True], ids=["plain", "gzip"])
 def test_link_to_alignment_ignores_sequence_whitespace(tmp_path, compressed):
     tr = ete.PhyloNode("(A:1,B:1)R;", format=1)

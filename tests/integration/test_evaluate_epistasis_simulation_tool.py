@@ -13,23 +13,9 @@ assert _spec.loader is not None
 _spec.loader.exec_module(_tool)
 
 
-def test_calc_auc_perfect_separation():
-    auc = _tool._calc_auc(scores=np.array([0.1, 0.2, 0.8, 0.9]), labels=np.array([0, 0, 1, 1], dtype=bool))
-    assert auc == pytest.approx(1.0, abs=1e-12)
-
-
 def test_calc_auc_tie_returns_half():
     auc = _tool._calc_auc(scores=np.array([1.0, 1.0, 1.0, 1.0]), labels=np.array([0, 1, 0, 1], dtype=bool))
     assert auc == pytest.approx(0.5, abs=1e-12)
-
-
-def test_average_precision_and_precision_at_k():
-    scores = np.array([0.1, 0.2, 0.8, 0.9])
-    labels = np.array([0, 0, 1, 1], dtype=bool)
-    ap = _tool._calc_average_precision(scores=scores, labels=labels)
-    p_at_2 = _tool._calc_precision_at_k(scores=scores, labels=labels, k=2)
-    assert ap == pytest.approx(1.0, abs=1e-12)
-    assert p_at_2 == pytest.approx(1.0, abs=1e-12)
 
 
 def test_calc_fg_detection_metrics():
@@ -47,6 +33,7 @@ def test_calc_fg_detection_metrics():
     assert out["n_neg"] == 2
     assert out["auroc"] == pytest.approx(1.0, abs=1e-12)
     assert out["average_precision"] == pytest.approx(1.0, abs=1e-12)
+    assert out["precision_at_k"] == pytest.approx(1.0, abs=1e-12)
 
 
 def test_calc_similarity_to_baseline_jaccard_and_pearson():

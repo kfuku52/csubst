@@ -110,6 +110,11 @@ def test_plot_barchart_lineage_branch_rows_use_fixed_unit_y_range(tmp_path):
     axes = fig.axes
     # 5 data rows (N+2 for lineage) + 1 bottom colorbar axis
     assert len(axes) == 6
+    assert [ax.get_ylabel() for ax in axes[2:5]] == [
+        'Substitutions in\nbranch_id 13',
+        'Substitutions in\nbranch_id 12',
+        'Substitutions in\nbranch_id 2',
+    ]
     for ax in axes[2:5]:
         ymin, ymax = ax.get_ylim()
         assert pytest.approx(ymin, abs=1e-12) == 0.0

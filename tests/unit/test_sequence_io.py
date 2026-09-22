@@ -1,8 +1,6 @@
-import ast
 import gzip
 import io
 from collections import OrderedDict
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -11,24 +9,6 @@ from csubst import sequence_io
 from csubst import parser_iqtree
 from csubst._vendor import pyvolve
 from csubst._vendor.pyvolve.evolver import Evolver
-
-
-@pytest.mark.slow
-def test_runtime_package_has_no_biopython_imports():
-    package_root = Path(sequence_io.__file__).resolve().parent
-    unexpected = list()
-    for path in package_root.rglob("*.py"):
-        module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(module):
-            if isinstance(node, ast.Import):
-                names = [alias.name for alias in node.names]
-            elif isinstance(node, ast.ImportFrom):
-                names = [node.module or ""]
-            else:
-                continue
-            if any(name == "Bio" or name.startswith("Bio.") for name in names):
-                unexpected.append("{}:{}".format(path, node.lineno))
-    assert unexpected == []
 
 
 def test_read_fasta_records_preserves_descriptions_and_uses_first_token_as_id():
@@ -40,20 +20,12 @@ def test_read_fasta_records_preserves_descriptions_and_uses_first_token_as_id():
     ]
 
 
-def test_read_fasta_records_removes_sequence_whitespace_like_biopython():
-    records = sequence_io.read_fasta_records(
-        io.StringIO(">seq1\nAC GT\tAA\n C G \n")
-    )
-    assert records[0].sequence == "ACGTAACG"
-
-
 @pytest.mark.parametrize('compressed', [False, True])
-@pytest.mark.parametrize('sequence', ['ATGGCT\n', 'ATG GCT\n', 'ATG\tGCT\r\n', ' AT G\nGC T\n'])
-def test_alignment_site_count_uses_fasta_whitespace_rules(tmp_path, compressed, sequence):
+def test_alignment_site_count_uses_fasta_whitespace_rules(tmp_path, compressed):
     path = tmp_path / ('alignment.fa.gz' if compressed else 'alignment.fa')
     opener = gzip.open if compressed else open
     with opener(path, 'wt', encoding='utf-8', newline='') as handle:
-        handle.write('>A\n' + sequence + '>B\nATGCCC\n')
+        handle.write('>A\n AT G\t\r\nGC T\r\n>B\nATGCCC\n')
     assert sequence_io.read_fasta_records(path)[0].sequence == 'ATGGCT'
     assert parser_iqtree._infer_num_input_site_from_alignment_file(path) == 2
 

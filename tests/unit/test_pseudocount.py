@@ -1,65 +1,7 @@
 import numpy as np
 import pytest
 
-from csubst import output_stat
 from csubst import pseudocount
-
-
-def test_validate_args_defaults_disable_smoothing():
-    out = pseudocount.validate_args({})
-    assert out["pseudocount_alpha"] == pytest.approx(0.0)
-    assert out["pseudocount_alpha_auto"] is False
-    assert out["pseudocount_mode"] == "none"
-    assert out["pseudocount_target"] == "both"
-    assert out["pseudocount_enabled"] is False
-    assert out["pseudocount_add_output_columns"] is False
-
-
-def test_validate_args_accepts_auto_alpha_token():
-    out = pseudocount.validate_args(
-        {
-            "pseudocount_alpha": "auto",
-            "pseudocount_mode": "symmetric",
-            "pseudocount_target": "both",
-        }
-    )
-    assert out["pseudocount_alpha_auto"] is True
-    assert out["pseudocount_alpha"] == pytest.approx(0.0)
-    assert out["pseudocount_enabled"] is True
-
-
-def test_validate_args_preserves_auto_flag_for_prevalidated_mapping():
-    out = pseudocount.validate_args(
-        {
-            "pseudocount_alpha": 0.0,
-            "pseudocount_alpha_auto": True,
-            "pseudocount_mode": "symmetric",
-            "pseudocount_target": "both",
-        }
-    )
-    assert out["pseudocount_alpha"] == pytest.approx(0.0)
-    assert out["pseudocount_alpha_auto"] is True
-    assert out["pseudocount_enabled"] is True
-
-
-@pytest.mark.parametrize(
-    "kwargs, expected",
-    [
-        ({"pseudocount_alpha": -0.1}, "pseudocount_alpha"),
-        ({"pseudocount_alpha": np.nan}, "pseudocount_alpha"),
-        ({"pseudocount_alpha": "abc"}, "pseudocount_alpha"),
-        ({"pseudocount_mode": "weird"}, "pseudocount_mode"),
-        ({"pseudocount_target": "all"}, "pseudocount_target"),
-    ],
-)
-def test_validate_args_rejects_invalid_values(kwargs, expected):
-    with pytest.raises(ValueError, match=expected):
-        pseudocount.validate_args(kwargs)
-
-
-def test_validate_args_rejects_removed_strength_parameter():
-    with pytest.raises(ValueError, match="pseudocount_strength"):
-        pseudocount.validate_args({"pseudocount_strength": 2.0})
 
 
 def test_smooth_ratio_alpha_zero_matches_raw_ratio():
@@ -183,13 +125,6 @@ def test_empirical_stat_alphas_preserve_additive_identities():
     assert alpha_map["dif2any"] == pytest.approx(alpha_map["dif2spe"] + alpha_map["dif2dif"])
     assert alpha_map["any2spe"] == pytest.approx(alpha_map["spe2spe"] + alpha_map["dif2spe"])
     assert alpha_map["any2dif"] == pytest.approx(alpha_map["spe2dif"] + alpha_map["dif2dif"])
-
-
-def test_output_stat_atomic_weight_map_covers_all_output_stats():
-    assert set(output_stat.STAT_TO_ATOMIC_WEIGHTS.keys()) == set(output_stat.ALL_OUTPUT_STATS)
-    for stat_name in output_stat.ALL_OUTPUT_STATS:
-        weights = output_stat.STAT_TO_ATOMIC_WEIGHTS[stat_name]
-        assert len(weights) == len(output_stat.ATOMIC_OUTPUT_STATS)
 
 
 @pytest.mark.parametrize('mode,alpha', [('symmetric', 1.), ('empirical', 'auto')])

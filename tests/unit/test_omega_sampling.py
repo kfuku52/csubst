@@ -4,6 +4,27 @@ import pytest
 from csubst import omega
 
 
+@pytest.mark.native
+def test_native_packed_sampling_matches_boolean_masks_and_python_counts(monkeypatch):
+    if omega.omega_cy is None:
+        pytest.skip('Cython extension is unavailable')
+    sampled = np.array([[0, 3, 8], [1, 2, 9]], dtype=np.int64)
+    packed = omega._pack_sampled_site_indices_to_uint8(sampled, num_site=10)
+    np.testing.assert_array_equal(packed, [[144, 128], [96, 64]])
+
+    p = np.array([0.2, 0.1, 0.25, 0.15, 0.1, 0.1, 0.05, 0.05, 0.0, 0.0])
+    ids = np.array([[2, 0, 1], [1, 1, 0]], dtype=np.int64)
+    sizes = np.array([2, 3, 5], dtype=np.int64)
+    native = omega._get_permutations_fast(
+        ids, sizes, p, 128, rng=np.random.default_rng(7),
+    )
+    monkeypatch.setattr(omega, 'omega_cy', None)
+    fallback = omega._get_permutations_fast(
+        ids, sizes, p, 128, rng=np.random.default_rng(7),
+    )
+    np.testing.assert_array_equal(native, fallback)
+
+
 def test_weighted_sample_without_replacement_masks_excludes_zero_probability_sites():
     p = np.array([0.7, 0.3, 0.0, 0.0], dtype=np.float64)
     masks = omega._weighted_sample_without_replacement_masks(p=p, size=2, niter=128)
@@ -317,75 +338,3 @@ def test_weighted_sample_without_replacement_packed_handles_full_positive_sites(
     expected = np.array([False, True, True, True], dtype=bool)
     for row in masks:
         np.testing.assert_array_equal(row, expected)
-
-
-def test_pack_sampled_site_indices_to_uint8_can_use_cython(monkeypatch):
-    class DummyOmegaCy:
-        def __init__(self):
-            self.called = 0
-
-        def pack_sampled_site_indices_uint8(self, sampled_site_indices, num_site):
-            self.called += 1
-            out = np.zeros((sampled_site_indices.shape[0], (num_site + 7) // 8), dtype=np.uint8)
-            for i in range(sampled_site_indices.shape[0]):
-                for site in sampled_site_indices[i, :]:
-                    out[i, int(site) >> 3] |= np.uint8(1 << (7 - (int(site) & 7)))
-            return out
-
-    sampled = np.array([[0, 3, 4], [1, 2, 7]], dtype=np.int64)
-    dummy = DummyOmegaCy()
-    monkeypatch.setattr(omega, "omega_cy", dummy)
-    out_cy = omega._pack_sampled_site_indices_to_uint8(sampled_site_indices=sampled, num_site=8)
-    assert dummy.called == 1
-
-    monkeypatch.setattr(omega, "omega_cy", None)
-    out_np = omega._pack_sampled_site_indices_to_uint8(sampled_site_indices=sampled, num_site=8)
-    np.testing.assert_array_equal(out_cy, out_np)
-
-
-def test_get_permutations_fast_can_use_cython_packed_shared_counts(monkeypatch):
-    class DummyOmegaCy:
-        def __init__(self):
-            self.called = 0
-
-        def calc_shared_counts_packed_uint8(self, packed_masks, remapped_cb_ids):
-            self.called += 1
-            arity = remapped_cb_ids.shape[1]
-            if arity == 1:
-                out = omega._UINT8_POPCOUNT[packed_masks[remapped_cb_ids[:, 0], :, :]].sum(axis=2, dtype=np.int32)
-            elif arity == 2:
-                out = omega._UINT8_POPCOUNT[np.bitwise_and(
-                    packed_masks[remapped_cb_ids[:, 0], :, :],
-                    packed_masks[remapped_cb_ids[:, 1], :, :],
-                )].sum(axis=2, dtype=np.int32)
-            else:
-                shared = packed_masks[remapped_cb_ids[:, 0], :, :].copy()
-                for col in range(1, arity):
-                    shared = np.bitwise_and(shared, packed_masks[remapped_cb_ids[:, col], :, :])
-                out = omega._UINT8_POPCOUNT[shared].sum(axis=2, dtype=np.int32)
-            return out.astype(np.int32, copy=False)
-
-    cb_ids = np.array([[0, 1], [1, 2], [0, 2]], dtype=np.int64)
-    sub_branches = np.array([2, 3, 5], dtype=np.int64)
-    p = np.array([0.2, 0.1, 0.25, 0.15, 0.1, 0.1, 0.05, 0.05], dtype=np.float64)
-
-    dummy = DummyOmegaCy()
-    monkeypatch.setattr(omega, "omega_cy", dummy)
-    out_cy = omega._get_permutations_fast(
-        cb_ids=cb_ids,
-        sub_branches=sub_branches,
-        p=p / p.sum(),
-        niter=128,
-        rng=np.random.default_rng(7),
-    )
-    assert dummy.called > 0
-
-    monkeypatch.setattr(omega, "omega_cy", None)
-    out_np = omega._get_permutations_fast(
-        cb_ids=cb_ids,
-        sub_branches=sub_branches,
-        p=p / p.sum(),
-        niter=128,
-        rng=np.random.default_rng(7),
-    )
-    np.testing.assert_array_equal(out_cy, out_np)

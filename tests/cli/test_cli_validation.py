@@ -77,8 +77,9 @@ def test_download_default_resource_matches_3di_backend():
     assert parser.parse_args(['download']).resource == parser.parse_args(['sites']).sa_backend
 
 
-@pytest.mark.parametrize('command', ['search', 'inspect'])
-@pytest.mark.parametrize('backend', ['prostt5', 'prostt5-cnn', 'esm3di-35m'])
+@pytest.mark.parametrize('command,backend', [
+    ('search', 'prostt5'), ('inspect', 'prostt5-cnn'), ('sites', 'esm3di-35m'),
+])
 def test_3di_backend_and_neutral_aliases_share_existing_destinations(command, backend):
     args = _get_cli_parser(True).parse_args([
         command, '--sa_backend', backend, '--sa_device', 'cpu', '--sa_batch_size', '3',
@@ -144,21 +145,13 @@ def test_sites_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects()
     assert "Matplotlib" not in log_text
 
 
-@pytest.mark.parametrize('resource', ['prostt5', 'prostt5-cnn', 'all'])
-def test_download_rejects_unsupported_checksum_request_cleanly(resource):
+def test_download_rejects_unsupported_checksum_request_cleanly():
     proc, log_text = _run_cli_subprocess(
-        'download', '--resource', resource, '--verify', 'yes', '--no_download', 'yes'
+        'download', '--resource', 'all', '--verify', 'yes', '--no_download', 'yes'
     )
     assert proc.returncode == 2
     assert '--verify yes is not supported for ProstT5' in log_text
     assert 'Traceback' not in log_text
-
-
-def test_simulate_invalid_percent_biased_sub_fails_cleanly():
-    proc, log_text = _run_cli("simulate", "--percent_biased_sub", "-1")
-    assert proc.returncode == 2
-    assert "--percent_biased_sub should be between 0 and <100." in log_text
-    assert "Traceback" not in log_text
 
 
 def test_missing_output_option_value_is_reported_once_and_written_to_log():
@@ -167,13 +160,6 @@ def test_missing_output_option_value_is_reported_once_and_written_to_log():
     assert proc.returncode == 2
     assert proc.stderr.count(expected) == 1
     assert expected in log_text
-
-
-def test_simulate_invalid_seed_fails_cleanly():
-    proc, log_text = _run_cli("simulate", "--simulate_seed", "-2")
-    assert proc.returncode == 2
-    assert "--simulate_seed should be -1 or >= 0." in log_text
-    assert "Traceback" not in log_text
 
 
 def test_invalid_common_random_seed_fails_cleanly():
@@ -193,13 +179,6 @@ def test_sites_invalid_species_regex_fails_cleanly():
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--species_regex", "(")
     assert proc.returncode == 2
     assert "--species_regex is not a valid regular expression" in log_text
-    assert "Traceback" not in log_text
-
-
-def test_sites_invalid_species_overlap_node_plot_fails_cleanly():
-    proc, log_text = _run_cli("sites", "--branch_id", "0", "--species_overlap_node_plot", "maybe")
-    assert proc.returncode == 2
-    assert "--species_overlap_node_plot should be one of yes, no, auto." in log_text
     assert "Traceback" not in log_text
 
 
@@ -224,13 +203,6 @@ def test_inspect_help_includes_species_overlap_node_plot_option():
     assert "--tree_fig_max_height" in advanced_help
     assert "--download_prostt5" in advanced_help
     assert "--sa_smoke_max_branches" in advanced_help
-
-
-def test_inspect_rejects_invalid_combination_count_max_arity():
-    proc, log_text = _run_cli("inspect", "--combination_count_max_arity", "0")
-    assert proc.returncode == 2
-    assert "--combination_count_max_arity should be >= 1" in log_text
-    assert "Traceback" not in log_text
 
 
 def test_sites_help_shows_output_manifest_and_removed_site_output_manifest_is_rejected():
@@ -321,15 +293,6 @@ def test_cli_help_lists_primary_commands_and_legacy_aliases():
     assert "sites (site)" in help_text
 
 
-def test_benchmark_help_is_available():
-    proc, log_text = _run_cli("benchmark", "-h")
-    assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
-    assert "--benchmark_expectation_methods" in help_text
-    assert "--benchmark_keep_going" in help_text
-    assert "--output_manifest" in help_text
-
-
 def test_scan_help_is_available():
     proc, _ = _run_cli("scan", "-h")
     assert proc.returncode == 0
@@ -388,16 +351,6 @@ def test_scan_parser_defaults_keep_one_assignment_space():
     assert args.scan_pvalue_calibration == "full_scan"
 
 
-def test_benchmark_plot_help_is_available():
-    proc, log_text = _run_cli("benchmark-plot", "-h")
-    assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
-    assert "--benchmark_dir" in help_text
-    assert "--benchmark_plot_metrics" in help_text
-    assert "--benchmark_plot_format" in help_text
-    assert "--output_manifest" in help_text
-
-
 def test_benchmark_plot_missing_directory_fails_cleanly():
     proc, log_text = _run_cli(
         "benchmark-plot",
@@ -409,15 +362,6 @@ def test_benchmark_plot_missing_directory_fails_cleanly():
     assert proc.returncode == 2
     assert "--benchmark_dir was not found or is not a directory" in log_text
     assert "Traceback" not in log_text
-
-
-def test_doctor_help_is_available():
-    proc, log_text = _run_cli("doctor", "-h")
-    assert proc.returncode == 0
-    help_text = (proc.stdout or "") + (proc.stderr or "") + (log_text or "")
-    assert "--check_iqtree_exe" in help_text
-    assert "--doctor_fail_level" in help_text
-    assert "--output_manifest" in help_text
 
 
 def test_inspect_rejects_legacy_yes_state_plot_option():

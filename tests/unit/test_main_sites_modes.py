@@ -138,62 +138,10 @@ def test_get_yvalues_for_lineage_branch_specific_rows():
     np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub_branch_12", "S"), [0.6, 0.0], atol=1e-12)
 
 
-def test_get_plot_sub_types_and_colors_lineage_has_n_plus_two_rows():
-    g = {"mode": "lineage", "single_branch_mode": False, "branch_ids": np.array([13, 12, 2], dtype=np.int64)}
-    sub_types, sn_colors = main_sites.get_plot_sub_types_and_colors(g)
-    assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_13", "_sub_branch_12", "_sub_branch_2"]
-    assert "entire tree" in sub_types["_sub"]
-    assert sub_types["_sub_"] == "Branch-wise\nsubstitutions\nin the targets"
-    assert sub_types["_sub_branch_13"] == "Substitutions in\nbranch_id 13"
-    assert sub_types["_sub_branch_12"] == "Substitutions in\nbranch_id 12"
-    assert sub_types["_sub_branch_2"] == "Substitutions in\nbranch_id 2"
-    assert sn_colors["_sub"]["N"] == "black"
-    assert sn_colors["_sub_"]["S"] == "gainsboro"
-    assert sn_colors["_sub_branch_12"]["S"] == "gainsboro"
-
-
-def test_get_set_expression_display_branch_ids_preserves_expression_order():
-    g = {"mode_expression": "117|48", "branch_ids": np.array([48, 117], dtype=np.int64)}
-    out = main_sites._get_set_expression_display_branch_ids(g)
-    assert out.tolist() == [117, 48]
-
-
 def test_get_set_expression_display_branch_ids_accepts_scalar_branch_id():
     g = {"mode_expression": "117|48", "branch_ids": np.int64(117)}
     out = main_sites._get_set_expression_display_branch_ids(g)
     assert out.tolist() == [117]
-
-
-def test_get_plot_sub_types_and_colors_set_has_branch_rows_and_expression_row():
-    g = {
-        "mode": "set",
-        "set_stat_type": "any",
-        "single_branch_mode": False,
-        "mode_expression": "117|48",
-        "branch_ids": np.array([48, 117], dtype=np.int64),
-    }
-    sub_types, sn_colors = main_sites.get_plot_sub_types_and_colors(g)
-    assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_117", "_sub_branch_48", "_set_expr"]
-    assert sub_types["_sub"] == "Branch-wise\nsubstitutions\nin the entire tree"
-    assert sub_types["_sub_"] == "Branch-wise\nsubstitutions\nin the targets"
-    assert sub_types["_sub_branch_117"] == "Substitutions in\nbranch_id 117"
-    assert sub_types["_sub_branch_48"] == "Substitutions in\nbranch_id 48"
-    assert sub_types["_set_expr"] == "Substitutions in\n117|48"
-    assert sn_colors["_set_expr"]["N"] == "red"
-    assert sn_colors["_set_expr"]["S"] == "gainsboro"
-
-
-def test_get_plot_sub_types_and_colors_set_with_A_has_A_row():
-    g = {
-        "mode": "set",
-        "set_stat_type": "any",
-        "single_branch_mode": False,
-        "mode_expression": "((117|48)-A)",
-        "branch_ids": np.array([48, 117], dtype=np.int64),
-    }
-    sub_types, _ = main_sites.get_plot_sub_types_and_colors(g)
-    assert list(sub_types.keys()) == ["_sub", "_sub_", "_sub_branch_117", "_sub_branch_48", "_set_other", "_set_expr"]
-    assert sub_types["_set_other"] == "Substitutions in\nA"
 
 
 def test_get_yvalues_set_expression_prefers_probability_column():
@@ -206,21 +154,6 @@ def test_get_yvalues_set_other_uses_other_prob_columns():
     df = pd.DataFrame({"N_set_other": [False, True], "N_set_other_prob": [0.2, 0.4], "S_set_other_prob": [0.1, 0.0]})
     np.testing.assert_allclose(main_sites.get_yvalues(df, "_set_other", "N"), [0.0, 1.0], atol=1e-12)
     np.testing.assert_allclose(main_sites.get_yvalues(df, "_set_other", "S"), [0.0, 0.0], atol=1e-12)
-
-
-@pytest.mark.parametrize(
-    ("set_stat_type", "channel_index", "state_orders", "expected"),
-    [
-        ("any", 0, np.array(["A", "V"]), ""),
-        ("spe", 1, np.array(["A", "V"]), "X→V"),
-    ],
-)
-def test_get_set_channel_label(set_stat_type, channel_index, state_orders, expected):
-    assert main_sites._get_set_channel_label(
-        set_stat_type=set_stat_type,
-        channel_index=channel_index,
-        state_orders=state_orders,
-    ) == expected
 
 
 def test_get_set_expression_channel_labels_spe():
@@ -238,19 +171,6 @@ def test_get_set_expression_channel_labels_spe():
         state_orders=np.array(["A", "V", "T"]),
     )
     assert out.tolist() == ["X→V", "X→A", ""]
-
-
-def test_get_set_expression_channel_indices():
-    prob = np.array(
-        [
-            [0.0, 0.8, 0.2],
-            [0.7, 0.1, 0.0],
-            [0.0, 0.0, 0.0],
-        ],
-        dtype=float,
-    )
-    out = main_sites.get_set_expression_channel_indices(prob_matrix=prob)
-    assert out.tolist() == [1, 0, -1]
 
 
 def test_get_set_heatmap_column_labels_uses_set_expr_channel_index():

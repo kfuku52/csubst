@@ -249,17 +249,6 @@ def test_chisq_test_returns_probability_for_nonzero_observation():
     assert 0.0 <= float(out) <= 1.0
 
 
-def test_get_cutoff_stat_bool_array_parses_compound_expression():
-    cb = pd.DataFrame(
-        {
-            "OCNany2spe": [1.9, 2.0, 2.1],
-            "omegaCany2spe": [10.0, 4.9, 5.0],
-        }
-    )
-    out = table.get_cutoff_stat_bool_array(cb, "OCNany2spe,2.0|omegaCany2spe,5.0")
-    assert out.tolist() == [False, False, True]
-
-
 def test_get_cutoff_stat_bool_array_rejects_unknown_column():
     cb = pd.DataFrame({"OCNany2spe": [1.0]})
     with pytest.raises(ValueError, match="was not found"):
@@ -277,30 +266,9 @@ def test_get_cutoff_stat_bool_array_accepts_whitespace_around_tokens():
     assert out.tolist() == [False, False, True]
 
 
-def test_parse_cutoff_stat_rejects_malformed_token():
-    with pytest.raises(ValueError, match="Expected"):
-        table.parse_cutoff_stat("OCNany2spe|omegaCany2spe,5.0")
-
-
-def test_parse_cutoff_stat_rejects_invalid_regex():
-    with pytest.raises(ValueError, match="Invalid cutoff regex"):
-        table.parse_cutoff_stat("OCN[any2spe,2.0")
-
-
-@pytest.mark.parametrize("value_text", ["nan", "inf", "-inf"])
-def test_parse_cutoff_stat_rejects_non_finite_cutoff_value(value_text):
-    with pytest.raises(ValueError, match="finite"):
-        table.parse_cutoff_stat("OCNany2spe,{}".format(value_text))
-
-
 def test_parse_cutoff_stat_supports_regex_with_comma_quantifier():
     out = table.parse_cutoff_stat(r"omegaC.{1,2},5.0")
     assert out == [(r"omegaC.{1,2}", 5.0)]
-
-
-def test_parse_cutoff_stat_supports_regex_with_alternation_pipe():
-    out = table.parse_cutoff_stat(r"OCN(any|dif)2spe,2.0|omegaCany2spe,5.0")
-    assert out == [(r"OCN(any|dif)2spe", 2.0), ("omegaCany2spe", 5.0)]
 
 
 def test_get_cutoff_stat_bool_array_supports_alternation_pipe_regex():

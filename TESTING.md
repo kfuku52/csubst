@@ -90,9 +90,14 @@ assertions. As a review guideline, split a test module before it grows much
 beyond roughly 600 lines unless keeping a cohesive scenario together is
 clearer.
 
-When moving or consolidating tests, compare collection counts before and after
-the change, run the affected suite, and then run the full suite. The Cython
-sanitizer job separately exercises sparse and expected-state parity tests.
+Keep a test when removing it would hide a realistic regression worth its runtime,
+flakiness, and maintenance cost. Prefer observable results and independent
+references over copied algorithms, fake-backend parity, or internal constants.
+Consolidate duplicate checks at the boundary that catches the failure; exercise
+independent option dimensions without automatically taking their Cartesian product.
+When pruning tests, record the lost or retained guarantee, run the affected suite,
+and then run the full suite. Collection counts describe the change, not a target.
+The Cython sanitizer job separately exercises sparse and expected-state parity tests.
 
 Performance parity uses `.github/performance_baseline.tsv`. Update it only from
 a successful, representative Linux hosted-runner result and review numerical

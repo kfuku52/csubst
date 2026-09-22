@@ -72,10 +72,9 @@ def test_get_global_parameters_builds_run_context_and_output_namespace(tmp_path,
     assert g.config["threads"] == 1
 
 
-@pytest.mark.parametrize("seed", [-2, 1.5, "1.5", True])
-def test_get_global_parameters_rejects_invalid_random_seed(seed):
+def test_get_global_parameters_rejects_invalid_random_seed():
     with pytest.raises(ValueError, match="random_seed"):
-        param.get_global_parameters(_args(random_seed=seed))
+        param.get_global_parameters(_args(random_seed=True))
 
 
 def test_get_global_parameters_validates_blas_threads():

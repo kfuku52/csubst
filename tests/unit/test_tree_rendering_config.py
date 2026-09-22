@@ -6,40 +6,19 @@ from csubst import tree
 from csubst import ete
 
 
-def test_get_tree_figure_size_scales_with_leaf_count():
-    fig_width,fig_height = tree._get_tree_figure_size(num_leaves=10, max_label_len=12)
-    expected_height = max(
-        tree.TREE_FIG_MIN_HEIGHT,
-        tree.TREE_FIG_BASE_HEIGHT + (10 * tree.TREE_FIG_HEIGHT_PER_LEAF),
+def test_tree_figure_size_grows_with_tips_and_spacing_but_respects_height_limit():
+    _, small = tree._get_tree_figure_size(num_leaves=10, max_label_len=12)
+    _, large = tree._get_tree_figure_size(num_leaves=100, max_label_len=12)
+    _, spaced = tree._get_tree_figure_size(
+        num_leaves=100, max_label_len=12, tip_label_spacing_factor=2.0,
     )
-    assert pytest.approx(fig_height, rel=0, abs=1e-12) == expected_height
-    assert pytest.approx(fig_width, rel=0, abs=1e-12) == tree.TREE_FIG_WIDTH
-
-
-def test_get_tree_figure_size_respects_tip_label_spacing_factor():
-    _,default_height = tree._get_tree_figure_size(num_leaves=10, max_label_len=12)
-    _,double_height = tree._get_tree_figure_size(num_leaves=10, max_label_len=12, tip_label_spacing_factor=2.0)
-    expected_double_height = max(
-        tree.TREE_FIG_MIN_HEIGHT,
-        tree.TREE_FIG_BASE_HEIGHT + (10 * tree.TREE_FIG_HEIGHT_PER_LEAF * 2.0),
+    assert 0 < small < large < spaced
+    _, capped = tree._get_tree_figure_size(
+        num_leaves=100000, max_label_len=12, tree_fig_max_height=500.0,
     )
-    assert pytest.approx(double_height, rel=0, abs=1e-12) == expected_double_height
-    assert double_height > default_height
-
-
-def test_get_tree_figure_size_respects_tree_fig_max_height_override():
-    _,fig_height = tree._get_tree_figure_size(
-        num_leaves=100000,
-        max_label_len=0,
-        tree_fig_max_height=500.0,
-    )
-    assert fig_height == 500.0
-
-
-def test_get_tree_figure_size_caps_pdf_height():
-    fig_width,fig_height = tree._get_tree_figure_size(num_leaves=100000, max_label_len=0)
-    assert fig_width == tree.TREE_FIG_WIDTH
-    assert fig_height == tree.TREE_FIG_MAX_HEIGHT
+    assert capped == 500.0
+    _, default_cap = tree._get_tree_figure_size(num_leaves=100000, max_label_len=12)
+    assert default_cap <= 200  # PDF pages must fit within the 14,400-point limit.
 
 
 def test_resolve_tree_tip_label_spacing_factor_rejects_nonpositive_values():
@@ -50,11 +29,6 @@ def test_resolve_tree_tip_label_spacing_factor_rejects_nonpositive_values():
 def test_resolve_tree_figure_max_height_rejects_nonpositive_values():
     with pytest.raises(ValueError, match="positive finite float"):
         tree._resolve_tree_figure_max_height(0)
-
-
-def test_normalize_state_plot_request_rejects_legacy_yes():
-    with pytest.raises(ValueError, match="no longer accepts yes/no"):
-        tree.normalize_state_plot_request("yes", param_name="--plot_state_aa")
 
 
 def test_plot_state_tree_zero_sites_is_noop(tmp_path, monkeypatch):

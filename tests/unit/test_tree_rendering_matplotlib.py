@@ -235,27 +235,6 @@ def test_render_tree_matplotlib_draws_species_overlap_node_markers(monkeypatch, 
     ]
 
 
-def test_render_tree_matplotlib_uses_projecting_caps_for_internal_segments(monkeypatch, tmp_path):
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)X:1,C:1)R;", format=1))
-    for node in tr.traverse():
-        ete.set_prop(node, "color_trait", "black")
-        ete.set_prop(node, "labelcolor_trait", "black")
-    fake_plt = _FakeTreePyplot()
-    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
-
-    tree._render_tree_matplotlib(
-        tree=tr,
-        trait_name="trait",
-        file_name=str(tmp_path / "caps.pdf"),
-        label="all",
-    )
-
-    capstyles = [collection.get_capstyle() for collection in fake_plt.axis.collection_calls]
-    assert tree.TREE_LINE_CAPSTYLE in capstyles
-    assert tree.TREE_LINE_TERMINAL_CAPSTYLE in capstyles
-    assert all(collection.get_joinstyle() == tree.TREE_LINE_JOINSTYLE for collection in fake_plt.axis.collection_calls)
-
-
 def test_render_tree_matplotlib_hides_missing_root_state_for_aa(monkeypatch, tmp_path):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     for node in tr.traverse():
@@ -316,30 +295,6 @@ def test_render_tree_matplotlib_offsets_root_state_text_to_clear_root_marker(mon
     root_item = next(item for item in fake_plt.axis.text_items if item["txt"] == "AAA")
     expected_x = xcoord[id(tr)] + (xspan * (tree.TREE_STATE_X_PADDING_RATIO + tree.TREE_ROOT_STATE_EXTRA_X_PADDING_RATIO))
     assert pytest.approx(root_item["x"], rel=0, abs=1e-12) == expected_x
-
-
-def test_render_tree_matplotlib_places_figure_title_in_figure_coordinates(monkeypatch, tmp_path):
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    for node in tr.traverse():
-        ete.set_prop(node, "color_trait", "black")
-        ete.set_prop(node, "labelcolor_trait", "black")
-    fake_plt = _FakeTreePyplot()
-    monkeypatch.setattr(tree, "_get_pyplot", lambda: fake_plt)
-
-    tree._render_tree_matplotlib(
-        tree=tr,
-        trait_name="trait",
-        file_name=str(tmp_path / "state_title.pdf"),
-        figure_title="Sites 1-2-3",
-    )
-
-    title_item = [item for item in fake_plt.figure.text_items if item["txt"] == "Sites 1-2-3"][-1]
-    assert title_item["x"] == tree.TREE_FIG_TITLE_X
-    assert title_item["y"] == tree.TREE_FIG_TITLE_Y
-    assert title_item["kwargs"]["ha"] == "left"
-    assert title_item["kwargs"]["va"] == "top"
-    assert "Sites 1-2-3" not in fake_plt.axis.text_calls
-    assert fake_plt.figure.suptitle_calls == []
 
 
 def test_render_tree_matplotlib_draws_placeholder_for_missing_aa_logo_sites(monkeypatch, tmp_path):

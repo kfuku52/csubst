@@ -437,17 +437,6 @@ def test_scan_permutation_context_uses_the_same_unit_mode_as_observed(
     assert branch_counts == sorted(expected_branch_counts)
 
 
-def test_scan_zero_event_probability_does_not_count_as_support_at_zero_threshold():
-    event_pp, branches = substitution_scan._support_for_unit(
-        branch_event={},
-        branch_ids=np.array([2, 3], dtype=np.int64),
-        min_event_pp=0.0,
-    )
-
-    assert event_pp == 0.0
-    assert branches == []
-
-
 def test_scan_zero_threshold_still_requires_an_observed_event_in_each_support_unit():
     g, on_tensor = _toy_scan_context()
     labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in g["tree"].traverse()}

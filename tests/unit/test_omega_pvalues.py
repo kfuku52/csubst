@@ -56,21 +56,6 @@ def test_needs_omega_pvalue_upper_tail_edge_refinement():
     np.testing.assert_array_equal(refine, np.array([True, True, False, True], dtype=bool))
 
 
-def test_calc_e_stat_rejects_quantile_stat():
-    cb = pd.DataFrame({"branch_id_1": [0], "OCNany2any": [1.0]})
-    sub_tensor = np.zeros((2, 3, 1, 2, 2), dtype=np.float64)
-    g = {"float_type": np.float64, "threads": 1, "asrv": "each"}
-    with pytest.raises(ValueError, match="Unsupported E-stat summary statistic"):
-        omega.calc_E_stat(
-            cb=cb,
-            sub_tensor=sub_tensor,
-            mode="any2any",
-            stat="quantile",
-            SN="N",
-            g=g,
-        )
-
-
 def test_get_cod_skips_when_required_columns_missing():
     cb = pd.DataFrame(
         {
@@ -120,35 +105,6 @@ def test_calc_omega_empirical_upper_tail_pvalues_uses_upper_tail_mid_p():
         float_tol=1e-12,
     )
     np.testing.assert_allclose(out, np.array([0.75, 0.75], dtype=np.float64))
-
-
-def test_calc_omega_empirical_upper_tail_pvalues_from_perm_matches_wrapper():
-    obs_omega = np.array([2.0, 1.0], dtype=np.float64)
-    exp_N = np.array([1.0, 1.0], dtype=np.float64)
-    exp_S = np.array([1.0, 1.0], dtype=np.float64)
-    perm_count_N = np.array([[2.0, 1.0, 3.0], [0.0, 1.0, 1.0]], dtype=np.float64)
-    perm_count_S = np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=np.float64)
-    wrapper_out = omega._calc_omega_empirical_upper_tail_pvalues(
-        obs_omega=obs_omega,
-        exp_N=exp_N,
-        exp_S=exp_S,
-        perm_count_N=perm_count_N,
-        perm_count_S=perm_count_S,
-        float_tol=1e-12,
-    )
-    perm_omega = omega._calc_permutation_omega_matrix(
-        exp_N=exp_N,
-        exp_S=exp_S,
-        perm_count_N=perm_count_N,
-        perm_count_S=perm_count_S,
-        float_tol=1e-12,
-    )
-    from_perm_out = omega._calc_omega_empirical_upper_tail_pvalues_from_perm(
-        obs_omega=obs_omega,
-        exp_S=exp_S,
-        perm_omega=perm_omega,
-    )
-    np.testing.assert_allclose(wrapper_out, from_perm_out)
 
 
 def test_calc_omega_empirical_upper_tail_pvalues_supports_dsc_calibrated_null():

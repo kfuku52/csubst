@@ -7,12 +7,6 @@ from csubst import tree
 from csubst import ete
 
 
-def test_add_numerical_node_labels_assigns_unique_integers():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(B:1,(A:1,C:1)X:1)R;", format=1))
-    labels = [ete.get_prop(n, "numerical_label") for n in tr.traverse()]
-    assert sorted(labels) == list(range(len(labels)))
-
-
 def test_add_numerical_node_labels_keeps_root_as_max_for_64_leaves():
     leaf_names = [f"L{i}" for i in range(64)]
     tree_txt = f"{leaf_names[0]}:1"

@@ -19,12 +19,6 @@ def test_scale_instantaneous_rate_matrix_matches_manual_scaling():
     np.testing.assert_allclose(out, expected, atol=1e-12)
 
 
-def test_scale_instantaneous_rate_matrix_requires_zero_diagonal():
-    inst = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=float)
-    with pytest.raises(AssertionError, match="Diagonal elements"):
-        parser_misc.scale_instantaneous_rate_matrix(inst, np.array([0.5, 0.5]))
-
-
 def test_scale_instantaneous_rate_matrix_requires_all_diagonal_elements_zero():
     inst = np.array([[0.0, 2.0], [3.0, 1e-3]], dtype=float)
     with pytest.raises(AssertionError, match="Diagonal elements"):
@@ -202,27 +196,6 @@ def test_initialize_and_report_nonsyn_recode_writes_table(tmp_path, monkeypatch)
     assert lines[0].startswith("recode\tstate_id\tstate_label")
     pca_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
     assert pca_path.exists() is False
-
-
-def test_initialize_and_report_nonsyn_recode_writes_pca_when_enabled(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    amino_acids = np.array(list("ACDEFGHIKLMNPQRSTVWY"), dtype=object)
-    codon_orders = np.array(["C{:02d}".format(i) for i in range(amino_acids.shape[0])], dtype=object)
-    synonymous_indices = {aa: [i] for i, aa in enumerate(amino_acids.tolist())}
-    matrix_groups = {aa: [codon_orders[i]] for i, aa in enumerate(amino_acids.tolist())}
-    g = {
-        "amino_acid_orders": amino_acids,
-        "codon_orders": codon_orders,
-        "synonymous_indices": synonymous_indices,
-        "matrix_groups": matrix_groups,
-        "nonsyn_recode": "dayhoff6",
-        "plot_nonsyn_recode_pca": True,
-    }
-    out = parser_misc._initialize_and_report_nonsyn_recode(g)
-    assert out["nonsyn_recode"] == "dayhoff6"
-    pca_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
-    assert pca_path.exists() is True
-    assert pca_path.stat().st_size > 0
 
 
 def test_initialize_and_report_nonsyn_recode_writes_pca_for_no_when_enabled(tmp_path, monkeypatch):

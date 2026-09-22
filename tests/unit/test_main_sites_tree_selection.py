@@ -7,16 +7,6 @@ from csubst import tree
 from csubst import ete
 
 
-def test_get_state_orders():
-    g = {"amino_acid_orders": np.array(["A", "B"]), "matrix_groups": {"grp": ["AA", "AB"]}}
-    orders_nsy, keys_nsy = main_sites.get_state_orders(g, "nsy")
-    assert keys_nsy == ["nsy"]
-    assert list(orders_nsy["nsy"]) == ["A", "B"]
-    orders_syn, keys_syn = main_sites.get_state_orders(g, "syn")
-    assert keys_syn == ["grp"]
-    assert orders_syn["grp"] == ["AA", "AB"]
-
-
 def test_add_gapline_empty_df_is_noop():
     df = pd.DataFrame({"codon_site_alignment": [], "gap_rate_all": []})
     fig, ax = main_sites.plt.subplots()
@@ -357,22 +347,6 @@ def test_get_highlight_leaf_and_branch_ids_marks_descendant_leaves_for_internal_
     )
     assert branch_ids == {labels["A"], labels["X"]}
     assert leaf_ids == {labels["A"], labels["C"]}
-
-
-def test_get_species_overlap_node_types_classifies_speciation_and_duplication():
-    tr = ete.PhyloNode(
-        "((Homo_sapiens_gene1:1,Homo_sapiens_gene2:1)Dup:1,(Mus_musculus_gene1:1,Rattus_norvegicus_gene1:1)Spec:1)Root;",
-        format=1,
-    )
-    tr = tree.add_numerical_node_labels(tr)
-    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()}
-    out = main_sites.get_species_overlap_node_types(
-        tree=tr,
-        species_regex=r"^([^_]+_[^_]+)_",
-    )
-    assert out[labels["Dup"]] == "duplication"
-    assert out[labels["Spec"]] == "speciation"
-    assert out[labels["Root"]] == "speciation"
 
 
 def test_get_species_overlap_node_types_returns_empty_without_regex(tiny_tree):

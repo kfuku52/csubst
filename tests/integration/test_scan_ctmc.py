@@ -57,16 +57,6 @@ def test_bridge_against_independent_quadrature(length):
         assert tensor[ids['X']].sum() > 1
 
 
-def test_bridge_spectral_matches_direct_frechet(monkeypatch):
-    tr, ids, states, q = fixture(.9, 3)
-    _, spectral = scan_ctmc.infer(tr, states, q, [.5, .5], [0, 1], 'bridge')
-    # Force the stable direct path by a tiny numerical perturbation that flags it.
-    original = scan_ctmc._integrals
-    monkeypatch.setattr(scan_ctmc, '_integrals', lambda values, length: -original(values, length))
-    _, direct = scan_ctmc.infer(tr, states, q, [.5, .5], [0, 1], 'bridge')
-    np.testing.assert_allclose(spectral, direct, atol=1e-12)
-
-
 def test_missing_data_and_group_aggregation():
     tr, ids, states, q = fixture(3.)
     states[:] = 0

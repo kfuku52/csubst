@@ -7,9 +7,14 @@ import pytest
 from cli_runner import run_csubst
 
 
-@pytest.mark.parametrize('input_option', ['alignment_file', 'rooted_tree_file', 'foreground', 'iqtree_state'])
-@pytest.mark.parametrize('alias', ['same', 'symlink', 'hardlink'])
-@pytest.mark.parametrize('parse_error', [None, 'unknown', 'early_type_error'])
+@pytest.mark.parametrize('input_option,alias,parse_error', [
+    ('alignment_file', alias, error)
+    for alias in ('same', 'symlink', 'hardlink')
+    for error in (None, 'unknown', 'early_type_error')
+] + [
+    (option, 'same', None)
+    for option in ('rooted_tree_file', 'foreground', 'iqtree_state')
+])
 def test_log_collision_preserves_inputs(tmp_path, input_option, alias, parse_error):
     source = tmp_path / 'input.dat'
     original = b'>A\nATGGCT\n>B\nATGGCC\n'

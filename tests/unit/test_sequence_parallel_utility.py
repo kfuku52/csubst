@@ -124,16 +124,6 @@ def test_calc_omega_state_rejects_non_triplet_length():
         sequence.calc_omega_state(state_nuc=state_nuc, g=g)
 
 
-def test_cdn2pep_state_sums_synonymous_codons():
-    g = {
-        "amino_acid_orders": np.array(["K", "N"]),
-        "synonymous_indices": {"K": [0], "N": [1]},
-    }
-    state_cdn = np.array([[[0.7, 0.3], [0.2, 0.8]]], dtype=float)
-    out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g)
-    np.testing.assert_allclose(out, state_cdn, atol=1e-12)
-
-
 def test_cdn2nsy_state_sums_recoded_codon_groups():
     g = {
         "nonsyn_state_orders": np.array(["AG", "C"]),

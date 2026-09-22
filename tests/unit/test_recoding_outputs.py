@@ -77,11 +77,16 @@ def test_write_nonsyn_recoding_table_skips_no(tmp_path):
     assert output_path.exists() is False
 
 
-def test_write_nonsyn_recoding_pca_plot_writes_png_for_fixed_recode(tmp_path):
+def test_write_nonsyn_recoding_pca_plot_writes_png_for_fixed_recode(tmp_path, monkeypatch):
     from matplotlib import image as mpimg
 
     g = _toy_grouping_g()
     g["nonsyn_recode"] = "dayhoff6"
+    g["plot_nonsyn_recode_pca_3di20"] = False
+    monkeypatch.setattr(
+        recoding, "_build_3di20_dataset_feature_vector",
+        lambda g: pytest.fail("disabled 3Di plotting must not load a predictor"),
+    )
     g = recoding.initialize_nonsyn_groups(g)
     output_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
     returned = recoding.write_nonsyn_recoding_pca_plot(g, output_path=str(output_path))
@@ -132,12 +137,6 @@ def test_get_label_connector_mask_raises_on_shape_mismatch():
             x_span=1.0,
             y_span=1.0,
         )
-
-
-def test_is_outside_axis_outlier_detects_large_outside_shift():
-    other = np.array([-1.0, -0.2, 0.1, 0.7, 1.0], dtype=np.float64)
-    assert recoding._is_outside_axis_outlier(value=3.0, other_values=other) is True
-    assert recoding._is_outside_axis_outlier(value=0.5, other_values=other) is False
 
 
 def test_detect_srchisq6_inset_target_true_for_far_point():
@@ -235,33 +234,6 @@ def test_build_3di20_dataset_feature_vector_is_not_no_when_data_available(monkey
     assert v_3di.shape == v_no.shape
     assert np.all(np.isfinite(v_3di))
     assert np.allclose(v_3di, v_no) is False
-
-
-def test_write_nonsyn_recoding_pca_plot_writes_png_for_no(tmp_path):
-    g = _toy_grouping_g()
-    g["nonsyn_recode"] = "no"
-    g = recoding.initialize_nonsyn_groups(g)
-    output_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
-    returned = recoding.write_nonsyn_recoding_pca_plot(g, output_path=str(output_path))
-    assert returned == str(output_path)
-    assert output_path.exists() is True
-    assert output_path.stat().st_size > 0
-
-
-def test_write_nonsyn_recoding_pca_plot_skips_3di20_when_disabled(tmp_path, monkeypatch):
-    g = _toy_grouping_g()
-    g["nonsyn_recode"] = "dayhoff6"
-    g["plot_nonsyn_recode_pca_3di20"] = False
-    g = recoding.initialize_nonsyn_groups(g)
-    monkeypatch.setattr(
-        recoding,
-        "_build_3di20_dataset_feature_vector",
-        lambda g: (_ for _ in ()).throw(AssertionError("3di20 feature should be skipped")),
-    )
-    output_path = tmp_path / "csubst_nonsyn_recoding_pca.png"
-    returned = recoding.write_nonsyn_recoding_pca_plot(g, output_path=str(output_path))
-    assert returned == str(output_path)
-    assert output_path.exists() is True
 
 
 def test_write_nonsyn_recoding_pca_plot_includes_3di20_when_enabled(tmp_path, monkeypatch):

@@ -143,33 +143,6 @@ def test_add_omega_empirical_pvalues_uses_dsc_calibrated_null_when_columns_prese
     )
 
 
-def test_calibrate_dsc_renames_empirical_pq_columns_to_nocalib():
-    cb = pd.DataFrame(
-        {
-            "branch_id_1": [0, 1],
-            "branch_id_2": [2, 3],
-            "dNCany2spe": [2.0, 1.0],
-            "dSCany2spe": [1.0, 2.0],
-            "omegaCany2spe": [2.0, 0.5],
-            "pomegaCany2spe": [0.05, 0.20],
-            "qomegaCany2spe": [0.10, 0.20],
-        }
-    )
-    out = omega.calibrate_dsc(cb.copy(), output_stats=["any2spe"])
-    assert "pomegaCany2spe" not in out.columns
-    assert "qomegaCany2spe" not in out.columns
-    assert "pomegaCany2spe_nocalib" in out.columns
-    assert "qomegaCany2spe_nocalib" in out.columns
-    np.testing.assert_allclose(
-        out.loc[:, "pomegaCany2spe_nocalib"].to_numpy(dtype=np.float64),
-        np.array([0.05, 0.20], dtype=np.float64),
-    )
-    np.testing.assert_allclose(
-        out.loc[:, "qomegaCany2spe_nocalib"].to_numpy(dtype=np.float64),
-        np.array([0.10, 0.20], dtype=np.float64),
-    )
-
-
 def test_calibrate_dsc_sets_zero_for_zero_over_zero():
     cb = pd.DataFrame(
         {

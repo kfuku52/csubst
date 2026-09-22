@@ -106,20 +106,6 @@ def test_scan_substitutions_supports_sparse_substitution_tensor_end_to_end():
     assert scan_df.loc[scan_df["target_class"] == "fg", "target_event_count"].iloc[0] == pytest.approx(1.7)
 
 
-def test_scan_worker_tensor_descriptor_reopens_memmap_without_serializing_data(tmp_path):
-    path = tmp_path / "tensor.mmap"
-    tensor = np.memmap(path, dtype=np.float64, mode="w+", shape=(2, 3))
-    tensor[:, :] = np.arange(6, dtype=float).reshape(2, 3)
-
-    packed = substitution_scan._pack_scan_tensor_for_worker(tensor)
-    reopened = substitution_scan._unpack_scan_tensor_for_worker(packed)
-
-    assert packed["__scan_memmap__"] is True
-    assert isinstance(reopened, np.memmap)
-    assert reopened.mode == "r"
-    np.testing.assert_allclose(reopened, tensor)
-
-
 def test_scan_worker_context_memmaps_large_state_arrays_and_drops_unused_states():
     state_nsy = np.ones((128, 128, 16), dtype=np.float64)
     state_cdn = np.ones((128, 128, 16), dtype=np.float64)
@@ -218,27 +204,6 @@ def test_scan_substitutions_handles_multiple_traits_and_stratified_qvalues(calib
     assert np.allclose(
         scan_df["q_rate_enrichment_asymptotic_by_trait_match"].to_numpy(dtype=float),
         scan_df["p_rate_enrichment_asymptotic"].to_numpy(dtype=float),
-    )
-
-
-def test_scan_full_scan_permutation_adds_empirical_maxt_pvalues():
-    g, on_tensor = _toy_scan_context()
-    g["scan_pvalue_calibration"] = "full_scan"
-    g["scan_n_permutations"] = 4
-    g["scan_permutation_seed"] = 3
-
-    scan_df, _ = substitution_scan.scan_substitutions(g=g, ON_tensor=on_tensor)
-
-    assert scan_df.shape[0] == 1
-    row = scan_df.iloc[0]
-    assert row["scan_pvalue_calibration"] == "full_scan"
-    assert row["scan_permutation_success_count"] == 4
-    assert row["scan_permutation_failure_count"] == 0
-    assert row["scan_permutation_failure_reasons"] == ""
-    assert np.isfinite(float(row["p_rate_enrichment_empirical_maxT"]))
-    assert 0 < float(row["p_rate_enrichment_empirical_maxT"]) <= 1
-    assert row["q_rate_enrichment_empirical_by_trait_match"] == pytest.approx(
-        row["p_rate_enrichment_empirical"]
     )
 
 

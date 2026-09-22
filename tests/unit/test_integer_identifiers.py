@@ -23,8 +23,8 @@ from pymol_fakes import import_parser_pymol_with_fake_pymol
     ("parser_uniprot", "_parse_positive_site"),
     ("omega", "_get_cb_ids"),
 ])
-@pytest.mark.parametrize("text", ["9007199254740993", "+9223372036854775807.0"])
-def test_integer_identifiers_preserve_exact_text(module_name, function_name, text, monkeypatch):
+def test_integer_identifiers_preserve_exact_text(module_name, function_name, monkeypatch):
+    text = "+9223372036854775807.0"
     if module_name in {"parser_pymol", "parser_biodb"}:
         import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta="", commands=[])
     module = importlib.import_module("csubst." + module_name)

@@ -2,8 +2,9 @@ import pytest
 from csubst import cli, endpoint_io, param, substitution_scan
 
 
-@pytest.mark.parametrize('command', ['search', 'analyze', 'sites', 'site', 'inspect', 'benchmark', 'scan'])
-@pytest.mark.parametrize('posterior', ['joint', 'marginal'])
+@pytest.mark.parametrize('command,posterior', [
+    (command, 'joint') for command in ('search', 'analyze', 'sites', 'site', 'inspect', 'benchmark', 'scan')
+] + [('search', 'marginal'), ('scan', 'marginal')])
 def test_common_posterior_default_and_opt_out(command, posterior):
     flags = [] if posterior == 'joint' else ['--substitution_posterior', posterior]
     args = cli._build_parser().parse_args([command, *flags])

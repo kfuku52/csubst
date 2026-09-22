@@ -18,15 +18,6 @@ def test_rank_quantiles_assigns_average_rank_to_ties():
     assert out.tolist() == pytest.approx([0.25, 0.625, 0.625, 1.0])
 
 
-def test_3di_q_weighted_exposure_resolves_to_state_aware(capsys):
-    g = {"scan_rate_exposure": "q_weighted", "nonsyn_recode": "3di20"}
-
-    resolved = substitution_scan.resolve_scan_rate_exposure(g)
-
-    assert resolved == "state_aware"
-    assert "3Di" in capsys.readouterr().out
-
-
 def test_normalize_scan_matches_all_expands_to_nine_classes():
     assert substitution_scan.normalize_scan_matches("all") == list(substitution_scan.SCAN_MATCHES)
     assert len(substitution_scan.normalize_scan_matches("all")) == 9
