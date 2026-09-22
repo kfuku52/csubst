@@ -34,3 +34,40 @@ Repository-specific instructions override these defaults.
 - For GitHub Actions edits, use `optimize-github-actions` in `.agents/skills/`.
   Preserve required coverage; never run untrusted PR code on self-hosted runners.
 <!-- END KF AGENT POLICY -->
+
+# CSUBST working guide
+
+- Start with `git status --short`, [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+  and [TESTING.md](TESTING.md#choosing-checks) for checks selected by change.
+  Read [README.md](README.md) for user-facing behavior and
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing module boundaries.
+- CLI parsing/dispatch starts in `csubst/cli.py`; command orchestration is in
+  `main_*`. Parameter validation starts in `param.py`; numerical work is in
+  `substitution*`, `omega*`, and the `scan_*` modules. Follow the architecture
+  guide for context, I/O, and accelerator contracts.
+- Run commands from the repository root in the selected development environment:
+  `python -m pip install -e '.[dev]'`, `python -m csubst --help`,
+  `make test-fast`, `make lint`, `make typecheck`. Use `make PYTHON=...` when
+  needed. Full, native, fallback, and artifact lanes are in TESTING.md; a fast
+  pass alone does not cover integration or numerical parity.
+- Use `.agents/skills/verify-csubst-change/SKILL.md` when selecting and reporting
+  verification for a code change. Use the existing push skill and
+  [RELEASING.md](RELEASING.md) for publication.
+- Preserve scientific defaults and reference values unless their change is
+  explicitly intended. Joint endpoint posteriors and legacy marginal estimates
+  are different estimators; consult [ENDPOINT_POSTERIORS.md](docs/ENDPOINT_POSTERIORS.md)
+  and [SCAN_CTMC.md](docs/SCAN_CTMC.md) for supported models and rate assumptions.
+  Read the relevant method document before changing null models, filtering,
+  calibration, seeds, or thresholds. Do not relax tolerances or regenerate
+  reference data merely to make a failing test pass.
+- Preserve CLI aliases, output schemas/names, cache compatibility, and failure
+  behavior; see [CLI_SAFETY.md](docs/CLI_SAFETY.md). Check input protection and
+  manifest finalization when touching output code.
+- Keep analysis runs in fresh temporary directories. Do not edit bundled
+  `csubst/dataset/` fixtures, substitution matrices, vendored sources, or
+  `.github/performance_baseline.tsv` as incidental cleanup. Generated C/binaries,
+  `build/`, `dist/`, caches, and local environments are not source edits.
+  Preserve existing research reports; new artifacts follow [reports/README.md](reports/README.md).
+- Finish by reviewing `git diff --check` and the diff. Report changed behavior,
+  exact checks and outcomes (including skips), and checks not run with reasons.
+  Do not describe source tests as installed-wheel or scientific calibration proof.

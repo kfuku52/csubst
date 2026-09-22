@@ -1,11 +1,20 @@
 # Contributing
 
-Use Python 3.12 for the complete local verification lane and keep compatibility
-with Python 3.10–3.14. Install an editable development environment with:
+Run the commands below from the repository root. Use Python 3.12 for the complete
+local verification lane and keep compatibility with Python 3.10–3.14. Select an
+existing development environment, or create one with `python3.12 -m venv .venv`
+and activate it with `source .venv/bin/activate`. Then install the editable package:
 
 ```bash
 python -m pip install -e '.[dev]'
 ```
+
+The native build needs a C compiler; pip supplies the declared build dependencies.
+IQ-TREE is installed separately for analyses that need a new fit, not by the
+`dev` extra. Real structure/model workflows need the optional dependencies and
+resources described in the README. They are not prerequisites for ordinary
+mocked unit tests. Check the selected interpreter with `python --version` and
+the entry point with `python -m csubst --help`.
 
 The common commands are available through `make`:
 
@@ -23,6 +32,10 @@ The `dev` extra includes the test runner, Ruff, mypy, build, and Twine used by
 these commands. The smaller `test` extra remains available for running tests
 without development and packaging tools. `make PYTHON=/path/to/python ...`
 selects a particular environment for every tool.
+
+Choose the smallest relevant lane using [Choosing checks](TESTING.md#choosing-checks)
+before running broader validation. The Makefile is the command source of truth;
+there is no separate agent-only test runner.
 
 Keep command orchestration in `csubst/cli.py`, pure I/O in focused modules, and
 numerical kernels behind small Python contracts. New optional Cython code must
