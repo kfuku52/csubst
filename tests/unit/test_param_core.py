@@ -121,6 +121,20 @@ def test_get_global_parameters_reports_missing_dependency_packages(monkeypatch, 
     assert txt in captured.out
 
 
+@pytest.mark.parametrize('missing_runtime', [None, 'numpy'])
+def test_build_only_cython_is_not_reported_as_missing(monkeypatch, capsys, missing_runtime):
+    def version(distribution_name):
+        if distribution_name.lower() == 'cython' or distribution_name == missing_runtime:
+            raise param.importlib_metadata.PackageNotFoundError(distribution_name)
+        return '1.0.0'
+
+    monkeypatch.setattr(param.importlib_metadata, 'version', version)
+    param.get_global_parameters(_args())
+    lines = capsys.readouterr().out.splitlines()
+    missing_line = next(line for line in lines if line.startswith('CSUBST missing dependency packages:'))
+    assert missing_line == 'CSUBST missing dependency packages: {}'.format(missing_runtime or 'none')
+
+
 @pytest.mark.parametrize(
     "kwargs,expected",
     [

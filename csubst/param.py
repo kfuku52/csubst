@@ -17,13 +17,13 @@ from csubst import recoding_config
 from csubst import runtime
 from csubst import table
 
+# Runtime diagnostics must not require tools from the isolated build environment.
 DEPENDENCY_DISTRIBUTIONS = (
     'ete4',
     'requests',
     'numpy',
     'scipy',
     'pandas',
-    'cython',
     'matplotlib',
 )
 
