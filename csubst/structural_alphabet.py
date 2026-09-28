@@ -540,7 +540,7 @@ def _append_prostt5_sequence_cache(
     if cache_file == "":
         return
     cache_file = os.path.abspath(os.path.expanduser(cache_file))
-    output_safety.validate_destination(cache_file)
+    output_safety.validate_destination(cache_file, mutable_input_label='input --prostt5_cache_file')
     lock_path = resource_cache.resolve_path_lock_path(cache_file, lock_label="prostt5-sequence-cache")
     with resource_cache.acquire_exclusive_lock(
         lock_path=lock_path,
@@ -576,7 +576,10 @@ def _append_prostt5_sequence_cache(
             return
         if existing_text != "" and not existing_text.endswith("\n"):
             existing_text += "\n"
-        resource_cache.atomic_write_text(cache_file, existing_text + "".join(new_lines))
+        resource_cache.atomic_write_text(
+            cache_file, existing_text + "".join(new_lines),
+            mutable_input_label='input --prostt5_cache_file',
+        )
 
 
 def _is_prostt5_oom_error(exc):

@@ -316,9 +316,9 @@ def acquire_exclusive_lock(
         time.sleep(min(poll_seconds, max(0.0, timeout_seconds - elapsed)))
 
 
-def atomic_write_text(path, text, encoding="utf-8"):
+def atomic_write_text(path, text, encoding="utf-8", *, mutable_input_label=None):
     path = os.path.abspath(os.path.expanduser(str(path)))
-    output_safety.validate_destination(path)
+    output_safety.validate_destination(path, mutable_input_label=mutable_input_label)
     parent = os.path.dirname(path) or "."
     os.makedirs(parent, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(prefix=".{}.tmp.".format(os.path.basename(path)), dir=parent)
@@ -327,7 +327,7 @@ def atomic_write_text(path, text, encoding="utf-8"):
             handle.write(str(text))
             handle.flush()
             os.fsync(handle.fileno())
-        output_safety.validate_destination(path)
+        output_safety.validate_destination(path, mutable_input_label=mutable_input_label)
         os.replace(tmp_path, path)
     except Exception:
         try:

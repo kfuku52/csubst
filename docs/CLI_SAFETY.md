@@ -13,6 +13,9 @@ its table and run-record destinations before opening the log as well. Shared
 output-path and TSV/manifest writers reject input/log aliases for dynamically
 resolved outputs. A rejected destination exits with status 2.
 Figure files and writable analysis caches use the same destination check.
+The ProstT5/3Di state/VESM caches may update their own configured cache paths;
+they still cannot overwrite another input or the CLI log, including through
+symlink and hardlink aliases.
 
 Search reruns preserve earlier tables in `.csubst_search_history/<run-id>/`
 inside the output directory, including tables from arities no longer reached.

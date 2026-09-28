@@ -12,10 +12,19 @@ from csubst import structural_prediction as sp
 def test_prostt5_cache_cannot_replace_input(tmp_path):
     alignment = tmp_path / 'input.fa'
     alignment.write_text('>A\nATG\n')
-    with output_safety.output_context([('input --alignment_file', alignment)]):
+    with output_safety.output_context([('input --prostt5_cache_file', alignment),
+                                       ('input --alignment_file', alignment)]):
         with pytest.raises(ValueError, match='must not overwrite input --alignment_file'):
             sa._append_prostt5_sequence_cache(str(alignment), 'model', {'MK': 'CC'})
     assert alignment.read_text() == '>A\nATG\n'
+
+
+def test_prostt5_cache_can_update_its_own_cli_input(tmp_path):
+    cache = tmp_path / 'cache.tsv'
+    with output_safety.output_context([('input --prostt5_cache_file', cache)]):
+        sa._append_prostt5_sequence_cache(str(cache), 'model', {'MK': 'CC'})
+        sa._append_prostt5_sequence_cache(str(cache), 'model', {'MA': 'AC'})
+    assert sa._load_prostt5_sequence_cache(str(cache), 'model') == {'MK': 'CC', 'MA': 'AC'}
 
 
 class FakePredictor:

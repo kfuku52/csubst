@@ -45,10 +45,19 @@ def test_score_cache_cannot_replace_input(tmp_path):
     alignment = tmp_path / 'input.fa'
     alignment.write_text('>A\nATG\n')
     key = vesm._cache_key(hashlib.sha256(b'AAAA').hexdigest(), 1, 'A', 'V')
-    with output_safety.output_context([('input --alignment_file', alignment)]):
+    with output_safety.output_context([('input --vep_cache_file', alignment),
+                                       ('input --alignment_file', alignment)]):
         with pytest.raises(ValueError, match='must not overwrite input --alignment_file'):
             vesm.merge_score_cache(str(alignment), {key: -1.25})
     assert alignment.read_text() == '>A\nATG\n'
+
+
+def test_score_cache_can_update_its_own_cli_input(tmp_path):
+    cache = tmp_path / 'scores.tsv'
+    key = vesm._cache_key(hashlib.sha256(b'AAAA').hexdigest(), 1, 'A', 'V')
+    with output_safety.output_context([('input --vep_cache_file', cache)]):
+        vesm.merge_score_cache(str(cache), {key: -1.25})
+    assert vesm.load_score_cache(str(cache)) == {key: pytest.approx(-1.25)}
 
 
 def test_scorer_records_llr_and_window_metadata_without_sign_reversal(monkeypatch):

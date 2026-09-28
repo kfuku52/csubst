@@ -24,16 +24,18 @@ def same_path(left, right):
         return False
 
 
-def check_destination(path, protected):
+def check_destination(path, protected, *, mutable_input_label=None):
     for label, source in protected:
+        if label == mutable_input_label:
+            continue
         if same_path(path, source):
             raise ValueError('Output must not overwrite {}: {}'.format(label, source))
 
 
-def validate_destination(path):
+def validate_destination(path, *, mutable_input_label=None):
     state = _active.get()
     if state is not None and isinstance(path, (str, os.PathLike)):
-        check_destination(path, state['protected'])
+        check_destination(path, state['protected'], mutable_input_label=mutable_input_label)
 
 
 def register_finalizer(path, callback):

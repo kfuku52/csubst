@@ -80,7 +80,7 @@ def merge_score_cache(
     if len(score_by_key) == 0:
         return
     cache_file = os.path.abspath(os.path.expanduser(str(cache_file)))
-    output_safety.validate_destination(cache_file)
+    output_safety.validate_destination(cache_file, mutable_input_label='input --vep_cache_file')
     lock_path = resource_cache.resolve_path_lock_path(cache_file, lock_label="vesm-score-cache")
     with resource_cache.acquire_exclusive_lock(
         lock_path=lock_path,
@@ -107,7 +107,9 @@ def merge_score_cache(
                     float(merged[key]),
                 )
             )
-        resource_cache.atomic_write_text(cache_file, "".join(lines))
+        resource_cache.atomic_write_text(
+            cache_file, "".join(lines), mutable_input_label='input --vep_cache_file',
+        )
 
 
 def _torch_mps_is_available(torch_module):

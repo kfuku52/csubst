@@ -31,11 +31,24 @@ def test_3di_state_cache_cannot_replace_input(tmp_path):
     g['sa_state_cache_file'] = str(alignment)
     states = np.zeros((2, 2, 20))
     states[:, :, 0] = 1
-    with output_safety.output_context([('input --alignment_file', alignment)]):
+    with output_safety.output_context([('input --sa_state_cache_file', alignment),
+                                       ('input --alignment_file', alignment)]):
         with pytest.raises(ValueError, match='must not overwrite input --alignment_file'):
             parser_misc._write_3di_state_cache(
                 g, None, shape, states, structural_alphabet.get_3di_state_orders())
     assert alignment.read_text() == '>A\nATGATG\n'
+
+
+def test_3di_state_cache_can_update_its_own_cli_input(tmp_path):
+    g, shape = _cache(tmp_path)
+    states = np.zeros((2, 2, 20))
+    states[:, :, 0] = 1
+    with output_safety.output_context([('input --sa_state_cache_file', g['sa_state_cache_file'])]):
+        parser_misc._write_3di_state_cache(
+            g, None, shape, states, structural_alphabet.get_3di_state_orders())
+    loaded, _, error = parser_misc._try_load_3di_state_cache(g, None, shape)
+    assert error is None
+    np.testing.assert_array_equal(loaded, states)
 
 
 @pytest.mark.parametrize('value', [float('nan'), float('inf'), -0.1, 1.1, 0.5])
