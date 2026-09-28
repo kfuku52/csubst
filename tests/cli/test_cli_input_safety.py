@@ -55,6 +55,20 @@ def test_log_collision_protects_inferred_iqtree_input(tmp_path):
     assert '--log_file must not overwrite input --iqtree_state' in result.stderr
 
 
+@pytest.mark.parametrize('parse_error', [False, True])
+def test_log_collision_preserves_scan_analytic_profile(tmp_path, parse_error):
+    profile = tmp_path / 'profile.json'
+    original = b'{"schema_version": 1, "endpoint_prior": "uniform"}\n'
+    profile.write_bytes(original)
+    args = ['scan', '--scan_analytic_profile', str(profile), '--log_file', str(profile)]
+    if parse_error:
+        args[1:1] = ['--threads', 'invalid']
+    result = run_csubst(args, tmp_path)
+    assert result.returncode == 2
+    assert profile.read_bytes() == original
+    assert '--log_file must not overwrite input --scan_analytic_profile' in result.stderr
+
+
 def test_all_failed_benchmarks_exit_nonzero_and_keep_summary(tmp_path):
     result = run_csubst(['benchmark', '--alignment_file', 'missing.fa',
                          '--rooted_tree_file', 'missing.nwk'], tmp_path)

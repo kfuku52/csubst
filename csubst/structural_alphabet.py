@@ -8,6 +8,7 @@ import pandas as pd
 
 from csubst import expectation_3di
 from csubst import ete
+from csubst import output_safety
 from csubst import resource_cache
 from csubst import runtime
 from csubst import sequence
@@ -539,6 +540,7 @@ def _append_prostt5_sequence_cache(
     if cache_file == "":
         return
     cache_file = os.path.abspath(os.path.expanduser(cache_file))
+    output_safety.validate_destination(cache_file)
     lock_path = resource_cache.resolve_path_lock_path(cache_file, lock_label="prostt5-sequence-cache")
     with resource_cache.acquire_exclusive_lock(
         lock_path=lock_path,

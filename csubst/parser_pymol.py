@@ -11,6 +11,7 @@ import subprocess
 import time
 
 from csubst import sequence
+from csubst import output_safety
 from csubst import sequence_io
 from csubst import resource_cache
 from csubst import runtime
@@ -1235,6 +1236,7 @@ def save_6view_pdf(image_prefix='tmp.csubst.pymol',
         ax.set_title(direction)
 
     plt.tight_layout()
+    output_safety.validate_destination(pdf_filename)
     plt.savefig(pdf_filename)
     plt.close(fig)
     print(f"Saved 6-view PDF as {pdf_filename}")

@@ -1,7 +1,6 @@
 import math
 import os
 import time
-from glob import glob
 
 import numpy as np
 import pandas as pd
@@ -27,13 +26,6 @@ class _FastStatePlotBypassUnavailable(RuntimeError):
 
 
 def _plot_state_tree_in_directory(output_dir, state, orders, mode, g, plot_request, plot_request_name):
-    output_prefix = str(g.get('output_prefix', 'csubst')).strip()
-    pattern = os.path.join(
-        str(output_dir), output_prefix + '_state_*_' + str(mode) + '_*.pdf'
-    )
-    for path in glob(pattern):
-        if os.path.isfile(path):
-            os.remove(path)
     os.makedirs(output_dir, exist_ok=True)
     return tree.plot_state_tree(
         state=state,
@@ -586,14 +578,6 @@ def _apply_fast_missing_site_masks(g, selected_site_indices, codon_symbol_index,
     return codon_symbol_index, aa_symbol_index, state_cdn_subset
 
 
-def _remove_legacy_state_plot_dir(g, output_name):
-    legacy_dir = runtime.output_path(g, output_name)
-    if os.path.isdir(legacy_dir):
-        import shutil
-
-        shutil.rmtree(legacy_dir)
-
-
 def _write_fast_unfiltered_alignments(g, codon_symbol_index, aa_symbol_index, aa_config):
     loaded_branch_ids = g.get("state_loaded_branch_ids", None)
     codon_path = runtime.output_path(g, "alignment_codon.fa")
@@ -621,7 +605,6 @@ def _write_fast_unfiltered_alignments(g, codon_symbol_index, aa_symbol_index, aa
 def _plot_fast_unfiltered_state_trees(g, selected_site_indices, state_cdn_subset, aa_config):
     site_numbers = (selected_site_indices + 1).astype(np.int64, copy=False)
     if tree.has_state_plot_request(g.get("plot_state_aa", "no")):
-        _remove_legacy_state_plot_dir(g, "plot_state_aa")
         if aa_config["mode"] == "nsy":
             aa_state_subset = sequence.cdn2nsy_state(state_cdn=state_cdn_subset, g=g)
         else:
@@ -638,7 +621,6 @@ def _plot_fast_unfiltered_state_trees(g, selected_site_indices, state_cdn_subset
         )
         _record_inspect_output_paths(g=g, output_paths=aa_out_files, output_kind="state_tree_aa_pdf")
     if tree.has_state_plot_request(g.get("plot_state_codon", "no")):
-        _remove_legacy_state_plot_dir(g, "plot_state_codon")
         codon_out_files = tree.plot_state_tree_selected_sites(
             state=state_cdn_subset,
             orders=g["codon_orders"],
@@ -738,7 +720,6 @@ def _run_standard_unfiltered_outputs(g):
         )
         _record_inspect_output_paths(g=g, output_paths=alignment_3di_path, output_kind="alignment_3di_fa")
     if tree.has_state_plot_request(g.get("plot_state_aa", "no")):
-        _remove_legacy_state_plot_dir(g, "plot_state_aa")
         aa_out_files = _plot_state_tree_in_directory(
             output_dir=g["outdir"],
             state=aa_state_unfiltered,
@@ -750,7 +731,6 @@ def _run_standard_unfiltered_outputs(g):
         )
         _record_inspect_output_paths(g=g, output_paths=aa_out_files, output_kind="state_tree_aa_pdf")
     if tree.has_state_plot_request(g.get("plot_state_codon", "no")):
-        _remove_legacy_state_plot_dir(g, "plot_state_codon")
         codon_out_files = _plot_state_tree_in_directory(
             output_dir=g["outdir"],
             state=codon_state_unfiltered,

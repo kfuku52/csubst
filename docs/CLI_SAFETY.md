@@ -12,6 +12,7 @@ Doctor checks all report destinations before opening its log. Search reserves
 its table and run-record destinations before opening the log as well. Shared
 output-path and TSV/manifest writers reject input/log aliases for dynamically
 resolved outputs. A rejected destination exits with status 2.
+Figure files and writable analysis caches use the same destination check.
 
 Search reruns preserve earlier tables in `.csubst_search_history/<run-id>/`
 inside the output directory, including tables from arities no longer reached.
@@ -45,6 +46,15 @@ configurations after a failed run. `no` stops at the first failure. In both
 cases, the summary, per-run results, and failure logs are written before the
 command exits with status 2 if any run failed. All-success benchmarks exit 0.
 Automation should check the exit status and retain the summary for diagnosis.
+On a rerun, earlier per-run logs are moved into
+`runs/<configuration>/.csubst_benchmark_history/<run-id>/`. Existing search
+tables remain available if setup fails before search starts; search archives
+them once it starts. A failed configuration never counts an earlier table in
+its new summary.
+
+`inspect` leaves legacy plot directories and older state PDFs in place.
+When a tree/site category table is disabled, `sites` leaves an existing table
+untouched and omits it from the current output manifest.
 
 ## Input paths and bundled examples
 

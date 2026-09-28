@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 
 from csubst import main_sites
+from csubst import output_safety
 from csubst import substitution_sparse
 from csubst import ete
 
@@ -35,6 +36,22 @@ def test_plot_state_writes_outputs_when_enabled(tmp_path, tiny_tree):
     assert set(out_paths) == expected
     for path in expected:
         assert Path(path).exists()
+
+
+def test_site_state_figure_cannot_replace_input(tmp_path, tiny_tree):
+    labels = {n.name: ete.get_prop(n, 'numerical_label') for n in tiny_tree.traverse()}
+    num_node = max(labels.values()) + 1
+    on = np.zeros((num_node, 1, 1, 2, 2), dtype=float)
+    os = np.zeros_like(on)
+    alignment = tmp_path / 'csubst_sites.state.pdf'
+    alignment.write_text('input data\n')
+    g = {'tree': tiny_tree, 'site_outdir': str(tmp_path), 'float_format': '%.4f',
+         'amino_acid_orders': np.array(['A', 'B']), 'matrix_groups': {'grp': ['AA', 'AB']},
+         'site_state_plot': True}
+    with output_safety.output_context([('input --alignment_file', alignment)]):
+        with pytest.raises(ValueError, match='must not overwrite input --alignment_file'):
+            main_sites.plot_state(on, os, np.array([labels['A'], labels['C']], dtype=int), g)
+    assert alignment.read_text() == 'input data\n'
 
 
 def test_get_df_ad_uses_nonsyn_state_orders_for_recoded_tensor():

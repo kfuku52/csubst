@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from csubst import parser_misc, structural_alphabet
+from csubst import output_safety, parser_misc, structural_alphabet
 
 
 def _cache(tmp_path):
@@ -23,6 +23,19 @@ def _rewrite(g, mutate):
         fields = {key: archive[key] for key in archive.files}
     mutate(fields)
     np.savez_compressed(g['sa_state_cache_file'], **fields)
+
+
+def test_3di_state_cache_cannot_replace_input(tmp_path):
+    g, shape = _cache(tmp_path)
+    alignment = tmp_path / 'input.fa'
+    g['sa_state_cache_file'] = str(alignment)
+    states = np.zeros((2, 2, 20))
+    states[:, :, 0] = 1
+    with output_safety.output_context([('input --alignment_file', alignment)]):
+        with pytest.raises(ValueError, match='must not overwrite input --alignment_file'):
+            parser_misc._write_3di_state_cache(
+                g, None, shape, states, structural_alphabet.get_3di_state_orders())
+    assert alignment.read_text() == '>A\nATGATG\n'
 
 
 @pytest.mark.parametrize('value', [float('nan'), float('inf'), -0.1, 1.1, 0.5])

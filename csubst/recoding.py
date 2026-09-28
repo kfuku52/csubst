@@ -7,6 +7,7 @@ import warnings
 import numpy as np
 
 from csubst import parallel
+from csubst import output_safety
 from csubst import sequence
 from csubst.recoding_config import (
     AUTO_RECODING_SCHEMES,
@@ -1526,6 +1527,7 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
             )
         ax.grid(True, linewidth=0.4, color="#d9d9d9", zorder=0)
         fig.tight_layout()
+        output_safety.validate_destination(output_path)
         fig.savefig(output_path, dpi=200)
         plt.close(fig)
     return output_path

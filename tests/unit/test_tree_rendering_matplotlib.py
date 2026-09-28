@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from csubst import tree
+from csubst import output_safety, tree
 from csubst import ete
 
 
@@ -147,6 +147,22 @@ def test_render_tree_matplotlib_hides_missing_root_state_for_codon(monkeypatch, 
     expected_scale_label_y = tree.TREE_SCALE_BAR_Y + tree.TREE_SCALE_BAR_TICK_HALF_HEIGHT + tree.TREE_SCALE_BAR_LABEL_GAP
     assert pytest.approx(scale_label_item["y"], rel=0, abs=1e-12) == expected_scale_label_y
     assert scale_label_item["kwargs"]["va"] == "bottom"
+
+
+def test_render_tree_matplotlib_cannot_replace_input(monkeypatch, tmp_path):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('(A:1,B:1)R;', format=1))
+    for node in tr.traverse():
+        ete.set_prop(node, 'color_trait', 'black')
+        ete.set_prop(node, 'labelcolor_trait', 'black')
+    alignment = tmp_path / 'plot.pdf'
+    alignment.write_text('input data\n')
+    fake_plt = _FakeTreePyplot()
+    monkeypatch.setattr(tree, '_get_pyplot', lambda: fake_plt)
+    with output_safety.output_context([('input --alignment_file', alignment)]):
+        with pytest.raises(ValueError, match='must not overwrite input --alignment_file'):
+            tree._render_tree_matplotlib(tr, 'trait', str(alignment))
+    assert alignment.read_text() == 'input data\n'
+    assert fake_plt.figure.savefig_calls == []
 
 
 def test_render_tree_matplotlib_places_branch_ids_below_branch_midpoints(monkeypatch, tmp_path):

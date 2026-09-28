@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from csubst import main_benchmark
+from csubst import output_safety
 from csubst import runtime
 
 
@@ -316,7 +317,8 @@ def test_run_single_config_clears_stale_cb_summary_on_failure(tmp_path, monkeypa
     assert second["cb_rows"] == 0
     assert second["hit_rows"] == 0
     assert pd.isna(second["score_max"])
-    assert os.path.exists(second["cb_tsv"]) is False
+    assert os.path.exists(second["cb_tsv"]) is True
+    assert pd.read_csv(second["cb_tsv"], sep="\t").loc[0, "omegaCany2spe"] == 7.0
 
 
 def test_run_single_config_fails_when_requested_summary_columns_are_missing(tmp_path, monkeypatch):
@@ -412,8 +414,65 @@ def test_main_benchmark_rejects_3di_codon_model_and_ignores_stale_cb_files(tmp_p
     assert failed["cb_rows"] == 0
     assert failed["hit_rows"] == 0
     assert pd.isna(failed["score_max"])
-    assert stale_cb.exists() is False
+    assert stale_cb.exists() is True
+    assert pd.read_csv(stale_cb, sep="\t").loc[0, "omegaCany2spe"] == 7.0
     assert (manifest["output_kind"] == "benchmark_cb_tsv").sum() == 0
+
+
+def test_failed_benchmark_rerun_preserves_previous_results_and_logs(tmp_path, monkeypatch):
+    g = _base_benchmark_config(tmp_path)
+    config = main_benchmark._iter_benchmark_configs(g)[0]
+    run_dir = tmp_path / 'benchmark' / 'runs' / ('001.' + config['label'])
+    run_dir.mkdir(parents=True)
+    old_cb = run_dir / 'csubst_cb_2.tsv'
+    old_cb.write_text('OCNany2spe\tomegaCany2spe\n3\t7\n')
+    (run_dir / 'benchmark_run.log').write_text('previous benchmark log\n')
+    (run_dir / 'csubst.log').write_text('previous search log\n')
+    monkeypatch.setattr(main_benchmark.main_analyze, 'main_analyze',
+                        lambda _g: (_ for _ in ()).throw(ValueError('rerun failed')))
+
+    with pytest.raises(ValueError, match='Benchmark failed'):
+        main_benchmark.main_benchmark(g)
+
+    assert old_cb.read_text() == 'OCNany2spe\tomegaCany2spe\n3\t7\n'
+    summary = pd.read_csv(tmp_path / 'benchmark' / 'csubst_benchmark_summary.tsv', sep='\t')
+    assert summary.loc[0, 'cb_rows'] == 0
+    assert summary.loc[0, 'hit_rows'] == 0
+    assert pd.isna(summary.loc[0, 'score_max'])
+    archived = list((run_dir / '.csubst_benchmark_history').iterdir())
+    assert len(archived) == 1
+    assert (archived[0] / 'benchmark_run.log').read_text() == 'previous benchmark log\n'
+    assert (archived[0] / 'csubst.log').read_text() == 'previous search log\n'
+
+
+def test_benchmark_does_not_score_unchanged_previous_table(tmp_path, monkeypatch):
+    g = _base_benchmark_config(tmp_path)
+    config = main_benchmark._iter_benchmark_configs(g)[0]
+    run_dir = tmp_path / 'benchmark' / 'runs' / ('001.' + config['label'])
+    run_dir.mkdir(parents=True)
+    old_cb = run_dir / 'csubst_cb_2.tsv'
+    old_cb.write_text('OCNany2spe\tomegaCany2spe\n3\t7\n')
+    monkeypatch.setattr(main_benchmark.main_analyze, 'main_analyze', lambda _g: None)
+
+    result = main_benchmark._run_single_config(g, config, str(run_dir))
+
+    assert result['status'] == 'fail'
+    assert result['cb_rows'] == 0
+    assert 'did not replace' in result['error_message']
+    assert old_cb.read_text() == 'OCNany2spe\tomegaCany2spe\n3\t7\n'
+
+
+def test_benchmark_run_log_collision_preserves_input(tmp_path):
+    g = _base_benchmark_config(tmp_path)
+    config = main_benchmark._iter_benchmark_configs(g)[0]
+    run_dir = tmp_path / 'benchmark' / 'runs' / ('001.' + config['label'])
+    run_dir.mkdir(parents=True)
+    alignment = run_dir / 'benchmark_run.log'
+    alignment.write_text('>A\nATG\n')
+    with output_safety.output_context([('input --alignment_file', alignment)]):
+        with pytest.raises(ValueError, match='must not overwrite input --alignment_file'):
+            main_benchmark._run_single_config(g, config, str(run_dir))
+    assert alignment.read_text() == '>A\nATG\n'
 
 
 @pytest.mark.parametrize('keep_going, expected_runs', [(True, 2), (False, 1)])

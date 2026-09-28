@@ -539,6 +539,16 @@ def test_main_inspect_uses_standard_path_for_all_state_plots(tmp_path, monkeypat
     assert calls == ["standard"]
 
 
+def test_standard_state_plot_preserves_existing_matching_file(tmp_path, monkeypatch):
+    previous = tmp_path / 'csubst_state_trait_aa_old.pdf'
+    previous.write_bytes(b'previous report')
+    monkeypatch.setattr(main_inspect.tree, 'plot_state_tree', lambda **_kwargs: [])
+    main_inspect._plot_state_tree_in_directory(
+        output_dir=str(tmp_path), state=None, orders=None, mode='aa',
+        g={'output_prefix': 'csubst'}, plot_request='all', plot_request_name='--plot_state_aa')
+    assert previous.read_bytes() == b'previous report'
+
+
 def test_run_fast_unfiltered_outputs_streams_selected_sites_and_writes_alignments(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
@@ -596,12 +606,18 @@ def test_run_fast_unfiltered_outputs_streams_selected_sites_and_writes_alignment
     monkeypatch.setattr(main_inspect, "_prepare_fast_inspect_context", fake_prepare)
     monkeypatch.setattr(main_inspect.tree, "plot_state_tree_selected_sites", fake_plot_state_tree_selected_sites)
 
+    legacy_dir = tmp_path / 'csubst_plot_state_aa'
+    legacy_dir.mkdir()
+    (legacy_dir / 'notes.txt').write_text('keep user notes\n')
+
     g = {
         "genetic_code": 1,
         "plot_state_aa": "2-3",
         "plot_state_codon": "2-3",
     }
     main_inspect._run_fast_unfiltered_outputs(g)
+
+    assert (legacy_dir / 'notes.txt').read_text() == 'keep user notes\n'
 
     codon_alignment = (tmp_path / "csubst_alignment_codon.fa").read_text(encoding="utf-8")
     aa_alignment = (tmp_path / "csubst_alignment_aa.fa").read_text(encoding="utf-8")

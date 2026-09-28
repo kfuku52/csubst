@@ -671,7 +671,7 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                         help='default=%(default)s: Opt-in analytical endpoint-enrichment P from a fixed '
                              'codon-tree mixture likelihood ratio; integrates ancestors and rate categories. '
                              'Requires --scan_pvalue_calibration none. Fitted-model uncertainty remains uncalibrated.')
-    parser.add_argument('--scan_analytic_profile', default=None, metavar='JSON',
+    parser.add_argument('--scan_analytic_profile', default=None, metavar='PATH',
                         help='Frozen independent-training endpoint mixture profile. Requires endpoint_mixture. '
                              'Do not train or choose this profile on the tested alignment.')
     parser.add_argument('--scan_pvalue_calibration', metavar='none|candidate_fixed|full_scan|parametric_bootstrap|parametric', default='full_scan', type=str,

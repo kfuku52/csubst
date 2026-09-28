@@ -5,6 +5,7 @@ import re
 import shutil
 import time
 import traceback
+import uuid
 from itertools import product
 
 import numpy as np
@@ -13,6 +14,7 @@ import pandas as pd
 from csubst import main_analyze
 from csubst import asrv
 from csubst import output_manifest
+from csubst import output_safety
 from csubst import pseudocount
 from csubst import omega_calibration, omega_null
 from csubst import recoding
@@ -292,11 +294,18 @@ def _prepare_run_context(base_g, config, run_dir):
     return runtime.ensure_output_layout(local_g, create_dir=True)
 
 
+def _validate_benchmark_log_path(path):
+    output_safety.validate_destination(path)
+    if os.path.lexists(path) and (os.path.islink(path) or not os.path.isfile(path)):
+        raise ValueError("Benchmark log is not a regular file: {}".format(path))
+
+
 def _materialize_search_log(local_g, benchmark_log):
     search_log = str(local_g.get("log_file", "")).strip()
     if search_log == "":
         return str(os.path.abspath(benchmark_log))
     search_log_abs = os.path.abspath(search_log)
+    _validate_benchmark_log_path(search_log_abs)
     benchmark_log_abs = os.path.abspath(benchmark_log)
     if search_log_abs == benchmark_log_abs:
         return search_log_abs
@@ -311,6 +320,8 @@ def _write_preparation_failure_logs(run_dir, output_prefix, config_label, exc):
     os.makedirs(run_dir, exist_ok=True)
     benchmark_log = os.path.abspath(os.path.join(run_dir, "benchmark_run.log"))
     search_log = os.path.abspath(os.path.join(run_dir, str(output_prefix) + ".log"))
+    for output_path in {benchmark_log, search_log}:
+        _validate_benchmark_log_path(output_path)
     log_text = "Benchmark configuration: {}\n".format(config_label)
     log_text += "Benchmark run directory: {}\n".format(os.path.abspath(run_dir))
     log_text += "Benchmark setup failed before search execution.\n"
@@ -326,15 +337,23 @@ def _write_preparation_failure_logs(run_dir, output_prefix, config_label, exc):
     return benchmark_log, search_log
 
 
-def _cleanup_run_outputs(run_dir, output_prefix):
-    cleanup_paths = [
+def _archive_previous_run_logs(run_dir, output_prefix):
+    log_paths = list(dict.fromkeys([
         os.path.abspath(os.path.join(run_dir, "benchmark_run.log")),
         os.path.abspath(os.path.join(run_dir, str(output_prefix) + ".log")),
-        runtime.output_path({"outdir": run_dir, "output_prefix": output_prefix}, "cb_2.tsv"),
-    ]
-    for output_path in cleanup_paths:
-        if os.path.exists(output_path):
-            os.remove(output_path)
+    ]))
+    for path in log_paths:
+        _validate_benchmark_log_path(path)
+    previous = [path for path in log_paths if os.path.exists(path)]
+    if not previous:
+        return
+    history = os.path.join(run_dir, ".csubst_benchmark_history")
+    if os.path.islink(history):
+        raise ValueError("Benchmark history must not be a symbolic link: {}".format(history))
+    archive = os.path.join(history, uuid.uuid4().hex)
+    os.makedirs(archive, exist_ok=False)
+    for path in previous:
+        os.replace(path, os.path.join(archive, os.path.basename(path)))
 
 
 def _append_benchmark_validation_message(run_log, search_log, message):
@@ -347,12 +366,13 @@ def _append_benchmark_validation_message(run_log, search_log, message):
         if path_abs not in log_paths:
             log_paths.append(path_abs)
     for path_abs in log_paths:
+        _validate_benchmark_log_path(path_abs)
         with open(path_abs, "a", encoding="utf-8") as handle:
             handle.write("\nBenchmark validation failure: {}\n".format(message))
 
 
-def _read_cb_summary(cb_path, score_col, ocn_col, min_score, min_ocn):
-    row = {
+def _empty_cb_summary(cb_path):
+    return {
         "cb_tsv": str(cb_path),
         "cb_rows": 0,
         "score_column_found": "N",
@@ -362,6 +382,18 @@ def _read_cb_summary(cb_path, score_col, ocn_col, min_score, min_ocn):
         "score_median": np.nan,
         "hit_rows": 0,
     }
+
+
+def _file_identity(path):
+    try:
+        info = os.stat(path)
+    except FileNotFoundError:
+        return None
+    return (info.st_dev, info.st_ino, info.st_mtime_ns, info.st_size)
+
+
+def _read_cb_summary(cb_path, score_col, ocn_col, min_score, min_ocn):
+    row = _empty_cb_summary(cb_path)
     if not os.path.exists(cb_path):
         return row
     df = pd.read_csv(cb_path, sep="\t")
@@ -420,9 +452,11 @@ def _validate_benchmark_result(result, score_col, ocn_col):
 
 def _run_single_config(base_g, config, run_dir):
     os.makedirs(run_dir, exist_ok=True)
-    _cleanup_run_outputs(run_dir=run_dir, output_prefix=base_g.get("output_prefix", "csubst"))
+    _archive_previous_run_logs(run_dir=run_dir, output_prefix=base_g.get("output_prefix", "csubst"))
     benchmark_log = os.path.join(run_dir, "benchmark_run.log")
     local_g = _prepare_run_context(base_g=base_g, config=config, run_dir=run_dir)
+    cb_path = runtime.output_path(local_g, "cb_2.tsv")
+    previous_cb_identity = _file_identity(cb_path)
     result = {
         "label": config["label"],
         "status": "pass",
@@ -449,16 +483,20 @@ def _run_single_config(base_g, config, run_dir):
                 result["error_message"] = "{}: {}".format(type(exc).__name__, exc)
     result["elapsed_sec"] = float(time.time() - start)
     result["search_log"] = _materialize_search_log(local_g=local_g, benchmark_log=benchmark_log)
-    cb_path = runtime.output_path(local_g, "cb_2.tsv")
-    result.update(
-        _read_cb_summary(
+    if (result["status"] == "pass") and (previous_cb_identity is not None):
+        if _file_identity(cb_path) == previous_cb_identity:
+            result["status"] = "fail"
+            result["error_message"] = "Search did not replace the previous csubst_cb_2.tsv output."
+    if result["status"] == "pass":
+        result.update(_read_cb_summary(
             cb_path=cb_path,
             score_col=base_g.get("benchmark_score_column", "omegaCany2spe"),
             ocn_col=base_g.get("benchmark_ocn_column", "OCNany2spe"),
             min_score=base_g.get("benchmark_min_score", 5.0),
             min_ocn=base_g.get("benchmark_min_ocn", 2.0),
-        )
-    )
+        ))
+    else:
+        result.update(_empty_cb_summary(cb_path))
     result = _validate_benchmark_result(
         result=result,
         score_col=base_g.get("benchmark_score_column", "omegaCany2spe"),
@@ -517,7 +555,7 @@ def _write_benchmark_output_manifest(g, summary_tsv, summary):
                     },
                 )
             cb_path = str(row.get("cb_tsv", "")).strip()
-            if (cb_path != "") and os.path.exists(cb_path):
+            if (str(row["status"]) == "pass") and (cb_path != "") and os.path.exists(cb_path):
                 output_manifest.add_output_manifest_row(
                     manifest_rows=manifest_rows,
                     output_path=cb_path,

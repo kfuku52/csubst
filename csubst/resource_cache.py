@@ -13,6 +13,8 @@ import time
 import uuid
 from contextlib import contextmanager
 
+from csubst import output_safety
+
 
 LOCK_FORMAT = "csubst-lock-v1"
 MANIFEST_FORMAT = "csubst-resource-v1"
@@ -316,6 +318,7 @@ def acquire_exclusive_lock(
 
 def atomic_write_text(path, text, encoding="utf-8"):
     path = os.path.abspath(os.path.expanduser(str(path)))
+    output_safety.validate_destination(path)
     parent = os.path.dirname(path) or "."
     os.makedirs(parent, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(prefix=".{}.tmp.".format(os.path.basename(path)), dir=parent)
@@ -324,6 +327,7 @@ def atomic_write_text(path, text, encoding="utf-8"):
             handle.write(str(text))
             handle.flush()
             os.fsync(handle.fileno())
+        output_safety.validate_destination(path)
         os.replace(tmp_path, path)
     except Exception:
         try:

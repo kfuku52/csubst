@@ -8,6 +8,7 @@ import sys
 
 from csubst import genetic_code
 from csubst import output_manifest
+from csubst import output_safety
 from csubst import parser_misc
 from csubst import runtime
 from csubst import sequence
@@ -486,6 +487,7 @@ def _resolve_barchart_output_base(g):
 
 def _save_barchart_figure(fig, outbase):
     out_path = outbase + ".pdf"
+    output_safety.validate_destination(out_path)
     fig.savefig(out_path, format='pdf', transparent=True)
     #fig.savefig(outbase+".svg", format='svg', transparent=True)
     print("Nonsynonymous and synonymous substitutions are shown in color and gray, respectively.", flush=True)
@@ -1151,6 +1153,7 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
     fig.tight_layout(h_pad=0.5, w_pad=1)
     outbase = os.path.join(g['site_outdir'], output_prefix + '.state')
     fig_path = outbase + ".pdf"
+    output_safety.validate_destination(fig_path)
     fig.savefig(fig_path, format='pdf', transparent=True)
     plt.close(fig)
     output_paths.append(fig_path)
@@ -2248,6 +2251,7 @@ def plot_vesm_tree_site(events, df, g, outbase):
     ]
     ax_grid.legend(handles, ['PP {:.2g}'.format(value) for value in pp_values], loc='upper right')
     fig.tight_layout()
+    output_safety.validate_destination(fig_path)
     fig.savefig(fig_path, format=plot_format, transparent=False, facecolor='white')
     plt.close(fig)
     print('Writing VESM tree + site plot: {}'.format(fig_path), flush=True)

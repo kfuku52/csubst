@@ -13,6 +13,7 @@ import tempfile
 from collections import OrderedDict
 
 from csubst import __version__
+from csubst import output_safety
 from csubst import genetic_code
 from csubst import foreground
 from csubst import sequence
@@ -311,6 +312,7 @@ def _write_3di_state_cache(g, selected_branch_ids, state_cdn_shape, state_nsy, s
     if cache_file == '':
         raise ValueError('--sa_state_cache_file is empty.')
     cache_path = os.path.abspath(cache_file)
+    output_safety.validate_destination(cache_path)
     cache_dir = os.path.dirname(cache_path)
     if (cache_dir != '') and (not os.path.isdir(cache_dir)):
         raise ValueError('Cache directory does not exist: {}'.format(cache_dir))
@@ -341,6 +343,7 @@ def _write_3di_state_cache(g, selected_branch_ids, state_cdn_shape, state_nsy, s
         )
         with open(tmp_path, mode='rb') as handle:
             os.fsync(handle.fileno())
+        output_safety.validate_destination(cache_path)
         os.replace(tmp_path, cache_path)
     except Exception:
         try:

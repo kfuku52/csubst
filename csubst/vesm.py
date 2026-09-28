@@ -5,6 +5,7 @@ import os
 import numpy as np
 
 from csubst import model_resources
+from csubst import output_safety
 from csubst import resource_cache
 
 
@@ -79,6 +80,7 @@ def merge_score_cache(
     if len(score_by_key) == 0:
         return
     cache_file = os.path.abspath(os.path.expanduser(str(cache_file)))
+    output_safety.validate_destination(cache_file)
     lock_path = resource_cache.resolve_path_lock_path(cache_file, lock_label="vesm-score-cache")
     with resource_cache.acquire_exclusive_lock(
         lock_path=lock_path,

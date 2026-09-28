@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from csubst import output_manifest
+from csubst import output_safety
 from csubst import runtime
 from csubst import tsv
 
@@ -389,6 +390,7 @@ def _plot_parameter_overview(runs, parameter_summary, parameter_columns, metric_
         ),
         fontsize=12,
     )
+    output_safety.validate_destination(out_path)
     fig.savefig(out_path, dpi=200, transparent=False)
     plt.close(fig)
 

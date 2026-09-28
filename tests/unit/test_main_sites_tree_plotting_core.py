@@ -1,8 +1,10 @@
 import re
 import numpy as np
 import pandas as pd
+import pytest
 
 from csubst import main_sites
+from csubst import output_safety
 from csubst import tree
 from csubst import ete
 
@@ -97,6 +99,12 @@ def test_plot_tree_site_honors_output_prefix(tmp_path, tiny_tree):
     assert str(tmp_path / "csubst_scan.tree_site.pdf") in out_paths
     assert str(tmp_path / "csubst_scan.tree_site.tsv") in out_paths
     assert not (tmp_path / "csubst_sites.tree_site.pdf").exists()
+    figure = tmp_path / 'csubst_scan.tree_site.pdf'
+    original = figure.read_bytes()
+    with output_safety.output_context([('input --cb_file', figure)]):
+        with pytest.raises(ValueError, match='must not overwrite input --cb_file'):
+            main_sites.plot_tree_site(df=df, g=g)
+    assert figure.read_bytes() == original
 
 
 def test_plot_tree_site_can_skip_category_table(tmp_path, tiny_tree):
@@ -135,7 +143,7 @@ def test_plot_tree_site_can_skip_category_table(tmp_path, tiny_tree):
     out_paths = main_sites.plot_tree_site(df=df, g=g)
 
     assert out_paths == [str(tmp_path / "csubst_scan.tree_site.pdf")]
-    assert not stale_table.exists()
+    assert stale_table.read_text() == 'stale\n'
 
 
 def test_plot_tree_site_supports_separate_highlight_branches_and_single_color(tmp_path, tiny_tree):

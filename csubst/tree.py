@@ -1675,6 +1675,7 @@ def _render_tree_matplotlib(tree, trait_name, file_name, label='all', state_by_n
     if pdf_pages is not None:
         pdf_pages.savefig(fig, transparent=True, pad_inches=TREE_FIG_SAVE_PAD_INCHES)
     else:
+        output_safety.validate_destination(file_name)
         fig.savefig(file_name, format='pdf', transparent=True, pad_inches=TREE_FIG_SAVE_PAD_INCHES)
     plt.close(fig)
 
@@ -1893,6 +1894,7 @@ def _render_state_tree_bundle(tree, trait_name, mode, orders, missing_state, sta
     file_name = str(file_prefix) + '_state' + suffix + '_' + mode + '_' + str(output_token) + '.pdf'
     if output_dir is not None:
         file_name = os.path.join(output_dir, file_name)
+    output_safety.validate_destination(file_name)
     with PdfPages(file_name) as pdf_pages:
         for local_idx, site_index in enumerate(site_indices.tolist()):
             site_state = state[:, int(site_index), :]

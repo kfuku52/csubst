@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from csubst import model_resources
+from csubst import output_safety
 from csubst import variant_effect
 from csubst import vesm
 
@@ -38,6 +39,16 @@ def test_merge_and_load_score_cache_preserves_existing_rows(tmp_path):
     vesm.merge_score_cache(str(cache_file), {key_b: 0.75})
     loaded = vesm.load_score_cache(str(cache_file))
     assert loaded == {key_a: pytest.approx(-1.25), key_b: pytest.approx(0.75)}
+
+
+def test_score_cache_cannot_replace_input(tmp_path):
+    alignment = tmp_path / 'input.fa'
+    alignment.write_text('>A\nATG\n')
+    key = vesm._cache_key(hashlib.sha256(b'AAAA').hexdigest(), 1, 'A', 'V')
+    with output_safety.output_context([('input --alignment_file', alignment)]):
+        with pytest.raises(ValueError, match='must not overwrite input --alignment_file'):
+            vesm.merge_score_cache(str(alignment), {key: -1.25})
+    assert alignment.read_text() == '>A\nATG\n'
 
 
 def test_scorer_records_llr_and_window_metadata_without_sign_reversal(monkeypatch):

@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from csubst import ete, parser_misc, sequence, tree, tsv
+from csubst import ete, output_safety, parser_misc, sequence, tree, tsv
 from csubst.plotting import TREE_LINE_CAPSTYLE, font_size, matplotlib, plt
 
 
@@ -1486,6 +1486,7 @@ def plot_tree_site(df: pd.DataFrame, g: MutableMapping[str, Any]) -> list[str]:
         output_prefix = _site_output_prefix(g)
     fmt = str(g.get('tree_site_plot_format', 'pdf')).lower()
     fig_path = os.path.join(g['site_outdir'], output_prefix + '.tree_site.' + fmt)
+    output_safety.validate_destination(fig_path)
     fig.savefig(
         fig_path,
         format=fmt,
@@ -1499,9 +1500,6 @@ def plot_tree_site(df: pd.DataFrame, g: MutableMapping[str, Any]) -> list[str]:
 
     table_path = os.path.join(g['site_outdir'], output_prefix + '.tree_site.tsv')
     if not bool(g.get('tree_site_output_table', True)):
-        if os.path.exists(table_path):
-            os.remove(table_path)
-            print('Removing stale tree + site category table: {}'.format(table_path), flush=True)
         print('Skipping tree + site category table.', flush=True)
         return [fig_path]
 
