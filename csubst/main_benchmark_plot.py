@@ -290,7 +290,9 @@ def _humanize_name(value):
 
 def _plot_parameter_overview(runs, parameter_summary, parameter_columns, metric_columns, out_path):
     import matplotlib
+    from csubst.plotting import configure_text_rendering
 
+    configure_text_rendering(matplotlib)
     matplotlib.use("Agg", force=True)
     import matplotlib.pyplot as plt
 

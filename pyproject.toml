@@ -42,7 +42,7 @@ dependencies = [
     "numpy",
     "scipy",
     "pandas",
-    "matplotlib<3.11",
+    "matplotlib",
     "defusedxml",
     "requests",
 ]

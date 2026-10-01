@@ -1,4 +1,4 @@
-"""Shared lazy Matplotlib setup for site renderers."""
+"""Shared Matplotlib text policy and lazy setup for site renderers."""
 
 import importlib
 
@@ -9,11 +9,19 @@ _matplotlib_module = None
 _pyplot_module = None
 
 
+def configure_text_rendering(module):
+    """Keep point sizes while avoiding Helvetica's small-size native hinting error."""
+    # Matplotlib 3.11 defaults to native hinting, which can divide by zero in
+    # macOS Helvetica's prep program. Auto-hinting preserves our pre-3.11 policy.
+    module.rcParams['text.hinting'] = 'auto'
+
+
 def _load_matplotlib_modules():
     global _matplotlib_module, _pyplot_module
     if _matplotlib_module is None:
         module = importlib.import_module('matplotlib')
         pyplot = importlib.import_module('matplotlib.pyplot')
+        configure_text_rendering(module)
         module.rcParams['font.size'] = font_size
         module.rcParams['font.family'] = 'sans-serif'
         module.rcParams['font.sans-serif'] = ['Helvetica', 'Arial', 'Nimbus Sans', 'DejaVu Sans']

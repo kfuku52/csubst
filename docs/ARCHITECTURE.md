@@ -47,6 +47,13 @@ structure integration, and command orchestration, and re-exports existing
 rendering entry points. Shared lazy Matplotlib initialization lives in
 `plotting`, so non-rendering commands still avoid importing the plotting stack.
 
+All Matplotlib rendering entry points use `plotting.configure_text_rendering`
+to select FreeType auto-hinting (`text.hinting="auto"`). This retains Helvetica
+and the requested point sizes while avoiding a zero division in macOS Helvetica's
+native hinting at small sizes under Matplotlib 3.11. Pixel-level text metrics may
+still vary between Matplotlib/FreeType versions. Native hinting can be reconsidered
+once this small-size font/interpreter failure is fixed and verified upstream.
+
 ## Acceleration
 
 Six optional Cython modules accelerate combination generation, sparse tensor

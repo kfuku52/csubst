@@ -1353,6 +1353,7 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
 
     import matplotlib as mpl
     import matplotlib.pyplot as plt
+    from csubst.plotting import configure_text_rendering
 
     style = {
         "font.family": "sans-serif",
@@ -1364,6 +1365,7 @@ def write_nonsyn_recoding_pca_plot(g, output_path="csubst_nonsyn_recoding_pca.pn
         "ytick.labelsize": 8,
     }
     with mpl.rc_context(style):
+        configure_text_rendering(mpl)
         fig, ax = plt.subplots(figsize=(3.6, 3.6))
         x = coords[:, 0].astype(np.float64, copy=False)
         y = coords[:, 1].astype(np.float64, copy=False)

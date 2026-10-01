@@ -478,6 +478,9 @@ def is_ete_plottable():
 
 def _get_pyplot():
     import matplotlib
+    from csubst.plotting import configure_text_rendering
+
+    configure_text_rendering(matplotlib)
     try:
         matplotlib.use('Agg')
     except Exception:

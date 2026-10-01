@@ -117,11 +117,8 @@ with zipfile.ZipFile(wheel_path) as archive:
     entry_point_text = archive.read(entry_points[0]).decode('utf-8')
     if 'csubst = csubst.cli:main' not in entry_point_text:
         raise RuntimeError("Wheel metadata is missing the csubst console entry point.")
-if not any(
-    requirement.startswith("matplotlib") and "<3.11" in requirement
-    for requirement in normalized_requirements
-):
-    raise RuntimeError("Wheel metadata is missing the Matplotlib <3.11 compatibility constraint.")
+if "matplotlib" not in normalized_requirements:
+    raise RuntimeError("Wheel metadata must leave the Matplotlib version unconstrained.")
 if not any(
     "pymol-open-source" in requirement
     and ">=3.2.0a0" in requirement
