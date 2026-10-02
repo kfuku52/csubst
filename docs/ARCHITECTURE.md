@@ -11,6 +11,11 @@ checks log/input path collisions before opening a log, including parse-error
 paths, without importing numerical libraries. See [CLI_SAFETY.md](CLI_SAFETY.md)
 for the observable failure behavior.
 
+Dataset preflight and copying share the file plan in `main_dataset`; IQ-TREE
+imports are deferred until provenance writing. `output_run` reserves a search
+namespace before CLI logging and passes ownership to one analysis context.
+Direct analysis callers acquire the same lock; nested searches cannot borrow it.
+
 ## Analysis context
 
 Command arguments are validated by `param.get_global_parameters` and wrapped in

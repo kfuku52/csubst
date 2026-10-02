@@ -3,7 +3,7 @@ import os
 import shutil
 
 from csubst import runtime
-from csubst import parser_iqtree
+from csubst import output_safety
 
 
 _FASTA_SUFFIXES = ('.fa', '.fasta', '.faa', '.fna')
@@ -55,6 +55,30 @@ def _build_dataset_copy_plan(name, dir_dataset, output_dir, iqtree_prefix):
     return copy_plan
 
 
+def _dataset_destinations(copy_plan, output_dir, iqtree_prefix):
+    destinations = [path_to for _, path_to, _ in copy_plan]
+    state_target = iqtree_prefix + '.state'
+    if all(path in destinations or os.path.isfile(path) for path in (
+        os.path.join(output_dir, 'alignment.fa.gz'), os.path.join(output_dir, 'tree.nwk'),
+        iqtree_prefix + '.iqtree', state_target,
+    )):
+        destinations.append(state_target + '.csubst-manifest.json')
+    return destinations
+
+
+def dataset_output_paths(name, output_dir='.', iqtree_outdir=None):
+    """Plan bundled outputs for CLI preflight, without numerical imports or writes."""
+    output_dir = os.path.abspath(str(output_dir))
+    if iqtree_outdir is None:
+        iqtree_outdir = os.path.join(output_dir, 'csubst_iqtree')
+    iqtree_prefix = runtime.infer_iqtree_output_prefix(
+        os.path.join(output_dir, 'alignment.fa.gz'), iqtree_outdir, base_dir=output_dir,
+    )
+    dir_dataset = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dataset')
+    copy_plan = _build_dataset_copy_plan(str(name), dir_dataset, output_dir, iqtree_prefix)
+    return _dataset_destinations(copy_plan, output_dir, iqtree_prefix)
+
+
 def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, force=False):
     name = str(name)
     output_dir = os.path.abspath(str(output_dir))
@@ -72,13 +96,11 @@ def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, f
     rooted_tree_target = os.path.join(output_dir, 'tree.nwk')
     iqtree_report_target = iqtree_prefix + '.iqtree'
     state_target = iqtree_prefix + '.state'
-    destinations = [path_to for _, path_to, _ in copy_plan]
     # The generated provenance file is an output too. Check it before copying
     # anything, including when only an earlier manifest remains in the folder.
-    if all(path in destinations or os.path.isfile(path) for path in (
-        alignment_target, rooted_tree_target, iqtree_report_target, state_target
-    )):
-        destinations.append(state_target + '.csubst-manifest.json')
+    destinations = _dataset_destinations(copy_plan, output_dir, iqtree_prefix)
+    for path in destinations:
+        output_safety.validate_destination(path)
     existing = [path for path in destinations if os.path.lexists(path)]
     unsafe_existing = [
         path for path in existing if os.path.islink(path) or not os.path.isfile(path)
@@ -105,6 +127,8 @@ def _copy_dataset_files(name, dir_dataset, output_dir='.', iqtree_outdir=None, f
         os.path.isfile(path)
         for path in [alignment_target, rooted_tree_target, iqtree_report_target, state_target]
     ):
+        from csubst import parser_iqtree
+
         manifest_path = parser_iqtree.write_dataset_iqtree_manifest(
             alignment_path=alignment_target,
             rooted_tree_path=rooted_tree_target,

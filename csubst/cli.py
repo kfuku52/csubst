@@ -1464,6 +1464,14 @@ def _main(argv=None, parsed_args=None):
     print(txt.format(datetime.datetime.now(datetime.timezone.utc), int(time.time()-csubst_start)), flush=True)
 
 
+def _reserve_command_output(args, layout):
+    if getattr(args, 'subcommand', '') in ('search', 'analyze'):
+        from csubst import output_run
+
+        return output_run.search_output_lock(layout)
+    return contextlib.nullcontext()
+
+
 def main(argv=None):
     """Run the CLI and return its exit status when execution completes."""
 
@@ -1489,11 +1497,12 @@ def main(argv=None):
             cli_io.validate_output_destinations(
                 layout, preflight_args, [('log --log_file', log_path)],
             )
+            with _reserve_command_output(preflight_args, layout), open(
+                log_path, 'a', buffering=1, encoding='utf-8',
+            ) as log_file:
+                log_file.write(parse_error.getvalue())
         except (ValueError, OSError) as exc:
             sys.stderr.write(str(exc) + '\n')
-        else:
-            with open(log_path, 'a', buffering=1, encoding='utf-8') as log_file:
-                log_file.write(parse_error.getvalue())
         raise
     try:
         layout = runtime.ensure_output_layout(vars(preflight_args).copy(), create_dir=False)
@@ -1505,11 +1514,16 @@ def main(argv=None):
         runtime.ensure_output_layout(layout, create_dir=True)
     except (ValueError, OSError) as exc:
         preflight_parser.error(str(exc))
-    with output_safety.output_context(protected), open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
-        stdout_tee = _TeeTextStream(sys.stdout, log_file)
-        stderr_tee = _TeeTextStream(sys.stderr, log_file)
-        with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):
-            return _main(argv=normalized_argv, parsed_args=preflight_args)
+    with contextlib.ExitStack() as stack:
+        try:
+            stack.enter_context(_reserve_command_output(preflight_args, layout))
+        except (ValueError, OSError) as exc:
+            preflight_parser.error(str(exc))
+        with output_safety.output_context(protected), open(log_path, 'w', buffering=1, encoding='utf-8') as log_file:
+            stdout_tee = _TeeTextStream(sys.stdout, log_file)
+            stderr_tee = _TeeTextStream(sys.stderr, log_file)
+            with contextlib.redirect_stdout(stdout_tee), contextlib.redirect_stderr(stderr_tee):
+                return _main(argv=normalized_argv, parsed_args=preflight_args)
 
 
 if __name__ == "__main__":

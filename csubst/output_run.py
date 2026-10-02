@@ -4,9 +4,47 @@ import os
 import re
 import uuid
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 from csubst import output_safety, resource_cache, runtime
+
+
+_reserved_search_lock: ContextVar[str | None] = ContextVar('csubst_reserved_search_lock', default=None)
+
+
+def _acquire_search_lock(lock):
+    return resource_cache.acquire_exclusive_lock(
+        lock, lock_label='search output', poll_seconds=.1, timeout_seconds=.1,
+    )
+
+
+@contextmanager
+def search_output_lock(g):
+    """Reserve a search namespace before the CLI opens its log."""
+    layout = runtime.ensure_output_layout(dict(g), create_dir=True)
+    lock = resource_cache.resolve_path_lock_path(runtime.output_path(layout, 'search_run.json'))
+    with _acquire_search_lock(lock):
+        token = _reserved_search_lock.set(lock)
+        try:
+            yield
+        finally:
+            _reserved_search_lock.reset(token)
+
+
+@contextmanager
+def _claim_search_lock(lock):
+    if _reserved_search_lock.get() != lock:
+        with _acquire_search_lock(lock):
+            yield
+        return
+    # Consume the CLI reservation for this run only. A nested or concurrent
+    # search must still acquire the physical lock and cannot borrow ownership.
+    token = _reserved_search_lock.set(None)
+    try:
+        yield
+    finally:
+        _reserved_search_lock.reset(token)
 
 
 def _search_tables(g):
@@ -24,8 +62,7 @@ def search_run(g):
     manifest = runtime.output_path(layout, 'search_run.json')
     lock = resource_cache.resolve_path_lock_path(manifest)
     # Fail promptly instead of mixing tables from concurrent invocations.
-    with resource_cache.acquire_exclusive_lock(lock, lock_label='search output',
-                                               poll_seconds=.1, timeout_seconds=.1):
+    with _claim_search_lock(lock):
         previous = _search_tables(layout)
         if os.path.lexists(manifest):
             previous.append(Path(manifest))

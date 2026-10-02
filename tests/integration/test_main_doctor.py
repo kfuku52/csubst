@@ -86,6 +86,24 @@ def test_main_doctor_raises_after_writing_summary_for_taxon_mismatch(tmp_path):
     assert row["status"] == "fail"
 
 
+@pytest.mark.parametrize('tree_text', ['(s1:1,s2:1);', "('s1 description':1,s2:1);"])
+def test_doctor_matches_description_and_identifier_aliases(tmp_path, tree_text):
+    _write_doctor_inputs(tmp_path)
+    (tmp_path / 'alignment.fa').write_text('>s1 description\nATGATG\n>s2\tother text\nATGATA\n')
+    (tmp_path / 'tree.nwk').write_text(tree_text)
+    g = _base_doctor_config(tmp_path, foreground=None)
+    main_doctor.main_doctor(g)
+    df = pd.read_csv(tmp_path / 'doctor/csubst_doctor_summary.tsv', sep='\t')
+    assert df.loc[df['check_name'] == 'tree_alignment_taxa', 'status'].tolist() == ['pass']
+
+
+def test_doctor_rejects_duplicate_identifiers_with_different_descriptions(tmp_path):
+    _write_doctor_inputs(tmp_path)
+    (tmp_path / 'alignment.fa').write_text('>s1 first\nATGATG\n>s1 second\nATGATA\n')
+    with pytest.raises(ValueError, match='Duplicate FASTA'):
+        main_doctor.main_doctor(_base_doctor_config(tmp_path))
+
+
 def test_main_doctor_warning_level_allows_explicitly_skipped_optional_checks(tmp_path):
     _write_doctor_inputs(tmp_path)
     g = _base_doctor_config(

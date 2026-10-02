@@ -8,11 +8,14 @@ collision exits with status 2 and leaves the input unchanged. Use a separate
 log filename; do not redirect the shell's stdout/stderr onto an input file,
 because shell redirection happens before CSUBST can check it.
 
-Doctor checks all report destinations before opening its log. Search reserves
+Doctor checks all report destinations before opening its log. Dataset checks
+its generated files and provenance manifest before opening its log, including
+with `--force yes` and on parse errors. Search reserves
 its table and run-record destinations before opening the log as well. Shared
 output-path and TSV/manifest writers reject input/log aliases for dynamically
 resolved outputs. A rejected destination exits with status 2.
 Figure files and writable analysis caches use the same destination check.
+Chimera attribute and amino-acid FASTA exports also reject input/log aliases.
 The ProstT5/3Di state/VESM caches may update their own configured cache paths;
 they still cannot overwrite another input or the CLI log, including through
 symlink and hardlink aliases.
@@ -23,7 +26,10 @@ Unrelated files are left in place. `<prefix>_search_run.json` identifies the
 current tables, archived paths, and `running`, `complete`, or `failed` status.
 Only a `complete` run should be consumed as a finished analysis; partial tables
 from a failed run remain available for diagnosis. History is retained until the
-user removes it. Concurrent searches cannot write the same table namespace.
+user removes it. Concurrent searches cannot write the same table namespace,
+including through symbolic links to the output directory. The namespace lock
+is acquired before opening or appending to the log and held through finalization,
+so a rejected concurrent search leaves the active run's log and tables intact.
 
 Output manifests are refreshed after the CLI log closes, including on ordinary
 command failures, so recorded file sizes describe the final files. A forcibly
@@ -39,7 +45,8 @@ Spaces, tabs, CRLF, and wrapped sequence lines do not add biological sites;
 gzip inputs use the same rules. Site-count inference stops after the first
 record rather than materializing the entire alignment. Tree-to-alignment
 mapping uses both complete headers and their first whitespace-delimited
-identifiers. Duplicate identifiers are rejected instead of overwriting or
+identifiers. Doctor uses the same header/identifier matching and duplicate
+identifier checks. Duplicate identifiers are rejected instead of overwriting or
 concatenating sequences. Exported alignments retain existing node names; unnamed
 nodes use `csubst_branch_<branch_id>` with a numeric suffix on collision. Both
 alignment exporters use the same rule and continue to exclude root records.

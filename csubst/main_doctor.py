@@ -8,7 +8,7 @@ from csubst import foreground
 from csubst import output_manifest
 from csubst import parser_iqtree
 from csubst import runtime
-from csubst import sequence
+from csubst import sequence_io
 from csubst import tree
 from csubst import ete
 from csubst import tsv
@@ -76,7 +76,10 @@ def _summarize_alignment(rows, check_name_prefix, path):
     if not _check_file_presence(rows, check_name_prefix + "_path", path, required=True, kind="alignment file"):
         return None
     try:
-        seqs = sequence.read_fasta(path)
+        records = sequence_io.read_fasta_records(path)
+        # Apply the same duplicate-identifier rule as tree/alignment linkage.
+        sequence_io.records_to_dict(records, key='id')
+        seqs = sequence_io.records_to_dict(records, key='description')
     except Exception as exc:
         _fail(rows, check_name_prefix + "_parse", "Failed to parse FASTA: {}".format(exc), path=path)
         return None
@@ -165,12 +168,13 @@ def _check_tree_alignment_consistency(rows, tree_summary, alignment_summary):
     if (tree_summary is None) or (alignment_summary is None):
         return
     tree_leaf_set = set(tree_summary["leaf_names"])
-    aln_name_set = set(alignment_summary["names"])
+    aln_name_set = {name if name in tree_leaf_set else name.split(None, 1)[0]
+                    for name in alignment_summary["names"]}
     if tree_leaf_set == aln_name_set:
         _pass(
             rows,
             "tree_alignment_taxa",
-            "Tree leaves and alignment headers match exactly ({:,} taxa).".format(len(tree_leaf_set)),
+            "Tree leaves and alignment identifiers match ({:,} taxa).".format(len(tree_leaf_set)),
         )
         return
     only_tree = sorted(tree_leaf_set.difference(aln_name_set))

@@ -765,6 +765,7 @@ def add_gene_index(df, g):
 
 
 def write_fasta(file, label, seq):
+    output_safety.validate_destination(file)
     with open(file, 'w') as f:
         f.write('>'+label+'\n')
         f.write(seq+'\n')
@@ -807,6 +808,7 @@ def _resolve_chimera_line_for_site(df, codon_site_col, seq_site):
 
 
 def _write_chimera_attribute_file(file_name, seq_sites, df, codon_site_col, header):
+    output_safety.validate_destination(file_name)
     with open(file_name, 'w') as f:
         f.write(header)
         for seq_site in seq_sites:

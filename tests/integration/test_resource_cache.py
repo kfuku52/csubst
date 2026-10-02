@@ -19,6 +19,19 @@ def test_resolve_cache_dir_prefers_explicit_path(tmp_path, monkeypatch):
     assert resource_cache.resolve_cache_dir(tmp_path / "explicit") == str(tmp_path / "explicit")
 
 
+def test_path_lock_prevents_concurrent_writes_through_directory_alias(tmp_path):
+    real = tmp_path / 'real'
+    real.mkdir()
+    alias = tmp_path / 'alias'
+    alias.symlink_to(real, target_is_directory=True)
+    lock = resource_cache.resolve_path_lock_path(real / 'cache.tsv')
+    alias_lock = resource_cache.resolve_path_lock_path(alias / 'cache.tsv')
+    with resource_cache.acquire_exclusive_lock(lock):
+        with pytest.raises(TimeoutError):
+            with resource_cache.acquire_exclusive_lock(alias_lock, poll_seconds=.01, timeout_seconds=.05):
+                pytest.fail('An alias acquired a second lock on the same cache.')
+
+
 def test_acquire_exclusive_lock_rejects_symlink(tmp_path):
     lock_path = tmp_path / "resource.lock"
     os.symlink(tmp_path / "missing-target", lock_path)

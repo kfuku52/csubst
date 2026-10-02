@@ -99,7 +99,14 @@ def validate_log_destination(log_path, parser, args, argv):
 def validate_output_destinations(layout, args, protected):
     command = getattr(args, 'subcommand', '')
     suffixes = []
-    if command == 'doctor':
+    if command == 'dataset':
+        from csubst import main_dataset
+
+        for path in main_dataset.dataset_output_paths(
+            getattr(args, 'name', 'PGK'), iqtree_outdir=getattr(args, 'iqtree_outdir', None),
+        ):
+            output_safety.check_destination(path, protected)
+    elif command == 'doctor':
         suffixes.extend(['doctor_summary.tsv', 'doctor_summary.json'])
         if getattr(args, 'output_manifest', True):
             suffixes.append('outputs.tsv')

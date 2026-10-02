@@ -51,7 +51,7 @@ def resolve_resource_lock_path(resource_id, cache_dir=None):
 
 
 def resolve_path_lock_path(path, lock_label=None):
-    target_path = os.path.abspath(os.path.expanduser(str(path)))
+    target_path = os.path.realpath(os.path.expanduser(str(path)))
     parent = os.path.dirname(target_path) or "."
     base = os.path.basename(target_path)
     label = base if lock_label is None else str(lock_label)

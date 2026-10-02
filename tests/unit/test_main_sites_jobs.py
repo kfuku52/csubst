@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 
 from csubst import main_sites
+from csubst import output_safety
 from csubst import runtime
 from csubst import tree
 from csubst import ete
@@ -60,6 +61,41 @@ def test_export2chimera_rejects_non_triplet_sequence_before_writing(tmp_path):
         main_sites.export2chimera(df=df, g=g)
     assert not (tmp_path / "csubst_sites_seq1.chimera.txt").exists()
     assert not (tmp_path / "csubst_sites_seq1.fasta").exists()
+
+
+@pytest.mark.parametrize('alias', ['same', 'symlink', 'hardlink'])
+def test_chimera_fasta_export_preserves_input_cds(tmp_path, alias):
+    import os
+
+    destination = tmp_path / 'csubst_seq1.fasta'
+    source = destination if alias == 'same' else tmp_path / 'untrimmed.fa'
+    source.write_text('>seq1\nAAAAAC\n')
+    original = source.read_bytes()
+    if alias == 'symlink':
+        destination.symlink_to(source)
+    elif alias == 'hardlink':
+        os.link(source, destination)
+    g = {'untrimmed_cds': str(source), 'site_outdir': str(tmp_path),
+         'output_prefix': 'csubst', 'matrix_groups': {'K': ['AAA'], 'N': ['AAC']}}
+    df = pd.DataFrame({'codon_site_seq1': [1, 2], 'OCNany2spe': [.2, .3]})
+    with output_safety.output_context([('input --untrimmed_cds', str(source))]):
+        with pytest.raises(ValueError, match='must not overwrite input'):
+            main_sites.export2chimera(df, g)
+    assert source.read_bytes() == destination.read_bytes() == original
+
+
+def test_chimera_attribute_export_preserves_log(tmp_path):
+    source = tmp_path / 'untrimmed.fa'
+    source.write_text('>seq1\nAAA\n')
+    log = tmp_path / 'csubst_seq1.chimera.txt'
+    log.write_text('existing CLI log\n')
+    g = {'untrimmed_cds': str(source), 'site_outdir': str(tmp_path),
+         'output_prefix': 'csubst', 'matrix_groups': {'K': ['AAA']}}
+    df = pd.DataFrame({'codon_site_seq1': [1], 'OCNany2spe': [.2]})
+    with output_safety.output_context([('log --log_file', str(log))]):
+        with pytest.raises(ValueError, match='must not overwrite log'):
+            main_sites.export2chimera(df, g)
+    assert log.read_text() == 'existing CLI log\n'
 
 
 def test_get_parent_branch_ids(tiny_tree):
