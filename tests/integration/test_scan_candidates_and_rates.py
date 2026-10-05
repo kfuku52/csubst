@@ -1,4 +1,7 @@
 
+import csv
+import io
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -81,6 +84,7 @@ def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground
     units = pd.DataFrame(
         {
             "unit_id": [1, 2],
+            "lineage_value": [7, 11],
             "fg_branch_ids": ["1", "2"],
         }
     )
@@ -94,6 +98,10 @@ def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground
 
     assert fg["support_unit_ids"] == "1"
     assert fg["support_branch_ids"] == "1"
+    assert fg["lineage_total"] == 2
+    assert fg["support_lineage_count"] == 1
+    assert fg["support_lineage_ids"] == "7"
+    assert fg["support_lineage_fraction"] == 0.5
     with pytest.raises(ValueError, match="Only foreground target class"):
         substitution_scan._summarize_unit_support(
             candidate_events=candidate_events,
@@ -101,6 +109,60 @@ def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground
             target_class="mg",
             min_event_pp=0.5,
         )
+
+
+@pytest.mark.parametrize("third_branch_pp, expected_count, expected_ids", [
+    (0.49, 1, "7"),
+    (0.5, 2, "7,11"),
+])
+def test_lineage_support_groups_disconnected_units_and_uses_analyzable_denominator(
+    third_branch_pp, expected_count, expected_ids,
+):
+    events = pd.DataFrame({"branch_id": [1, 2, 3], "event_pp": [0.9, 0.8, third_branch_pp]})
+    units = pd.DataFrame({
+        "unit_id": [1, 2, 3, 4],
+        "lineage_value": [7, 7, 11, 13],
+        "fg_branch_ids": ["1", "2", "3", ""],
+    })
+
+    support = substitution_scan._summarize_unit_support(events, units, "fg", 0.5)
+
+    assert support["support_unit_count"] == expected_count + 1
+    assert support["unit_total"] == 4
+    assert support["lineage_total"] == 2  # ID 13 has no analyzable candidate branch.
+    assert support["support_lineage_count"] == expected_count
+    assert support["support_lineage_fraction"] == expected_count / 2
+    assert support["support_lineage_ids"] == expected_ids
+
+
+@pytest.mark.parametrize("no_units", [False, True])
+def test_lineage_support_with_no_analyzable_branches_is_undefined_fraction(no_units):
+    events = pd.DataFrame({"branch_id": [1], "event_pp": [0.9]})
+    units = pd.DataFrame({"unit_id": [1], "lineage_value": [7], "fg_branch_ids": [""]})
+    if no_units:
+        units = units.iloc[:0]
+
+    support = substitution_scan._summarize_unit_support(events, units, "fg", 0.5)
+
+    assert support["lineage_total"] == 0
+    assert support["support_lineage_count"] == 0
+    assert np.isnan(support["support_lineage_fraction"])
+    assert support["support_lineage_ids"] == ""
+
+
+def test_lineage_support_id_list_round_trips_delimited_identifiers():
+    identifiers = ['origin,a', 'origin"b', 'origin\nc', 'origin\rd', 'origin\r\ne']
+    branch_ids = list(range(1, len(identifiers) + 1))
+    units = pd.DataFrame({
+        "unit_id": branch_ids, "lineage_value": identifiers, "fg_branch_ids": list(map(str, branch_ids)),
+    })
+    events = pd.DataFrame({"branch_id": branch_ids, "event_pp": [0.9] * len(identifiers)})
+    support = substitution_scan._summarize_unit_support(events, units, "fg", 0.5)
+    assert support["support_lineage_count"] == len(identifiers)
+    assert next(csv.reader(io.StringIO(support["support_lineage_ids"]))) == identifiers
+    serialized = pd.DataFrame([support]).to_csv(sep="\t", index=False)
+    saved = pd.read_csv(io.StringIO(serialized), sep="\t").iloc[0]
+    assert saved["support_lineage_ids"] == support["support_lineage_ids"]
 
 
 def test_extract_candidate_posterior_events_supports_sparse_tensors():

@@ -1,4 +1,6 @@
 
+import csv
+import io
 import json
 
 import numpy as np
@@ -186,7 +188,9 @@ def test_main_scan_all_sites_filtered_writes_no_test_result(monkeypatch, tmp_pat
 
     assert frame.empty
     assert not units.empty
-    assert pd.read_csv(tmp_path / "csubst_scan.tsv", sep="\t").empty
+    saved = pd.read_csv(tmp_path / "csubst_scan.tsv", sep="\t")
+    assert saved.empty
+    assert {"lineage_total", "support_lineage_count", "support_lineage_fraction", "support_lineage_ids"}.issubset(saved.columns)
     report = json.loads((tmp_path / "csubst_scan_inference.json").read_text())
     assert report["no_test_reason"] == "all_sites_excluded_by_configured_filter"
     assert report["status"] == ["no_observed_candidates"]
@@ -221,6 +225,9 @@ def test_main_scan_replaces_callers_states_and_retains_only_needed_emissions(mon
         assert emissions() is None
         assert 'scan_tip_emissions' not in g
     assert not frame.empty
+    saved = pd.read_csv(tmp_path / 'csubst_scan.tsv', sep='\t', dtype={'support_lineage_ids': str})
+    for column in ['lineage_total', 'support_lineage_count', 'support_lineage_fraction', 'support_lineage_ids']:
+        assert saved[column].tolist() == frame[column].tolist()
 
 
 @pytest.mark.parametrize("setting", [dict(scan_min_event_pp=np.nan), dict(scan_min_event_pp=1.1),
@@ -357,6 +364,10 @@ def test_scan_substitutions_outputs_foreground_rows():
     fg_row = scan_df.iloc[0]
     assert fg_row["state_change"] == "1K"
     assert fg_row["support_unit_count"] == 2
+    assert fg_row["lineage_total"] == 2
+    assert fg_row["support_lineage_count"] == 2
+    assert fg_row["support_lineage_ids"] == "1,2"
+    assert fg_row["support_lineage_fraction"] == 1.0
     assert fg_row["target_event_count"] == pytest.approx(1.7)
     assert fg_row["target_exposure_branch_length"] == pytest.approx(2.0)
     assert fg_row["site_rate"] == pytest.approx(0.25)
@@ -401,6 +412,51 @@ def test_scan_unit_modes_split_binary_foreground_and_control_internal_branch_cov
     assert clade_df.shape[0] == 1
     assert clade_df.iloc[0]["scan_unit_mode"] == "clade"
     assert clade_df.iloc[0]["support_unit_count"] == 2
+    assert clade_df.iloc[0]["support_lineage_count"] == 1
+    assert clade_df.iloc[0]["lineage_total"] == 1
+    assert clade_df.iloc[0]["support_lineage_ids"] == "1"
+    assert clade_df.iloc[0]["support_lineage_fraction"] == 1.0
+
+
+@pytest.mark.parametrize("fg_format", [1, 2])
+@pytest.mark.parametrize("unit_mode", ["lineage", "stem", "clade"])
+@pytest.mark.parametrize("lineage_id, other_id", [
+    ("7", "11"), ("origin,a", "11"), ("001", "origin-b"), ("18446744073709551615", "11"),
+])
+def test_scan_groups_original_foreground_file_ids_by_trait(tmp_path, fg_format, unit_mode, lineage_id, other_id):
+    g, tensor, labels = _toy_binary_unit_modes_context()
+    path = tmp_path / "foreground.tsv"
+    if fg_format == 1:
+        pd.DataFrame({"id": [lineage_id, lineage_id, other_id, "99"], "name": ["A", "C", "D", "absent.*"]}).to_csv(
+            path, sep="\t", index=False, header=False,
+        )
+    else:
+        pd.DataFrame({
+            "name": ["A", "C", "D", "absent.*"],
+            "trait": [lineage_id, lineage_id, other_id, "99"],
+            "other_trait": [lineage_id, other_id, "13", "99"],
+        }).to_csv(path, sep="\t", index=False)
+    g.update(foreground=str(path), fg_format=fg_format, scan_unit_mode=unit_mode, scan_min_support="1")
+    g["fg_df"] = foreground.read_foreground_file(g)
+    foreground.get_foreground_ids(g, write=False)
+    tensor[labels["D"], 0, 0, 0, 1] = 0.49
+
+    scan, units = substitution_scan.scan_substitutions(g, tensor)
+
+    trait = "PLACEHOLDER" if fg_format == 1 else "trait"
+    primary = scan.loc[scan["trait"] == trait].iloc[0]
+    assert primary["support_unit_count"] == (1 if unit_mode == "lineage" else 2)
+    assert primary["lineage_total"] == 2  # The unmatched ID 99 has no candidate branch.
+    assert primary["support_lineage_count"] == 1
+    assert primary["support_lineage_fraction"] == 0.5
+    assert next(csv.reader(io.StringIO(primary["support_lineage_ids"]))) == [lineage_id]
+    assert set(units.loc[units["trait"] == trait, "lineage_value"].map(str)).issuperset({lineage_id, other_id})
+    if fg_format == 2:
+        secondary = scan.loc[scan["trait"] == "other_trait"].iloc[0]
+        assert secondary["lineage_total"] == 3
+        assert secondary["support_lineage_count"] == 2
+        assert secondary["support_lineage_fraction"] == pytest.approx(2 / 3)
+        assert next(csv.reader(io.StringIO(secondary["support_lineage_ids"]))) == [lineage_id, other_id]
 
 
 @pytest.mark.parametrize(

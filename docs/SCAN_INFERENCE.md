@@ -10,6 +10,42 @@ foreground support and rate contrast use the same data. Consequently, the
 analytic tail and its BH adjustment are **exploratory diagnostics**, not
 selection-adjusted significance or guaranteed FDR control.
 
+## Support grouped by foreground lineage ID
+
+Scan reports support at both the selected unit level and the original
+foreground lineage-ID level. Use the existing `--foreground` table to assign
+the same nonzero ID to paralogs or species assigned to one phenotypic origin,
+and different IDs to origins you want to count separately. No additional
+input file or option is required. IDs still define foreground clades under
+the existing rules; inspect `csubst_scan_units.tsv` to check the selected
+branches and their `lineage_value`.
+
+| Column | Meaning within the candidate's trait |
+| --- | --- |
+| `lineage_total` | Distinct foreground IDs with at least one analyzable candidate branch in the selected scan units |
+| `support_lineage_count` | Distinct foreground IDs with at least one supporting unit, using the existing observation-specific event threshold |
+| `support_lineage_fraction` | `support_lineage_count / lineage_total`; undefined when the total is zero |
+| `support_lineage_ids` | Supporting original foreground IDs, comma-separated in scan-unit order, with CSV quoting for IDs containing commas, quotes or newlines |
+
+For example, six supporting clade units with IDs `7,7,11,11,13,17` have
+`support_unit_count=6` and `support_lineage_count=4`. Assigning ID `1` to all
+foreground leaves makes the grouped count at most one, even if those leaves
+form disconnected clades. A lineage with no analyzable candidate branch is
+excluded from `lineage_total`; absence of a supporting event alone does not
+exclude it.
+The total is determined by selected scan-unit branches for the trait and is
+constant across its candidates; it is not a site-specific nonmissing-tip count.
+
+Marginal/joint observations use `--scan_min_event_pp`; bridge observations use
+`--scan_min_event_count` for support. See [joint/bridge scan](SCAN_CTMC.md).
+
+These columns describe the supplied grouping. They do not infer duplication
+events or independent phenotypic origins. Adding this annotation does not
+change `scan_min_support`, candidate selection, event mass, exposure, scores,
+or P/q calculations. To apply discovery support to foreground IDs themselves,
+use the existing `--scan_unit_mode lineage` and rerun scan; branch selection
+then follows `--fg_stem_only`.
+
 ## Score, posterior mass and sparse observations
 
 `score_rate_enrichment` is the negative base-10 logarithm of the one-sided

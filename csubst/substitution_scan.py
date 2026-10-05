@@ -1,4 +1,6 @@
+import csv
 import hashlib
+import io
 import json
 import math
 import os
@@ -120,6 +122,10 @@ SCAN_OUTPUT_COLUMNS = (
     "support_pp_mean",
     "support_unit_ids",
     "support_branch_ids",
+    "lineage_total",
+    "support_lineage_count",
+    "support_lineage_fraction",
+    "support_lineage_ids",
     "target_event_count",
     "target_event_branch_count",
     "target_raw_branch_length",
@@ -1364,6 +1370,12 @@ def _support_for_unit(branch_event, branch_ids, min_event_pp):
     return max(values), supporting
 
 
+def _format_lineage_id_list(values):
+    output = io.StringIO()
+    csv.writer(output, lineterminator="\r\n").writerow(str(value) for value in values)
+    return output.getvalue().removesuffix("\r\n")
+
+
 def _summarize_unit_support(candidate_events, units_df, target_class, min_event_pp):
     if str(target_class) != "fg":
         raise ValueError("Only foreground target class is supported in scan.")
@@ -1376,13 +1388,22 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
             "support_pp_mean": np.nan,
             "support_unit_ids": "",
             "support_branch_ids": "",
+            "lineage_total": 0,
+            "support_lineage_count": 0,
+            "support_lineage_fraction": np.nan,
+            "support_lineage_ids": "",
         }
     branch_event = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
     support_pp = []
     support_units = []
     support_branches = []
+    analyzable_lineages = dict()
+    support_lineages = set()
     for _, row in units_df.iterrows():
         fg_ids = _parse_id_list(row.get("fg_branch_ids", ""))
+        lineage_value = row["lineage_value"]
+        if fg_ids.size > 0:
+            analyzable_lineages[lineage_value] = None
         fg_pp, fg_support_branches = _support_for_unit(branch_event, fg_ids, min_event_pp)
         is_support = len(fg_support_branches) > 0
         pp = fg_pp
@@ -1391,8 +1412,11 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
             support_units.append(int(row["unit_id"]))
             support_pp.append(float(pp))
             support_branches.extend([int(v) for v in branches])
+            support_lineages.add(lineage_value)
     unit_total = int(units_df.shape[0])
     support_count = int(len(support_units))
+    lineage_total = len(analyzable_lineages)
+    support_lineage_count = len(support_lineages)
     return {
         "unit_total": unit_total,
         "support_unit_count": support_count,
@@ -1401,6 +1425,10 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
         "support_pp_mean": float(np.mean(support_pp)) if len(support_pp) else np.nan,
         "support_unit_ids": ",".join(str(v) for v in support_units),
         "support_branch_ids": ",".join(str(v) for v in sorted(set(support_branches))),
+        "lineage_total": lineage_total,
+        "support_lineage_count": support_lineage_count,
+        "support_lineage_fraction": (support_lineage_count / lineage_total) if lineage_total > 0 else np.nan,
+        "support_lineage_ids": _format_lineage_id_list(v for v in analyzable_lineages if v in support_lineages),
     }
 
 

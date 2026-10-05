@@ -108,6 +108,37 @@ def test_parametric_bootstrap_repeats_asr_and_candidate_selection(monkeypatch, d
     assert 'rate_categories_and_priors' in updated['scan_calibration_diagnostics']['fixed']
 
 
+@pytest.mark.parametrize("observation", ["joint", "bridge"])
+@pytest.mark.parametrize("unit_mode", ["lineage", "stem", "clade"])
+def test_inferred_scan_lineage_support_groups_paralogs_in_each_observation_mode(observation, unit_mode):
+    from scan_fixtures import make_scan_context
+    from csubst import foreground, substitution_scan
+    g, _ = make_scan_context()
+    g["fg_df"]["trait"] = 7
+    foreground.get_foreground_ids(g, write=False)
+    g.update(scan_rate_exposure="endpoint", scan_observation=observation, scan_unit_mode=unit_mode,
+             scan_min_support="1", scan_min_event_pp=0.1, scan_min_event_count=0.1,
+             state_cdn=g["state_nsy"].copy(),
+             instantaneous_codon_rate_matrix=np.array([[-1., 1.], [1., -1.]]),
+             equilibrium_frequency=np.array([.5, .5]), substitution_model="GY",
+             nonsynonymous_indices={"A": [0], "K": [1]}, iqtree_rate_values=np.ones(1))
+    for node in g["tree"].traverse():
+        if not ete.is_leaf(node):
+            g["state_cdn"][int(ete.get_prop(node, "numerical_label"))] = 0
+    updated, tensor = scan_ctmc.prepare(g)
+    scan, _ = substitution_scan.scan_substitutions(updated, tensor)
+    # A bridge includes reversions along the path even when both observed
+    # foreground tips end in K; joint endpoints only report the change to K.
+    expected_targets = {"A", "K"} if observation == "bridge" else {"K"}
+    assert len(scan) == len(expected_targets)
+    assert set(scan["to_state"]) == expected_targets
+    assert (scan["support_unit_count"] == (1 if unit_mode == "lineage" else 2)).all()
+    assert (scan["lineage_total"] == 1).all()
+    assert (scan["support_lineage_count"] == 1).all()
+    assert (scan["support_lineage_fraction"] == 1.0).all()
+    assert (scan["support_lineage_ids"] == "7").all()
+
+
 def test_prepare_joint_accepts_unloaded_internal_states_and_shares_identical_observation_alphabets():
     from scan_fixtures import make_scan_context
     g, _ = make_scan_context()
