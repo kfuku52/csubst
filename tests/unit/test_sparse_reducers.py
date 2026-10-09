@@ -70,6 +70,25 @@ def test_get_cb_sparse_arity3_projection_product_matches_dense_without_5d_recons
     np.testing.assert_allclose(observed.values, expected.values, atol=1e-12)
 
 
+def test_get_cbs_sparse_arity3_projection_product_matches_dense_without_5d_reconstruction(monkeypatch):
+    rng = np.random.default_rng(33)
+    dense = rng.random((4, 6, 2, 3, 3), dtype=np.float64)
+    dense[dense < 0.7] = 0
+    sparse_tensor = substitution.dense_to_sparse_sub_tensor(dense, tol=0)
+    ids = np.array([[0, 1, 2], [1, 2, 3]], dtype=np.int64)
+    g = {"threads": 1}
+    expected = substitution.get_cbs(ids, dense, attr="N", g=g)
+
+    monkeypatch.setattr(
+        substitution,
+        "_get_sparse_combination_group_tensor",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("5D reconstruction should not run")),
+    )
+    observed = substitution.get_cbs(ids, sparse_tensor, attr="N", g=g)
+
+    np.testing.assert_allclose(observed.values, expected.values, atol=1e-12)
+
+
 def test_sparse_projection_product_cython_matches_python_for_totals_and_sites(monkeypatch):
     rng = np.random.default_rng(32)
     dense = rng.random((5, 9, 2, 3, 3), dtype=np.float64)

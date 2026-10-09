@@ -10,6 +10,39 @@ import pytest
 from cli_runner import run_csubst
 
 
+@pytest.fixture
+def tiny_fit(tmp_path):
+    """Six tips and two codons suffice for real CLI output-lifecycle checks."""
+    import numpy as np
+    from csubst import ete, main_simulate, tree
+
+    phylogeny = tree.add_numerical_node_labels(ete.PhyloNode(
+        '((A:0.1,B:0.1)X:0.1,((C:0.1,D:0.1)Y:0.1,(E:0.1,F:0.1)Z:0.1)W:0.1)R;',
+        format=1,
+    ))
+    alignment = tmp_path / 'alignment.fa'
+    alignment.write_text(''.join(
+        '>{}\n{}\n'.format(name, 'GATAAG' if name in 'ACE' else 'GCTAAA')
+        for name in 'ABCDEF'
+    ))
+    ancestors = tmp_path / 'ancestors.fa'
+    ancestors.write_text(''.join('>{}\nGCTAAA\n'.format(name) for name in 'XYZWR'))
+    files = main_simulate.write_true_asr_bundle(
+        dict(tree=phylogeny, eq_freq=np.full(61, 1 / 61), substitution_model='GY+F',
+             genetic_code=1, background_omega=0.2, kappa=2.),
+        str(ancestors), str(tmp_path / 'fit'),
+    )
+    # The synthetic fit has one uniform rate category, as reported by IQ-TREE.
+    with open(files['iqtree'], 'a') as report:
+        report.write('Model of rate heterogeneity: Uniform\n')
+    args = ['--alignment_file', str(alignment), '--rooted_tree_file', files['treefile']]
+    for option, key in [('state', 'state'), ('tree', 'treefile'), ('rate', 'rate'),
+                        ('iqtree', 'iqtree'), ('log', 'log')]:
+        args += ['--iqtree_' + option, files[key]]
+    ids = {node.name: int(ete.get_prop(node, 'numerical_label')) for node in phylogeny.traverse()}
+    return args, ','.join(str(ids[name]) for name in 'AC')
+
+
 def doctor_inputs(tmp_path):
     alignment = tmp_path / 'input.fa'
     alignment.write_text('>A\nATGGCT\n>B\nATGGCC\n')
@@ -161,18 +194,13 @@ def test_dataset_preflight_does_not_import_numerical_libraries(tmp_path, monkeyp
 
 
 @pytest.mark.slow
-def test_sites_cli_preserves_untrimmed_cds_at_chimera_fasta_destination(tmp_path):
-    from csubst import sequence_io
-
-    assert run_csubst(['dataset', '--name', 'PGK'], tmp_path).returncode == 0
-    record = next(r for r in sequence_io.read_fasta_records(tmp_path / 'alignment.fa.gz')
-                  if '-' not in r.sequence and 'N' not in r.sequence)
-    source = tmp_path / 'sites' / 'csubst.branch_id23,51' / ('csubst_' + record.id + '.fasta')
+def test_sites_cli_preserves_untrimmed_cds_at_chimera_fasta_destination(tmp_path, tiny_fit):
+    fit_args, branch_ids = tiny_fit
+    source = tmp_path / 'sites' / ('csubst.branch_id' + branch_ids) / 'csubst_A.fasta'
     source.parent.mkdir(parents=True)
-    sequence_io.write_fasta_records([record], source)
+    source.write_text('>A\nGATAAG\n')
     original = source.read_bytes()
-    result = run_csubst(['sites', '--alignment_file', 'alignment.fa.gz',
-                         '--rooted_tree_file', 'tree.nwk', '--branch_id', '23,51',
+    result = run_csubst(['sites', *fit_args, '--branch_id', branch_ids,
                          '--outdir', 'sites', '--untrimmed_cds', str(source),
                          '--site_state_plot', 'no', '--site_summary_plot', 'no',
                          '--tree_site_plot', 'no'], tmp_path)
@@ -182,9 +210,9 @@ def test_sites_cli_preserves_untrimmed_cds_at_chimera_fasta_destination(tmp_path
 
 
 @pytest.mark.slow
-def test_search_rerun_archives_old_high_arity_and_reports_failure(tmp_path):
-    assert run_csubst(['dataset', '--name', 'PGK'], tmp_path).returncode == 0
-    base = ['search', '--alignment_file', 'alignment.fa.gz', '--rooted_tree_file', 'tree.nwk',
+def test_search_rerun_archives_old_high_arity_and_reports_failure(tmp_path, tiny_fit):
+    fit_args, _ = tiny_fit
+    base = ['search', *fit_args,
             '--max_arity', '3', '--max_combination', '10', '--output_stat', 'any2spe']
     first = run_csubst(base + ['--cutoff_stat', 'OCNany2spe,0'], tmp_path)
     assert first.returncode == 0, first.stderr

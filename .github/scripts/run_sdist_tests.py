@@ -18,7 +18,10 @@ def main():
         sources = [p.parent for p in Path(tmp).glob('*/pytest.ini')]
         if len(sources) != 1:
             raise RuntimeError('Expected one pytest root inside the source distribution')
-        for options in (['-n', 'auto', '--dist', 'worksteal', '-m', 'not process'], ['-m', 'process']):
+        for options in (
+            ['-n', 'auto', '--dist', 'worksteal', '-m', 'not process', '--ignore=tests/process'],
+            ['tests/process'],
+        ):
             subprocess.run([sys.executable, '-m', 'pytest', '-q', *options], cwd=sources[0], check=True)
 
 

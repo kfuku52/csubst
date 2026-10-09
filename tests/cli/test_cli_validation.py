@@ -146,7 +146,7 @@ def test_sites_invalid_max_sites_fails_cleanly_without_matplotlib_side_effects()
 
 
 def test_download_rejects_unsupported_checksum_request_cleanly():
-    proc, log_text = _run_cli_subprocess(
+    proc, log_text = _run_cli(
         'download', '--resource', 'all', '--verify', 'yes', '--no_download', 'yes'
     )
     assert proc.returncode == 2

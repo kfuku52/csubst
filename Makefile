@@ -11,8 +11,8 @@ test-fast:
 	$(PYTHON) -m pytest -q -n auto --dist worksteal tests/unit tests/cli -m "not slow and not parity and not process"
 
 test:
-	$(PYTHON) -m pytest -q -n auto --dist worksteal -m "not process"
-	$(PYTHON) -m pytest -q -m process
+	$(PYTHON) -m pytest -q -n auto --dist worksteal -m "not process" --ignore=tests/process
+	$(PYTHON) -m pytest -q tests/process
 
 test-native:
 	CSUBST_STRICT_EXTENSIONS=1 $(PYTHON) -m pytest -q -m native

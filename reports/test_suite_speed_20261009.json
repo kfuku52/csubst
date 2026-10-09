@@ -1,0 +1,137 @@
+{
+  "date": "2026-10-09",
+  "scope": "Local test-suite wall time and retained regression guarantees; not CSUBST analysis performance or scientific recalibration.",
+  "baseline_commit": "f238b61",
+  "environment": {
+    "platform": "macOS 27.0.1 arm64",
+    "python": "3.14.7",
+    "pytest": "9.1.1",
+    "pytest_xdist": "3.8.0",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "pandas": "3.0.5",
+    "workers": 4,
+    "extensions": "All six native modules import successfully",
+    "cache": "Existing Matplotlib/pytest cache reused across sequential measurements"
+  },
+  "full_suite": {
+    "before_commands": [
+      "python -m pytest -q -n auto --dist worksteal -m \"not process\"",
+      "python -m pytest -q -m process"
+    ],
+    "after_command": "/usr/bin/time -l make test",
+    "measurement_notes": "Before replicate 1 times the two lanes separately with /usr/bin/time -l and sums wall time; it also requests duration/JUnit reports. Before replicate 2 and both final after replicates time make test. No other pytest, build, lint, or typecheck workload ran concurrently with these full-suite timings. Intermediate exploratory runs are excluded.",
+    "before_runs": [
+      {
+        "wall_seconds": 27.47,
+        "max_rss_bytes": 433373184
+      },
+      {
+        "wall_seconds": 27.16,
+        "max_rss_bytes": 436584448
+      }
+    ],
+    "after_runs": [
+      {
+        "wall_seconds": 21.11,
+        "max_rss_bytes": 396673024
+      },
+      {
+        "wall_seconds": 20.76,
+        "max_rss_bytes": 399572992
+      }
+    ],
+    "before_median_seconds": 27.315,
+    "after_median_seconds": 20.935,
+    "wall_time_reduction_percent": 23.4,
+    "before_results": {
+      "passed": 2101,
+      "skipped": 9
+    },
+    "after_results": {
+      "passed": 2101,
+      "skipped": 9
+    },
+    "memory_scope": "Maximum resident set size reported by macOS /usr/bin/time -l; not summed memory across xdist workers."
+  },
+  "fast_suite": {
+    "command": "/usr/bin/time -l make test-fast",
+    "before": {
+      "wall_seconds": 10.1,
+      "max_rss_bytes": 386580480
+    },
+    "after": {
+      "wall_seconds": 10.33,
+      "max_rss_bytes": 404602880
+    },
+    "after_results": {
+      "passed": 1629,
+      "skipped": 6
+    },
+    "interpretation": "No demonstrated speedup; 10.10 versus 10.33 seconds is within local run noise."
+  },
+  "changes_and_tradeoffs": [
+    "Removed two small-input CB/CBS threads-setting comparisons that actually ran serially under the adaptive scheduler. Dense/sparse numerical parity remains; the arity-three site reducer check moved unchanged to test_sparse_reducers.py.",
+    "Replaced PGK-scale inputs in two output-lifecycle CLI tests with a six-tip, two-codon synthetic IQ-TREE-compatible bundle. Real CLI execution, joint inference, high-arity output archival, failed-run state, and input preservation assertions remain. Those two tests no longer incidentally exercise the complete PGK dataset; the separate scientific CI parity lane remains unchanged.",
+    "Both scan calibration modes still compare dense/sparse/disk-backed representations serially. Actual worker parity runs three representative cases (state-aware/full-scan/dense, endpoint/candidate-fixed/sparse, endpoint/full-scan/disk-backed), compares all result columns except worker diagnostics, and asserts two workers and four successful permutations. The complete calibration-by-representation product is not repeated in worker processes.",
+    "Process integration tests moved to tests/process. Ordinary runs skip collecting that directory; the serial lane collects only it. Collection rejects explicit process markers outside the directory. CI wheel coverage and extracted-sdist fallback use the same selection.",
+    "One unsupported-checksum CLI test now invokes the real parser/handler in process. Its error/exit-status contract remains; subprocess/log-file boundaries are covered by the remaining CLI tests.",
+    "Known-mean count-null trial counts, draw counts, scientific thresholds, inference defaults, and performance baselines remain unchanged."
+  ],
+  "verification": [
+    {
+      "command": "python -m pytest -q tests/cli tests/integration/test_scan_permutations.py tests/unit/test_sparse_reducers.py tests/unit/test_substitution_dense_reducers.py tests/unit/test_sequence_parallel_utility.py --durations=10",
+      "result": "174 passed before process-directory extraction"
+    },
+    {
+      "command": "python -m pytest -q tests/process tests/integration/test_scan_permutations.py tests/integration/test_resource_cache.py --durations=8",
+      "result": "38 passed after process-directory extraction; subsequent full runs cover the final state-aware case"
+    },
+    {
+      "command": "make test",
+      "result": "2096 passed, 9 skipped in parallel lane; 5 passed in process lane; two final timed runs passed"
+    },
+    {
+      "command": "make test-fast",
+      "result": "1629 passed, 6 skipped"
+    },
+    {
+      "command": "make lint typecheck",
+      "result": "passed; final Ruff and diff checks also passed"
+    },
+    {
+      "command": "python -m csubst --help",
+      "result": "passed"
+    },
+    {
+      "command": "CSUBST_SKIP_EXTENSIONS=1 python -m build --sdist --outdir <temporary-directory>/dist",
+      "result": "passed with isolated build dependencies; both process modules included and removed duplicate module absent"
+    },
+    {
+      "command": "CSUBST_DISABLE_EXTENSIONS=1 python <repository>/.github/scripts/run_sdist_tests.py (cwd=<temporary-directory>)",
+      "result": "Extracted-source fallback: 2066 passed, 39 skipped in ordinary lane; 5 passed in process lane"
+    },
+    {
+      "command": "Compare pytest --collect-only -q -m process with pytest --collect-only -q tests/process",
+      "result": "both selections contain the same 5 cases"
+    },
+    {
+      "command": "Parse pytest.yml with PyYAML and compare to HEAD; parse run_sdist_tests.py with ast",
+      "result": "valid syntax; only two pytest command selections changed in the workflow; event configuration, jobs, matrices, permissions, runners, coverage flags, and release dependencies retained"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "skips": {
+    "native_source": "4 torch-dependent, 2 gemmi-dependent, 3 IQ-TREE-dependent cases; unchanged from baseline",
+    "extracted_fallback": "Same 9 optional-dependency skips plus 30 compiled-extension checks, intentionally unavailable with extensions disabled"
+  },
+  "unverified": [
+    "Linux/Python 3.12 GitHub Actions execution and coverage threshold; local interpreter is Python 3.14 and Python 3.12 is unavailable.",
+    "Non-editable installed-wheel execution; extracted-source testing is not wheel verification.",
+    "Real IQ-TREE fits, optional structural model backends, and scientific calibration/performance scripts; unnecessary for this test-only change and prerequisites are absent.",
+    "actionlint could not run because the installed executable is x86_64 on this arm64 host; parsed-workflow validation completed instead."
+  ]
+}

@@ -86,3 +86,11 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.integration)
         if "parity" in path_parts:
             item.add_marker(pytest.mark.parity)
+        if item.path.is_relative_to(ROOT / 'tests' / 'process'):
+            item.add_marker(pytest.mark.integration)
+            item.add_marker(pytest.mark.process)
+        elif item.get_closest_marker('process') is not None:
+            raise pytest.UsageError(
+                'Place nested-process tests under tests/process/ so the serial lane collects them: '
+                + item.nodeid
+            )

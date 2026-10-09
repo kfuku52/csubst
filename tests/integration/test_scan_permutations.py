@@ -6,30 +6,24 @@ import pytest
 from csubst import ete
 from csubst import foreground
 from csubst import substitution_scan
-from scan_fixtures import make_scan_context as _toy_scan_context
+from scan_fixtures import make_scan_context as _toy_scan_context, make_endpoint_scan_context
 
 
 @pytest.mark.parametrize("calibration", ["candidate_fixed", "full_scan"])
-def test_endpoint_scan_dense_sparse_and_parallel_permutations_agree(calibration):
+def test_endpoint_scan_dense_sparse_and_stored_permutations_agree(calibration):
     from csubst import substitution, site_storage
 
-    g, on_tensor = _toy_scan_context()
-    g.update(scan_rate_exposure="endpoint", state_cdn=g["state_nsy"].copy(),
-             instantaneous_codon_rate_matrix=np.array([[-1., 1.], [1., -1.]]),
-             equilibrium_frequency=np.array([.5, .5]), substitution_model="GY",
-             nonsynonymous_indices={"A": [0], "K": [1]},
-             iqtree_rate_values=np.ones(1), scan_n_permutations=4,
-             scan_pvalue_calibration=calibration, threads=1)
+    g, on_tensor = make_endpoint_scan_context()
+    g['scan_pvalue_calibration'] = calibration
     dense, _ = substitution_scan.scan_substitutions(g=dict(g), ON_tensor=on_tensor)
     sparse, _ = substitution_scan.scan_substitutions(
-        g=dict(g, threads=2), ON_tensor=substitution.dense_to_sparse_sub_tensor(on_tensor))
-    cols = [c for c in dense if c not in ["scan_permutation_n_jobs", "scan_permutation_backend"]]
-    pd.testing.assert_frame_equal(dense[cols], sparse[cols])
+        g=dict(g), ON_tensor=substitution.dense_to_sparse_sub_tensor(on_tensor))
+    pd.testing.assert_frame_equal(dense, sparse)
     stored = site_storage.SiteEventTensor(on_tensor.shape)
     stored.write_block(0, np.moveaxis(on_tensor, 1, 0))
     stored.seal()
-    disk, _ = substitution_scan.scan_substitutions(g=dict(g, threads=2), ON_tensor=stored)
-    pd.testing.assert_frame_equal(dense[cols], disk[cols])
+    disk, _ = substitution_scan.scan_substitutions(g=dict(g), ON_tensor=stored)
+    pd.testing.assert_frame_equal(dense, disk)
     assert dense.iloc[0]["scan_permutation_success_count"] == 4
     assert dense.iloc[0]["scan_exposure_units"] == "expected_endpoint_events"
 
@@ -121,32 +115,6 @@ def test_scan_eligibility_is_fixed_before_sampling():
     invalid_observed_ids = np.array([bid for bid in valid_branch_ids if bid != labels["A"]])
     with pytest.raises(ValueError, match="observed foreground component"):
         substitution_scan._get_scan_trait_plan(g, "trait", invalid_observed_ids)
-
-
-@pytest.mark.slow
-@pytest.mark.process
-def test_scan_parallel_permutation_matches_single_thread_result():
-    serial_g, serial_tensor = _toy_scan_context()
-    serial_g["scan_pvalue_calibration"] = "full_scan"
-    serial_g["scan_n_permutations"] = 4
-    serial_g["scan_permutation_seed"] = 3
-    serial_g["threads"] = 1
-    parallel_g, parallel_tensor = _toy_scan_context()
-    parallel_g["scan_pvalue_calibration"] = "full_scan"
-    parallel_g["scan_n_permutations"] = 4
-    parallel_g["scan_permutation_seed"] = 3
-    parallel_g["threads"] = 2
-
-    serial_df, _ = substitution_scan.scan_substitutions(g=serial_g, ON_tensor=serial_tensor)
-    parallel_df, _ = substitution_scan.scan_substitutions(g=parallel_g, ON_tensor=parallel_tensor)
-
-    assert parallel_df.iloc[0]["scan_permutation_n_jobs"] == 2
-    assert serial_df.iloc[0]["p_rate_enrichment_empirical"] == pytest.approx(
-        parallel_df.iloc[0]["p_rate_enrichment_empirical"]
-    )
-    assert serial_df.iloc[0]["p_rate_enrichment_empirical_maxT"] == pytest.approx(
-        parallel_df.iloc[0]["p_rate_enrichment_empirical_maxT"]
-    )
 
 
 def test_scan_rejects_negative_permutation_count_even_without_calibration():

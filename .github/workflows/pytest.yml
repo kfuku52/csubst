@@ -139,11 +139,11 @@ jobs:
 
       - name: Run parallel-safe full test suite against the wheel
         working-directory: ${{ runner.temp }}/csubst-wheel-tests
-        run: python -m pytest "$GITHUB_WORKSPACE/tests" --import-mode=importlib -q -n auto --dist worksteal -m "not process" --durations=20 --cov=csubst --cov-config="$GITHUB_WORKSPACE/pyproject.toml" --cov-branch --cov-report=
+        run: python -m pytest "$GITHUB_WORKSPACE/tests" --import-mode=importlib -q -n auto --dist worksteal -m "not process" --ignore="$GITHUB_WORKSPACE/tests/process" --durations=20 --cov=csubst --cov-config="$GITHUB_WORKSPACE/pyproject.toml" --cov-branch --cov-report=
 
       - name: Run nested-process tests serially against the wheel
         working-directory: ${{ runner.temp }}/csubst-wheel-tests
-        run: python -m pytest "$GITHUB_WORKSPACE/tests" --import-mode=importlib -q -m process --durations=20 --cov=csubst --cov-config="$GITHUB_WORKSPACE/pyproject.toml" --cov-branch --cov-append --cov-report=term-missing:skip-covered --cov-fail-under=70
+        run: python -m pytest "$GITHUB_WORKSPACE/tests/process" --import-mode=importlib -q --durations=20 --cov=csubst --cov-config="$GITHUB_WORKSPACE/pyproject.toml" --cov-branch --cov-append --cov-report=term-missing:skip-covered --cov-fail-under=70
 
       - name: Require native execution from the wheel
         working-directory: ${{ runner.temp }}/csubst-wheel-tests

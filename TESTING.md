@@ -9,6 +9,8 @@ The test suite is organized by the kind of feedback each test provides:
 - `tests/cli/` covers the command-line parser and a focused set of executable
   entry-point subprocess checks.
 - `tests/parity/` compares independent implementations and execution backends.
+- `tests/process/` contains integration tests that start worker processes and
+  run in a separate serial lane.
 - `tests/support/` contains reusable factories and fakes. Files in this
   directory must not use the `test_*.py` naming pattern.
 
@@ -32,8 +34,8 @@ For the shortest complete run, execute parallel-safe tests first and keep the
 few tests that create their own worker processes in a serial lane:
 
 ```bash
-pytest -q -n auto --dist worksteal -m "not process"
-pytest -q -m process
+pytest -q -n auto --dist worksteal -m "not process" --ignore=tests/process
+pytest -q tests/process
 ```
 
 The repository caps `-n auto` at four workers to avoid collection overhead,
@@ -43,8 +45,8 @@ To verify the source-only fallback locally:
 
 ```bash
 CSUBST_SKIP_EXTENSIONS=1 python -m pip install -e '.[test]'
-CSUBST_DISABLE_EXTENSIONS=1 pytest -q -m "not process"
-CSUBST_DISABLE_EXTENSIONS=1 pytest -q -m process
+CSUBST_DISABLE_EXTENSIONS=1 pytest -q -m "not process" --ignore=tests/process
+CSUBST_DISABLE_EXTENSIONS=1 pytest -q tests/process
 ```
 
 For a shorter local feedback loop matching the Python-version CI matrix, run:
@@ -64,12 +66,15 @@ pytest -q -m slow
 pytest -q -m process
 ```
 
-`integration`, `cli`, and `parity` markers are assigned from the directory
+`integration`, `cli`, `parity`, and `process` markers are assigned from the directory
 taxonomy. Add `@pytest.mark.slow` only after a duration report shows that a test
 materially exceeds the normal unit-test feedback time. Tests that require a
 compiled extension may use `@pytest.mark.requires_cython`. Add
-`@pytest.mark.process` only when a test creates nested worker processes and
-therefore must run outside pytest-xdist.
+tests under `tests/process/` when they create nested worker processes and
+therefore must run outside pytest-xdist. Collection rejects explicit `process`
+markers elsewhere to keep the serial lane complete. Selecting this directory
+directly avoids importing the ordinary suite a second time; `-m process`
+remains available for selection from the full suite.
 
 The `native` marker identifies tests that must exercise the compiled path,
 including read-only NumPy arrays, memmaps, and pandas-owned arrays:
@@ -98,6 +103,15 @@ independent option dimensions without automatically taking their Cartesian produ
 When pruning tests, record the lost or retained guarantee, run the affected suite,
 and then run the full suite. Collection counts describe the change, not a target.
 The Cython sanitizer job separately exercises sparse and expected-state parity tests.
+
+Output-lifecycle CLI checks use a six-tip, two-codon synthetic IQ-TREE-compatible
+bundle; they still run the real CLI and joint inference. Bundled-dataset numerical
+checks belong in the scientific parity lane. Scan tensor representations are
+compared serially for both calibration modes; real worker parity covers dense,
+sparse, and disk-backed inputs in the `process` lane without repeating their full
+Cartesian product. Do not count a small-input `threads=2` comparison as parallel
+coverage when the adaptive scheduler still selects one worker. Known-mean
+count-null rejection and power checks retain their sample sizes and thresholds.
 
 Performance parity uses `.github/performance_baseline.tsv`. Update it only from
 a successful, representative Linux hosted-runner result and review numerical
@@ -185,8 +199,8 @@ CSUBST_TEST_ROOT="$(mktemp -d)"
 python -m venv "$CSUBST_TEST_ROOT/venv"
 "$CSUBST_TEST_ROOT/venv/bin/python" .github/scripts/install_test_artifact.py
 cd "$CSUBST_TEST_ROOT"
-CSUBST_TEST_INSTALLED=1 "$CSUBST_TEST_ROOT/venv/bin/python" -m pytest "$CSUBST_REPO/tests" --import-mode=importlib -q -n auto --dist worksteal -m 'not process'
-CSUBST_TEST_INSTALLED=1 "$CSUBST_TEST_ROOT/venv/bin/python" -m pytest "$CSUBST_REPO/tests" --import-mode=importlib -q -m process
+CSUBST_TEST_INSTALLED=1 "$CSUBST_TEST_ROOT/venv/bin/python" -m pytest "$CSUBST_REPO/tests" --import-mode=importlib -q -n auto --dist worksteal -m 'not process' --ignore="$CSUBST_REPO/tests/process"
+CSUBST_TEST_INSTALLED=1 "$CSUBST_TEST_ROOT/venv/bin/python" -m pytest "$CSUBST_REPO/tests/process" --import-mode=importlib -q
 CSUBST_STRICT_EXTENSIONS=1 "$CSUBST_TEST_ROOT/venv/bin/python" "$CSUBST_REPO/.github/scripts/sites_parity_check.py" --installed --numerical-only
 ```
 

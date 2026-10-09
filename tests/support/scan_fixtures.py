@@ -70,3 +70,14 @@ def make_scan_context():
         "min_clade_bin_count": 1,
     }
     return g, on_tensor
+
+
+def make_endpoint_scan_context():
+    g, on_tensor = make_scan_context()
+    g.update(scan_rate_exposure="endpoint", state_cdn=g["state_nsy"].copy(),
+             instantaneous_codon_rate_matrix=np.array([[-1., 1.], [1., -1.]]),
+             equilibrium_frequency=np.array([.5, .5]), substitution_model="GY",
+             nonsynonymous_indices={"A": [0], "K": [1]},
+             iqtree_rate_values=np.ones(1), scan_n_permutations=4,
+             threads=1)
+    return g, on_tensor
