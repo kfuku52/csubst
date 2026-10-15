@@ -1,0 +1,403 @@
+{
+  "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "numpy": "2.5.3",
+  "pandas": "3.0.5",
+  "repeats": 3,
+  "warmups": 1,
+  "experiments": {
+    "candidate_groups_0": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.8999977920902893,
+          "cpu_seconds": 0.8953200000000008
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.6969737079925835,
+          "cpu_seconds": 0.6936669999999996
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.6703395410440862,
+          "cpu_seconds": 0.6672100000000007
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.9065928750205785,
+          "cpu_seconds": 0.9018550000000012
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.8817700840299949,
+          "cpu_seconds": 0.877243
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.6644015839556232,
+          "cpu_seconds": 0.6603639999999995
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.6814280829858035,
+          "cpu_seconds": 0.6743050000000004
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.9191322079859674,
+          "cpu_seconds": 0.9096609999999998
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.9065928750205785,
+            "prototype": 0.6703395410440862
+          },
+          "ratio": 0.7394052606346265
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.9018550000000012,
+            "prototype": 0.6672100000000007
+          },
+          "ratio": 0.7398195940589117
+        }
+      },
+      "compared_pairs": 4,
+      "input_events": 719
+    },
+    "static_scan_cache_pgk_full20": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 1.9305909159593284,
+          "cpu_seconds": 1.8759690000000013
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 2.5205547499936074,
+          "cpu_seconds": 2.044903999999999
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 1.7715269590262324,
+          "cpu_seconds": 1.7600259999999999
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.0633552499348298,
+          "cpu_seconds": 1.8907319999999999
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 1.7609180409926921,
+          "cpu_seconds": 1.751842
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 1.7611341249430552,
+          "cpu_seconds": 1.754258
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 1.79038962488994,
+          "cpu_seconds": 1.7847329999999992
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 1.8302439580438659,
+          "cpu_seconds": 1.8087319999999991
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 1.8302439580438659,
+            "prototype": 1.7715269590262324
+          },
+          "ratio": 0.9679184849868926
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 1.8087319999999991,
+            "prototype": 1.7600259999999999
+          },
+          "ratio": 0.9730717430774712
+        }
+      },
+      "compared_pairs": 4,
+      "cache_counters": [
+        {
+          "events_calls": 44,
+          "exposure_calls": 44,
+          "events_hits": 20,
+          "exposure_hits": 8,
+          "events_retained_bytes": 35928,
+          "exposure_retained_bytes": 241920
+        },
+        {
+          "events_calls": 44,
+          "exposure_calls": 44,
+          "events_hits": 20,
+          "exposure_hits": 8,
+          "events_retained_bytes": 35928,
+          "exposure_retained_bytes": 241920
+        },
+        {
+          "events_calls": 44,
+          "exposure_calls": 44,
+          "events_hits": 20,
+          "exposure_hits": 8,
+          "events_retained_bytes": 35928,
+          "exposure_retained_bytes": 241920
+        },
+        {
+          "events_calls": 44,
+          "exposure_calls": 44,
+          "events_hits": 20,
+          "exposure_hits": 8,
+          "events_retained_bytes": 35928,
+          "exposure_retained_bytes": 241920
+        }
+      ]
+    },
+    "static_scan_cache_pepc_fixed10": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 2.849514624918811,
+          "cpu_seconds": 2.657395000000001
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 1.715616666013375,
+          "cpu_seconds": 1.634557000000001
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 1.7561392500065267,
+          "cpu_seconds": 1.6443370000000002
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.851086457958445,
+          "cpu_seconds": 2.656452999999999
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.8319716250989586,
+          "cpu_seconds": 2.619719999999994
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 1.8300545000238344,
+          "cpu_seconds": 1.6053449999999998
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 1.6772732079261914,
+          "cpu_seconds": 1.6356959999999958
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.6251485419925302,
+          "cpu_seconds": 2.5618049999999997
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 2.8319716250989586,
+            "prototype": 1.7561392500065267
+          },
+          "ratio": 0.6201118805154558
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 2.619719999999994,
+            "prototype": 1.6356959999999958
+          },
+          "ratio": 0.6243781778205303
+        }
+      },
+      "compared_pairs": 4,
+      "cache_counters": [
+        {
+          "events_calls": 1133,
+          "exposure_calls": 1133,
+          "events_hits": 1030,
+          "exposure_hits": 927,
+          "events_retained_bytes": 302396,
+          "exposure_retained_bytes": 3028200
+        },
+        {
+          "events_calls": 1133,
+          "exposure_calls": 1133,
+          "events_hits": 1030,
+          "exposure_hits": 927,
+          "events_retained_bytes": 302396,
+          "exposure_retained_bytes": 3028200
+        },
+        {
+          "events_calls": 1133,
+          "exposure_calls": 1133,
+          "events_hits": 1030,
+          "exposure_hits": 927,
+          "events_retained_bytes": 302396,
+          "exposure_retained_bytes": 3028200
+        },
+        {
+          "events_calls": 1133,
+          "exposure_calls": 1133,
+          "events_hits": 1030,
+          "exposure_hits": 927,
+          "events_retained_bytes": 302396,
+          "exposure_retained_bytes": 3028200
+        }
+      ]
+    }
+  },
+  "clade_cache": {},
+  "commands": {
+    "pepc_all_matches": [
+      "python",
+      "-m",
+      "csubst",
+      "scan",
+      "--alignment_file",
+      "csubst/dataset/PEPC.alignment.fa",
+      "--rooted_tree_file",
+      "csubst/dataset/PEPC.tree.nwk",
+      "--outdir",
+      "${WORKDIR}/scan/pepc_all_matches",
+      "--threads",
+      "1",
+      "--blas_threads",
+      "1",
+      "--random_seed",
+      "8",
+      "--float_digit",
+      "12",
+      "--iqtree_treefile",
+      "csubst/dataset/PEPC.alignment.fa.treefile",
+      "--iqtree_state",
+      "csubst/dataset/PEPC.alignment.fa.state",
+      "--iqtree_rate",
+      "csubst/dataset/PEPC.alignment.fa.rate",
+      "--iqtree_iqtree",
+      "csubst/dataset/PEPC.alignment.fa.iqtree",
+      "--iqtree_log",
+      "csubst/dataset/PEPC.alignment.fa.log",
+      "--foreground",
+      "csubst/dataset/PEPC.foreground.txt",
+      "--scan_site_plot",
+      "no",
+      "--scan_pvalue_calibration",
+      "none",
+      "--scan_match",
+      "all"
+    ],
+    "pgk_full20": [
+      "python",
+      "-m",
+      "csubst",
+      "scan",
+      "--alignment_file",
+      "csubst/dataset/PGK.alignment.fa",
+      "--rooted_tree_file",
+      "csubst/dataset/PGK.tree.nwk",
+      "--outdir",
+      "${WORKDIR}/scan/pgk_full20",
+      "--threads",
+      "1",
+      "--blas_threads",
+      "1",
+      "--random_seed",
+      "8",
+      "--float_digit",
+      "12",
+      "--iqtree_treefile",
+      "csubst/dataset/PGK.alignment.fa.treefile",
+      "--iqtree_state",
+      "csubst/dataset/PGK.alignment.fa.state",
+      "--iqtree_rate",
+      "csubst/dataset/PGK.alignment.fa.rate",
+      "--iqtree_iqtree",
+      "csubst/dataset/PGK.alignment.fa.iqtree",
+      "--iqtree_log",
+      "csubst/dataset/PGK.alignment.fa.log",
+      "--foreground",
+      "csubst/dataset/PGK.foreground.txt",
+      "--scan_site_plot",
+      "no",
+      "--scan_pvalue_calibration",
+      "full_scan",
+      "--scan_n_permutations",
+      "20"
+    ],
+    "pepc_fixed10": [
+      "python",
+      "-m",
+      "csubst",
+      "scan",
+      "--alignment_file",
+      "csubst/dataset/PEPC.alignment.fa",
+      "--rooted_tree_file",
+      "csubst/dataset/PEPC.tree.nwk",
+      "--outdir",
+      "${WORKDIR}/scan/pepc_fixed10",
+      "--threads",
+      "1",
+      "--blas_threads",
+      "1",
+      "--random_seed",
+      "8",
+      "--float_digit",
+      "12",
+      "--iqtree_treefile",
+      "csubst/dataset/PEPC.alignment.fa.treefile",
+      "--iqtree_state",
+      "csubst/dataset/PEPC.alignment.fa.state",
+      "--iqtree_rate",
+      "csubst/dataset/PEPC.alignment.fa.rate",
+      "--iqtree_iqtree",
+      "csubst/dataset/PEPC.alignment.fa.iqtree",
+      "--iqtree_log",
+      "csubst/dataset/PEPC.alignment.fa.log",
+      "--foreground",
+      "csubst/dataset/PEPC.foreground.txt",
+      "--scan_site_plot",
+      "no",
+      "--scan_pvalue_calibration",
+      "candidate_fixed",
+      "--scan_n_permutations",
+      "10"
+    ]
+  }
+}

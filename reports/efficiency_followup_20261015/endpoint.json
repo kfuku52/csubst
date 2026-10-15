@@ -1,0 +1,142 @@
+{
+  "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "numpy": "2.5.3",
+  "pandas": "3.0.5",
+  "repeats": 3,
+  "warmups": 1,
+  "experiments": {
+    "predictive_kernel_pepc_full": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 10.8809580829693,
+          "cpu_seconds": 6.769110999999999
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 8.883342667017132,
+          "cpu_seconds": 7.202996000000001
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 11.445982625009492,
+          "cpu_seconds": 8.388853999999998
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 13.35398883302696,
+          "cpu_seconds": 7.525598000000002
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 12.73925129196141,
+          "cpu_seconds": 8.261411999999996
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 12.118024833034724,
+          "cpu_seconds": 8.604078000000001
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 11.103006499935873,
+          "cpu_seconds": 7.892045000000003
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 10.156096915947273,
+          "cpu_seconds": 7.757476000000004
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 12.73925129196141,
+            "prototype": 11.445982625009492
+          },
+          "ratio": 0.898481579701
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 7.757476000000004,
+            "prototype": 8.388853999999998
+          },
+          "ratio": 1.0813896169321044
+        }
+      },
+      "compared_pairs": 4,
+      "cache_counters": [
+        {
+          "calls": 17360,
+          "retained_bytes": 30647680,
+          "hits": 16800
+        },
+        {
+          "calls": 17360,
+          "retained_bytes": 30647680,
+          "hits": 16800
+        },
+        {
+          "calls": 17360,
+          "retained_bytes": 30647680,
+          "hits": 16800
+        },
+        {
+          "calls": 17360,
+          "retained_bytes": 30647680,
+          "hits": 16800
+        }
+      ]
+    }
+  },
+  "clade_cache": {},
+  "commands": {
+    "pepc_full": [
+      "python",
+      "-m",
+      "csubst",
+      "search",
+      "--alignment_file",
+      "csubst/dataset/PEPC.alignment.fa",
+      "--rooted_tree_file",
+      "csubst/dataset/PEPC.tree.nwk",
+      "--outdir",
+      "${WORKDIR}/pepc_full",
+      "--threads",
+      "1",
+      "--blas_threads",
+      "1",
+      "--random_seed",
+      "8",
+      "--float_digit",
+      "12",
+      "--iqtree_treefile",
+      "csubst/dataset/PEPC.alignment.fa.treefile",
+      "--iqtree_state",
+      "csubst/dataset/PEPC.alignment.fa.state",
+      "--iqtree_rate",
+      "csubst/dataset/PEPC.alignment.fa.rate",
+      "--iqtree_iqtree",
+      "csubst/dataset/PEPC.alignment.fa.iqtree",
+      "--iqtree_log",
+      "csubst/dataset/PEPC.alignment.fa.log",
+      "--max_arity",
+      "2",
+      "--output_stat",
+      "any2any,spe2any,any2spe,spe2spe",
+      "--drop_invariant_tip_sites",
+      "no",
+      "--calibrate_longtail",
+      "no"
+    ]
+  }
+}

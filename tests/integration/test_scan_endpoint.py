@@ -55,6 +55,28 @@ def test_endpoint_fixes_zero_direct_q_without_multiplying_by_length_again():
     assert np.isfinite(new["p_rate_enrichment_asymptotic"])
 
 
+def test_exposure_cache_reuses_only_vectors_and_recomputes_assignment_summaries(monkeypatch):
+    g, meta, ids = context()
+    ctx = scan_endpoint.build_context(g, meta, ids)
+    calls = []
+    original = scan_endpoint.expected_events
+    def counted(*args):
+        calls.append(1)
+        return original(*args)
+    monkeypatch.setattr(scan_endpoint, 'expected_events', counted)
+    options = dict(candidate_events=pd.DataFrame(dict(branch_id=[1], event_pp=[.5])),
+                   branch_meta=meta, state_nsy=g['state_nsy'], state_cdn=g['state_cdn'], site=0,
+                   from_ids=[0], to_ids=[2], rate_length='raw', rate_exposure='endpoint', endpoint_context=ctx)
+    cache = substitution_scan._CandidateCache()
+    first = substitution_scan._rate_summary(**options, target_branch_ids=[1], exposure_cache=cache)
+    second = substitution_scan._rate_summary(**options, target_branch_ids=[2], exposure_cache=cache)
+    assert len(calls) == 1
+    assert first['target_event_count'] == .5 and second['target_event_count'] == 0
+    assert first['target_exposure'] != second['target_exposure']
+    substitution_scan._rate_summary(**options, target_branch_ids=[1], exposure_cache=substitution_scan._CandidateCache())
+    assert len(calls) == 2
+
+
 def test_zero_and_missing_reasons_and_positive_count_conflict():
     g, meta, ids = context((0., 1.))
     ctx = scan_endpoint.build_context(g, meta, ids)

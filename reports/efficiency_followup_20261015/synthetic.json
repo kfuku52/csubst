@@ -1,0 +1,735 @@
+{
+  "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "numpy": "2.5.3",
+  "pandas": "3.0.5",
+  "repeats": 3,
+  "warmups": 1,
+  "experiments": {
+    "inspect_balanced_512": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.003255833056755364,
+          "cpu_seconds": 0.0031039999999999957
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.001535917050205171,
+          "cpu_seconds": 0.0013810000000000766
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0012093340046703815,
+          "cpu_seconds": 0.0012080000000000979
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.0032644999446347356,
+          "cpu_seconds": 0.003110999999999864
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.002906709094531834,
+          "cpu_seconds": 0.002866999999999953
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0011708750389516354,
+          "cpu_seconds": 0.0011700000000001154
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.001350749982520938,
+          "cpu_seconds": 0.0013449999999999296
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.0028456669533625245,
+          "cpu_seconds": 0.002843000000000151
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.002906709094531834,
+            "prototype": 0.0012093340046703815
+          },
+          "ratio": 0.4160492038730011
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.002866999999999953,
+            "prototype": 0.0012080000000000979
+          },
+          "ratio": 0.4213463550750323
+        }
+      },
+      "compared_pairs": 4
+    },
+    "missingness_balanced_512": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.016336290980689228,
+          "cpu_seconds": 0.016332000000000013
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.004876999999396503,
+          "cpu_seconds": 0.004841000000000095
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.004706416977569461,
+          "cpu_seconds": 0.004645999999999928
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.017356500029563904,
+          "cpu_seconds": 0.016901999999999973
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.01928154204506427,
+          "cpu_seconds": 0.01869799999999988
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.005196416983380914,
+          "cpu_seconds": 0.005104999999999915
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.006331916898488998,
+          "cpu_seconds": 0.005891000000000091
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.018492334056645632,
+          "cpu_seconds": 0.017994999999999983
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.018492334056645632,
+            "prototype": 0.005196416983380914
+          },
+          "ratio": 0.2810038455645065
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.017994999999999983,
+            "prototype": 0.005104999999999915
+          },
+          "ratio": 0.28368991386495807
+        }
+      },
+      "compared_pairs": 4
+    },
+    "inspect_balanced_2048": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.014289290993474424,
+          "cpu_seconds": 0.013986999999999972
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.010239874944090843,
+          "cpu_seconds": 0.00944900000000004
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0054786670953035355,
+          "cpu_seconds": 0.005473999999999979
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.01525129098445177,
+          "cpu_seconds": 0.014418000000000042
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.013865999993868172,
+          "cpu_seconds": 0.013487999999999944
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.005501416977494955,
+          "cpu_seconds": 0.005465000000000053
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.045638542040251195,
+          "cpu_seconds": 0.043287000000000075
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.013290624949149787,
+          "cpu_seconds": 0.012998000000000065
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.013865999993868172,
+            "prototype": 0.005501416977494955
+          },
+          "ratio": 0.3967558762388428
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.013487999999999944,
+            "prototype": 0.005473999999999979
+          },
+          "ratio": 0.4058422301304865
+        }
+      },
+      "compared_pairs": 4
+    },
+    "missingness_balanced_2048": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.07528712507337332,
+          "cpu_seconds": 0.07251200000000013
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.018112250021658838,
+          "cpu_seconds": 0.01776399999999989
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.026669165934436023,
+          "cpu_seconds": 0.025449999999999973
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.08045949996449053,
+          "cpu_seconds": 0.07804600000000006
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.07026458298787475,
+          "cpu_seconds": 0.06981499999999996
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.016512625035829842,
+          "cpu_seconds": 0.01648000000000005
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.017912750015966594,
+          "cpu_seconds": 0.017374
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.08960266702342778,
+          "cpu_seconds": 0.08250700000000011
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.08045949996449053,
+            "prototype": 0.017912750015966594
+          },
+          "ratio": 0.22263064055670356
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.07804600000000006,
+            "prototype": 0.017374
+          },
+          "ratio": 0.22261230556338554
+        }
+      },
+      "compared_pairs": 4
+    },
+    "inspect_ladder_512": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.04792779206763953,
+          "cpu_seconds": 0.045538999999999774
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.0015382919227704406,
+          "cpu_seconds": 0.0013619999999998633
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0019222080009058118,
+          "cpu_seconds": 0.001650999999999847
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.043516249977983534,
+          "cpu_seconds": 0.0431140000000001
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.04421779199037701,
+          "cpu_seconds": 0.04334399999999983
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0011746250092983246,
+          "cpu_seconds": 0.0011730000000000906
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0015108749503269792,
+          "cpu_seconds": 0.0013779999999998793
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.042684791958890855,
+          "cpu_seconds": 0.042554999999999676
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.043516249977983534,
+            "prototype": 0.0015108749503269792
+          },
+          "ratio": 0.034719787460808
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.0431140000000001,
+            "prototype": 0.0013779999999998793
+          },
+          "ratio": 0.03196177575729174
+        }
+      },
+      "compared_pairs": 4
+    },
+    "missingness_ladder_512": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.1346172500634566,
+          "cpu_seconds": 0.1317499999999998
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.004326542024500668,
+          "cpu_seconds": 0.004242999999999775
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.00408287497702986,
+          "cpu_seconds": 0.0040799999999996395
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.13149683398660272,
+          "cpu_seconds": 0.12948300000000001
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.12977237498853356,
+          "cpu_seconds": 0.12884399999999996
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0039764579851180315,
+          "cpu_seconds": 0.003975000000000062
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.004637416917830706,
+          "cpu_seconds": 0.004538000000000153
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.13515933300368488,
+          "cpu_seconds": 0.13228700000000027
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.13149683398660272,
+            "prototype": 0.00408287497702986
+          },
+          "ratio": 0.03104922645853082
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.12948300000000001,
+            "prototype": 0.0040799999999996395
+          },
+          "ratio": 0.0315099279442061
+        }
+      },
+      "compared_pairs": 4
+    },
+    "inspect_ladder_2048": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.6987206669291481,
+          "cpu_seconds": 0.6837
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.006488165934570134,
+          "cpu_seconds": 0.005954000000000015
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0061822920106351376,
+          "cpu_seconds": 0.005946999999999925
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.6763849169947207,
+          "cpu_seconds": 0.6707909999999999
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.7225813750410452,
+          "cpu_seconds": 0.7121529999999998
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.005070124985650182,
+          "cpu_seconds": 0.005066999999999489
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.0054620420560240746,
+          "cpu_seconds": 0.005443999999999782
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.6950118340319023,
+          "cpu_seconds": 0.6836089999999997
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.6950118340319023,
+            "prototype": 0.0054620420560240746
+          },
+          "ratio": 0.007858919501179827
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.6836089999999997,
+            "prototype": 0.005443999999999782
+          },
+          "ratio": 0.007963616628803577
+        }
+      },
+      "compared_pairs": 4
+    },
+    "missingness_ladder_2048": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 3.0200537089258432,
+          "cpu_seconds": 2.442273
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.01938175002578646,
+          "cpu_seconds": 0.01811200000000035
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.022495166980661452,
+          "cpu_seconds": 0.01824099999999973
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 3.1068873340263963,
+          "cpu_seconds": 2.396737
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.6436470829648897,
+          "cpu_seconds": 2.5098629999999993
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.02230937499552965,
+          "cpu_seconds": 0.019271999999999068
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 0.03144554200116545,
+          "cpu_seconds": 0.02617000000000047
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.6568365410203114,
+          "cpu_seconds": 2.510218
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 2.6568365410203114,
+            "prototype": 0.022495166980661452
+          },
+          "ratio": 0.008466899123580474
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 2.5098629999999993,
+            "prototype": 0.019271999999999068
+          },
+          "ratio": 0.007678506755149215
+        }
+      },
+      "compared_pairs": 4
+    },
+    "maximum_score_1000": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.013389375060796738,
+          "cpu_seconds": 0.012374999999998693
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.00012883392628282309,
+          "cpu_seconds": 0.00012700000000265277
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 3.762508276849985e-05,
+          "cpu_seconds": 3.6999999998954536e-05
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.013720124959945679,
+          "cpu_seconds": 0.012558000000002068
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.012605833006091416,
+          "cpu_seconds": 0.008824999999998084
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 7.90830235928297e-05,
+          "cpu_seconds": 7.700000000099294e-05
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 2.7916044928133488e-05,
+          "cpu_seconds": 2.600000000185787e-05
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.017252666992135346,
+          "cpu_seconds": 0.0121709999999986
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.013720124959945679,
+            "prototype": 3.762508276849985e-05
+          },
+          "ratio": 0.002742327994704271
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.0121709999999986,
+            "prototype": 3.6999999998954536e-05
+          },
+          "ratio": 0.003040013145917245
+        }
+      },
+      "compared_pairs": 4
+    },
+    "maximum_score_10000": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.18876004195772111,
+          "cpu_seconds": 0.10563699999999798
+        },
+        {
+          "version": "prototype",
+          "warmup": true,
+          "seconds": 0.00010474992450326681,
+          "cpu_seconds": 0.0001029999999992981
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 3.5499921068549156e-05,
+          "cpu_seconds": 3.399999999942338e-05
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.17759862507227808,
+          "cpu_seconds": 0.09756100000000245
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.10980304202530533,
+          "cpu_seconds": 0.08487200000000072
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 8.395803160965443e-05,
+          "cpu_seconds": 8.400000000108321e-05
+        },
+        {
+          "version": "prototype",
+          "warmup": false,
+          "seconds": 3.5125063732266426e-05,
+          "cpu_seconds": 3.399999999942338e-05
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.1501294580521062,
+          "cpu_seconds": 0.07998399999999961
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.1501294580521062,
+            "prototype": 3.5499921068549156e-05
+          },
+          "ratio": 0.00023646206100489628
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.08487200000000072,
+            "prototype": 3.399999999942338e-05
+          },
+          "ratio": 0.0004006032613750482
+        }
+      },
+      "compared_pairs": 4
+    }
+  },
+  "clade_cache": {
+    "balanced_512": {
+      "seconds": 0.009631625027395785,
+      "numpy_descendant_bytes": 131104,
+      "descendant_entries": 16388,
+      "leaf_name_references": 4608,
+      "interval_integer_payload_bytes": 24552,
+      "note": "Interval payload is a design estimate, not an API-equivalent implementation."
+    },
+    "balanced_2048": {
+      "seconds": 0.038036708952859044,
+      "numpy_descendant_bytes": 655392,
+      "descendant_entries": 81924,
+      "leaf_name_references": 22528,
+      "interval_integer_payload_bytes": 98280,
+      "note": "Interval payload is a design estimate, not an API-equivalent implementation."
+    },
+    "ladder_512": {
+      "seconds": 0.13519345899112523,
+      "numpy_descendant_bytes": 4186112,
+      "descendant_entries": 523264,
+      "leaf_name_references": 131327,
+      "interval_integer_payload_bytes": 24552,
+      "note": "Interval payload is a design estimate, not an API-equivalent implementation."
+    },
+    "ladder_2048": {
+      "seconds": 2.584281999967061,
+      "numpy_descendant_bytes": 67076096,
+      "descendant_entries": 8384512,
+      "leaf_name_references": 2098175,
+      "interval_integer_payload_bytes": 98280,
+      "note": "Interval payload is a design estimate, not an API-equivalent implementation."
+    }
+  },
+  "commands": {}
+}

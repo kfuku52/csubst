@@ -225,3 +225,11 @@ also retain both macOS architectures and Linux, with installed PGK/PEPC parity
 for every supported Python version. Major/minor release automation calls the
 wheel workflow explicitly for the tested tag; patch versions do not create a
 release.
+
+A small scope job selects numerical lanes before dependency installation.
+Changes limited to known documentation/report formats keep lint, type checking,
+hygiene and documentation validation, while skipping numerical/package lanes.
+A patch-only version bump may accompany those changes only when the remaining
+initializer AST is identical. Source, tests, research Python scripts, packaging,
+dependencies, workflows, unknown diffs, schedules and manual runs retain numerical
+coverage. Major/minor releases always retain packaging and scientific checks.

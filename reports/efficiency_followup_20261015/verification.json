@@ -1,0 +1,41 @@
+{
+  "commit": "4382e1f84d01b7bff56855965c4c6e55c3512c51",
+  "production_changes": false,
+  "checks": {
+    "prototype_equivalence": {
+      "candidate_tables_exact": 16,
+      "nonmissing_masks_exact": 6,
+      "maximum_score_values_and_failures_exact": 8,
+      "predictive_transform_tolerance": 9
+    },
+    "benchmark_pairs_including_warmup": {
+      "scan": 12,
+      "synthetic": 40,
+      "endpoint": 4,
+      "structure_cv": 4
+    },
+    "ruff_report_scripts": "passed",
+    "make_lint": "passed; Ruff, repository hygiene and documentation checks",
+    "git_diff_check": "passed; new report files also checked with git diff --no-index --check",
+    "report_paths_sizes_json_python_syntax": "passed"
+  },
+  "omitted": {
+    "full_source_tests": "No production-code changes; prior publication verification is in reports/efficiency_20261015/verification.json",
+    "installed_artifact_and_linux": "Not run locally for report-only work",
+    "scientific_recalibration_and_optional_model_inference": "Outside measured workloads",
+    "peak_rss_comparison": "Only retained cache payloads counted"
+  },
+  "artifact_sha256": {
+    "README.md": "101a1d46803c0067f73f8f340fe96c9be7d6b7f85b13dcec7dead6fa59fd124f",
+    "audit.py": "3d391f1ed919a630027d24544525d5ce8afe447e08f8a10a36f0df5dda9d68f0",
+    "check_prototypes.py": "839f6c6ee9cce18e33fa4b68cf6851ca08f52d857de41aa1d361facc46ff99b4",
+    "ci.json": "29181c2d176693792546a9daaa07ee3123533f9a5de1d061debf8cf0c5323ba4",
+    "endpoint.json": "aeca665cb2b21d55aaed29ed7fe982bf95a17314300dff736d66ecf6a51a5e96",
+    "profile_paths.py": "8adcf4dd7ca1b1f3c615f92fa9f50c217f8882688b39a5d4d7c3a89e40199d4c",
+    "profiles.json": "6a8f668556127f9df8590f5ad0315eb2c137d88a8e868f42c6676f47f75828c8",
+    "scan.json": "41fc8107da34b43411147a5f3317a6cbd1442764ecf662cae63eefe8bd815b97",
+    "structure_cv.json": "fd04c8672d5a4bc3b3be400eac61355c5d40bd53410e299c01661dc73885d7d2",
+    "structure_cv.py": "71abbfc5e43d556a389fedee391338b29293c475755761a222a56d6666d8751d",
+    "synthetic.json": "32a230005c7492958900c9e33db261f9c2a6ad0093d880172cb17965dc1cee98"
+  }
+}

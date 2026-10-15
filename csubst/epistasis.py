@@ -7,6 +7,7 @@ prediction, not independent validation of an ASR pipeline or an epistasis test.
 import csv
 import hashlib
 import json
+from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
@@ -130,6 +131,12 @@ def predict(base, context, features, beta, clip, mask):
     if not np.isfinite(beta) or beta < 0 or not np.isfinite(clip) or clip <= 0:
         raise ValueError('beta must be finite and nonnegative; clip must be finite and positive.')
     score = (context @ features.T) / features.shape[1]
+    return _predict_score(base, score, beta, clip, mask)
+
+
+def _predict_score(base, score, beta, clip, mask):
+    if not np.isfinite(beta) or beta < 0 or not np.isfinite(clip) or clip <= 0:
+        raise ValueError('beta must be finite and nonnegative; clip must be finite and positive.')
     if not np.isfinite(score).all():
         raise ValueError('Nonfinite structure interaction score.')
     logweight = np.clip(beta * score, -clip, clip)
@@ -170,14 +177,31 @@ def _select(counts, context, features, masks, groups, rows, candidates):
         raise ValueError('Insufficient independent clades for inner CV; reduce depth bins or use fixed parameters.')
     if len(candidates) == 1:
         return candidates[0], {'selection': 'fixed', 'inner_score': None}
+    folds = [(rows[groups[rows] == group], rows[groups[rows] != group]) for group in blocks]
+    cache = OrderedDict()
+    cached_bytes = 0
+
+    def cached(key, build):
+        nonlocal cached_bytes
+        if key in cache:
+            cache.move_to_end(key)
+            return cache[key]
+        value = build()
+        if value.nbytes <= 32 * 1024**2:
+            while cache and (cached_bytes + value.nbytes > 32 * 1024**2 or len(cache) >= 1024):
+                cached_bytes -= cache.popitem(last=False)[1].nbytes
+            cache[key] = value
+            cached_bytes += value.nbytes
+        return value
+
     best, best_score, best_folds = candidates[0], -np.inf, []
     for beta, alpha, clip in candidates:
         scores = []
-        for group in blocks:
-            test = rows[groups[rows] == group]
-            train = rows[groups[rows] != group]
-            base = base_probabilities(counts, train, masks[test], alpha)
-            p = predict(base, context[test], features, beta, clip, masks[test])
+        for fold, (test, train) in enumerate(folds):
+            mask = masks[test]
+            base = cached(('base', fold, alpha), lambda: base_probabilities(counts, train, mask, alpha))
+            score = cached(('score', fold), lambda: (context[test] @ features.T) / features.shape[1])
+            p = _predict_score(base, score, beta, clip, mask)
             total = counts[test].sum()
             # All branches (including zero-event rows) remain in the folds.
             scores.append(log_score(counts[test], p) / total if total > 0 else 0.)

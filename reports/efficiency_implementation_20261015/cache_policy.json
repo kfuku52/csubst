@@ -1,0 +1,17 @@
+{
+  "case": "PEPC all matches, no calibration",
+  "caches": [
+    {
+      "calls": 811,
+      "hits": 0,
+      "retained_bytes": 2960412
+    },
+    {
+      "calls": 811,
+      "hits": 0,
+      "retained_bytes": 11921700
+    }
+  ],
+  "initial_candidate_source_sha256": "beb3bbe036abf4e036866f0653655c30463e7883d2ad5525ff94ed77f9baf5ce",
+  "final_policy": "Retain candidate vectors only for full_scan and candidate_fixed assignment calibration."
+}

@@ -9,6 +9,49 @@ from csubst import tree
 from csubst import ete
 
 
+@pytest.mark.parametrize('bad_first', ['probability', 'site', 'duplicate'])
+def test_state_batches_preserve_first_error_before_later_malformed_row(tmp_path, bad_first):
+    path = tmp_path / 'states.tsv'
+    first = {'probability': 'R\t1\tAAA\t-1\t2\n', 'site': 'R\t0\tAAA\t1\t0\n',
+             'duplicate': 'R\t1\tAAA\t1\t0\nR\t1\tAAA\t1\t0\n'}[bad_first]
+    path.write_text('Node\tSite\tState\tp_AAA\tp_AAC\n' + first + 'malformed\n')
+    expected = {'probability': 'Invalid probability', 'site': 'Unexpected Site', 'duplicate': 'Duplicate Node/Site'}
+    with pytest.raises(ValueError, match=expected[bad_first]):
+        parser_iqtree._load_internal_state_rows_one_pass(np.zeros((1, 1, 2)), path, ['AAA', 'AAC'], 1,
+                                                       {'R': 0}, {'R'}, {'R'}, np.float64)
+
+
+@pytest.mark.parametrize('boolean_source', [False, True])
+def test_missing_masks_selected_nodes_and_polytomy_match_leaf_reference(boolean_source):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('(((A:1):1,B:1,C:1)X:1,D:1)R;', format=1))
+    nodes = list(tr.traverse())
+    state = np.random.default_rng(8).random((len(nodes), 13, 4))
+    state[state < .5] = 0
+    selected = [int(ete.get_prop(node, 'numerical_label')) for node in nodes if node.name == 'X']
+    options = {'leaf_nonmissing_sites': state.sum(axis=2) != 0} if boolean_source else {'state_tensor': state}
+    expected = parser_iqtree._get_internal_site_nonzero_masks_by_leaves(tr, selected_internal_ids=selected,
+                                                                     state_tensor=options.get('state_tensor'),
+                                                                     leaf_nonmissing_sites=options.get('leaf_nonmissing_sites'))
+    actual = parser_iqtree.get_internal_site_nonzero_masks(tr, selected_internal_ids=selected, **options)
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        np.testing.assert_array_equal(actual[key], expected[key])
+
+
+def test_selected_missing_mask_does_not_read_unrelated_leaf_rows():
+    tr = ete.PhyloNode('(((A:1,B:1)X:1,C:1)Y:1,D:1)R;', format=1)
+    for index, node in enumerate(tr.traverse()):
+        ete.set_prop(node, 'numerical_label', index)
+    unrelated = next(node for node in ete.iter_leaves(tr) if node.name == 'D')
+    ete.set_prop(unrelated, 'numerical_label', 1000)
+    selected = [int(ete.get_prop(node, 'numerical_label')) for node in tr.traverse() if node.name == 'X']
+    states = np.ones((10, 2, 3)) / 3
+    expected = parser_iqtree._get_internal_site_nonzero_masks_by_leaves(tr, states, selected, None)
+    actual = parser_iqtree.get_internal_site_nonzero_masks(tr, states, selected)
+    for key in expected:
+        np.testing.assert_array_equal(actual[key], expected[key])
+
+
 def _make_state_tensor_g(tmp_path, alignment_text):
     alignment_file = tmp_path / "toy.fa"
     state_file = tmp_path / "toy.state.tsv"

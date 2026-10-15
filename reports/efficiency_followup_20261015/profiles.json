@@ -1,0 +1,2437 @@
+{
+  "commit": "4382e1f84d01b7bff56855965c4c6e55c3512c51",
+  "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+  "kind": "diagnostic cProfile, not timing comparison",
+  "cases": {
+    "pepc_scan_all": {
+      "command": [
+        "python",
+        "-m",
+        "csubst",
+        "scan",
+        "--alignment_file",
+        "csubst/dataset/PEPC.alignment.fa",
+        "--rooted_tree_file",
+        "csubst/dataset/PEPC.tree.nwk",
+        "--outdir",
+        "${WORKDIR}/pepc_scan_all/output",
+        "--threads",
+        "1",
+        "--blas_threads",
+        "1",
+        "--random_seed",
+        "8",
+        "--float_digit",
+        "12",
+        "--iqtree_treefile",
+        "csubst/dataset/PEPC.alignment.fa.treefile",
+        "--iqtree_state",
+        "csubst/dataset/PEPC.alignment.fa.state",
+        "--iqtree_rate",
+        "csubst/dataset/PEPC.alignment.fa.rate",
+        "--iqtree_iqtree",
+        "csubst/dataset/PEPC.alignment.fa.iqtree",
+        "--iqtree_log",
+        "csubst/dataset/PEPC.alignment.fa.log",
+        "--foreground",
+        "csubst/dataset/PEPC.foreground.txt",
+        "--scan_site_plot",
+        "no",
+        "--scan_pvalue_calibration",
+        "none",
+        "--scan_match",
+        "all"
+      ],
+      "total_seconds": 17.11238535599992,
+      "functions": [
+        {
+          "function": "csubst/__main__.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.9958000000000004e-05,
+          "cumulative_seconds": 17.112816333
+        },
+        {
+          "function": "csubst/cli.py:1475:main",
+          "calls": 1,
+          "self_seconds": 0.00010583200000000001,
+          "cumulative_seconds": 17.071524708000002
+        },
+        {
+          "function": "csubst/cli.py:1439:_main",
+          "calls": 1,
+          "self_seconds": 0.001606706,
+          "cumulative_seconds": 17.045556917000003
+        },
+        {
+          "function": "csubst/cli.py:300:command_scan",
+          "calls": 1,
+          "self_seconds": 0.001227126,
+          "cumulative_seconds": 16.997614083000002
+        },
+        {
+          "function": "csubst/main_scan.py:134:main_scan",
+          "calls": 1,
+          "self_seconds": 0.0012766720000000002,
+          "cumulative_seconds": 14.256423458
+        },
+        {
+          "function": "csubst/substitution_scan.py:2942:scan_substitutions",
+          "calls": 1,
+          "self_seconds": 0.001559409,
+          "cumulative_seconds": 10.323860416
+        },
+        {
+          "function": "csubst/substitution_scan.py:2212:_scan_substitutions_core",
+          "calls": 1,
+          "self_seconds": 0.10007732500000001,
+          "cumulative_seconds": 9.887864917
+        },
+        {
+          "function": "csubst/scan_ctmc.py:287:prepare",
+          "calls": 1,
+          "self_seconds": 0.026148106,
+          "cumulative_seconds": 3.628734166
+        },
+        {
+          "function": "csubst/scan_ctmc.py:150:infer",
+          "calls": 1,
+          "self_seconds": 0.0016388330000000001,
+          "cumulative_seconds": 3.5894624580000003
+        },
+        {
+          "function": "csubst/scan_ctmc.py:56:_joint_infer",
+          "calls": 1,
+          "self_seconds": 0.331604538,
+          "cumulative_seconds": 3.5878236250000004
+        },
+        {
+          "function": "csubst/substitution_scan.py:1756:_rate_summary",
+          "calls": 811,
+          "self_seconds": 0.20809128200000002,
+          "cumulative_seconds": 3.4036073320000004
+        },
+        {
+          "function": "csubst/substitution_scan.py:1301:build_candidates",
+          "calls": 1,
+          "self_seconds": 0.030679305,
+          "cumulative_seconds": 2.8699744170000003
+        },
+        {
+          "function": "csubst/endpoint.py:141:iter_blocks",
+          "calls": 3103,
+          "self_seconds": 1.020765442,
+          "cumulative_seconds": 2.7936187240000003
+        },
+        {
+          "function": "csubst/cli.py:236:get_global_parameters_or_exit",
+          "calls": 1,
+          "self_seconds": 1.8247e-05,
+          "cumulative_seconds": 2.684797666
+        },
+        {
+          "function": "csubst/param.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.0498000000000002e-05,
+          "cumulative_seconds": 2.5050712500000003
+        },
+        {
+          "function": "csubst/scan_endpoint.py:133:expected_events",
+          "calls": 811,
+          "self_seconds": 1.3304336730000001,
+          "cumulative_seconds": 2.296470123
+        },
+        {
+          "function": "csubst/asrv.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.2668000000000001e-05,
+          "cumulative_seconds": 2.011862834
+        },
+        {
+          "function": "csubst/ete.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.8625000000000002e-05,
+          "cumulative_seconds": 2.0093189170000003
+        },
+        {
+          "function": "csubst/substitution_scan.py:427:_state_distribution_label",
+          "calls": 4672,
+          "self_seconds": 0.030943156000000003,
+          "cumulative_seconds": 1.5881463100000002
+        },
+        {
+          "function": "csubst/scan_ctmc.py:97:transform",
+          "calls": 12320,
+          "self_seconds": 0.30010162900000004,
+          "cumulative_seconds": 1.423682805
+        },
+        {
+          "function": "csubst/substitution_scan.py:1390:_summarize_unit_support",
+          "calls": 2336,
+          "self_seconds": 0.060570023,
+          "cumulative_seconds": 1.403848911
+        },
+        {
+          "function": "csubst/endpoint_io.py:372:transform",
+          "calls": 12320,
+          "self_seconds": 1.0733813810000001,
+          "cumulative_seconds": 1.0733813810000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1253:_candidate_state_sets",
+          "calls": 4108,
+          "self_seconds": 0.027932549,
+          "cumulative_seconds": 0.933033984
+        },
+        {
+          "function": "csubst/substitution_scan.py:710:extract_candidate_posterior_events",
+          "calls": 811,
+          "self_seconds": 0.142677659,
+          "cumulative_seconds": 0.601681423
+        },
+        {
+          "function": "csubst/substitution_scan.py:1344:_event_mask_for_candidate",
+          "calls": 2336,
+          "self_seconds": 0.042340996000000006,
+          "cumulative_seconds": 0.527304396
+        },
+        {
+          "function": "csubst/scan_ctmc.py:107:flush_block",
+          "calls": 22,
+          "self_seconds": 0.000250951,
+          "cumulative_seconds": 0.41686237000000004
+        },
+        {
+          "function": "csubst/substitution_scan.py:2171:_build_scan_static_context",
+          "calls": 1,
+          "self_seconds": 0.000261831,
+          "cumulative_seconds": 0.3938915
+        },
+        {
+          "function": "csubst/site_storage.py:38:write_block",
+          "calls": 44,
+          "self_seconds": 0.0006386590000000001,
+          "cumulative_seconds": 0.38512571
+        },
+        {
+          "function": "csubst/site_storage.py:55:read_sites",
+          "calls": 1630,
+          "self_seconds": 0.011288946000000001,
+          "cumulative_seconds": 0.34767975700000003
+        },
+        {
+          "function": "csubst/site_storage.py:68:read_site",
+          "calls": 1622,
+          "self_seconds": 0.021998030000000002,
+          "cumulative_seconds": 0.296112594
+        },
+        {
+          "function": "csubst/substitution_scan.py:548:extract_atomic_events",
+          "calls": 1,
+          "self_seconds": 0.156918377,
+          "cumulative_seconds": 0.252866917
+        },
+        {
+          "function": "csubst/site_storage.py:110:write_block",
+          "calls": 22,
+          "self_seconds": 0.0009432510000000001,
+          "cumulative_seconds": 0.238668876
+        },
+        {
+          "function": "csubst/site_storage.py:114:read_sites",
+          "calls": 842,
+          "self_seconds": 0.0021576010000000003,
+          "cumulative_seconds": 0.227888481
+        },
+        {
+          "function": "csubst/param.py:1028:get_global_parameters",
+          "calls": 1,
+          "self_seconds": 0.00019663000000000002,
+          "cumulative_seconds": 0.17861083400000002
+        },
+        {
+          "function": "csubst/endpoint.py:125:transition",
+          "calls": 24640,
+          "self_seconds": 0.037916084,
+          "cumulative_seconds": 0.12568278400000002
+        },
+        {
+          "function": "csubst/substitution_scan.py:1554:_build_scan_q_context",
+          "calls": 1,
+          "self_seconds": 1.0876e-05,
+          "cumulative_seconds": 0.113037334
+        },
+        {
+          "function": "csubst/scan_endpoint.py:89:build_context",
+          "calls": 1,
+          "self_seconds": 0.013938407000000002,
+          "cumulative_seconds": 0.11294308300000001
+        },
+        {
+          "function": "csubst/parser_misc.py:1163:prep_state",
+          "calls": 1,
+          "self_seconds": 0.000159831,
+          "cumulative_seconds": 0.109490375
+        },
+        {
+          "function": "csubst/tsv.py:4:write_dataframe",
+          "calls": 2,
+          "self_seconds": 5.7375000000000005e-05,
+          "cumulative_seconds": 0.098744333
+        },
+        {
+          "function": "csubst/param.py:557:_normalize_state_parameters",
+          "calls": 1,
+          "self_seconds": 1.2624000000000001e-05,
+          "cumulative_seconds": 0.09128691600000001
+        },
+        {
+          "function": "csubst/endpoint_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.9500000000000002e-05,
+          "cumulative_seconds": 0.09049354100000001
+        },
+        {
+          "function": "csubst/parser_iqtree.py:1036:get_state_tensor",
+          "calls": 1,
+          "self_seconds": 0.006959842000000001,
+          "cumulative_seconds": 0.08937033400000001
+        },
+        {
+          "function": "csubst/fitted_model.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.9126e-05,
+          "cumulative_seconds": 0.088792042
+        },
+        {
+          "function": "csubst/parser_misc.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 5.2915000000000004e-05,
+          "cumulative_seconds": 0.087801583
+        },
+        {
+          "function": "csubst/substitution_scan.py:1357:_support_for_unit",
+          "calls": 21024,
+          "self_seconds": 0.057680221000000004,
+          "cumulative_seconds": 0.08078781800000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1858:exposure_diagnostics",
+          "calls": 1622,
+          "self_seconds": 0.0073306180000000006,
+          "cumulative_seconds": 0.07955512000000001
+        },
+        {
+          "function": "csubst/site_storage.py:76:iter_site_blocks",
+          "calls": 55,
+          "self_seconds": 9.2538e-05,
+          "cumulative_seconds": 0.07583345600000001
+        },
+        {
+          "function": "csubst/parser_misc.py:105:prepare_input_context",
+          "calls": 1,
+          "self_seconds": 7.7996e-05,
+          "cumulative_seconds": 0.069811125
+        },
+        {
+          "function": "csubst/foreground.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.7748000000000005e-05,
+          "cumulative_seconds": 0.066946041
+        },
+        {
+          "function": "csubst/endpoint.py:91:_uniform_transition",
+          "calls": 560,
+          "self_seconds": 0.056522978,
+          "cumulative_seconds": 0.05935912300000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1373:_format_lineage_id_list",
+          "calls": 2336,
+          "self_seconds": 0.032795743,
+          "cumulative_seconds": 0.046825328000000006
+        },
+        {
+          "function": "csubst/_extensions.py:23:load_optional_extension",
+          "calls": 7,
+          "self_seconds": 2.2079e-05,
+          "cumulative_seconds": 0.045013290000000004
+        },
+        {
+          "function": "csubst/cli.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.7334e-05,
+          "cumulative_seconds": 0.040359583000000004
+        },
+        {
+          "function": "csubst/cli_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 6.459e-06,
+          "cumulative_seconds": 0.037055792000000004
+        },
+        {
+          "function": "csubst/omega.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 0.000339332,
+          "cumulative_seconds": 0.0365175
+        },
+        {
+          "function": "csubst/parser_misc.py:412:read_input",
+          "calls": 1,
+          "self_seconds": 0.000144957,
+          "cumulative_seconds": 0.035532417000000004
+        },
+        {
+          "function": "csubst/substitution_scan.py:1647:_annotate_inference",
+          "calls": 1,
+          "self_seconds": 0.00026484100000000003,
+          "cumulative_seconds": 0.03068275
+        },
+        {
+          "function": "csubst/substitution_scan.py:438:_is_sparse_sub_tensor",
+          "calls": 71003,
+          "self_seconds": 0.013828066000000002,
+          "cumulative_seconds": 0.030109984000000003
+        },
+        {
+          "function": "csubst/cli.py:1374:_build_parser",
+          "calls": 2,
+          "self_seconds": 0.00013383900000000002,
+          "cumulative_seconds": 0.029786001000000003
+        },
+        {
+          "function": "csubst/parser_iqtree.py:72:_fill_leaf_state_matrix_codon",
+          "calls": 71,
+          "self_seconds": 0.0183617,
+          "cumulative_seconds": 0.027887877000000002
+        }
+      ]
+    },
+    "pgk_full_scan20": {
+      "command": [
+        "python",
+        "-m",
+        "csubst",
+        "scan",
+        "--alignment_file",
+        "csubst/dataset/PGK.alignment.fa",
+        "--rooted_tree_file",
+        "csubst/dataset/PGK.tree.nwk",
+        "--outdir",
+        "${WORKDIR}/pgk_full_scan20/output",
+        "--threads",
+        "1",
+        "--blas_threads",
+        "1",
+        "--random_seed",
+        "8",
+        "--float_digit",
+        "12",
+        "--iqtree_treefile",
+        "csubst/dataset/PGK.alignment.fa.treefile",
+        "--iqtree_state",
+        "csubst/dataset/PGK.alignment.fa.state",
+        "--iqtree_rate",
+        "csubst/dataset/PGK.alignment.fa.rate",
+        "--iqtree_iqtree",
+        "csubst/dataset/PGK.alignment.fa.iqtree",
+        "--iqtree_log",
+        "csubst/dataset/PGK.alignment.fa.log",
+        "--foreground",
+        "csubst/dataset/PGK.foreground.txt",
+        "--scan_site_plot",
+        "no",
+        "--scan_pvalue_calibration",
+        "full_scan",
+        "--scan_n_permutations",
+        "20"
+      ],
+      "total_seconds": 12.555151928999978,
+      "functions": [
+        {
+          "function": "csubst/__main__.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.3293e-05,
+          "cumulative_seconds": 12.559829792
+        },
+        {
+          "function": "csubst/cli.py:1475:main",
+          "calls": 1,
+          "self_seconds": 0.000103085,
+          "cumulative_seconds": 12.484082458000001
+        },
+        {
+          "function": "csubst/cli.py:1439:_main",
+          "calls": 1,
+          "self_seconds": 0.00035608300000000004,
+          "cumulative_seconds": 12.459879500000001
+        },
+        {
+          "function": "csubst/cli.py:300:command_scan",
+          "calls": 1,
+          "self_seconds": 0.00031100100000000004,
+          "cumulative_seconds": 12.454368584000001
+        },
+        {
+          "function": "csubst/main_scan.py:134:main_scan",
+          "calls": 1,
+          "self_seconds": 0.000507291,
+          "cumulative_seconds": 6.867367334000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:2942:scan_substitutions",
+          "calls": 1,
+          "self_seconds": 0.00043041600000000003,
+          "cumulative_seconds": 5.872539458
+        },
+        {
+          "function": "csubst/cli.py:236:get_global_parameters_or_exit",
+          "calls": 1,
+          "self_seconds": 1.4084000000000001e-05,
+          "cumulative_seconds": 5.540968166000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:2212:_scan_substitutions_core",
+          "calls": 21,
+          "self_seconds": 0.039328477,
+          "cumulative_seconds": 5.461737498000001
+        },
+        {
+          "function": "csubst/param.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.3083e-05,
+          "cumulative_seconds": 5.278341
+        },
+        {
+          "function": "csubst/substitution_scan.py:2802:_calibrate_scan_pvalues",
+          "calls": 1,
+          "self_seconds": 0.00024304600000000002,
+          "cumulative_seconds": 5.047759583
+        },
+        {
+          "function": "csubst/parallel.py:153:run_starmap",
+          "calls": 1,
+          "self_seconds": 1.7083000000000002e-05,
+          "cumulative_seconds": 4.947529791
+        },
+        {
+          "function": "csubst/substitution_scan.py:2650:_run_scan_permutation_chunk",
+          "calls": 1,
+          "self_seconds": 0.001241696,
+          "cumulative_seconds": 4.9475125
+        },
+        {
+          "function": "csubst/substitution_scan.py:2573:_run_scan_permutation",
+          "calls": 20,
+          "self_seconds": 0.001927581,
+          "cumulative_seconds": 4.945552872
+        },
+        {
+          "function": "csubst/asrv.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 6.9570000000000005e-06,
+          "cumulative_seconds": 4.305645458
+        },
+        {
+          "function": "csubst/ete.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.5833000000000002e-05,
+          "cumulative_seconds": 4.305202584
+        },
+        {
+          "function": "csubst/substitution_scan.py:1301:build_candidates",
+          "calls": 21,
+          "self_seconds": 0.034193228,
+          "cumulative_seconds": 2.973638042
+        },
+        {
+          "function": "csubst/substitution_scan.py:427:_state_distribution_label",
+          "calls": 5002,
+          "self_seconds": 0.038010662,
+          "cumulative_seconds": 1.9144044040000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1390:_summarize_unit_support",
+          "calls": 2501,
+          "self_seconds": 0.045410924000000005,
+          "cumulative_seconds": 1.037596344
+        },
+        {
+          "function": "csubst/scan_ctmc.py:287:prepare",
+          "calls": 1,
+          "self_seconds": 0.0064904690000000004,
+          "cumulative_seconds": 0.8728054160000001
+        },
+        {
+          "function": "csubst/scan_ctmc.py:150:infer",
+          "calls": 1,
+          "self_seconds": 0.0008976670000000001,
+          "cumulative_seconds": 0.861624625
+        },
+        {
+          "function": "csubst/scan_ctmc.py:56:_joint_infer",
+          "calls": 1,
+          "self_seconds": 0.047086911,
+          "cumulative_seconds": 0.8607269580000001
+        },
+        {
+          "function": "csubst/endpoint.py:141:iter_blocks",
+          "calls": 456,
+          "self_seconds": 0.288748647,
+          "cumulative_seconds": 0.7484777060000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1253:_candidate_state_sets",
+          "calls": 2501,
+          "self_seconds": 0.019554134,
+          "cumulative_seconds": 0.6569204980000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1344:_event_mask_for_candidate",
+          "calls": 2501,
+          "self_seconds": 0.033865135000000005,
+          "cumulative_seconds": 0.435761383
+        },
+        {
+          "function": "csubst/scan_ctmc.py:97:transform",
+          "calls": 1792,
+          "self_seconds": 0.051043977000000004,
+          "cumulative_seconds": 0.279341681
+        },
+        {
+          "function": "csubst/param.py:1028:get_global_parameters",
+          "calls": 1,
+          "self_seconds": 0.000244504,
+          "cumulative_seconds": 0.2617895
+        },
+        {
+          "function": "csubst/substitution_scan.py:2171:_build_scan_static_context",
+          "calls": 1,
+          "self_seconds": 0.000605333,
+          "cumulative_seconds": 0.24819858300000003
+        },
+        {
+          "function": "csubst/endpoint_io.py:372:transform",
+          "calls": 1792,
+          "self_seconds": 0.22100831,
+          "cumulative_seconds": 0.22100831
+        },
+        {
+          "function": "csubst/endpoint.py:125:transition",
+          "calls": 3584,
+          "self_seconds": 0.011232819000000002,
+          "cumulative_seconds": 0.132519478
+        },
+        {
+          "function": "csubst/param.py:557:_normalize_state_parameters",
+          "calls": 1,
+          "self_seconds": 1.1709000000000001e-05,
+          "cumulative_seconds": 0.12358025
+        },
+        {
+          "function": "csubst/endpoint_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.7042000000000003e-05,
+          "cumulative_seconds": 0.1229345
+        },
+        {
+          "function": "csubst/fitted_model.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.9875000000000002e-05,
+          "cumulative_seconds": 0.121031625
+        },
+        {
+          "function": "csubst/parser_misc.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.8168000000000005e-05,
+          "cumulative_seconds": 0.12028820900000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:548:extract_atomic_events",
+          "calls": 1,
+          "self_seconds": 0.09509228500000001,
+          "cumulative_seconds": 0.12001620800000001
+        },
+        {
+          "function": "csubst/foreground.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.8664e-05,
+          "cumulative_seconds": 0.107569417
+        },
+        {
+          "function": "csubst/endpoint.py:91:_uniform_transition",
+          "calls": 256,
+          "self_seconds": 0.093209199,
+          "cumulative_seconds": 0.09621367
+        },
+        {
+          "function": "csubst/substitution_scan.py:1554:_build_scan_q_context",
+          "calls": 1,
+          "self_seconds": 1.1416e-05,
+          "cumulative_seconds": 0.08792741600000001
+        },
+        {
+          "function": "csubst/scan_endpoint.py:89:build_context",
+          "calls": 1,
+          "self_seconds": 0.013674702,
+          "cumulative_seconds": 0.08783170900000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1756:_rate_summary",
+          "calls": 44,
+          "self_seconds": 0.004866698,
+          "cumulative_seconds": 0.07901662000000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:2706:_scan_plan_diagnostics",
+          "calls": 1,
+          "self_seconds": 0.004958858,
+          "cumulative_seconds": 0.077364917
+        },
+        {
+          "function": "csubst/cli.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.1834e-05,
+          "cumulative_seconds": 0.074445459
+        },
+        {
+          "function": "csubst/cli_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 5.667e-06,
+          "cumulative_seconds": 0.071800709
+        },
+        {
+          "function": "csubst/omega.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 0.000132833,
+          "cumulative_seconds": 0.06714320800000001
+        },
+        {
+          "function": "csubst/_extensions.py:23:load_optional_extension",
+          "calls": 7,
+          "self_seconds": 4.2461000000000006e-05,
+          "cumulative_seconds": 0.065981209
+        },
+        {
+          "function": "csubst/runtime.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.7541000000000003e-05,
+          "cumulative_seconds": 0.05726150000000001
+        },
+        {
+          "function": "csubst/parser_misc.py:105:prepare_input_context",
+          "calls": 1,
+          "self_seconds": 6.375200000000001e-05,
+          "cumulative_seconds": 0.055286625000000006
+        },
+        {
+          "function": "csubst/parser_misc.py:412:read_input",
+          "calls": 1,
+          "self_seconds": 0.00012149300000000001,
+          "cumulative_seconds": 0.041134041
+        },
+        {
+          "function": "csubst/substitution.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 0.000105958,
+          "cumulative_seconds": 0.040994625
+        },
+        {
+          "function": "csubst/scan_ctmc.py:107:flush_block",
+          "calls": 7,
+          "self_seconds": 6.4999e-05,
+          "cumulative_seconds": 0.040085331
+        },
+        {
+          "function": "csubst/substitution_scan.py:1953:build_site_annotations",
+          "calls": 2,
+          "self_seconds": 0.000371444,
+          "cumulative_seconds": 0.037598626
+        },
+        {
+          "function": "csubst/substitution_scan.py:1357:_support_for_unit",
+          "calls": 5002,
+          "self_seconds": 0.023721455000000002,
+          "cumulative_seconds": 0.036539619
+        },
+        {
+          "function": "csubst/parser_misc.py:1163:prep_state",
+          "calls": 1,
+          "self_seconds": 7.216400000000001e-05,
+          "cumulative_seconds": 0.035446292000000004
+        },
+        {
+          "function": "csubst/scan_endpoint.py:133:expected_events",
+          "calls": 44,
+          "self_seconds": 0.013093071000000001,
+          "cumulative_seconds": 0.034552168
+        },
+        {
+          "function": "csubst/cli.py:1374:_build_parser",
+          "calls": 2,
+          "self_seconds": 0.000116039,
+          "cumulative_seconds": 0.034348167
+        },
+        {
+          "function": "csubst/site_storage.py:38:write_block",
+          "calls": 14,
+          "self_seconds": 0.00016078700000000002,
+          "cumulative_seconds": 0.032359916
+        },
+        {
+          "function": "csubst/parser_iqtree.py:1036:get_state_tensor",
+          "calls": 1,
+          "self_seconds": 0.0010213680000000001,
+          "cumulative_seconds": 0.030691167000000002
+        },
+        {
+          "function": "csubst/combination.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 4.6209000000000004e-05,
+          "cumulative_seconds": 0.029844375000000003
+        },
+        {
+          "function": "csubst/substitution_scan.py:1210:_build_permuted_scan_context",
+          "calls": 21,
+          "self_seconds": 0.00024624200000000003,
+          "cumulative_seconds": 0.029192459
+        },
+        {
+          "function": "csubst/substitution_scan.py:2468:_build_permuted_context_with_seed",
+          "calls": 20,
+          "self_seconds": 0.0010559550000000001,
+          "cumulative_seconds": 0.027782127
+        },
+        {
+          "function": "csubst/site_storage.py:55:read_sites",
+          "calls": 99,
+          "self_seconds": 0.00060981,
+          "cumulative_seconds": 0.027680999
+        }
+      ]
+    },
+    "pepc_fixed10": {
+      "command": [
+        "python",
+        "-m",
+        "csubst",
+        "scan",
+        "--alignment_file",
+        "csubst/dataset/PEPC.alignment.fa",
+        "--rooted_tree_file",
+        "csubst/dataset/PEPC.tree.nwk",
+        "--outdir",
+        "${WORKDIR}/pepc_fixed10/output",
+        "--threads",
+        "1",
+        "--blas_threads",
+        "1",
+        "--random_seed",
+        "8",
+        "--float_digit",
+        "12",
+        "--iqtree_treefile",
+        "csubst/dataset/PEPC.alignment.fa.treefile",
+        "--iqtree_state",
+        "csubst/dataset/PEPC.alignment.fa.state",
+        "--iqtree_rate",
+        "csubst/dataset/PEPC.alignment.fa.rate",
+        "--iqtree_iqtree",
+        "csubst/dataset/PEPC.alignment.fa.iqtree",
+        "--iqtree_log",
+        "csubst/dataset/PEPC.alignment.fa.log",
+        "--foreground",
+        "csubst/dataset/PEPC.foreground.txt",
+        "--scan_site_plot",
+        "no",
+        "--scan_pvalue_calibration",
+        "candidate_fixed",
+        "--scan_n_permutations",
+        "10"
+      ],
+      "total_seconds": 10.692670805000056,
+      "functions": [
+        {
+          "function": "csubst/__main__.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.7042e-05,
+          "cumulative_seconds": 10.695392
+        },
+        {
+          "function": "csubst/cli.py:1475:main",
+          "calls": 1,
+          "self_seconds": 8.278900000000001e-05,
+          "cumulative_seconds": 10.662891083
+        },
+        {
+          "function": "csubst/cli.py:1439:_main",
+          "calls": 1,
+          "self_seconds": 0.00165025,
+          "cumulative_seconds": 10.643614417
+        },
+        {
+          "function": "csubst/cli.py:300:command_scan",
+          "calls": 1,
+          "self_seconds": 0.000306541,
+          "cumulative_seconds": 10.610520167
+        },
+        {
+          "function": "csubst/main_scan.py:134:main_scan",
+          "calls": 1,
+          "self_seconds": 0.0012133740000000001,
+          "cumulative_seconds": 8.66341525
+        },
+        {
+          "function": "csubst/substitution_scan.py:2942:scan_substitutions",
+          "calls": 1,
+          "self_seconds": 0.000508823,
+          "cumulative_seconds": 5.7535950840000005
+        },
+        {
+          "function": "csubst/substitution_scan.py:2802:_calibrate_scan_pvalues",
+          "calls": 1,
+          "self_seconds": 0.0006391200000000001,
+          "cumulative_seconds": 3.6658180830000004
+        },
+        {
+          "function": "csubst/parallel.py:153:run_starmap",
+          "calls": 1,
+          "self_seconds": 1.0917e-05,
+          "cumulative_seconds": 3.449733875
+        },
+        {
+          "function": "csubst/substitution_scan.py:2650:_run_scan_permutation_chunk",
+          "calls": 1,
+          "self_seconds": 0.001038712,
+          "cumulative_seconds": 3.4497228750000004
+        },
+        {
+          "function": "csubst/substitution_scan.py:2573:_run_scan_permutation",
+          "calls": 10,
+          "self_seconds": 0.0006792030000000001,
+          "cumulative_seconds": 3.4479517090000003
+        },
+        {
+          "function": "csubst/substitution_scan.py:2484:_candidate_fixed_permutation_scores",
+          "calls": 10,
+          "self_seconds": 0.042489453,
+          "cumulative_seconds": 3.429158084
+        },
+        {
+          "function": "csubst/scan_ctmc.py:287:prepare",
+          "calls": 1,
+          "self_seconds": 0.03161924,
+          "cumulative_seconds": 2.740225208
+        },
+        {
+          "function": "csubst/scan_ctmc.py:150:infer",
+          "calls": 1,
+          "self_seconds": 0.000883917,
+          "cumulative_seconds": 2.7011365830000003
+        },
+        {
+          "function": "csubst/scan_ctmc.py:56:_joint_infer",
+          "calls": 1,
+          "self_seconds": 0.227640843,
+          "cumulative_seconds": 2.7002526660000004
+        },
+        {
+          "function": "csubst/substitution_scan.py:1756:_rate_summary",
+          "calls": 1133,
+          "self_seconds": 0.186472187,
+          "cumulative_seconds": 2.302981867
+        },
+        {
+          "function": "csubst/endpoint.py:141:iter_blocks",
+          "calls": 3103,
+          "self_seconds": 0.7870254160000001,
+          "cumulative_seconds": 2.2374258520000003
+        },
+        {
+          "function": "csubst/cli.py:236:get_global_parameters_or_exit",
+          "calls": 1,
+          "self_seconds": 1.6293e-05,
+          "cumulative_seconds": 1.9132872920000001
+        },
+        {
+          "function": "csubst/param.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.9128000000000003e-05,
+          "cumulative_seconds": 1.8011965
+        },
+        {
+          "function": "csubst/substitution_scan.py:2212:_scan_substitutions_core",
+          "calls": 1,
+          "self_seconds": 0.011610234,
+          "cumulative_seconds": 1.655150667
+        },
+        {
+          "function": "csubst/asrv.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.55e-05,
+          "cumulative_seconds": 1.391405416
+        },
+        {
+          "function": "csubst/ete.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.2958000000000003e-05,
+          "cumulative_seconds": 1.391151583
+        },
+        {
+          "function": "csubst/scan_ctmc.py:97:transform",
+          "calls": 12320,
+          "self_seconds": 0.23257671600000002,
+          "cumulative_seconds": 1.1872241490000002
+        },
+        {
+          "function": "csubst/scan_endpoint.py:133:expected_events",
+          "calls": 1133,
+          "self_seconds": 0.4393711,
+          "cumulative_seconds": 1.089749204
+        },
+        {
+          "function": "csubst/endpoint_io.py:372:transform",
+          "calls": 12320,
+          "self_seconds": 0.916022168,
+          "cumulative_seconds": 0.916022168
+        },
+        {
+          "function": "csubst/substitution_scan.py:1301:build_candidates",
+          "calls": 1,
+          "self_seconds": 0.008749159000000001,
+          "cumulative_seconds": 0.797613042
+        },
+        {
+          "function": "csubst/substitution_scan.py:710:extract_candidate_posterior_events",
+          "calls": 1133,
+          "self_seconds": 0.058525718000000004,
+          "cumulative_seconds": 0.5372843930000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:427:_state_distribution_label",
+          "calls": 1092,
+          "self_seconds": 0.008917735000000001,
+          "cumulative_seconds": 0.48334786700000004
+        },
+        {
+          "function": "csubst/substitution_scan.py:2171:_build_scan_static_context",
+          "calls": 1,
+          "self_seconds": 0.000216166,
+          "cumulative_seconds": 0.42410829200000005
+        },
+        {
+          "function": "csubst/site_storage.py:55:read_sites",
+          "calls": 2302,
+          "self_seconds": 0.009812762000000001,
+          "cumulative_seconds": 0.396576256
+        },
+        {
+          "function": "csubst/site_storage.py:68:read_site",
+          "calls": 2266,
+          "self_seconds": 0.010185647,
+          "cumulative_seconds": 0.326222754
+        },
+        {
+          "function": "csubst/substitution_scan.py:548:extract_atomic_events",
+          "calls": 1,
+          "self_seconds": 0.196066915,
+          "cumulative_seconds": 0.30517387500000004
+        },
+        {
+          "function": "csubst/site_storage.py:114:read_sites",
+          "calls": 1178,
+          "self_seconds": 0.002112849,
+          "cumulative_seconds": 0.26750416800000004
+        },
+        {
+          "function": "csubst/substitution_scan.py:1390:_summarize_unit_support",
+          "calls": 546,
+          "self_seconds": 0.012433734,
+          "cumulative_seconds": 0.250623331
+        },
+        {
+          "function": "csubst/substitution_scan.py:1253:_candidate_state_sets",
+          "calls": 546,
+          "self_seconds": 0.00440518,
+          "cumulative_seconds": 0.203144614
+        },
+        {
+          "function": "csubst/substitution_scan.py:1490:_other_branch_ids_from_maps",
+          "calls": 1031,
+          "self_seconds": 0.021442819000000002,
+          "cumulative_seconds": 0.19799744600000002
+        },
+        {
+          "function": "csubst/scan_ctmc.py:107:flush_block",
+          "calls": 22,
+          "self_seconds": 0.00021608300000000002,
+          "cumulative_seconds": 0.19075075000000002
+        },
+        {
+          "function": "csubst/substitution_scan.py:2706:_scan_plan_diagnostics",
+          "calls": 1,
+          "self_seconds": 0.024377996000000002,
+          "cumulative_seconds": 0.183802125
+        },
+        {
+          "function": "csubst/site_storage.py:38:write_block",
+          "calls": 44,
+          "self_seconds": 0.000675424,
+          "cumulative_seconds": 0.17084950200000001
+        },
+        {
+          "function": "csubst/site_storage.py:110:write_block",
+          "calls": 22,
+          "self_seconds": 0.001151666,
+          "cumulative_seconds": 0.11739816800000001
+        },
+        {
+          "function": "csubst/param.py:1028:get_global_parameters",
+          "calls": 1,
+          "self_seconds": 0.00022954,
+          "cumulative_seconds": 0.11119216700000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1456:_union_unit_branch_ids",
+          "calls": 1033,
+          "self_seconds": 0.007823882,
+          "cumulative_seconds": 0.109436156
+        },
+        {
+          "function": "csubst/substitution_scan.py:1344:_event_mask_for_candidate",
+          "calls": 546,
+          "self_seconds": 0.011350576000000001,
+          "cumulative_seconds": 0.10920587100000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1858:exposure_diagnostics",
+          "calls": 2266,
+          "self_seconds": 0.007695625,
+          "cumulative_seconds": 0.09408501100000001
+        },
+        {
+          "function": "csubst/substitution_scan.py:1554:_build_scan_q_context",
+          "calls": 1,
+          "self_seconds": 1.3915000000000001e-05,
+          "cumulative_seconds": 0.093234541
+        },
+        {
+          "function": "csubst/scan_endpoint.py:89:build_context",
+          "calls": 1,
+          "self_seconds": 0.009411639000000001,
+          "cumulative_seconds": 0.093147541
+        },
+        {
+          "function": "csubst/endpoint.py:125:transition",
+          "calls": 24640,
+          "self_seconds": 0.026061874000000002,
+          "cumulative_seconds": 0.08977070300000001
+        },
+        {
+          "function": "csubst/site_storage.py:76:iter_site_blocks",
+          "calls": 55,
+          "self_seconds": 0.000129171,
+          "cumulative_seconds": 0.082804335
+        },
+        {
+          "function": "csubst/parser_misc.py:1163:prep_state",
+          "calls": 1,
+          "self_seconds": 0.000191668,
+          "cumulative_seconds": 0.079966542
+        },
+        {
+          "function": "csubst/substitution_scan.py:1446:_target_branch_ids_from_maps",
+          "calls": 2063,
+          "self_seconds": 0.035483827,
+          "cumulative_seconds": 0.07944717400000001
+        },
+        {
+          "function": "csubst/param.py:557:_normalize_state_parameters",
+          "calls": 1,
+          "self_seconds": 1.2917e-05,
+          "cumulative_seconds": 0.063109541
+        },
+        {
+          "function": "csubst/endpoint_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.3667e-05,
+          "cumulative_seconds": 0.06269645800000001
+        },
+        {
+          "function": "csubst/parser_iqtree.py:1036:get_state_tensor",
+          "calls": 1,
+          "self_seconds": 0.0062883800000000005,
+          "cumulative_seconds": 0.06268725
+        },
+        {
+          "function": "csubst/fitted_model.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.7501000000000003e-05,
+          "cumulative_seconds": 0.059009250000000006
+        },
+        {
+          "function": "csubst/parser_misc.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 4.5709000000000006e-05,
+          "cumulative_seconds": 0.05807525
+        },
+        {
+          "function": "csubst/parser_misc.py:105:prepare_input_context",
+          "calls": 1,
+          "self_seconds": 6.7416e-05,
+          "cumulative_seconds": 0.048851250000000006
+        },
+        {
+          "function": "csubst/foreground.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 5.2542000000000006e-05,
+          "cumulative_seconds": 0.047670458000000006
+        },
+        {
+          "function": "csubst/endpoint.py:91:_uniform_transition",
+          "calls": 560,
+          "self_seconds": 0.03976327,
+          "cumulative_seconds": 0.042842361
+        },
+        {
+          "function": "csubst/substitution_scan.py:1029:_parse_id_list",
+          "calls": 9324,
+          "self_seconds": 0.025660518,
+          "cumulative_seconds": 0.040600988000000005
+        },
+        {
+          "function": "csubst/substitution_scan.py:2451:_scan_row_key",
+          "calls": 1236,
+          "self_seconds": 0.002147051,
+          "cumulative_seconds": 0.036159732
+        },
+        {
+          "function": "csubst/substitution_scan.py:1449:<genexpr>",
+          "calls": 290883,
+          "self_seconds": 0.033274579000000006,
+          "cumulative_seconds": 0.033274579000000006
+        }
+      ]
+    },
+    "pepc_full": {
+      "command": [
+        "python",
+        "-m",
+        "csubst",
+        "search",
+        "--alignment_file",
+        "csubst/dataset/PEPC.alignment.fa",
+        "--rooted_tree_file",
+        "csubst/dataset/PEPC.tree.nwk",
+        "--outdir",
+        "${WORKDIR}/pepc_full/output",
+        "--threads",
+        "1",
+        "--blas_threads",
+        "1",
+        "--random_seed",
+        "8",
+        "--float_digit",
+        "12",
+        "--iqtree_treefile",
+        "csubst/dataset/PEPC.alignment.fa.treefile",
+        "--iqtree_state",
+        "csubst/dataset/PEPC.alignment.fa.state",
+        "--iqtree_rate",
+        "csubst/dataset/PEPC.alignment.fa.rate",
+        "--iqtree_iqtree",
+        "csubst/dataset/PEPC.alignment.fa.iqtree",
+        "--iqtree_log",
+        "csubst/dataset/PEPC.alignment.fa.log",
+        "--max_arity",
+        "2",
+        "--output_stat",
+        "any2any,spe2any,any2spe,spe2spe",
+        "--drop_invariant_tip_sites",
+        "no",
+        "--calibrate_longtail",
+        "no"
+      ],
+      "total_seconds": 10.758834065999999,
+      "functions": [
+        {
+          "function": "csubst/__main__.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.4917000000000002e-05,
+          "cumulative_seconds": 10.7602425
+        },
+        {
+          "function": "csubst/cli.py:1475:main",
+          "calls": 1,
+          "self_seconds": 7.4418e-05,
+          "cumulative_seconds": 10.729133416
+        },
+        {
+          "function": "csubst/output_run.py:22:search_output_lock",
+          "calls": 2,
+          "self_seconds": 3.3041000000000004e-05,
+          "cumulative_seconds": 10.696756625
+        },
+        {
+          "function": "csubst/resource_cache.py:242:acquire_exclusive_lock",
+          "calls": 2,
+          "self_seconds": 1.9748e-05,
+          "cumulative_seconds": 10.696436959000001
+        },
+        {
+          "function": "csubst/resource_cache.py:190:_release_lock",
+          "calls": 1,
+          "self_seconds": 5.7541000000000004e-05,
+          "cumulative_seconds": 10.695982375
+        },
+        {
+          "function": "csubst/cli.py:1439:_main",
+          "calls": 1,
+          "self_seconds": 0.001671209,
+          "cumulative_seconds": 10.695068209
+        },
+        {
+          "function": "csubst/cli.py:289:command_search",
+          "calls": 1,
+          "self_seconds": 2.6002000000000003e-05,
+          "cumulative_seconds": 10.691455000000001
+        },
+        {
+          "function": "csubst/main_analyze.py:674:main_analyze",
+          "calls": 1,
+          "self_seconds": 0.00013791700000000001,
+          "cumulative_seconds": 8.910831791
+        },
+        {
+          "function": "csubst/main_analyze.py:683:_main_analyze",
+          "calls": 1,
+          "self_seconds": 0.000332442,
+          "cumulative_seconds": 8.901774167000001
+        },
+        {
+          "function": "csubst/parser_misc.py:1163:prep_state",
+          "calls": 1,
+          "self_seconds": 0.000131709,
+          "cumulative_seconds": 7.823550083000001
+        },
+        {
+          "function": "csubst/endpoint_io.py:651:prepare",
+          "calls": 5,
+          "self_seconds": 0.001374124,
+          "cumulative_seconds": 7.782018042000001
+        },
+        {
+          "function": "csubst/endpoint_io.py:389:_build",
+          "calls": 1,
+          "self_seconds": 0.239451037,
+          "cumulative_seconds": 7.745731625
+        },
+        {
+          "function": "csubst/endpoint.py:141:iter_blocks",
+          "calls": 4372,
+          "self_seconds": 1.220067245,
+          "cumulative_seconds": 4.874526841000001
+        },
+        {
+          "function": "csubst/endpoint_io.py:372:transform",
+          "calls": 34720,
+          "self_seconds": 3.3348972800000003,
+          "cumulative_seconds": 3.3348972800000003
+        },
+        {
+          "function": "csubst/cli.py:236:get_global_parameters_or_exit",
+          "calls": 1,
+          "self_seconds": 2.4417e-05,
+          "cumulative_seconds": 1.7784005840000001
+        },
+        {
+          "function": "csubst/param.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.5668000000000005e-05,
+          "cumulative_seconds": 1.685387125
+        },
+        {
+          "function": "csubst/endpoint_io.py:160:append",
+          "calls": 69440,
+          "self_seconds": 0.420294292,
+          "cumulative_seconds": 1.480351809
+        },
+        {
+          "function": "csubst/asrv.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 4.3916000000000004e-05,
+          "cumulative_seconds": 1.33159475
+        },
+        {
+          "function": "csubst/ete.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 8.708e-06,
+          "cumulative_seconds": 1.331382625
+        },
+        {
+          "function": "csubst/endpoint_io.py:155:_flush",
+          "calls": 512,
+          "self_seconds": 1.0223584540000001,
+          "cumulative_seconds": 1.022523375
+        },
+        {
+          "function": "csubst/main_analyze.py:140:cb_search",
+          "calls": 1,
+          "self_seconds": 0.005332456,
+          "cumulative_seconds": 0.9648515830000001
+        },
+        {
+          "function": "csubst/endpoint_io.py:243:_projections",
+          "calls": 17360,
+          "self_seconds": 0.011894984,
+          "cumulative_seconds": 0.958524962
+        },
+        {
+          "function": "csubst/tsv.py:4:write_dataframe",
+          "calls": 3,
+          "self_seconds": 9.8292e-05,
+          "cumulative_seconds": 0.7133120000000001
+        },
+        {
+          "function": "csubst/event_reporting.py:7:annotate",
+          "calls": 3,
+          "self_seconds": 0.027777464,
+          "cumulative_seconds": 0.15974479300000002
+        },
+        {
+          "function": "csubst/endpoint.py:125:transition",
+          "calls": 34720,
+          "self_seconds": 0.034010655,
+          "cumulative_seconds": 0.101199594
+        },
+        {
+          "function": "csubst/tree.py:387:get_node_distance",
+          "calls": 1,
+          "self_seconds": 7.4088e-05,
+          "cumulative_seconds": 0.092665167
+        },
+        {
+          "function": "csubst/param.py:1028:get_global_parameters",
+          "calls": 1,
+          "self_seconds": 0.000138861,
+          "cumulative_seconds": 0.092160459
+        },
+        {
+          "function": "csubst/tree.py:289:calc_node_dist_chunk",
+          "calls": 1,
+          "self_seconds": 0.020206893,
+          "cumulative_seconds": 0.091188792
+        },
+        {
+          "function": "csubst/ete.py:114:get_distance",
+          "calls": 16892,
+          "self_seconds": 0.067828909,
+          "cumulative_seconds": 0.067828909
+        },
+        {
+          "function": "csubst/omega.py:3457:calc_omega",
+          "calls": 1,
+          "self_seconds": 0.00116725,
+          "cumulative_seconds": 0.062054500000000005
+        },
+        {
+          "function": "csubst/parser_iqtree.py:1036:get_state_tensor",
+          "calls": 1,
+          "self_seconds": 0.004265966,
+          "cumulative_seconds": 0.05304475
+        },
+        {
+          "function": "csubst/omega.py:2299:get_E",
+          "calls": 1,
+          "self_seconds": 0.00011721000000000001,
+          "cumulative_seconds": 0.047395625000000004
+        },
+        {
+          "function": "csubst/foreground.py:1652:add_median_cb_stats",
+          "calls": 1,
+          "self_seconds": 4.9836e-05,
+          "cumulative_seconds": 0.045156792
+        },
+        {
+          "function": "csubst/endpoint.py:91:_uniform_transition",
+          "calls": 560,
+          "self_seconds": 0.040888231000000004,
+          "cumulative_seconds": 0.043042786
+        },
+        {
+          "function": "csubst/param.py:215:_normalize_model_parameters",
+          "calls": 1,
+          "self_seconds": 3.7793e-05,
+          "cumulative_seconds": 0.038827834000000006
+        },
+        {
+          "function": "csubst/recoding_config.py:106:validate_nonsyn_expectation",
+          "calls": 3,
+          "self_seconds": 2.1625e-05,
+          "cumulative_seconds": 0.038782500000000004
+        },
+        {
+          "function": "csubst/expectation_3di.py:27:validate_options",
+          "calls": 3,
+          "self_seconds": 5.793e-06,
+          "cumulative_seconds": 0.038393209000000005
+        },
+        {
+          "function": "csubst/expectation_3di.py:18:required",
+          "calls": 4,
+          "self_seconds": 8.707e-06,
+          "cumulative_seconds": 0.038391125000000005
+        },
+        {
+          "function": "csubst/endpoint_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.646e-05,
+          "cumulative_seconds": 0.038015375000000004
+        },
+        {
+          "function": "csubst/fitted_model.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.1334e-05,
+          "cumulative_seconds": 0.036775125000000006
+        },
+        {
+          "function": "csubst/parser_misc.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.1082000000000005e-05,
+          "cumulative_seconds": 0.036297542
+        },
+        {
+          "function": "csubst/endpoint_io.py:614:_input_fingerprint",
+          "calls": 5,
+          "self_seconds": 0.0013463260000000001,
+          "cumulative_seconds": 0.032925
+        },
+        {
+          "function": "csubst/foreground.py:1454:_aggregate_cb_stats",
+          "calls": 1,
+          "self_seconds": 4.0956000000000006e-05,
+          "cumulative_seconds": 0.032766208000000005
+        },
+        {
+          "function": "csubst/cli.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.4750000000000002e-05,
+          "cumulative_seconds": 0.030781583
+        },
+        {
+          "function": "csubst/substitution.py:1024:get_b",
+          "calls": 2,
+          "self_seconds": 0.0036651670000000004,
+          "cumulative_seconds": 0.030175625
+        },
+        {
+          "function": "csubst/foreground.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.7667000000000004e-05,
+          "cumulative_seconds": 0.029650667000000002
+        },
+        {
+          "function": "csubst/cli_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 8.542e-06,
+          "cumulative_seconds": 0.028519625000000003
+        },
+        {
+          "function": "csubst/parser_misc.py:105:prepare_input_context",
+          "calls": 1,
+          "self_seconds": 7.3541e-05,
+          "cumulative_seconds": 0.028153
+        },
+        {
+          "function": "csubst/endpoint_io.py:168:finish",
+          "calls": 16,
+          "self_seconds": 1.2666e-05,
+          "cumulative_seconds": 0.026804918
+        },
+        {
+          "function": "csubst/endpoint_io.py:617:add",
+          "calls": 385,
+          "self_seconds": 0.02131972,
+          "cumulative_seconds": 0.026144824
+        },
+        {
+          "function": "csubst/substitution.py:1793:get_cb_from_pairwise_grams",
+          "calls": 4,
+          "self_seconds": 0.0013565810000000001,
+          "cumulative_seconds": 0.024422708
+        },
+        {
+          "function": "csubst/output_safety.py:18:same_path",
+          "calls": 329,
+          "self_seconds": 0.0005892120000000001,
+          "cumulative_seconds": 0.022444424
+        },
+        {
+          "function": "csubst/runtime.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.8042e-05,
+          "cumulative_seconds": 0.021663958
+        },
+        {
+          "function": "csubst/output_safety.py:27:check_destination",
+          "calls": 21,
+          "self_seconds": 0.00012361700000000002,
+          "cumulative_seconds": 0.021647583
+        },
+        {
+          "function": "csubst/_extensions.py:23:load_optional_extension",
+          "calls": 7,
+          "self_seconds": 1.4002e-05,
+          "cumulative_seconds": 0.020123417
+        },
+        {
+          "function": "csubst/table.py:55:sort_branch_ids",
+          "calls": 9,
+          "self_seconds": 0.00018607700000000001,
+          "cumulative_seconds": 0.019966667
+        },
+        {
+          "function": "csubst/foreground.py:1402:_ensure_df_cb_stats_columns",
+          "calls": 1,
+          "self_seconds": 7.875200000000001e-05,
+          "cumulative_seconds": 0.019671875000000002
+        },
+        {
+          "function": "csubst/table.py:108:merge_tables",
+          "calls": 5,
+          "self_seconds": 0.00011407700000000001,
+          "cumulative_seconds": 0.017779834
+        },
+        {
+          "function": "csubst/omega.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 6.4669e-05,
+          "cumulative_seconds": 0.016081208
+        },
+        {
+          "function": "csubst/parser_iqtree.py:72:_fill_leaf_state_matrix_codon",
+          "calls": 71,
+          "self_seconds": 0.008862675,
+          "cumulative_seconds": 0.015477621
+        }
+      ]
+    },
+    "pepc_marginal": {
+      "command": [
+        "python",
+        "-m",
+        "csubst",
+        "search",
+        "--alignment_file",
+        "csubst/dataset/PEPC.alignment.fa",
+        "--rooted_tree_file",
+        "csubst/dataset/PEPC.tree.nwk",
+        "--outdir",
+        "${WORKDIR}/pepc_marginal/output",
+        "--threads",
+        "1",
+        "--blas_threads",
+        "1",
+        "--random_seed",
+        "8",
+        "--float_digit",
+        "12",
+        "--iqtree_treefile",
+        "csubst/dataset/PEPC.alignment.fa.treefile",
+        "--iqtree_state",
+        "csubst/dataset/PEPC.alignment.fa.state",
+        "--iqtree_rate",
+        "csubst/dataset/PEPC.alignment.fa.rate",
+        "--iqtree_iqtree",
+        "csubst/dataset/PEPC.alignment.fa.iqtree",
+        "--iqtree_log",
+        "csubst/dataset/PEPC.alignment.fa.log",
+        "--max_arity",
+        "2",
+        "--substitution_posterior",
+        "marginal"
+      ],
+      "total_seconds": 5.188300600000004,
+      "functions": [
+        {
+          "function": "csubst/__main__.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 0.000640375,
+          "cumulative_seconds": 5.189635667
+        },
+        {
+          "function": "csubst/cli.py:1475:main",
+          "calls": 1,
+          "self_seconds": 0.000151835,
+          "cumulative_seconds": 5.165073875
+        },
+        {
+          "function": "csubst/output_run.py:22:search_output_lock",
+          "calls": 2,
+          "self_seconds": 3.9499e-05,
+          "cumulative_seconds": 5.131262833
+        },
+        {
+          "function": "csubst/resource_cache.py:242:acquire_exclusive_lock",
+          "calls": 2,
+          "self_seconds": 2.0668000000000003e-05,
+          "cumulative_seconds": 5.1309275
+        },
+        {
+          "function": "csubst/resource_cache.py:190:_release_lock",
+          "calls": 1,
+          "self_seconds": 7.3124e-05,
+          "cumulative_seconds": 5.1303735
+        },
+        {
+          "function": "csubst/cli.py:1439:_main",
+          "calls": 1,
+          "self_seconds": 0.001190335,
+          "cumulative_seconds": 5.128248792
+        },
+        {
+          "function": "csubst/cli.py:289:command_search",
+          "calls": 1,
+          "self_seconds": 4.9041e-05,
+          "cumulative_seconds": 5.1242638750000005
+        },
+        {
+          "function": "csubst/main_analyze.py:674:main_analyze",
+          "calls": 1,
+          "self_seconds": 0.001340582,
+          "cumulative_seconds": 3.359575083
+        },
+        {
+          "function": "csubst/main_analyze.py:683:_main_analyze",
+          "calls": 1,
+          "self_seconds": 0.00040434300000000004,
+          "cumulative_seconds": 3.349509959
+        },
+        {
+          "function": "csubst/cli.py:236:get_global_parameters_or_exit",
+          "calls": 1,
+          "self_seconds": 1.1126e-05,
+          "cumulative_seconds": 1.76278175
+        },
+        {
+          "function": "csubst/main_analyze.py:140:cb_search",
+          "calls": 1,
+          "self_seconds": 0.004512589,
+          "cumulative_seconds": 1.718750167
+        },
+        {
+          "function": "csubst/param.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 4.1252000000000004e-05,
+          "cumulative_seconds": 1.666158709
+        },
+        {
+          "function": "csubst/parser_misc.py:1163:prep_state",
+          "calls": 1,
+          "self_seconds": 6.6877e-05,
+          "cumulative_seconds": 1.321692042
+        },
+        {
+          "function": "csubst/parser_iqtree.py:1036:get_state_tensor",
+          "calls": 1,
+          "self_seconds": 0.0049874080000000005,
+          "cumulative_seconds": 1.304378875
+        },
+        {
+          "function": "csubst/asrv.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.0585000000000001e-05,
+          "cumulative_seconds": 1.253376167
+        },
+        {
+          "function": "csubst/ete.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.3375000000000002e-05,
+          "cumulative_seconds": 1.2532041250000001
+        },
+        {
+          "function": "csubst/parser_iqtree.py:938:_load_internal_state_rows_one_pass",
+          "calls": 1,
+          "self_seconds": 0.304639785,
+          "cumulative_seconds": 1.18657775
+        },
+        {
+          "function": "csubst/omega.py:3457:calc_omega",
+          "calls": 1,
+          "self_seconds": 0.001374168,
+          "cumulative_seconds": 0.723469833
+        },
+        {
+          "function": "csubst/omega.py:2299:get_E",
+          "calls": 1,
+          "self_seconds": 0.000401452,
+          "cumulative_seconds": 0.710740958
+        },
+        {
+          "function": "csubst/tsv.py:4:write_dataframe",
+          "calls": 3,
+          "self_seconds": 4.9792e-05,
+          "cumulative_seconds": 0.6484034160000001
+        },
+        {
+          "function": "csubst/omega.py:1810:_get_fused_expected_sparse_reducer",
+          "calls": 2,
+          "self_seconds": 0.007851904,
+          "cumulative_seconds": 0.501565834
+        },
+        {
+          "function": "csubst/substitution.py:1638:_calc_projection_gram_pair_values",
+          "calls": 8,
+          "self_seconds": 0.197628287,
+          "cumulative_seconds": 0.199311291
+        },
+        {
+          "function": "csubst/substitution.py:1809:get_cb_from_expected_reducer",
+          "calls": 2,
+          "self_seconds": 7.746000000000001e-05,
+          "cumulative_seconds": 0.18699162600000002
+        },
+        {
+          "function": "csubst/substitution.py:1815:get_cb_from_sparse_projections",
+          "calls": 2,
+          "self_seconds": 0.00038733500000000004,
+          "cumulative_seconds": 0.18691416600000002
+        },
+        {
+          "function": "csubst/substitution.py:2171:get_cb",
+          "calls": 2,
+          "self_seconds": 6.2959e-05,
+          "cumulative_seconds": 0.17848012600000002
+        },
+        {
+          "function": "csubst/substitution.py:984:get_substitution_tensor",
+          "calls": 2,
+          "self_seconds": 2.8042e-05,
+          "cumulative_seconds": 0.17366487500000002
+        },
+        {
+          "function": "csubst/substitution.py:571:_build_sparse_substitution_tensor",
+          "calls": 2,
+          "self_seconds": 0.000198996,
+          "cumulative_seconds": 0.173620624
+        },
+        {
+          "function": "csubst/substitution.py:521:_build_cython_packed_substitution_tensor",
+          "calls": 2,
+          "self_seconds": 0.164955707,
+          "cumulative_seconds": 0.16822720800000002
+        },
+        {
+          "function": "csubst/omega.py:1561:_project_parent_eigen_state",
+          "calls": 276,
+          "self_seconds": 0.15140097400000002,
+          "cumulative_seconds": 0.165470541
+        },
+        {
+          "function": "csubst/substitution.py:2133:_run_cb_parallel_jobs",
+          "calls": 2,
+          "self_seconds": 1.7459e-05,
+          "cumulative_seconds": 0.163111958
+        },
+        {
+          "function": "csubst/substitution.py:2120:_run_cb_single_job",
+          "calls": 2,
+          "self_seconds": 2.879e-05,
+          "cumulative_seconds": 0.162609791
+        },
+        {
+          "function": "csubst/substitution.py:1946:sub_tensor2cb_sparse",
+          "calls": 2,
+          "self_seconds": 2.021e-05,
+          "cumulative_seconds": 0.16198404200000002
+        },
+        {
+          "function": "csubst/substitution.py:1704:_run_sparse_cb_projection_gram",
+          "calls": 2,
+          "self_seconds": 0.000154294,
+          "cumulative_seconds": 0.16176141700000002
+        },
+        {
+          "function": "csubst/parser_iqtree.py:259:_iter_state_rows",
+          "calls": 67000,
+          "self_seconds": 0.088834046,
+          "cumulative_seconds": 0.13755416
+        },
+        {
+          "function": "csubst/substitution.py:1459:_get_sparse_cb_projection",
+          "calls": 4,
+          "self_seconds": 5.5211000000000004e-05,
+          "cumulative_seconds": 0.133255332
+        },
+        {
+          "function": "csubst/substitution.py:1451:_build_sparse_cb_projection",
+          "calls": 4,
+          "self_seconds": 0.00046304100000000003,
+          "cumulative_seconds": 0.133165375
+        },
+        {
+          "function": "csubst/substitution_sparse.py:235:project",
+          "calls": 4,
+          "self_seconds": 0.01732743,
+          "cumulative_seconds": 0.132702334
+        },
+        {
+          "function": "csubst/expected_sparse.py:199:finalize",
+          "calls": 4,
+          "self_seconds": 3.0791000000000004e-05,
+          "cumulative_seconds": 0.125862667
+        },
+        {
+          "function": "csubst/param.py:1028:get_global_parameters",
+          "calls": 1,
+          "self_seconds": 0.000216762,
+          "cumulative_seconds": 0.09622570800000001
+        },
+        {
+          "function": "csubst/tree.py:387:get_node_distance",
+          "calls": 1,
+          "self_seconds": 7.815900000000001e-05,
+          "cumulative_seconds": 0.09000166600000001
+        },
+        {
+          "function": "csubst/tree.py:289:calc_node_dist_chunk",
+          "calls": 1,
+          "self_seconds": 0.017553669,
+          "cumulative_seconds": 0.08864704100000001
+        },
+        {
+          "function": "csubst/expected_sparse.py:96:branch_projection_payloads",
+          "calls": 276,
+          "self_seconds": 0.073180255,
+          "cumulative_seconds": 0.074414175
+        },
+        {
+          "function": "csubst/ete.py:114:get_distance",
+          "calls": 16616,
+          "self_seconds": 0.068345942,
+          "cumulative_seconds": 0.068345942
+        },
+        {
+          "function": "csubst/omega.py:1555:_transform_parent_state_to_eigen",
+          "calls": 258,
+          "self_seconds": 0.067072951,
+          "cumulative_seconds": 0.067072951
+        },
+        {
+          "function": "csubst/parser_iqtree.py:884:mask_missing_sites",
+          "calls": 1,
+          "self_seconds": 0.000692193,
+          "cumulative_seconds": 0.063512333
+        },
+        {
+          "function": "csubst/parser_iqtree.py:280:_parse_state_site_label",
+          "calls": 66999,
+          "self_seconds": 0.043226863000000004,
+          "cumulative_seconds": 0.062249905
+        },
+        {
+          "function": "csubst/parser_iqtree.py:896:get_internal_site_nonzero_masks",
+          "calls": 1,
+          "self_seconds": 0.034650956000000004,
+          "cumulative_seconds": 0.058158834000000006
+        },
+        {
+          "function": "csubst/parser_misc.py:105:prepare_input_context",
+          "calls": 1,
+          "self_seconds": 0.00010374900000000001,
+          "cumulative_seconds": 0.046136416
+        },
+        {
+          "function": "csubst/foreground.py:1652:add_median_cb_stats",
+          "calls": 1,
+          "self_seconds": 4.8085000000000005e-05,
+          "cumulative_seconds": 0.036228333
+        },
+        {
+          "function": "csubst/param.py:215:_normalize_model_parameters",
+          "calls": 1,
+          "self_seconds": 4.6250000000000006e-05,
+          "cumulative_seconds": 0.035439916
+        },
+        {
+          "function": "csubst/recoding_config.py:106:validate_nonsyn_expectation",
+          "calls": 3,
+          "self_seconds": 3.0042e-05,
+          "cumulative_seconds": 0.035397251000000005
+        },
+        {
+          "function": "csubst/expectation_3di.py:27:validate_options",
+          "calls": 3,
+          "self_seconds": 1.2375000000000001e-05,
+          "cumulative_seconds": 0.034662958
+        },
+        {
+          "function": "csubst/expectation_3di.py:18:required",
+          "calls": 4,
+          "self_seconds": 1.5417e-05,
+          "cumulative_seconds": 0.034656083000000004
+        },
+        {
+          "function": "csubst/endpoint_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.1835e-05,
+          "cumulative_seconds": 0.03395925
+        },
+        {
+          "function": "csubst/fitted_model.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.3042000000000002e-05,
+          "cumulative_seconds": 0.031669375
+        },
+        {
+          "function": "csubst/parser_misc.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.4378e-05,
+          "cumulative_seconds": 0.031156375000000004
+        },
+        {
+          "function": "csubst/substitution.py:1024:get_b",
+          "calls": 2,
+          "self_seconds": 0.003139277,
+          "cumulative_seconds": 0.030231833000000003
+        },
+        {
+          "function": "csubst/foreground.py:1454:_aggregate_cb_stats",
+          "calls": 1,
+          "self_seconds": 3.2459e-05,
+          "cumulative_seconds": 0.02712525
+        },
+        {
+          "function": "csubst/output_safety.py:18:same_path",
+          "calls": 314,
+          "self_seconds": 0.000668334,
+          "cumulative_seconds": 0.025863876
+        },
+        {
+          "function": "csubst/foreground.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.6167000000000002e-05,
+          "cumulative_seconds": 0.025617375
+        }
+      ]
+    },
+    "pgk_urn": {
+      "command": [
+        "python",
+        "-m",
+        "csubst",
+        "search",
+        "--alignment_file",
+        "csubst/dataset/PGK.alignment.fa",
+        "--rooted_tree_file",
+        "csubst/dataset/PGK.tree.nwk",
+        "--outdir",
+        "${WORKDIR}/pgk_urn/output",
+        "--threads",
+        "1",
+        "--blas_threads",
+        "1",
+        "--random_seed",
+        "8",
+        "--float_digit",
+        "12",
+        "--iqtree_treefile",
+        "csubst/dataset/PGK.alignment.fa.treefile",
+        "--iqtree_state",
+        "csubst/dataset/PGK.alignment.fa.state",
+        "--iqtree_rate",
+        "csubst/dataset/PGK.alignment.fa.rate",
+        "--iqtree_iqtree",
+        "csubst/dataset/PGK.alignment.fa.iqtree",
+        "--iqtree_log",
+        "csubst/dataset/PGK.alignment.fa.log",
+        "--max_arity",
+        "2",
+        "--expectation_method",
+        "urn",
+        "--output_stat",
+        "any2spe"
+      ],
+      "total_seconds": 4.844640489000002,
+      "functions": [
+        {
+          "function": "csubst/__main__.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.2376e-05,
+          "cumulative_seconds": 4.846379000000001
+        },
+        {
+          "function": "csubst/cli.py:1475:main",
+          "calls": 1,
+          "self_seconds": 6.9709e-05,
+          "cumulative_seconds": 4.809341958
+        },
+        {
+          "function": "csubst/output_run.py:22:search_output_lock",
+          "calls": 2,
+          "self_seconds": 0.001261708,
+          "cumulative_seconds": 4.775781084
+        },
+        {
+          "function": "csubst/resource_cache.py:242:acquire_exclusive_lock",
+          "calls": 2,
+          "self_seconds": 2.7040000000000002e-05,
+          "cumulative_seconds": 4.774108042
+        },
+        {
+          "function": "csubst/resource_cache.py:190:_release_lock",
+          "calls": 1,
+          "self_seconds": 5.6005e-05,
+          "cumulative_seconds": 4.773182542000001
+        },
+        {
+          "function": "csubst/cli.py:1439:_main",
+          "calls": 1,
+          "self_seconds": 0.002818,
+          "cumulative_seconds": 4.769072333
+        },
+        {
+          "function": "csubst/cli.py:289:command_search",
+          "calls": 1,
+          "self_seconds": 2.5916e-05,
+          "cumulative_seconds": 4.763542958
+        },
+        {
+          "function": "csubst/main_analyze.py:674:main_analyze",
+          "calls": 1,
+          "self_seconds": 0.000552125,
+          "cumulative_seconds": 2.7544378750000003
+        },
+        {
+          "function": "csubst/main_analyze.py:683:_main_analyze",
+          "calls": 1,
+          "self_seconds": 0.0018734620000000002,
+          "cumulative_seconds": 2.7445552500000003
+        },
+        {
+          "function": "csubst/cli.py:236:get_global_parameters_or_exit",
+          "calls": 1,
+          "self_seconds": 1.2208e-05,
+          "cumulative_seconds": 2.006859792
+        },
+        {
+          "function": "csubst/param.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.9249e-05,
+          "cumulative_seconds": 1.910583334
+        },
+        {
+          "function": "csubst/asrv.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 6.459e-06,
+          "cumulative_seconds": 1.4618460420000001
+        },
+        {
+          "function": "csubst/ete.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 8.459e-06,
+          "cumulative_seconds": 1.461672625
+        },
+        {
+          "function": "csubst/main_analyze.py:140:cb_search",
+          "calls": 1,
+          "self_seconds": 0.000504248,
+          "cumulative_seconds": 1.455748167
+        },
+        {
+          "function": "csubst/endpoint_io.py:651:prepare",
+          "calls": 3,
+          "self_seconds": 0.005152921,
+          "cumulative_seconds": 1.117385208
+        },
+        {
+          "function": "csubst/parser_misc.py:1163:prep_state",
+          "calls": 1,
+          "self_seconds": 8.270900000000001e-05,
+          "cumulative_seconds": 1.102429542
+        },
+        {
+          "function": "csubst/endpoint_io.py:389:_build",
+          "calls": 1,
+          "self_seconds": 0.016416114000000002,
+          "cumulative_seconds": 1.074706791
+        },
+        {
+          "function": "csubst/omega.py:3457:calc_omega",
+          "calls": 1,
+          "self_seconds": 4.5291000000000004e-05,
+          "cumulative_seconds": 0.9786555840000001
+        },
+        {
+          "function": "csubst/omega.py:2299:get_E",
+          "calls": 1,
+          "self_seconds": 0.000110211,
+          "cumulative_seconds": 0.9745028330000001
+        },
+        {
+          "function": "csubst/omega.py:2196:calc_E_stat",
+          "calls": 2,
+          "self_seconds": 6.1538e-05,
+          "cumulative_seconds": 0.82352475
+        },
+        {
+          "function": "csubst/omega.py:1966:calc_E_mean",
+          "calls": 2,
+          "self_seconds": 0.0028315890000000002,
+          "cumulative_seconds": 0.619622875
+        },
+        {
+          "function": "csubst/omega.py:1063:_calc_urn_expected_overlap",
+          "calls": 79,
+          "self_seconds": 0.00014271300000000001,
+          "cumulative_seconds": 0.608719875
+        },
+        {
+          "function": "csubst/omega.py:1031:_calc_wallenius_expected_overlap",
+          "calls": 79,
+          "self_seconds": 0.006157541000000001,
+          "cumulative_seconds": 0.608448999
+        },
+        {
+          "function": "csubst/omega.py:951:_calc_weighted_urn_expected_overlap",
+          "calls": 79,
+          "self_seconds": 0.034945853,
+          "cumulative_seconds": 0.6022914580000001
+        },
+        {
+          "function": "csubst/endpoint.py:141:iter_blocks",
+          "calls": 456,
+          "self_seconds": 0.158789388,
+          "cumulative_seconds": 0.5278436390000001
+        },
+        {
+          "function": "csubst/substitution.py:2171:get_cb",
+          "calls": 2,
+          "self_seconds": 5.4503e-05,
+          "cumulative_seconds": 0.353427417
+        },
+        {
+          "function": "csubst/substitution.py:2133:_run_cb_parallel_jobs",
+          "calls": 2,
+          "self_seconds": 2.4499e-05,
+          "cumulative_seconds": 0.34536945700000005
+        },
+        {
+          "function": "csubst/substitution.py:2120:_run_cb_single_job",
+          "calls": 2,
+          "self_seconds": 0.00013624900000000002,
+          "cumulative_seconds": 0.34250566600000004
+        },
+        {
+          "function": "csubst/substitution.py:1946:sub_tensor2cb_sparse",
+          "calls": 2,
+          "self_seconds": 4.0333e-05,
+          "cumulative_seconds": 0.341793375
+        },
+        {
+          "function": "csubst/substitution.py:1704:_run_sparse_cb_projection_gram",
+          "calls": 2,
+          "self_seconds": 0.00017724800000000002,
+          "cumulative_seconds": 0.338768499
+        },
+        {
+          "function": "csubst/omega.py:1032:inclusion",
+          "calls": 10045,
+          "self_seconds": 0.024406972000000002,
+          "cumulative_seconds": 0.33237151400000003
+        },
+        {
+          "function": "csubst/substitution.py:1459:_get_sparse_cb_projection",
+          "calls": 2,
+          "self_seconds": 3.1745e-05,
+          "cumulative_seconds": 0.314351166
+        },
+        {
+          "function": "csubst/substitution.py:1451:_build_sparse_cb_projection",
+          "calls": 2,
+          "self_seconds": 0.000662458,
+          "cumulative_seconds": 0.31430362500000003
+        },
+        {
+          "function": "csubst/substitution_sparse.py:235:project",
+          "calls": 2,
+          "self_seconds": 0.033871133000000005,
+          "cumulative_seconds": 0.313641167
+        },
+        {
+          "function": "csubst/endpoint_io.py:372:transform",
+          "calls": 1792,
+          "self_seconds": 0.302476379,
+          "cumulative_seconds": 0.302476379
+        },
+        {
+          "function": "csubst/omega.py:797:_calc_wallenius_inclusion_probabilities",
+          "calls": 10045,
+          "self_seconds": 0.173223647,
+          "cumulative_seconds": 0.277517519
+        },
+        {
+          "function": "csubst/endpoint_io.py:128:finish",
+          "calls": 2,
+          "self_seconds": 0.011809679,
+          "cumulative_seconds": 0.248052083
+        },
+        {
+          "function": "csubst/endpoint_io.py:114:append",
+          "calls": 896,
+          "self_seconds": 0.051200396,
+          "cumulative_seconds": 0.24638758900000002
+        },
+        {
+          "function": "csubst/omega.py:2141:_prepare_substitution_permutation_components",
+          "calls": 2,
+          "self_seconds": 8.370900000000001e-05,
+          "cumulative_seconds": 0.19784041700000002
+        },
+        {
+          "function": "csubst/substitution_sparse.py:318:summarize_sparse_sub_tensor",
+          "calls": 2,
+          "self_seconds": 0.004072831,
+          "cumulative_seconds": 0.197749791
+        },
+        {
+          "function": "csubst/omega.py:589:_calc_cb_site_overlap",
+          "calls": 79,
+          "self_seconds": 0.16146358000000002,
+          "cumulative_seconds": 0.17520322000000002
+        },
+        {
+          "function": "csubst/substitution.py:793:get_group_state_totals",
+          "calls": 2,
+          "self_seconds": 0.0025227960000000003,
+          "cumulative_seconds": 0.145031041
+        },
+        {
+          "function": "csubst/substitution_sparse.py:106:decode_event_ids",
+          "calls": 390,
+          "self_seconds": 0.10311664200000001,
+          "cumulative_seconds": 0.112318582
+        },
+        {
+          "function": "csubst/substitution_sparse.py:192:iter_branch_coordinates",
+          "calls": 264,
+          "self_seconds": 0.029772874,
+          "cumulative_seconds": 0.107039254
+        },
+        {
+          "function": "csubst/param.py:1028:get_global_parameters",
+          "calls": 1,
+          "self_seconds": 0.000161915,
+          "cumulative_seconds": 0.095882958
+        },
+        {
+          "function": "csubst/tsv.py:4:write_dataframe",
+          "calls": 3,
+          "self_seconds": 5.9377000000000004e-05,
+          "cumulative_seconds": 0.077831417
+        },
+        {
+          "function": "csubst/param.py:215:_normalize_model_parameters",
+          "calls": 1,
+          "self_seconds": 5.4538000000000005e-05,
+          "cumulative_seconds": 0.042355250000000004
+        },
+        {
+          "function": "csubst/recoding_config.py:106:validate_nonsyn_expectation",
+          "calls": 3,
+          "self_seconds": 2.0959e-05,
+          "cumulative_seconds": 0.042292333
+        },
+        {
+          "function": "csubst/expectation_3di.py:27:validate_options",
+          "calls": 3,
+          "self_seconds": 9.208e-06,
+          "cumulative_seconds": 0.041911833
+        },
+        {
+          "function": "csubst/expectation_3di.py:18:required",
+          "calls": 4,
+          "self_seconds": 8.666e-06,
+          "cumulative_seconds": 0.041906583000000004
+        },
+        {
+          "function": "csubst/endpoint_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 2.6751000000000002e-05,
+          "cumulative_seconds": 0.041490875
+        },
+        {
+          "function": "csubst/substitution.py:1108:get_s",
+          "calls": 2,
+          "self_seconds": 8.1248e-05,
+          "cumulative_seconds": 0.041121500000000005
+        },
+        {
+          "function": "csubst/fitted_model.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.1041000000000002e-05,
+          "cumulative_seconds": 0.040173458
+        },
+        {
+          "function": "csubst/parser_misc.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.379e-05,
+          "cumulative_seconds": 0.039676208000000004
+        },
+        {
+          "function": "csubst/substitution.py:677:get_site_sub_counts",
+          "calls": 2,
+          "self_seconds": 0.025554041000000003,
+          "cumulative_seconds": 0.036746918
+        },
+        {
+          "function": "csubst/cli.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.7458e-05,
+          "cumulative_seconds": 0.036729291000000004
+        },
+        {
+          "function": "csubst/cli_io.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 1.3709e-05,
+          "cumulative_seconds": 0.035404959
+        },
+        {
+          "function": "csubst/event_reporting.py:7:annotate",
+          "calls": 3,
+          "self_seconds": 0.005816190000000001,
+          "cumulative_seconds": 0.034992583
+        },
+        {
+          "function": "csubst/foreground.py:1:<module>",
+          "calls": 1,
+          "self_seconds": 3.3166e-05,
+          "cumulative_seconds": 0.033289083000000004
+        },
+        {
+          "function": "csubst/endpoint_io.py:614:_input_fingerprint",
+          "calls": 3,
+          "self_seconds": 0.00043073600000000003,
+          "cumulative_seconds": 0.032951459
+        }
+      ]
+    }
+  },
+  "input_sha256": {
+    "csubst/dataset/PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+    "csubst/dataset/PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+    "csubst/dataset/PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+    "csubst/dataset/PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+    "csubst/dataset/PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+    "csubst/dataset/PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+    "csubst/dataset/PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0",
+    "csubst/dataset/PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+    "csubst/dataset/PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+    "csubst/dataset/PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+    "csubst/dataset/PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+    "csubst/dataset/PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+    "csubst/dataset/PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+    "csubst/dataset/PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+    "csubst/dataset/PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03",
+    "csubst/dataset/PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258"
+  }
+}

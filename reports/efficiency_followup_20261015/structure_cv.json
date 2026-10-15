@@ -1,0 +1,101 @@
+{
+  "runs": [
+    {
+      "version": "before",
+      "warmup": true,
+      "seconds": 0.7640683329664171,
+      "cpu_seconds": 0.69042
+    },
+    {
+      "version": "prototype",
+      "warmup": true,
+      "seconds": 0.5521062921034172,
+      "cpu_seconds": 0.49229199999999995
+    },
+    {
+      "version": "prototype",
+      "warmup": false,
+      "seconds": 0.677920666988939,
+      "cpu_seconds": 0.575907
+    },
+    {
+      "version": "before",
+      "warmup": false,
+      "seconds": 0.6681732090655714,
+      "cpu_seconds": 0.6392950000000002
+    },
+    {
+      "version": "before",
+      "warmup": false,
+      "seconds": 0.7615503330016509,
+      "cpu_seconds": 0.6955030000000004
+    },
+    {
+      "version": "prototype",
+      "warmup": false,
+      "seconds": 0.5415238339919597,
+      "cpu_seconds": 0.4930950000000003
+    },
+    {
+      "version": "prototype",
+      "warmup": false,
+      "seconds": 0.5757099170004949,
+      "cpu_seconds": 0.5193950000000003
+    },
+    {
+      "version": "before",
+      "warmup": false,
+      "seconds": 0.7019245420815423,
+      "cpu_seconds": 0.6424719999999997
+    }
+  ],
+  "summary": {
+    "seconds": {
+      "medians": {
+        "before": 0.7019245420815423,
+        "prototype": 0.5757099170004949
+      },
+      "ratio": 0.8201877587770893
+    },
+    "cpu_seconds": {
+      "medians": {
+        "before": 0.6424719999999997,
+        "prototype": 0.5193950000000003
+      },
+      "ratio": 0.8084321184425166
+    }
+  },
+  "compared_pairs": 4,
+  "branches": 80,
+  "sites": 256,
+  "dimensions": 2,
+  "folds": 5,
+  "candidates": 744,
+  "cache_counters": [
+    {
+      "base_calls": 3720,
+      "base_retained_bytes": 655360,
+      "base_hits": 3700,
+      "score_retained_bytes": 163840
+    },
+    {
+      "base_calls": 3720,
+      "base_retained_bytes": 655360,
+      "base_hits": 3700,
+      "score_retained_bytes": 163840
+    },
+    {
+      "base_calls": 3720,
+      "base_retained_bytes": 655360,
+      "base_hits": 3700,
+      "score_retained_bytes": 163840
+    },
+    {
+      "base_calls": 3720,
+      "base_retained_bytes": 655360,
+      "base_hits": 3700,
+      "score_retained_bytes": 163840
+    }
+  ],
+  "scope": "Inner selection only; synthetic valid inputs, optional feature."
+}
