@@ -71,7 +71,8 @@ def test_build_candidates_supports_scan_match_specific_grouping():
     assert set(spe_to_spe["state_change"].tolist()) == {"A1K", "A1N", "C1K"}
 
 
-def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground_targets():
+@pytest.mark.parametrize('prepared', [False, True])
+def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground_targets(prepared):
     candidate_events = pd.DataFrame(
         {
             "branch_id": [1, 3, 4],
@@ -94,6 +95,7 @@ def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground
         units_df=units,
         target_class="fg",
         min_event_pp=0.5,
+        unit_plan=substitution_scan._scan_unit_support_plan(units) if prepared else None,
     )
 
     assert fg["support_unit_ids"] == "1"
@@ -109,6 +111,19 @@ def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground
             target_class="mg",
             min_event_pp=0.5,
         )
+
+
+def test_candidate_event_mask_preserves_row_order_and_excludes_diagonal_mass():
+    events = pd.DataFrame({
+        'site': ['2', '0', '2', '2', '2', '2'],
+        'from_state_id': ['0', '0', '1', '2', '0', '0'],
+        'to_state_id': ['1', '1', '1', '1', '2', '1'],
+    }, index=[8, 4, 3, 3, 1, 0])
+    mask = substitution_scan._event_mask_for_candidate(events, 2, [0, 1], [1])
+    assert mask.tolist() == [True, False, False, False, False, True]
+    assert not substitution_scan._event_mask_for_candidate(events, 3, [0], [1]).any()
+    assert not substitution_scan._event_mask_for_candidate(events, 2, [], [1]).any()
+    assert substitution_scan._event_mask_for_candidate(events.iloc[:0], 2, [0], [1]).shape == (0,)
 
 
 @pytest.mark.parametrize("third_branch_pp, expected_count, expected_ids", [

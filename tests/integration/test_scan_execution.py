@@ -170,6 +170,20 @@ def test_scan_called_rate_mode_does_not_build_unused_projection(monkeypatch):
     assert context["rate_event_projection"] is None
 
 
+def test_scan_does_not_extract_rate_events_for_candidates_below_minimum_support(monkeypatch):
+    g, on_tensor = _toy_scan_context()
+    on_tensor[g['fg_ids']['trait'][1], 0, 0, 0, 1] = 0.1
+    monkeypatch.setattr(
+        substitution_scan, 'extract_candidate_posterior_events',
+        lambda *args, **kwargs: pytest.fail('Unsupported candidates do not need rate events'),
+    )
+
+    frame, units = substitution_scan._scan_substitutions_core(g, on_tensor)
+
+    assert frame.empty
+    assert len(units) == 2
+
+
 def test_main_scan_all_sites_filtered_writes_no_test_result(monkeypatch, tmp_path):
     g, on_tensor = _toy_scan_context()
     g.update(foreground="foreground.tsv", outdir=str(tmp_path), output_prefix="csubst",

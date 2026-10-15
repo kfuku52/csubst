@@ -1344,14 +1344,14 @@ def build_candidates(events, scan_matches, state_orders):
 def _event_mask_for_candidate(events, site, from_ids, to_ids):
     if events.shape[0] == 0:
         return np.zeros(shape=(0,), dtype=bool)
-    from_ids = set(int(v) for v in np.asarray(from_ids, dtype=np.int64).reshape(-1).tolist())
-    to_ids = set(int(v) for v in np.asarray(to_ids, dtype=np.int64).reshape(-1).tolist())
-    return (
-        (events["site"].astype(int) == int(site))
-        & events["from_state_id"].astype(int).isin(from_ids)
-        & events["to_state_id"].astype(int).isin(to_ids)
-        & (events["from_state_id"].astype(int) != events["to_state_id"].astype(int))
-    ).to_numpy(dtype=bool)
+    from_ids = np.asarray(from_ids, dtype=np.int64).reshape(-1)
+    to_ids = np.asarray(to_ids, dtype=np.int64).reshape(-1)
+    mask = events["site"].to_numpy(dtype=int) == int(site)
+    positions = np.flatnonzero(mask)
+    ancestral = events["from_state_id"].to_numpy(dtype=int)[positions]
+    derived = events["to_state_id"].to_numpy(dtype=int)[positions]
+    mask[positions] &= np.isin(ancestral, from_ids) & np.isin(derived, to_ids) & (ancestral != derived)
+    return mask
 
 
 def _support_for_unit(branch_event, branch_ids, min_event_pp):
@@ -1376,7 +1376,18 @@ def _format_lineage_id_list(values):
     return output.getvalue().removesuffix("\r\n")
 
 
-def _summarize_unit_support(candidate_events, units_df, target_class, min_event_pp):
+def _scan_unit_support_plan(units_df):
+    """Parse fixed branch membership once per trait/foreground assignment."""
+    branch_lists = units_df.get("fg_branch_ids", [""] * len(units_df))
+    return [
+        (unit_id, lineage_value, _parse_id_list(branch_ids))
+        for unit_id, lineage_value, branch_ids in zip(
+            units_df["unit_id"], units_df["lineage_value"], branch_lists,
+        )
+    ]
+
+
+def _summarize_unit_support(candidate_events, units_df, target_class, min_event_pp, unit_plan=None):
     if str(target_class) != "fg":
         raise ValueError("Only foreground target class is supported in scan.")
     if units_df.shape[0] == 0:
@@ -1399,9 +1410,9 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
     support_branches = []
     analyzable_lineages = dict()
     support_lineages = set()
-    for _, row in units_df.iterrows():
-        fg_ids = _parse_id_list(row.get("fg_branch_ids", ""))
-        lineage_value = row["lineage_value"]
+    if unit_plan is None:
+        unit_plan = _scan_unit_support_plan(units_df)
+    for unit_id, lineage_value, fg_ids in unit_plan:
         if fg_ids.size > 0:
             analyzable_lineages[lineage_value] = None
         fg_pp, fg_support_branches = _support_for_unit(branch_event, fg_ids, min_event_pp)
@@ -1409,7 +1420,7 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
         pp = fg_pp
         branches = fg_support_branches
         if is_support:
-            support_units.append(int(row["unit_id"]))
+            support_units.append(int(unit_id))
             support_pp.append(float(pp))
             support_branches.extend([int(v) for v in branches])
             support_lineages.add(lineage_value)
@@ -2277,7 +2288,27 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
         else:
             site_annotations = scan_static["permutation_site_annotations"]
         site_annotation_by_site = site_annotations.set_index("site", drop=False)
-        for _, cand in candidates.iterrows():
+        unit_plan = _scan_unit_support_plan(units_trait)
+        rate_branch_sets = {
+            target_class: (
+                _target_branch_ids_from_maps(
+                    fg_ids_map=rate_fg_ids_map,
+                    trait_name=trait_name,
+                    target_class=target_class,
+                    valid_branch_ids=valid_branch_ids,
+                ),
+                _other_branch_ids_from_maps(
+                    fg_ids_map=rate_fg_ids_map,
+                    trait_name=trait_name,
+                    target_class=target_class,
+                    valid_branch_ids=valid_branch_ids,
+                    scan_other_scope=scan_other_scope,
+                    units_df=units_trait,
+                ),
+            )
+            for target_class in scan_targets
+        }
+        for cand in candidates.to_dict("records"):
             site = int(cand["site"])
             from_ids = np.array([int(v) for v in str(cand["from_state_ids"]).split(",") if v != ""], dtype=np.int64)
             to_ids = np.array([int(v) for v in str(cand["to_state_ids"]).split(",") if v != ""], dtype=np.int64)
@@ -2288,6 +2319,15 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                 to_ids=to_ids,
             )
             matched_events = events.loc[mask, :].copy()
+            candidate_support = _summarize_unit_support(
+                candidate_events=matched_events,
+                units_df=units_trait,
+                target_class="fg",
+                min_event_pp=min_event_pp,
+                unit_plan=unit_plan,
+            )
+            if int(candidate_support["support_unit_count"]) < int(min_support_count):
+                continue
             if rate_event_mode == "called":
                 rate_events = matched_events
             elif rate_event_mode == "posterior_sum":
@@ -2302,14 +2342,6 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
             else:
                 txt = "--scan_rate_event_mode should be one of {}."
                 raise ValueError(txt.format(", ".join(SCAN_RATE_EVENT_MODES)))
-            candidate_support = _summarize_unit_support(
-                candidate_events=matched_events,
-                units_df=units_trait,
-                target_class="fg",
-                min_event_pp=min_event_pp,
-            )
-            if int(candidate_support["support_unit_count"]) < int(min_support_count):
-                continue
             scan_id += 1
             site_row = site_annotation_by_site.loc[site, :].to_dict()
             site_label = int(site_row.get("codon_site_alignment", site + 1))
@@ -2320,26 +2352,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                 match=cand["scan_match"],
             )
             for target_class in scan_targets:
-                target_branch_ids = _target_branch_ids_from_maps(
-                    fg_ids_map=rate_fg_ids_map,
-                    trait_name=trait_name,
-                    target_class=target_class,
-                    valid_branch_ids=valid_branch_ids,
-                )
-                other_branch_ids = _other_branch_ids_from_maps(
-                    fg_ids_map=rate_fg_ids_map,
-                    trait_name=trait_name,
-                    target_class=target_class,
-                    valid_branch_ids=valid_branch_ids,
-                    scan_other_scope=scan_other_scope,
-                    units_df=units_trait,
-                )
-                support = _summarize_unit_support(
-                    candidate_events=matched_events,
-                    units_df=units_trait,
-                    target_class=target_class,
-                    min_event_pp=min_event_pp,
-                )
+                target_branch_ids, other_branch_ids = rate_branch_sets[target_class]
                 rate = _rate_summary(
                     candidate_events=rate_events,
                     branch_meta=branch_meta,
@@ -2397,7 +2410,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     "p_rate_enrichment_empirical_maxT": np.nan,
                 }
                 row.update(site_row)
-                row.update(support)
+                row.update(candidate_support)
                 row.update(rate)
                 rows.append(row)
     if len(rows) == 0:

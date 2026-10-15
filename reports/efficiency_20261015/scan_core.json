@@ -1,0 +1,264 @@
+{
+  "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "warmups": 1,
+  "measured_repeats": 3,
+  "runs": [
+    {
+      "case": "pgk_scan_defaults",
+      "version": "before",
+      "repeat": 0,
+      "warmup": true,
+      "seconds": 0.24005754198879004,
+      "cpu_seconds": 0.2258849999999999,
+      "rows": 12
+    },
+    {
+      "case": "pgk_scan_defaults",
+      "version": "after",
+      "repeat": 0,
+      "warmup": true,
+      "seconds": 0.12870837491936982,
+      "cpu_seconds": 0.12795600000000018,
+      "rows": 12
+    },
+    {
+      "case": "pgk_scan_defaults",
+      "version": "after",
+      "repeat": 1,
+      "warmup": false,
+      "seconds": 0.13443108298815787,
+      "cpu_seconds": 0.1323190000000003,
+      "rows": 12
+    },
+    {
+      "case": "pgk_scan_defaults",
+      "version": "before",
+      "repeat": 1,
+      "warmup": false,
+      "seconds": 0.28079583297949284,
+      "cpu_seconds": 0.25045899999999977,
+      "rows": 12
+    },
+    {
+      "case": "pgk_scan_defaults",
+      "version": "before",
+      "repeat": 2,
+      "warmup": false,
+      "seconds": 0.2635433330433443,
+      "cpu_seconds": 0.24402800000000013,
+      "rows": 12
+    },
+    {
+      "case": "pgk_scan_defaults",
+      "version": "after",
+      "repeat": 2,
+      "warmup": false,
+      "seconds": 0.17229116696398705,
+      "cpu_seconds": 0.15901599999999982,
+      "rows": 12
+    },
+    {
+      "case": "pgk_scan_defaults",
+      "version": "after",
+      "repeat": 3,
+      "warmup": false,
+      "seconds": 0.17027520795818418,
+      "cpu_seconds": 0.16122900000000007,
+      "rows": 12
+    },
+    {
+      "case": "pgk_scan_defaults",
+      "version": "before",
+      "repeat": 3,
+      "warmup": false,
+      "seconds": 0.3367162919603288,
+      "cpu_seconds": 0.28228399999999976,
+      "rows": 12
+    },
+    {
+      "case": "pepc_scan_defaults",
+      "version": "before",
+      "repeat": 0,
+      "warmup": true,
+      "seconds": 1.5098351249471307,
+      "cpu_seconds": 1.192088,
+      "rows": 103
+    },
+    {
+      "case": "pepc_scan_defaults",
+      "version": "after",
+      "repeat": 0,
+      "warmup": true,
+      "seconds": 1.0057731249835342,
+      "cpu_seconds": 0.7162160000000002,
+      "rows": 103
+    },
+    {
+      "case": "pepc_scan_defaults",
+      "version": "after",
+      "repeat": 1,
+      "warmup": false,
+      "seconds": 1.084953041980043,
+      "cpu_seconds": 0.7494829999999997,
+      "rows": 103
+    },
+    {
+      "case": "pepc_scan_defaults",
+      "version": "before",
+      "repeat": 1,
+      "warmup": false,
+      "seconds": 1.9104477079818025,
+      "cpu_seconds": 1.2730789999999992,
+      "rows": 103
+    },
+    {
+      "case": "pepc_scan_defaults",
+      "version": "before",
+      "repeat": 2,
+      "warmup": false,
+      "seconds": 1.42376029107254,
+      "cpu_seconds": 1.1843590000000006,
+      "rows": 103
+    },
+    {
+      "case": "pepc_scan_defaults",
+      "version": "after",
+      "repeat": 2,
+      "warmup": false,
+      "seconds": 0.8176962920697406,
+      "cpu_seconds": 0.6358610000000002,
+      "rows": 103
+    },
+    {
+      "case": "pepc_scan_defaults",
+      "version": "after",
+      "repeat": 3,
+      "warmup": false,
+      "seconds": 0.7786255829269066,
+      "cpu_seconds": 0.6463809999999999,
+      "rows": 103
+    },
+    {
+      "case": "pepc_scan_defaults",
+      "version": "before",
+      "repeat": 3,
+      "warmup": false,
+      "seconds": 1.2988042089855298,
+      "cpu_seconds": 1.1141559999999995,
+      "rows": 103
+    }
+  ],
+  "summary": {
+    "pgk_scan_defaults": {
+      "seconds": {
+        "medians": {
+          "before": 0.28079583297949284,
+          "after": 0.17027520795818418
+        },
+        "after_over_before": 0.6064021896315668
+      },
+      "cpu_seconds": {
+        "medians": {
+          "before": 0.25045899999999977,
+          "after": 0.15901599999999982
+        },
+        "after_over_before": 0.6348983266722297
+      },
+      "identical_output": true,
+      "command": [
+        "${HOME}/miniforge3-arm64/bin/python",
+        "-m",
+        "csubst",
+        "scan",
+        "--alignment_file",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PGK.alignment.fa",
+        "--rooted_tree_file",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PGK.tree.nwk",
+        "--outdir",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/scan-core/pgk_scan_defaults",
+        "--threads",
+        "1",
+        "--blas_threads",
+        "1",
+        "--random_seed",
+        "8",
+        "--float_digit",
+        "12",
+        "--iqtree_treefile",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PGK.alignment.fa.treefile",
+        "--iqtree_state",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PGK.alignment.fa.state",
+        "--iqtree_rate",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PGK.alignment.fa.rate",
+        "--iqtree_iqtree",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PGK.alignment.fa.iqtree",
+        "--iqtree_log",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PGK.alignment.fa.log",
+        "--foreground",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PGK.foreground.txt",
+        "--scan_site_plot",
+        "no",
+        "--scan_pvalue_calibration",
+        "none"
+      ]
+    },
+    "pepc_scan_defaults": {
+      "seconds": {
+        "medians": {
+          "before": 1.42376029107254,
+          "after": 0.8176962920697406
+        },
+        "after_over_before": 0.574321602587861
+      },
+      "cpu_seconds": {
+        "medians": {
+          "before": 1.1843590000000006,
+          "after": 0.6463809999999999
+        },
+        "after_over_before": 0.5457644177145609
+      },
+      "identical_output": true,
+      "command": [
+        "${HOME}/miniforge3-arm64/bin/python",
+        "-m",
+        "csubst",
+        "scan",
+        "--alignment_file",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PEPC.alignment.fa",
+        "--rooted_tree_file",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PEPC.tree.nwk",
+        "--outdir",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/scan-core/pepc_scan_defaults",
+        "--threads",
+        "1",
+        "--blas_threads",
+        "1",
+        "--random_seed",
+        "8",
+        "--float_digit",
+        "12",
+        "--iqtree_treefile",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PEPC.alignment.fa.treefile",
+        "--iqtree_state",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PEPC.alignment.fa.state",
+        "--iqtree_rate",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PEPC.alignment.fa.rate",
+        "--iqtree_iqtree",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PEPC.alignment.fa.iqtree",
+        "--iqtree_log",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PEPC.alignment.fa.log",
+        "--foreground",
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/baseline/csubst/dataset/PEPC.foreground.txt",
+        "--scan_site_plot",
+        "no",
+        "--scan_pvalue_calibration",
+        "none"
+      ]
+    }
+  },
+  "source_sha256": {
+    "before": "ad0eace454f19c24a8e351e865e221fac16fe95c4c0720457048c629ba654ba1",
+    "after": "0a21adcad371d178f334d6996bfa1754123ef6a707684d40e21169b23777b96c"
+  }
+}

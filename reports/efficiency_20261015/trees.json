@@ -1,0 +1,160 @@
+{
+  "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "warmups": 1,
+  "measured_repeats": 3,
+  "runs": [
+    {
+      "case": "balanced_2048",
+      "version": "before",
+      "command": [
+        "${HOME}/miniforge3-arm64/bin/python",
+        "${HOME}/repos/csubst/reports/efficiency_20261015/benchmark.py",
+        "tree-worker",
+        "balanced_2048"
+      ],
+      "seconds": [
+        0.05106916697695851,
+        0.02356124995276332,
+        0.06685645796824247
+      ],
+      "output_sha256": "8a5d268906699f9cbcb9bf71797ddf16ae54d80025bde768aa30b07445d4db8d",
+      "peak_rss_mib": 126.578125,
+      "source_sha256": {
+        "tree.py": "902157596e64450dc11697ea8116926abe0952d4e422a0a482354bf96634f40b",
+        "endpoint.py": "0cdff54f5ca204aecb7bb56908d941aa949a58c2db1bfb2c44cd6746b16f6d16"
+      }
+    },
+    {
+      "case": "balanced_2048",
+      "version": "after",
+      "command": [
+        "${HOME}/miniforge3-arm64/bin/python",
+        "${HOME}/repos/csubst/reports/efficiency_20261015/benchmark.py",
+        "tree-worker",
+        "balanced_2048"
+      ],
+      "seconds": [
+        0.005378833971917629,
+        0.005688625038601458,
+        0.004784708027727902
+      ],
+      "output_sha256": "8a5d268906699f9cbcb9bf71797ddf16ae54d80025bde768aa30b07445d4db8d",
+      "peak_rss_mib": 127.171875,
+      "source_sha256": {
+        "tree.py": "96037e296bf1c9502a9a1592329d95c794d7f7bf4c19ef9fff0db75cb69a2f5d",
+        "endpoint.py": "4d64021b56d99b84655962cd88616d30a812c008bbbfaf119027296a46aa9d1a"
+      }
+    },
+    {
+      "case": "ladder_2048",
+      "version": "before",
+      "command": [
+        "${HOME}/miniforge3-arm64/bin/python",
+        "${HOME}/repos/csubst/reports/efficiency_20261015/benchmark.py",
+        "tree-worker",
+        "ladder_2048"
+      ],
+      "seconds": [
+        1.1390555000398308,
+        1.1379444579361007,
+        1.1342145410599187
+      ],
+      "output_sha256": "92a025adf1553f149688bd6e139d90f43fd5164fdb9a54eefe8ddb40dbe54c46",
+      "peak_rss_mib": 128.421875,
+      "source_sha256": {
+        "tree.py": "902157596e64450dc11697ea8116926abe0952d4e422a0a482354bf96634f40b",
+        "endpoint.py": "0cdff54f5ca204aecb7bb56908d941aa949a58c2db1bfb2c44cd6746b16f6d16"
+      }
+    },
+    {
+      "case": "ladder_2048",
+      "version": "after",
+      "command": [
+        "${HOME}/miniforge3-arm64/bin/python",
+        "${HOME}/repos/csubst/reports/efficiency_20261015/benchmark.py",
+        "tree-worker",
+        "ladder_2048"
+      ],
+      "seconds": [
+        0.008387750014662743,
+        0.010436875047162175,
+        0.01722566701937467
+      ],
+      "output_sha256": "92a025adf1553f149688bd6e139d90f43fd5164fdb9a54eefe8ddb40dbe54c46",
+      "peak_rss_mib": 127.71875,
+      "source_sha256": {
+        "tree.py": "96037e296bf1c9502a9a1592329d95c794d7f7bf4c19ef9fff0db75cb69a2f5d",
+        "endpoint.py": "4d64021b56d99b84655962cd88616d30a812c008bbbfaf119027296a46aa9d1a"
+      }
+    },
+    {
+      "case": "endpoint_16384",
+      "version": "before",
+      "command": [
+        "${HOME}/miniforge3-arm64/bin/python",
+        "${HOME}/repos/csubst/reports/efficiency_20261015/benchmark.py",
+        "tree-worker",
+        "endpoint_16384"
+      ],
+      "seconds": [
+        1.3880545829888433,
+        1.7885328329866752,
+        1.705187042010948
+      ],
+      "output_sha256": "08063881d584e95e1734c94e92def2197295bb9d20f96d44852ce6fe37aa3687",
+      "peak_rss_mib": 124.296875,
+      "source_sha256": {
+        "tree.py": "902157596e64450dc11697ea8116926abe0952d4e422a0a482354bf96634f40b",
+        "endpoint.py": "0cdff54f5ca204aecb7bb56908d941aa949a58c2db1bfb2c44cd6746b16f6d16"
+      }
+    },
+    {
+      "case": "endpoint_16384",
+      "version": "after",
+      "command": [
+        "${HOME}/miniforge3-arm64/bin/python",
+        "${HOME}/repos/csubst/reports/efficiency_20261015/benchmark.py",
+        "tree-worker",
+        "endpoint_16384"
+      ],
+      "seconds": [
+        0.008424541912972927,
+        0.009255583980120718,
+        0.007748542004264891
+      ],
+      "output_sha256": "08063881d584e95e1734c94e92def2197295bb9d20f96d44852ce6fe37aa3687",
+      "peak_rss_mib": 126.640625,
+      "source_sha256": {
+        "tree.py": "96037e296bf1c9502a9a1592329d95c794d7f7bf4c19ef9fff0db75cb69a2f5d",
+        "endpoint.py": "4d64021b56d99b84655962cd88616d30a812c008bbbfaf119027296a46aa9d1a"
+      }
+    }
+  ],
+  "summary": {
+    "balanced_2048": {
+      "seconds": {
+        "before": 0.05106916697695851,
+        "after": 0.005378833971917629
+      },
+      "after_over_before": 0.10532449010465478,
+      "identical_output": true
+    },
+    "ladder_2048": {
+      "seconds": {
+        "before": 1.1379444579361007,
+        "after": 0.010436875047162175
+      },
+      "after_over_before": 0.009171691091225684,
+      "identical_output": true
+    },
+    "endpoint_16384": {
+      "seconds": {
+        "before": 1.705187042010948,
+        "after": 0.008424541912972927
+      },
+      "after_over_before": 0.004940538313637289,
+      "identical_output": true
+    }
+  }
+}

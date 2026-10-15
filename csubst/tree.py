@@ -129,11 +129,14 @@ def add_numerical_node_labels(tree):
         leaf_numerical_labels[leaf_name] = 1 << i
 
     nodes = list(tree.traverse())
-    clade_signatures = list()
-    for node in nodes:
-        leaf_names = ete.get_leaf_names(node)
-        clade_signature = sum(leaf_numerical_labels[leaf_name] for leaf_name in leaf_names)
-        clade_signatures.append(clade_signature)
+    signature_by_node = {}
+    for node in tree.traverse('postorder'):
+        children = ete.get_children(node)
+        signature_by_node[node] = (
+            sum(signature_by_node[child] for child in children)
+            if children else leaf_numerical_labels[node.name]
+        )
+    clade_signatures = [signature_by_node[node] for node in nodes]
 
     # Rank node signatures with pure-Python sorting so large integer signatures
     # remain exact and deterministic across environments.

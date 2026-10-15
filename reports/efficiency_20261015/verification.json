@@ -1,0 +1,306 @@
+{
+  "baseline_commit": "5df0919b9164652f73174027faaf7896d6749d3b",
+  "version": "1.16.19",
+  "checks": [
+    {
+      "name": "native_imports",
+      "command": [
+        "${VERIFY_PYTHON}",
+        "-c",
+        "import csubst.combination_cy, csubst.omega_cy, csubst.parser_iqtree_cy, csubst.recoding_cy, csubst.substitution_cy, csubst.substitution_sparse_cy; from csubst import __version__; print(__version__)"
+      ],
+      "exit_code": 0,
+      "seconds": 1.39846099994611,
+      "summary": [],
+      "env": {}
+    },
+    {
+      "name": "cli_help",
+      "command": [
+        "${VERIFY_PYTHON}",
+        "-m",
+        "csubst",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.08024679194204509,
+      "summary": [],
+      "env": {}
+    },
+    {
+      "name": "test-fast",
+      "command": [
+        "make",
+        "PYTHON=${VERIFY_PYTHON}",
+        "test-fast"
+      ],
+      "exit_code": 2,
+      "seconds": 0.6346727499039844,
+      "summary": [
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/verify-venv/bin/python -m pytest -q -n auto --dist worksteal tests/unit tests/cli -m \"not slow and not parity and not process\""
+      ],
+      "env": {},
+      "failure_reason": "Cached ETE4 cp312 binary could not load: missing PyInit_tree export. Resolved by rebuilding ETE4 4.4.0 from source; no repository dependency constraint changed."
+    },
+    {
+      "name": "test-fast",
+      "command": [
+        "make",
+        "PYTHON=${VERIFY_PYTHON}",
+        "test-fast"
+      ],
+      "exit_code": 0,
+      "seconds": 52.47095070895739,
+      "summary": [
+        "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/verify-venv/bin/python -m pytest -q -n auto --dist worksteal tests/unit tests/cli -m \"not slow and not parity and not process\"",
+        "SKIPPED [3] tests/unit/test_structural_prediction.py:165: could not import 'torch': No module named 'torch'",
+        "SKIPPED [1] tests/unit/test_structural_reference.py:89: could not import 'gemmi': No module named 'gemmi'",
+        "SKIPPED [1] tests/unit/test_structural_reference.py:105: could not import 'gemmi': No module named 'gemmi'",
+        "SKIPPED [1] tests/unit/test_structural_validation.py:225: could not import 'torch': No module named 'torch'",
+        "1632 passed, 6 skipped, 8 warnings in 25.52s"
+      ],
+      "env": {
+        "PYTEST_ADDOPTS": "-ra"
+      }
+    },
+    {
+      "name": "lint",
+      "command": [
+        "make",
+        "PYTHON=${VERIFY_PYTHON}",
+        "lint"
+      ],
+      "exit_code": 0,
+      "seconds": 1.1748397080227733,
+      "summary": [
+        "All checks passed!",
+        "Repository hygiene checks passed.",
+        "Documentation checks passed: 22 documents, 23 commands, 1 help examples, 2 templates, 73 local links."
+      ],
+      "env": {
+        "PYTEST_ADDOPTS": "-ra"
+      }
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "make",
+        "PYTHON=${VERIFY_PYTHON}",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "seconds": 9.693810582975857,
+      "summary": [
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file",
+        "Success: no issues found in 1 source file"
+      ],
+      "env": {
+        "PYTEST_ADDOPTS": "-ra"
+      }
+    },
+    {
+      "name": "test",
+      "command": [
+        "make",
+        "PYTHON=${VERIFY_PYTHON}",
+        "test"
+      ],
+      "exit_code": 0,
+      "seconds": 44.69965583400335,
+      "summary": [
+        "SKIPPED [3] tests/unit/test_structural_prediction.py:165: could not import 'torch': No module named 'torch'",
+        "SKIPPED [1] tests/unit/test_structural_reference.py:89: could not import 'gemmi': No module named 'gemmi'",
+        "SKIPPED [1] tests/unit/test_structural_reference.py:105: could not import 'gemmi': No module named 'gemmi'",
+        "SKIPPED [1] tests/unit/test_structural_validation.py:225: could not import 'torch': No module named 'torch'",
+        "SKIPPED [3] tests/integration/test_3di_model_expectations.py:99: IQ-TREE is not installed",
+        "2102 passed, 9 skipped, 8 warnings in 34.12s",
+        "5 passed in 9.20s"
+      ],
+      "env": {
+        "PYTEST_ADDOPTS": "-ra"
+      }
+    },
+    {
+      "name": "test-native",
+      "command": [
+        "make",
+        "PYTHON=${VERIFY_PYTHON}",
+        "test-native"
+      ],
+      "exit_code": 0,
+      "seconds": 6.475137499975972,
+      "summary": [
+        "15 passed, 2101 deselected in 5.40s"
+      ],
+      "env": {
+        "PYTEST_ADDOPTS": "-ra"
+      }
+    },
+    {
+      "name": "fallback",
+      "command": [
+        "${VERIFY_PYTHON}",
+        "-m",
+        "pytest",
+        "-q",
+        "-rs",
+        "tests/unit/test_tree_core.py",
+        "tests/unit/test_endpoint.py",
+        "tests/unit/test_scan_statistics.py",
+        "tests/unit/test_scan_analytic.py",
+        "tests/unit/test_scan_assignment_sampler.py",
+        "tests/integration/test_scan_candidates_and_rates.py",
+        "tests/integration/test_scan_execution.py",
+        "tests/integration/test_scan_permutations.py",
+        "tests/integration/test_scan_calibration_null.py",
+        "tests/integration/test_scan_ctmc.py",
+        "tests/integration/test_scan_endpoint.py",
+        "tests/parity"
+      ],
+      "exit_code": 0,
+      "seconds": 14.194915457977913,
+      "summary": [
+        "SKIPPED [1] tests/parity/test_omega_expected_state_parity.py:97: Cython expected projection-row builder is unavailable",
+        "SKIPPED [6] tests/parity/test_site_weight_normalization.py:16: Compiled substitution extension is unavailable",
+        "283 passed, 7 skipped in 12.53s"
+      ],
+      "env": {
+        "PYTEST_ADDOPTS": "-ra",
+        "CSUBST_DISABLE_EXTENSIONS": "1"
+      }
+    },
+    {
+      "name": "fixed_fit_parity",
+      "command": [
+        "${VERIFY_PYTHON}",
+        ".github/scripts/sites_parity_check.py",
+        "--numerical-only",
+        "--workdir",
+        "${WORKDIR}/final-parity",
+        "--output",
+        "${WORKDIR}/final-parity.tsv"
+      ],
+      "exit_code": 0,
+      "seconds": 55.22250933304895,
+      "summary": [
+        "Wrote parity metrics: /private/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-efficiency-u1hic_bi/final-parity.tsv"
+      ],
+      "env": {
+        "PYTEST_ADDOPTS": "-ra"
+      }
+    },
+    {
+      "name": "benchmark_runner_lint",
+      "command": [
+        "${VERIFY_PYTHON}",
+        "-m",
+        "ruff",
+        "check",
+        "reports/efficiency_20261015/benchmark.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.0839599589817226,
+      "summary": [
+        "All checks passed!"
+      ],
+      "env": {
+        "PYTEST_ADDOPTS": "-ra"
+      }
+    }
+  ],
+  "environment_repair": {
+    "command": [
+      "${VERIFY_PYTHON}",
+      "-m",
+      "pip",
+      "install",
+      "--no-cache-dir",
+      "--no-binary=ete4",
+      "--force-reinstall",
+      "--no-deps",
+      "ete4"
+    ],
+    "version": "4.4.0",
+    "exit_code": 0,
+    "import_verified": true
+  },
+  "environment": {
+    "python": "3.12.14 (main, Aug 25 2026, 13:50:33) [Clang 22.1.3 ]",
+    "dependencies": {
+      "numpy": "2.5.4",
+      "scipy": "1.18.1",
+      "pandas": "3.0.6",
+      "ete4": "4.4.0",
+      "matplotlib": "3.11.2",
+      "pytest": "9.1.1",
+      "ruff": "0.17.0",
+      "mypy": "2.4.0",
+      "csubst": "1.16.19"
+    }
+  },
+  "final_status": "passed_with_declared_optional_skips",
+  "initial_focused_python314": {
+    "command": [
+      "python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/unit/test_tree_core.py",
+      "tests/unit/test_endpoint.py",
+      "tests/integration/test_scan_candidates_and_rates.py",
+      "tests/integration/test_scan_execution.py"
+    ],
+    "result": "130 passed in 3.95s",
+    "exit_code": 0,
+    "python": "3.14.7"
+  },
+  "fixed_fit_reference_results": [
+    {
+      "dataset": "PEPC",
+      "branch_id_1": "9",
+      "branch_id_2": "108",
+      "omegaCany2spe": "0.030734",
+      "convergent": "0",
+      "divergent": "2",
+      "blank": "969"
+    },
+    {
+      "dataset": "PGK",
+      "branch_id_1": "23",
+      "branch_id_2": "51",
+      "omegaCany2spe": "1.910709",
+      "convergent": "5",
+      "divergent": "7",
+      "blank": "405"
+    }
+  ],
+  "not_run": [
+    "Installed-wheel, sdist-only and sanitizer CI lanes",
+    "Linux runtime/RSS baseline thresholds",
+    "Other Python versions beyond the focused Python 3.14 and full Python 3.12 checks",
+    "Fresh real IQ-TREE fits and optional torch/gemmi/model-weight workflows"
+  ]
+}
