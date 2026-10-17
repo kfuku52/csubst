@@ -896,6 +896,63 @@ def mask_missing_sites(state_tensor, tree, selected_internal_ids=None, leaf_nonm
 def get_internal_site_nonzero_masks(tree, state_tensor=None, selected_internal_ids=None, leaf_nonmissing_sites=None):
     if (state_tensor is None) and (leaf_nonmissing_sites is None):
         raise ValueError('Either state_tensor or leaf_nonmissing_sites is required.')
+    # Valid posterior rows are nonnegative, so presence can be propagated once
+    # per subtree. Bound temporary node/site booleans independently of sites.
+    selected = None if selected_internal_ids is None else set(map(int, selected_internal_ids))
+    nodes = list(tree.traverse('postorder'))
+    targets = [(node, list(ete.get_children(node)) + list(ete.get_sisters(node)))
+               for node in tree.traverse() if not ete.is_root(node) and not ete.is_leaf(node)
+               and (selected is None or int(ete.get_prop(node, 'numerical_label')) in selected)]
+    targets = [(node, groups) for node, groups in targets if len(groups) >= 2]
+    if not targets:
+        return {}
+    roots = {group for _, groups in targets for group in groups}
+    needed = set()
+    for node in tree.traverse('preorder'):
+        if node in roots or node.up in needed:
+            needed.add(node)
+    source = state_tensor if leaf_nonmissing_sites is None else leaf_nonmissing_sites
+    if leaf_nonmissing_sites is not None and source.dtype.kind != 'b':
+        return _get_internal_site_nonzero_masks_by_leaves(
+            tree, state_tensor, selected, leaf_nonmissing_sites)
+    num_site = source.shape[1]
+    out = {int(ete.get_prop(node, 'numerical_label')): np.empty(num_site, dtype=bool)
+           for node, _ in targets}
+    block_size = max(1, (8 * 1024**2) // max(1, len(needed)))
+    for start in range(0, num_site, block_size):
+        stop = min(start + block_size, num_site)
+        presence = {}
+        for node in nodes:
+            if node not in needed:
+                continue
+            children = ete.get_children(node)
+            if not children:
+                values = source[int(ete.get_prop(node, 'numerical_label')), start:stop]
+                if leaf_nonmissing_sites is None:
+                    # Preserve the historical sum/cancellation behavior for
+                    # arbitrary signed or nonfinite arrays accepted by this API.
+                    if np.any(values < 0) or not np.isfinite(values).all():
+                        return _get_internal_site_nonzero_masks_by_leaves(
+                            tree, state_tensor, selected, leaf_nonmissing_sites)
+                    values = np.any(values != 0, axis=1)
+                presence[node] = values
+            else:
+                values = presence[children[0]].copy()
+                for child in children[1:]:
+                    values |= presence[child]
+                presence[node] = values
+        for node, groups in targets:
+            # Count only up to two; avoid a group/site temporary on polytomies.
+            seen = np.zeros(stop - start, dtype=bool)
+            twice = np.zeros_like(seen)
+            for group in groups:
+                twice |= seen & presence[group]
+                seen |= presence[group]
+            out[int(ete.get_prop(node, 'numerical_label'))][start:stop] = twice
+    return out
+
+
+def _get_internal_site_nonzero_masks_by_leaves(tree, state_tensor, selected_internal_ids, leaf_nonmissing_sites):
     selected_set = None if selected_internal_ids is None else set([int(v) for v in selected_internal_ids])
     nonzero_masks = dict()
     for node in tree.traverse():
@@ -935,6 +992,47 @@ def get_internal_site_nonzero_masks(tree, state_tensor=None, selected_internal_i
 
 
 
+def _state_probability_batches(state_path, target_names, num_state, dtype, batch_size=256):
+    """Batch reductions while retaining row-order validation and parse errors."""
+    rows = iter(_iter_state_rows(state_path))
+    exhausted = False
+    while not exhausted:
+        batch, pending_error = [], None
+        try:
+            while len(batch) < batch_size:
+                row = next(rows)
+                if row[0] in target_names:
+                    batch.append(row)
+        except StopIteration:
+            exhausted = True
+        except Exception as error:
+            # Earlier probability/metadata errors must win over a later broken
+            # text row, just as in the original streaming validation.
+            pending_error = error
+            exhausted = True
+        parsed, complete = [], []
+        for index, row in enumerate(batch):
+            try:
+                values = np.fromstring(row[3], sep='\t', dtype=dtype)
+            except ValueError as error:
+                values = error
+            parsed.append(values)
+            if isinstance(values, np.ndarray) and values.size == num_state:
+                complete.append(index)
+        invalid, sums = {}, {}
+        if complete:
+            matrix = np.stack([parsed[index] for index in complete])
+            good = np.isfinite(matrix).all(axis=1) & ~(matrix < 0).any(axis=1)
+            totals = np.zeros(len(matrix), dtype=matrix.dtype)
+            totals[good] = matrix[good].sum(axis=1)
+            invalid = dict(zip(complete, ~good))
+            sums = dict(zip(complete, totals))
+        for index, row in enumerate(batch):
+            yield row, parsed[index], invalid.get(index), sums.get(index)
+        if pending_error is not None:
+            raise pending_error
+
+
 def _load_internal_state_rows_one_pass(
     state_tensor,
     state_path,
@@ -953,9 +1051,9 @@ def _load_internal_state_rows_one_pass(
     num_state = len(state_columns)
     sites_by_node = OrderedDict()
     loaded_names = set()
-    for node_name, site_text, state_text, probabilities, line_number in _iter_state_rows(state_path):
-        if node_name not in target_node_names:
-            continue
+    for row, values, invalid, probability_sum in _state_probability_batches(
+            state_path, target_node_names, num_state, dtype):
+        node_name, site_text, state_text, probabilities, line_number = row
         site_label = _parse_state_site_label(site_text)
         if site_label < 1 or site_label > expected_num_site:
             raise ValueError(
@@ -971,7 +1069,8 @@ def _load_internal_state_rows_one_pass(
                 )
             )
         node_sites.add(site_label)
-        values = np.fromstring(probabilities, sep='\t', dtype=dtype)
+        if isinstance(values, Exception):
+            raise values
         if values.shape[0] != num_state:
             raise ValueError(
                 'Malformed .state probabilities at line {}: expected {}, observed {}.'.format(
@@ -981,11 +1080,11 @@ def _load_internal_state_rows_one_pass(
         if state_text in ('?', '???'):
             values.fill(0)
         else:
-            if (not np.isfinite(values).all()) or np.any(values < 0):
+            if invalid:
                 raise ValueError(
                     'Invalid probability value(s) in .state file at line {}.'.format(line_number)
                 )
-            probability_sum = float(values.sum())
+            probability_sum = float(probability_sum)
             if (not math.isfinite(probability_sum)) or (abs(probability_sum - 1.0) > 1e-3):
                 raise ValueError(
                     '.state probabilities at line {} sum to {:.8g}; expected 1.'.format(

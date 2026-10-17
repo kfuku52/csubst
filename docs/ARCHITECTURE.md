@@ -46,6 +46,21 @@ constraints, reruns candidate discovery, and computes conditional tails;
 `main_scan` writes the independent calibration JSON, including empty results.
 See [SCAN_CALIBRATION.md](SCAN_CALIBRATION.md) for the null and failure contract.
 
+`clade_index` stores preorder intervals and lazily produces the historical
+breadth-first descendant listings. The scan sampler checks interval overlap
+without materializing every clade. Leaf names retain their original order;
+diagnostics and persistent topology/cache signatures keep their existing format.
+Descendant listings have an 8 MiB cache which is omitted when workers are pickled.
+
+Scan candidate event and endpoint-exposure caches live only in one fixed-fit
+static context or one worker chunk, with separate 32 MiB/4,096-entry limits.
+They are enabled for repeated assignment calibration, avoiding unused retained
+vectors during single-pass discovery or a new fit in each parametric replicate.
+Worker transport drops these caches; a new fit/filter/bootstrap creates a new
+context. Assignment-dependent support, rates and candidate discovery are always
+recomputed. Structure-weighting inner CV similarly reuses only fold-local priors
+and interaction scores, bounded to 32 MiB, without sharing held-out responses.
+
 `site_tree_plot` owns tree/site selection, layout, labels, heatmaps, and figure
 output for prepared site tables. `main_sites` retains data preparation,
 structure integration, and command orchestration, and re-exports existing

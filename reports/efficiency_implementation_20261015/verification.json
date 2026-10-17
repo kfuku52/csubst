@@ -1,0 +1,206 @@
+{
+  "base_sha": "4382e1f84d01b7bff56855965c4c6e55c3512c51",
+  "version": "1.16.20",
+  "destination": "origin/master",
+  "source": {
+    "python": "3.12.14",
+    "test_fast": {
+      "passed": 1662,
+      "skipped": 6
+    },
+    "test_full_parallel": {
+      "passed": 2136,
+      "skipped": 9
+    },
+    "test_process": {
+      "passed": 5
+    },
+    "native": {
+      "passed": 15,
+      "strict": true
+    },
+    "fallback": {
+      "passed": 327,
+      "skipped": 1
+    },
+    "lint": "passed",
+    "typecheck": "passed; 25 targets",
+    "fixed_fit_parity": "passed; source_parity.tsv"
+  },
+  "installed_wheel": {
+    "python": "3.12.14",
+    "non_editable": true,
+    "outside_checkout": true,
+    "prefix_guard": true,
+    "full_parallel": {
+      "passed": 2136,
+      "skipped": 9
+    },
+    "process": {
+      "passed": 5
+    },
+    "native": {
+      "passed": 15,
+      "strict": true
+    },
+    "fixed_fit_parity": "passed; wheel_parity.tsv"
+  },
+  "skips": {
+    "full": {
+      "torch_unavailable": 4,
+      "gemmi_unavailable": 2,
+      "real_iqtree_unavailable": 3
+    },
+    "fallback": "1 compiled-parser-only check disabled intentionally"
+  },
+  "warnings": "8 pre-existing Matplotlib set_bad PendingDeprecationWarning per full suite",
+  "commands": [
+    "make test-fast lint typecheck test test-native",
+    "CSUBST_DISABLE_EXTENSIONS=1 python -m pytest -q tests/unit/test_clade_index.py tests/unit/test_iqtree_state_tensor.py tests/unit/test_iqtree_state_selection.py tests/unit/test_scan_assignment_sampler.py tests/unit/test_scan_statistics.py tests/unit/test_tree_core.py tests/unit/test_omega_epistasis.py tests/integration/test_foreground_targets.py tests/integration/test_main_inspect.py tests/integration/test_scan_calibration_null.py tests/integration/test_scan_candidates_and_rates.py tests/integration/test_scan_ctmc.py tests/integration/test_scan_endpoint.py tests/integration/test_scan_execution.py tests/integration/test_scan_outputs.py tests/integration/test_scan_permutations.py",
+    "python .github/scripts/sites_parity_check.py --numerical-only --output metrics.tsv --workdir fresh-workdir",
+    "make package",
+    "CSUBST_USE_CYTHON=0 python -m pip wheel --no-cache-dir --no-deps dist/csubst-1.16.20.tar.gz --wheel-dir dist/from-sdist",
+    "python .github/scripts/package_artifact_check.py",
+    "CSUBST_TEST_INSTALLED=1 python -m pytest \"$REPO_ROOT/tests\" --import-mode=importlib -q -n auto --dist worksteal -m \"not process\" --ignore=\"$REPO_ROOT/tests/process\"",
+    "CSUBST_TEST_INSTALLED=1 python -m pytest \"$REPO_ROOT/tests/process\" --import-mode=importlib -q",
+    "CSUBST_TEST_INSTALLED=1 CSUBST_STRICT_EXTENSIONS=1 python -m pytest \"$REPO_ROOT/tests\" --import-mode=importlib -q -m native",
+    "CSUBST_STRICT_EXTENSIONS=1 python \"$REPO_ROOT/.github/scripts/sites_parity_check.py\" --installed --numerical-only --output metrics.tsv --workdir fresh-workdir",
+    "python -m ruff check reports/efficiency_implementation_20261015 reports/efficiency_followup_20261015",
+    "actionlint -shellcheck= .github/workflows/pytest.yml",
+    "git diff --check"
+  ],
+  "artifact_checks": "make package, generated-C sdist wheel, artifact content and metadata passed; every top-level Python module in wheel matches release source bytes",
+  "artifacts": {
+    "csubst-1.16.20-cp312-cp312-macosx_11_0_arm64.whl": {
+      "sha256": "d6924d7a3d91a94ec2d1d28d50b3f815c00d8c62ad2753c8b8156541ac5dfdce",
+      "size_bytes": 3910791
+    },
+    "csubst-1.16.20.tar.gz": {
+      "sha256": "c080519c3b21b1bea536d00ccf21f7aa7cc1b8db58ca5172e4e5889e8552adab",
+      "size_bytes": 4703351
+    }
+  },
+  "benchmark": {
+    "cli_runs": 64,
+    "warmups_per_version": 1,
+    "measured_repeats_per_version": 3,
+    "table_pairs_equivalent": 32,
+    "scan_json_pairs_equivalent": 20,
+    "parallel_n_jobs": 2,
+    "phase_experiments": 13,
+    "phase_equivalent_pairs_per_experiment": 4,
+    "post_benchmark_validation_only_guard": "Explicit missing-score rejection; normal-input calculations unchanged; release tests and maximum benchmark repeated. Measured/release hashes recorded in cli.json."
+  },
+  "workflow_checks": {
+    "actionlint_version": "1.7.12",
+    "arm64_archive_sha256": "aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f",
+    "actionlint": "passed; external shellcheck disabled",
+    "yaml_dependencies": "parsed and asserted",
+    "scope_tests": "source/wheel suite covers docs, patch-only metadata, source, scripts, workflows and unknown diffs",
+    "required_branch_rules_at_inspection": []
+  },
+  "environment_repair": "Initial fresh-wheel checks failed because a cached ETE4 4.4.0 binary lacked PyInit_tree. Rebuilt the same version with --no-cache-dir --no-binary=ete4 --force-reinstall --no-deps and reran all wheel checks successfully. No dependency constraints changed.",
+  "not_run_locally": [
+    "Linux performance thresholds and sanitizers (GitHub CI)",
+    "new IQ-TREE fits",
+    "1000-draw scientific recalibration",
+    "real GPU/3Di/VESM model inference",
+    "external shellcheck",
+    "Wiki clone checks"
+  ],
+  "deployment": "CLI distribution; no standalone service deployment configuration. Patch release policy publishes master without manual tags/releases/Bioconda updates.",
+  "release_source_sha256": {
+    "__init__.py": "c97fbbdae114fb3c7664cbe21f0169c5f59cd8dfeab66675862cf9423c8a2094",
+    "__main__.py": "19747c61f8d20de4398453ed33d5bde108ac07bccdf34452ed5f7c5347e64702",
+    "_extensions.py": "0bf699e81d1db996a0e7cd634e3c3ff6118ac86f704babf9e3782daf11947ef3",
+    "asrv.py": "22a818fe7b259ab9bd40eb8259769c4be71b71510c7d85d47e5770626154f5fe",
+    "clade_index.py": "d28494d9772cc959eb4dd0d27b30e2eab373f90def8219dfc0f01e5a578535fe",
+    "cli.py": "c7010b3339a2f0a45d820a2238db9052485056f306be5559f199246f9532a094",
+    "cli_io.py": "30a07df49bcf57ca0f94a105290a0307d65bea1a166a2907acd38ad67f735393",
+    "combination.py": "d140135311a4b7f9010fdf4b4fb31fea2e17d229d584abae74ef56a4344f9630",
+    "config_types.py": "7b2169b95ab7de2871533fb8674d93df0872d1ee898a79209e2fc9ede041e4d5",
+    "endpoint.py": "4d64021b56d99b84655962cd88616d30a812c008bbbfaf119027296a46aa9d1a",
+    "endpoint_io.py": "92a4aa17a152bb2250b9bba545fa3109a7695544dd35b18cf9ed29fa0af56188",
+    "epistasis.py": "3349dadf52da8882aafd4574dddb88af51de3545ac48e51eade8bb13b233046c",
+    "ete.py": "112ba3ac4375c77f87efab7ef4dac5af07d7b7af7a5a10bb66921877eaa3b053",
+    "event_reporting.py": "517f79e12cf3c5cd0ad54e29e1c6669f61dfc9d09b0d9342d044759c1ddd0562",
+    "expectation_3di.py": "267cf8a8e6124f0d55189241cfa8557b574e7f75bc1a2ef4c9884fdcb5a3f41c",
+    "expected_sparse.py": "5789de095a46728f4aeafad4abe1ebd35882484e1b6f3ac276c25336fc9bc008",
+    "fitted_model.py": "4f664b55a50ffac52cf318ec36096e09c46ffa1f5922aca56a266069a1c42e30",
+    "foreground.py": "1b5d92ede24002b40a42154f5db3a4158f3f145419016296f08c48a4b6f012ab",
+    "genetic_code.py": "2c3c3df58b8d713f57d59fe89ffe82e3f557f2f79fb5db55a9e4f92763b89ee4",
+    "longtail.py": "c73efdc99a8a95025e454684f334b474c162d73a313a5bf1f85746ad7468af82",
+    "main_analyze.py": "7cb3174073f91fd86a619026133d767c11545431fe4d8c018cf56b8f747ce749",
+    "main_benchmark.py": "3b77ff2a62c6df1a73d77ae72ace9d0169abbb853edf396d5c5848170e6062bd",
+    "main_benchmark_plot.py": "076f19a58b60017dd2a11aba8198f6ce781731486eeaedb9cf5e678e8ffa949c",
+    "main_dataset.py": "6d1365c3fa296fb29daa5f80bb6db2371f665806d4d0abda509ae905fca26207",
+    "main_doctor.py": "b470a0851a9e6af81ea6e47b056570e033f2f6a7d83eaf9f9fd08cc7a2711a6e",
+    "main_download.py": "8396d586444316a1d8fe3777fede23f18bfe497e1222b31ac14d967b9283f1a0",
+    "main_inspect.py": "86e8bf5656c03410b922f9799f6b4996452d0e411e47fe57582a2a0b64c1a1d6",
+    "main_scan.py": "19ef363ca706795929336c74b6877a9f10bc080df0a0528388a6a01c13783120",
+    "main_simulate.py": "f403b1798a8aba186bfa3857ffceb7efad4bdd855fed0e1e93944c6c7d670160",
+    "main_sites.py": "e36565f8833e177179e7521e6499c3c23f5ccf510a91b16c590b6498ecaf62db",
+    "model_resources.py": "88bbb411dc48b0b493704731ca347bc1ac747c76688f34a9e6a49020e53da9cd",
+    "ncbi_blast.py": "58f945534fb90537cea34df2cdb9069b4b3b7a3f7421c76597faa0551b29b2d7",
+    "omega.py": "4c32f0d3d54f0f9d409f714a756c470f0e59b9416755aa0b69fdf39bb40a42d0",
+    "omega_calibration.py": "630e09e2358ddf89d77142200e45e74de329eda9e63464bc21de2d5b68933862",
+    "omega_null.py": "edb544953952e0932849ff41286954158623d539d5294b924152cbd9fcc85078",
+    "omega_statistics.py": "5105fcfd78c58f79b44d8be2190877539c9cfe203663d85a3d135e4668d3ba23",
+    "output_manifest.py": "4ec9538c7aebe1aaa638ad660c37bc4133aca20944b9d25f3c1bc465c35e6af3",
+    "output_run.py": "a9a066686bbd9ac7d60f4c95d7e469e2ada2ec6cee4bfb66225ef6630291bee5",
+    "output_safety.py": "bec62cff8ea44ec1b5b27f70bb6d0a992521bbfbff59f28c897fad3148a3fdaf",
+    "output_stat.py": "ddd1e860e27115d841b0b1c01b4823e49638af421d871d9c68578af5db85cb9d",
+    "pair_epistasis.py": "2f9f8247132a09d47f13a36b01ca821b20aa123cb81a8895b23780314d4617a6",
+    "parallel.py": "5b8671804e0884f5ed95f5ebb632a08e60413a723dc32c76a363eb16beaa8a72",
+    "param.py": "fecb2eb39453785e8ebc99729907d019bfbb94a83b1499f0a22718f83a1f1fa8",
+    "parser_biodb.py": "555969d2988d4a583b8b315c3ebb0777a46d5e861f947f30541664edf817c897",
+    "parser_iqtree.py": "79b7af043d1943ef6de6294accd851c2360bbc09d027fa1eb91c17e3d1f71093",
+    "parser_misc.py": "e5abdc75958a1cae6df770b91cc5d53425cb7c5b8eea82d961e1b40d45734b7e",
+    "parser_pymol.py": "d42f6017e22e2c4b41914c6bd956dff74e78daefafe9cc4b9794a00b146cbc5b",
+    "parser_uniprot.py": "f1ce0d11f3b6d63f58848be19767e07b5a720189fa6f5dcc5d8d4e3b76668c5d",
+    "pipeline_calibration.py": "d22257479baffa632f259d31ad1b458055cdf05a87ceca85bde6a083acba3e27",
+    "plotting.py": "2f85787c5bdd4c0f92e72cc03846f5bb9e561bf4c121847cff0c80013656668c",
+    "pseudocount.py": "034535a7d584af3e7167f2d828b0a9b29d55009b2c7039de093de58338607fff",
+    "randomness.py": "76da9d7ca212f977e98447e80d659ddea7ae18e3cba06873e6d25e815c4f92ac",
+    "recoding.py": "2ab48a0ae8dcfc4b5a926c2d2a10c4e875b6749912f2e79cde642e47b525e03d",
+    "recoding_config.py": "7e80e4d6591761acea7b6d2886e6ecc3b8caf033371453063ea8eb5ad143e07a",
+    "resource_cache.py": "03f51411122df69af5b035a9aa79301d273546a554771f6b4415ba6398f35c5b",
+    "runtime.py": "3d36b5603d3c3e5d8ec01b45cefac10ce913f373521613cacb3ba317d3943cb0",
+    "scan_analytic.py": "af0901bf1b2ea8d9ae7d156a749d495385f48e6a40f477abd95c777d0c31ea57",
+    "scan_bootstrap.py": "4dcde8c4f4c0e3a52d3908645507dce175188f7cfbee3a0aab8eba3a447a3cab",
+    "scan_ctmc.py": "6a92a2c08dc4b5443704e8245b914c07be51614ad63a056b86bc6e3cdda15995",
+    "scan_endpoint.py": "41b1ec9636518d9f4f71ee1e71a80d0daff218560c1a00dfe5d2ce0cb06aa7d3",
+    "scan_permutation.py": "df0205fce060b51de07d2ae36e1fd216253c8d9069aa200dfe86dc094d1a01d3",
+    "scan_statistics.py": "15adc165c9d5a46534650ae37feea9bb76b6842a69ce664eb3256879d66415f1",
+    "sequence.py": "f727a1bbaa72af814aef31ebfc9c0057b2b8295b73f2e51d49f7bfb8b5e52829",
+    "sequence_io.py": "c506ed744c3b3fa1ed9375dd3d6feb80357f25abe38ac288d9f7841cea5570ab",
+    "site_filter.py": "378ad10ea0bafff5d395729beae25decfc7e05feb0dd976aa99d286871272ca5",
+    "site_storage.py": "e39073dad88538dbcd5611a9496e9357a149be03c0bf29c3d570bdd5253ab75d",
+    "site_tree_plot.py": "1cc18ff304f27bbb998e56e676e461304d832b0a54ce470f4ef468b32ce6b90b",
+    "structural_alphabet.py": "f0171e030b0c23539f375dd0bbe9bc801bc738ec1e2f09b9f530cfa98f3feaf9",
+    "structural_observation.py": "d7b21597fa0a91aca28535f7856524546edbf30efca809404170e3711adf7aa5",
+    "structural_prediction.py": "d4e782fe6dfd5e42ab6855390be951b7f79bd84303d1dbdbe9123387fa5f70c8",
+    "structural_reference.py": "ceec116fce1b5aad9cf4fa63f8da8f0159483f5659fa582e1724750fb200b3f4",
+    "structural_validation.py": "2f26950b93042b49983f68e7313960249942af6e3971032460f1b57c2963401a",
+    "structure_resources.py": "9e28995fcb20437b1a580b8ef64ee59b562d6d4f8e3b910aff870161e9aa6445",
+    "substitution.py": "ff8f51b6d62e956757df18f849120016edd33b91efd7b36519003d9d9b93e2a7",
+    "substitution_scan.py": "8543f4c653d91af020ddaf1f29cfd40f1937eea805d80ef1413a671052a01d50",
+    "substitution_sparse.py": "19a74eaf2e48d58c959d33d014048a1349308d84d495aa07f1739196d6bd39a4",
+    "table.py": "3c887efdbd2a9d77644d9fc8dcec9e12ff9bb5f299434f4776dcac8306e7c077",
+    "tree.py": "05ca09a1108e8727ef4c56684382874e1cf45641f0059b93739ceb5da5327b54",
+    "tsv.py": "6ca074e954c8dbfac3535f250763b3ec85f75d134388ae8b7d4f14507f347d54",
+    "urn_expectation.py": "3dfd91c0648d8f4fc33da7c5b485cd0d834613e06698225d57eecc6acdb2564c",
+    "utility.py": "6845f8296a5962c8529ab4c81770153e3eb18951d64b95bc4b99407a3066a565",
+    "variant_effect.py": "ddd4c2ac3511f79b93a4be7c64433103ebdf18b095ce085c60501d3dacc01228",
+    "vesm.py": "1ef25f80460be7b59ac7c35dd5bd0e70b7631263410361849626a0c4bbe56260"
+  },
+  "artifact_sha256": {
+    "README.md": "e6342dea43dd09269ce590d9d855859075925e939689f5e1d7e413abcd94812f",
+    "benchmark.py": "3d9e85360720df90653a98263553a5f49b2aabf8018aa51d5c3a6c34bc4047be",
+    "cache_policy.json": "aec1dedbc1bfcac770fbf2cd0ab61946a051139976e6d74dc28bc7bd2101c149",
+    "cli.json": "1418bf30c2da004737c3375ccc6802e98ab89d2468c961c42560e1696645294b",
+    "phases.json": "2adb5f579019169fa07367d576a28452dfa05ec09f6a509b722bc95ed523a5ce",
+    "source_parity.tsv": "24b4534e10d6dbb2011db0b07bb291464607662f590c688d8041ba92f4319e18",
+    "wheel_parity.tsv": "cc99cc1fb677f535ab137457b8b662fc2de34677d5077fc63c01c5b3d704fc84"
+  }
+}

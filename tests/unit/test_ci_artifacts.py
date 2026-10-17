@@ -68,6 +68,50 @@ def test_pull_request_compares_against_base_commit(monkeypatch):
     assert commands == [['git', 'diff', '--name-only', 'b' * 40, 'HEAD']]
 
 
+@pytest.mark.parametrize('paths, patch_only, expected', [
+    (['README.md', 'docs/ARCHITECTURE.md', 'reports/run/results.json'], False, False),
+    (['README.md', 'csubst/__init__.py'], True, False),
+    (['README.md', 'csubst/__init__.py'], False, True),
+    (['reports/scientific_review_20260910/calibrate_site_selection.py'], False, True),
+    (['csubst/omega.py'], False, True), (['tests/unit/test_tree_core.py'], False, True),
+    (['.github/workflows/pytest.yml'], False, True), (['pyproject.toml'], False, True),
+    ([], False, True), (['unknown-file'], False, True),
+])
+def test_numerical_coverage_only_excludes_known_documentation(paths, patch_only, expected):
+    assert ci_scope.needs_numerical(paths, patch_only) is expected
+
+
+@pytest.mark.parametrize('after, expected', [
+    ("__version__ = '1.2.4'\nx = None\n", True),
+    ("__version__ = '1.3.0'\nx = None\n", False),
+    ("__version__ = '1.2.4'\nx = 'changed'\n", False),
+    ("__version__ = '1.2.3'\nx = None\n", False),
+    ("__version__ = unknown\nx = None\n", False),
+])
+def test_docs_patch_bump_cannot_hide_code_or_release_changes(after, expected):
+    assert ci_scope.version_only_patch("__version__ = '1.2.3'\nx = None\n", after) is expected
+
+
+@pytest.mark.parametrize('paths, expected', [(['README.md', 'csubst/__init__.py'], False),
+                                           (['csubst/omega.py'], True), (None, True)])
+def test_scope_outputs_preserve_periodic_and_unknown_coverage(tmp_path, monkeypatch, paths, expected):
+    import json
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'csubst').mkdir()
+    (tmp_path / 'csubst/__init__.py').write_text("__version__ = '1.2.4'\n")
+    event = tmp_path / 'event.json'
+    event.write_text(json.dumps({'before': 'a' * 40}))
+    output = tmp_path / 'output.txt'
+    monkeypatch.setenv('GITHUB_EVENT_PATH', str(event))
+    monkeypatch.setenv('GITHUB_EVENT_NAME', 'push')
+    monkeypatch.setenv('GITHUB_OUTPUT', str(output))
+    monkeypatch.setattr(ci_scope, 'changed_paths', lambda *args: paths)
+    monkeypatch.setattr(ci_scope.subprocess, 'run', lambda *args, **kwargs:
+                        SimpleNamespace(returncode=0, stdout="__version__ = '1.2.3'\n"))
+    ci_scope.main()
+    assert 'numerical=' + str(expected).lower() in output.read_text().splitlines()
+
+
 def test_wheel_guard_rejects_source_checkout(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, 'prefix', str(tmp_path / 'venv'))
     monkeypatch.setitem(sys.modules, 'csubst', SimpleNamespace(__file__=str(tmp_path / 'checkout/csubst/__init__.py')))

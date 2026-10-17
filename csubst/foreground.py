@@ -81,6 +81,7 @@ def _get_node_by_branch_id(g):
 
 
 def _build_trait_clade_permutation_cache(g, trait_name):
+    from csubst.clade_index import CladeIndex, CladeDescendants, CladesByBranch
     node_by_id = _get_node_by_branch_id(g)
     tree_obj = g['tree']
     branch_ids = np.array(
@@ -108,31 +109,17 @@ def _build_trait_clade_permutation_cache(g, trait_name):
         dtype=np.int64,
     )
     is_fg_stem = np.zeros(shape=(branch_ids.shape[0],), dtype=bool)
-    descendant_branch_ids_by_bid = dict()
-    descendant_indices_by_bid = dict()
-    leaf_names_by_bid = dict()
+    index = CladeIndex(tree_obj, branch_ids, branch_id_to_index)
+    descendant_branch_ids_by_index = CladeDescendants(index, 'ids')
+    descendant_indices_by_index = CladeDescendants(index)
+    leaf_names_by_index = CladeDescendants(index, 'leaves')
+    descendant_branch_ids_by_bid = CladesByBranch(descendant_branch_ids_by_index)
+    descendant_indices_by_bid = CladesByBranch(descendant_indices_by_index)
     for i, bid in enumerate(branch_ids.tolist()):
         node = node_by_id[int(bid)]
         is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
         is_parent_fg = ete.get_prop(node.up, 'is_fg_' + trait_name, False)
         is_fg_stem[i] = bool(is_fg and (not is_parent_fg))
-        descendant_branch_ids = np.array(
-            [
-                int(ete.get_prop(d, "numerical_label"))
-                for d in node.traverse()
-                if not ete.is_root(d)
-            ],
-            dtype=np.int64,
-        )
-        descendant_branch_ids_by_bid[int(bid)] = descendant_branch_ids
-        descendant_indices_by_bid[int(bid)] = np.array(
-            [branch_id_to_index[int(d)] for d in descendant_branch_ids.tolist() if int(d) in branch_id_to_index],
-            dtype=np.int64,
-        )
-        leaf_names_by_bid[int(bid)] = tuple(ete.get_leaf_names(node))
-    descendant_branch_ids_by_index = [descendant_branch_ids_by_bid[int(bid)] for bid in branch_ids.tolist()]
-    descendant_indices_by_index = [descendant_indices_by_bid[int(bid)] for bid in branch_ids.tolist()]
-    leaf_names_by_index = [leaf_names_by_bid[int(bid)] for bid in branch_ids.tolist()]
     df_clade_size_template = pd.DataFrame(index=branch_ids, columns=['branch_id', 'size', 'is_fg_stem_' + trait_name])
     df_clade_size_template.loc[:, 'branch_id'] = branch_ids
     df_clade_size_template.loc[:, 'size'] = size_array

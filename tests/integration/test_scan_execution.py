@@ -11,7 +11,7 @@ from csubst import ete
 from csubst import foreground
 from csubst import main_scan
 from csubst import substitution_scan
-from csubst import substitution
+from csubst import substitution, site_storage
 from csubst import tree
 
 
@@ -168,6 +168,56 @@ def test_scan_called_rate_mode_does_not_build_unused_projection(monkeypatch):
     )
 
     assert context["rate_event_projection"] is None
+
+
+def test_candidate_cache_evicts_and_never_reuses_values_across_scan_fits():
+    cache = substitution_scan._CandidateCache(max_bytes=16, max_items=2)
+    for index in range(3):
+        cache.obtain(index, lambda: np.ones(1), lambda value: value.nbytes)
+    assert list(cache.entries) == [1, 2]
+    assert cache.nbytes == 16
+    cache.obtain('large', lambda: np.ones(3), lambda value: value.nbytes)
+    assert cache.nbytes == 16 and 'large' not in cache.entries
+    g, tensor = _toy_scan_context()
+    g.update(scan_pvalue_calibration='candidate_fixed', scan_n_permutations=2)
+    first, _ = substitution_scan.scan_substitutions(g, tensor)
+    tensor[g['fg_ids']['trait'][0], 0, 0, 0, 1] = .6
+    second, _ = substitution_scan.scan_substitutions(g, tensor)
+    assert first['target_event_count'].iloc[0] != second['target_event_count'].iloc[0]
+
+
+def test_single_pass_scan_does_not_retain_unreused_candidate_vectors():
+    g, tensor = _toy_scan_context()
+    static = substitution_scan._build_scan_static_context(g, tensor)
+    substitution_scan._scan_substitutions_core(g, tensor, scan_static=static)
+    assert '_event_cache' not in static and '_exposure_cache' not in static
+
+
+def test_projected_site_event_extraction_does_not_read_unused_payload(monkeypatch):
+    values = np.zeros((3, 1, 1, 2, 2))
+    values[1, 0, 0, 0, 1] = .8
+    tensor = site_storage.SiteEventTensor(values.shape)
+    tensor.write_block(0, np.moveaxis(values, 1, 0))
+    tensor.seal()
+    projection = substitution_scan._build_scan_rate_projection(substitution.dense_to_sparse_sub_tensor(values), ['any2spe'])
+    expected = substitution_scan.extract_candidate_posterior_events(tensor, 0, [0, 1], [1])
+    monkeypatch.setattr(tensor, 'read_site', lambda *args: pytest.fail('Projection already contains the requested values'))
+    actual = substitution_scan.extract_candidate_posterior_events(tensor, 0, [0, 1], [1], projection=projection)
+    pd.testing.assert_frame_equal(actual, expected, check_exact=True)
+
+
+def test_scan_does_not_extract_rate_events_for_candidates_below_minimum_support(monkeypatch):
+    g, on_tensor = _toy_scan_context()
+    on_tensor[g['fg_ids']['trait'][1], 0, 0, 0, 1] = 0.1
+    monkeypatch.setattr(
+        substitution_scan, 'extract_candidate_posterior_events',
+        lambda *args, **kwargs: pytest.fail('Unsupported candidates do not need rate events'),
+    )
+
+    frame, units = substitution_scan._scan_substitutions_core(g, on_tensor)
+
+    assert frame.empty
+    assert len(units) == 2
 
 
 def test_main_scan_all_sites_filtered_writes_no_test_result(monkeypatch, tmp_path):

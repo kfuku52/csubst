@@ -8,8 +8,10 @@ assignment. Each lineage has a fixed number of components in each bin.
 import itertools
 import math
 from dataclasses import dataclass
+from collections.abc import Sequence
 
 import numpy as np
+from csubst.clade_index import CladeDescendants
 
 
 ENUMERATION_PROPOSAL_LIMIT = 10_000
@@ -28,7 +30,7 @@ class SamplingError(RuntimeError):
 class CladePlan:
     pools: tuple[tuple[int, ...], ...]
     counts: tuple[tuple[int, ...], ...]
-    descendants: tuple[frozenset[int], ...]
+    descendants: Sequence
     observed: Configuration
     proposal_count: int
     configurations: tuple[Configuration, ...] | None
@@ -38,6 +40,8 @@ def nonoverlapping(configuration, descendants):
     selected = [int(i) for group in configuration for i in group]
     if len(selected) != len(set(selected)):
         return False
+    if isinstance(descendants, CladeDescendants):
+        return descendants.nonoverlapping(selected)
     selected_set = set(selected)
     return all(not ((descendants[i] - {i}) & selected_set) for i in selected)
 
@@ -58,7 +62,8 @@ def build_plan(bin_array, eligible, observed, descendants):
     bin_array = np.asarray(bin_array, dtype=np.int64)
     eligible = np.asarray(eligible, dtype=bool)
     observed = tuple(tuple(sorted(int(i) for i in group)) for group in observed)
-    descendants = tuple(frozenset(int(i) for i in values) for values in descendants)
+    if not isinstance(descendants, CladeDescendants):
+        descendants = tuple(frozenset(int(i) for i in values) for values in descendants)
     selected = [i for group in observed for i in group]
     if not selected:
         raise ValueError("No foreground components are available for scan calibration.")

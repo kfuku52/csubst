@@ -41,6 +41,10 @@ def _plot_state_tree_in_directory(output_dir, state, orders, mode, g, plot_reque
 def _collect_branch_rows(tree_obj):
     rows = []
     node_by_id = {}
+    leaf_counts = {}
+    for node in tree_obj.traverse('postorder'):
+        children = ete.get_children(node)
+        leaf_counts[node] = sum(leaf_counts[child] for child in children) if children else 1
     for node in tree_obj.traverse():
         branch_id = int(ete.get_prop(node, "numerical_label"))
         node_by_id[branch_id] = node
@@ -58,7 +62,7 @@ def _collect_branch_rows(tree_obj):
             "is_leaf": bool(ete.is_leaf(node)),
             "node_name": "" if (node.name is None) else str(node.name),
             "branch_length": branch_length,
-            "num_descendant_leaves": int(sum([1 for _ in ete.iter_leaves(node)])),
+            "num_descendant_leaves": leaf_counts[node],
         }
         rows.append(row)
     return rows, node_by_id

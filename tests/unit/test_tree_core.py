@@ -26,6 +26,23 @@ def test_add_numerical_node_labels_keeps_root_as_max_for_64_leaves():
     assert root_label not in nonroot_labels
 
 
+@pytest.mark.parametrize('newick', [
+    '((A:1,B:1)X:1,(C:1,D:1)Y:1)R;',
+    '((((A:1)U:1,B:1)X:1,C:1)Y:1,D:1,E:1)R;',
+    '((A:1,A:1)X:1,B:1)R;',
+])
+def test_numerical_labels_preserve_clade_ranks_and_unary_ties(newick):
+    tr = ete.PhyloNode(newick, format=1)
+    nodes = list(tr.traverse())
+    leaf_weights = {name: 1 << i for i, name in enumerate(sorted(ete.get_leaf_names(tr)))}
+    ranked = sorted(nodes, key=lambda node: sum(leaf_weights[name] for name in ete.get_leaf_names(node)))
+    expected = {node: rank for rank, node in enumerate(ranked)}
+
+    for _ in range(2):
+        assert tree.add_numerical_node_labels(tr) is tr
+        assert {node: ete.get_prop(node, 'numerical_label') for node in nodes} == expected
+
+
 def test_is_consistent_tree_checks_leaf_sets():
     t1 = ete.PhyloNode("(A:1,B:1)R;", format=1)
     t2 = ete.PhyloNode("(B:1,A:1)R2;", format=1)

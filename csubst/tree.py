@@ -129,11 +129,14 @@ def add_numerical_node_labels(tree):
         leaf_numerical_labels[leaf_name] = 1 << i
 
     nodes = list(tree.traverse())
-    clade_signatures = list()
-    for node in nodes:
-        leaf_names = ete.get_leaf_names(node)
-        clade_signature = sum(leaf_numerical_labels[leaf_name] for leaf_name in leaf_names)
-        clade_signatures.append(clade_signature)
+    signature_by_node = {}
+    for node in tree.traverse('postorder'):
+        children = ete.get_children(node)
+        signature_by_node[node] = (
+            sum(signature_by_node[child] for child in children)
+            if children else leaf_numerical_labels[node.name]
+        )
+    clade_signatures = [signature_by_node[node] for node in nodes]
 
     # Rank node signatures with pure-Python sorting so large integer signatures
     # remain exact and deterministic across environments.
@@ -201,6 +204,29 @@ def _internal_node_partition_names(tree_obj):
     return result
 
 
+def _internal_node_partition_bits(tree_obj):
+    """Root-independent vertex identities without materialized leaf sets."""
+    names = sorted(set(ete.get_leaf_names(tree_obj)))
+    leaf_bits = {name: 1 << index for index, name in enumerate(names)}
+    bits = {}
+    for node in tree_obj.traverse('postorder'):
+        value = leaf_bits[node.name] if ete.is_leaf(node) else 0
+        for child in ete.get_children(node):
+            value |= bits[child]
+        bits[node] = value
+    all_bits = bits[tree_obj]
+    partitions = {}
+    for node in tree_obj.traverse():
+        if ete.is_leaf(node):
+            continue
+        parts = {bits[child] for child in ete.get_children(node)}
+        outside = all_bits ^ bits[node]
+        if outside:
+            parts.add(outside)
+        partitions[node] = frozenset(parts)
+    return partitions
+
+
 def transfer_root(tree_to, tree_from, verbose=False):
     for node in tree_to.traverse():
         if node.dist is None:
@@ -215,7 +241,8 @@ def transfer_root(tree_to, tree_from, verbose=False):
     outgroups = subroot_leaves[0] if not is_n0_bigger_than_n1 else subroot_leaves[1]
     if verbose:
         print('outgroups:', outgroups)
-    original_node_names = _internal_node_partition_names(tree_to)
+    original_node_names = {partition: node.name
+                           for node, partition in _internal_node_partition_bits(tree_to).items()}
     tree_to.set_outgroup(ingroups[0])
     if (len(outgroups) == 1):
         outgroup_ancestor = [n for n in ete.iter_leaves(tree_to) if n.name == outgroups[0]][0]
@@ -238,15 +265,8 @@ def transfer_root(tree_to, tree_from, verbose=False):
                 n_to.dist = total_subroot_length_to * proportion
     # ETE rerooting can move the root's name to a newly inserted vertex. Restore
     # names from unrooted vertex identity, so ASR rows still refer to the same node.
-    all_leaves = frozenset(ete.get_leaf_names(tree_to))
-    for node in tree_to.traverse():
-        if ete.is_leaf(node):
-            continue
-        parts = [frozenset(ete.get_leaf_names(child)) for child in ete.get_children(node)]
-        outside = all_leaves - frozenset(ete.get_leaf_names(node))
-        if outside:
-            parts.append(outside)
-        node.name = original_node_names.get(frozenset(parts), '')
+    for node, partition in _internal_node_partition_bits(tree_to).items():
+        node.name = original_node_names.get(partition, '')
     if not tree_to.name:
         used_names = {n.name for n in tree_to.traverse()}
         root_name = 'Root'

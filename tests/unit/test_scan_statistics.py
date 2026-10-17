@@ -8,6 +8,12 @@ from scipy.stats import binom, chi2, poisson
 from csubst import scan_statistics as stats
 
 
+def test_maximum_score_rejects_rows_without_a_score_column():
+    assert stats.maximum_score(pd.DataFrame()) == -np.inf
+    with pytest.raises(KeyError, match='score_rate_enrichment'):
+        stats.maximum_score(pd.DataFrame(index=[0]))
+
+
 def test_sparse_poisson_diagnostic_is_not_an_exact_test():
     score, p = stats.rate_score(2, 1, 0, 1)
     assert p == pytest.approx(.04794548357123278)

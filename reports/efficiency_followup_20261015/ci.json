@@ -1,0 +1,105 @@
+{
+  "run_url": "https://github.com/kfuku52/csubst/actions/runs/38690129612",
+  "commit": "4382e1f84d01b7bff56855965c4c6e55c3512c51",
+  "event": "push",
+  "jobs": [
+    {
+      "name": "lint",
+      "conclusion": "success",
+      "seconds": 29.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "Fast tests (Python 3.11)",
+      "conclusion": "success",
+      "seconds": 119.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "packaging",
+      "conclusion": "success",
+      "seconds": 95.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "Fast tests (Python 3.14)",
+      "conclusion": "success",
+      "seconds": 133.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "Fast tests (Python 3.10)",
+      "conclusion": "success",
+      "seconds": 119.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "Fast tests (Python 3.13)",
+      "conclusion": "success",
+      "seconds": 134.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "cython-sanitizers",
+      "conclusion": "success",
+      "seconds": 124.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "fresh-macos-intel",
+      "conclusion": "skipped",
+      "seconds": null,
+      "runner_labels": [
+        "macos-15-intel"
+      ]
+    },
+    {
+      "name": "Pure-Python fallback (Python 3.12)",
+      "conclusion": "success",
+      "seconds": 63.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "parity",
+      "conclusion": "success",
+      "seconds": 80.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "Full test suite (Python 3.12)",
+      "conclusion": "success",
+      "seconds": 131.0,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "record-parity-baseline",
+      "conclusion": "skipped",
+      "seconds": null,
+      "runner_labels": [
+        "ubuntu-latest"
+      ]
+    }
+  ],
+  "sum_job_seconds": 1027.0,
+  "note": "Elapsed job seconds; not billed minutes and not an estimate of achievable savings."
+}

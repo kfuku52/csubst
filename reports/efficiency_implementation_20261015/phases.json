@@ -1,0 +1,919 @@
+{
+  "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "numpy": "2.5.3",
+  "pandas": "3.0.5",
+  "baseline": "4382e1f84d01b7bff56855965c4c6e55c3512c51",
+  "experiments": {
+    "missingness_balanced": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.130945417098701,
+          "cpu_seconds": 0.109618
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.02862608397845179,
+          "cpu_seconds": 0.02700900000000006
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.02603900001849979,
+          "cpu_seconds": 0.02596899999999991
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.08031337498687208,
+          "cpu_seconds": 0.07870599999999994
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.10802504105959088,
+          "cpu_seconds": 0.09856500000000001
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.03583054197952151,
+          "cpu_seconds": 0.028158000000000127
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.02618091693148017,
+          "cpu_seconds": 0.025309000000000026
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.1680947500281036,
+          "cpu_seconds": 0.08629299999999995
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.10802504105959088,
+            "after": 0.02618091693148017
+          },
+          "ratio": 0.2423597035898162
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.08629299999999995,
+            "after": 0.02596899999999991
+          },
+          "ratio": 0.3009398213064782
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "inspect_balanced": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.028987416066229343,
+          "cpu_seconds": 0.020701999999999998
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.004960458027198911,
+          "cpu_seconds": 0.004959000000000158
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.00856166600715369,
+          "cpu_seconds": 0.007630000000000026
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.015340083045884967,
+          "cpu_seconds": 0.015341000000000049
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.07121608301531523,
+          "cpu_seconds": 0.05542000000000025
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.0051334170857444406,
+          "cpu_seconds": 0.005132999999999832
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.00638241705019027,
+          "cpu_seconds": 0.006107000000000085
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.016256083035841584,
+          "cpu_seconds": 0.015499000000000152
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.016256083035841584,
+            "after": 0.00638241705019027
+          },
+          "ratio": 0.39261715359833294
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.015499000000000152,
+            "after": 0.006107000000000085
+          },
+          "ratio": 0.3940254209949045
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "clades_balanced": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.039903625031001866,
+          "cpu_seconds": 0.039893999999999874
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.013506249990314245,
+          "cpu_seconds": 0.012448000000000015
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.015569792012684047,
+          "cpu_seconds": 0.012870000000000381
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.06869629106950015,
+          "cpu_seconds": 0.04284599999999994
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.0532898330129683,
+          "cpu_seconds": 0.04698500000000028
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.011303833918645978,
+          "cpu_seconds": 0.011302999999999841
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.01279199996497482,
+          "cpu_seconds": 0.012430000000000163
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.04030841705389321,
+          "cpu_seconds": 0.03864400000000012
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.0532898330129683,
+            "after": 0.01279199996497482
+          },
+          "ratio": 0.24004578813114003
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.04284599999999994,
+            "after": 0.012430000000000163
+          },
+          "ratio": 0.2901087616113565
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "root_partitions_balanced": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.282106832950376,
+          "cpu_seconds": 0.16165899999999978
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.011842083069495857,
+          "cpu_seconds": 0.010176999999999659
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.005833250004798174,
+          "cpu_seconds": 0.005831999999999837
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.13290433399379253,
+          "cpu_seconds": 0.12246100000000038
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.1343798750312999,
+          "cpu_seconds": 0.1269430000000007
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.0071645829593762755,
+          "cpu_seconds": 0.00695800000000002
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.005701082991436124,
+          "cpu_seconds": 0.005695000000000228
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.14707766706123948,
+          "cpu_seconds": 0.12500499999999892
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.1343798750312999,
+            "after": 0.005833250004798174
+          },
+          "ratio": 0.043408657758012406
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.12500499999999892,
+            "after": 0.005831999999999837
+          },
+          "ratio": 0.046654133834645714
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "missingness_ladder": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 3.385667833033949,
+          "cpu_seconds": 2.8018770000000006
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.024837333941832185,
+          "cpu_seconds": 0.023531999999999442
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.05820829200092703,
+          "cpu_seconds": 0.057923999999999864
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.6930235840845853,
+          "cpu_seconds": 2.5756570000000005
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 3.070691542001441,
+          "cpu_seconds": 2.851839
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.023416624986566603,
+          "cpu_seconds": 0.023364999999998304
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.02547566604334861,
+          "cpu_seconds": 0.025153000000001313
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.8749091249192134,
+          "cpu_seconds": 2.6810840000000002
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 2.8749091249192134,
+            "after": 0.02547566604334861
+          },
+          "ratio": 0.008861381329423584
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 2.6810840000000002,
+            "after": 0.025153000000001313
+          },
+          "ratio": 0.00938165309255559
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "inspect_ladder": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 1.1930172919528559,
+          "cpu_seconds": 1.0720540000000014
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.004957791999913752,
+          "cpu_seconds": 0.004958000000002016
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.014986459049396217,
+          "cpu_seconds": 0.011808999999999514
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 1.2980268329847604,
+          "cpu_seconds": 1.1431989999999992
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 1.1286846660077572,
+          "cpu_seconds": 1.0327779999999969
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.007281541940756142,
+          "cpu_seconds": 0.005243000000000109
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.006676541059277952,
+          "cpu_seconds": 0.005213000000001244
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 1.248220874927938,
+          "cpu_seconds": 1.085530000000002
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 1.248220874927938,
+            "after": 0.007281541940756142
+          },
+          "ratio": 0.005833536425335395
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 1.085530000000002,
+            "after": 0.005243000000000109
+          },
+          "ratio": 0.004829898759131575
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "clades_ladder": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 5.780387790990062,
+          "cpu_seconds": 2.783251
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.10620366607327014,
+          "cpu_seconds": 0.019290000000001584
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.021755167050287127,
+          "cpu_seconds": 0.01267700000000005
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 10.680363417020999,
+          "cpu_seconds": 2.9642079999999993
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 4.688357292092405,
+          "cpu_seconds": 2.7641940000000034
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.01293750002514571,
+          "cpu_seconds": 0.012821999999999889
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.01870179094839841,
+          "cpu_seconds": 0.0170400000000015
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 3.5094199589220807,
+          "cpu_seconds": 2.7649200000000036
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 4.688357292092405,
+            "after": 0.01870179094839841
+          },
+          "ratio": 0.003988985860770828
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 2.7649200000000036,
+            "after": 0.012821999999999889
+          },
+          "ratio": 0.004637385530141875
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "root_partitions_ladder": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 3.531986999907531,
+          "cpu_seconds": 2.5109859999999955
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.011445209034718573,
+          "cpu_seconds": 0.010806000000002314
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.005712416954338551,
+          "cpu_seconds": 0.005712000000002604
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.7187064579920843,
+          "cpu_seconds": 2.464933000000002
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 2.6793894580332562,
+          "cpu_seconds": 2.507463999999999
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.007645041914656758,
+          "cpu_seconds": 0.0074759999999969295
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.015078458935022354,
+          "cpu_seconds": 0.008308999999997013
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 3.4482530830428004,
+          "cpu_seconds": 2.484613000000003
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 2.7187064579920843,
+            "after": 0.007645041914656758
+          },
+          "ratio": 0.0028120144755543214
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 2.484613000000003,
+            "after": 0.0074759999999969295
+          },
+          "ratio": 0.0030089192964847726
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "candidates_any2spe": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 1.554473500000313,
+          "cpu_seconds": 1.2781710000000004
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.7123032920062542,
+          "cpu_seconds": 0.646329999999999
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.6118150840047747,
+          "cpu_seconds": 0.5758360000000025
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 1.0974223329685628,
+          "cpu_seconds": 1.0676540000000045
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 1.2323278750991449,
+          "cpu_seconds": 1.1768069999999966
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.8168374169617891,
+          "cpu_seconds": 0.6929889999999972
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.7182942079380155,
+          "cpu_seconds": 0.6033809999999988
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 1.587465082993731,
+          "cpu_seconds": 1.1897179999999992
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 1.2323278750991449,
+            "after": 0.7182942079380155
+          },
+          "ratio": 0.5828758907853369
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 1.1768069999999966,
+            "after": 0.6033809999999988
+          },
+          "ratio": 0.5127272356469672
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "candidates_all": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 6.301979792071506,
+          "cpu_seconds": 5.504660000000001
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 2.0227427919162437,
+          "cpu_seconds": 1.9337110000000024
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 2.1741801250027493,
+          "cpu_seconds": 2.0584750000000014
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 7.444663624977693,
+          "cpu_seconds": 5.51682000000001
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 22.155874124960974,
+          "cpu_seconds": 6.850415999999996
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 9.583597250049934,
+          "cpu_seconds": 2.5630610000000047
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 11.81102283403743,
+          "cpu_seconds": 2.8220270000000056
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 28.95052795810625,
+          "cpu_seconds": 7.970082000000005
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 22.155874124960974,
+            "after": 9.583597250049934
+          },
+          "ratio": 0.4325533353366086
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 6.850415999999996,
+            "after": 2.5630610000000047
+          },
+          "ratio": 0.3741467671452371
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "pepc_state_parser": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 4.243973790900782,
+          "cpu_seconds": 0.8987849999999895
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 4.412252499954775,
+          "cpu_seconds": 0.6987710000000078
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 2.7836672080447897,
+          "cpu_seconds": 0.6646539999999987
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 3.763839832972735,
+          "cpu_seconds": 0.8281360000000006
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 3.1007547919871286,
+          "cpu_seconds": 0.7979500000000002
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.8086812499677762,
+          "cpu_seconds": 0.596225000000004
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.6654983330518007,
+          "cpu_seconds": 0.5898749999999922
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.8291938749607652,
+          "cpu_seconds": 0.7590689999999967
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 3.1007547919871286,
+            "after": 0.8086812499677762
+          },
+          "ratio": 0.2608014190794914
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.7979500000000002,
+            "after": 0.596225000000004
+          },
+          "ratio": 0.7471959395952176
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "structure_inner_cv": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.7415531659498811,
+          "cpu_seconds": 0.6675790000000035
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.4807356669334695,
+          "cpu_seconds": 0.453171999999995
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.5248411250067875,
+          "cpu_seconds": 0.46859800000000007
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.857675833045505,
+          "cpu_seconds": 0.7204399999999964
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.7166796670062467,
+          "cpu_seconds": 0.6527050000000116
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.5384881249628961,
+          "cpu_seconds": 0.49282800000000293
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 0.45119758299551904,
+          "cpu_seconds": 0.41918300000000386
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.6665852089645341,
+          "cpu_seconds": 0.5872209999999995
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.7166796670062467,
+            "after": 0.5248411250067875
+          },
+          "ratio": 0.7323231691491714
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.6527050000000116,
+            "after": 0.46859800000000007
+          },
+          "ratio": 0.7179322971326889
+        }
+      },
+      "equivalent_pairs": 4
+    },
+    "maximum_score_10000": {
+      "runs": [
+        {
+          "version": "before",
+          "warmup": true,
+          "seconds": 0.07999212492723018,
+          "cpu_seconds": 0.079596
+        },
+        {
+          "version": "after",
+          "warmup": true,
+          "seconds": 0.00020766700617969036,
+          "cpu_seconds": 0.00020700000000006824
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 4.695798270404339e-05,
+          "cpu_seconds": 4.700000000013027e-05
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.08164320897776634,
+          "cpu_seconds": 0.079534
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.07899833307601511,
+          "cpu_seconds": 0.07853200000000005
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 8.216698188334703e-05,
+          "cpu_seconds": 8.199999999991547e-05
+        },
+        {
+          "version": "after",
+          "warmup": false,
+          "seconds": 3.062502946704626e-05,
+          "cpu_seconds": 3.100000000011427e-05
+        },
+        {
+          "version": "before",
+          "warmup": false,
+          "seconds": 0.07699175004381686,
+          "cpu_seconds": 0.07685699999999995
+        }
+      ],
+      "summary": {
+        "seconds": {
+          "medians": {
+            "before": 0.07899833307601511,
+            "after": 4.695798270404339e-05
+          },
+          "ratio": 0.0005944173867423086
+        },
+        "cpu_seconds": {
+          "medians": {
+            "before": 0.07853200000000005,
+            "after": 4.700000000013027e-05
+          },
+          "ratio": 0.000598482147406538
+        }
+      },
+      "equivalent_pairs": 4
+    }
+  },
+  "clade_payload": {
+    "balanced": {
+      "before_numpy": 655392,
+      "after_numpy": 180160,
+      "listing_cache_limit": 8388608
+    },
+    "ladder": {
+      "before_numpy": 67076096,
+      "after_numpy": 180160,
+      "listing_cache_limit": 8388608
+    }
+  },
+  "state_input_sha256": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0"
+}

@@ -63,11 +63,13 @@ class EndpointModel:
             if parent >= 0:
                 self.children[parent].append(child)
         self.order: list[int] = []
+        visited = set()
         stack = [self.root]
         while stack:
             node = stack.pop()
-            if node in self.order:
+            if node in visited:
                 raise ValueError('Endpoint tree contains a cycle.')
+            visited.add(node)
             self.order.append(node)
             stack.extend(reversed(self.children[node]))
         if len(self.order) != p.size:

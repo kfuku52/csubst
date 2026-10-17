@@ -44,8 +44,13 @@ def rate_score(x_target, l_target, x_other, l_other):
 
 def maximum_score(frame):
     """Max over testable candidates, with explicit zero-exposure no-tests."""
-    values = np.array([calibration_score(row) for _, row in frame.iterrows()])
-    return float(values.max()) if values.size else -np.inf
+    if len(frame) == 0:
+        return -np.inf
+    values = frame['score_rate_enrichment'].to_numpy(dtype=float, copy=True)
+    invalid = ~(np.isfinite(values) & (values >= 0))
+    for index in np.flatnonzero(invalid):
+        values[index] = calibration_score(frame.iloc[index])
+    return float(values.max())
 
 
 def calibration_score(row):

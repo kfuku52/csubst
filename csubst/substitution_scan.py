@@ -6,6 +6,7 @@ import math
 import os
 import re
 import tempfile
+from collections import OrderedDict
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from typing import Any
 
@@ -25,6 +26,47 @@ from csubst import sequence
 from csubst import scan_statistics
 from csubst import substitution
 from csubst import site_storage
+
+
+class _CandidateCache:
+    """A bounded cache owned by one immutable scan fit or one worker chunk."""
+
+    def __init__(self, max_bytes=32 * 1024**2, max_items=4096):
+        self.max_bytes, self.max_items = max_bytes, max_items
+        self.entries = OrderedDict()
+        self.nbytes = 0
+
+    def obtain(self, key, build, size_of):
+        if key in self.entries:
+            self.entries.move_to_end(key)
+            return self.entries[key][0]
+        value = build()
+        size = size_of(value)
+        if size <= self.max_bytes:
+            while self.entries and (self.nbytes + size > self.max_bytes or len(self.entries) >= self.max_items):
+                self.nbytes -= self.entries.popitem(last=False)[1][1]
+            self.entries[key] = (value, size)
+            self.nbytes += size
+        return value
+
+
+def _scan_candidate_cache(scan_static, name):
+    if scan_static is None or not scan_static.get('_cache_candidates', True):
+        return None
+    if name not in scan_static:
+        scan_static[name] = _CandidateCache()
+    return scan_static[name]
+
+
+def _cached_posterior_events(scan_static, sub_tensor, site, from_ids, to_ids, float_tol):
+    projection = scan_static.get('rate_event_projection') if scan_static is not None else None
+    def build():
+        return extract_candidate_posterior_events(sub_tensor, site, from_ids, to_ids, float_tol, projection)
+    cache = _scan_candidate_cache(scan_static, '_event_cache')
+    if cache is None:
+        return build()
+    key = (id(sub_tensor), int(site), tuple(from_ids), tuple(to_ids), float_tol, id(projection))
+    return cache.obtain(key, build, lambda frame: int(frame.memory_usage(index=True, deep=True).sum()))
 
 
 SCAN_MATCHES = (
@@ -513,6 +555,8 @@ def _pack_scan_worker_context(g, scan_static):
                        "scan_observed_state_nsy", "scan_observed_state_pep"]:
         worker_g.pop(unused_key, None)
     worker_static = dict(scan_static)
+    for key in ('_event_cache', '_exposure_cache', '_fixed_candidates'):
+        worker_static.pop(key, None)
     endpoint_context = q_context.get("endpoint_context")
     if endpoint_context is not None:
         q_context["endpoint_context"] = {
@@ -528,6 +572,8 @@ def _unpack_scan_worker_context(g, scan_static):
     worker_g = dict(g)
     worker_g["state_nsy"] = _unpack_scan_tensor_for_worker(worker_g.get("state_nsy", None))
     worker_static = dict(scan_static)
+    for key in ('_event_cache', '_exposure_cache', '_fixed_candidates'):
+        worker_static.pop(key, None)
     q_context = dict(worker_static["q_context"])
     packed_state_cdn = q_context.get("state_cdn", None)
     if packed_state_cdn is None:
@@ -721,7 +767,6 @@ def extract_candidate_posterior_events(
     to_ids = np.array(sorted(set(np.asarray(to_ids, dtype=np.int64).reshape(-1).tolist())), dtype=np.int64)
     if isinstance(sub_tensor, site_storage.SiteEventTensor):
         num_branch, num_site, num_group, num_from, num_to = sub_tensor.shape
-        arr = sub_tensor.read_site(site)[:, np.newaxis]
         array_site = 0
     elif _is_sparse_sub_tensor(sub_tensor):
         num_branch = int(sub_tensor.shape[0])
@@ -745,6 +790,8 @@ def extract_candidate_posterior_events(
         to_ids=to_ids,
     )
     if branch_values is None:
+        if isinstance(sub_tensor, site_storage.SiteEventTensor):
+            arr = sub_tensor.read_site(site)[:, np.newaxis]
         branch_values = np.zeros(shape=(num_branch,), dtype=np.float64)
         for anc in from_ids.tolist():
             if (int(anc) < 0) or (int(anc) >= num_from):
@@ -1081,10 +1128,21 @@ def _get_scan_trait_plan(g, trait_name, valid_branch_ids):
         observed = [tuple(i for group in observed for i in group)]
     elif any(len(group) == 0 for group in observed):
         raise ValueError("Every foreground lineage needs a non-root component for scan calibration.")
-    eligible = np.array([
-        any(int(bid) in valid_set for bid in _selected_stem_fg_branch_ids(g, trait_cache, i))
-        for i in range(len(trait_cache["branch_ids"]))
-    ], dtype=bool)
+    descendants = trait_cache['descendant_indices_by_index']
+    if (isinstance(descendants, scan_permutation.CladeDescendants) and unit_mode != 'stem'
+            and not (unit_mode == 'lineage' and bool(g.get('fg_stem_only', False)))):
+        index = descendants.index
+        valid = np.array([int(bid) in valid_set for bid in index.branch_ids], dtype=bool)
+        positions = index.preorder_indices
+        present = np.zeros(len(positions), dtype=np.int64)
+        present[positions >= 0] = valid[positions[positions >= 0]]
+        cumulative = np.concatenate(([0], np.cumsum(present)))
+        eligible = cumulative[index.stops] > cumulative[index.starts]
+    else:
+        eligible = np.array([
+            any(int(bid) in valid_set for bid in _selected_stem_fg_branch_ids(g, trait_cache, i))
+            for i in range(len(trait_cache["branch_ids"]))
+        ], dtype=bool)
     if not eligible.any():
         raise ValueError("No clades have analyzable target branches for scan calibration.")
     min_count = int(g.get("min_clade_bin_count", g.get("scan_permutation_min_clade_bin_count", 10)))
@@ -1301,17 +1359,47 @@ def _format_state_change(from_label, to_label, site_label, match):
 def build_candidates(events, scan_matches, state_orders):
     rows = []
     num_state = int(state_orders.shape[0])
+    summaries = {}
     for match in scan_matches:
         if events.shape[0] == 0:
             continue
-        group_cols = _candidate_group_columns(match)
-        grouped = events.groupby(group_cols, sort=True)
-        for key, group in grouped:
-            state_sets = _candidate_state_sets(match=match, group=group, num_state=num_state)
-            if state_sets is None:
+        group_cols = tuple(_candidate_group_columns(match))
+        if group_cols not in summaries:
+            # Reduce each state distribution in one pass, preserving pandas'
+            # summation and tie ordering, rather than grouping each tiny frame.
+            distributions = {}
+            for column in ('from_state_id', 'to_state_id'):
+                keys = list(dict.fromkeys((*group_cols, column)))
+                reduced = events.groupby(keys, sort=True)['event_pp'].sum()
+                by_group = {}
+                for key, mass in reduced.items():
+                    key = key if isinstance(key, tuple) else (key,)
+                    group_key = tuple(key[keys.index(col)] for col in group_cols)
+                    by_group.setdefault(group_key, []).append((key[keys.index(column)], mass))
+                distributions[column] = {
+                    key: ','.join('{}:{:.6g}'.format(str(state_orders[int(index)]), float(value))
+                                  for index, value in pd.Series(
+                                      [mass for _, mass in values], index=[index for index, _ in values]
+                                  ).sort_values(ascending=False).items())
+                    for key, values in by_group.items()}
+            records = []
+            for key, group in events.groupby(list(group_cols), sort=True):
+                key = key if isinstance(key, tuple) else (key,)
+                _, _, observed_from, observed_to = _candidate_state_sets('any2any', group, num_state)
+                records.append((int(group['site'].iloc[0]), observed_from, observed_to,
+                                distributions['from_state_id'][key], distributions['to_state_id'][key],
+                                float(group['event_pp'].sum())))
+            summaries[group_cols] = records
+        ancestral, derived = match.split('2')
+        all_states = np.arange(num_state, dtype=np.int64)
+        for site, observed_from, observed_to, from_distribution, to_distribution, total in summaries[group_cols]:
+            if ((ancestral == 'spe' and len(observed_from) != 1)
+                    or (ancestral == 'dif' and len(observed_from) < 2)
+                    or (derived == 'spe' and len(observed_to) != 1)
+                    or (derived == 'dif' and len(observed_to) < 2)):
                 continue
-            from_set, to_set, observed_from, observed_to = state_sets
-            site = int(group["site"].iloc[0])
+            from_set = all_states if ancestral == 'any' else observed_from
+            to_set = all_states if derived == 'any' else observed_to
             from_label = _state_set_label(from_set, state_orders)
             to_label = _state_set_label(to_set, state_orders)
             state_change = _format_state_change(
@@ -1330,10 +1418,10 @@ def build_candidates(events, scan_matches, state_orders):
                     "observed_to_state_ids": ",".join(str(v) for v in observed_to.tolist()),
                     "from_state": from_label,
                     "to_state": to_label,
-                    "from_state_distribution": _state_distribution_label(group, "from_state_id", state_orders),
-                    "to_state_distribution": _state_distribution_label(group, "to_state_id", state_orders),
+                    "from_state_distribution": from_distribution,
+                    "to_state_distribution": to_distribution,
                     "state_change": state_change,
-                    "candidate_event_pp_sum": float(group["event_pp"].sum()),
+                    "candidate_event_pp_sum": total,
                 }
             )
     if len(rows) == 0:
@@ -1344,14 +1432,14 @@ def build_candidates(events, scan_matches, state_orders):
 def _event_mask_for_candidate(events, site, from_ids, to_ids):
     if events.shape[0] == 0:
         return np.zeros(shape=(0,), dtype=bool)
-    from_ids = set(int(v) for v in np.asarray(from_ids, dtype=np.int64).reshape(-1).tolist())
-    to_ids = set(int(v) for v in np.asarray(to_ids, dtype=np.int64).reshape(-1).tolist())
-    return (
-        (events["site"].astype(int) == int(site))
-        & events["from_state_id"].astype(int).isin(from_ids)
-        & events["to_state_id"].astype(int).isin(to_ids)
-        & (events["from_state_id"].astype(int) != events["to_state_id"].astype(int))
-    ).to_numpy(dtype=bool)
+    from_ids = np.asarray(from_ids, dtype=np.int64).reshape(-1)
+    to_ids = np.asarray(to_ids, dtype=np.int64).reshape(-1)
+    mask = events["site"].to_numpy(dtype=int) == int(site)
+    positions = np.flatnonzero(mask)
+    ancestral = events["from_state_id"].to_numpy(dtype=int)[positions]
+    derived = events["to_state_id"].to_numpy(dtype=int)[positions]
+    mask[positions] &= np.isin(ancestral, from_ids) & np.isin(derived, to_ids) & (ancestral != derived)
+    return mask
 
 
 def _support_for_unit(branch_event, branch_ids, min_event_pp):
@@ -1376,7 +1464,18 @@ def _format_lineage_id_list(values):
     return output.getvalue().removesuffix("\r\n")
 
 
-def _summarize_unit_support(candidate_events, units_df, target_class, min_event_pp):
+def _scan_unit_support_plan(units_df):
+    """Parse fixed branch membership once per trait/foreground assignment."""
+    branch_lists = units_df.get("fg_branch_ids", [""] * len(units_df))
+    return [
+        (unit_id, lineage_value, _parse_id_list(branch_ids))
+        for unit_id, lineage_value, branch_ids in zip(
+            units_df["unit_id"], units_df["lineage_value"], branch_lists,
+        )
+    ]
+
+
+def _summarize_unit_support(candidate_events, units_df, target_class, min_event_pp, unit_plan=None):
     if str(target_class) != "fg":
         raise ValueError("Only foreground target class is supported in scan.")
     if units_df.shape[0] == 0:
@@ -1399,9 +1498,9 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
     support_branches = []
     analyzable_lineages = dict()
     support_lineages = set()
-    for _, row in units_df.iterrows():
-        fg_ids = _parse_id_list(row.get("fg_branch_ids", ""))
-        lineage_value = row["lineage_value"]
+    if unit_plan is None:
+        unit_plan = _scan_unit_support_plan(units_df)
+    for unit_id, lineage_value, fg_ids in unit_plan:
         if fg_ids.size > 0:
             analyzable_lineages[lineage_value] = None
         fg_pp, fg_support_branches = _support_for_unit(branch_event, fg_ids, min_event_pp)
@@ -1409,7 +1508,7 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
         pp = fg_pp
         branches = fg_support_branches
         if is_support:
-            support_units.append(int(row["unit_id"]))
+            support_units.append(int(unit_id))
             support_pp.append(float(pp))
             support_branches.extend([int(v) for v in branches])
             support_lineages.add(lineage_value)
@@ -1758,6 +1857,7 @@ def _rate_summary(
     codon_q_matrix=None,
     codon_state_ids=None,
     endpoint_context=None,
+    exposure_cache=None,
 ):
     target_set = set(int(v) for v in np.asarray(target_branch_ids, dtype=np.int64).reshape(-1).tolist())
     branch_ids = branch_meta["branch_id"].astype(int).to_numpy(copy=False)
@@ -1782,9 +1882,14 @@ def _rate_summary(
             raise ValueError("Scan endpoint requires raw model lengths and a fitted endpoint context.")
         if not np.array_equal(branch_ids, endpoint_context["branch_ids"]):
             raise ValueError("Scan endpoint context branch order does not match branch metadata.")
-        opportunity, missing_exposure, exposure_reasons = scan_endpoint.expected_events(
-            endpoint_context, state_cdn, state_nsy, site, from_ids, to_ids,
-        )
+        def expected():
+            return scan_endpoint.expected_events(endpoint_context, state_cdn, state_nsy, site, from_ids, to_ids)
+        if exposure_cache is None:
+            opportunity, missing_exposure, exposure_reasons = expected()
+        else:
+            key = (id(endpoint_context), id(state_cdn), id(state_nsy), int(site), tuple(from_ids), tuple(to_ids))
+            opportunity, missing_exposure, exposure_reasons = exposure_cache.obtain(
+                key, expected, lambda values: sum(value.nbytes for value in values))
     elif rate_exposure == "state_aware":
         opp_states = _opportunity_states(from_ids=from_ids, to_ids=to_ids)
         if opp_states.shape[0] == 0:
@@ -2195,6 +2300,9 @@ def _build_scan_static_context(g, ON_tensor, rate_ON_tensor=None):
         "observed_site_annotations": observed_site_annotations,
         "permutation_site_annotations": permutation_site_annotations,
         "rate_event_projection": rate_event_projection,
+        # Single-pass discovery has no repeated candidate vectors to reuse.
+        '_cache_candidates': normalize_scan_pvalue_calibration(
+            g.get('scan_pvalue_calibration', 'full_scan')) in ('full_scan', 'candidate_fixed'),
     }
 
 
@@ -2277,7 +2385,27 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
         else:
             site_annotations = scan_static["permutation_site_annotations"]
         site_annotation_by_site = site_annotations.set_index("site", drop=False)
-        for _, cand in candidates.iterrows():
+        unit_plan = _scan_unit_support_plan(units_trait)
+        rate_branch_sets = {
+            target_class: (
+                _target_branch_ids_from_maps(
+                    fg_ids_map=rate_fg_ids_map,
+                    trait_name=trait_name,
+                    target_class=target_class,
+                    valid_branch_ids=valid_branch_ids,
+                ),
+                _other_branch_ids_from_maps(
+                    fg_ids_map=rate_fg_ids_map,
+                    trait_name=trait_name,
+                    target_class=target_class,
+                    valid_branch_ids=valid_branch_ids,
+                    scan_other_scope=scan_other_scope,
+                    units_df=units_trait,
+                ),
+            )
+            for target_class in scan_targets
+        }
+        for cand in candidates.to_dict("records"):
             site = int(cand["site"])
             from_ids = np.array([int(v) for v in str(cand["from_state_ids"]).split(",") if v != ""], dtype=np.int64)
             to_ids = np.array([int(v) for v in str(cand["to_state_ids"]).split(",") if v != ""], dtype=np.int64)
@@ -2288,28 +2416,29 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                 to_ids=to_ids,
             )
             matched_events = events.loc[mask, :].copy()
-            if rate_event_mode == "called":
-                rate_events = matched_events
-            elif rate_event_mode == "posterior_sum":
-                rate_events = extract_candidate_posterior_events(
-                    sub_tensor=rate_ON_tensor,
-                    site=site,
-                    from_ids=from_ids,
-                    to_ids=to_ids,
-                    float_tol=float(g.get("float_tol", 1e-12)),
-                    projection=scan_static.get("rate_event_projection", None),
-                )
-            else:
-                txt = "--scan_rate_event_mode should be one of {}."
-                raise ValueError(txt.format(", ".join(SCAN_RATE_EVENT_MODES)))
             candidate_support = _summarize_unit_support(
                 candidate_events=matched_events,
                 units_df=units_trait,
                 target_class="fg",
                 min_event_pp=min_event_pp,
+                unit_plan=unit_plan,
             )
             if int(candidate_support["support_unit_count"]) < int(min_support_count):
                 continue
+            if rate_event_mode == "called":
+                rate_events = matched_events
+            elif rate_event_mode == "posterior_sum":
+                rate_events = _cached_posterior_events(
+                    scan_static=scan_static,
+                    sub_tensor=rate_ON_tensor,
+                    site=site,
+                    from_ids=from_ids,
+                    to_ids=to_ids,
+                    float_tol=float(g.get("float_tol", 1e-12)),
+                )
+            else:
+                txt = "--scan_rate_event_mode should be one of {}."
+                raise ValueError(txt.format(", ".join(SCAN_RATE_EVENT_MODES)))
             scan_id += 1
             site_row = site_annotation_by_site.loc[site, :].to_dict()
             site_label = int(site_row.get("codon_site_alignment", site + 1))
@@ -2320,26 +2449,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                 match=cand["scan_match"],
             )
             for target_class in scan_targets:
-                target_branch_ids = _target_branch_ids_from_maps(
-                    fg_ids_map=rate_fg_ids_map,
-                    trait_name=trait_name,
-                    target_class=target_class,
-                    valid_branch_ids=valid_branch_ids,
-                )
-                other_branch_ids = _other_branch_ids_from_maps(
-                    fg_ids_map=rate_fg_ids_map,
-                    trait_name=trait_name,
-                    target_class=target_class,
-                    valid_branch_ids=valid_branch_ids,
-                    scan_other_scope=scan_other_scope,
-                    units_df=units_trait,
-                )
-                support = _summarize_unit_support(
-                    candidate_events=matched_events,
-                    units_df=units_trait,
-                    target_class=target_class,
-                    min_event_pp=min_event_pp,
-                )
+                target_branch_ids, other_branch_ids = rate_branch_sets[target_class]
                 rate = _rate_summary(
                     candidate_events=rate_events,
                     branch_meta=branch_meta,
@@ -2356,6 +2466,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     codon_q_matrix=q_context["codon_q_matrix"],
                     codon_state_ids=q_context["codon_state_ids"],
                     endpoint_context=q_context.get("endpoint_context"),
+                    exposure_cache=_scan_candidate_cache(scan_static, '_exposure_cache'),
                 )
                 row = {
                     "scan_id": int(scan_id),
@@ -2397,7 +2508,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
                     "p_rate_enrichment_empirical_maxT": np.nan,
                 }
                 row.update(site_row)
-                row.update(support)
+                row.update(candidate_support)
                 row.update(rate)
                 rows.append(row)
     if len(rows) == 0:
@@ -2499,12 +2610,15 @@ def _candidate_fixed_permutation_scores(
         branch_meta=branch_meta,
     )
     out = {}
-    for _, row in observed_df.iterrows():
+    candidates = scan_static.get('_fixed_candidates') if scan_static is not None else None
+    if candidates is None:
+        candidates = [(row, _parse_id_list(row['from_state_ids']), _parse_id_list(row['to_state_ids']))
+                      for row in observed_df.to_dict('records')]
+    branch_sets = {}
+    for row, from_ids, to_ids in candidates:
         trait_name = str(row["trait"])
         target_class = str(row["target_class"])
         site = int(row["site"])
-        from_ids = np.array([int(v) for v in str(row["from_state_ids"]).split(",") if v != ""], dtype=np.int64)
-        to_ids = np.array([int(v) for v in str(row["to_state_ids"]).split(",") if v != ""], dtype=np.int64)
         if rate_event_mode == "called":
             mask = _event_mask_for_candidate(
                 events=called_events,
@@ -2514,28 +2628,23 @@ def _candidate_fixed_permutation_scores(
             )
             rate_events = called_events.loc[mask, :].copy()
         else:
-            rate_events = extract_candidate_posterior_events(
+            rate_events = _cached_posterior_events(
+                scan_static=scan_static,
                 sub_tensor=rate_ON_tensor,
                 site=site,
                 from_ids=from_ids,
                 to_ids=to_ids,
                 float_tol=float(g.get("float_tol", 1e-12)),
             )
-        target_branch_ids = _target_branch_ids_from_maps(
-            fg_ids_map=scan_context.get("rate_fg_ids", scan_context["fg_ids"]),
-            trait_name=trait_name,
-            target_class=target_class,
-            valid_branch_ids=valid_branch_ids,
-        )
-        units_trait = scan_context["units"].loc[scan_context["units"]["trait"] == trait_name, :].reset_index(drop=True)
-        other_branch_ids = _other_branch_ids_from_maps(
-            fg_ids_map=scan_context.get("rate_fg_ids", scan_context["fg_ids"]),
-            trait_name=trait_name,
-            target_class=target_class,
-            valid_branch_ids=valid_branch_ids,
-            scan_other_scope=scan_other_scope,
-            units_df=units_trait,
-        )
+        branch_key = (trait_name, target_class)
+        if branch_key not in branch_sets:
+            fg_ids = scan_context.get('rate_fg_ids', scan_context['fg_ids'])
+            units_trait = scan_context['units'].loc[scan_context['units']['trait'] == trait_name, :].reset_index(drop=True)
+            branch_sets[branch_key] = (
+                _target_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids),
+                _other_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids,
+                                           scan_other_scope, units_df=units_trait))
+        target_branch_ids, other_branch_ids = branch_sets[branch_key]
         rate = _rate_summary(
             candidate_events=rate_events,
             branch_meta=branch_meta,
@@ -2552,6 +2661,7 @@ def _candidate_fixed_permutation_scores(
             codon_q_matrix=q_context["codon_q_matrix"],
             codon_state_ids=q_context["codon_state_ids"],
             endpoint_context=q_context.get("endpoint_context"),
+            exposure_cache=_scan_candidate_cache(scan_static, '_exposure_cache'),
         )
         out[_scan_row_key(row)] = scan_statistics.calibration_score(rate)
     return out
@@ -2650,6 +2760,10 @@ def _run_scan_permutation_chunk(
     g, scan_static = _unpack_scan_worker_context(g=g, scan_static=scan_static)
     ON_tensor = _unpack_scan_tensor_for_worker(ON_tensor)
     rate_ON_tensor = _unpack_scan_tensor_for_worker(rate_ON_tensor)
+    if calibration == 'candidate_fixed':
+        scan_static['_fixed_candidates'] = [
+            (row, _parse_id_list(row['from_state_ids']), _parse_id_list(row['to_state_ids']))
+            for row in observed_df.to_dict('records')]
     summary: dict[str, Any] = {
         "success_count": 0,
         "failure_count": 0,
