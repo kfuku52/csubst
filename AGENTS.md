@@ -1,4 +1,4 @@
-<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=10; sha256=82e3c0eb467582a414d9a6b2feaaaf6f5c8ae330d30f2e3efbf8c303155d0e2e -->
+<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=11; sha256=e029bf20aa611849e9fbfa6bbd70ec5e07bdbb0106e38f330b0c4aa4d6392034 -->
 # Common agent policy
 
 Repository-specific instructions override these defaults.
@@ -29,7 +29,8 @@ Repository-specific instructions override these defaults.
   guides in linked documentation.
 - For GitHub push/release work, use `prepare-github-push` in `.agents/skills/`.
   Local-only commits need no version bump; GitHub pushes require one.
-- For software performance work, use `benchmark-performance` in `.agents/skills/`.
+- Optimize bottlenecks in RAM usage or CPU time whenever found. For software
+  performance work, use `benchmark-performance` in `.agents/skills/`.
   Performance claims require comparable measurements and equivalent output.
 - For GitHub Actions edits, use `optimize-github-actions` in `.agents/skills/`.
   Preserve required coverage; never run untrusted PR code on self-hosted runners.
