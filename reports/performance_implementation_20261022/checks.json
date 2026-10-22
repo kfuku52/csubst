@@ -1,0 +1,322 @@
+[
+  {
+    "label": "fast-lint-typecheck-py312",
+    "command": [
+      "make",
+      "PYTHON=${WORKDIR}/verify-venv/bin/python",
+      "test-fast",
+      "lint",
+      "typecheck"
+    ],
+    "exit_code": 0,
+    "seconds": 17.228606292046607,
+    "summaries": [
+      "1668 passed, 6 skipped, 8 warnings in 9.93s",
+      "All checks passed!",
+      "Repository hygiene checks passed.",
+      "Documentation checks passed: 22 documents, 23 commands, 1 help examples, 2 templates, 73 local links.",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file"
+    ]
+  },
+  {
+    "label": "full-source-py312",
+    "command": [
+      "make",
+      "PYTHON=${WORKDIR}/verify-venv/bin/python",
+      "test"
+    ],
+    "exit_code": 0,
+    "seconds": 18.618680999963544,
+    "summaries": [
+      "2167 passed, 9 skipped, 8 warnings in 13.52s",
+      "5 passed in 4.55s"
+    ]
+  },
+  {
+    "label": "native-py312",
+    "command": [
+      "make",
+      "PYTHON=${WORKDIR}/verify-venv/bin/python",
+      "test-native"
+    ],
+    "exit_code": 0,
+    "seconds": 1.9657882910687476,
+    "summaries": [
+      "15 passed, 2166 deselected in 1.62s"
+    ]
+  },
+  {
+    "label": "fallback-full-py312",
+    "command": [
+      "env",
+      "CSUBST_DISABLE_EXTENSIONS=1",
+      "${WORKDIR}/verify-venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-n",
+      "auto",
+      "--dist",
+      "worksteal",
+      "-m",
+      "not process",
+      "--ignore=tests/process"
+    ],
+    "exit_code": 0,
+    "seconds": 13.900314124999568,
+    "summaries": [
+      "2137 passed, 39 skipped, 8 warnings in 13.50s"
+    ]
+  },
+  {
+    "label": "fallback-process-py312",
+    "command": [
+      "env",
+      "CSUBST_DISABLE_EXTENSIONS=1",
+      "${WORKDIR}/verify-venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/process"
+    ],
+    "exit_code": 0,
+    "seconds": 4.824364291969687,
+    "summaries": [
+      "5 passed in 4.52s"
+    ]
+  },
+  {
+    "label": "scientific-reference-py312",
+    "command": [
+      "env",
+      "CSUBST_STRICT_EXTENSIONS=1",
+      "${WORKDIR}/verify-venv/bin/python",
+      ".github/scripts/sites_parity_check.py",
+      "--numerical-only",
+      "--workdir",
+      "${WORKDIR}/reference",
+      "--output",
+      "${WORKDIR}/reference.tsv"
+    ],
+    "exit_code": 0,
+    "seconds": 22.96506479207892,
+    "summaries": []
+  },
+  {
+    "label": "source-native-imports-py312",
+    "command": [
+      "${WORKDIR}/verify-venv/bin/python",
+      "-c",
+      "import csubst.combination_cy, csubst.omega_cy, csubst.parser_iqtree_cy, csubst.recoding_cy, csubst.substitution_cy, csubst.substitution_sparse_cy; print(\"All six native modules imported\")"
+    ],
+    "exit_code": 0,
+    "seconds": 0.06418908305931836,
+    "summaries": []
+  },
+  {
+    "label": "package-py312",
+    "command": [
+      "make",
+      "PYTHON=${WORKDIR}/verify-venv/bin/python",
+      "package"
+    ],
+    "exit_code": 0,
+    "seconds": 40.64919174998067,
+    "summaries": [
+      "Successfully built csubst-1.16.21.tar.gz and csubst-1.16.21-cp312-cp312-macosx_11_0_arm64.whl"
+    ]
+  },
+  {
+    "label": "wheel-from-generated-c-py312",
+    "command": [
+      "env",
+      "CSUBST_USE_CYTHON=0",
+      "${WORKDIR}/verify-venv/bin/python",
+      "-m",
+      "pip",
+      "wheel",
+      "--no-deps",
+      "dist/csubst-1.16.21.tar.gz",
+      "--wheel-dir",
+      "dist/from-sdist"
+    ],
+    "exit_code": 0,
+    "seconds": 20.62281054095365,
+    "summaries": [
+      "Successfully built csubst"
+    ]
+  },
+  {
+    "label": "package-artifact-check",
+    "command": [
+      "${WORKDIR}/verify-venv/bin/python",
+      ".github/scripts/package_artifact_check.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.0812851251102984,
+    "summaries": [
+      "Verified source distribution: dist/csubst-1.16.21.tar.gz",
+      "Verified wheel: dist/from-sdist/csubst-1.16.21-cp312-cp312-macosx_11_0_arm64.whl"
+    ]
+  },
+  {
+    "label": "install-wheel-py312",
+    "command": [
+      "${WORKDIR}/wheel-venv/bin/python",
+      ".github/scripts/install_test_artifact.py"
+    ],
+    "exit_code": 0,
+    "seconds": 8.274559208075516,
+    "summaries": [
+      "Successfully installed contourpy-1.4.0 coverage-7.16.2 csubst-1.16.21 cycler-0.12.1 defusedxml-0.7.1 execnet-2.1.2 fonttools-4.67.0 iniconfig-2.3.1 kiwisolver-1.5.1 matplotlib-3.11.2 packaging-26.3 pandas-3.0.6 pillow-13.0.0 pluggy-1.7.0 pygments-2.21.0 pyparsing-3.3.3 pytest-9.1.1 pytest-cov-7.1.0 pytest-xdist-3.8.0 python-dateutil-3.0.0 six-1.17.0 tzdata-2026.5"
+    ]
+  },
+  {
+    "label": "installed-wheel-full-py312",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "${WORKDIR}/wheel-venv/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests",
+      "--import-mode=importlib",
+      "-q",
+      "-n",
+      "auto",
+      "--dist",
+      "worksteal",
+      "-m",
+      "not process",
+      "--ignore=${REPOSITORY}/tests/process"
+    ],
+    "exit_code": 0,
+    "seconds": 23.865010459092446,
+    "summaries": [
+      "2167 passed, 9 skipped, 8 warnings in 21.36s"
+    ],
+    "cwd": "${WORKDIR}"
+  },
+  {
+    "label": "installed-wheel-process-py312",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "${WORKDIR}/wheel-venv/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests/process",
+      "--import-mode=importlib",
+      "-q"
+    ],
+    "exit_code": 0,
+    "seconds": 4.403942458098754,
+    "summaries": [
+      "5 passed in 4.15s"
+    ],
+    "cwd": "${WORKDIR}"
+  },
+  {
+    "label": "installed-wheel-scientific-reference-py312",
+    "command": [
+      "env",
+      "CSUBST_STRICT_EXTENSIONS=1",
+      "${WORKDIR}/wheel-venv/bin/python",
+      "${REPOSITORY}/.github/scripts/sites_parity_check.py",
+      "--installed",
+      "--numerical-only",
+      "--workdir",
+      "${WORKDIR}/wheel_reference",
+      "--output",
+      "${WORKDIR}/wheel_reference.tsv"
+    ],
+    "exit_code": 0,
+    "seconds": 21.2385963749839,
+    "summaries": [],
+    "cwd": "${WORKDIR}"
+  },
+  {
+    "label": "install-sdist-without-extensions-py312",
+    "command": [
+      "env",
+      "CSUBST_SKIP_EXTENSIONS=1",
+      "${WORKDIR}/sdist-venv/bin/python",
+      ".github/scripts/install_test_artifact.py",
+      "--sdist"
+    ],
+    "exit_code": 0,
+    "seconds": 10.451218542060815,
+    "summaries": [
+      "Successfully built csubst",
+      "Successfully installed contourpy-1.4.0 coverage-7.16.2 csubst-1.16.21 cycler-0.12.1 defusedxml-0.7.1 execnet-2.1.2 fonttools-4.67.0 iniconfig-2.3.1 kiwisolver-1.5.1 matplotlib-3.11.2 packaging-26.3 pandas-3.0.6 pillow-13.0.0 pluggy-1.7.0 pygments-2.21.0 pyparsing-3.3.3 pytest-9.1.1 pytest-cov-7.1.0 pytest-xdist-3.8.0 python-dateutil-3.0.0 six-1.17.0 tzdata-2026.5"
+    ]
+  },
+  {
+    "label": "sdist-without-native-import-py312",
+    "command": [
+      "${WORKDIR}/sdist-venv/bin/python",
+      "-c",
+      "import importlib.metadata; from pathlib import Path; import sys; import csubst; from csubst._extensions import load_optional_extension; assert importlib.metadata.version(\"csubst\") == \"1.16.21\"; assert load_optional_extension(\"combination_cy\") is None; print(\"Source-only artifact installed; no native extension is available\")"
+    ],
+    "exit_code": 1,
+    "seconds": 0.3011175829451531,
+    "summaries": [],
+    "resolved_by": "sdist-without-native-import-isolated-py312",
+    "cause": "Checkout cwd shadowed the installed sdist; outside-checkout isolated import and installed-prefix assertion succeeded."
+  },
+  {
+    "label": "sdist-without-native-import-isolated-py312",
+    "command": [
+      "${WORKDIR}/sdist-venv/bin/python",
+      "-I",
+      "-c",
+      "import importlib.metadata; from pathlib import Path; import sys; import csubst; from csubst._extensions import load_optional_extension; assert importlib.metadata.version(\"csubst\") == \"1.16.21\"; assert Path(csubst.__file__).resolve().is_relative_to(Path(sys.prefix).resolve()); assert load_optional_extension(\"combination_cy\") is None; print(\"Verified isolated source-only installed artifact; no native extension is available\")"
+    ],
+    "cwd": "${WORKDIR}",
+    "exit_code": 0,
+    "seconds": 0.04300416703335941,
+    "summaries": [
+      "Verified isolated source-only installed artifact; no native extension is available"
+    ]
+  },
+  {
+    "label": "sdist-extracted-full-py312",
+    "command": [
+      "env",
+      "CSUBST_DISABLE_EXTENSIONS=1",
+      "${WORKDIR}/sdist-venv/bin/python",
+      ".github/scripts/run_sdist_tests.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 42.34484016697388,
+    "summaries": [
+      "2137 passed, 39 skipped, 8 warnings in 22.50s",
+      "5 passed in 4.29s"
+    ]
+  }
+]

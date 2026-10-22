@@ -1,0 +1,606 @@
+{
+  "scope": "diagnostic cProfile; not speed comparison",
+  "case": "PEPC candidate_fixed 50",
+  "functions": [
+    {
+      "function": "csubst/cli.py:1475:main",
+      "calls": 1,
+      "self_seconds": 6.1001e-05,
+      "cumulative_seconds": 9.632799417000001
+    },
+    {
+      "function": "csubst/cli.py:1439:_main",
+      "calls": 1,
+      "self_seconds": 0.001663334,
+      "cumulative_seconds": 9.620938334
+    },
+    {
+      "function": "csubst/cli.py:300:command_scan",
+      "calls": 1,
+      "self_seconds": 0.000277874,
+      "cumulative_seconds": 9.611241708000001
+    },
+    {
+      "function": "csubst/main_scan.py:134:main_scan",
+      "calls": 1,
+      "self_seconds": 0.002097334,
+      "cumulative_seconds": 8.551401125
+    },
+    {
+      "function": "csubst/substitution_scan.py:3074:scan_substitutions",
+      "calls": 1,
+      "self_seconds": 0.002955413,
+      "cumulative_seconds": 6.304839291
+    },
+    {
+      "function": "csubst/substitution_scan.py:2934:_calibrate_scan_pvalues",
+      "calls": 1,
+      "self_seconds": 0.001132222,
+      "cumulative_seconds": 4.889226625
+    },
+    {
+      "function": "csubst/parallel.py:153:run_starmap",
+      "calls": 1,
+      "self_seconds": 0.0015053330000000002,
+      "cumulative_seconds": 4.68737475
+    },
+    {
+      "function": "csubst/substitution_scan.py:2778:_run_scan_permutation_chunk",
+      "calls": 1,
+      "self_seconds": 0.003946323,
+      "cumulative_seconds": 4.685869125
+    },
+    {
+      "function": "csubst/substitution_scan.py:2701:_run_scan_permutation",
+      "calls": 50,
+      "self_seconds": 0.004977884,
+      "cumulative_seconds": 4.621675955000001
+    },
+    {
+      "function": "csubst/substitution_scan.py:2612:_candidate_fixed_permutation_scores",
+      "calls": 50,
+      "self_seconds": 0.051118039000000004,
+      "cumulative_seconds": 4.514539625
+    },
+    {
+      "function": "csubst/substitution_scan.py:1858:_rate_summary",
+      "calls": 5253,
+      "self_seconds": 0.491857205,
+      "cumulative_seconds": 4.4934244560000005
+    },
+    {
+      "function": "csubst/scan_ctmc.py:287:prepare",
+      "calls": 1,
+      "self_seconds": 0.024244143000000003,
+      "cumulative_seconds": 2.1105672500000003
+    },
+    {
+      "function": "csubst/scan_ctmc.py:150:infer",
+      "calls": 1,
+      "self_seconds": 0.001061832,
+      "cumulative_seconds": 2.079596291
+    },
+    {
+      "function": "csubst/scan_ctmc.py:56:_joint_infer",
+      "calls": 1,
+      "self_seconds": 0.143062257,
+      "cumulative_seconds": 2.078534459
+    },
+    {
+      "function": "csubst/endpoint.py:141:iter_blocks",
+      "calls": 3103,
+      "self_seconds": 0.65825312,
+      "cumulative_seconds": 1.8033236620000002
+    },
+    {
+      "function": "pandas/core/groupby/groupby.py:2953:sum",
+      "calls": 5801,
+      "self_seconds": 0.01925284,
+      "cumulative_seconds": 1.164140589
+    },
+    {
+      "function": "pandas/core/groupby/groupby.py:1698:_agg_general",
+      "calls": 5801,
+      "self_seconds": 0.038526111,
+      "cumulative_seconds": 1.1136928510000002
+    },
+    {
+      "function": "pandas/core/frame.py:4337:__getitem__",
+      "calls": 48084,
+      "self_seconds": 0.10375611700000001,
+      "cumulative_seconds": 1.093174249
+    },
+    {
+      "function": "pandas/core/groupby/groupby.py:1764:_cython_agg_general",
+      "calls": 5801,
+      "self_seconds": 0.013048306,
+      "cumulative_seconds": 1.049292981
+    },
+    {
+      "function": "csubst/cli.py:236:get_global_parameters_or_exit",
+      "calls": 1,
+      "self_seconds": 9.666e-06,
+      "cumulative_seconds": 1.030724541
+    },
+    {
+      "function": "csubst/substitution_scan.py:2339:_scan_substitutions_core",
+      "calls": 1,
+      "self_seconds": 0.009933487000000001,
+      "cumulative_seconds": 1.018354417
+    },
+    {
+      "function": "csubst/param.py:1:<module>",
+      "calls": 1,
+      "self_seconds": 1.7291e-05,
+      "cumulative_seconds": 0.967428167
+    },
+    {
+      "function": "csubst/asrv.py:1:<module>",
+      "calls": 1,
+      "self_seconds": 4.374e-06,
+      "cumulative_seconds": 0.964354083
+    },
+    {
+      "function": "csubst/ete.py:1:<module>",
+      "calls": 1,
+      "self_seconds": 7.458e-06,
+      "cumulative_seconds": 0.9642012080000001
+    },
+    {
+      "function": "csubst/scan_ctmc.py:97:transform",
+      "calls": 12320,
+      "self_seconds": 0.183324371,
+      "cumulative_seconds": 0.946024359
+    },
+    {
+      "function": "pandas/core/internals/managers.py:2293:grouped_reduce",
+      "calls": 5801,
+      "self_seconds": 0.010137861000000001,
+      "cumulative_seconds": 0.9440973760000001
+    },
+    {
+      "function": "pandas/core/groupby/groupby.py:1781:array_func",
+      "calls": 5801,
+      "self_seconds": 0.009070338,
+      "cumulative_seconds": 0.881085882
+    },
+    {
+      "function": "pandas/core/groupby/ops.py:946:_cython_operation",
+      "calls": 5801,
+      "self_seconds": 0.020446342000000003,
+      "cumulative_seconds": 0.8714507
+    },
+    {
+      "function": "pandas/core/frame.py:4968:_get_item",
+      "calls": 48082,
+      "self_seconds": 0.029006424000000003,
+      "cumulative_seconds": 0.835402394
+    },
+    {
+      "function": "pandas/core/frame.py:4292:_ixs",
+      "calls": 49235,
+      "self_seconds": 0.028671401000000003,
+      "cumulative_seconds": 0.8292940560000001
+    },
+    {
+      "function": "csubst/endpoint_io.py:372:transform",
+      "calls": 12320,
+      "self_seconds": 0.736374666,
+      "cumulative_seconds": 0.736374666
+    },
+    {
+      "function": "pandas/core/groupby/ops.py:750:has_dropped_na",
+      "calls": 5802,
+      "self_seconds": 0.014951554,
+      "cumulative_seconds": 0.676504883
+    },
+    {
+      "function": "pandas/core/groupby/ops.py:772:ids",
+      "calls": 11605,
+      "self_seconds": 0.014442611000000001,
+      "cumulative_seconds": 0.652821133
+    },
+    {
+      "function": "pandas/core/groupby/ops.py:776:result_index_and_ids",
+      "calls": 5805,
+      "self_seconds": 0.032855549000000005,
+      "cumulative_seconds": 0.639511398
+    },
+    {
+      "function": "pandas/util/_decorators.py:328:wrapper",
+      "calls": 6977,
+      "self_seconds": 0.00604865,
+      "cumulative_seconds": 0.5390766330000001
+    },
+    {
+      "function": "pandas/core/frame.py:10610:groupby",
+      "calls": 5805,
+      "self_seconds": 0.011580568000000001,
+      "cumulative_seconds": 0.501684011
+    },
+    {
+      "function": "pandas/core/groupby/groupby.py:1068:__init__",
+      "calls": 11606,
+      "self_seconds": 0.019198522000000003,
+      "cumulative_seconds": 0.49582578800000005
+    },
+    {
+      "function": "pandas/core/groupby/grouper.py:721:get_grouper",
+      "calls": 5805,
+      "self_seconds": 0.081983737,
+      "cumulative_seconds": 0.47515278000000005
+    },
+    {
+      "function": "csubst/substitution_scan.py:39:obtain",
+      "calls": 10506,
+      "self_seconds": 0.022273304,
+      "cumulative_seconds": 0.472546721
+    },
+    {
+      "function": "pandas/core/frame.py:4956:_box_col_values",
+      "calls": 49235,
+      "self_seconds": 0.052333394000000005,
+      "cumulative_seconds": 0.457052712
+    },
+    {
+      "function": "pandas/core/generic.py:6348:astype",
+      "calls": 6351,
+      "self_seconds": 0.020080357,
+      "cumulative_seconds": 0.44509403900000005
+    },
+    {
+      "function": "pandas/core/groupby/grouper.py:616:uniques",
+      "calls": 5812,
+      "self_seconds": 0.004034237,
+      "cumulative_seconds": 0.393914134
+    },
+    {
+      "function": "pandas/core/groupby/grouper.py:620:_codes_and_uniques",
+      "calls": 5812,
+      "self_seconds": 0.00778293,
+      "cumulative_seconds": 0.38987989700000003
+    },
+    {
+      "function": "pandas/core/algorithms.py:652:factorize",
+      "calls": 5825,
+      "self_seconds": 0.021619779000000002,
+      "cumulative_seconds": 0.378091449
+    },
+    {
+      "function": "csubst/substitution_scan.py:2295:_build_scan_static_context",
+      "calls": 1,
+      "self_seconds": 0.00020674900000000002,
+      "cumulative_seconds": 0.376495
+    },
+    {
+      "function": "pandas/core/internals/managers.py:1226:iget",
+      "calls": 49244,
+      "self_seconds": 0.182242532,
+      "cumulative_seconds": 0.34366577600000003
+    },
+    {
+      "function": "pandas/core/indexing.py:1192:__getitem__",
+      "calls": 2845,
+      "self_seconds": 0.0054931960000000005,
+      "cumulative_seconds": 0.320001782
+    },
+    {
+      "function": "pandas/core/groupby/generic.py:2929:__getitem__",
+      "calls": 5801,
+      "self_seconds": 0.007714812000000001,
+      "cumulative_seconds": 0.305849755
+    },
+    {
+      "function": "pandas/core/base.py:216:__getitem__",
+      "calls": 5801,
+      "self_seconds": 0.014701262000000001,
+      "cumulative_seconds": 0.297526524
+    },
+    {
+      "function": "pandas/core/indexing.py:1058:_getitem_lowerdim",
+      "calls": 1864,
+      "self_seconds": 0.010008577000000001,
+      "cumulative_seconds": 0.29132456100000004
+    },
+    {
+      "function": "pandas/core/internals/managers.py:399:apply",
+      "calls": 13490,
+      "self_seconds": 0.038643058,
+      "cumulative_seconds": 0.272025373
+    },
+    {
+      "function": "csubst/substitution_scan.py:61:_cached_posterior_events",
+      "calls": 5253,
+      "self_seconds": 0.021033742,
+      "cumulative_seconds": 0.255219322
+    },
+    {
+      "function": "pandas/core/indexing.py:1383:_getitem_tuple",
+      "calls": 1743,
+      "self_seconds": 0.005564604000000001,
+      "cumulative_seconds": 0.253900245
+    },
+    {
+      "function": "csubst/substitution_scan.py:594:extract_atomic_events",
+      "calls": 1,
+      "self_seconds": 0.164020634,
+      "cumulative_seconds": 0.25344662500000004
+    },
+    {
+      "function": "pandas/core/indexes/base.py:486:__new__",
+      "calls": 7840,
+      "self_seconds": 0.043261183,
+      "cumulative_seconds": 0.24116620700000002
+    },
+    {
+      "function": "pandas/core/generic.py:6119:__finalize__",
+      "calls": 70673,
+      "self_seconds": 0.157104786,
+      "cumulative_seconds": 0.231805524
+    },
+    {
+      "function": "csubst/substitution_scan.py:1901:expected",
+      "calls": 206,
+      "self_seconds": 0.013884832000000001,
+      "cumulative_seconds": 0.22777624500000002
+    },
+    {
+      "function": "csubst/substitution_scan.py:1492:_summarize_unit_support",
+      "calls": 546,
+      "self_seconds": 0.010801543,
+      "cumulative_seconds": 0.21752325700000003
+    },
+    {
+      "function": "csubst/scan_endpoint.py:133:expected_events",
+      "calls": 206,
+      "self_seconds": 0.087180589,
+      "cumulative_seconds": 0.213891413
+    },
+    {
+      "function": "pandas/core/algorithms.py:590:factorize_array",
+      "calls": 5825,
+      "self_seconds": 0.05583215800000001,
+      "cumulative_seconds": 0.199819197
+    },
+    {
+      "function": "pandas/core/internals/managers.py:626:astype",
+      "calls": 6351,
+      "self_seconds": 0.004563562,
+      "cumulative_seconds": 0.193927691
+    },
+    {
+      "function": "pandas/core/indexing.py:1415:_getitem_axis",
+      "calls": 1563,
+      "self_seconds": 0.0032359790000000004,
+      "cumulative_seconds": 0.19379535
+    },
+    {
+      "function": "pandas/core/indexes/base.py:680:_with_infer",
+      "calls": 6030,
+      "self_seconds": 0.020426534,
+      "cumulative_seconds": 0.188336616
+    },
+    {
+      "function": "csubst/substitution_scan.py:1376:build_candidates",
+      "calls": 1,
+      "self_seconds": 0.0065727070000000005,
+      "cumulative_seconds": 0.186791542
+    },
+    {
+      "function": "pandas/core/generic.py:6548:copy",
+      "calls": 7079,
+      "self_seconds": 0.008322741,
+      "cumulative_seconds": 0.171406881
+    },
+    {
+      "function": "pandas/core/indexes/base.py:1033:view",
+      "calls": 73710,
+      "self_seconds": 0.038709137000000005,
+      "cumulative_seconds": 0.17061522
+    },
+    {
+      "function": "pandas/core/frame.py:686:_constructor_sliced_from_mgr",
+      "calls": 49338,
+      "self_seconds": 0.032495586,
+      "cumulative_seconds": 0.16839293100000002
+    },
+    {
+      "function": "pandas/core/dtypes/common.py:1480:is_extension_array_dtype",
+      "calls": 6351,
+      "self_seconds": 0.020659450000000003,
+      "cumulative_seconds": 0.166951772
+    },
+    {
+      "function": "pandas/core/base.py:567:to_numpy",
+      "calls": 27917,
+      "self_seconds": 0.092385215,
+      "cumulative_seconds": 0.16671891
+    },
+    {
+      "function": "csubst/substitution_scan.py:2838:_scan_plan_diagnostics",
+      "calls": 1,
+      "self_seconds": 0.018261569000000002,
+      "cumulative_seconds": 0.165014833
+    },
+    {
+      "function": "pandas/core/groupby/ops.py:535:cython_operation",
+      "calls": 5801,
+      "self_seconds": 0.010025196,
+      "cumulative_seconds": 0.16403566700000002
+    },
+    {
+      "function": "pandas/core/groupby/grouper.py:450:__init__",
+      "calls": 5812,
+      "self_seconds": 0.014914716000000001,
+      "cumulative_seconds": 0.161525939
+    },
+    {
+      "function": "pandas/core/dtypes/common.py:1821:pandas_dtype",
+      "calls": 15721,
+      "self_seconds": 0.041472525,
+      "cumulative_seconds": 0.156861399
+    },
+    {
+      "function": "pandas/core/series.py:1756:to_dict",
+      "calls": 5902,
+      "self_seconds": 0.07755531,
+      "cumulative_seconds": 0.152454811
+    },
+    {
+      "function": "pandas/core/groupby/ops.py:311:_cython_op_ndim_compat",
+      "calls": 5801,
+      "self_seconds": 0.013661446,
+      "cumulative_seconds": 0.14723797900000002
+    },
+    {
+      "function": "pandas/core/algorithms.py:274:_get_hashtable_algo",
+      "calls": 6922,
+      "self_seconds": 0.005461702000000001,
+      "cumulative_seconds": 0.14707159
+    },
+    {
+      "function": "pandas/core/generic.py:294:_from_mgr",
+      "calls": 70359,
+      "self_seconds": 0.031369092,
+      "cumulative_seconds": 0.140949073
+    },
+    {
+      "function": "pandas/core/internals/blocks.py:578:astype",
+      "calls": 6351,
+      "self_seconds": 0.014265779000000001,
+      "cumulative_seconds": 0.139792784
+    },
+    {
+      "function": "pandas/core/construction.py:531:sanitize_array",
+      "calls": 10521,
+      "self_seconds": 0.044024824000000004,
+      "cumulative_seconds": 0.138499946
+    },
+    {
+      "function": "pandas/core/groupby/ops.py:358:_call_cython_op",
+      "calls": 5801,
+      "self_seconds": 0.076770688,
+      "cumulative_seconds": 0.133576533
+    },
+    {
+      "function": "pandas/core/groupby/generic.py:2940:_gotitem",
+      "calls": 5801,
+      "self_seconds": 0.010069623,
+      "cumulative_seconds": 0.13097466400000002
+    },
+    {
+      "function": "csubst/site_storage.py:55:read_sites",
+      "calls": 448,
+      "self_seconds": 0.00238788,
+      "cumulative_seconds": 0.125263791
+    },
+    {
+      "function": "csubst/substitution_scan.py:69:<lambda>",
+      "calls": 206,
+      "self_seconds": 0.0007697380000000001,
+      "cumulative_seconds": 0.119750349
+    },
+    {
+      "function": "pandas/core/internals/managers.py:739:copy",
+      "calls": 7130,
+      "self_seconds": 0.016903387000000002,
+      "cumulative_seconds": 0.1168344
+    },
+    {
+      "function": "csubst/substitution_scan.py:1311:_candidate_state_sets",
+      "calls": 546,
+      "self_seconds": 0.002858058,
+      "cumulative_seconds": 0.11407845700000001
+    },
+    {
+      "function": "pandas/core/dtypes/generic.py:43:_instancecheck",
+      "calls": 174778,
+      "self_seconds": 0.045269405000000006,
+      "cumulative_seconds": 0.11353476500000001
+    },
+    {
+      "function": "pandas/core/frame.py:3975:memory_usage",
+      "calls": 206,
+      "self_seconds": 0.002121235,
+      "cumulative_seconds": 0.113146749
+    },
+    {
+      "function": "pandas/core/generic.py:6196:__setattr__",
+      "calls": 129889,
+      "self_seconds": 0.087210905,
+      "cumulative_seconds": 0.110402358
+    },
+    {
+      "function": "pandas/core/algorithms.py:1438:safe_sort",
+      "calls": 5817,
+      "self_seconds": 0.020597123000000002,
+      "cumulative_seconds": 0.108039325
+    },
+    {
+      "function": "pandas/core/indexes/range.py:620:_view",
+      "calls": 65223,
+      "self_seconds": 0.033341481,
+      "cumulative_seconds": 0.10776508100000001
+    },
+    {
+      "function": "csubst/scan_ctmc.py:107:flush_block",
+      "calls": 22,
+      "self_seconds": 0.000129712,
+      "cumulative_seconds": 0.10356037700000001
+    },
+    {
+      "function": "pandas/core/frame.py:702:__init__",
+      "calls": 320,
+      "self_seconds": 0.0013310960000000001,
+      "cumulative_seconds": 0.102222662
+    },
+    {
+      "function": "csubst/substitution_scan.py:2596:_build_permuted_context_with_seed",
+      "calls": 50,
+      "self_seconds": 0.0017882820000000002,
+      "cumulative_seconds": 0.100142747
+    },
+    {
+      "function": "csubst/site_storage.py:114:read_sites",
+      "calls": 251,
+      "self_seconds": 0.0006068310000000001,
+      "cumulative_seconds": 0.099975375
+    },
+    {
+      "function": "csubst/substitution_scan.py:1656:_build_scan_q_context",
+      "calls": 1,
+      "self_seconds": 9.083000000000001e-06,
+      "cumulative_seconds": 0.099020042
+    },
+    {
+      "function": "csubst/substitution_scan.py:1268:_build_permuted_scan_context",
+      "calls": 51,
+      "self_seconds": 0.0008990850000000001,
+      "cumulative_seconds": 0.09899846000000001
+    },
+    {
+      "function": "csubst/scan_endpoint.py:89:build_context",
+      "calls": 1,
+      "self_seconds": 0.01835912,
+      "cumulative_seconds": 0.098937125
+    },
+    {
+      "function": "pandas/core/generic.py:258:__init__",
+      "calls": 71376,
+      "self_seconds": 0.07728142,
+      "cumulative_seconds": 0.09789283800000001
+    },
+    {
+      "function": "pandas/core/indexing.py:1352:_getitem_iterable",
+      "calls": 427,
+      "self_seconds": 0.0005748400000000001,
+      "cumulative_seconds": 0.09632803000000001
+    },
+    {
+      "function": "csubst/substitution_scan.py:63:build",
+      "calls": 206,
+      "self_seconds": 0.000302289,
+      "cumulative_seconds": 0.09500950300000001
+    }
+  ]
+}
