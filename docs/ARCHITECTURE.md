@@ -60,9 +60,15 @@ Worker transport drops these caches; a new fit/filter/bootstrap creates a new
 context. Assignment-dependent support, rates and candidate discovery are always
 recomputed. Structure-weighting inner CV similarly reuses only fold-local priors
 and interaction scores, bounded to 32 MiB, without sharing held-out responses.
+The same limit includes cached log-priors, masks and held-out scoring summaries;
+those summaries never contribute to a training prior or another fold.
 Fixed-candidate calibration also prepares branch metadata columns and target/control
 masks within one assignment. These borrowed columns and masks are discarded after
 that assignment; different foregrounds never share their masks.
+Its repeated posterior-event scores retain read-only branch vectors in the
+existing event cache, including array/object sizes in its byte limit. Single-pass
+and ordinary event callers still receive DataFrames, and vectors too large to
+retain use that existing representation.
 
 `site_tree_plot` owns tree/site selection, layout, labels, heatmaps, and figure
 output for prepared site tables. `main_sites` retains data preparation,

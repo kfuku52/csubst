@@ -96,13 +96,32 @@ def test_independent_positive_signal_improves_outer_score():
 
 def test_predict_matches_independent_multifeature_softmax():
     base = np.array([[.2, .3, .5], [.5, .3, .2]])
+    original = base.copy()
+    base.flags.writeable = False
     context = np.array([[1., 0.], [0., 1.]])
     features = np.array([[1., 0.], [0., 1.], [-1., -1.]])
     expected = base * np.exp(.8 * context @ features.T / 2)
     expected /= expected.sum(axis=1, keepdims=True)
     np.testing.assert_allclose(epistasis.predict(base, context, features, .8, 3., np.ones_like(base, bool)), expected)
+    np.testing.assert_array_equal(base, original)
     with pytest.raises(ValueError, match='nonnegative'):
         epistasis.predict(base, context, features, -3., 3., np.ones_like(base, bool))
+
+
+def test_inner_cache_eviction_preserves_predictions_and_fold_diagnostics(monkeypatch):
+    arrays = _arrays()
+    expected = epistasis.crossfit(*arrays, _config())
+    monkeypatch.setattr(epistasis, '_CV_CACHE_BYTES', 128)
+    actual = epistasis.crossfit(*arrays, _config())
+    np.testing.assert_equal(actual, expected)
+
+
+@pytest.mark.parametrize('beta', [0., 1.])
+def test_finite_interaction_overflow_remains_an_error_even_at_zero_beta(beta):
+    base = np.full((2, 3), 1 / 3)
+    with np.errstate(over='ignore'), pytest.raises(ValueError, match='Nonfinite structure interaction score'):
+        epistasis.predict(base, np.full((2, 1), np.finfo(float).max),
+                          np.full((3, 1), 2.), beta, 3., np.ones_like(base, bool))
 
 
 def test_insufficient_clades_and_depth_bins_fail_explicitly():

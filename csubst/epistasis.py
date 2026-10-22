@@ -17,6 +17,7 @@ from csubst import ete
 
 BETA_GRID = np.round(np.arange(0., 3.01, 0.1), 10)
 CLIP_GRID = (1.5, 2., 2.5, 3., 4., 5.)
+_CV_CACHE_BYTES = 32 * 1024**2
 
 
 def validate_options(g):
@@ -135,13 +136,58 @@ def predict(base, context, features, beta, clip, mask):
 
 
 def _predict_score(base, score, beta, clip, mask):
+    return _predict_prior(_FoldPrior(base), score, beta, clip, mask)
+
+
+class _FoldPrior:
+    """A private prior whose storage becomes log-prior after validation."""
+
+    __slots__ = ('values', 'ready')
+
+    def __init__(self, values):
+        self.values, self.ready = values, False
+
+    @property
+    def nbytes(self):
+        return self.values.nbytes
+
+    def log(self, mask):
+        if not self.ready:
+            values = np.full_like(self.values, -np.inf)
+            np.log(self.values, out=values, where=(self.values > 0) & mask)
+            values.flags.writeable = False
+            self.values, self.ready = values, True
+        return self.values
+
+
+class _FoldResponse:
+    """Held-out counts used only to score this inner fold's predictions."""
+
+    __slots__ = ('total', 'positive', 'values')
+
+    def __init__(self, counts):
+        self.total = counts.sum()
+        self.positive = counts > 0
+        self.values = counts[self.positive]
+
+    @property
+    def nbytes(self):
+        return self.positive.nbytes + self.values.nbytes + 8
+
+    def log_score(self, probabilities):
+        values = probabilities[self.positive]
+        if np.any(values <= 0):
+            return -np.inf
+        return float(np.sum(self.values * np.log(values)))
+
+
+def _predict_prior(prior, score, beta, clip, mask):
     if not np.isfinite(beta) or beta < 0 or not np.isfinite(clip) or clip <= 0:
         raise ValueError('beta must be finite and nonnegative; clip must be finite and positive.')
     if not np.isfinite(score).all():
         raise ValueError('Nonfinite structure interaction score.')
     logweight = np.clip(beta * score, -clip, clip)
-    logbase = np.full_like(base, -np.inf)
-    np.log(base, out=logbase, where=(base > 0) & mask)
+    logbase = prior.log(mask)
     logmass = logbase + logweight
     maximum = np.max(logmass, axis=1, keepdims=True)
     maximum = np.where(np.isfinite(maximum), maximum, 0.)
@@ -187,8 +233,8 @@ def _select(counts, context, features, masks, groups, rows, candidates):
             cache.move_to_end(key)
             return cache[key]
         value = build()
-        if value.nbytes <= 32 * 1024**2:
-            while cache and (cached_bytes + value.nbytes > 32 * 1024**2 or len(cache) >= 1024):
+        if value.nbytes <= _CV_CACHE_BYTES:
+            while cache and (cached_bytes + value.nbytes > _CV_CACHE_BYTES or len(cache) >= 1024):
                 cached_bytes -= cache.popitem(last=False)[1].nbytes
             cache[key] = value
             cached_bytes += value.nbytes
@@ -198,13 +244,13 @@ def _select(counts, context, features, masks, groups, rows, candidates):
     for beta, alpha, clip in candidates:
         scores = []
         for fold, (test, train) in enumerate(folds):
-            mask = masks[test]
-            base = cached(('base', fold, alpha), lambda: base_probabilities(counts, train, mask, alpha))
+            mask = cached(('mask', fold), lambda: masks[test])
+            prior = cached(('prior', fold, alpha), lambda: _FoldPrior(base_probabilities(counts, train, mask, alpha)))
             score = cached(('score', fold), lambda: (context[test] @ features.T) / features.shape[1])
-            p = _predict_score(base, score, beta, clip, mask)
-            total = counts[test].sum()
+            p = _predict_prior(prior, score, beta, clip, mask)
+            response = cached(('response', fold), lambda: _FoldResponse(counts[test]))
             # All branches (including zero-event rows) remain in the folds.
-            scores.append(log_score(counts[test], p) / total if total > 0 else 0.)
+            scores.append(response.log_score(p) / response.total if response.total > 0 else 0.)
         mean = float(np.mean(scores))
         # Deterministic ordering: on ties prefer beta=0, then less smoothing,
         # then a smaller clip. No negative beta can alias the null model.
