@@ -1,7 +1,38 @@
+from fractions import Fraction
+import itertools
+
 import numpy as np
 import pytest
 
 from csubst import omega
+
+
+@pytest.mark.parametrize('weights', [[0., 1., 2., 4.], [1., 1., 1., 1.],
+                                    [1e-100, .1, 1., 1e100]])
+@pytest.mark.parametrize('dtype', [np.float32, np.float64])
+def test_fisher_inclusion_matches_independent_weighted_subsets(weights, dtype):
+    values = np.array(weights)
+    values.flags.writeable = False
+    original = values.tobytes()
+    positive = np.flatnonzero(values > 0)
+    for draw in range(len(positive) + 2):
+        size = min(draw, len(positive))
+        total = Fraction(0)
+        included = [Fraction(0) for _ in values]
+        for selected in itertools.combinations(positive, size):
+            mass = Fraction(1)
+            for site in selected:
+                mass *= Fraction(float(values[site]))
+            total += mass
+            for site in selected:
+                included[site] += mass
+        expected = np.array([float(mass / total) for mass in included])
+        actual = omega._calc_fisher_inclusion_probabilities(values, draw, dtype)
+        assert actual.dtype == dtype
+        np.testing.assert_allclose(actual, expected, rtol=2e-7 if dtype == np.float32 else 3e-13,
+                                   atol=1e-14)
+    assert values.tobytes() == original
+    assert not values.flags.writeable
 
 
 @pytest.mark.native

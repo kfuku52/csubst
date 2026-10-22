@@ -918,18 +918,17 @@ def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.
     log_denominator = prefix[num_positive, draw_size]
     if not np.isfinite(log_denominator):
         raise ValueError('Unable to normalize Fisher weighted-urn probabilities.')
-    inclusion = np.zeros(num_positive, dtype=np.float64)
-    for index in range(num_positive):
-        log_excluded_poly = -np.inf
-        for left_pick in range(draw_size):
-            right_pick = draw_size - 1 - left_pick
-            log_excluded_poly = np.logaddexp(
-                log_excluded_poly,
-                prefix[index, left_pick] + suffix[index + 1, right_pick],
-            )
-        inclusion[index] = np.exp(
-            log_weights[index] + log_excluded_poly - log_denominator
-        )
+    # Sites are independent in this contraction. Keep each site's original
+    # left-pick addition order while avoiding Python's site-by-draw loop.
+    inclusion = np.full(num_positive, -np.inf, dtype=np.float64)
+    workspace = np.empty(num_positive, dtype=np.float64)
+    for left_pick in range(draw_size):
+        right_pick = draw_size - 1 - left_pick
+        np.add(prefix[:-1, left_pick], suffix[1:, right_pick], out=workspace)
+        np.logaddexp(inclusion, workspace, out=inclusion)
+    np.add(log_weights, inclusion, out=inclusion)
+    np.subtract(inclusion, log_denominator, out=inclusion)
+    np.exp(inclusion, out=inclusion)
     out[positive_mask] = np.clip(inclusion, a_min=0.0, a_max=1.0)
     return out.astype(float_type, copy=False)
 
