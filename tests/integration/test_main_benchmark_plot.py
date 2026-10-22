@@ -335,6 +335,7 @@ def test_main_benchmark_plot_skips_structurally_invalid_summaries(
     assert payload["skipped_summary_files"] == [str((invalid_dir / "csubst_benchmark_summary.tsv").resolve())]
 
 
+@pytest.mark.filterwarnings("error:'str' is not supported as a fill value")
 def test_main_benchmark_plot_skips_summaries_with_blank_required_fields(
     tmp_path,
     capsys,

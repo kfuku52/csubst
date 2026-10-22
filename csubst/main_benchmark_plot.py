@@ -178,7 +178,7 @@ def _read_benchmark_runs(summary_path):
                 summary_path,
             )
         )
-    required_values = df.loc[:, _REQUIRED_SUMMARY_COLUMNS].fillna("").astype(str)
+    required_values = df.loc[:, _REQUIRED_SUMMARY_COLUMNS].astype(object).fillna("").astype(str)
     required_values = required_values.apply(lambda col: col.str.strip())
     blank_rows = required_values.eq("").any(axis=1)
     if bool(blank_rows.any()):
