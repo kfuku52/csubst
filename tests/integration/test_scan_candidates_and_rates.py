@@ -94,15 +94,54 @@ def test_candidate_distribution_retains_pandas_ties_and_display(size, dtype):
     ([1, 1, 1, 2], [1e16, 1., 1., .25], (1e16 + 2., .25)),
     ([], [], (0., 0.)),
 ])
-def test_rate_summary_retains_branch_aggregation_and_missing_values(ids, masses, expected):
+@pytest.mark.parametrize('prepared', [False, True])
+def test_rate_summary_retains_branch_aggregation_and_missing_values(ids, masses, expected, prepared):
     events = pd.DataFrame({'branch_id': ids, 'event_pp': masses})
     original = events.copy(deep=True)
     meta = pd.DataFrame({'branch_id': [1, 2], 'parent_id': [0, 0], 'raw_length': [.1, .2],
                          'sn_rescaled_length': [.1, .2], 'n_rescaled_length': [.1, .2]})
+    branches = substitution_scan._ScanRateMetadata(meta).prepare([1], None) if prepared else None
     result = substitution_scan._rate_summary(
-        events, meta, np.ones((3, 1, 2)), 0, [0], [1], [1], 'raw', 'raw_branch_length')
+        events, meta, np.ones((3, 1, 2)), 0, [0], [1], [1], 'raw', 'raw_branch_length',
+        prepared_branch=branches)
     assert (result['target_event_count'], result['other_event_count']) == expected
     pd.testing.assert_frame_equal(events, original, check_exact=True)
+
+
+def test_prepared_rates_keep_assignment_masks_and_length_choices_independent():
+    meta = pd.DataFrame({'branch_id': [7, 1, 3], 'parent_id': [0, 0, 0],
+                         'raw_length': [.5, .25, .25], 'sn_rescaled_length': [1., .5, .5],
+                         'n_rescaled_length': [2., 1., 1.]})
+    events = pd.DataFrame({'branch_id': [1, 3, 7], 'event_pp': [.75, .125, .25]})
+    data = substitution_scan._ScanRateMetadata(meta)
+    for target, other, length, expected in (
+        ([1, 1, 99], [1, 3, 7], 'raw', (.75, .375, .25, .75)),
+        ([7], None, 'sn_rescaled', (.25, .875, 1., 1.)),
+        ([1], [3], 'n_rescaled', (.75, .125, 1., 1.)),
+    ):
+        result = substitution_scan._rate_summary(
+            events, meta, np.ones((8, 1, 2)), 0, [0], [1], target, length, 'raw_branch_length',
+            other_branch_ids=other, prepared_branch=data.prepare(target, other))
+        assert tuple(result[key] for key in ('target_event_count', 'other_event_count',
+                                            'target_exposure', 'other_exposure')) == expected
+
+
+def test_rate_metadata_is_lazy_so_event_column_error_precedes_length_error():
+    meta = pd.DataFrame({'branch_id': [1]})
+    prepared = substitution_scan._ScanRateMetadata(meta).prepare([1], None)
+    with pytest.raises(KeyError, match='event_pp'):
+        substitution_scan._rate_summary(
+            pd.DataFrame({'branch_id': [1]}), meta, np.ones((2, 1, 2)), 0, [0], [1], [1],
+            'raw', 'raw_branch_length', prepared_branch=prepared)
+
+
+@pytest.mark.parametrize('length', [[], 'unknown'])
+def test_rate_metadata_retains_invalid_length_error(length):
+    meta = pd.DataFrame({'branch_id': [1]})
+    with pytest.raises(ValueError, match='--scan_rate_length'):
+        substitution_scan._rate_summary(
+            pd.DataFrame({'branch_id': [1], 'event_pp': [.5]}), meta, np.ones((2, 1, 2)),
+            0, [0], [1], [1], length, 'raw_branch_length')
 
 
 @pytest.mark.parametrize('prepared', [False, True])

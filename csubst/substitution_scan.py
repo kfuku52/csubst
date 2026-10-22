@@ -1855,6 +1855,44 @@ def _q_weighted_opportunity(
     return state_nsy[parent_ids, int(site), :].dot(weights)
 
 
+class _ScanRateMetadata:
+    """Borrow fixed branch columns only for one foreground assignment."""
+
+    def __init__(self, branch_meta):
+        self.branch_meta = branch_meta
+        self.branch_ids = None
+        self._lengths = {}
+        self._parent_ids = None
+
+    def prepare(self, target_branch_ids, other_branch_ids):
+        # Keep conversion lazy and ordered like the unprepared rate call.
+        target_set = set(int(v) for v in np.asarray(target_branch_ids, dtype=np.int64).reshape(-1).tolist())
+        if self.branch_ids is None:
+            self.branch_ids = self.branch_meta["branch_id"].astype(int).to_numpy(copy=False)
+        is_target = np.isin(self.branch_ids, np.array(sorted(target_set), dtype=np.int64))
+        if other_branch_ids is None:
+            other_set = set(int(v) for v in self.branch_ids.tolist()).difference(target_set)
+        else:
+            other_set = set(int(v) for v in np.asarray(other_branch_ids, dtype=np.int64).reshape(-1).tolist())
+            other_set = other_set.difference(target_set)
+        is_other = np.isin(self.branch_ids, np.array(sorted(other_set), dtype=np.int64))
+        return self, is_target, is_other
+
+    def get_lengths(self, rate_length):
+        length_col = _length_column(rate_length)
+        if length_col not in self._lengths:
+            self._lengths[length_col] = tuple(
+                self.branch_meta[column].to_numpy(dtype=np.float64, copy=False)
+                for column in (length_col, "raw_length", "sn_rescaled_length", "n_rescaled_length")
+            )
+        return self._lengths[length_col]
+
+    def get_parents(self):
+        if self._parent_ids is None:
+            self._parent_ids = self.branch_meta["parent_id"].astype(int).to_numpy(copy=False)
+        return self._parent_ids
+
+
 def _rate_summary(
     candidate_events,
     branch_meta,
@@ -1874,16 +1912,12 @@ def _rate_summary(
     exposure_cache=None,
     *,
     score_only=False,
+    prepared_branch=None,
 ):
-    target_set = set(int(v) for v in np.asarray(target_branch_ids, dtype=np.int64).reshape(-1).tolist())
-    branch_ids = branch_meta["branch_id"].astype(int).to_numpy(copy=False)
-    is_target = np.isin(branch_ids, np.array(sorted(target_set), dtype=np.int64))
-    if other_branch_ids is None:
-        other_set = set(int(v) for v in branch_ids.tolist()).difference(target_set)
-    else:
-        other_set = set(int(v) for v in np.asarray(other_branch_ids, dtype=np.int64).reshape(-1).tolist())
-        other_set = other_set.difference(target_set)
-    is_other = np.isin(branch_ids, np.array(sorted(other_set), dtype=np.int64))
+    if prepared_branch is None:
+        prepared_branch = _ScanRateMetadata(branch_meta).prepare(target_branch_ids, other_branch_ids)
+    branch_data, is_target, is_other = prepared_branch
+    branch_ids = branch_data.branch_ids
     event_ids = candidate_events["branch_id"]
     if event_ids.is_unique:
         # Posterior extraction already yields one row per branch. Preserve
@@ -1894,11 +1928,7 @@ def _rate_summary(
         # retain pandas' compensated summation for that case.
         event_by_branch = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
     event_values = np.array([float(event_by_branch.get(int(bid), 0.0)) for bid in branch_ids], dtype=np.float64)
-    length_col = _length_column(rate_length)
-    chosen_length = branch_meta[length_col].to_numpy(dtype=np.float64, copy=False)
-    raw_length = branch_meta["raw_length"].to_numpy(dtype=np.float64, copy=False)
-    sn_length = branch_meta["sn_rescaled_length"].to_numpy(dtype=np.float64, copy=False)
-    n_length = branch_meta["n_rescaled_length"].to_numpy(dtype=np.float64, copy=False)
+    chosen_length, raw_length, sn_length, n_length = branch_data.get_lengths(rate_length)
     missing_exposure = np.zeros(branch_ids.shape[0], dtype=bool)
     exposure_reasons = np.full(branch_ids.shape[0], "ok", dtype="U24")
     if rate_exposure == "endpoint":
@@ -1919,7 +1949,7 @@ def _rate_summary(
         if opp_states.shape[0] == 0:
             opportunity = np.zeros(shape=branch_ids.shape[0], dtype=np.float64)
         else:
-            parent_ids = branch_meta["parent_id"].astype(int).to_numpy(copy=False)
+            parent_ids = branch_data.get_parents()
             opportunity = state_nsy[parent_ids, int(site), :][:, opp_states].sum(axis=1)
     elif rate_exposure == "raw_branch_length":
         opportunity = np.ones(shape=branch_ids.shape[0], dtype=np.float64)
@@ -2653,6 +2683,8 @@ def _candidate_fixed_permutation_scores(
         candidates = [(row, _parse_id_list(row['from_state_ids']), _parse_id_list(row['to_state_ids']))
                       for row in observed_df.to_dict('records')]
     branch_sets = {}
+    branch_data = None
+    branch_masks = {}
     for row, from_ids, to_ids in candidates:
         trait_name = str(row["trait"])
         target_class = str(row["target_class"])
@@ -2683,6 +2715,10 @@ def _candidate_fixed_permutation_scores(
                 _other_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids,
                                            scan_other_scope, units_df=units_trait))
         target_branch_ids, other_branch_ids = branch_sets[branch_key]
+        if branch_data is None:
+            branch_data = _ScanRateMetadata(branch_meta)
+        if branch_key not in branch_masks:
+            branch_masks[branch_key] = branch_data.prepare(target_branch_ids, other_branch_ids)
         rate = _rate_summary(
             candidate_events=rate_events,
             branch_meta=branch_meta,
@@ -2701,6 +2737,7 @@ def _candidate_fixed_permutation_scores(
             endpoint_context=q_context.get("endpoint_context"),
             exposure_cache=_scan_candidate_cache(scan_static, '_exposure_cache'),
             score_only=True,
+            prepared_branch=branch_masks[branch_key],
         )
         out[_scan_row_key(row)] = scan_statistics.calibration_score(rate)
     return out

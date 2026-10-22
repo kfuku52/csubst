@@ -60,6 +60,9 @@ Worker transport drops these caches; a new fit/filter/bootstrap creates a new
 context. Assignment-dependent support, rates and candidate discovery are always
 recomputed. Structure-weighting inner CV similarly reuses only fold-local priors
 and interaction scores, bounded to 32 MiB, without sharing held-out responses.
+Fixed-candidate calibration also prepares branch metadata columns and target/control
+masks within one assignment. These borrowed columns and masks are discarded after
+that assignment; different foregrounds never share their masks.
 
 `site_tree_plot` owns tree/site selection, layout, labels, heatmaps, and figure
 output for prepared site tables. `main_sites` retains data preparation,
