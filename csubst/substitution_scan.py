@@ -1884,7 +1884,15 @@ def _rate_summary(
         other_set = set(int(v) for v in np.asarray(other_branch_ids, dtype=np.int64).reshape(-1).tolist())
         other_set = other_set.difference(target_set)
     is_other = np.isin(branch_ids, np.array(sorted(other_set), dtype=np.int64))
-    event_by_branch = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
+    event_ids = candidate_events["branch_id"]
+    if event_ids.is_unique:
+        # Posterior extraction already yields one row per branch. Preserve
+        # groupby's missing-value handling without regrouping those rows.
+        event_by_branch = dict(zip(event_ids, candidate_events["event_pp"].fillna(0)))
+    else:
+        # Called events can contain several state pairs on the same branch;
+        # retain pandas' compensated summation for that case.
+        event_by_branch = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
     event_values = np.array([float(event_by_branch.get(int(bid), 0.0)) for bid in branch_ids], dtype=np.float64)
     length_col = _length_column(rate_length)
     chosen_length = branch_meta[length_col].to_numpy(dtype=np.float64, copy=False)

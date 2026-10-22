@@ -87,6 +87,24 @@ def test_candidate_distribution_retains_pandas_ties_and_display(size, dtype):
     assert substitution_scan._candidate_distribution_label(values, orders) == expected
 
 
+@pytest.mark.parametrize('ids,masses,expected', [
+    ([2, 1], [.25, .75], (.75, .25)),
+    ([2, 1], [.25, np.nan], (0., .25)),
+    ([1, np.nan, 2], [.5, .9, .25], (.5, .25)),
+    ([1, 1, 1, 2], [1e16, 1., 1., .25], (1e16 + 2., .25)),
+    ([], [], (0., 0.)),
+])
+def test_rate_summary_retains_branch_aggregation_and_missing_values(ids, masses, expected):
+    events = pd.DataFrame({'branch_id': ids, 'event_pp': masses})
+    original = events.copy(deep=True)
+    meta = pd.DataFrame({'branch_id': [1, 2], 'parent_id': [0, 0], 'raw_length': [.1, .2],
+                         'sn_rescaled_length': [.1, .2], 'n_rescaled_length': [.1, .2]})
+    result = substitution_scan._rate_summary(
+        events, meta, np.ones((3, 1, 2)), 0, [0], [1], [1], 'raw', 'raw_branch_length')
+    assert (result['target_event_count'], result['other_event_count']) == expected
+    pd.testing.assert_frame_equal(events, original, check_exact=True)
+
+
 @pytest.mark.parametrize('prepared', [False, True])
 def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground_targets(prepared):
     candidate_events = pd.DataFrame(
