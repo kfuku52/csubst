@@ -1,0 +1,232 @@
+{
+  "environment": {
+    "commit": "4498c43",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "cases": {
+    "PGK": {
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.3628909579711035,
+            "cpu_s": 0.36018099999999986
+          },
+          {
+            "wall_s": 0.40370354207698256,
+            "cpu_s": 0.39009999999999945
+          },
+          {
+            "wall_s": 0.35924700007308275,
+            "cpu_s": 0.3578349999999997
+          }
+        ],
+        "compressed": [
+          {
+            "wall_s": 0.4032883330946788,
+            "cpu_s": 0.3979219999999999
+          },
+          {
+            "wall_s": 0.3897543749772012,
+            "cpu_s": 0.3877890000000006
+          },
+          {
+            "wall_s": 0.46724420797545463,
+            "cpu_s": 0.4453149999999999
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.3628909579711035,
+            "min": 0.35924700007308275,
+            "max": 0.40370354207698256
+          },
+          "cpu_s": {
+            "median": 0.36018099999999986,
+            "min": 0.3578349999999997,
+            "max": 0.39009999999999945
+          }
+        },
+        "compressed": {
+          "wall_s": {
+            "median": 0.4032883330946788,
+            "min": 0.3897543749772012,
+            "max": 0.46724420797545463
+          },
+          "cpu_s": {
+            "median": 0.3979219999999999,
+            "min": 0.3877890000000006,
+            "max": 0.4453149999999999
+          }
+        }
+      },
+      "max_abs_errors": {
+        "nodes": 0.0,
+        "events": 0.0,
+        "category": 0.0
+      },
+      "original_sites": 417,
+      "unique_sites": 405,
+      "pattern_temporary_upper_bytes": 13437312,
+      "returned_array_bytes": 152872200
+    },
+    "PEPC": {
+      "runs": {
+        "before": [
+          {
+            "wall_s": 2.842136541963555,
+            "cpu_s": 2.0696440000000003
+          },
+          {
+            "wall_s": 1.8802041249582544,
+            "cpu_s": 1.8549550000000004
+          },
+          {
+            "wall_s": 1.7909506249707192,
+            "cpu_s": 1.7794689999999989
+          }
+        ],
+        "compressed": [
+          {
+            "wall_s": 2.0895085830707103,
+            "cpu_s": 2.0460449999999994
+          },
+          {
+            "wall_s": 2.276098500005901,
+            "cpu_s": 2.116681
+          },
+          {
+            "wall_s": 1.9573747089598328,
+            "cpu_s": 1.950215
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 1.8802041249582544,
+            "min": 1.7909506249707192,
+            "max": 2.842136541963555
+          },
+          "cpu_s": {
+            "median": 1.8549550000000004,
+            "min": 1.7794689999999989,
+            "max": 2.0696440000000003
+          }
+        },
+        "compressed": {
+          "wall_s": {
+            "median": 2.0895085830707103,
+            "min": 1.9573747089598328,
+            "max": 2.276098500005901
+          },
+          "cpu_s": {
+            "median": 2.0460449999999994,
+            "min": 1.950215,
+            "max": 2.116681
+          }
+        }
+      },
+      "max_abs_errors": {
+        "nodes": 0.0,
+        "events": 0.0,
+        "category": 0.0
+      },
+      "original_sites": 971,
+      "unique_sites": 966,
+      "pattern_temporary_upper_bytes": 67301912,
+      "returned_array_bytes": 772178040
+    },
+    "PEPC_x4_repeated": {
+      "runs": {
+        "before": [
+          {
+            "wall_s": 7.13406320894137,
+            "cpu_s": 6.941131999999996
+          },
+          {
+            "wall_s": 6.5718366670189425,
+            "cpu_s": 6.335611999999998
+          },
+          {
+            "wall_s": 6.660110624972731,
+            "cpu_s": 6.477653000000004
+          }
+        ],
+        "compressed": [
+          {
+            "wall_s": 2.9360169590217993,
+            "cpu_s": 2.899168000000003
+          },
+          {
+            "wall_s": 3.431951083941385,
+            "cpu_s": 2.953887999999992
+          },
+          {
+            "wall_s": 3.2466744580306113,
+            "cpu_s": 3.110330999999988
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 6.660110624972731,
+            "min": 6.5718366670189425,
+            "max": 7.13406320894137
+          },
+          "cpu_s": {
+            "median": 6.477653000000004,
+            "min": 6.335611999999998,
+            "max": 6.941131999999996
+          }
+        },
+        "compressed": {
+          "wall_s": {
+            "median": 3.2466744580306113,
+            "min": 2.9360169590217993,
+            "max": 3.431951083941385
+          },
+          "cpu_s": {
+            "median": 2.953887999999992,
+            "min": 2.899168000000003,
+            "max": 3.110330999999988
+          }
+        }
+      },
+      "max_abs_errors": {
+        "nodes": 0.0,
+        "events": 0.0,
+        "category": 0.0
+      },
+      "original_sites": 3884,
+      "unique_sites": 966,
+      "pattern_temporary_upper_bytes": 269184464,
+      "returned_array_bytes": 3088712160
+    }
+  },
+  "input_sha256": {
+    "csubst/dataset/PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+    "csubst/dataset/PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+    "csubst/dataset/PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+    "csubst/dataset/PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+    "csubst/dataset/PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+    "csubst/dataset/PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+    "csubst/dataset/PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+    "csubst/dataset/PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0"
+  },
+  "scope": "Endpoint inference plus full node/event expansion and eligibility; not end-to-end CLI",
+  "memory_metric": "Array payload bytes; peak RSS was not measured",
+  "synthetic_equivalence": {
+    "nodes": 0.0,
+    "events": 0.0,
+    "category": 0.0
+  }
+}

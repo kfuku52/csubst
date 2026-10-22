@@ -1,0 +1,465 @@
+{
+  "proposal": 8,
+  "environment": {
+    "commit": "4498c43",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "cases": {
+    "PGK": {
+      "stores": [
+        {
+          "shape": [
+            65,
+            417,
+            1,
+            20,
+            20
+          ],
+          "nbytes": 86736000,
+          "threshold": 0.0
+        },
+        {
+          "shape": [
+            4,
+            65,
+            417,
+            61
+          ],
+          "nbytes": 52908960,
+          "threshold": null
+        }
+      ],
+      "read_sequence": {
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.001335624954663217,
+              "cpu_s": 0.0013369999999999216
+            },
+            {
+              "wall_s": 0.0010082500521093607,
+              "cpu_s": 0.0010090000000000376
+            },
+            {
+              "wall_s": 0.0012510840315371752,
+              "cpu_s": 0.001250999999999891
+            }
+          ],
+          "mmap_copy": [
+            {
+              "wall_s": 0.025044457986950874,
+              "cpu_s": 0.0011799999999999589
+            },
+            {
+              "wall_s": 0.015506291994825006,
+              "cpu_s": 0.0009570000000000967
+            },
+            {
+              "wall_s": 0.015527124982327223,
+              "cpu_s": 0.0010189999999998811
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.0012510840315371752,
+              "min": 0.0010082500521093607,
+              "max": 0.001335624954663217
+            },
+            "cpu_s": {
+              "median": 0.001250999999999891,
+              "min": 0.0010090000000000376,
+              "max": 0.0013369999999999216
+            }
+          },
+          "mmap_copy": {
+            "wall_s": {
+              "median": 0.015527124982327223,
+              "min": 0.015506291994825006,
+              "max": 0.025044457986950874
+            },
+            "cpu_s": {
+              "median": 0.0010189999999998811,
+              "min": 0.0009570000000000967,
+              "max": 0.0011799999999999589
+            }
+          }
+        },
+        "access_count": 24,
+        "exact_checksum_parity": true,
+        "map_initialization_and_cache_reset_included": true
+      },
+      "scan_core": {
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.09954508300870657,
+              "cpu_s": 0.09954599999999991
+            },
+            {
+              "wall_s": 0.09967158397193998,
+              "cpu_s": 0.09967199999999998
+            },
+            {
+              "wall_s": 0.10247804108075798,
+              "cpu_s": 0.10088300000000006
+            }
+          ],
+          "mmap_copy": [
+            {
+              "wall_s": 0.11370674998033792,
+              "cpu_s": 0.10246200000000005
+            },
+            {
+              "wall_s": 0.11401429201941937,
+              "cpu_s": 0.10250899999999996
+            },
+            {
+              "wall_s": 0.11384645791258663,
+              "cpu_s": 0.1022409999999998
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.09967158397193998,
+              "min": 0.09954508300870657,
+              "max": 0.10247804108075798
+            },
+            "cpu_s": {
+              "median": 0.09967199999999998,
+              "min": 0.09954599999999991,
+              "max": 0.10088300000000006
+            }
+          },
+          "mmap_copy": {
+            "wall_s": {
+              "median": 0.11384645791258663,
+              "min": 0.11370674998033792,
+              "max": 0.11401429201941937
+            },
+            "cpu_s": {
+              "median": 0.10246200000000005,
+              "min": 0.1022409999999998,
+              "max": 0.10250899999999996
+            }
+          }
+        },
+        "scan_rows": 12,
+        "exact_frame_parity": true
+      },
+      "input_sha256": {
+        "csubst/dataset/PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "csubst/dataset/PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "csubst/dataset/PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03",
+        "csubst/dataset/PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "csubst/dataset/PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "csubst/dataset/PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "csubst/dataset/PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "csubst/dataset/PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b"
+      }
+    },
+    "PEPC": {
+      "stores": [
+        {
+          "shape": [
+            141,
+            971,
+            1,
+            20,
+            20
+          ],
+          "nbytes": 438115200,
+          "threshold": 0.0
+        },
+        {
+          "shape": [
+            4,
+            141,
+            971,
+            61
+          ],
+          "nbytes": 267250272,
+          "threshold": null
+        }
+      ],
+      "read_sequence": {
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.017674207920208573,
+              "cpu_s": 0.01621499999999987
+            },
+            {
+              "wall_s": 0.01630654197651893,
+              "cpu_s": 0.015982000000000163
+            },
+            {
+              "wall_s": 0.015632249996997416,
+              "cpu_s": 0.015600000000000058
+            }
+          ],
+          "mmap_copy": [
+            {
+              "wall_s": 0.01144758309237659,
+              "cpu_s": 0.01144799999999968
+            },
+            {
+              "wall_s": 0.014928792021237314,
+              "cpu_s": 0.009372999999999188
+            },
+            {
+              "wall_s": 0.021510666934773326,
+              "cpu_s": 0.012901999999999525
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.01630654197651893,
+              "min": 0.015632249996997416,
+              "max": 0.017674207920208573
+            },
+            "cpu_s": {
+              "median": 0.015982000000000163,
+              "min": 0.015600000000000058,
+              "max": 0.01621499999999987
+            }
+          },
+          "mmap_copy": {
+            "wall_s": {
+              "median": 0.014928792021237314,
+              "min": 0.01144758309237659,
+              "max": 0.021510666934773326
+            },
+            "cpu_s": {
+              "median": 0.01144799999999968,
+              "min": 0.009372999999999188,
+              "max": 0.012901999999999525
+            }
+          }
+        },
+        "access_count": 206,
+        "exact_checksum_parity": true,
+        "map_initialization_and_cache_reset_included": true
+      },
+      "scan_core": {
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.48780879203695804,
+              "cpu_s": 0.4754839999999998
+            },
+            {
+              "wall_s": 0.4055163749726489,
+              "cpu_s": 0.4043270000000003
+            },
+            {
+              "wall_s": 0.437202624976635,
+              "cpu_s": 0.43468700000000027
+            }
+          ],
+          "mmap_copy": [
+            {
+              "wall_s": 0.4742143750190735,
+              "cpu_s": 0.4590259999999997
+            },
+            {
+              "wall_s": 0.4119846250396222,
+              "cpu_s": 0.40371999999999897
+            },
+            {
+              "wall_s": 0.505215041921474,
+              "cpu_s": 0.4658719999999992
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.437202624976635,
+              "min": 0.4055163749726489,
+              "max": 0.48780879203695804
+            },
+            "cpu_s": {
+              "median": 0.43468700000000027,
+              "min": 0.4043270000000003,
+              "max": 0.4754839999999998
+            }
+          },
+          "mmap_copy": {
+            "wall_s": {
+              "median": 0.4742143750190735,
+              "min": 0.4119846250396222,
+              "max": 0.505215041921474
+            },
+            "cpu_s": {
+              "median": 0.4590259999999997,
+              "min": 0.40371999999999897,
+              "max": 0.4658719999999992
+            }
+          }
+        },
+        "scan_rows": 103,
+        "exact_frame_parity": true
+      },
+      "input_sha256": {
+        "csubst/dataset/PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "csubst/dataset/PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "csubst/dataset/PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0",
+        "csubst/dataset/PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "csubst/dataset/PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "csubst/dataset/PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "csubst/dataset/PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "csubst/dataset/PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4"
+      }
+    }
+  },
+  "warmups": 1,
+  "measured_repeats": 3,
+  "scope": "warm OS page cache, fresh mapping per sample; public block reads unchanged",
+  "thread_control": "VECLIB/OPENBLAS/OMP/MKL/BLIS=1 before NumPy import",
+  "checks": {
+    "exact_site_comparisons": 36,
+    "public_block_independent_writable": true,
+    "cache_readonly_and_same_site_identity": true,
+    "pickle_excludes_mapping_and_payload": true,
+    "snapshot_survives_file_rewrite_and_truncation": true,
+    "unfinished_and_truncated_errors": true,
+    "zero_copy_public_view_rejected_due_to_snapshot_aliasing": true
+  },
+  "memory_sequential_synthetic": {
+    "shape": [
+      141,
+      971,
+      1,
+      20,
+      20
+    ],
+    "payload_bytes": 438115200,
+    "before": [
+      {
+        "checksum": 26012090.252869666,
+        "wall_s": 0.06830704200547189,
+        "cpu_s": 0.06758699999999995,
+        "peak_rss_mib": 162.796875
+      },
+      {
+        "checksum": 26012090.252869666,
+        "wall_s": 0.08309604204259813,
+        "cpu_s": 0.08037899999999998,
+        "peak_rss_mib": 166.296875
+      },
+      {
+        "checksum": 26012090.252869666,
+        "wall_s": 0.0617980828974396,
+        "cpu_s": 0.06179800000000002,
+        "peak_rss_mib": 161.5625
+      }
+    ],
+    "mmap_copy": [
+      {
+        "checksum": 26012090.252869666,
+        "wall_s": 0.05819529190193862,
+        "cpu_s": 0.05231700000000006,
+        "peak_rss_mib": 579.1875
+      },
+      {
+        "checksum": 26012090.252869666,
+        "wall_s": 0.07005416706670076,
+        "cpu_s": 0.05920900000000007,
+        "peak_rss_mib": 581.796875
+      },
+      {
+        "checksum": 26012090.252869666,
+        "wall_s": 0.09500020800624043,
+        "cpu_s": 0.07383000000000006,
+        "peak_rss_mib": 584.0
+      }
+    ]
+  },
+  "synthetic_lifecycle": {
+    "shape": [
+      141,
+      971,
+      1,
+      20,
+      20
+    ],
+    "scope": "file create, write, seal, full site reads, unmap, delete",
+    "input_block_generation_excluded": true,
+    "exact_checksum_parity": true,
+    "runs": {
+      "before": [
+        {
+          "wall_s": 0.2573333339532837,
+          "cpu_s": 0.1610879999999999
+        },
+        {
+          "wall_s": 0.19399404199793935,
+          "cpu_s": 0.1659959999999998
+        },
+        {
+          "wall_s": 0.17994558298960328,
+          "cpu_s": 0.16297899999999998
+        }
+      ],
+      "mmap_copy": [
+        {
+          "wall_s": 0.23531245801132172,
+          "cpu_s": 0.14526700000000003
+        },
+        {
+          "wall_s": 0.279819666990079,
+          "cpu_s": 0.16400199999999998
+        },
+        {
+          "wall_s": 0.16801016696263105,
+          "cpu_s": 0.13829700000000011
+        }
+      ]
+    },
+    "summary": {
+      "before": {
+        "wall_s": {
+          "median": 0.19399404199793935,
+          "min": 0.17994558298960328,
+          "max": 0.2573333339532837
+        },
+        "cpu_s": {
+          "median": 0.16297899999999998,
+          "min": 0.1610879999999999,
+          "max": 0.1659959999999998
+        }
+      },
+      "mmap_copy": {
+        "wall_s": {
+          "median": 0.23531245801132172,
+          "min": 0.16801016696263105,
+          "max": 0.279819666990079
+        },
+        "cpu_s": {
+          "median": 0.14526700000000003,
+          "min": 0.13829700000000011,
+          "max": 0.16400199999999998
+        }
+      }
+    }
+  },
+  "verification": {
+    "prototype_storage_tests": {
+      "passed": 10,
+      "skipped": 0,
+      "command": "python reports/performance_candidates_20261022/proposal08.py --check-existing-tests"
+    }
+  }
+}

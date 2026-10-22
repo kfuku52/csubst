@@ -1,0 +1,55 @@
+{
+  "baseline_commit": "4498c436b58c205dc4e10e6d96549b8bb6e805bf",
+  "scope": "Ten source-level prototype investigations; production code unchanged",
+  "checks": [
+    {
+      "command": "make lint",
+      "exit_code": 0,
+      "result": "Ruff, repository hygiene, and documentation checks passed; 22 documents, 23 commands, 73 local links; Wiki not checked"
+    },
+    {
+      "command": "python -m ruff check reports/performance_candidates_20261022",
+      "exit_code": 0,
+      "result": "All checks passed"
+    },
+    {
+      "command": "python -m compileall -q reports/performance_candidates_20261022",
+      "exit_code": 0,
+      "result": "All report Python files compiled"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "No tracked whitespace errors"
+    },
+    {
+      "command": "Report audit: 10 proposal triples, all JSON, relative Markdown links, untracked whitespace, home-path exclusion, tracked diff and untracked inventory",
+      "exit_code": 0,
+      "result": "34 report files verified; ten independent proposal records complete; no tracked changes"
+    }
+  ],
+  "prototype_tests": [
+    {
+      "proposal": 8,
+      "selection": "tests/unit/test_site_storage.py with in-process prototype",
+      "passed": 10,
+      "skipped": 0
+    },
+    {
+      "proposal": 9,
+      "selection": "tests/unit/test_omega_sampling.py -k \"fisher or draw_one\" with in-process prototype",
+      "passed": 2,
+      "deselected": 17
+    },
+    {
+      "proposal": 10,
+      "selection": "tests/unit/test_endpoint.py with in-process prototype",
+      "passed": 26
+    }
+  ],
+  "not_run": [
+    "Full pytest, test-fast, and typecheck: production code unchanged; report prototypes validated directly",
+    "Installed wheel, sdist-only, sanitizer, Linux performance lanes, real IQ-TREE refit, GPU/structural inference, and scientific recalibration"
+  ],
+  "audit_note": "The first audit treated no-index diff exit 1 for an added file as a failure. Corrected to accept 0 or 1 only with empty diagnostics; no whitespace defects were found."
+}

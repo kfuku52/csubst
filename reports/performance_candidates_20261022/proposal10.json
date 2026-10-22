@@ -1,0 +1,439 @@
+{
+  "proposal": 10,
+  "environment": {
+    "commit": "4498c43",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "warmups_per_implementation": 1,
+  "measured_repeats": 3,
+  "block_size": 64,
+  "scope": "Endpoint inference and classified reduction; not CLI",
+  "thread_control": "VECLIB/OPENBLAS/OMP/MKL/BLIS env=1 before NumPy import",
+  "memory_scope": "Explicit ndarray buffers and allocation volume; peak RSS and BLAS workspace not measured",
+  "cases": {
+    "PGK": {
+      "sites": 417,
+      "nodes": 65,
+      "states": 61,
+      "rates": [
+        0.265,
+        0.3789,
+        0.8278,
+        1.7853
+      ],
+      "weights": [
+        0.0091,
+        0.0315,
+        0.7594,
+        0.2
+      ],
+      "input_sha256": {
+        "PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+        "PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03"
+      },
+      "parity": {
+        "asserted_values": 18968913,
+        "records": 455,
+        "maximum_absolute_difference": 0.0,
+        "retained_until_exhaustion": false
+      },
+      "timing": {
+        "samples": {
+          "before": [
+            {
+              "wall_s": 0.3399534170748666,
+              "cpu_s": 0.3379349999999999
+            },
+            {
+              "wall_s": 0.33583504101261497,
+              "cpu_s": 0.334422
+            },
+            {
+              "wall_s": 0.3274545419262722,
+              "cpu_s": 0.32679500000000017
+            }
+          ],
+          "after": [
+            {
+              "wall_s": 0.33689633302856237,
+              "cpu_s": 0.33355099999999993
+            },
+            {
+              "wall_s": 0.3292792499996722,
+              "cpu_s": 0.32499199999999995
+            },
+            {
+              "wall_s": 0.383721666992642,
+              "cpu_s": 0.3355769999999998
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.33583504101261497,
+              "min": 0.3274545419262722,
+              "max": 0.3399534170748666
+            },
+            "cpu_s": {
+              "median": 0.334422,
+              "min": 0.32679500000000017,
+              "max": 0.3379349999999999
+            }
+          },
+          "after": {
+            "wall_s": {
+              "median": 0.33689633302856237,
+              "min": 0.3292792499996722,
+              "max": 0.383721666992642
+            },
+            "cpu_s": {
+              "median": 0.33355099999999993,
+              "min": 0.32499199999999995,
+              "max": 0.3355769999999998
+            }
+          }
+        },
+        "principal_buffer_bytes_unchanged": 16373760,
+        "explicit_output_allocation_volume_avoided_bytes": 156284928,
+        "maximum_two_explicit_result_arrays_bytes": 62464,
+        "extra_retained_workspace_bytes": 0
+      }
+    },
+    "PEPC": {
+      "sites": 971,
+      "nodes": 141,
+      "states": 61,
+      "rates": [
+        0.0989,
+        0.437,
+        0.4477,
+        1.0476
+      ],
+      "weights": [
+        0.017,
+        0.0116,
+        0.0407,
+        0.9307
+      ],
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "parity": {
+        "asserted_values": 96269795,
+        "records": 2256,
+        "maximum_absolute_difference": 0.0,
+        "retained_until_exhaustion": false
+      },
+      "timing": {
+        "samples": {
+          "before": [
+            {
+              "wall_s": 1.738693332998082,
+              "cpu_s": 1.6646239999999999
+            },
+            {
+              "wall_s": 1.8125428339699283,
+              "cpu_s": 1.6594359999999995
+            },
+            {
+              "wall_s": 1.947503583971411,
+              "cpu_s": 1.6551230000000032
+            }
+          ],
+          "after": [
+            {
+              "wall_s": 1.6394245839910582,
+              "cpu_s": 1.580896000000001
+            },
+            {
+              "wall_s": 1.5611880000215024,
+              "cpu_s": 1.552778
+            },
+            {
+              "wall_s": 1.6995638340013102,
+              "cpu_s": 1.602329000000001
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 1.8125428339699283,
+              "min": 1.738693332998082,
+              "max": 1.947503583971411
+            },
+            "cpu_s": {
+              "median": 1.6594359999999995,
+              "min": 1.6551230000000032,
+              "max": 1.6646239999999999
+            }
+          },
+          "after": {
+            "wall_s": {
+              "median": 1.6394245839910582,
+              "min": 1.5611880000215024,
+              "max": 1.6995638340013102
+            },
+            "cpu_s": {
+              "median": 1.580896000000001,
+              "min": 1.552778,
+              "max": 1.602329000000001
+            }
+          }
+        },
+        "principal_buffer_bytes_unchanged": 35518464,
+        "explicit_output_allocation_volume_avoided_bytes": 796064640,
+        "maximum_two_explicit_result_arrays_bytes": 62464,
+        "extra_retained_workspace_bytes": 0
+      }
+    },
+    "PEPCx4": {
+      "sites": 3884,
+      "nodes": 141,
+      "states": 61,
+      "rates": [
+        0.0989,
+        0.437,
+        0.4477,
+        1.0476
+      ],
+      "weights": [
+        0.017,
+        0.0116,
+        0.0407,
+        0.9307
+      ],
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "parity": {
+        "asserted_values": 385079180,
+        "records": 8601,
+        "maximum_absolute_difference": 0.0,
+        "retained_until_exhaustion": false
+      },
+      "timing": {
+        "samples": {
+          "before": [
+            {
+              "wall_s": 6.8083919999189675,
+              "cpu_s": 6.610585
+            },
+            {
+              "wall_s": 6.848970833001658,
+              "cpu_s": 6.649701999999991
+            },
+            {
+              "wall_s": 7.212863250053488,
+              "cpu_s": 6.8663680000000085
+            }
+          ],
+          "after": [
+            {
+              "wall_s": 6.902993416995741,
+              "cpu_s": 6.386750999999997
+            },
+            {
+              "wall_s": 7.263530250056647,
+              "cpu_s": 6.604731000000001
+            },
+            {
+              "wall_s": 6.716438791016117,
+              "cpu_s": 6.548161999999991
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 6.848970833001658,
+              "min": 6.8083919999189675,
+              "max": 7.212863250053488
+            },
+            "cpu_s": {
+              "median": 6.649701999999991,
+              "min": 6.610585,
+              "max": 6.8663680000000085
+            }
+          },
+          "after": {
+            "wall_s": {
+              "median": 6.902993416995741,
+              "min": 6.716438791016117,
+              "max": 7.263530250056647
+            },
+            "cpu_s": {
+              "median": 6.548161999999991,
+              "min": 6.386750999999997,
+              "max": 6.604731000000001
+            }
+          }
+        },
+        "principal_buffer_bytes_unchanged": 35518464,
+        "explicit_output_allocation_volume_avoided_bytes": 3184258560,
+        "maximum_two_explicit_result_arrays_bytes": 62464,
+        "extra_retained_workspace_bytes": 0
+      }
+    }
+  },
+  "edge_checks": {
+    "uniform_regular_1": {
+      "asserted_values": 4422,
+      "records": 335,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "uniform_regular_4": {
+      "asserted_values": 4422,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "uniform_regular_64": {
+      "asserted_values": 4422,
+      "records": 10,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "uniform_regular_retained": {
+      "asserted_values": 4422,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": true
+    },
+    "uniform_regular_transform_alias_retained": {
+      "asserted_values": 5762,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": true
+    },
+    "uniform_read_only_strided_1": {
+      "asserted_values": 4422,
+      "records": 335,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "uniform_read_only_strided_4": {
+      "asserted_values": 4422,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "uniform_read_only_strided_64": {
+      "asserted_values": 4422,
+      "records": 10,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "uniform_read_only_strided_retained": {
+      "asserted_values": 4422,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": true
+    },
+    "uniform_read_only_strided_transform_alias_retained": {
+      "asserted_values": 5762,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": true
+    },
+    "invariant_mixture_regular_1": {
+      "asserted_values": 6432,
+      "records": 335,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "invariant_mixture_regular_4": {
+      "asserted_values": 6432,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "invariant_mixture_regular_64": {
+      "asserted_values": 6432,
+      "records": 10,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "invariant_mixture_regular_retained": {
+      "asserted_values": 6432,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": true
+    },
+    "invariant_mixture_regular_transform_alias_retained": {
+      "asserted_values": 7772,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": true
+    },
+    "invariant_mixture_read_only_strided_1": {
+      "asserted_values": 6432,
+      "records": 335,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "invariant_mixture_read_only_strided_4": {
+      "asserted_values": 6432,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "invariant_mixture_read_only_strided_64": {
+      "asserted_values": 6432,
+      "records": 10,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    },
+    "invariant_mixture_read_only_strided_retained": {
+      "asserted_values": 6432,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": true
+    },
+    "invariant_mixture_read_only_strided_transform_alias_retained": {
+      "asserted_values": 7772,
+      "records": 85,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": true
+    },
+    "empty_sites": {
+      "asserted_values": 0,
+      "records": 0,
+      "maximum_absolute_difference": 0.0,
+      "retained_until_exhaustion": false
+    }
+  },
+  "existing_tests": {
+    "command": "python -m pytest -q tests/unit/test_endpoint.py (prototype substituted in process)",
+    "exit_code": 0,
+    "output": "..........................                                               [100%]\n26 passed in 0.17s\n"
+  }
+}

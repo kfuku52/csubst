@@ -1,0 +1,745 @@
+{
+  "environment": {
+    "commit": "4498c43",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "proposal": 2,
+  "scope": "EndpointModel inference with native scan classified-event transform; not CLI",
+  "warmups": 1,
+  "measured_repeats": 3,
+  "cases": {
+    "PGK": {
+      "nodes": 65,
+      "leaves": 33,
+      "sites": 417,
+      "states": 61,
+      "rates": [
+        0.265,
+        0.3789,
+        0.8278,
+        1.7853
+      ],
+      "weights": [
+        0.0091,
+        0.0315,
+        0.7594,
+        0.2
+      ],
+      "input_sha256": {
+        "PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+        "PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03"
+      },
+      "parity": {
+        "16": {
+          "asserted_values": 18968913,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "32": {
+          "asserted_values": 18968913,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "64": {
+          "asserted_values": 18968913,
+          "maximum_absolute_difference": 6.661338147750939e-16,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "128": {
+          "asserted_values": 18968913,
+          "maximum_absolute_difference": 6.661338147750939e-16,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "256": {
+          "asserted_values": 18968913,
+          "maximum_absolute_difference": 6.661338147750939e-16,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        }
+      },
+      "blocks": {
+        "16": {
+          "samples": [
+            {
+              "wall_s": 0.5870100839529186,
+              "cpu_s": 0.5429400000000015
+            },
+            {
+              "wall_s": 0.5371627500280738,
+              "cpu_s": 0.5313830000000017
+            },
+            {
+              "wall_s": 0.5624819160439074,
+              "cpu_s": 0.5425559999999994
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 0.5624819160439074,
+              "min": 0.5371627500280738,
+              "max": 0.5870100839529186
+            },
+            "cpu_s": {
+              "median": 0.5425559999999994,
+              "min": 0.5313830000000017,
+              "max": 0.5429400000000015
+            }
+          },
+          "principal_buffer_bytes": 4093440,
+          "scan_write_buffer_bytes_if_disk_backed": 5358080
+        },
+        "32": {
+          "samples": [
+            {
+              "wall_s": 0.43011533294338733,
+              "cpu_s": 0.42229199999999967
+            },
+            {
+              "wall_s": 0.42752466700039804,
+              "cpu_s": 0.41288699999999956
+            },
+            {
+              "wall_s": 0.4498632079921663,
+              "cpu_s": 0.4237310000000001
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 0.43011533294338733,
+              "min": 0.42752466700039804,
+              "max": 0.4498632079921663
+            },
+            "cpu_s": {
+              "median": 0.42229199999999967,
+              "min": 0.41288699999999956,
+              "max": 0.4237310000000001
+            }
+          },
+          "principal_buffer_bytes": 8186880,
+          "scan_write_buffer_bytes_if_disk_backed": 10716160
+        },
+        "64": {
+          "samples": [
+            {
+              "wall_s": 0.35452524991706014,
+              "cpu_s": 0.3434900000000001
+            },
+            {
+              "wall_s": 0.39417583402246237,
+              "cpu_s": 0.35241799999999834
+            },
+            {
+              "wall_s": 0.35995654202997684,
+              "cpu_s": 0.34491400000000105
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 0.35995654202997684,
+              "min": 0.35452524991706014,
+              "max": 0.39417583402246237
+            },
+            "cpu_s": {
+              "median": 0.34491400000000105,
+              "min": 0.3434900000000001,
+              "max": 0.35241799999999834
+            }
+          },
+          "principal_buffer_bytes": 16373760,
+          "scan_write_buffer_bytes_if_disk_backed": 21432320
+        },
+        "128": {
+          "samples": [
+            {
+              "wall_s": 0.292998458025977,
+              "cpu_s": 0.2893309999999998
+            },
+            {
+              "wall_s": 0.3132749580545351,
+              "cpu_s": 0.3039469999999991
+            },
+            {
+              "wall_s": 0.29521050001494586,
+              "cpu_s": 0.28857099999999924
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 0.29521050001494586,
+              "min": 0.292998458025977,
+              "max": 0.3132749580545351
+            },
+            "cpu_s": {
+              "median": 0.2893309999999998,
+              "min": 0.28857099999999924,
+              "max": 0.3039469999999991
+            }
+          },
+          "principal_buffer_bytes": 32747520,
+          "scan_write_buffer_bytes_if_disk_backed": 42864640
+        },
+        "256": {
+          "samples": [
+            {
+              "wall_s": 0.3080670420313254,
+              "cpu_s": 0.30002500000000065
+            },
+            {
+              "wall_s": 0.2907723750686273,
+              "cpu_s": 0.2823209999999996
+            },
+            {
+              "wall_s": 0.2724537079920992,
+              "cpu_s": 0.2722099999999994
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 0.2907723750686273,
+              "min": 0.2724537079920992,
+              "max": 0.3080670420313254
+            },
+            "cpu_s": {
+              "median": 0.2823209999999996,
+              "min": 0.2722099999999994,
+              "max": 0.30002500000000065
+            }
+          },
+          "principal_buffer_bytes": 65495040,
+          "scan_write_buffer_bytes_if_disk_backed": 85729280
+        }
+      },
+      "current_effective_scan_block": 64
+    },
+    "PEPC": {
+      "nodes": 141,
+      "leaves": 71,
+      "sites": 971,
+      "states": 61,
+      "rates": [
+        0.0989,
+        0.437,
+        0.4477,
+        1.0476
+      ],
+      "weights": [
+        0.017,
+        0.0116,
+        0.0407,
+        0.9307
+      ],
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "parity": {
+        "16": {
+          "asserted_values": 96269795,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "32": {
+          "asserted_values": 96269795,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "64": {
+          "asserted_values": 96269795,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "128": {
+          "asserted_values": 96269795,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "256": {
+          "asserted_values": 96269795,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        }
+      },
+      "blocks": {
+        "16": {
+          "samples": [
+            {
+              "wall_s": 2.8517970420653,
+              "cpu_s": 2.7939739999999986
+            },
+            {
+              "wall_s": 2.738525874912739,
+              "cpu_s": 2.6845539999999986
+            },
+            {
+              "wall_s": 2.665319166961126,
+              "cpu_s": 2.60044400000001
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 2.738525874912739,
+              "min": 2.665319166961126,
+              "max": 2.8517970420653
+            },
+            "cpu_s": {
+              "median": 2.6845539999999986,
+              "min": 2.60044400000001,
+              "max": 2.7939739999999986
+            }
+          },
+          "principal_buffer_bytes": 8879616,
+          "scan_write_buffer_bytes_if_disk_backed": 11622912
+        },
+        "32": {
+          "samples": [
+            {
+              "wall_s": 2.517515374929644,
+              "cpu_s": 2.4137059999999977
+            },
+            {
+              "wall_s": 2.1299847500631586,
+              "cpu_s": 2.081820999999998
+            },
+            {
+              "wall_s": 1.9788259170018137,
+              "cpu_s": 1.9605089999999876
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 2.1299847500631586,
+              "min": 1.9788259170018137,
+              "max": 2.517515374929644
+            },
+            "cpu_s": {
+              "median": 2.081820999999998,
+              "min": 1.9605089999999876,
+              "max": 2.4137059999999977
+            }
+          },
+          "principal_buffer_bytes": 17759232,
+          "scan_write_buffer_bytes_if_disk_backed": 23245824
+        },
+        "64": {
+          "samples": [
+            {
+              "wall_s": 2.1662299999734387,
+              "cpu_s": 1.918301999999997
+            },
+            {
+              "wall_s": 1.8301325000356883,
+              "cpu_s": 1.7754440000000002
+            },
+            {
+              "wall_s": 1.6347504160366952,
+              "cpu_s": 1.602105999999992
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 1.8301325000356883,
+              "min": 1.6347504160366952,
+              "max": 2.1662299999734387
+            },
+            "cpu_s": {
+              "median": 1.7754440000000002,
+              "min": 1.602105999999992,
+              "max": 1.918301999999997
+            }
+          },
+          "principal_buffer_bytes": 35518464,
+          "scan_write_buffer_bytes_if_disk_backed": 46491648
+        },
+        "128": {
+          "samples": [
+            {
+              "wall_s": 1.8394557079300284,
+              "cpu_s": 1.7179089999999988
+            },
+            {
+              "wall_s": 1.6177777090342715,
+              "cpu_s": 1.5518459999999976
+            },
+            {
+              "wall_s": 1.4709439580328763,
+              "cpu_s": 1.4632590000000079
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 1.6177777090342715,
+              "min": 1.4709439580328763,
+              "max": 1.8394557079300284
+            },
+            "cpu_s": {
+              "median": 1.5518459999999976,
+              "min": 1.4632590000000079,
+              "max": 1.7179089999999988
+            }
+          },
+          "principal_buffer_bytes": 71036928,
+          "scan_write_buffer_bytes_if_disk_backed": 92983296
+        },
+        "256": {
+          "samples": [
+            {
+              "wall_s": 1.809841167065315,
+              "cpu_s": 1.5371179999999995
+            },
+            {
+              "wall_s": 1.580869207973592,
+              "cpu_s": 1.5292659999999998
+            },
+            {
+              "wall_s": 1.4864477079827338,
+              "cpu_s": 1.4349559999999997
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 1.580869207973592,
+              "min": 1.4864477079827338,
+              "max": 1.809841167065315
+            },
+            "cpu_s": {
+              "median": 1.5292659999999998,
+              "min": 1.4349559999999997,
+              "max": 1.5371179999999995
+            }
+          },
+          "principal_buffer_bytes": 142073856,
+          "scan_write_buffer_bytes_if_disk_backed": 185966592
+        }
+      },
+      "current_effective_scan_block": 46
+    },
+    "PEPCx4": {
+      "nodes": 141,
+      "leaves": 71,
+      "sites": 3884,
+      "states": 61,
+      "rates": [
+        0.0989,
+        0.437,
+        0.4477,
+        1.0476
+      ],
+      "weights": [
+        0.017,
+        0.0116,
+        0.0407,
+        0.9307
+      ],
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "parity": {
+        "16": {
+          "asserted_values": 385079180,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "32": {
+          "asserted_values": 385079180,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "64": {
+          "asserted_values": 385079180,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "128": {
+          "asserted_values": 385079180,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        },
+        "256": {
+          "asserted_values": 385079180,
+          "maximum_absolute_difference": 0.0,
+          "rtol": 1e-12,
+          "atol": 1e-13
+        }
+      },
+      "blocks": {
+        "16": {
+          "samples": [
+            {
+              "wall_s": 12.491642624954693,
+              "cpu_s": 10.764498000000003
+            },
+            {
+              "wall_s": 12.291614416986704,
+              "cpu_s": 11.520400999999993
+            },
+            {
+              "wall_s": 11.891594290966168,
+              "cpu_s": 11.111299000000031
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 12.291614416986704,
+              "min": 11.891594290966168,
+              "max": 12.491642624954693
+            },
+            "cpu_s": {
+              "median": 11.111299000000031,
+              "min": 10.764498000000003,
+              "max": 11.520400999999993
+            }
+          },
+          "principal_buffer_bytes": 8879616,
+          "scan_write_buffer_bytes_if_disk_backed": 11622912
+        },
+        "32": {
+          "samples": [
+            {
+              "wall_s": 9.902602707967162,
+              "cpu_s": 8.71843800000002
+            },
+            {
+              "wall_s": 8.600069917039946,
+              "cpu_s": 8.207703999999978
+            },
+            {
+              "wall_s": 9.076362582971342,
+              "cpu_s": 8.600242999999978
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 9.076362582971342,
+              "min": 8.600069917039946,
+              "max": 9.902602707967162
+            },
+            "cpu_s": {
+              "median": 8.600242999999978,
+              "min": 8.207703999999978,
+              "max": 8.71843800000002
+            }
+          },
+          "principal_buffer_bytes": 17759232,
+          "scan_write_buffer_bytes_if_disk_backed": 23245824
+        },
+        "64": {
+          "samples": [
+            {
+              "wall_s": 7.2212239999789745,
+              "cpu_s": 6.573201000000012
+            },
+            {
+              "wall_s": 7.077888375031762,
+              "cpu_s": 6.494897999999978
+            },
+            {
+              "wall_s": 7.510934874997474,
+              "cpu_s": 6.707582000000002
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 7.2212239999789745,
+              "min": 7.077888375031762,
+              "max": 7.510934874997474
+            },
+            "cpu_s": {
+              "median": 6.573201000000012,
+              "min": 6.494897999999978,
+              "max": 6.707582000000002
+            }
+          },
+          "principal_buffer_bytes": 35518464,
+          "scan_write_buffer_bytes_if_disk_backed": 46491648
+        },
+        "128": {
+          "samples": [
+            {
+              "wall_s": 6.498592957970686,
+              "cpu_s": 5.914767000000012
+            },
+            {
+              "wall_s": 6.1052855419693515,
+              "cpu_s": 5.878809999999987
+            },
+            {
+              "wall_s": 5.99102791689802,
+              "cpu_s": 5.762642
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 6.1052855419693515,
+              "min": 5.99102791689802,
+              "max": 6.498592957970686
+            },
+            "cpu_s": {
+              "median": 5.878809999999987,
+              "min": 5.762642,
+              "max": 5.914767000000012
+            }
+          },
+          "principal_buffer_bytes": 71036928,
+          "scan_write_buffer_bytes_if_disk_backed": 92983296
+        },
+        "256": {
+          "samples": [
+            {
+              "wall_s": 6.9582425829721615,
+              "cpu_s": 6.141700999999983
+            },
+            {
+              "wall_s": 6.524661959032528,
+              "cpu_s": 6.085769999999997
+            },
+            {
+              "wall_s": 6.515463207964785,
+              "cpu_s": 6.108402000000012
+            }
+          ],
+          "summary": {
+            "wall_s": {
+              "median": 6.524661959032528,
+              "min": 6.515463207964785,
+              "max": 6.9582425829721615
+            },
+            "cpu_s": {
+              "median": 6.108402000000012,
+              "min": 6.085769999999997,
+              "max": 6.141700999999983
+            }
+          },
+          "principal_buffer_bytes": 142073856,
+          "scan_write_buffer_bytes_if_disk_backed": 185966592
+        }
+      },
+      "current_effective_scan_block": 46
+    }
+  },
+  "thread_control": "VECLIB/OPENBLAS/OMP/MKL/BLIS env = 1 before NumPy import; no threadpoolctl installed",
+  "numpy_configuration": {
+    "blas": {
+      "name": "blas",
+      "version": "3.9.0",
+      "found": true
+    },
+    "simd": {
+      "baseline": [
+        "NEON",
+        "NEON_FP16",
+        "NEON_VFPV4",
+        "ASIMD"
+      ],
+      "found": [
+        "ASIMDHP",
+        "ASIMDDP"
+      ],
+      "not found": [
+        "ASIMDFHM",
+        "SVE"
+      ]
+    }
+  },
+  "memory_scope": "inside_buffer + post_buffer + scale_buffer exact ndarray bytes; not RSS",
+  "edge_case_parity": {
+    "uniform_16": {
+      "asserted_values": 31560,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "uniform_32": {
+      "asserted_values": 31560,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "uniform_64": {
+      "asserted_values": 31560,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "uniform_128": {
+      "asserted_values": 31560,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "uniform_256": {
+      "asserted_values": 31560,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "invariant_mixture_16": {
+      "asserted_values": 46288,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "invariant_mixture_32": {
+      "asserted_values": 46288,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "invariant_mixture_64": {
+      "asserted_values": 46288,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "invariant_mixture_128": {
+      "asserted_values": 46288,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    },
+    "invariant_mixture_256": {
+      "asserted_values": 46288,
+      "maximum_absolute_difference": 0.0,
+      "rtol": 1e-12,
+      "atol": 1e-13
+    }
+  },
+  "blas_runtime_library": "libopenblas.0.dylib"
+}

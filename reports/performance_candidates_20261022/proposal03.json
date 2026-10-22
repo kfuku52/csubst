@@ -1,0 +1,249 @@
+{
+  "environment": {
+    "commit": "4498c43",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "scope": "cold transition construction, not CLI runtime",
+  "native_thread_control": "environment set before NumPy/SciPy import; no threadpoolctl installed",
+  "accuracy": {
+    "chain": [
+      {
+        "length": 0,
+        "production_passes": true,
+        "spectral_passes": true,
+        "max_absolute_error": 0.0,
+        "max_positive_relative_error": 0.0,
+        "positive_transitions_lost": 0,
+        "rare_reference": 0.0,
+        "rare_spectral": 0.0
+      },
+      {
+        "length": 1e-10,
+        "production_passes": true,
+        "spectral_passes": false,
+        "max_absolute_error": 1.7763568394002505e-15,
+        "max_positive_relative_error": 7.342801983266678e+47,
+        "positive_transitions_lost": 24,
+        "rare_reference": 1.6340138886887222e-75,
+        "rare_spectral": 0.0
+      },
+      {
+        "length": 1e-05,
+        "production_passes": true,
+        "spectral_passes": false,
+        "max_absolute_error": 1.3322676295501878e-15,
+        "max_positive_relative_error": 8.192215080642016e+17,
+        "positive_transitions_lost": 16,
+        "rare_reference": 1.6339938723499697e-40,
+        "rare_spectral": 0.0
+      },
+      {
+        "length": 0.1,
+        "production_passes": true,
+        "spectral_passes": false,
+        "max_absolute_error": 7.771561172376096e-16,
+        "max_positive_relative_error": 0.00012966104135409952,
+        "positive_transitions_lost": 0,
+        "rare_reference": 1.4463835220439955e-12,
+        "rare_spectral": 1.4461959824503299e-12
+      },
+      {
+        "length": 1,
+        "production_passes": true,
+        "spectral_passes": false,
+        "max_absolute_error": 5.551115123125783e-16,
+        "max_positive_relative_error": 1.6387836426050692e-11,
+        "positive_transitions_lost": 0,
+        "rare_reference": 5.056353381665741e-06,
+        "rare_spectral": 5.056353381582879e-06
+      },
+      {
+        "length": 10,
+        "production_passes": true,
+        "spectral_passes": true,
+        "max_absolute_error": 4.996003610813204e-16,
+        "max_positive_relative_error": 3.2079624232108904e-15,
+        "positive_transitions_lost": 0,
+        "rare_reference": 0.04565927403412676,
+        "rare_spectral": 0.045659274034126715
+      },
+      {
+        "length": 100,
+        "production_passes": true,
+        "spectral_passes": true,
+        "max_absolute_error": 3.3306690738754696e-16,
+        "max_positive_relative_error": 2.66443296813983e-15,
+        "positive_transitions_lost": 0,
+        "rare_reference": 0.1249943393014399,
+        "rare_spectral": 0.12499433930144006
+      }
+    ],
+    "rare_evidence_max_node_absolute_error": 0.9453080693542968,
+    "nonreversible_fallback_matches": true,
+    "zero_pi_fallback": true,
+    "invalid_inputs_rejected": 2
+  },
+  "datasets": {
+    "PGK": {
+      "nodes": 65,
+      "sites": 417,
+      "states": 61,
+      "categories": 4,
+      "q_sha256": "647b03df32b468ad3d0a62b3f2163d59f3288e58988e03380a38b7170a6ec8ef",
+      "lengths_sha256": "8c2e3c6c5f9ea08f9502414258728788ee4f9c43f427667eccc2aaece75ec108",
+      "spectral_applicable": true,
+      "samples": {
+        "production": [
+          {
+            "wall_s": 0.022249708068557084,
+            "cpu_s": 0.022250000000000103
+          },
+          {
+            "wall_s": 0.021513624931685627,
+            "cpu_s": 0.02151499999999995
+          },
+          {
+            "wall_s": 0.02418070798739791,
+            "cpu_s": 0.02404699999999993
+          }
+        ],
+        "spectral": [
+          {
+            "wall_s": 0.013024959014728665,
+            "cpu_s": 0.012916999999999845
+          },
+          {
+            "wall_s": 0.011676209047436714,
+            "cpu_s": 0.011678000000000077
+          },
+          {
+            "wall_s": 0.01176158303860575,
+            "cpu_s": 0.01175499999999996
+          }
+        ]
+      },
+      "summary": {
+        "production": {
+          "wall_s": {
+            "median": 0.022249708068557084,
+            "min": 0.021513624931685627,
+            "max": 0.02418070798739791
+          },
+          "cpu_s": {
+            "median": 0.022250000000000103,
+            "min": 0.02151499999999995,
+            "max": 0.02404699999999993
+          }
+        },
+        "spectral": {
+          "wall_s": {
+            "median": 0.01176158303860575,
+            "min": 0.011676209047436714,
+            "max": 0.013024959014728665
+          },
+          "cpu_s": {
+            "median": 0.01175499999999996,
+            "min": 0.011678000000000077,
+            "max": 0.012916999999999845
+          }
+        }
+      },
+      "transition_max_absolute_error": 4.735922335189339e-14,
+      "transition_max_positive_relative_error": 4.29638711369786,
+      "transition_positive_entries_lost": 22,
+      "posterior_16_sites_allclose": false,
+      "posterior_max_absolute_errors": {
+        "node": 2.2315482794965646e-13,
+        "joint": 2.277067423506196e-13,
+        "predictive": 3.83026943495679e-13,
+        "category_node": 1.1097789354153065e-12
+      },
+      "production_cache_capacity_bytes": 7620608,
+      "spectral_extra_array_bytes": 30744
+    },
+    "PEPC": {
+      "nodes": 141,
+      "sites": 971,
+      "states": 61,
+      "categories": 4,
+      "q_sha256": "28817a0a8300f96f7e9efa0db7e925f8fe4e7c63232416079624642526a773f9",
+      "lengths_sha256": "de1b45b1125b426dfa8716867a56f02625ac047143d49763cac7b48dcdeb6c20",
+      "spectral_applicable": true,
+      "samples": {
+        "production": [
+          {
+            "wall_s": 0.045792541932314634,
+            "cpu_s": 0.04574400000000001
+          },
+          {
+            "wall_s": 0.045240583014674485,
+            "cpu_s": 0.045242000000000004
+          },
+          {
+            "wall_s": 0.04536400001961738,
+            "cpu_s": 0.045266999999999946
+          }
+        ],
+        "spectral": [
+          {
+            "wall_s": 0.025737249990925193,
+            "cpu_s": 0.02573800000000004
+          },
+          {
+            "wall_s": 0.024000582983717322,
+            "cpu_s": 0.02400200000000008
+          },
+          {
+            "wall_s": 0.02511791593860835,
+            "cpu_s": 0.02511899999999989
+          }
+        ]
+      },
+      "summary": {
+        "production": {
+          "wall_s": {
+            "median": 0.04536400001961738,
+            "min": 0.045240583014674485,
+            "max": 0.045792541932314634
+          },
+          "cpu_s": {
+            "median": 0.045266999999999946,
+            "min": 0.045242000000000004,
+            "max": 0.04574400000000001
+          }
+        },
+        "spectral": {
+          "wall_s": {
+            "median": 0.02511791593860835,
+            "min": 0.024000582983717322,
+            "max": 0.025737249990925193
+          },
+          "cpu_s": {
+            "median": 0.02511899999999989,
+            "min": 0.02400200000000008,
+            "max": 0.02573800000000004
+          }
+        }
+      },
+      "transition_max_absolute_error": 1.8624165766578805e-14,
+      "transition_max_positive_relative_error": 21.086736948957473,
+      "transition_positive_entries_lost": 78,
+      "posterior_16_sites_allclose": false,
+      "posterior_max_absolute_errors": {
+        "node": 1.1851297720966159e-11,
+        "joint": 1.1851297720966159e-11,
+        "predictive": 1.1570522318038456e-11,
+        "category_node": 1.1851297720966159e-11
+      },
+      "production_cache_capacity_bytes": 7620608,
+      "spectral_extra_array_bytes": 30744
+    }
+  },
+  "decision": "reject: spectral reconstruction violates existing entrywise rare-transition accuracy"
+}
