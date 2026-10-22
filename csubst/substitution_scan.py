@@ -1356,6 +1356,23 @@ def _format_state_change(from_label, to_label, site_label, match):
     return "{}:{}".format(site_label, match)
 
 
+def _candidate_distribution_label(values, state_orders):
+    """Format a distribution with the historical pandas descending tie order."""
+    if len(values) == 1:
+        index, value = values[0]
+        return '{}:{:.6g}'.format(str(state_orders[int(index)]), float(value))
+    masses = np.asarray([mass for _, mass in values])
+    missing = np.isnan(masses)
+    positions = np.flatnonzero(~missing)
+    # pandas reverses before and after ascending quicksort. Sorting -masses
+    # instead changes the order of tied states, which is part of the output.
+    order = positions[::-1][masses[positions][::-1].argsort(kind='quicksort')][::-1]
+    if missing.any():
+        order = np.concatenate((order, np.flatnonzero(missing)))
+    return ','.join('{}:{:.6g}'.format(str(state_orders[int(values[i][0])]), float(values[i][1]))
+                    for i in order)
+
+
 def build_candidates(events, scan_matches, state_orders):
     rows = []
     num_state = int(state_orders.shape[0])
@@ -1377,10 +1394,7 @@ def build_candidates(events, scan_matches, state_orders):
                     group_key = tuple(key[keys.index(col)] for col in group_cols)
                     by_group.setdefault(group_key, []).append((key[keys.index(column)], mass))
                 distributions[column] = {
-                    key: ','.join('{}:{:.6g}'.format(str(state_orders[int(index)]), float(value))
-                                  for index, value in pd.Series(
-                                      [mass for _, mass in values], index=[index for index, _ in values]
-                                  ).sort_values(ascending=False).items())
+                    key: _candidate_distribution_label(values, state_orders)
                     for key, values in by_group.items()}
             records = []
             for key, group in events.groupby(list(group_cols), sort=True):

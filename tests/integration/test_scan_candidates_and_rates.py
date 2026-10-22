@@ -71,6 +71,22 @@ def test_build_candidates_supports_scan_match_specific_grouping():
     assert set(spe_to_spe["state_change"].tolist()) == {"A1K", "A1N", "C1K"}
 
 
+@pytest.mark.parametrize('size', [0, 1, 3, 20, 61])
+@pytest.mark.parametrize('dtype', [np.float32, np.float64, np.int64])
+def test_candidate_distribution_retains_pandas_ties_and_display(size, dtype):
+    rng = np.random.default_rng(84)
+    orders = np.array(['state{}'.format(i) for i in range(size)])
+    indices = rng.permutation(size)
+    masses = rng.integers(0, 4, size=size).astype(dtype)
+    if dtype != np.int64:
+        masses[::5] = np.nan
+    values = list(zip(indices, masses))
+    expected = ','.join('{}:{:.6g}'.format(orders[int(index)], float(value))
+                        for index, value in pd.Series(masses, index=indices).sort_values(
+                            ascending=False).items())
+    assert substitution_scan._candidate_distribution_label(values, orders) == expected
+
+
 @pytest.mark.parametrize('prepared', [False, True])
 def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground_targets(prepared):
     candidate_events = pd.DataFrame(
