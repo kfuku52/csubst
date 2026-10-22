@@ -217,27 +217,27 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='OC', output_stats=g.get('output_stats'))
         cb, g = omega.calc_omega(cb, OS_tensor_reducer, ON_tensor_reducer, g)
         if bool(g.get('epistasis_enabled', False)):
-            g['df_cb_stats'].at[0, 'epistasis_enabled'] = 'Y'
-            g['df_cb_stats'].at[0, 'epistasis_apply_to'] = str(g.get('epistasis_apply_to', 'N'))
-            g['df_cb_stats'].at[0, 'epistasis_site_metric'] = str(g.get('epistasis_site_metric_resolved', g.get('epistasis_site_metric', 'auto')))
-            g['df_cb_stats'].at[0, 'epistasis_feature_mode'] = str(g.get('epistasis_feature_mode_resolved', g.get('epistasis_feature_mode', 'single')))
-            g['df_cb_stats'].at[0, 'epistasis_beta_partition'] = str(g.get('epistasis_beta_partition', 'global'))
+            g['df_cb_stats'].loc[0, 'epistasis_enabled'] = 'Y'
+            g['df_cb_stats'].loc[0, 'epistasis_apply_to'] = str(g.get('epistasis_apply_to', 'N'))
+            g['df_cb_stats'].loc[0, 'epistasis_site_metric'] = str(g.get('epistasis_site_metric_resolved', g.get('epistasis_site_metric', 'auto')))
+            g['df_cb_stats'].loc[0, 'epistasis_feature_mode'] = str(g.get('epistasis_feature_mode_resolved', g.get('epistasis_feature_mode', 'single')))
+            g['df_cb_stats'].loc[0, 'epistasis_beta_partition'] = str(g.get('epistasis_beta_partition', 'global'))
             epistasis_state = g.get('_epistasis_state', dict())
             epistasis_channels = [channel for channel in ['N', 'S'] if channel in epistasis_state]
             has_s_channel = ('S' in epistasis_channels)
-            g['df_cb_stats'].at[0, 'epistasis_negative_control_S'] = 'Y' if has_s_channel else 'N'
+            g['df_cb_stats'].loc[0, 'epistasis_negative_control_S'] = 'Y' if has_s_channel else 'N'
             if has_s_channel:
                 if epistasis_channels == ['S']:
-                    g['df_cb_stats'].at[0, 'epistasis_negative_control_S_mode'] = 'S_only'
+                    g['df_cb_stats'].loc[0, 'epistasis_negative_control_S_mode'] = 'S_only'
                 else:
-                    g['df_cb_stats'].at[0, 'epistasis_negative_control_S_mode'] = 'NS_with_S'
+                    g['df_cb_stats'].loc[0, 'epistasis_negative_control_S_mode'] = 'NS_with_S'
             for channel in ['N', 'S']:
                 channel_state = g.get('_epistasis_state', dict()).get(channel, None)
                 if channel_state is None:
                     continue
-                g['df_cb_stats'].at[0, 'epistasis_beta_' + channel] = float(channel_state.get('beta', np.nan))
-                g['df_cb_stats'].at[0, 'epistasis_clip_' + channel] = float(channel_state.get('clip', np.nan))
-                g['df_cb_stats'].at[0, 'epistasis_alpha_' + channel] = float(channel_state.get('alpha', np.nan))
+                g['df_cb_stats'].loc[0, 'epistasis_beta_' + channel] = float(channel_state.get('beta', np.nan))
+                g['df_cb_stats'].loc[0, 'epistasis_clip_' + channel] = float(channel_state.get('clip', np.nan))
+                g['df_cb_stats'].loc[0, 'epistasis_alpha_' + channel] = float(channel_state.get('alpha', np.nan))
         if (g['calibrate_longtail']):
             if (g['exhaustive_until'] >= current_arity):
                 cb = omega.calibrate_dsc(
@@ -260,7 +260,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                 status_cols = [c for c in cb.columns if str(c).startswith('calibration_status_')]
                 applied = any((cb[c] == 'applied').any() for c in status_cols) if status_cols else True
                 g['df_cb_stats'].at[0, 'dSC_calibration'] = 'Y' if applied else 'N'
-                g['df_cb_stats'].at[0, 'longtail_method'] = g.get('longtail_method', 'independent_null')
+                g['df_cb_stats'].loc[0, 'longtail_method'] = g.get('longtail_method', 'independent_null')
             else:
                 txt = '--calibrate_longtail is deactivated for arity = {}. '
                 txt += 'This option is effective for the arity range specified by --exhaustive_until.\n'

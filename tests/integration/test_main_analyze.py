@@ -152,6 +152,7 @@ def test_cb_search_uses_direct_generation_for_higher_order_exhaustive_search(mon
     }
 
 
+@pytest.mark.filterwarnings('error:Setting a value on a DataFrame via .at')
 def test_cb_search_recomputes_empirical_pvalues_after_calibration(monkeypatch):
     calls = {
         "recompute": 0,
@@ -326,6 +327,7 @@ def test_cb_search_rejects_invalid_max_arity():
         main_analyze.cb_search(g=g, b=None, OS_tensor=None, ON_tensor=None, id_combinations=None, write_cb=False)
 
 
+@pytest.mark.filterwarnings('error:Setting a value on a DataFrame via .at')
 def test_cb_search_records_epistasis_negative_control_fields(monkeypatch):
     def fake_get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=False, cb_all=False, arity=2,
                                    check_attr=None, verbose=True):
