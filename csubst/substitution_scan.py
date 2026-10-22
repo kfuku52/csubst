@@ -1872,6 +1872,8 @@ def _rate_summary(
     codon_state_ids=None,
     endpoint_context=None,
     exposure_cache=None,
+    *,
+    score_only=False,
 ):
     target_set = set(int(v) for v in np.asarray(target_branch_ids, dtype=np.int64).reshape(-1).tolist())
     branch_ids = branch_meta["branch_id"].astype(int).to_numpy(copy=False)
@@ -1936,6 +1938,27 @@ def _rate_summary(
     other_event = float(event_values[is_other].sum())
     target_exposure = float(exposure[is_target].sum())
     other_exposure = float(exposure[is_other].sum())
+    score, pvalue = scan_statistics.rate_score(
+        x_target=target_event,
+        l_target=target_exposure,
+        x_other=other_event,
+        l_other=other_exposure,
+    )
+    impossible = (event_values > 0) & (exposure == 0)
+    invalid_endpoint = rate_exposure == "endpoint" and impossible[is_target | is_other].any()
+    if invalid_endpoint:
+        score = pvalue = np.nan
+    if score_only:
+        # Assignment calibration consumes only these fields. Share validation,
+        # exposure and score calculations with the full output path so their
+        # failure/no-test semantics cannot drift apart.
+        return {
+            "score_rate_enrichment": score,
+            "target_event_count": target_event,
+            "other_event_count": other_event,
+            "target_exposure": target_exposure,
+            "other_exposure": other_exposure,
+        }
     target_rate = target_event / target_exposure if target_exposure > 0 else np.nan
     other_rate = other_event / other_exposure if other_exposure > 0 else np.nan
     if np.isfinite(target_rate) and np.isfinite(other_rate):
@@ -1945,13 +1968,6 @@ def _rate_summary(
             rate_ratio = target_rate / other_rate
     else:
         rate_ratio = np.nan
-    score, pvalue = scan_statistics.rate_score(
-        x_target=target_event,
-        l_target=target_exposure,
-        x_other=other_event,
-        l_other=other_exposure,
-    )
-    impossible = (event_values > 0) & (exposure == 0)
     if impossible[is_target | is_other].any():
         rate_status = "positive_event_zero_exposure"
         if rate_exposure == "endpoint":
@@ -2676,6 +2692,7 @@ def _candidate_fixed_permutation_scores(
             codon_state_ids=q_context["codon_state_ids"],
             endpoint_context=q_context.get("endpoint_context"),
             exposure_cache=_scan_candidate_cache(scan_static, '_exposure_cache'),
+            score_only=True,
         )
         out[_scan_row_key(row)] = scan_statistics.calibration_score(rate)
     return out

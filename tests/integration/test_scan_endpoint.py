@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from scipy.linalg import expm
 
-from csubst import genetic_code, parser_misc, scan_endpoint, substitution_scan
+from csubst import genetic_code, parser_misc, scan_endpoint, scan_statistics, substitution_scan
 
 
 def context(lengths=(1., 2.), ids=(0, 1, 2)):
@@ -96,6 +96,34 @@ def test_zero_and_missing_reasons_and_positive_count_conflict():
     assert "zero_model_length:1" in out["target_exposure_diagnostics"]
     assert out["rate_status"] == "positive_event_zero_exposure"
     assert np.isnan(out["p_rate_enrichment_asymptotic"])
+
+
+@pytest.mark.parametrize('mode', ['valid', 'zero_target', 'zero_control', 'missing', 'invalid'])
+def test_score_only_preserves_endpoint_validation_and_testability(mode):
+    lengths = (0., 1.) if mode == 'zero_target' else (1., 0.) if mode == 'zero_control' else (1., 2.)
+    g, meta, ids = context(lengths)
+    ctx = scan_endpoint.build_context(g, meta, ids)
+    if mode == 'missing':
+        g['state_cdn'][1] = 0
+    elif mode == 'invalid':
+        g['state_cdn'][0, 0, 0] = -1
+    options = dict(candidate_events=pd.DataFrame(dict(branch_id=[1, 2], event_pp=[.5, .25])),
+                   branch_meta=meta, state_nsy=g['state_nsy'], state_cdn=g['state_cdn'],
+                   site=0, from_ids=[0], to_ids=[2], target_branch_ids=[1], rate_length='raw',
+                   rate_exposure='endpoint', endpoint_context=ctx)
+    if mode == 'invalid':
+        for score_only in (False, True):
+            with pytest.raises(ValueError, match='finite and nonnegative'):
+                substitution_scan._rate_summary(**options, score_only=score_only)
+        return
+    full = substitution_scan._rate_summary(**options)
+    compact = substitution_scan._rate_summary(**options, score_only=True)
+    keys = ('score_rate_enrichment', 'target_event_count', 'other_event_count',
+            'target_exposure', 'other_exposure')
+    np.testing.assert_equal(compact, {key: full[key] for key in keys})
+    assert scan_statistics.calibration_score(compact) == scan_statistics.calibration_score(full)
+    if mode != 'valid':
+        assert scan_statistics.calibration_score(compact) == -np.inf
 
 
 def test_disconnected_and_zero_source_mass_are_distinguished():
