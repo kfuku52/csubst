@@ -1,0 +1,285 @@
+{
+  "proposal": 10,
+  "environment": {
+    "commit": "88528ce21dd4093365205576e163fae311dd819a",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "source_function_sha256": {
+    "select": "e5468163de7864f7011fc9d08508024c9b7c02cf58a1dc1cd71fa1545fdf8054",
+    "predict_score": "8001b11812dd39443349fe4fa41bdc7e3fd6a1b46df5d828357c3fd593c6ba7b"
+  },
+  "command": "python reports/performance_round2_20261022/proposal10.py",
+  "scope": "full nested crossfit stage; fully synthetic inputs, not a CLI or biological calibration",
+  "warmups": 1,
+  "measured_repeats": 3,
+  "memory_scope": "cache retained array payload bytes; Python metadata and process peak RSS not measured",
+  "edge_checks": [
+    {
+      "case": "normal",
+      "exact_outcome": true,
+      "outcome": "ok"
+    },
+    {
+      "case": "zero_context",
+      "exact_outcome": true,
+      "outcome": "ok"
+    },
+    {
+      "case": "zero_events",
+      "exact_outcome": true,
+      "outcome": "ok"
+    },
+    {
+      "case": "masked",
+      "exact_outcome": true,
+      "outcome": "ok"
+    },
+    {
+      "case": "buffer",
+      "exact_outcome": true,
+      "outcome": "ok"
+    },
+    {
+      "case": "depth_bins",
+      "exact_outcome": true,
+      "outcome": "ok"
+    },
+    {
+      "case": "readonly",
+      "exact_outcome": true,
+      "outcome": "ok"
+    },
+    {
+      "case": "undefined",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "case": "nonfinite",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "case": "overflow_beta_zero",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "case": "fixed",
+      "exact_outcome": true,
+      "outcome": "ok"
+    },
+    {
+      "case": "insufficient",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "case": "outer_heldout_response_independence",
+      "exact_outcome": true
+    },
+    {
+      "case": "buffer_response_independence",
+      "exact_outcome": true
+    },
+    {
+      "case": "combined_cache_byte_eviction",
+      "exact_outcome": true
+    },
+    {
+      "case": "independent_direct_softmax",
+      "rtol": 1e-14,
+      "exact_outcome": false
+    }
+  ],
+  "cases": {
+    "PGK_shape": {
+      "shape": [
+        64,
+        417
+      ],
+      "input": "entirely synthetic Poisson counts and independent Gaussian context/features",
+      "groups": 5,
+      "partitions": 1,
+      "context_dimensions": 2,
+      "grid_candidates": 744,
+      "exact_all_crossfit_arrays_and_diagnostics": true,
+      "cache": {
+        "prior_log_conversions": 160,
+        "heldout_builds": 40,
+        "selection_calls": 10,
+        "cache_hits": 61160,
+        "cache_misses": 280,
+        "evictions": 0,
+        "peak_retained_array_bytes": 930176,
+        "cache_limit_array_bytes": 33554432,
+        "baseline_retained_array_bytes_derived": 867360,
+        "additional_retained_array_bytes_derived": 62816
+      },
+      "runs": {
+        "before": [
+          {
+            "wall_s": 1.8783598749432713,
+            "cpu_s": 1.8470890000000004
+          },
+          {
+            "wall_s": 1.9918255000375211,
+            "cpu_s": 1.9548140000000007
+          },
+          {
+            "wall_s": 2.10724320798181,
+            "cpu_s": 1.995749
+          }
+        ],
+        "cached": [
+          {
+            "wall_s": 1.0625746250152588,
+            "cpu_s": 1.0457409999999996
+          },
+          {
+            "wall_s": 1.1548957909690216,
+            "cpu_s": 1.1126699999999996
+          },
+          {
+            "wall_s": 1.702141541056335,
+            "cpu_s": 1.3449160000000013
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 1.9918255000375211,
+            "min": 1.8783598749432713,
+            "max": 2.10724320798181
+          },
+          "cpu_s": {
+            "median": 1.9548140000000007,
+            "min": 1.8470890000000004,
+            "max": 1.995749
+          }
+        },
+        "cached": {
+          "wall_s": {
+            "median": 1.1548957909690216,
+            "min": 1.0625746250152588,
+            "max": 1.702141541056335
+          },
+          "cpu_s": {
+            "median": 1.1126699999999996,
+            "min": 1.0457409999999996,
+            "max": 1.3449160000000013
+          }
+        }
+      },
+      "input_array_sha256": {
+        "counts": "43993dac398fc793394c0ef6962a0a4e05e979426c00682f2a73e8b891370ad6",
+        "context": "5ef48d787d7e5788da523084b8d243a22caffbbbdf40ebcaeadc41067dfb0593",
+        "features": "971df75e5fd6c524fc8de1113242513e421b44f4126ddcf992b1ea3bbbcbec8a",
+        "masks": "aafca4b3e00e72f730a21bef74aa0a091deaa56ed7b2a4dca6c50a109b224325",
+        "groups": "6e1add0e206f5c24eee64c6166eb1e878a6a84eca57a8d18a57ab010adbde45f",
+        "partitions": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+      }
+    },
+    "PEPC_shape": {
+      "shape": [
+        140,
+        971
+      ],
+      "input": "entirely synthetic Poisson counts and independent Gaussian context/features",
+      "groups": 5,
+      "partitions": 1,
+      "context_dimensions": 2,
+      "grid_candidates": 744,
+      "exact_all_crossfit_arrays_and_diagnostics": true,
+      "cache": {
+        "prior_log_conversions": 160,
+        "heldout_builds": 40,
+        "selection_calls": 10,
+        "cache_hits": 61160,
+        "cache_misses": 280,
+        "evictions": 0,
+        "peak_retained_array_bytes": 4663104,
+        "cache_limit_array_bytes": 33554432,
+        "baseline_retained_array_bytes_derived": 4350080,
+        "additional_retained_array_bytes_derived": 313024
+      },
+      "runs": {
+        "before": [
+          {
+            "wall_s": 9.342787415953353,
+            "cpu_s": 8.379688000000002
+          },
+          {
+            "wall_s": 8.438433124916628,
+            "cpu_s": 7.787379999999999
+          },
+          {
+            "wall_s": 7.465054792002775,
+            "cpu_s": 7.426158999999998
+          }
+        ],
+        "cached": [
+          {
+            "wall_s": 3.9205919170053676,
+            "cpu_s": 3.861657000000001
+          },
+          {
+            "wall_s": 3.7973276670090854,
+            "cpu_s": 3.766937999999996
+          },
+          {
+            "wall_s": 3.8050093749770895,
+            "cpu_s": 3.7231549999999913
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 8.438433124916628,
+            "min": 7.465054792002775,
+            "max": 9.342787415953353
+          },
+          "cpu_s": {
+            "median": 7.787379999999999,
+            "min": 7.426158999999998,
+            "max": 8.379688000000002
+          }
+        },
+        "cached": {
+          "wall_s": {
+            "median": 3.8050093749770895,
+            "min": 3.7973276670090854,
+            "max": 3.9205919170053676
+          },
+          "cpu_s": {
+            "median": 3.766937999999996,
+            "min": 3.7231549999999913,
+            "max": 3.861657000000001
+          }
+        }
+      },
+      "input_array_sha256": {
+        "counts": "a5c1b3ae1a8bdc54bf8de73d78902a7bd35138f7f5c1387b3ac2dd21901a3eea",
+        "context": "b8c54e86c593364f19c177c91401ba572983569fb5f9d481d275031d2f318b45",
+        "features": "06c05421ee41484f55d4c735e7e5e113e46b6e6146926a1a045299a1cf441084",
+        "masks": "191013f50e27b054bfb0cc10cb041ac51342189c0833e9052758ad93a54a520f",
+        "groups": "f9e2ef39ffc39c1dc578108bc0f1d549698ad50d523f429cc2e3b8f38415812b",
+        "partitions": "5cc201eb697e57027dcf74bac0995467bc9b787848be4c0d740956a97ddf65a5"
+      }
+    }
+  },
+  "existing_tests": {
+    "command": "pytest -q tests/unit/test_omega_epistasis.py --disable-warnings",
+    "backend": "private _select replaced with proposal10",
+    "exit_code": 0,
+    "summary": "22 passed in 0.71s"
+  }
+}

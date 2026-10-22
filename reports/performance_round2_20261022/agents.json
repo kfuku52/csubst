@@ -1,0 +1,100 @@
+{
+  "baseline_commit": "88528ce21dd4093365205576e163fae311dd819a",
+  "baseline_version": "1.16.21",
+  "separate_proposal_agents": 10,
+  "active_child_limit": 3,
+  "benchmark_serialization": "bench_common.benchmark_lock",
+  "production_modified": false,
+  "agents": [
+    {
+      "proposal": 1,
+      "agent": "/root/round2_proposal01",
+      "status": "completed",
+      "verdict": "defer",
+      "report": "proposal01.md",
+      "measurements": "proposal01.json",
+      "harness": "proposal01.py"
+    },
+    {
+      "proposal": 2,
+      "agent": "/root/round2_proposal02",
+      "status": "completed",
+      "verdict": "candidate",
+      "report": "proposal02.md",
+      "measurements": "proposal02.json",
+      "harness": "proposal02.py"
+    },
+    {
+      "proposal": 3,
+      "agent": "/root/round2_proposal03",
+      "status": "completed",
+      "verdict": "conditional",
+      "report": "proposal03.md",
+      "measurements": "proposal03.json",
+      "harness": "proposal03.py"
+    },
+    {
+      "proposal": 4,
+      "agent": "/root/round2_proposal04",
+      "status": "completed",
+      "verdict": "conditional",
+      "report": "proposal04.md",
+      "measurements": "proposal04.json",
+      "harness": "proposal04.py"
+    },
+    {
+      "proposal": 5,
+      "agent": "/root/round2_proposal05",
+      "status": "completed",
+      "verdict": "conditional_memory_only",
+      "report": "proposal05.md",
+      "measurements": "proposal05.json",
+      "harness": "proposal05.py"
+    },
+    {
+      "proposal": 6,
+      "agent": "/root/round2_proposal06",
+      "status": "completed",
+      "verdict": "conditional_large_query_count",
+      "report": "proposal06.md",
+      "measurements": "proposal06.json",
+      "harness": "proposal06.py"
+    },
+    {
+      "proposal": 7,
+      "agent": "/root/round2_proposal07",
+      "status": "completed",
+      "verdict": "defer",
+      "report": "proposal07.md",
+      "measurements": "proposal07.json",
+      "harness": "proposal07.py"
+    },
+    {
+      "proposal": 8,
+      "agent": "/root/round2_proposal08",
+      "status": "completed",
+      "verdict": "defer",
+      "report": "proposal08.md",
+      "measurements": "proposal08.json",
+      "harness": "proposal08.py"
+    },
+    {
+      "proposal": 9,
+      "agent": "/root/round2_proposal09",
+      "status": "completed",
+      "verdict": "defer",
+      "report": "proposal09.md",
+      "measurements": "proposal09.json",
+      "harness": "proposal09.py"
+    },
+    {
+      "proposal": 10,
+      "agent": "/root/round2_proposal10",
+      "status": "completed",
+      "verdict": "conditional_synthetic_cv",
+      "report": "proposal10.md",
+      "measurements": "proposal10.json",
+      "harness": "proposal10.py"
+    }
+  ]
+}

@@ -1,0 +1,451 @@
+{
+  "proposal": 7,
+  "environment": {
+    "commit": "88528ce21dd4093365205576e163fae311dd819a",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "source_function_sha256": "0a1490349829984320143f77addc0e49aa8c6835a0ec7a1503da1732786bac1a",
+  "scope": "joint inference stage including cold product/transition construction and disk output; not whole CLI",
+  "warmups": 1,
+  "measured_repeats": 3,
+  "memory_scope": "cache array byte accounting, not process RSS; both retained transition and product charged",
+  "cases": {
+    "PGK": {
+      "input_sha256": {
+        "PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+        "PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03"
+      },
+      "shape": [
+        65,
+        417,
+        61
+      ],
+      "rates": [
+        0.265,
+        0.3789,
+        0.8278,
+        1.7853
+      ],
+      "weights": [
+        0.0091,
+        0.0315,
+        0.7594,
+        0.2
+      ],
+      "requested_block_size": 64,
+      "disk_backed": true,
+      "parity": {
+        "all_outputs_bitwise_exact": true,
+        "asserted_values": 19139916,
+        "cache": {
+          "hits": 1536,
+          "misses": 256,
+          "retained_product_bytes": 7620608,
+          "accounted_array_bytes": 15241216,
+          "peak_accounted_array_bytes": 15241216,
+          "limit_array_bytes": 33554432,
+          "entries": 256
+        }
+      },
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.5185793749988079,
+            "cpu_s": 0.49900500000000036
+          },
+          {
+            "wall_s": 0.4788272910518572,
+            "cpu_s": 0.4673449999999999
+          },
+          {
+            "wall_s": 0.5337818330153823,
+            "cpu_s": 0.4747570000000003
+          }
+        ],
+        "cached": [
+          {
+            "wall_s": 0.7848994160303846,
+            "cpu_s": 0.5120990000000001
+          },
+          {
+            "wall_s": 0.4728548750281334,
+            "cpu_s": 0.460318
+          },
+          {
+            "wall_s": 0.46753116708714515,
+            "cpu_s": 0.44529700000000005
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.5185793749988079,
+            "min": 0.4788272910518572,
+            "max": 0.5337818330153823
+          },
+          "cpu_s": {
+            "median": 0.4747570000000003,
+            "min": 0.4673449999999999,
+            "max": 0.49900500000000036
+          }
+        },
+        "cached": {
+          "wall_s": {
+            "median": 0.4728548750281334,
+            "min": 0.46753116708714515,
+            "max": 0.7848994160303846
+          },
+          "cpu_s": {
+            "median": 0.460318,
+            "min": 0.44529700000000005,
+            "max": 0.5120990000000001
+          }
+        }
+      },
+      "cache": {
+        "hits": 1536,
+        "misses": 256,
+        "retained_product_bytes": 7620608,
+        "accounted_array_bytes": 15241216,
+        "peak_accounted_array_bytes": 15241216,
+        "limit_array_bytes": 33554432,
+        "entries": 256
+      }
+    },
+    "PEPC": {
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "shape": [
+        141,
+        971,
+        61
+      ],
+      "rates": [
+        0.0989,
+        0.437,
+        0.4477,
+        1.0476
+      ],
+      "weights": [
+        0.017,
+        0.0116,
+        0.0407,
+        0.9307
+      ],
+      "requested_block_size": 64,
+      "disk_backed": true,
+      "parity": {
+        "all_outputs_bitwise_exact": true,
+        "asserted_values": 96663028,
+        "cache": {
+          "hits": 11760,
+          "misses": 560,
+          "retained_product_bytes": 16670080,
+          "accounted_array_bytes": 33340160,
+          "peak_accounted_array_bytes": 33340160,
+          "limit_array_bytes": 33554432,
+          "entries": 560
+        }
+      },
+      "runs": {
+        "before": [
+          {
+            "wall_s": 2.9301612919662148,
+            "cpu_s": 2.596734999999999
+          },
+          {
+            "wall_s": 3.0616933749988675,
+            "cpu_s": 2.6972270000000016
+          },
+          {
+            "wall_s": 3.192724540946074,
+            "cpu_s": 2.7286089999999987
+          }
+        ],
+        "cached": [
+          {
+            "wall_s": 2.9446236670482904,
+            "cpu_s": 2.528955
+          },
+          {
+            "wall_s": 4.025714625022374,
+            "cpu_s": 2.869888999999997
+          },
+          {
+            "wall_s": 3.550533250090666,
+            "cpu_s": 2.9997490000000013
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 3.0616933749988675,
+            "min": 2.9301612919662148,
+            "max": 3.192724540946074
+          },
+          "cpu_s": {
+            "median": 2.6972270000000016,
+            "min": 2.596734999999999,
+            "max": 2.7286089999999987
+          }
+        },
+        "cached": {
+          "wall_s": {
+            "median": 3.550533250090666,
+            "min": 2.9446236670482904,
+            "max": 4.025714625022374
+          },
+          "cpu_s": {
+            "median": 2.869888999999997,
+            "min": 2.528955,
+            "max": 2.9997490000000013
+          }
+        }
+      },
+      "cache": {
+        "hits": 11760,
+        "misses": 560,
+        "retained_product_bytes": 16670080,
+        "accounted_array_bytes": 33340160,
+        "peak_accounted_array_bytes": 33340160,
+        "limit_array_bytes": 33554432,
+        "entries": 560
+      }
+    }
+  },
+  "edge_checks": [
+    {
+      "mode": "normal",
+      "disk_backed": false,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 734,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "normal",
+      "disk_backed": true,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 734,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "missing",
+      "disk_backed": false,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 734,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "missing",
+      "disk_backed": true,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 734,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "ambiguous",
+      "disk_backed": false,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 734,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "ambiguous",
+      "disk_backed": true,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 734,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "zero_q",
+      "disk_backed": false,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 734,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "zero_q",
+      "disk_backed": true,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 734,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "no_summary",
+      "disk_backed": false,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 315,
+      "cache": null
+    },
+    {
+      "mode": "no_summary",
+      "disk_backed": true,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 315,
+      "cache": null
+    },
+    {
+      "mode": "eligible",
+      "disk_backed": false,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 779,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "eligible",
+      "disk_backed": true,
+      "all_outputs_bitwise_exact": true,
+      "asserted_values": 779,
+      "cache": {
+        "hits": 29,
+        "misses": 7,
+        "retained_product_bytes": 504,
+        "accounted_array_bytes": 1008,
+        "peak_accounted_array_bytes": 1008,
+        "limit_array_bytes": 33554432,
+        "entries": 7
+      }
+    },
+    {
+      "mode": "negative_tip",
+      "same_error": [
+        "ValueError",
+        "Endpoint tip likelihoods must be equal-sized, finite and nonnegative."
+      ]
+    },
+    {
+      "mode": "nan_tip",
+      "same_error": [
+        "ValueError",
+        "Endpoint tip likelihoods must be equal-sized, finite and nonnegative."
+      ]
+    },
+    {
+      "mode": "bad_q",
+      "same_error": [
+        "ValueError",
+        "Endpoint Q must be a generator stationary for pi."
+      ]
+    },
+    {
+      "mode": "bad_pi",
+      "same_error": [
+        "ValueError",
+        "Invalid endpoint Q or root frequencies."
+      ]
+    },
+    {
+      "mode": "bad_block",
+      "same_error": [
+        "ValueError",
+        "Endpoint block size must be a positive integer."
+      ]
+    },
+    {
+      "mode": "identity_byte_eviction",
+      "cache": {
+        "hits": 1,
+        "misses": 2,
+        "retained_product_bytes": 72,
+        "accounted_array_bytes": 144,
+        "peak_accounted_array_bytes": 144,
+        "limit_array_bytes": 144,
+        "entries": 1
+      }
+    }
+  ]
+}

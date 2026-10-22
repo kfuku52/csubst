@@ -1,0 +1,1731 @@
+{
+  "proposal": 8,
+  "environment": {
+    "commit": "88528ce21dd4093365205576e163fae311dd819a",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "command": "python reports/performance_round2_20261022/proposal08.py",
+  "source_function_sha256": "fa029d05413a645e536fe4c6b7a396d7323893f4eb58b3a0aca385e178c2f8b8",
+  "scope": "support reducer batches; one cold prepared plan construction per batch; not whole CLI",
+  "memory_scope": "retained array bytes only, excluding Python objects and temporary arrays; RSS not measured",
+  "warmups": 1,
+  "measured_repeats": 5,
+  "edge_checks": [
+    {
+      "plan": "empty_units",
+      "event": "ordinary",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "ordinary",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "ordinary",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "ordinary",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "ordinary",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "ordinary",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "ordinary",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "ordinary",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "empty",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "empty",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "empty",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "empty",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "empty",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "empty",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "empty",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "empty",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "nan_zero_negative",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "nan_zero_negative",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "nan_zero_negative",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "nan_zero_negative",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "nan_zero_negative",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "nan_zero_negative",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "nan_zero_negative",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "nan_zero_negative",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "inf",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "inf",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "inf",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "inf",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "inf",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "inf",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "inf",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "inf",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "compensated_duplicates",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "compensated_duplicates",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "compensated_duplicates",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "compensated_duplicates",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "compensated_duplicates",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "compensated_duplicates",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "compensated_duplicates",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_units",
+      "event": "compensated_duplicates",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "ordinary",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "ordinary",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "ordinary",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "ordinary",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "ordinary",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "ordinary",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "ordinary",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "ordinary",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "empty",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "empty",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "empty",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "empty",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "empty",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "empty",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "empty",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "empty",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "nan_zero_negative",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "nan_zero_negative",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "nan_zero_negative",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "nan_zero_negative",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "nan_zero_negative",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "nan_zero_negative",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "nan_zero_negative",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "nan_zero_negative",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "inf",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "inf",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "inf",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "inf",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "inf",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "inf",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "inf",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "inf",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "compensated_duplicates",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "compensated_duplicates",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "compensated_duplicates",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "compensated_duplicates",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "compensated_duplicates",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "compensated_duplicates",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "compensated_duplicates",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "empty_memberships",
+      "event": "compensated_duplicates",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "ordinary",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "ordinary",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "ordinary",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "ordinary",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "ordinary",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "ordinary",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "ordinary",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "ordinary",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "empty",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "empty",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "empty",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "empty",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "empty",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "empty",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "empty",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "empty",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "nan_zero_negative",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "nan_zero_negative",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "nan_zero_negative",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "nan_zero_negative",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "nan_zero_negative",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "nan_zero_negative",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "nan_zero_negative",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "nan_zero_negative",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "inf",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "inf",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "inf",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "inf",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "inf",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "inf",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "inf",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "inf",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "compensated_duplicates",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "compensated_duplicates",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "compensated_duplicates",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "compensated_duplicates",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "compensated_duplicates",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "compensated_duplicates",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "compensated_duplicates",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "mixed_empty",
+      "event": "compensated_duplicates",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "ordinary",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "ordinary",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "ordinary",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "ordinary",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "ordinary",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "ordinary",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "ordinary",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "ordinary",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "empty",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "empty",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "empty",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "empty",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "empty",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "empty",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "empty",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "empty",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "nan_zero_negative",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "nan_zero_negative",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "nan_zero_negative",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "nan_zero_negative",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "nan_zero_negative",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "nan_zero_negative",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "nan_zero_negative",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "nan_zero_negative",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "inf",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "inf",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "inf",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "inf",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "inf",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "inf",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "inf",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "inf",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "compensated_duplicates",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "compensated_duplicates",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "compensated_duplicates",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "compensated_duplicates",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "compensated_duplicates",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "compensated_duplicates",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "compensated_duplicates",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "duplicates_and_gaps",
+      "event": "compensated_duplicates",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "ordinary",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "ordinary",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "ordinary",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "ordinary",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "ordinary",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "ordinary",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "ordinary",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "ordinary",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "empty",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "empty",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "empty",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "empty",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "empty",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "empty",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "empty",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "empty",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "nan_zero_negative",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "nan_zero_negative",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "nan_zero_negative",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "nan_zero_negative",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "nan_zero_negative",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "nan_zero_negative",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "nan_zero_negative",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "nan_zero_negative",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "inf",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "inf",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "inf",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "inf",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "inf",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "inf",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "inf",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "inf",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "compensated_duplicates",
+      "threshold": "0.0",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "compensated_duplicates",
+      "threshold": "0.5",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "compensated_duplicates",
+      "threshold": "0.49999999999999994",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "compensated_duplicates",
+      "threshold": "0.5000000000000001",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "compensated_duplicates",
+      "threshold": "nan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "compensated_duplicates",
+      "threshold": "inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "compensated_duplicates",
+      "threshold": "-inf",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "plan": "lineage_csv",
+      "event": "compensated_duplicates",
+      "threshold": "bad",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "case": "bad_target",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "case": "bad_event_column",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "case": "bad_unit_id",
+      "exact_outcome": true,
+      "outcome": "error"
+    },
+    {
+      "case": "none_plan",
+      "exact_outcome": true,
+      "outcome": "result"
+    },
+    {
+      "case": "independent_hand_calculated_support_oracle",
+      "exact_outcome": true
+    }
+  ],
+  "cases": {
+    "PGK": {
+      "call_count": 198,
+      "exact_fields_types": true,
+      "path_trace": {
+        "prepared_calls": 198,
+        "segmented_max_calls": 198,
+        "plan_count": 1,
+        "extra_retained_array_bytes": 432
+      },
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.024346208083443344,
+            "cpu_s": 0.02413299999999996
+          },
+          {
+            "wall_s": 0.02409787499345839,
+            "cpu_s": 0.023896999999999835
+          },
+          {
+            "wall_s": 0.02194920799229294,
+            "cpu_s": 0.021930999999999923
+          },
+          {
+            "wall_s": 0.021848833071999252,
+            "cpu_s": 0.02182800000000018
+          },
+          {
+            "wall_s": 0.021199417067691684,
+            "cpu_s": 0.021198999999999746
+          }
+        ],
+        "segmented": [
+          {
+            "wall_s": 0.026784125017002225,
+            "cpu_s": 0.026388999999999996
+          },
+          {
+            "wall_s": 0.025205917074345052,
+            "cpu_s": 0.025090000000000057
+          },
+          {
+            "wall_s": 0.025348458089865744,
+            "cpu_s": 0.025036000000000058
+          },
+          {
+            "wall_s": 0.02336125005967915,
+            "cpu_s": 0.023334999999999884
+          },
+          {
+            "wall_s": 0.02349499997217208,
+            "cpu_s": 0.023478999999999584
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.02194920799229294,
+            "min": 0.021199417067691684,
+            "max": 0.024346208083443344
+          },
+          "cpu_s": {
+            "median": 0.021930999999999923,
+            "min": 0.021198999999999746,
+            "max": 0.02413299999999996
+          }
+        },
+        "segmented": {
+          "wall_s": {
+            "median": 0.025205917074345052,
+            "min": 0.02336125005967915,
+            "max": 0.026784125017002225
+          },
+          "cpu_s": {
+            "median": 0.025036000000000058,
+            "min": 0.023334999999999884,
+            "max": 0.026388999999999996
+          }
+        }
+      },
+      "unit_counts": [
+        2
+      ],
+      "membership_counts": [
+        16
+      ],
+      "maximum_membership_per_unit": 15,
+      "input_sha256": {
+        "PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+        "PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03"
+      }
+    },
+    "PEPC": {
+      "call_count": 546,
+      "exact_fields_types": true,
+      "path_trace": {
+        "prepared_calls": 546,
+        "segmented_max_calls": 546,
+        "plan_count": 1,
+        "extra_retained_array_bytes": 576
+      },
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.06279354100115597,
+            "cpu_s": 0.06257900000000038
+          },
+          {
+            "wall_s": 0.060472542070783675,
+            "cpu_s": 0.06039300000000036
+          },
+          {
+            "wall_s": 0.06399770802818239,
+            "cpu_s": 0.06344999999999956
+          },
+          {
+            "wall_s": 0.06536395801231265,
+            "cpu_s": 0.06462499999999949
+          },
+          {
+            "wall_s": 0.06311300001107156,
+            "cpu_s": 0.0628700000000002
+          }
+        ],
+        "segmented": [
+          {
+            "wall_s": 0.06279275007545948,
+            "cpu_s": 0.0627930000000001
+          },
+          {
+            "wall_s": 0.07106770796235651,
+            "cpu_s": 0.06750300000000031
+          },
+          {
+            "wall_s": 0.0671431670198217,
+            "cpu_s": 0.06643199999999982
+          },
+          {
+            "wall_s": 0.0694734159624204,
+            "cpu_s": 0.06858400000000042
+          },
+          {
+            "wall_s": 0.06331645895261317,
+            "cpu_s": 0.06331699999999962
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.06311300001107156,
+            "min": 0.060472542070783675,
+            "max": 0.06536395801231265
+          },
+          "cpu_s": {
+            "median": 0.0628700000000002,
+            "min": 0.06039300000000036,
+            "max": 0.06462499999999949
+          }
+        },
+        "segmented": {
+          "wall_s": {
+            "median": 0.0671431670198217,
+            "min": 0.06279275007545948,
+            "max": 0.07106770796235651
+          },
+          "cpu_s": {
+            "median": 0.06643199999999982,
+            "min": 0.0627930000000001,
+            "max": 0.06858400000000042
+          }
+        }
+      },
+      "unit_counts": [
+        9
+      ],
+      "membership_counts": [
+        15
+      ],
+      "maximum_membership_per_unit": 5,
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      }
+    }
+  },
+  "synthetic_large_membership": {
+    "call_count": 40,
+    "exact_fields_types": true,
+    "path_trace": {
+      "prepared_calls": 40,
+      "segmented_max_calls": 40,
+      "plan_count": 1,
+      "extra_retained_array_bytes": 340800
+    },
+    "runs": {
+      "before": [
+        {
+          "wall_s": 0.12434187496546656,
+          "cpu_s": 0.12426099999999973
+        },
+        {
+          "wall_s": 0.1277615410508588,
+          "cpu_s": 0.12744800000000023
+        },
+        {
+          "wall_s": 0.13158987497445196,
+          "cpu_s": 0.1311409999999995
+        },
+        {
+          "wall_s": 0.12419287499506027,
+          "cpu_s": 0.1232540000000002
+        },
+        {
+          "wall_s": 0.1289678750326857,
+          "cpu_s": 0.12869399999999942
+        }
+      ],
+      "segmented": [
+        {
+          "wall_s": 0.046625291113741696,
+          "cpu_s": 0.0465870000000006
+        },
+        {
+          "wall_s": 0.04545741598121822,
+          "cpu_s": 0.045395999999999326
+        },
+        {
+          "wall_s": 0.046915207989513874,
+          "cpu_s": 0.04675600000000024
+        },
+        {
+          "wall_s": 0.042239250033162534,
+          "cpu_s": 0.04222500000000018
+        },
+        {
+          "wall_s": 0.04698687500786036,
+          "cpu_s": 0.046931999999999974
+        }
+      ]
+    },
+    "summary": {
+      "before": {
+        "wall_s": {
+          "median": 0.1277615410508588,
+          "min": 0.12419287499506027,
+          "max": 0.13158987497445196
+        },
+        "cpu_s": {
+          "median": 0.12744800000000023,
+          "min": 0.1232540000000002,
+          "max": 0.1311409999999995
+        }
+      },
+      "segmented": {
+        "wall_s": {
+          "median": 0.046625291113741696,
+          "min": 0.042239250033162534,
+          "max": 0.04698687500786036
+        },
+        "cpu_s": {
+          "median": 0.0465870000000006,
+          "min": 0.04222500000000018,
+          "max": 0.046931999999999974
+        }
+      }
+    },
+    "unit_count": 200,
+    "memberships": 20000,
+    "unique_branch_ids": 2000,
+    "description": "artificial large overlapping unit memberships; not a biological replicate"
+  }
+}

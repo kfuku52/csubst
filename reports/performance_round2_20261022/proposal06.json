@@ -1,0 +1,475 @@
+{
+  "proposal": "06: prepared sorted common maxT reference with exact boundary checks",
+  "environment": {
+    "commit": "88528ce21dd4093365205576e163fae311dd819a",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "baseline_commit": "88528ce",
+  "production_modified": false,
+  "warmups": 1,
+  "measured_repeats": 5,
+  "source_function_sha256": "d5bbf6b315f46e08b562b0bb3b63ff2d0c3dac4404f8a3469482258ee0c291cc",
+  "scope": "final maxT query stage only; not permutation evaluation or whole CLI",
+  "cases": {
+    "PGK": {
+      "queries": 13,
+      "reference_draws": 20,
+      "exact_enumeration": false,
+      "inner_batches_per_sample": 141,
+      "scope": "common maxT final-tail batch; validation, float conversion and sort preparation included",
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.00018825207123572522,
+            "cpu_s": 0.00018597163120567196
+          },
+          {
+            "wall_s": 0.00020540602825555606,
+            "cpu_s": 0.00018641843971631286
+          },
+          {
+            "wall_s": 0.00019230260282543534,
+            "cpu_s": 0.00018524113475177308
+          },
+          {
+            "wall_s": 0.00019477009987920946,
+            "cpu_s": 0.00018612056737588663
+          },
+          {
+            "wall_s": 0.0002050413692317216,
+            "cpu_s": 0.00019081560283687755
+          }
+        ],
+        "prepared": [
+          {
+            "wall_s": 4.448611305775583e-05,
+            "cpu_s": 4.143971631205704e-05
+          },
+          {
+            "wall_s": 4.1072985903749654e-05,
+            "cpu_s": 4.093617021276516e-05
+          },
+          {
+            "wall_s": 4.117819150341741e-05,
+            "cpu_s": 4.104964539007024e-05
+          },
+          {
+            "wall_s": 3.9778369089179004e-05,
+            "cpu_s": 3.978014184397303e-05
+          },
+          {
+            "wall_s": 4.125945435189609e-05,
+            "cpu_s": 4.119858156028493e-05
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.00019477009987920946,
+            "min": 0.00018825207123572522,
+            "max": 0.00020540602825555606
+          },
+          "cpu_s": {
+            "median": 0.00018612056737588663,
+            "min": 0.00018524113475177308,
+            "max": 0.00019081560283687755
+          }
+        },
+        "prepared": {
+          "wall_s": {
+            "median": 4.117819150341741e-05,
+            "min": 3.9778369089179004e-05,
+            "max": 4.448611305775583e-05
+          },
+          "cpu_s": {
+            "median": 4.104964539007024e-05,
+            "min": 3.978014184397303e-05,
+            "max": 4.143971631205704e-05
+          }
+        }
+      },
+      "strict_array_and_bytes_equal": true,
+      "sorted_reference_bytes": 160,
+      "returned_output_bytes": 104,
+      "memory_scope": "array sizes only, not process peak RSS; query scratch also scales with query count",
+      "input_sha256": {
+        "PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+        "PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03"
+      },
+      "captured_from_real_full_scan": true,
+      "candidate_rows_plus_global_query": 13,
+      "capture_successful_trials": 20
+    },
+    "PEPC": {
+      "queries": 104,
+      "reference_draws": 20,
+      "exact_enumeration": false,
+      "inner_batches_per_sample": 8,
+      "scope": "common maxT final-tail batch; validation, float conversion and sort preparation included",
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.0020549011242110282,
+            "cpu_s": 0.0018525000000000347
+          },
+          {
+            "wall_s": 0.0027933021337958053,
+            "cpu_s": 0.0020741250000000377
+          },
+          {
+            "wall_s": 0.002847026116796769,
+            "cpu_s": 0.0027722500000000316
+          },
+          {
+            "wall_s": 0.0014641875022789463,
+            "cpu_s": 0.0014642499999999448
+          },
+          {
+            "wall_s": 0.001778151112375781,
+            "cpu_s": 0.0016266249999998816
+          }
+        ],
+        "prepared": [
+          {
+            "wall_s": 6.318750092759728e-05,
+            "cpu_s": 6.299999999992423e-05
+          },
+          {
+            "wall_s": 0.0015557187580270693,
+            "cpu_s": 0.00012999999999996348
+          },
+          {
+            "wall_s": 6.539588503073901e-05,
+            "cpu_s": 6.525000000001668e-05
+          },
+          {
+            "wall_s": 0.00014244263002183288,
+            "cpu_s": 0.00014225000000012145
+          },
+          {
+            "wall_s": 0.0002756197500275448,
+            "cpu_s": 0.00011074999999993729
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.0020549011242110282,
+            "min": 0.0014641875022789463,
+            "max": 0.002847026116796769
+          },
+          "cpu_s": {
+            "median": 0.0018525000000000347,
+            "min": 0.0014642499999999448,
+            "max": 0.0027722500000000316
+          }
+        },
+        "prepared": {
+          "wall_s": {
+            "median": 0.00014244263002183288,
+            "min": 6.318750092759728e-05,
+            "max": 0.0015557187580270693
+          },
+          "cpu_s": {
+            "median": 0.00011074999999993729,
+            "min": 6.299999999992423e-05,
+            "max": 0.00014225000000012145
+          }
+        }
+      },
+      "strict_array_and_bytes_equal": true,
+      "sorted_reference_bytes": 160,
+      "returned_output_bytes": 832,
+      "memory_scope": "array sizes only, not process peak RSS; query scratch also scales with query count",
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "captured_from_real_full_scan": true,
+      "candidate_rows_plus_global_query": 104,
+      "capture_successful_trials": 20
+    },
+    "synthetic_103_queries_1000_draws": {
+      "queries": 103,
+      "reference_draws": 1000,
+      "exact_enumeration": false,
+      "inner_batches_per_sample": 3,
+      "scope": "common maxT final-tail batch; validation, float conversion and sort preparation included",
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.003749222339441379,
+            "cpu_s": 0.003666333333333327
+          },
+          {
+            "wall_s": 0.007229111002137263,
+            "cpu_s": 0.004024666666666714
+          },
+          {
+            "wall_s": 0.0081152916730692,
+            "cpu_s": 0.004239666666666864
+          },
+          {
+            "wall_s": 0.00995593067879478,
+            "cpu_s": 0.003779333333333431
+          },
+          {
+            "wall_s": 0.004920847325896223,
+            "cpu_s": 0.004425666666666809
+          }
+        ],
+        "prepared": [
+          {
+            "wall_s": 0.00017022201791405678,
+            "cpu_s": 0.0001696666666664015
+          },
+          {
+            "wall_s": 0.00017818067378054062,
+            "cpu_s": 0.00016399999999983095
+          },
+          {
+            "wall_s": 0.0001666526853417357,
+            "cpu_s": 0.0001660000000001105
+          },
+          {
+            "wall_s": 0.0001529723328227798,
+            "cpu_s": 0.00015266666666668982
+          },
+          {
+            "wall_s": 0.00015476365418483815,
+            "cpu_s": 0.00015433333333329338
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.007229111002137263,
+            "min": 0.003749222339441379,
+            "max": 0.00995593067879478
+          },
+          "cpu_s": {
+            "median": 0.004024666666666714,
+            "min": 0.003666333333333327,
+            "max": 0.004425666666666809
+          }
+        },
+        "prepared": {
+          "wall_s": {
+            "median": 0.0001666526853417357,
+            "min": 0.0001529723328227798,
+            "max": 0.00017818067378054062
+          },
+          "cpu_s": {
+            "median": 0.00016399999999983095,
+            "min": 0.00015266666666668982,
+            "max": 0.0001696666666664015
+          }
+        }
+      },
+      "strict_array_and_bytes_equal": true,
+      "sorted_reference_bytes": 8000,
+      "returned_output_bytes": 824,
+      "memory_scope": "array sizes only, not process peak RSS; query scratch also scales with query count",
+      "synthetic": true
+    },
+    "synthetic_10000_queries_1000_draws": {
+      "queries": 10000,
+      "reference_draws": 1000,
+      "exact_enumeration": false,
+      "inner_batches_per_sample": 1,
+      "scope": "common maxT final-tail batch; validation, float conversion and sort preparation included",
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.4431966249831021,
+            "cpu_s": 0.41655000000000086
+          },
+          {
+            "wall_s": 0.38138833292759955,
+            "cpu_s": 0.3645049999999994
+          },
+          {
+            "wall_s": 0.4683305410435423,
+            "cpu_s": 0.3466950000000004
+          },
+          {
+            "wall_s": 0.35660295805428177,
+            "cpu_s": 0.34005100000000077
+          },
+          {
+            "wall_s": 0.384971083025448,
+            "cpu_s": 0.33612900000000145
+          }
+        ],
+        "prepared": [
+          {
+            "wall_s": 0.0011060419492423534,
+            "cpu_s": 0.0011050000000007998
+          },
+          {
+            "wall_s": 0.0011311250273138285,
+            "cpu_s": 0.0011299999999998533
+          },
+          {
+            "wall_s": 0.001113708014599979,
+            "cpu_s": 0.0011139999999993933
+          },
+          {
+            "wall_s": 0.0012855830136686563,
+            "cpu_s": 0.0012270000000000891
+          },
+          {
+            "wall_s": 0.0013641250552609563,
+            "cpu_s": 0.001364000000000587
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.384971083025448,
+            "min": 0.35660295805428177,
+            "max": 0.4683305410435423
+          },
+          "cpu_s": {
+            "median": 0.3466950000000004,
+            "min": 0.33612900000000145,
+            "max": 0.41655000000000086
+          }
+        },
+        "prepared": {
+          "wall_s": {
+            "median": 0.0011311250273138285,
+            "min": 0.0011060419492423534,
+            "max": 0.0013641250552609563
+          },
+          "cpu_s": {
+            "median": 0.0011299999999998533,
+            "min": 0.0011050000000007998,
+            "max": 0.001364000000000587
+          }
+        }
+      },
+      "strict_array_and_bytes_equal": true,
+      "sorted_reference_bytes": 8000,
+      "returned_output_bytes": 80000,
+      "memory_scope": "array sizes only, not process peak RSS; query scratch also scales with query count",
+      "synthetic": true
+    },
+    "synthetic_2000_queries_10000_draws": {
+      "queries": 2000,
+      "reference_draws": 10000,
+      "exact_enumeration": false,
+      "inner_batches_per_sample": 1,
+      "scope": "common maxT final-tail batch; validation, float conversion and sort preparation included",
+      "runs": {
+        "before": [
+          {
+            "wall_s": 0.4944919580593705,
+            "cpu_s": 0.47763300000000086
+          },
+          {
+            "wall_s": 0.4892793750623241,
+            "cpu_s": 0.4805659999999996
+          },
+          {
+            "wall_s": 0.47586895897984505,
+            "cpu_s": 0.4711970000000001
+          },
+          {
+            "wall_s": 0.5011814159806818,
+            "cpu_s": 0.49613000000000085
+          },
+          {
+            "wall_s": 0.5263529580552131,
+            "cpu_s": 0.4714439999999982
+          }
+        ],
+        "prepared": [
+          {
+            "wall_s": 0.0007875420851632953,
+            "cpu_s": 0.000786999999998983
+          },
+          {
+            "wall_s": 0.0008446249412372708,
+            "cpu_s": 0.000844000000000733
+          },
+          {
+            "wall_s": 0.000759249902330339,
+            "cpu_s": 0.0007589999999986219
+          },
+          {
+            "wall_s": 0.0008471660548821092,
+            "cpu_s": 0.0008199999999973784
+          },
+          {
+            "wall_s": 0.0009093330008909106,
+            "cpu_s": 0.0008790000000011844
+          }
+        ]
+      },
+      "summary": {
+        "before": {
+          "wall_s": {
+            "median": 0.4944919580593705,
+            "min": 0.47586895897984505,
+            "max": 0.5263529580552131
+          },
+          "cpu_s": {
+            "median": 0.47763300000000086,
+            "min": 0.4711970000000001,
+            "max": 0.49613000000000085
+          }
+        },
+        "prepared": {
+          "wall_s": {
+            "median": 0.0008446249412372708,
+            "min": 0.000759249902330339,
+            "max": 0.0009093330008909106
+          },
+          "cpu_s": {
+            "median": 0.0008199999999973784,
+            "min": 0.0007589999999986219,
+            "max": 0.0008790000000011844
+          }
+        }
+      },
+      "strict_array_and_bytes_equal": true,
+      "sorted_reference_bytes": 80000,
+      "returned_output_bytes": 16000,
+      "memory_scope": "array sizes only, not process peak RSS; query scratch also scales with query count",
+      "synthetic": true
+    }
+  },
+  "edge_checks": {
+    "query_or_invalid_case_comparisons": 4517,
+    "boundary_corrected_queries": 118,
+    "adversarial_references_where_naive_threshold_count_was_wrong": 59,
+    "strict_array_and_bytes_equal": true,
+    "reference_snapshot_ownership_and_readonly": true,
+    "orchestration_denominator_error_order_preserved": true,
+    "public_scalar_function_unchanged": true
+  },
+  "metadata_note": "Source hash and six orchestration error-order checks added after timing; timed algorithms unchanged."
+}

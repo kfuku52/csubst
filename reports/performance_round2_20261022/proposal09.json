@@ -1,0 +1,810 @@
+{
+  "proposal": "reachability_aware_uniformization_start_order",
+  "environment": {
+    "commit": "88528ce21dd4093365205576e163fae311dd819a",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "source_function_sha256": "e7962705c81b80f901b818ed40d813faf33b565acee03b66a369d770e95e8e77",
+  "command": "python reports/performance_round2_20261022/proposal09.py",
+  "scope": "cold model+all transitions and warm endpoint stage; not full CLI",
+  "warmups": 1,
+  "repeats": 3,
+  "tolerances": {
+    "rtol": 3e-14,
+    "atol": 1e-300
+  },
+  "memory_scope": "array bytes, not RSS",
+  "cases": {
+    "PGK": {
+      "input_sha256": {
+        "PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+        "PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03"
+      },
+      "shape": [
+        65,
+        417,
+        61
+      ],
+      "rates": [
+        0.265,
+        0.3789,
+        0.8278,
+        1.7853
+      ],
+      "graph_minimum_order": 2,
+      "actual_accepted_min_order": 5,
+      "actual_accepted_max_order": 26,
+      "accepted_transition_count": 256,
+      "reachable_pair_count": 3721,
+      "extra_retained_array_bytes": 3721,
+      "transient_distance_array_bytes": 29768,
+      "transition_maximum_absolute": 0.0,
+      "transition_maximum_relative": 0.0,
+      "record_parity": {
+        "records": 455,
+        "values": 18968913,
+        "changed": 0,
+        "maximum_absolute": 0.0,
+        "maximum_relative": 0.0,
+        "threshold_crossings": 0,
+        "rtol": 3e-14,
+        "atol": 1e-300
+      },
+      "cold_model_and_all_transitions": {
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.02219929196871817,
+              "cpu_s": 0.022125999999999202
+            },
+            {
+              "wall_s": 0.02226416696794331,
+              "cpu_s": 0.02226499999999998
+            },
+            {
+              "wall_s": 0.024992458056658506,
+              "cpu_s": 0.023304999999999687
+            }
+          ],
+          "graph": [
+            {
+              "wall_s": 0.0192262080963701,
+              "cpu_s": 0.018974000000000046
+            },
+            {
+              "wall_s": 0.022742790984921157,
+              "cpu_s": 0.019398999999999944
+            },
+            {
+              "wall_s": 0.024682167102582753,
+              "cpu_s": 0.023106000000000293
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.02226416696794331,
+              "min": 0.02219929196871817,
+              "max": 0.024992458056658506
+            },
+            "cpu_s": {
+              "median": 0.02226499999999998,
+              "min": 0.022125999999999202,
+              "max": 0.023304999999999687
+            }
+          },
+          "graph": {
+            "wall_s": {
+              "median": 0.022742790984921157,
+              "min": 0.0192262080963701,
+              "max": 0.024682167102582753
+            },
+            "cpu_s": {
+              "median": 0.019398999999999944,
+              "min": 0.018974000000000046,
+              "max": 0.023106000000000293
+            }
+          }
+        }
+      },
+      "warm_endpoint_stage": {
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.36949854192789644,
+              "cpu_s": 0.32407199999999925
+            },
+            {
+              "wall_s": 0.3298160000704229,
+              "cpu_s": 0.3207690000000003
+            },
+            {
+              "wall_s": 0.41961866698693484,
+              "cpu_s": 0.40238900000000033
+            }
+          ],
+          "graph": [
+            {
+              "wall_s": 0.314755457919091,
+              "cpu_s": 0.3117740000000002
+            },
+            {
+              "wall_s": 0.45876891596708447,
+              "cpu_s": 0.3660059999999996
+            },
+            {
+              "wall_s": 0.42868379200808704,
+              "cpu_s": 0.4020480000000006
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.36949854192789644,
+              "min": 0.3298160000704229,
+              "max": 0.41961866698693484
+            },
+            "cpu_s": {
+              "median": 0.32407199999999925,
+              "min": 0.3207690000000003,
+              "max": 0.40238900000000033
+            }
+          },
+          "graph": {
+            "wall_s": {
+              "median": 0.42868379200808704,
+              "min": 0.314755457919091,
+              "max": 0.45876891596708447
+            },
+            "cpu_s": {
+              "median": 0.3660059999999996,
+              "min": 0.3117740000000002,
+              "max": 0.4020480000000006
+            }
+          }
+        }
+      }
+    },
+    "PEPC": {
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "shape": [
+        141,
+        971,
+        61
+      ],
+      "rates": [
+        0.0989,
+        0.437,
+        0.4477,
+        1.0476
+      ],
+      "graph_minimum_order": 2,
+      "actual_accepted_min_order": 5,
+      "actual_accepted_max_order": 23,
+      "accepted_transition_count": 560,
+      "reachable_pair_count": 3721,
+      "extra_retained_array_bytes": 3721,
+      "transient_distance_array_bytes": 29768,
+      "transition_maximum_absolute": 0.0,
+      "transition_maximum_relative": 0.0,
+      "record_parity": {
+        "records": 2256,
+        "values": 96269795,
+        "changed": 0,
+        "maximum_absolute": 0.0,
+        "maximum_relative": 0.0,
+        "threshold_crossings": 0,
+        "rtol": 3e-14,
+        "atol": 1e-300
+      },
+      "cold_model_and_all_transitions": {
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.10187195905018598,
+              "cpu_s": 0.0681049999999992
+            },
+            {
+              "wall_s": 0.04851037496700883,
+              "cpu_s": 0.046983000000000885
+            },
+            {
+              "wall_s": 0.059661125065758824,
+              "cpu_s": 0.05579399999999879
+            }
+          ],
+          "graph": [
+            {
+              "wall_s": 0.04198837501462549,
+              "cpu_s": 0.040836000000002315
+            },
+            {
+              "wall_s": 0.07496275007724762,
+              "cpu_s": 0.04606199999999916
+            },
+            {
+              "wall_s": 0.05046529194805771,
+              "cpu_s": 0.042920999999999765
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.059661125065758824,
+              "min": 0.04851037496700883,
+              "max": 0.10187195905018598
+            },
+            "cpu_s": {
+              "median": 0.05579399999999879,
+              "min": 0.046983000000000885,
+              "max": 0.0681049999999992
+            }
+          },
+          "graph": {
+            "wall_s": {
+              "median": 0.05046529194805771,
+              "min": 0.04198837501462549,
+              "max": 0.07496275007724762
+            },
+            "cpu_s": {
+              "median": 0.042920999999999765,
+              "min": 0.040836000000002315,
+              "max": 0.04606199999999916
+            }
+          }
+        }
+      },
+      "warm_endpoint_stage": {
+        "runs": {
+          "before": [
+            {
+              "wall_s": 3.302225042018108,
+              "cpu_s": 2.0743110000000016
+            },
+            {
+              "wall_s": 4.667409916059114,
+              "cpu_s": 2.064315999999998
+            },
+            {
+              "wall_s": 2.35374833305832,
+              "cpu_s": 2.047823000000001
+            }
+          ],
+          "graph": [
+            {
+              "wall_s": 2.0259354999288917,
+              "cpu_s": 1.8636289999999995
+            },
+            {
+              "wall_s": 3.542451790999621,
+              "cpu_s": 2.1431980000000017
+            },
+            {
+              "wall_s": 2.4969488750211895,
+              "cpu_s": 1.9485700000000001
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 3.302225042018108,
+              "min": 2.35374833305832,
+              "max": 4.667409916059114
+            },
+            "cpu_s": {
+              "median": 2.064315999999998,
+              "min": 2.047823000000001,
+              "max": 2.0743110000000016
+            }
+          },
+          "graph": {
+            "wall_s": {
+              "median": 2.4969488750211895,
+              "min": 2.0259354999288917,
+              "max": 3.542451790999621
+            },
+            "cpu_s": {
+              "median": 1.9485700000000001,
+              "min": 1.8636289999999995,
+              "max": 2.1431980000000017
+            }
+          }
+        }
+      }
+    }
+  },
+  "edge_checks": [
+    {
+      "model": "dense",
+      "length": 0.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "dense",
+      "length": 1e-100,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        1
+      ],
+      "smallest_positive": 1.4037219207984387e-101
+    },
+    {
+      "model": "dense",
+      "length": 1e-10,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        2
+      ],
+      "smallest_positive": 1.4037219212959204e-11
+    },
+    {
+      "model": "dense",
+      "length": 1e-05,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        4
+      ],
+      "smallest_positive": 1.403771667136526e-06
+    },
+    {
+      "model": "dense",
+      "length": 0.1,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        15
+      ],
+      "smallest_positive": 0.0174530220536537
+    },
+    {
+      "model": "dense",
+      "length": 1.0,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        35
+      ],
+      "smallest_positive": 0.11625820475302483
+    },
+    {
+      "model": "dense",
+      "length": 100.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 0.12499999999999992
+    },
+    {
+      "model": "chain",
+      "length": 0.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "chain",
+      "length": 1e-100,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 249,
+      "accepted_orders": [],
+      "smallest_positive": 5.716666666666665e-302
+    },
+    {
+      "model": "chain",
+      "length": 1e-10,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [
+        8
+      ],
+      "smallest_positive": 1.6340138886887227e-75
+    },
+    {
+      "model": "chain",
+      "length": 1e-05,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [
+        10
+      ],
+      "smallest_positive": 1.6339938723499687e-40
+    },
+    {
+      "model": "chain",
+      "length": 0.1,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [
+        16
+      ],
+      "smallest_positive": 1.4463835220439955e-12
+    },
+    {
+      "model": "chain",
+      "length": 1.0,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [
+        24
+      ],
+      "smallest_positive": 5.056353381665741e-06
+    },
+    {
+      "model": "chain",
+      "length": 100.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 0.1249943393014399
+    },
+    {
+      "model": "reducible",
+      "length": 0.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "reducible",
+      "length": 1e-100,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        1
+      ],
+      "smallest_positive": 3.4152162681202006e-101
+    },
+    {
+      "model": "reducible",
+      "length": 1e-10,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        2
+      ],
+      "smallest_positive": 3.415216267989757e-11
+    },
+    {
+      "model": "reducible",
+      "length": 1e-05,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        4
+      ],
+      "smallest_positive": 3.415203223690022e-06
+    },
+    {
+      "model": "reducible",
+      "length": 0.1,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        12
+      ],
+      "smallest_positive": 0.03276177526473939
+    },
+    {
+      "model": "reducible",
+      "length": 1.0,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        25
+      ],
+      "smallest_positive": 0.20028244259260536
+    },
+    {
+      "model": "reducible",
+      "length": 100.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 0.24999999999999983
+    },
+    {
+      "model": "directed_cycle",
+      "length": 0.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "directed_cycle",
+      "length": 1e-100,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 249,
+      "accepted_orders": [],
+      "smallest_positive": 5.716666666666665e-302
+    },
+    {
+      "model": "directed_cycle",
+      "length": 1e-10,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [
+        8
+      ],
+      "smallest_positive": 1.6340138887745086e-75
+    },
+    {
+      "model": "directed_cycle",
+      "length": 1e-05,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [
+        9
+      ],
+      "smallest_positive": 1.6340024508317e-40
+    },
+    {
+      "model": "directed_cycle",
+      "length": 0.1,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [
+        14
+      ],
+      "smallest_positive": 1.5235444516404839e-12
+    },
+    {
+      "model": "directed_cycle",
+      "length": 1.0,
+      "reference": "Decimal420/59terms",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [
+        19
+      ],
+      "smallest_positive": 8.114272835935585e-06
+    },
+    {
+      "model": "directed_cycle",
+      "length": 100.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 7,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 0.12499999968829716
+    },
+    {
+      "model": "underflow_first_path",
+      "length": 0.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "underflow_first_path",
+      "length": 1e-100,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 2,
+      "accepted_orders": [
+        3
+      ],
+      "smallest_positive": 5.716666666666666e-302
+    },
+    {
+      "model": "underflow_first_path",
+      "length": 1e-10,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 2,
+      "accepted_orders": [
+        4
+      ],
+      "smallest_positive": 5.716666666066418e-32
+    },
+    {
+      "model": "underflow_first_path",
+      "length": 1e-05,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        6
+      ],
+      "smallest_positive": 5.716606642030815e-17
+    },
+    {
+      "model": "underflow_first_path",
+      "length": 0.1,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        12
+      ],
+      "smallest_positive": 5.151255504743587e-05
+    },
+    {
+      "model": "underflow_first_path",
+      "length": 1.0,
+      "reference": "Decimal420/59terms",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [
+        21
+      ],
+      "smallest_positive": 0.021723317832158057
+    },
+    {
+      "model": "underflow_first_path",
+      "length": 100.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 1,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 0.24999999999999983
+    },
+    {
+      "model": "zero_generator",
+      "length": 0.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 0,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "zero_generator",
+      "length": 1e-100,
+      "reference": "Decimal420/59terms",
+      "graph_order": 0,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "zero_generator",
+      "length": 1e-10,
+      "reference": "Decimal420/59terms",
+      "graph_order": 0,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "zero_generator",
+      "length": 1e-05,
+      "reference": "Decimal420/59terms",
+      "graph_order": 0,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "zero_generator",
+      "length": 0.1,
+      "reference": "Decimal420/59terms",
+      "graph_order": 0,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "zero_generator",
+      "length": 1.0,
+      "reference": "Decimal420/59terms",
+      "graph_order": 0,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "zero_generator",
+      "length": 100.0,
+      "reference": "scipy.linalg.expm",
+      "graph_order": 0,
+      "zero_guards": 0,
+      "accepted_orders": [],
+      "smallest_positive": 1.0
+    },
+    {
+      "model": "ambiguous_mixed_zero_rate_records",
+      "predictive": false,
+      "records": 3,
+      "values": 96,
+      "changed": 0,
+      "maximum_absolute": 0.0,
+      "maximum_relative": 0.0,
+      "threshold_crossings": 0,
+      "rtol": 3e-14,
+      "atol": 1e-300
+    },
+    {
+      "model": "ambiguous_mixed_zero_rate_records",
+      "predictive": true,
+      "records": 3,
+      "values": 120,
+      "changed": 0,
+      "maximum_absolute": 0.0,
+      "maximum_relative": 0.0,
+      "threshold_crossings": 0,
+      "rtol": 3e-14,
+      "atol": 1e-300
+    }
+  ],
+  "supplementary_checks": [
+    {
+      "model": "capacity_fallback_128_states",
+      "unchanged_fallback": true
+    },
+    {
+      "model": "directed_absorbing_chain",
+      "graph_order": 5,
+      "reference": "Decimal420/59terms",
+      "smallest_reachable_probability": 1.4005833332516326e-53
+    }
+  ],
+  "existing_endpoint_tests": {
+    "passed": 26,
+    "failed": 0,
+    "skipped": 0,
+    "scope": "existing source endpoint tests with GraphModel injected, not installed wheel"
+  },
+  "prototype_class_sha256": "a10e600f52ab964880c29fe05e573d85db06854d96c6608ab3fe4efd2ab2bc85"
+}

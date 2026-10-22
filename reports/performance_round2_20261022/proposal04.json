@@ -1,0 +1,503 @@
+{
+  "proposal": 4,
+  "environment": {
+    "commit": "88528ce21dd4093365205576e163fae311dd819a",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "warmups": 1,
+  "measured_repeats": 3,
+  "scope": "analytical likelihood/test stage including private snapshot/cache preparation; not whole CLI",
+  "memory_scope": "retained numerical array bytes; Python container overhead and process RSS unmeasured",
+  "cache_limit_bytes": 33554432,
+  "cases": {
+    "PGK": {
+      "actual_candidates": {
+        "candidate_count": 23,
+        "site_count": 12,
+        "branch_count": 65,
+        "rate_categories": 4,
+        "exact_bytes": true,
+        "maximum_absolute_difference": 0.0,
+        "comparison_rtol": 1e-13,
+        "comparison_atol": 1e-13,
+        "cache": {
+          "peak_retained_array_bytes": 7931808,
+          "snapshot_builds": 12
+        },
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.2582939158892259,
+              "cpu_s": 0.25024000000000024
+            },
+            {
+              "wall_s": 0.24586841696873307,
+              "cpu_s": 0.24058400000000058
+            },
+            {
+              "wall_s": 0.2364208330400288,
+              "cpu_s": 0.23190699999999964
+            }
+          ],
+          "prepared": [
+            {
+              "wall_s": 0.2666622910182923,
+              "cpu_s": 0.254683
+            },
+            {
+              "wall_s": 0.22557200002484024,
+              "cpu_s": 0.2220639999999996
+            },
+            {
+              "wall_s": 0.2264221670338884,
+              "cpu_s": 0.22219299999999986
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.24586841696873307,
+              "min": 0.2364208330400288,
+              "max": 0.2582939158892259
+            },
+            "cpu_s": {
+              "median": 0.24058400000000058,
+              "min": 0.23190699999999964,
+              "max": 0.25024000000000024
+            }
+          },
+          "prepared": {
+            "wall_s": {
+              "median": 0.2264221670338884,
+              "min": 0.22557200002484024,
+              "max": 0.2666622910182923
+            },
+            "cpu_s": {
+              "median": 0.22219299999999986,
+              "min": 0.2220639999999996,
+              "max": 0.254683
+            }
+          }
+        }
+      },
+      "same_site_20_contrasts_synthetic": {
+        "candidate_count": 20,
+        "site_count": 1,
+        "branch_count": 65,
+        "rate_categories": 4,
+        "exact_bytes": true,
+        "maximum_absolute_difference": 0.0,
+        "comparison_rtol": 1e-13,
+        "comparison_atol": 1e-13,
+        "cache": {
+          "peak_retained_array_bytes": 660984,
+          "snapshot_builds": 1
+        },
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.19120337499771267,
+              "cpu_s": 0.19082899999999992
+            },
+            {
+              "wall_s": 0.18717666703741997,
+              "cpu_s": 0.18685200000000002
+            },
+            {
+              "wall_s": 0.20579704199917614,
+              "cpu_s": 0.19980200000000004
+            }
+          ],
+          "prepared": [
+            {
+              "wall_s": 0.13670324999839067,
+              "cpu_s": 0.13614700000000024
+            },
+            {
+              "wall_s": 0.13973687507677823,
+              "cpu_s": 0.13797199999999954
+            },
+            {
+              "wall_s": 0.13394241698551923,
+              "cpu_s": 0.13342100000000023
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.19120337499771267,
+              "min": 0.18717666703741997,
+              "max": 0.20579704199917614
+            },
+            "cpu_s": {
+              "median": 0.19082899999999992,
+              "min": 0.18685200000000002,
+              "max": 0.19980200000000004
+            }
+          },
+          "prepared": {
+            "wall_s": {
+              "median": 0.13670324999839067,
+              "min": 0.13394241698551923,
+              "max": 0.13973687507677823
+            },
+            "cpu_s": {
+              "median": 0.13614700000000024,
+              "min": 0.13342100000000023,
+              "max": 0.13797199999999954
+            }
+          }
+        }
+      },
+      "input_sha256": {
+        "csubst/dataset/PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "csubst/dataset/PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+        "csubst/dataset/PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "csubst/dataset/PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "csubst/dataset/PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "csubst/dataset/PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "csubst/dataset/PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "csubst/dataset/PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03"
+      },
+      "actual_candidates_grouped": {
+        "candidate_count": 23,
+        "site_count": 12,
+        "branch_count": 65,
+        "rate_categories": 4,
+        "exact_bytes": true,
+        "maximum_absolute_difference": 0.0,
+        "comparison_rtol": 1e-13,
+        "comparison_atol": 1e-13,
+        "cache": {
+          "peak_retained_array_bytes": 7931808,
+          "snapshot_builds": 12
+        },
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.3405944590922445,
+              "cpu_s": 0.283401
+            },
+            {
+              "wall_s": 0.3737558330176398,
+              "cpu_s": 0.2624409999999999
+            },
+            {
+              "wall_s": 0.33107616601046175,
+              "cpu_s": 0.28120800000000035
+            }
+          ],
+          "grouped": [
+            {
+              "wall_s": 0.27767787501215935,
+              "cpu_s": 0.2536990000000001
+            },
+            {
+              "wall_s": 0.2753103750292212,
+              "cpu_s": 0.23997700000000055
+            },
+            {
+              "wall_s": 0.3087752499850467,
+              "cpu_s": 0.2534989999999997
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.3405944590922445,
+              "min": 0.33107616601046175,
+              "max": 0.3737558330176398
+            },
+            "cpu_s": {
+              "median": 0.28120800000000035,
+              "min": 0.2624409999999999,
+              "max": 0.283401
+            }
+          },
+          "grouped": {
+            "wall_s": {
+              "median": 0.27767787501215935,
+              "min": 0.2753103750292212,
+              "max": 0.3087752499850467
+            },
+            "cpu_s": {
+              "median": 0.2534989999999997,
+              "min": 0.23997700000000055,
+              "max": 0.2536990000000001
+            }
+          }
+        }
+      }
+    },
+    "PEPC": {
+      "actual_candidates": {
+        "candidate_count": 198,
+        "site_count": 94,
+        "branch_count": 141,
+        "rate_categories": 4,
+        "exact_bytes": true,
+        "maximum_absolute_difference": 0.0,
+        "comparison_rtol": 1e-13,
+        "comparison_atol": 1e-13,
+        "cache": {
+          "peak_retained_array_bytes": 32969304,
+          "snapshot_builds": 194
+        },
+        "runs": {
+          "before": [
+            {
+              "wall_s": 2.6186072499258444,
+              "cpu_s": 2.5992239999999995
+            },
+            {
+              "wall_s": 2.7312863749684766,
+              "cpu_s": 2.673376000000001
+            },
+            {
+              "wall_s": 3.763700500014238,
+              "cpu_s": 3.3130939999999995
+            }
+          ],
+          "prepared": [
+            {
+              "wall_s": 3.2482855420093983,
+              "cpu_s": 3.2253339999999984
+            },
+            {
+              "wall_s": 3.536755625042133,
+              "cpu_s": 3.3812640000000016
+            },
+            {
+              "wall_s": 3.5745727920439094,
+              "cpu_s": 3.463151
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 2.7312863749684766,
+              "min": 2.6186072499258444,
+              "max": 3.763700500014238
+            },
+            "cpu_s": {
+              "median": 2.673376000000001,
+              "min": 2.5992239999999995,
+              "max": 3.3130939999999995
+            }
+          },
+          "prepared": {
+            "wall_s": {
+              "median": 3.536755625042133,
+              "min": 3.2482855420093983,
+              "max": 3.5745727920439094
+            },
+            "cpu_s": {
+              "median": 3.3812640000000016,
+              "min": 3.2253339999999984,
+              "max": 3.463151
+            }
+          }
+        }
+      },
+      "same_site_20_contrasts_synthetic": {
+        "candidate_count": 20,
+        "site_count": 1,
+        "branch_count": 141,
+        "rate_categories": 4,
+        "exact_bytes": true,
+        "maximum_absolute_difference": 0.0,
+        "comparison_rtol": 1e-13,
+        "comparison_atol": 1e-13,
+        "cache": {
+          "peak_retained_array_bytes": 1433448,
+          "snapshot_builds": 1
+        },
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.287163166096434,
+              "cpu_s": 0.2850830000000002
+            },
+            {
+              "wall_s": 0.32842425000853837,
+              "cpu_s": 0.2909799999999976
+            },
+            {
+              "wall_s": 0.2881828339304775,
+              "cpu_s": 0.2707630000000023
+            }
+          ],
+          "prepared": [
+            {
+              "wall_s": 0.23653100000228733,
+              "cpu_s": 0.2336079999999967
+            },
+            {
+              "wall_s": 0.214566458016634,
+              "cpu_s": 0.20478300000000615
+            },
+            {
+              "wall_s": 0.19921387499198318,
+              "cpu_s": 0.1898780000000002
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.2881828339304775,
+              "min": 0.287163166096434,
+              "max": 0.32842425000853837
+            },
+            "cpu_s": {
+              "median": 0.2850830000000002,
+              "min": 0.2707630000000023,
+              "max": 0.2909799999999976
+            }
+          },
+          "prepared": {
+            "wall_s": {
+              "median": 0.214566458016634,
+              "min": 0.19921387499198318,
+              "max": 0.23653100000228733
+            },
+            "cpu_s": {
+              "median": 0.20478300000000615,
+              "min": 0.1898780000000002,
+              "max": 0.2336079999999967
+            }
+          }
+        }
+      },
+      "input_sha256": {
+        "csubst/dataset/PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "csubst/dataset/PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "csubst/dataset/PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "csubst/dataset/PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "csubst/dataset/PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "csubst/dataset/PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "csubst/dataset/PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "csubst/dataset/PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "actual_candidates_grouped": {
+        "candidate_count": 198,
+        "site_count": 94,
+        "branch_count": 141,
+        "rate_categories": 4,
+        "exact_bytes": true,
+        "maximum_absolute_difference": 0.0,
+        "comparison_rtol": 1e-13,
+        "comparison_atol": 1e-13,
+        "cache": {
+          "peak_retained_array_bytes": 32969304,
+          "snapshot_builds": 94
+        },
+        "runs": {
+          "before": [
+            {
+              "wall_s": 4.959784124977887,
+              "cpu_s": 3.999140999999998
+            },
+            {
+              "wall_s": 3.5588914580876008,
+              "cpu_s": 3.1286799999999992
+            },
+            {
+              "wall_s": 3.2239950420334935,
+              "cpu_s": 2.9649199999999993
+            }
+          ],
+          "grouped": [
+            {
+              "wall_s": 4.522817834047601,
+              "cpu_s": 3.9759390000000003
+            },
+            {
+              "wall_s": 3.1679928329540417,
+              "cpu_s": 2.7696260000000024
+            },
+            {
+              "wall_s": 3.024968040990643,
+              "cpu_s": 2.868902000000002
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 3.5588914580876008,
+              "min": 3.2239950420334935,
+              "max": 4.959784124977887
+            },
+            "cpu_s": {
+              "median": 3.1286799999999992,
+              "min": 2.9649199999999993,
+              "max": 3.999140999999998
+            }
+          },
+          "grouped": {
+            "wall_s": {
+              "median": 3.1679928329540417,
+              "min": 3.024968040990643,
+              "max": 4.522817834047601
+            },
+            "cpu_s": {
+              "median": 2.868902000000002,
+              "min": 2.7696260000000024,
+              "max": 3.9759390000000003
+            }
+          }
+        }
+      }
+    }
+  },
+  "edge_checks": {
+    "scaled_parity_cases": 648,
+    "exact_bytes": true,
+    "maximum_absolute_difference": 0.0,
+    "independent_enumerated_tip_patterns": 16,
+    "failure_parity_cases": [
+      [
+        "ValueError",
+        "Target branches must be non-root tree nodes."
+      ],
+      [
+        "ValueError",
+        "Every leaf needs an observation likelihood."
+      ],
+      [
+        "ValueError",
+        "Invalid leaf observation likelihood."
+      ],
+      [
+        "ValueError",
+        "Invalid leaf observation likelihood."
+      ],
+      [
+        "ValueError",
+        "Invalid leaf observation likelihood."
+      ]
+    ]
+  },
+  "source_function_sha256": "064f042dff97a53deaf42da48f82c45dd3847c5d9b500ab4bcb6015d04ce448a",
+  "verdict": "conditional_hold: real PGK improves with site grouping; real PEPC ranges overlap; analytical stage only",
+  "checks": {
+    "prototype_backend_existing_analytic_tests": {
+      "passed": 7,
+      "skipped": 0,
+      "command": "python reports/performance_round2_20261022/proposal04.py --verify-only"
+    },
+    "ruff": "passed",
+    "py_compile": "passed"
+  }
+}
