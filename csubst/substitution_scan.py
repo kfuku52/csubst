@@ -5,6 +5,7 @@ import json
 import math
 import os
 import re
+import sys
 import tempfile
 from collections import OrderedDict
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
@@ -58,7 +59,32 @@ def _scan_candidate_cache(scan_static, name):
     return scan_static[name]
 
 
-def _cached_posterior_events(scan_static, sub_tensor, site, from_ids, to_ids, float_tol):
+class _PosteriorBranchValues:
+    """Read-only, branch-indexed mass for private fixed-candidate scoring."""
+
+    __slots__ = ('values',)
+
+    def __init__(self, frame, num_branch):
+        self.values = np.zeros(num_branch, dtype=np.float64)
+        self.values[frame['branch_id'].to_numpy(dtype=np.int64)] = frame['event_pp'].fillna(0).to_numpy(dtype=np.float64)
+        self.values.flags.writeable = False
+
+    @property
+    def nbytes(self):
+        return sys.getsizeof(self.values) + sys.getsizeof(self)
+
+    def select(self, branch_ids):
+        valid = (branch_ids >= 0) & (branch_ids < len(self.values))
+        values = np.zeros(len(branch_ids), dtype=np.float64)
+        values[valid] = self.values[branch_ids[valid]]
+        return values
+
+
+_POSTERIOR_VECTOR_OVERHEAD = (sys.getsizeof(np.empty(0, dtype=np.float64))
+                              + sys.getsizeof(object.__new__(_PosteriorBranchValues)))
+
+
+def _cached_posterior_events(scan_static, sub_tensor, site, from_ids, to_ids, float_tol, *, branch_values=False):
     projection = scan_static.get('rate_event_projection') if scan_static is not None else None
     def build():
         return extract_candidate_posterior_events(sub_tensor, site, from_ids, to_ids, float_tol, projection)
@@ -66,6 +92,12 @@ def _cached_posterior_events(scan_static, sub_tensor, site, from_ids, to_ids, fl
     if cache is None:
         return build()
     key = (id(sub_tensor), int(site), tuple(from_ids), tuple(to_ids), float_tol, id(projection))
+    # A dense vector is useful only if it fits the existing cache budget.
+    # Public/discovery callers continue to receive the historical DataFrame.
+    if branch_values and int(sub_tensor.shape[0]) * 8 + _POSTERIOR_VECTOR_OVERHEAD <= cache.max_bytes:
+        return cache.obtain(('branch_values',) + key,
+                            lambda: _PosteriorBranchValues(build(), int(sub_tensor.shape[0])),
+                            lambda value: value.nbytes)
     return cache.obtain(key, build, lambda frame: int(frame.memory_usage(index=True, deep=True).sum()))
 
 
@@ -1918,16 +1950,17 @@ def _rate_summary(
         prepared_branch = _ScanRateMetadata(branch_meta).prepare(target_branch_ids, other_branch_ids)
     branch_data, is_target, is_other = prepared_branch
     branch_ids = branch_data.branch_ids
-    event_ids = candidate_events["branch_id"]
-    if event_ids.is_unique:
-        # Posterior extraction already yields one row per branch. Preserve
-        # groupby's missing-value handling without regrouping those rows.
-        event_by_branch = dict(zip(event_ids, candidate_events["event_pp"].fillna(0)))
+    if isinstance(candidate_events, _PosteriorBranchValues):
+        event_values = candidate_events.select(branch_ids)
     else:
-        # Called events can contain several state pairs on the same branch;
-        # retain pandas' compensated summation for that case.
-        event_by_branch = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
-    event_values = np.array([float(event_by_branch.get(int(bid), 0.0)) for bid in branch_ids], dtype=np.float64)
+        event_ids = candidate_events["branch_id"]
+        if event_ids.is_unique:
+            # Posterior extraction already yields one row per branch.
+            event_by_branch = dict(zip(event_ids, candidate_events["event_pp"].fillna(0)))
+        else:
+            # Called events retain pandas' compensated summation.
+            event_by_branch = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
+        event_values = np.array([float(event_by_branch.get(int(bid), 0.0)) for bid in branch_ids], dtype=np.float64)
     chosen_length, raw_length, sn_length, n_length = branch_data.get_lengths(rate_length)
     missing_exposure = np.zeros(branch_ids.shape[0], dtype=bool)
     exposure_reasons = np.full(branch_ids.shape[0], "ok", dtype="U24")
@@ -2705,6 +2738,7 @@ def _candidate_fixed_permutation_scores(
                 from_ids=from_ids,
                 to_ids=to_ids,
                 float_tol=float(g.get("float_tol", 1e-12)),
+                branch_values=True,
             )
         branch_key = (trait_name, target_class)
         if branch_key not in branch_sets:
