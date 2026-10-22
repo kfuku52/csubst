@@ -1,0 +1,54 @@
+{
+  "environment_record_utc": "2026-10-22T13:48:37.934851+00:00",
+  "runs": [
+    {
+      "name": "0_after.log",
+      "opened_utc": "2026-10-22T13:48:03.095582+00:00",
+      "closed_utc": "2026-10-22T13:48:11.309093+00:00",
+      "contains_environment_read": false
+    },
+    {
+      "name": "0_before.log",
+      "opened_utc": "2026-10-22T13:47:37.335191+00:00",
+      "closed_utc": "2026-10-22T13:48:02.978027+00:00",
+      "contains_environment_read": false
+    },
+    {
+      "name": "1_after.log",
+      "opened_utc": "2026-10-22T13:48:11.469229+00:00",
+      "closed_utc": "2026-10-22T13:48:19.139067+00:00",
+      "contains_environment_read": false
+    },
+    {
+      "name": "1_before.log",
+      "opened_utc": "2026-10-22T13:48:19.254592+00:00",
+      "closed_utc": "2026-10-22T13:48:43.766785+00:00",
+      "contains_environment_read": true
+    },
+    {
+      "name": "2_after.log",
+      "opened_utc": "2026-10-22T13:49:08.911730+00:00",
+      "closed_utc": "2026-10-22T13:49:16.572985+00:00",
+      "contains_environment_read": false
+    },
+    {
+      "name": "2_before.log",
+      "opened_utc": "2026-10-22T13:48:43.917588+00:00",
+      "closed_utc": "2026-10-22T13:49:08.770937+00:00",
+      "contains_environment_read": false
+    },
+    {
+      "name": "3_after.log",
+      "opened_utc": "2026-10-22T13:49:16.707065+00:00",
+      "closed_utc": "2026-10-22T13:49:24.718131+00:00",
+      "contains_environment_read": false
+    },
+    {
+      "name": "3_before.log",
+      "opened_utc": "2026-10-22T13:49:24.901549+00:00",
+      "closed_utc": "2026-10-22T13:49:47.897202+00:00",
+      "contains_environment_read": false
+    }
+  ],
+  "environment_read_only_overlapped_warmup": false
+}

@@ -1,0 +1,1144 @@
+[
+  {
+    "label": "source-fast",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test-fast"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 14.25655575003475,
+    "summaries": [
+      "1671 passed, 6 skipped, 8 warnings in 11.57s"
+    ]
+  },
+  {
+    "label": "lint",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "lint"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.8861450830008835,
+    "summaries": [
+      "All checks passed!",
+      "Repository hygiene checks passed.",
+      "Documentation checks passed: 22 documents, 23 commands, 1 help examples, 2 templates, 73 local links."
+    ]
+  },
+  {
+    "label": "typecheck",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "typecheck"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 3.6950042090611532,
+    "summaries": [
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file"
+    ]
+  },
+  {
+    "label": "source-full",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 24.803206541924737,
+    "summaries": [
+      "2184 passed, 9 skipped, 8 warnings in 18.97s",
+      "5 passed in 4.97s"
+    ]
+  },
+  {
+    "label": "source-native",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test-native"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 2.369926166953519,
+    "summaries": [
+      "15 passed, 2183 deselected in 1.93s"
+    ]
+  },
+  {
+    "label": "source-scientific-reference",
+    "command": [
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      ".github/scripts/sites_parity_check.py",
+      "--numerical-only",
+      "--workdir",
+      "${WORKDIR}/source-scientific",
+      "--output",
+      "${WORKDIR}/source-scientific.tsv"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 23.058683666982688,
+    "summaries": []
+  },
+  {
+    "label": "package",
+    "command": [
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "package"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 39.52233462501317,
+    "summaries": [
+      "Successfully built csubst-1.16.22.tar.gz and csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ]
+  },
+  {
+    "label": "sdist-generated-c-wheel",
+    "command": [
+      "env",
+      "CSUBST_USE_CYTHON=0",
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "-m",
+      "pip",
+      "wheel",
+      "--no-deps",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz",
+      "--wheel-dir",
+      "${REPOSITORY}/dist/from-sdist"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 20.04587079200428,
+    "summaries": [
+      "Successfully built csubst"
+    ]
+  },
+  {
+    "label": "artifact-contents",
+    "command": [
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      ".github/scripts/package_artifact_check.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.08237800002098083,
+    "summaries": [
+      "Verified source distribution: dist/csubst-1.16.22.tar.gz",
+      "Verified wheel: dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ]
+  },
+  {
+    "label": "artifact-metadata",
+    "command": [
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "-m",
+      "twine",
+      "check",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz",
+      "${REPOSITORY}/dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.2087940409546718,
+    "summaries": []
+  },
+  {
+    "label": "wheel-environment",
+    "command": [
+      "${HOME}/.local/bin/uv",
+      "venv",
+      "--python",
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "${WORKDIR}/wheel-env"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.08330324990674853,
+    "summaries": []
+  },
+  {
+    "label": "wheel-install",
+    "command": [
+      "${HOME}/.local/bin/uv",
+      "pip",
+      "install",
+      "--python",
+      "${WORKDIR}/wheel-env/bin/python",
+      "--no-binary",
+      "ete4",
+      "${REPOSITORY}/dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl[test]"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 1.3124709170078859,
+    "summaries": []
+  },
+  {
+    "label": "wheel-import-prefix",
+    "command": [
+      "${WORKDIR}/wheel-env/bin/python",
+      "-I",
+      "-c",
+      "import csubst,importlib,pathlib,sys; p=pathlib.Path(sys.prefix).resolve(); assert pathlib.Path(csubst.__file__).resolve().is_relative_to(p); names=('combination_cy','omega_cy','parser_iqtree_cy','recoding_cy','substitution_cy','substitution_sparse_cy'); modules=[importlib.import_module('csubst.'+n) for n in names]; assert all(pathlib.Path(m.__file__).resolve().is_relative_to(p) for m in modules); print(csubst.__version__,'six installed native extensions verified')"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 1.6449896660633385,
+    "summaries": []
+  },
+  {
+    "label": "wheel-full",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests",
+      "--import-mode=importlib",
+      "-q",
+      "-n",
+      "auto",
+      "--dist",
+      "worksteal",
+      "-m",
+      "not process",
+      "--ignore=${REPOSITORY}/tests/process"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 23.947612834046595,
+    "summaries": [
+      "2184 passed, 9 skipped, 25 warnings in 22.66s"
+    ]
+  },
+  {
+    "label": "wheel-process",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests/process",
+      "--import-mode=importlib",
+      "-q"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 4.97159729199484,
+    "summaries": [
+      "5 passed in 4.66s"
+    ]
+  },
+  {
+    "label": "wheel-native",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "CSUBST_STRICT_EXTENSIONS=1",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests",
+      "--import-mode=importlib",
+      "-q",
+      "-m",
+      "native"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 1.8186065419577062,
+    "summaries": [
+      "15 passed, 2183 deselected in 1.51s"
+    ]
+  },
+  {
+    "label": "wheel-scientific-reference",
+    "command": [
+      "${WORKDIR}/wheel-env/bin/python",
+      "${REPOSITORY}/.github/scripts/sites_parity_check.py",
+      "--installed",
+      "--numerical-only",
+      "--workdir",
+      "${WORKDIR}/wheel-scientific",
+      "--output",
+      "${WORKDIR}/wheel-scientific.tsv"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 21.72706087504048,
+    "summaries": []
+  },
+  {
+    "label": "sdist-environment",
+    "command": [
+      "${HOME}/.local/bin/uv",
+      "venv",
+      "--python",
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "${WORKDIR}/sdist-env"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.03870841604657471,
+    "summaries": []
+  },
+  {
+    "label": "sdist-install",
+    "command": [
+      "env",
+      "CSUBST_SKIP_EXTENSIONS=1",
+      "${HOME}/.local/bin/uv",
+      "pip",
+      "install",
+      "--python",
+      "${WORKDIR}/sdist-env/bin/python",
+      "--no-binary",
+      "ete4",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz[test]"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 2.5287561250152066,
+    "summaries": []
+  },
+  {
+    "label": "sdist-import-prefix",
+    "command": [
+      "${WORKDIR}/sdist-env/bin/python",
+      "-I",
+      "-c",
+      "import csubst,pathlib,sys; from csubst._extensions import load_optional_extension; assert pathlib.Path(csubst.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix).resolve()); assert all(load_optional_extension(n) is None for n in ('combination_cy','omega_cy','parser_iqtree_cy','recoding_cy','substitution_cy','substitution_sparse_cy')); print(csubst.__version__,'installed source-only package verified')"
+    ],
+    "cwd": "${WORKDIR}/sdist-check",
+    "exit_code": 0,
+    "seconds": 0.025779166957363486,
+    "summaries": []
+  },
+  {
+    "label": "sdist-full",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/sdist-env/bin/python",
+      ".github/scripts/run_sdist_tests.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 48.39868500002194,
+    "summaries": [
+      "2154 passed, 39 skipped, 25 warnings in 27.09s",
+      "5 passed in 4.31s"
+    ]
+  },
+  {
+    "label": "source-fallback",
+    "command": [
+      "env",
+      "CSUBST_DISABLE_EXTENSIONS=1",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 19.64589304209221,
+    "summaries": [
+      "2154 passed, 39 skipped, 8 warnings in 14.52s",
+      "5 passed in 4.51s"
+    ]
+  },
+  {
+    "label": "final-source-test-fast",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test-fast"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 8.363087540958077,
+    "summaries": [
+      "1671 passed, 6 skipped, 8 warnings in 7.49s"
+    ]
+  },
+  {
+    "label": "final-source-lint",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "lint"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.48090279195457697,
+    "summaries": [
+      "All checks passed!",
+      "Repository hygiene checks passed.",
+      "Documentation checks passed: 22 documents, 23 commands, 1 help examples, 2 templates, 73 local links."
+    ]
+  },
+  {
+    "label": "final-source-typecheck",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "typecheck"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 2.5654701669700444,
+    "summaries": [
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file"
+    ]
+  },
+  {
+    "label": "final-source-test",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 18.346528332913294,
+    "summaries": [
+      "2184 passed, 9 skipped, 8 warnings in 13.60s",
+      "5 passed in 4.23s"
+    ]
+  },
+  {
+    "label": "final-pandas31-source-full",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-n",
+      "auto",
+      "--dist",
+      "worksteal",
+      "-m",
+      "not process",
+      "--ignore=tests/process"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 14.116064957925119,
+    "summaries": [
+      "2184 passed, 9 skipped, 14 warnings in 13.75s"
+    ]
+  },
+  {
+    "label": "final-package",
+    "command": [
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "package"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 37.53374329197686,
+    "summaries": [
+      "Successfully built csubst-1.16.22.tar.gz and csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ]
+  },
+  {
+    "label": "final-sdist-generated-c-wheel",
+    "command": [
+      "env",
+      "CSUBST_USE_CYTHON=0",
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "-m",
+      "pip",
+      "wheel",
+      "--no-deps",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz",
+      "--wheel-dir",
+      "${REPOSITORY}/dist/from-sdist"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 20.646697249962017,
+    "summaries": [
+      "Successfully built csubst"
+    ]
+  },
+  {
+    "label": "final-artifact-contents",
+    "command": [
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      ".github/scripts/package_artifact_check.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.07896945800166577,
+    "summaries": [
+      "Verified source distribution: dist/csubst-1.16.22.tar.gz",
+      "Verified wheel: dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ]
+  },
+  {
+    "label": "final-artifact-metadata",
+    "command": [
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "-m",
+      "twine",
+      "check",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz",
+      "${REPOSITORY}/dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.20347191602922976,
+    "summaries": []
+  },
+  {
+    "label": "final-wheel-install",
+    "command": [
+      "${HOME}/.local/bin/uv",
+      "pip",
+      "install",
+      "--python",
+      "${WORKDIR}/wheel-env/bin/python",
+      "--force-reinstall",
+      "--no-deps",
+      "${REPOSITORY}/dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.1532864160835743,
+    "summaries": []
+  },
+  {
+    "label": "final-wheel-import-prefix",
+    "command": [
+      "${WORKDIR}/wheel-env/bin/python",
+      "-I",
+      "-c",
+      "import csubst,importlib,pathlib,sys; p=pathlib.Path(sys.prefix).resolve(); assert pathlib.Path(csubst.__file__).resolve().is_relative_to(p); names=('combination_cy','omega_cy','parser_iqtree_cy','recoding_cy','substitution_cy','substitution_sparse_cy'); assert all(pathlib.Path(importlib.import_module('csubst.'+n).__file__).resolve().is_relative_to(p) for n in names); print(csubst.__version__,'six installed native extensions verified')"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 1.5590690000681207,
+    "summaries": []
+  },
+  {
+    "label": "final-wheel-full",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests",
+      "--import-mode=importlib",
+      "-q",
+      "-n",
+      "auto",
+      "--dist",
+      "worksteal",
+      "-m",
+      "not process",
+      "--ignore=${REPOSITORY}/tests/process"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 15.151780584012158,
+    "summaries": [
+      "2184 passed, 9 skipped, 14 warnings in 14.82s"
+    ]
+  },
+  {
+    "label": "final-wheel-process",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests/process",
+      "--import-mode=importlib",
+      "-q"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 4.476069458061829,
+    "summaries": [
+      "5 passed in 4.22s"
+    ]
+  },
+  {
+    "label": "final-wheel-native",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "CSUBST_STRICT_EXTENSIONS=1",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests",
+      "--import-mode=importlib",
+      "-q",
+      "-m",
+      "native"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 1.8903483329340816,
+    "summaries": [
+      "15 passed, 2183 deselected in 1.56s"
+    ]
+  },
+  {
+    "label": "final-wheel-scientific-reference",
+    "command": [
+      "${WORKDIR}/wheel-env/bin/python",
+      "${REPOSITORY}/.github/scripts/sites_parity_check.py",
+      "--installed",
+      "--numerical-only",
+      "--workdir",
+      "${WORKDIR}/final-wheel-scientific",
+      "--output",
+      "${WORKDIR}/final-wheel-scientific.tsv"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 21.401332624955103,
+    "summaries": []
+  },
+  {
+    "label": "final-sdist-install",
+    "command": [
+      "env",
+      "CSUBST_SKIP_EXTENSIONS=1",
+      "${HOME}/.local/bin/uv",
+      "pip",
+      "install",
+      "--python",
+      "${WORKDIR}/sdist-env/bin/python",
+      "--force-reinstall",
+      "--no-deps",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 2.647953125066124,
+    "summaries": []
+  },
+  {
+    "label": "final-sdist-import-prefix",
+    "command": [
+      "${WORKDIR}/sdist-env/bin/python",
+      "-I",
+      "-c",
+      "import csubst,pathlib,sys; from csubst._extensions import load_optional_extension; assert pathlib.Path(csubst.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix).resolve()); assert all(load_optional_extension(n) is None for n in ('combination_cy','omega_cy','parser_iqtree_cy','recoding_cy','substitution_cy','substitution_sparse_cy')); print(csubst.__version__,'installed source-only package verified')"
+    ],
+    "cwd": "${WORKDIR}/sdist-check",
+    "exit_code": 0,
+    "seconds": 0.023068125010468066,
+    "summaries": []
+  },
+  {
+    "label": "final-sdist-full",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/sdist-env/bin/python",
+      ".github/scripts/run_sdist_tests.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 35.7921109580202,
+    "summaries": [
+      "2154 passed, 39 skipped, 14 warnings in 16.36s",
+      "5 passed in 4.32s"
+    ]
+  },
+  {
+    "label": "final-source-fallback",
+    "command": [
+      "env",
+      "CSUBST_DISABLE_EXTENSIONS=1",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 20.433225541957654,
+    "summaries": [
+      "2154 passed, 39 skipped, 8 warnings in 15.40s",
+      "5 passed in 4.42s"
+    ]
+  },
+  {
+    "label": "release-pandas31-strict-source-full",
+    "command": [
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-n",
+      "auto",
+      "--dist",
+      "worksteal",
+      "-m",
+      "not process",
+      "--ignore=tests/process",
+      "-W",
+      "error::pandas.errors.Pandas4Warning"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 13.25,
+    "summaries": [
+      "2184 passed, 9 skipped, 8 warnings in 13.25s"
+    ],
+    "duration_scope": "pytest-reported elapsed; complete log retained in temporary check directory"
+  },
+  {
+    "label": "release-source-test-fast",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test-fast"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 8.78200608305633,
+    "summaries": [
+      "1671 passed, 6 skipped, 8 warnings in 7.71s"
+    ]
+  },
+  {
+    "label": "release-source-lint",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "lint"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.4629902500892058,
+    "summaries": [
+      "All checks passed!",
+      "Repository hygiene checks passed.",
+      "Documentation checks passed: 22 documents, 23 commands, 1 help examples, 2 templates, 73 local links."
+    ]
+  },
+  {
+    "label": "release-source-typecheck",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "typecheck"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 2.4484286670340225,
+    "summaries": [
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file"
+    ]
+  },
+  {
+    "label": "release-source-test",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 20.120230125030503,
+    "summaries": [
+      "2184 passed, 9 skipped, 8 warnings in 14.92s",
+      "5 passed in 4.65s"
+    ]
+  },
+  {
+    "label": "release-package",
+    "command": [
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "package"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 37.08500045794062,
+    "summaries": [
+      "Successfully built csubst-1.16.22.tar.gz and csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ]
+  },
+  {
+    "label": "release-sdist-generated-c-wheel",
+    "command": [
+      "env",
+      "CSUBST_USE_CYTHON=0",
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "-m",
+      "pip",
+      "wheel",
+      "--no-deps",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz",
+      "--wheel-dir",
+      "${REPOSITORY}/dist/from-sdist"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 20.211941667017527,
+    "summaries": [
+      "Successfully built csubst"
+    ]
+  },
+  {
+    "label": "release-artifact-contents",
+    "command": [
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      ".github/scripts/package_artifact_check.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.08050616702530533,
+    "summaries": [
+      "Verified source distribution: dist/csubst-1.16.22.tar.gz",
+      "Verified wheel: dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ]
+  },
+  {
+    "label": "release-artifact-metadata",
+    "command": [
+      "${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "-m",
+      "twine",
+      "check",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz",
+      "${REPOSITORY}/dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.22070750000420958,
+    "summaries": []
+  },
+  {
+    "label": "release-wheel-install",
+    "command": [
+      "${HOME}/.local/bin/uv",
+      "pip",
+      "install",
+      "--python",
+      "${WORKDIR}/wheel-env/bin/python",
+      "--force-reinstall",
+      "--no-deps",
+      "${REPOSITORY}/dist/from-sdist/csubst-1.16.22-cp312-cp312-macosx_11_0_arm64.whl"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.15256054198835045,
+    "summaries": []
+  },
+  {
+    "label": "release-wheel-import-prefix",
+    "command": [
+      "${WORKDIR}/wheel-env/bin/python",
+      "-I",
+      "-c",
+      "import csubst,importlib,pathlib,sys; p=pathlib.Path(sys.prefix).resolve(); assert pathlib.Path(csubst.__file__).resolve().is_relative_to(p); names=('combination_cy','omega_cy','parser_iqtree_cy','recoding_cy','substitution_cy','substitution_sparse_cy'); assert all(pathlib.Path(importlib.import_module('csubst.'+n).__file__).resolve().is_relative_to(p) for n in names); print(csubst.__version__,'six installed native extensions verified')"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 1.356541582965292,
+    "summaries": []
+  },
+  {
+    "label": "release-wheel-full",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests",
+      "--import-mode=importlib",
+      "-q",
+      "-n",
+      "auto",
+      "--dist",
+      "worksteal",
+      "-m",
+      "not process",
+      "--ignore=${REPOSITORY}/tests/process",
+      "-W",
+      "error::pandas.errors.Pandas4Warning"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 14.605776042095385,
+    "summaries": [
+      "2184 passed, 9 skipped, 8 warnings in 14.15s"
+    ]
+  },
+  {
+    "label": "release-wheel-process",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests/process",
+      "--import-mode=importlib",
+      "-q"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 4.95057345891837,
+    "summaries": [
+      "5 passed in 4.68s"
+    ]
+  },
+  {
+    "label": "release-wheel-native",
+    "command": [
+      "env",
+      "CSUBST_TEST_INSTALLED=1",
+      "PYTEST_ADDOPTS=-ra",
+      "CSUBST_STRICT_EXTENSIONS=1",
+      "${WORKDIR}/wheel-env/bin/python",
+      "-m",
+      "pytest",
+      "${REPOSITORY}/tests",
+      "--import-mode=importlib",
+      "-q",
+      "-m",
+      "native"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 1.706676207948476,
+    "summaries": [
+      "15 passed, 2183 deselected in 1.35s"
+    ]
+  },
+  {
+    "label": "release-wheel-scientific-reference",
+    "command": [
+      "${WORKDIR}/wheel-env/bin/python",
+      "${REPOSITORY}/.github/scripts/sites_parity_check.py",
+      "--installed",
+      "--numerical-only",
+      "--workdir",
+      "${WORKDIR}/release-wheel-scientific",
+      "--output",
+      "${WORKDIR}/release-wheel-scientific.tsv"
+    ],
+    "cwd": "${WORKDIR}/wheel-check",
+    "exit_code": 0,
+    "seconds": 21.62103116605431,
+    "summaries": []
+  },
+  {
+    "label": "release-sdist-install",
+    "command": [
+      "env",
+      "CSUBST_SKIP_EXTENSIONS=1",
+      "${HOME}/.local/bin/uv",
+      "pip",
+      "install",
+      "--python",
+      "${WORKDIR}/sdist-env/bin/python",
+      "--force-reinstall",
+      "--no-deps",
+      "${REPOSITORY}/dist/csubst-1.16.22.tar.gz"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 4.618334500002675,
+    "summaries": []
+  },
+  {
+    "label": "release-sdist-import-prefix",
+    "command": [
+      "${WORKDIR}/sdist-env/bin/python",
+      "-I",
+      "-c",
+      "import csubst,pathlib,sys; from csubst._extensions import load_optional_extension; assert pathlib.Path(csubst.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix).resolve()); assert all(load_optional_extension(n) is None for n in ('combination_cy','omega_cy','parser_iqtree_cy','recoding_cy','substitution_cy','substitution_sparse_cy')); print(csubst.__version__,'installed source-only package verified')"
+    ],
+    "cwd": "${WORKDIR}/sdist-check",
+    "exit_code": 0,
+    "seconds": 0.02567950007505715,
+    "summaries": []
+  },
+  {
+    "label": "release-sdist-full",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "${WORKDIR}/sdist-env/bin/python",
+      ".github/scripts/run_sdist_tests.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 35.34896854206454,
+    "summaries": [
+      "2154 passed, 39 skipped, 8 warnings in 15.59s",
+      "5 passed in 4.42s"
+    ]
+  },
+  {
+    "label": "release-source-fallback",
+    "command": [
+      "env",
+      "CSUBST_DISABLE_EXTENSIONS=1",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=${VERIFY_ENV_ROOT}/verify-venv/bin/python",
+      "test"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 19.531582582974806,
+    "summaries": [
+      "2154 passed, 39 skipped, 8 warnings in 14.51s",
+      "5 passed in 4.51s"
+    ]
+  },
+  {
+    "label": "release-direct-boundaries",
+    "command": [
+      "${HOME}/miniforge3-arm64/bin/python",
+      "${REPOSITORY}/reports/performance_round2_implementation_20261022/regression.py",
+      "--baseline",
+      "${WORKDIR}/baseline",
+      "--result",
+      "${WORKDIR}/release-regression.json"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 7.449135625036433,
+    "summaries": [
+      "Exact baseline comparisons passed: 95 95 16"
+    ]
+  }
+]

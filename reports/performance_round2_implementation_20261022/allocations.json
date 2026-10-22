@@ -1,0 +1,39 @@
+{
+  "scope": "allocation volume, not peak RSS or timing",
+  "records": {
+    "before": {
+      "substitution_scan.py:_rate_summary": {
+        "calls": 20703,
+        "allocated_array_bytes": 278248320
+      },
+      "scan_endpoint.py:expected_events": {
+        "calls": 206,
+        "allocated_array_bytes": 2768640
+      }
+    },
+    "after": {
+      "scan_endpoint.py:expected_events": {
+        "calls": 206,
+        "allocated_array_bytes": 2768640
+      }
+    }
+  },
+  "exact_outputs": {
+    "csubst_scan_units.tsv": {
+      "rows": 9,
+      "columns": 9,
+      "exact": true
+    },
+    "csubst_scan.tsv": {
+      "rows": 103,
+      "columns": 125,
+      "exact": true
+    },
+    "csubst_scan_calibration.json": {
+      "exact": true
+    },
+    "csubst_scan_inference.json": {
+      "exact": true
+    }
+  }
+}

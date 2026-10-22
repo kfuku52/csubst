@@ -1,0 +1,25 @@
+{
+  "status": "initial comparator stopped on intended version change; all timings discarded and full final run restarted in fresh directory",
+  "comparison_after_scoping_version_field": {
+    "csubst_scan_units.tsv": {
+      "rows": 9,
+      "columns": 9,
+      "exact": true
+    },
+    "csubst_scan.tsv": {
+      "rows": 103,
+      "columns": 125,
+      "exact": true
+    },
+    "csubst_scan_calibration.json": {
+      "exact": true
+    },
+    "csubst_scan_inference.json": {
+      "exact_except_csubst_version": true,
+      "csubst_versions": [
+        "1.16.21",
+        "1.16.22"
+      ]
+    }
+  }
+}

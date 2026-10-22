@@ -1,0 +1,21 @@
+{
+  "environment": "fresh installed 1.16.22 wheel with pandas 3.1.0",
+  "command": [
+    "env",
+    "CSUBST_TEST_INSTALLED=1",
+    "$WHEEL_PYTHON",
+    "-m",
+    "pytest",
+    "tests/integration/test_main_analyze.py",
+    "--import-mode=importlib",
+    "-q",
+    "-k",
+    "records_epistasis_negative_control_fields",
+    "-W",
+    "error:Setting a value on a DataFrame via .at",
+    "--maxfail=1"
+  ],
+  "expected_before_fix_exit": 1,
+  "actual_exit": 1,
+  "reason": "Pandas4Warning: .at expands a previously absent statistics column; replace those writes with .loc"
+}

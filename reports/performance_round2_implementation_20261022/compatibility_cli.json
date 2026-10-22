@@ -1,0 +1,51 @@
+{
+  "scope": "output regression only, not timing; identical saved inputs and all static cb_stats columns",
+  "comparisons": {
+    "pgk_structure": {
+      "csubst_cb_stats.tsv": {
+        "rows": 1,
+        "columns": 91,
+        "exact": true,
+        "excluded_dynamic_columns": [
+          "elapsed_sec"
+        ]
+      },
+      "csubst_cb_2.tsv": {
+        "rows": 1682,
+        "columns": 45,
+        "exact": true
+      },
+      "csubst_b.tsv": {
+        "rows": 65,
+        "columns": 10,
+        "exact": true
+      },
+      "csubst_epistasis.json": {
+        "exact": true
+      }
+    },
+    "pepc_structure": {
+      "csubst_cb_stats.tsv": {
+        "rows": 1,
+        "columns": 91,
+        "exact": true,
+        "excluded_dynamic_columns": [
+          "elapsed_sec"
+        ]
+      },
+      "csubst_cb_2.tsv": {
+        "rows": 8446,
+        "columns": 45,
+        "exact": true
+      },
+      "csubst_b.tsv": {
+        "rows": 141,
+        "columns": 10,
+        "exact": true
+      },
+      "csubst_epistasis.json": {
+        "exact": true
+      }
+    }
+  }
+}

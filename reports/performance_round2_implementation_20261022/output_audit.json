@@ -1,0 +1,1981 @@
+{
+  "scope": "all completed pairs rechecked after extending the comparator to static cb_stats metadata; only elapsed_sec and intended inference version differences are excluded",
+  "comparisons": {
+    "metadata_cli": {
+      "pgk_fixed200": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pepc_fixed200": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pgk_fixed_parallel200": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pgk_called50": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pepc_plain": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ]
+    },
+    "vectors_cli": {
+      "pgk_fixed200": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pepc_fixed200": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pepc_fixed1000": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pepc_fixed_parallel200": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pgk_full20": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ]
+    },
+    "analytic_cli": {
+      "pgk_analytic": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 23,
+            "columns": 131,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 23,
+            "columns": 131,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 23,
+            "columns": 131,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 23,
+            "columns": 131,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pepc_analytic": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 198,
+            "columns": 131,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 198,
+            "columns": 131,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 198,
+            "columns": 131,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 198,
+            "columns": 131,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ]
+    },
+    "structure_cli": {
+      "pgk_structure": [
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 91,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 1682,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 65,
+            "columns": 10,
+            "exact": true
+          },
+          "csubst_epistasis.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 91,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 1682,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 65,
+            "columns": 10,
+            "exact": true
+          },
+          "csubst_epistasis.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 91,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 1682,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 65,
+            "columns": 10,
+            "exact": true
+          },
+          "csubst_epistasis.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 91,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 1682,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 65,
+            "columns": 10,
+            "exact": true
+          },
+          "csubst_epistasis.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pepc_structure": [
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 91,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          },
+          "csubst_epistasis.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 91,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          },
+          "csubst_epistasis.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 91,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          },
+          "csubst_epistasis.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 91,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          },
+          "csubst_epistasis.json": {
+            "exact": true
+          }
+        }
+      ]
+    },
+    "diagnostic_cli": {
+      "pepc_fixed1000": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ],
+      "pgk_full_parallel20": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact": true
+          }
+        }
+      ]
+    },
+    "final_cli22": {
+      "pepc_fixed1000": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        }
+      ],
+      "pgk_fixed_parallel200": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        }
+      ],
+      "pgk_full_parallel20": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 2,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 12,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        }
+      ],
+      "pgk_search": [
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 1682,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 65,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 1682,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 65,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 1682,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 65,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 1682,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 65,
+            "columns": 10,
+            "exact": true
+          }
+        }
+      ],
+      "pepc_search": [
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        }
+      ],
+      "pepc_plain": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        }
+      ]
+    },
+    "final_confirm": {
+      "pepc_fixed1000": [
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        },
+        {
+          "csubst_scan_units.tsv": {
+            "rows": 9,
+            "columns": 9,
+            "exact": true
+          },
+          "csubst_scan.tsv": {
+            "rows": 103,
+            "columns": 125,
+            "exact": true
+          },
+          "csubst_scan_calibration.json": {
+            "exact": true
+          },
+          "csubst_scan_inference.json": {
+            "exact_except_csubst_version": true,
+            "csubst_versions": [
+              "1.16.21",
+              "1.16.22"
+            ]
+          }
+        }
+      ]
+    },
+    "memory_control": {
+      "pepc_search": [
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        },
+        {
+          "csubst_cb_stats.tsv": {
+            "rows": 1,
+            "columns": 82,
+            "exact": true,
+            "excluded_dynamic_columns": [
+              "elapsed_sec"
+            ]
+          },
+          "csubst_cb_2.tsv": {
+            "rows": 8446,
+            "columns": 45,
+            "exact": true
+          },
+          "csubst_b.tsv": {
+            "rows": 141,
+            "columns": 10,
+            "exact": true
+          }
+        }
+      ]
+    }
+  }
+}

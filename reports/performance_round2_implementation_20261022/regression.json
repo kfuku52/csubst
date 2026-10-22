@@ -1,0 +1,1038 @@
+{
+  "environment": {
+    "commit": "dd42117a5a013bf5a9825ed0826ba0ce1039476c",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "scan": {
+    "metadata": [
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "normal"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "other_none"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "normal"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "other_none"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "normal"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "other_none"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "normal"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "positive_zero"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "missing"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "zero_control"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "bad_order"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "no_context"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "bad_length"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "invalid_target",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "invalid_branch_id",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "both_invalid",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "missing_event_column",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "missing_length_column",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "invalid_length",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "invalid_parent",
+        "outcome": "error"
+      }
+    ],
+    "numeric_vectors": [
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "normal"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "other_none"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "raw",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "sn_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "raw_branch_length",
+        "length": "n_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "normal"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "other_none"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "raw",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "sn_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "state_aware",
+        "length": "n_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "normal"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "other_none"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "raw",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "sn_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "normal"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "overlap_duplicates"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "other_none"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "empty_groups"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "empty_events"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "nan_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "negative_event"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "zero_target"
+      },
+      {
+        "exposure": "q_weighted",
+        "length": "n_rescaled",
+        "case": "missing_state"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "normal"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "positive_zero"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "missing"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "zero_control"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "bad_order"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "no_context"
+      },
+      {
+        "exposure": "endpoint_stub",
+        "case": "bad_length"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "invalid_target",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "invalid_branch_id",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "both_invalid",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "missing_event_column",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "missing_length_column",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "invalid_length",
+        "outcome": "error"
+      },
+      {
+        "exposure": "failure_order",
+        "case": "invalid_parent",
+        "outcome": "error"
+      }
+    ],
+    "numeric_path_calls": 347,
+    "exact": true
+  },
+  "cv": [
+    {
+      "case": "normal",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "zero_context",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "zero_counts",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "missing_row",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "readonly",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "buffer",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "two_partitions",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "nan_counts",
+      "exact": true,
+      "outcome": "error"
+    },
+    {
+      "case": "overflow",
+      "exact": true,
+      "outcome": "error"
+    },
+    {
+      "case": "wrong_shape",
+      "exact": true,
+      "outcome": "error"
+    },
+    {
+      "case": "few_clades",
+      "exact": true,
+      "outcome": "error"
+    },
+    {
+      "case": "fixed_zero",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "all_undefined",
+      "exact": true,
+      "outcome": "error"
+    },
+    {
+      "case": "no_features",
+      "exact": true,
+      "outcome": "error"
+    },
+    {
+      "case": "ties",
+      "exact": true,
+      "outcome": "result"
+    },
+    {
+      "case": "float32",
+      "exact": true,
+      "outcome": "result"
+    }
+  ]
+}
