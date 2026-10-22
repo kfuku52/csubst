@@ -1962,8 +1962,9 @@ def _rate_summary(
             event_by_branch = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
         event_values = np.array([float(event_by_branch.get(int(bid), 0.0)) for bid in branch_ids], dtype=np.float64)
     chosen_length, raw_length, sn_length, n_length = branch_data.get_lengths(rate_length)
-    missing_exposure = np.zeros(branch_ids.shape[0], dtype=bool)
-    exposure_reasons = np.full(branch_ids.shape[0], "ok", dtype="U24")
+    if rate_exposure != "endpoint":
+        missing_exposure = np.zeros(branch_ids.shape[0], dtype=bool)
+        exposure_reasons = np.full(branch_ids.shape[0], "ok", dtype="U24")
     if rate_exposure == "endpoint":
         if rate_length != "raw" or endpoint_context is None:
             raise ValueError("Scan endpoint requires raw model lengths and a fitted endpoint context.")
