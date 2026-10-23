@@ -135,6 +135,29 @@ def test_rate_metadata_is_lazy_so_event_column_error_precedes_length_error():
             'raw', 'raw_branch_length', prepared_branch=prepared)
 
 
+@pytest.mark.parametrize('exposure', ['raw_branch_length', 'state_aware', 'q_weighted'])
+@pytest.mark.parametrize('lengths', [[.1, .2], [0., .2], [.1, 0.], [0., 0.]])
+@pytest.mark.parametrize('vector', [False, True])
+def test_legacy_score_only_preserves_full_summary_testability(exposure, lengths, vector):
+    meta = pd.DataFrame({'branch_id': [1, 2], 'parent_id': [0, 0],
+                         'raw_length': lengths, 'sn_rescaled_length': lengths,
+                         'n_rescaled_length': lengths})
+    events = pd.DataFrame({'branch_id': [1, 2], 'event_pp': [.5, .25]})
+    if vector:
+        events = substitution_scan._PosteriorBranchValues(events, 3)
+    options = dict(candidate_events=events, branch_meta=meta, state_nsy=np.ones((3, 1, 2)) / 2,
+                   site=0, from_ids=[0], to_ids=[1], target_branch_ids=[1], rate_length='raw',
+                   rate_exposure=exposure, q_matrix=np.array([[-2., 2.], [5., -5.]]),
+                   prepared_branch=substitution_scan._ScanRateMetadata(meta).prepare([1], None))
+    full = substitution_scan._rate_summary(**options)
+    compact = substitution_scan._rate_summary(**options, score_only=True)
+    np.testing.assert_equal(compact, {key: full[key] for key in compact})
+    assert substitution_scan.scan_statistics.calibration_score(compact) == (
+        substitution_scan.scan_statistics.calibration_score(full))
+    if 0 in lengths:
+        assert 'legacy_zero_exposure' in full['target_exposure_diagnostics'] + full['other_exposure_diagnostics']
+
+
 @pytest.mark.parametrize('length', [[], 'unknown'])
 def test_rate_metadata_retains_invalid_length_error(length):
     meta = pd.DataFrame({'branch_id': [1]})

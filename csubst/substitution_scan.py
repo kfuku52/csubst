@@ -1934,6 +1934,7 @@ class _ScanRateMetadata:
         self.branch_ids = None
         self._lengths = {}
         self._parent_ids = None
+        self._event_selection = None
 
     def prepare(self, target_branch_ids, other_branch_ids):
         # Keep conversion lazy and ordered like the unprepared rate call.
@@ -1948,6 +1949,19 @@ class _ScanRateMetadata:
             other_set = other_set.difference(target_set)
         is_other = np.isin(self.branch_ids, np.array(sorted(other_set), dtype=np.int64))
         return self, is_target, is_other
+
+    def select_events(self, events):
+        # One fixed branch axis per assignment; retain only the last size's
+        # bounds check, never an event vector or a per-candidate index cache.
+        size = len(events.values)
+        selection = self._event_selection
+        if selection is None or selection[0] != size:
+            ids = self.branch_ids
+            selection = (size, bool(((ids >= 0) & (ids < size)).all()))
+            self._event_selection = selection
+        if selection[1]:
+            return events.values[self.branch_ids]
+        return events.select(self.branch_ids)
 
     def get_lengths(self, rate_length):
         length_col = _length_column(rate_length)
@@ -1990,7 +2004,7 @@ def _rate_summary(
     branch_data, is_target, is_other = prepared_branch
     branch_ids = branch_data.branch_ids
     if isinstance(candidate_events, _PosteriorBranchValues):
-        event_values = candidate_events.select(branch_ids)
+        event_values = branch_data.select_events(candidate_events)
     else:
         event_ids = candidate_events["branch_id"]
         if event_ids.is_unique:
@@ -2001,9 +2015,6 @@ def _rate_summary(
             event_by_branch = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
         event_values = np.array([float(event_by_branch.get(int(bid), 0.0)) for bid in branch_ids], dtype=np.float64)
     chosen_length, raw_length, sn_length, n_length = branch_data.get_lengths(rate_length)
-    if rate_exposure != "endpoint":
-        missing_exposure = np.zeros(branch_ids.shape[0], dtype=bool)
-        exposure_reasons = np.full(branch_ids.shape[0], "ok", dtype="U24")
     if rate_exposure == "endpoint":
         if rate_length != "raw" or endpoint_context is None:
             raise ValueError("Scan endpoint requires raw model lengths and a fitted endpoint context.")
@@ -2043,8 +2054,6 @@ def _rate_summary(
         txt = "--scan_rate_exposure should be one of {}."
         raise ValueError(txt.format(", ".join(SCAN_RATE_EXPOSURES)))
     exposure = opportunity if rate_exposure == "endpoint" else chosen_length * opportunity
-    if rate_exposure != "endpoint":
-        exposure_reasons[exposure == 0] = "legacy_zero_exposure"
     target_event = float(event_values[is_target].sum())
     other_event = float(event_values[is_other].sum())
     target_exposure = float(exposure[is_target].sum())
@@ -2070,6 +2079,10 @@ def _rate_summary(
             "target_exposure": target_exposure,
             "other_exposure": other_exposure,
         }
+    if rate_exposure != "endpoint":
+        missing_exposure = np.zeros(branch_ids.shape[0], dtype=bool)
+        exposure_reasons = np.full(branch_ids.shape[0], "ok", dtype="U24")
+        exposure_reasons[exposure == 0] = "legacy_zero_exposure"
     target_rate = target_event / target_exposure if target_exposure > 0 else np.nan
     other_rate = other_event / other_exposure if other_exposure > 0 else np.nan
     if np.isfinite(target_rate) and np.isfinite(other_rate):

@@ -233,12 +233,11 @@ class EndpointModel:
                         pred += (class_weight[c, :, None, None]
                                  * post[c, parent, :, :, None] * transition)
                     if observed_transform is not None:
-                        for target, lvalues, rvalues, reducer in (
-                                (reduced, left, right, observed_transform),
-                                (reduced_pred, post[c, parent], np.ones_like(right),
-                                 predictive_transform or observed_transform)):
-                            if target is reduced_pred and not predictive:
-                                continue
+                        reductions = [(reduced, left, right, observed_transform)]
+                        if predictive:
+                            reductions.append((reduced_pred, post[c, parent], np.ones_like(right),
+                                               predictive_transform or observed_transform))
+                        for target, lvalues, rvalues, reducer in reductions:
                             values = reducer(lvalues * class_weight[c, :, None], rvalues, transition)
                             for key, value in values.items():
                                 if key not in target:

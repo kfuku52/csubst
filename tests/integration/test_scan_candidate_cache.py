@@ -47,6 +47,21 @@ def test_unretainable_vectors_and_single_pass_calls_keep_dataframe_path():
     assert '_event_cache' not in disabled
 
 
+@pytest.mark.parametrize('ids', [[3, 1, 1, 0], [3, -1, 10**12, 1], [], [-1, 10**12]])
+def test_prepared_event_selection_preserves_order_missing_ids_and_vector_size_changes(ids):
+    meta = pd.DataFrame({'branch_id': ids})
+    data, _, _ = scan._ScanRateMetadata(meta).prepare([1], None)
+    for size in (4, 2, 4):
+        frame = pd.DataFrame({'branch_id': np.arange(size), 'event_pp': np.arange(size) / 4})
+        vector = scan._PosteriorBranchValues(frame, size)
+        actual = data.select_events(vector)
+        expected = np.array([bid / 4 if 0 <= bid < size else 0. for bid in ids])
+        np.testing.assert_array_equal(actual, expected, strict=True)
+        actual[:] = -1
+        np.testing.assert_array_equal(data.select_events(vector), expected, strict=True)
+        assert not vector.values.flags.writeable
+
+
 def test_numeric_candidate_cache_eviction_and_fit_keys():
     tensor = np.zeros((4, 3, 1, 2, 2))
     tensor[1, :, 0, 0, 1] = [.1, .2, .3]

@@ -94,6 +94,51 @@ def test_state_permutation_and_selected_edges():
     assert reordered[2].joint is None
 
 
+@pytest.mark.parametrize('predictive', [False, True])
+@pytest.mark.parametrize('block_size', [1, 2, 64])
+@pytest.mark.parametrize('rates,weights', [([1.], [1.]), ([0., .2, 2.], [.2, .4, .4])])
+def test_transformed_selected_and_unselected_edges_match_enumeration(predictive, block_size, rates, weights):
+    parents, lengths = [-1, 0, 1, 1, 0], [0, .03, .4, .2, .7]
+    pi = np.array([.2, .3, .5])
+    q = np.tile(pi, (3, 1)) - np.eye(3)
+    tips = {2: np.array([[1., 0, 0], [0, 1, 0], [1, 1, 1]]),
+            3: np.array([[0., 1, 0], [0, 1, 0], [1, 1, 1]]),
+            4: np.array([[1., 1, 0], [.1, .5, .8], [1, 1, 1]])}
+    nodes, edges, predictions = enumerate_model(parents, lengths, q, pi, tips, rates, weights)
+    prediction_calls = []
+
+    def full(left, right, transition):
+        return {'mass': left[:, :, None] * transition * right[:, None, :]}
+
+    def coarse(left, right, transition):
+        return {'total': ((left @ transition) * right).sum(axis=1)}
+
+    def prediction(left, right, transition):
+        np.testing.assert_array_equal(right, np.ones(right.shape))
+        prediction_calls.append(1)
+        return full(left, right, transition)
+
+    model = EndpointModel(parents, lengths, q, pi, rates, weights)
+    for record in model.iter_blocks(tips, block_size, branch_ids=[1], joint=False,
+                                    predictive=predictive, transform=full,
+                                    unselected_transform=coarse, predictive_transform=prediction):
+        sl = slice(record.start, record.stop)
+        np.testing.assert_allclose(record.node, nodes[record.child, sl], atol=2e-14, rtol=0)
+        assert record.joint is None and record.predictive is None
+        if record.parent < 0:
+            continue
+        expected = {'mass': edges[record.child][sl]} if record.child == 1 else {
+            'total': edges[record.child][sl].sum(axis=(1, 2))}
+        for key, value in expected.items():
+            np.testing.assert_allclose(record.reduced[key], value, atol=2e-14, rtol=0)
+        if predictive:
+            np.testing.assert_allclose(record.reduced_predictive['mass'], predictions[record.child][sl],
+                                       atol=2e-14, rtol=0)
+        else:
+            assert record.reduced_predictive == {}
+    assert bool(prediction_calls) == predictive
+
+
 def test_inactive_structural_states_and_missing_tips():
     q = np.array([[-1., 1, 0], [1, -1, 0], [0, 0, 0]])
     m = EndpointModel([-1, 0, 0], [0, .1, .2], q, [.5, .5, 0])

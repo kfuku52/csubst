@@ -1,0 +1,185 @@
+[
+  {
+    "label": "focused",
+    "command": [
+      "<PYTHON312>",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/unit/test_endpoint.py",
+      "tests/unit/test_scan_statistics.py",
+      "tests/integration/test_scan_candidate_cache.py",
+      "tests/integration/test_scan_candidates_and_rates.py",
+      "tests/integration/test_scan_endpoint.py",
+      "tests/integration/test_scan_calibration.py",
+      "tests/parity"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 4,
+    "seconds": 1.7222751670051366,
+    "summaries": [
+      "ERROR: file or directory not found: tests/integration/test_scan_calibration.py"
+    ]
+  },
+  {
+    "label": "focused-corrected",
+    "command": [
+      "<PYTHON312>",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/unit/test_endpoint.py",
+      "tests/unit/test_endpoint_io.py",
+      "tests/unit/test_endpoint_event_fallback.py",
+      "tests/unit/test_scan_statistics.py",
+      "tests/integration/test_scan_candidate_cache.py",
+      "tests/integration/test_scan_candidates_and_rates.py",
+      "tests/integration/test_scan_endpoint.py",
+      "tests/integration/test_scan_calibration_null.py",
+      "tests/integration/test_scan_permutations.py",
+      "tests/integration/test_scan_ctmc.py",
+      "tests/parity"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 6.959999041981064,
+    "summaries": [
+      "397 passed in 5.88s"
+    ]
+  },
+  {
+    "label": "maintained-lanes",
+    "command": [
+      "make",
+      "PYTHON=<PYTHON312>",
+      "test-fast",
+      "lint",
+      "typecheck",
+      "test",
+      "test-native"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 81.87823479203507,
+    "summaries": [
+      "1704 passed, 6 skipped, 8 warnings in 17.94s",
+      "All checks passed!",
+      "Repository hygiene checks passed.",
+      "Documentation checks passed: 22 documents, 23 commands, 1 help examples, 2 templates, 73 local links.",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "2249 passed, 9 skipped, 8 warnings in 28.93s",
+      "5 passed in 18.03s",
+      "15 passed, 2248 deselected in 3.67s"
+    ]
+  },
+  {
+    "label": "native-imports",
+    "command": [
+      "<PYTHON312>",
+      "-c",
+      "import importlib; from importlib.machinery import EXTENSION_SUFFIXES; names=[\"combination_cy\",\"substitution_cy\",\"substitution_sparse_cy\",\"recoding_cy\",\"parser_iqtree_cy\",\"omega_cy\"]; modules=[importlib.import_module(\"csubst.\"+name) for name in names]; assert all(any(module.__file__.endswith(suffix) for suffix in EXTENSION_SUFFIXES) for module in modules); print(\"Verified 6 compiled modules\")"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.15503966703545302,
+    "summaries": [
+      "Verified 6 compiled modules"
+    ]
+  },
+  {
+    "label": "focused-py314",
+    "command": [
+      "python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/unit/test_endpoint.py",
+      "tests/unit/test_endpoint_io.py",
+      "tests/unit/test_endpoint_event_fallback.py",
+      "tests/unit/test_scan_statistics.py",
+      "tests/integration/test_scan_candidate_cache.py",
+      "tests/integration/test_scan_candidates_and_rates.py",
+      "tests/integration/test_scan_endpoint.py",
+      "tests/integration/test_scan_calibration_null.py",
+      "tests/integration/test_scan_permutations.py",
+      "tests/integration/test_scan_ctmc.py",
+      "tests/parity"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 12.786390249966644,
+    "summaries": [
+      "394 passed in 9.31s"
+    ]
+  },
+  {
+    "label": "fallback-full",
+    "command": [
+      "env",
+      "CSUBST_DISABLE_EXTENSIONS=1",
+      "make",
+      "PYTHON=<PYTHON312>",
+      "test"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 47.92514912493061,
+    "summaries": [
+      "2219 passed, 39 skipped, 8 warnings in 31.77s",
+      "5 passed in 15.13s"
+    ]
+  },
+  {
+    "label": "report-audit",
+    "command": [
+      "python",
+      "reports/performance_round4_20261023/audit_report.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.2442002499010414,
+    "summaries": [
+      "Verified 16 report files, 48 CLI output pairs and final source fingerprints."
+    ]
+  },
+  {
+    "label": "report-lint",
+    "command": [
+      "python",
+      "-m",
+      "ruff",
+      "check",
+      "reports/performance_round4_20261023"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.04912595800124109,
+    "summaries": [
+      "All checks passed!"
+    ]
+  }
+]

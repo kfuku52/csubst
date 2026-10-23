@@ -1,0 +1,790 @@
+{
+  "scope": "all output files except csubst.log; table elapsed_sec and search run_id excluded",
+  "paired_runs_including_warmups": 30,
+  "cases": {
+    "pepc_fixed1000": [
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 9,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 103,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 9,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 103,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 9,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 103,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 9,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 103,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 9,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 103,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 9,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 103,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      }
+    ],
+    "pepc_search": [
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 8446,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 141,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 8446,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 141,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 8446,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 141,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 8446,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 141,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 8446,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 141,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 8446,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 141,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      }
+    ],
+    "pgk_called50": [
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      }
+    ],
+    "pgk_marginal200": [
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      },
+      {
+        "csubst_scan_units.tsv": {
+          "rows": 2,
+          "columns": 9,
+          "exact": true
+        },
+        "csubst_scan.tsv": {
+          "rows": 12,
+          "columns": 125,
+          "exact": true
+        },
+        "csubst_scan_calibration.json": {
+          "exact": true
+        },
+        "csubst_scan_inference.json": {
+          "exact": true
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        }
+      }
+    ],
+    "pgk_search": [
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 1682,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 65,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 1682,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 65,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 1682,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 65,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 1682,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 65,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 1682,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 65,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      },
+      {
+        "csubst_cb_stats.tsv": {
+          "rows": 1,
+          "columns": 82,
+          "exact": true,
+          "excluded_dynamic_columns": [
+            "elapsed_sec"
+          ]
+        },
+        "csubst_cb_2.tsv": {
+          "rows": 1682,
+          "columns": 45,
+          "exact": true
+        },
+        "csubst_b.tsv": {
+          "rows": 65,
+          "columns": 10,
+          "exact": true
+        },
+        "csubst_endpoint_model.json": {
+          "exact": true,
+          "excluded_dynamic_fields": []
+        },
+        "csubst_foreground_branch.txt": {
+          "byte_exact": true
+        },
+        "csubst_search_run.json": {
+          "exact": true,
+          "excluded_dynamic_fields": [
+            "run_id"
+          ]
+        }
+      }
+    ]
+  }
+}

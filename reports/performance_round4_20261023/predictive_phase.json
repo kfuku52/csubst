@@ -1,0 +1,266 @@
+{
+  "environment": {
+    "commit": "c371a1b54b317831f923bfc0024fef65d039f636",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "scope": "in-process phase timings, excluding CLI startup",
+  "source_sha256": {
+    "endpoint.py": "4d64021b56d99b84655962cd88616d30a812c008bbbfaf119027296a46aa9d1a",
+    "substitution_scan.py": "9d74dc04a54210b1eaa9cdf34bf8482bad0c33986805e3c9d650981fb910675d",
+    "scan_statistics.py": "d5dbf683d275ba347320d824e970d6352f5fef058c8183835e01991ecd432b89"
+  },
+  "cases": {
+    "pgk_search": {
+      "input_sha256": {
+        "PGK.alignment.fa": "f9fa71ef37cfcb1d8fc4364d26672c0de5489be99627b8ceddf6bd01a330ece3",
+        "PGK.tree.nwk": "f01a2aba24196290d94f5fae67329749502e274f8112998c27e8b8a1c94e045b",
+        "PGK.foreground.txt": "0ab2b2e205647b12e1d54b2c7b0f3428e53a8e7d77cd96e7b053a7f762e97258",
+        "PGK.alignment.fa.treefile": "2b21c8be1845363c21ed6a82738896eb1fc5146b3cb1e6043e6c2b82802f6774",
+        "PGK.alignment.fa.state": "827fce5ce8ea110b6f2cb1748ecbd0b474067588ddd33bb7478bce8cdb89479e",
+        "PGK.alignment.fa.rate": "a374d438f78048c7eba2afe259ed559e87d66fe968b94ee0bf40e21c160e9276",
+        "PGK.alignment.fa.iqtree": "834f507c64a5b2156c97aaee5661c08d75faf16d1430823a7d201443b487cfbd",
+        "PGK.alignment.fa.log": "ef157bfd8b36e8231e3648c0095f9083e9016bc21438eb097d5d08b481246e03"
+      },
+      "captured_rate_calls": 0,
+      "endpoint": {
+        "iterations_per_sample": 1,
+        "repeats": 9,
+        "warmups": 1,
+        "runs": {
+          "before": [
+            {
+              "wall_s": 0.6312724589370191,
+              "cpu_s": 0.5385230000000005
+            },
+            {
+              "wall_s": 0.5862135840579867,
+              "cpu_s": 0.5287660000000001
+            },
+            {
+              "wall_s": 0.6549980839481577,
+              "cpu_s": 0.5153999999999996
+            },
+            {
+              "wall_s": 1.143497624900192,
+              "cpu_s": 0.5859550000000002
+            },
+            {
+              "wall_s": 0.8361341250129044,
+              "cpu_s": 0.5852830000000004
+            },
+            {
+              "wall_s": 0.6322524169227108,
+              "cpu_s": 0.5250600000000016
+            },
+            {
+              "wall_s": 0.6020462079904974,
+              "cpu_s": 0.5353519999999996
+            },
+            {
+              "wall_s": 0.5916005000472069,
+              "cpu_s": 0.5446810000000006
+            },
+            {
+              "wall_s": 0.6028265000786632,
+              "cpu_s": 0.5560010000000002
+            }
+          ],
+          "after": [
+            {
+              "wall_s": 0.7667345840018243,
+              "cpu_s": 0.5291879999999995
+            },
+            {
+              "wall_s": 0.6144607500173151,
+              "cpu_s": 0.5313460000000001
+            },
+            {
+              "wall_s": 0.7308770830277354,
+              "cpu_s": 0.5020159999999994
+            },
+            {
+              "wall_s": 1.5706665839534253,
+              "cpu_s": 0.5635820000000002
+            },
+            {
+              "wall_s": 0.8164417080115527,
+              "cpu_s": 0.5505139999999997
+            },
+            {
+              "wall_s": 1.0924802500521764,
+              "cpu_s": 0.5857890000000001
+            },
+            {
+              "wall_s": 0.5677187499823049,
+              "cpu_s": 0.5354550000000007
+            },
+            {
+              "wall_s": 0.5766351249767467,
+              "cpu_s": 0.5353689999999993
+            },
+            {
+              "wall_s": 0.5929642919218168,
+              "cpu_s": 0.5348699999999997
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 0.6312724589370191,
+              "min": 0.5862135840579867,
+              "max": 1.143497624900192
+            },
+            "cpu_s": {
+              "median": 0.5385230000000005,
+              "min": 0.5153999999999996,
+              "max": 0.5859550000000002
+            }
+          },
+          "after": {
+            "wall_s": {
+              "median": 0.7308770830277354,
+              "min": 0.5677187499823049,
+              "max": 1.5706665839534253
+            },
+            "cpu_s": {
+              "median": 0.5353689999999993,
+              "min": 0.5020159999999994,
+              "max": 0.5857890000000001
+            }
+          }
+        },
+        "exact_records": 455
+      }
+    },
+    "pepc_search": {
+      "input_sha256": {
+        "PEPC.alignment.fa": "c95a860e443f10b3e5b93736ccc5ddeb681a0714368932bb714d0c95435949ef",
+        "PEPC.tree.nwk": "fe287d9ce9802fa35e6707cb33f187d96f06e0e55d54aadde27348993df7c8f4",
+        "PEPC.foreground.txt": "485e21c9dfd1f7e7f0122c3cc657eb68850dcd1c1f9358c47d7b912c711c7f5d",
+        "PEPC.alignment.fa.treefile": "47459e7ceaf02ce45eea1e60f6b85aee0f58c3815891a657517d78fa02dc346d",
+        "PEPC.alignment.fa.state": "4abb134159d5716e94e33ff50a89e619d877ca095ed39bae55c96d058c7631e0",
+        "PEPC.alignment.fa.rate": "1b1721e9e887e51a11efe1e4bbb149539d8c82666fd08cec4d9f60cf9dec19f7",
+        "PEPC.alignment.fa.iqtree": "c392821f49840bd82b6af87a0b7d416efe3a0a4caef08eb8fc66060b3fe103af",
+        "PEPC.alignment.fa.log": "9b158beb43041cd988fd9a4e1503fc29be3eddd4db8af741f6dd9b4b2c691eb0"
+      },
+      "captured_rate_calls": 0,
+      "endpoint": {
+        "iterations_per_sample": 1,
+        "repeats": 9,
+        "warmups": 1,
+        "runs": {
+          "before": [
+            {
+              "wall_s": 4.1150788749800995,
+              "cpu_s": 3.1074569999999966
+            },
+            {
+              "wall_s": 5.728382250061259,
+              "cpu_s": 3.1718580000000003
+            },
+            {
+              "wall_s": 4.78652454202529,
+              "cpu_s": 3.041702000000001
+            },
+            {
+              "wall_s": 3.326679041958414,
+              "cpu_s": 2.854951
+            },
+            {
+              "wall_s": 3.434511457919143,
+              "cpu_s": 2.9786490000000043
+            },
+            {
+              "wall_s": 3.08167083398439,
+              "cpu_s": 2.849654000000001
+            },
+            {
+              "wall_s": 3.0847562910057604,
+              "cpu_s": 2.866067000000001
+            },
+            {
+              "wall_s": 3.9623626249376684,
+              "cpu_s": 2.924640999999994
+            },
+            {
+              "wall_s": 3.0593988749897107,
+              "cpu_s": 2.7058120000000088
+            }
+          ],
+          "after": [
+            {
+              "wall_s": 5.629398667020723,
+              "cpu_s": 3.3088580000000007
+            },
+            {
+              "wall_s": 6.231677999952808,
+              "cpu_s": 3.232146
+            },
+            {
+              "wall_s": 3.561004750081338,
+              "cpu_s": 2.923583999999998
+            },
+            {
+              "wall_s": 3.644247333984822,
+              "cpu_s": 2.958053999999997
+            },
+            {
+              "wall_s": 3.288465042016469,
+              "cpu_s": 2.839387000000002
+            },
+            {
+              "wall_s": 3.216800707974471,
+              "cpu_s": 2.8802949999999967
+            },
+            {
+              "wall_s": 3.0295434170402586,
+              "cpu_s": 2.8144140000000135
+            },
+            {
+              "wall_s": 3.465121166082099,
+              "cpu_s": 2.817953000000003
+            },
+            {
+              "wall_s": 3.768267708015628,
+              "cpu_s": 2.942639
+            }
+          ]
+        },
+        "summary": {
+          "before": {
+            "wall_s": {
+              "median": 3.434511457919143,
+              "min": 3.0593988749897107,
+              "max": 5.728382250061259
+            },
+            "cpu_s": {
+              "median": 2.924640999999994,
+              "min": 2.7058120000000088,
+              "max": 3.1718580000000003
+            }
+          },
+          "after": {
+            "wall_s": {
+              "median": 3.561004750081338,
+              "min": 3.0295434170402586,
+              "max": 6.231677999952808
+            },
+            "cpu_s": {
+              "median": 2.923583999999998,
+              "min": 2.8144140000000135,
+              "max": 3.3088580000000007
+            }
+          }
+        },
+        "exact_records": 2256
+      }
+    }
+  }
+}

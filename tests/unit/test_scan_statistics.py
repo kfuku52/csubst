@@ -103,6 +103,22 @@ def test_zero_exposure_is_a_declared_no_test_but_bad_data_still_fail():
         stats.calibration_score(dict(row, target_exposure_branch_length=1., other_exposure_branch_length=1.))
 
 
+@pytest.mark.parametrize('score,exposure,expected', [
+    (0, 0., 0.), (0, 1., 0.), (1e200, 1., 1e200), (np.float32(2.), 1., 2.), ('2', 0., 2.),
+    (np.nan, 0., -np.inf), (np.nan, 1., None),
+    (-1., 0., None), (-1., 1., None), (np.inf, 0., None), (np.inf, 1., None),
+    (-np.inf, 0., None), (-np.inf, 1., None),
+])
+def test_calibration_score_scalar_validation_preserves_no_test_and_errors(score, exposure, expected):
+    row = dict(score_rate_enrichment=score, target_event_count=2., other_event_count=.01,
+               target_exposure=exposure, other_exposure=1.)
+    if expected is None:
+        with pytest.raises(ValueError, match='Undefined rate score'):
+            stats.calibration_score(row)
+    else:
+        assert stats.calibration_score(row) == expected
+
+
 def test_enumerated_reference_includes_candidate_discovery():
     # All eight equally probable outcomes of three independent binary features;
     # discovery retains only positive features. Max-score reference includes

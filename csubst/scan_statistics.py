@@ -56,7 +56,7 @@ def maximum_score(frame):
 
 def calibration_score(row):
     score = float(row['score_rate_enrichment'])
-    if np.isfinite(score) and score >= 0:
+    if math.isfinite(score) and score >= 0:
         return score
     # This is a declared testability rule, not silent omission of undefined
     # arithmetic: current instantaneous-Q exposure can be zero for observed
@@ -64,7 +64,7 @@ def calibration_score(row):
     required = ('target_event_count', 'other_event_count',
                 'target_exposure' if 'target_exposure' in row else 'target_exposure_branch_length',
                 'other_exposure' if 'other_exposure' in row else 'other_exposure_branch_length')
-    if np.isnan(score) and all(key in row for key in required):
+    if math.isnan(score) and all(key in row for key in required):
         counts_exposure = np.array([row[key] for key in required], dtype=float)
         if (np.isfinite(counts_exposure).all() and (counts_exposure >= 0).all()
                 and (counts_exposure[2:] == 0).any()):
