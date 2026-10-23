@@ -1,0 +1,287 @@
+{
+  "version": "1.17.0",
+  "pre_push_base": "624bb8a6dae536d0fa10891f666684ef1ad3dab0",
+  "commands": [
+    {
+      "label": "rebuild-sdist-wheel",
+      "command": [
+        "<PYTHON312>",
+        "-m",
+        "pip",
+        "wheel",
+        "--no-deps",
+        "<RELEASE_WORK>/source/dist/csubst-1.17.0.tar.gz",
+        "--wheel-dir",
+        "<RELEASE_WORK>/source/dist/from-sdist"
+      ],
+      "exit_code": 0,
+      "seconds": 31.990747957956046,
+      "summaries": [
+        "Successfully built csubst"
+      ],
+      "environment": {
+        "CSUBST_USE_CYTHON": "0"
+      }
+    },
+    {
+      "label": "artifact-check",
+      "command": [
+        "<PYTHON312>",
+        ".github/scripts/package_artifact_check.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.11421441694255918,
+      "summaries": [
+        "Verified source distribution: dist/csubst-1.17.0.tar.gz",
+        "Verified wheel: dist/from-sdist/csubst-1.17.0-cp312-cp312-macosx_11_0_arm64.whl"
+      ]
+    },
+    {
+      "label": "twine-sdist-wheel",
+      "command": [
+        "<PYTHON312>",
+        "-m",
+        "twine",
+        "check",
+        "<RELEASE_WORK>/source/dist/csubst-1.17.0.tar.gz",
+        "<RELEASE_WORK>/source/dist/from-sdist/csubst-1.17.0-cp312-cp312-macosx_11_0_arm64.whl"
+      ],
+      "exit_code": 0,
+      "seconds": 0.6260755830444396,
+      "summaries": [
+        "source/dist/from-sdist/csubst-1.17.0-cp312-cp312-macosx_11_0_arm64.whl: PASSED",
+        "source/dist/csubst-1.17.0.tar.gz: PASSED"
+      ]
+    },
+    {
+      "label": "create-wheel-venv",
+      "command": [
+        "<PYTHON312>",
+        "-m",
+        "venv",
+        "<RELEASE_WORK>/wheel-venv"
+      ],
+      "exit_code": 0,
+      "seconds": 2.1922561660176143,
+      "summaries": []
+    },
+    {
+      "label": "install-wheel",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        ".github/scripts/install_test_artifact.py"
+      ],
+      "exit_code": 0,
+      "seconds": 21.07164587499574,
+      "summaries": [
+        "Successfully installed bottle-0.13.4 brotli-1.2.1 certifi-2026.10.19 charset_normalizer-3.5.2 cheroot-11.1.2 contourpy-1.4.0 coverage-7.17.0 csubst-1.17.0 cycler-0.12.1 defusedxml-0.7.1 ete4-4.4.0 execnet-2.1.2 fonttools-4.67.0 idna-3.20 iniconfig-2.3.1 jaraco.functools-4.6.0 kiwisolver-1.5.1 matplotlib-3.11.2 more-itertools-11.2.1 numpy-2.5.4 packaging-26.3 pandas-3.1.0 pillow-13.0.0 pluggy-1.7.0 pygments-2.21.0 pyparsing-3.3.3 pytest-9.1.1 pytest-cov-7.1.0 pytest-xdist-3.8.0 python-dateutil-3.0.0 requests-2.34.2 scipy-1.18.1 six-1.17.0 tzdata-2026.5 urllib3-2.8.0"
+      ]
+    },
+    {
+      "label": "pip-check",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.24723158299457282,
+      "summaries": []
+    },
+    {
+      "label": "version-smoke",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "-m",
+        "csubst",
+        "--version"
+      ],
+      "exit_code": 0,
+      "seconds": 0.05147700000088662,
+      "summaries": [
+        "CSUBST version: 1.17.0"
+      ]
+    },
+    {
+      "label": "installed-native",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "-m",
+        "pytest",
+        "<RELEASE_WORK>/source/tests",
+        "--import-mode=importlib",
+        "-q",
+        "-m",
+        "native"
+      ],
+      "exit_code": 4,
+      "seconds": 12.460382999968715,
+      "summaries": [],
+      "environment": {
+        "CSUBST_TEST_INSTALLED": "1",
+        "CSUBST_STRICT_EXTENSIONS": "1"
+      }
+    },
+    {
+      "label": "rebuild-same-ete4-from-source",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--force-reinstall",
+        "--no-deps",
+        "--no-cache-dir",
+        "--no-binary=ete4",
+        "ete4==4.4.0"
+      ],
+      "exit_code": 0,
+      "seconds": 42.79621987498831
+    },
+    {
+      "label": "pip-check-repaired",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.36967191693838686,
+      "summaries": []
+    },
+    {
+      "label": "installed-native-corrected",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "-m",
+        "pytest",
+        "<RELEASE_WORK>/source/tests",
+        "--import-mode=importlib",
+        "-q",
+        "-m",
+        "native"
+      ],
+      "exit_code": 0,
+      "seconds": 28.116142082959414,
+      "summaries": [
+        "15 passed, 2248 deselected in 27.50s"
+      ],
+      "environment": {
+        "CSUBST_TEST_INSTALLED": "1",
+        "CSUBST_STRICT_EXTENSIONS": "1"
+      }
+    },
+    {
+      "label": "installed-full",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "-m",
+        "pytest",
+        "<RELEASE_WORK>/source/tests",
+        "--import-mode=importlib",
+        "-q",
+        "-n",
+        "auto",
+        "--dist",
+        "worksteal",
+        "-m",
+        "not process",
+        "--ignore=<RELEASE_WORK>/source/tests/process",
+        "--cov=csubst",
+        "--cov-config=<RELEASE_WORK>/source/pyproject.toml",
+        "--cov-branch",
+        "--cov-report="
+      ],
+      "exit_code": 0,
+      "seconds": 23.426367833046243,
+      "summaries": [
+        "2249 passed, 9 skipped, 8 warnings in 22.41s"
+      ],
+      "environment": {
+        "CSUBST_TEST_INSTALLED": "1"
+      }
+    },
+    {
+      "label": "installed-process",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "-m",
+        "pytest",
+        "<RELEASE_WORK>/source/tests/process",
+        "--import-mode=importlib",
+        "-q",
+        "--cov=csubst",
+        "--cov-config=<RELEASE_WORK>/source/pyproject.toml",
+        "--cov-branch",
+        "--cov-append",
+        "--cov-report=term-missing:skip-covered",
+        "--cov-fail-under=70"
+      ],
+      "exit_code": 0,
+      "seconds": 9.010059499996714,
+      "summaries": [
+        "================================ tests coverage ================================",
+        "______________ coverage: platform darwin, python 3.12.15-final-0 _______________",
+        "TOTAL                                                                      31301   6613  13274   2608    76%",
+        "7 files skipped due to complete coverage.",
+        "Required test coverage of 70% reached. Total coverage: 75.53%",
+        "5 passed in 8.68s"
+      ],
+      "environment": {
+        "CSUBST_TEST_INSTALLED": "1"
+      }
+    },
+    {
+      "label": "installed-numerical-parity",
+      "command": [
+        "<RELEASE_WORK>/wheel-venv/bin/python",
+        "<RELEASE_WORK>/source/.github/scripts/sites_parity_check.py",
+        "--installed",
+        "--numerical-only",
+        "--workdir",
+        "<RELEASE_WORK>/parity-runs",
+        "--output",
+        "<RELEASE_WORK>/parity.tsv"
+      ],
+      "exit_code": 0,
+      "seconds": 22.334055292070843,
+      "summaries": [],
+      "environment": {
+        "CSUBST_TEST_INSTALLED": "1",
+        "CSUBST_STRICT_EXTENSIONS": "1"
+      }
+    }
+  ],
+  "environment_repair": "Cached ete4 4.4.0 tree extension was a 16,727-byte bundle without PyInit_tree. Rebuilt the same version from source with --no-cache-dir --no-binary=ete4; import succeeds. Test paths normalized to physical paths to match test taxonomy.",
+  "source_implementation_commit": "6bc51fa",
+  "make_package": {
+    "command": [
+      "make",
+      "PYTHON=<PYTHON312>",
+      "package"
+    ],
+    "exit_code": 0,
+    "cwd": "<RELEASE_WORK>/source"
+  },
+  "artifacts_sha256": {
+    "dist/csubst-1.17.0-cp312-cp312-macosx_11_0_arm64.whl": "1f120db64da5208eec7201bf418dcdfb9099e411339419b72ced1823cc4bb2dc",
+    "dist/csubst-1.17.0.tar.gz": "10fe4e285895a078cb58929ba4807c32a4b2612147265ee37324610bb74058dd",
+    "dist/from-sdist/csubst-1.17.0-cp312-cp312-macosx_11_0_arm64.whl": "0321c3a2ff4ef6a98865fed410b5ad69cfdbefe0bce95ee30dbb4380fffbb3e3"
+  },
+  "environment": {
+    "python": "3.12.15 (main, Oct 14 2026, 00:55:37) [Clang 23.1.3 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "packages": {
+      "csubst": "1.17.0",
+      "ete4": "4.4.0",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1",
+      "pandas": "3.1.0",
+      "matplotlib": "3.11.2",
+      "pytest": "9.1.1"
+    }
+  },
+  "product_python_matches_outgoing_tree": true
+}
