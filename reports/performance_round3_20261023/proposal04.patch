@@ -1,0 +1,107 @@
+--- a/csubst/substitution_scan.py
++++ b/csubst/substitution_scan.py
+@@ -1947,0 +1948 @@
++    defer_score=False,
+@@ -2013,6 +2014,9 @@
+-    score, pvalue = scan_statistics.rate_score(
+-        x_target=target_event,
+-        l_target=target_exposure,
+-        x_other=other_event,
+-        l_other=other_exposure,
+-    )
++    if defer_score:
++        score = pvalue = np.nan
++    else:
++        score, pvalue = scan_statistics.rate_score(
++            x_target=target_event,
++            l_target=target_exposure,
++            x_other=other_event,
++            l_other=other_exposure,
++        )
+@@ -2027 +2031 @@
+-        return {
++        result = {
+@@ -2033,0 +2038,3 @@
++        if defer_score:
++            result['_invalid_endpoint'] = invalid_endpoint
++        return result
+@@ -2683,0 +2691,68 @@
++BLOCK_SIZE = 256
++
++
++def rate_scores_batch(values):
++    """Return scalar-equivalent score/P arrays for an (N, 4) float matrix.
++
++    Scalar math.log/exp deliberately preserve the established libm rounding.
++    All inputs here are already float aggregates from _rate_summary.
++    """
++    values = np.asarray(values, dtype=np.float64)
++    if values.ndim != 2 or values.shape[1] != 4:
++        raise ValueError('Batch rate scores require an (N, 4) array.')
++    size = values.shape[0]
++    scores = np.full(size, np.nan)
++    pvalues = np.full(size, np.nan)
++    valid = np.isfinite(values).all(axis=1)
++    valid &= (values[:, (0, 2)] >= 0).all(axis=1)
++    valid &= (values[:, (1, 3)] > 0).all(axis=1)
++    ids = np.flatnonzero(valid)
++    if not ids.size:
++        return scores, pvalues
++    x, a, y, b = values[ids].T
++    positive_x = x > 0
++    log_x = np.zeros(len(ids))
++    log_y = np.zeros(len(ids))
++    log_x[positive_x] = np.fromiter(map(math.log, x[positive_x]), float)
++    positive_y = y > 0
++    log_y[positive_y] = np.fromiter(map(math.log, y[positive_y]), float)
++    log_a = np.fromiter(map(math.log, a), float)
++    log_b = np.fromiter(map(math.log, b), float)
++    enriched = positive_x & (~positive_y | (log_x - log_a > log_y - log_b))
++    scores[ids[~enriched]] = 0.
++    pvalues[ids[~enriched]] = 1.
++    ids = ids[enriched]
++    if not ids.size:
++        return scores, pvalues
++    x, y = x[enriched], y[enriched]
++    log_x, log_y = log_x[enriched], log_y[enriched]
++    log_a, log_b = log_a[enriched], log_b[enriched]
++    positive_y = y > 0
++    log_p = -np.logaddexp(0., log_b - log_a)
++    log_q = -np.logaddexp(0., log_a - log_b)
++    fraction_x = np.zeros(len(ids))
++    fraction_x[positive_y] = -np.logaddexp(0., log_y[positive_y] - log_x[positive_y])
++    with np.errstate(over='ignore', invalid='ignore'):
++        terms = x * (fraction_x - log_p)
++        terms[positive_y] += y[positive_y] * (
++            -np.logaddexp(0., log_x[positive_y] - log_y[positive_y]) - log_q[positive_y])
++        # Python max(0., nan) returns 0.; fmax preserves that scalar behavior.
++        deviance = np.fmax(0., 2 * terms)
++    tails = scan_statistics.log_ndtr(-np.sqrt(deviance))
++    scores[ids] = -tails / math.log(10)
++    pvalues[ids] = np.fromiter(map(math.exp, tails), float)
++    return scores, pvalues
++
++
++def flush_batch(pending, out):
++    if not pending:
++        return
++    values = [(row['target_event_count'], row['target_exposure'],
++               row['other_event_count'], row['other_exposure']) for _, row in pending]
++    scores, _ = rate_scores_batch(values)
++    for (key, row), score in zip(pending, scores):
++        row['score_rate_enrichment'] = np.nan if row.pop('_invalid_endpoint') else float(score)
++        out[key] = scan_statistics.calibration_score(row)
++    pending.clear()
++
++
+@@ -2714,0 +2790 @@
++    pending = []
+@@ -2774 +2850 @@
+-            score_only=True,
++            score_only=True, defer_score=True,
+@@ -2777 +2853,4 @@
+-        out[_scan_row_key(row)] = scan_statistics.calibration_score(rate)
++        pending.append((_scan_row_key(row), rate))
++        if len(pending) >= BLOCK_SIZE:
++            flush_batch(pending, out)
++    flush_batch(pending, out)

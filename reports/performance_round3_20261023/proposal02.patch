@@ -1,0 +1,18 @@
+--- a/csubst/endpoint_io.py
++++ b/csubst/endpoint_io.py
+@@ -371,0 +372,6 @@
++    # Structural joint endpoints use one-to-one reported states. Select their
++    # off-diagonal products directly when the optional accelerator is absent.
++    selected = (kinds == ['N'] and specs['N'] is not None
++                and mappings['N'].shape[0] == mappings['N'].shape[1]
++                and np.all(mappings['N'].sum(axis=0) == 1))
++
+@@ -379,0 +386,8 @@
++            elif selected:
++                pairs, ng, ns = spec
++                event, ca, cd = pairs.T
++                values = left[:, ca] * transition[ca, cd] * right[:, cd]
++                events = np.zeros((left.shape[0], ng * ns * ns),
++                                  dtype=np.result_type(values.dtype, mappings[kind].dtype))
++                events[:, event] = values
++                events = events.reshape(left.shape[0], ng, ns, ns)

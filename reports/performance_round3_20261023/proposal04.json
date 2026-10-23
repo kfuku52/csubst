@@ -1,0 +1,50 @@
+{
+  "proposal": 4,
+  "baseline_commit": "624bb8a6dae536d0fa10891f666684ef1ad3dab0",
+  "environment": {
+    "commit": "624bb8a6dae536d0fa10891f666684ef1ad3dab0",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "benchmark_configuration": {
+    "warmups": 5,
+    "repeats": 7,
+    "permutations": 50
+  },
+  "benchmark_executed": false,
+  "block_size": 256,
+  "command": "python reports/performance_round3_20261023/proposal04.py",
+  "source_sha256": {
+    "scan_statistics.py": "15adc165c9d5a46534650ae37feea9bb76b6842a69ce664eb3256879d66415f1",
+    "substitution_scan.py": "c3ef7e8baa89e12cd32cb4a2050c53d711fead052d226f9266e8e36dfde4a2ee"
+  },
+  "memory": "At most 256 pending row dictionaries plus O(256) numeric temporaries; peak RSS not measured.",
+  "cases": {},
+  "edge_checks": {
+    "cases": 25754,
+    "exact_score_and_p_cases": 25754,
+    "mismatch_cases": 0,
+    "mismatch_examples": [],
+    "max_absolute_score_difference": 0.0,
+    "max_absolute_p_difference": 0.0,
+    "warning_count": 0,
+    "empty_shapes_preserved": true,
+    "invalid_shapes_rejected": 4,
+    "no_test_failure_endpoint_cases": 10,
+    "seed": 404
+  },
+  "failure_order_check": {
+    "baseline": "ValueError: Undefined rate score in selected candidates; null replicate cannot be omitted.",
+    "batch04": "RuntimeError: Later candidate exposure failed.",
+    "same_failure_reason": false,
+    "consequence": "Both runs fail, but batching can replace the first invalid-score reason with a later exposure failure."
+  },
+  "decision": "reject",
+  "reason": "Deferred validation changes the first reported failure reason.",
+  "performance_status": "Not run: correctness regression rejected the prototype before measurement. An earlier timing process was terminated while waiting for the shared lock."
+}

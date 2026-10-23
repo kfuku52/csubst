@@ -1,0 +1,10 @@
+--- a/csubst/substitution.py
++++ b/csubst/substitution.py
+@@ -770 +770,6 @@
+-            matrix = matrix.multiply(sub_tensor.matrix.getrow(int(branch_id))).tocsr()
++            row = sub_tensor.matrix.getrow(int(branch_id))
++            # Multiplying an empty row by finite values stays empty. Retain
++            # getrow validation and nonfinite 0 * NaN/Inf sparse semantics.
++            if matrix.nnz == 0 and np.isfinite(row.data).all():
++                continue
++            matrix = matrix.multiply(row).tocsr()

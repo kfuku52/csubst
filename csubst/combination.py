@@ -1456,12 +1456,13 @@ def count_independent_branch_combinations(tree_obj, max_arity, exclude_sister_pa
     all_polynomial = dict()
     for node in reversed(nodes):
         children = ete.get_children(node)
+        # Child states are no longer needed after this parent consumes them.
         child_not_selected = [
-            not_selected_polynomial[id(child)]
+            not_selected_polynomial.pop(id(child))
             for child in children
         ]
         child_all = [
-            all_polynomial[id(child)]
+            all_polynomial.pop(id(child))
             for child in children
         ]
 

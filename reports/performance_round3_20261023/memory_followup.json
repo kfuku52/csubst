@@ -1,0 +1,127 @@
+{
+  "scope": "Fresh-process memory; no runtime speed claim",
+  "repeats": 3,
+  "workloads": {
+    "conservation": "192 tips x 8192 sites x 20 float64 states, missing every 29th site; process RSS includes imports and input",
+    "combinations": "8192-tip pectinate tree, arity16, sister excluded; tracemalloc only during DP, excludes existing tree/imports; RSS not measured"
+  },
+  "cases": {
+    "conservation": {
+      "runs": {
+        "before": [
+          {
+            "peak_rss_bytes": 693764096,
+            "output_sha256": "574b083bef98a394c8012e6b9fd036e43d5213e839389253864fada63596a913",
+            "source_sha256": "c3ef7e8baa89e12cd32cb4a2050c53d711fead052d226f9266e8e36dfde4a2ee"
+          },
+          {
+            "peak_rss_bytes": 692666368,
+            "output_sha256": "574b083bef98a394c8012e6b9fd036e43d5213e839389253864fada63596a913",
+            "source_sha256": "c3ef7e8baa89e12cd32cb4a2050c53d711fead052d226f9266e8e36dfde4a2ee"
+          },
+          {
+            "peak_rss_bytes": 695975936,
+            "output_sha256": "574b083bef98a394c8012e6b9fd036e43d5213e839389253864fada63596a913",
+            "source_sha256": "c3ef7e8baa89e12cd32cb4a2050c53d711fead052d226f9266e8e36dfde4a2ee"
+          }
+        ],
+        "after": [
+          {
+            "peak_rss_bytes": 461160448,
+            "output_sha256": "574b083bef98a394c8012e6b9fd036e43d5213e839389253864fada63596a913",
+            "source_sha256": "9d74dc04a54210b1eaa9cdf34bf8482bad0c33986805e3c9d650981fb910675d"
+          },
+          {
+            "peak_rss_bytes": 451887104,
+            "output_sha256": "574b083bef98a394c8012e6b9fd036e43d5213e839389253864fada63596a913",
+            "source_sha256": "9d74dc04a54210b1eaa9cdf34bf8482bad0c33986805e3c9d650981fb910675d"
+          },
+          {
+            "peak_rss_bytes": 454443008,
+            "output_sha256": "574b083bef98a394c8012e6b9fd036e43d5213e839389253864fada63596a913",
+            "source_sha256": "9d74dc04a54210b1eaa9cdf34bf8482bad0c33986805e3c9d650981fb910675d"
+          }
+        ]
+      },
+      "output_exact_digest": true,
+      "metric": "peak_rss_bytes",
+      "summary": {
+        "before": {
+          "median": 693764096,
+          "min": 692666368,
+          "max": 695975936
+        },
+        "after": {
+          "median": 454443008,
+          "min": 451887104,
+          "max": 461160448
+        }
+      }
+    },
+    "combinations": {
+      "runs": {
+        "before": [
+          {
+            "peak_traced_bytes": 17336748,
+            "output_sha256": "730250a99fedcd9b8023a3258ad0dd0bd42d5ea56b906e015b5625f1c6dc5033",
+            "source_sha256": "d140135311a4b7f9010fdf4b4fb31fea2e17d229d584abae74ef56a4344f9630"
+          },
+          {
+            "peak_traced_bytes": 17336748,
+            "output_sha256": "730250a99fedcd9b8023a3258ad0dd0bd42d5ea56b906e015b5625f1c6dc5033",
+            "source_sha256": "d140135311a4b7f9010fdf4b4fb31fea2e17d229d584abae74ef56a4344f9630"
+          },
+          {
+            "peak_traced_bytes": 17336748,
+            "output_sha256": "730250a99fedcd9b8023a3258ad0dd0bd42d5ea56b906e015b5625f1c6dc5033",
+            "source_sha256": "d140135311a4b7f9010fdf4b4fb31fea2e17d229d584abae74ef56a4344f9630"
+          }
+        ],
+        "after": [
+          {
+            "peak_traced_bytes": 149824,
+            "output_sha256": "730250a99fedcd9b8023a3258ad0dd0bd42d5ea56b906e015b5625f1c6dc5033",
+            "source_sha256": "ec99b771f25fad95eb6ef0227e0c02d60b44806ca1268247fd304c7a01c4fb68"
+          },
+          {
+            "peak_traced_bytes": 149824,
+            "output_sha256": "730250a99fedcd9b8023a3258ad0dd0bd42d5ea56b906e015b5625f1c6dc5033",
+            "source_sha256": "ec99b771f25fad95eb6ef0227e0c02d60b44806ca1268247fd304c7a01c4fb68"
+          },
+          {
+            "peak_traced_bytes": 149824,
+            "output_sha256": "730250a99fedcd9b8023a3258ad0dd0bd42d5ea56b906e015b5625f1c6dc5033",
+            "source_sha256": "ec99b771f25fad95eb6ef0227e0c02d60b44806ca1268247fd304c7a01c4fb68"
+          }
+        ]
+      },
+      "output_exact_digest": true,
+      "metric": "peak_traced_bytes",
+      "summary": {
+        "before": {
+          "median": 17336748,
+          "min": 17336748,
+          "max": 17336748
+        },
+        "after": {
+          "median": 149824,
+          "min": 149824,
+          "max": 149824
+        }
+      }
+    }
+  },
+  "environment": {
+    "commit": "624bb8a6dae536d0fa10891f666684ef1ad3dab0",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "execution_notes": [
+    "Initial conservation RSS comparison completed. Initial combination follow-up failed in input preparation because the wrapper PhyloNode requires a source. Corrected to explicit Newick input and resumed only the unmeasured combination case; no successful comparison repeated."
+  ]
+}

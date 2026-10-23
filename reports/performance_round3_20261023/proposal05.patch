@@ -1,0 +1,88 @@
+--- a/csubst/substitution_scan.py
++++ b/csubst/substitution_scan.py
+@@ -1221,0 +1222 @@
++    include_units=True,
+@@ -1235,0 +1237 @@
++    sampled_components = []
+@@ -1252 +1254 @@
+-                "leaf_names": list(trait_cache["leaf_names_by_index"][stem_index]),
++                "leaf_names": list(trait_cache["leaf_names_by_index"][stem_index]) if include_units else [],
+@@ -1253,0 +1256,3 @@
++        if not include_units:
++            sampled_components.extend(components)
++            continue
+@@ -1267,0 +1273,22 @@
++    if not include_units:
++        # Fixed candidates need branch unions, not per-unit display metadata.
++        # All unit sister sets exclude the same complete foreground union;
++        # their union therefore equals the sister set of that union.
++        all_fg_ids = _component_ids(sampled_components, "fg_branch_ids")
++        all_rate_fg_ids = _component_ids(sampled_components, "clade_branch_ids")
++        sister_ids = np.array([], dtype=np.int64)
++        if normalize_scan_other_scope(g.get("scan_other_scope", "all")) == "sister":
++            sister_ids = _unit_sister_branch_ids(
++                g=g, fg_branch_ids=all_fg_ids, all_fg_branch_ids=all_fg_ids,
++                node_by_id=_node_by_branch_id(g),
++            )
++            sister_ids = np.array([int(v) for v in sister_ids if int(v) in valid_set], dtype=np.int64)
++        return {
++            "units": None,
++            "fg_ids": all_fg_ids,
++            "rate_fg_ids": all_rate_fg_ids,
++            "sister_ids": sister_ids,
++            "fg_leaf_names": [],
++            "sampling_attempts": attempts,
++            "configuration": [[int(trait_cache["branch_ids"][i]) for i in group] for group in configuration],
++        }
+@@ -1306,0 +1334 @@
++    include_units=True,
+@@ -1314,0 +1343 @@
++    sister_ids = {}
+@@ -1324,2 +1353,6 @@
+-        )
+-        units.append(trait_context["units"])
++            include_units=include_units,
++        )
++        if include_units:
++            units.append(trait_context["units"])
++        else:
++            sister_ids[trait_name] = trait_context["sister_ids"]
+@@ -1331,2 +1364,5 @@
+-    return {
+-        "units": pd.concat(units, ignore_index=True) if units else pd.DataFrame(columns=list(SCAN_UNIT_COLUMNS)),
++    units_df = None
++    if include_units:
++        units_df = pd.concat(units, ignore_index=True) if units else pd.DataFrame(columns=list(SCAN_UNIT_COLUMNS))
++    context = {
++        "units": units_df,
+@@ -1340,0 +1377,3 @@
++    if not include_units:
++        context["sister_ids"] = sister_ids
++    return context
+@@ -2668 +2707 @@
+-def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutation_index):
++def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutation_index, include_units=True):
+@@ -2680,0 +2720 @@
++        include_units=include_units,
+@@ -2747,5 +2787,14 @@
+-            units_trait = scan_context['units'].loc[scan_context['units']['trait'] == trait_name, :].reset_index(drop=True)
+-            branch_sets[branch_key] = (
+-                _target_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids),
+-                _other_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids,
+-                                           scan_other_scope, units_df=units_trait))
++            target_ids = _target_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids)
++            if scan_context['units'] is None:
++                if scan_other_scope == 'all':
++                    other_ids = valid_branch_ids
++                elif scan_other_scope == 'sister':
++                    other_ids = scan_context['sister_ids'][trait_name]
++                else:
++                    raise ValueError("Unsupported fixed-candidate control scope: " + str(scan_other_scope))
++                other_ids = np.setdiff1d(other_ids, target_ids)
++            else:
++                units_trait = scan_context['units'].loc[scan_context['units']['trait'] == trait_name, :].reset_index(drop=True)
++                other_ids = _other_branch_ids_from_maps(
++                    fg_ids, trait_name, target_class, valid_branch_ids, scan_other_scope, units_df=units_trait)
++            branch_sets[branch_key] = (target_ids, other_ids)
+@@ -2813,0 +2863 @@
++            include_units=calibration != "candidate_fixed",

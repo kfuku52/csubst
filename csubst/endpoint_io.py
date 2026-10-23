@@ -369,6 +369,12 @@ def _event_transform(g, kinds, mappings):
                      for ca, a in enumerate(groups) for cd, d in enumerate(groups) if a != d]
         specs[kind] = (np.asarray(pairs, dtype=np.int64).reshape(-1, 3), ng, ns)
 
+    # Structural joint endpoints use one-to-one reported states. Select their
+    # off-diagonal products directly when the optional accelerator is absent.
+    selected = (kinds == ['N'] and specs['N'] is not None
+                and mappings['N'].shape[0] == mappings['N'].shape[1]
+                and np.all(mappings['N'].sum(axis=0) == 1))
+
     def transform(left, right, transition):
         out = {}
         raw = None
@@ -377,6 +383,14 @@ def _event_transform(g, kinds, mappings):
             if native is not None and spec is not None:
                 pairs, ng, ns = spec
                 events = native(left, right, transition, pairs, ng, ns)
+            elif selected:
+                pairs, ng, ns = spec
+                event, ca, cd = pairs.T
+                values = left[:, ca] * transition[ca, cd] * right[:, cd]
+                events = np.zeros((left.shape[0], ng * ns * ns),
+                                  dtype=np.result_type(values.dtype, mappings[kind].dtype))
+                events[:, event] = values
+                events = events.reshape(left.shape[0], ng, ns, ns)
             else:
                 if raw is None:
                     raw = left[:, :, None] * transition * right[:, None, :]

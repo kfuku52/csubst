@@ -69,6 +69,10 @@ Its repeated posterior-event scores retain read-only branch vectors in the
 existing event cache, including array/object sizes in its byte limit. Single-pass
 and ordinary event callers still receive DataFrames, and vectors too large to
 retain use that existing representation.
+Fixed-candidate assignments prepare branch unions and optional sister controls
+without display-only unit tables; observed output and full-scan discovery retain
+their full unit metadata. Conservation annotations split the selected-tip copy
+into site blocks targeting 16 MiB (at least one site), preserving tip summation order.
 
 `site_tree_plot` owns tree/site selection, layout, labels, heatmaps, and figure
 output for prepared site tables. `main_sites` retains data preparation,

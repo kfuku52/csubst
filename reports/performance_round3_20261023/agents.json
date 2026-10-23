@@ -1,0 +1,82 @@
+[
+  {
+    "proposal": "01",
+    "agent": "/root/proposal01",
+    "status": "completed",
+    "parent_decision": "reject",
+    "product_paths": []
+  },
+  {
+    "proposal": "02",
+    "agent": "/root/proposal02",
+    "status": "completed",
+    "parent_decision": "adopt",
+    "product_paths": [
+      "csubst/endpoint_io.py"
+    ]
+  },
+  {
+    "proposal": "03",
+    "agent": "/root/proposal03",
+    "status": "completed",
+    "parent_decision": "adopt",
+    "product_paths": [
+      "csubst/scan_statistics.py"
+    ]
+  },
+  {
+    "proposal": "04",
+    "agent": "/root/proposal04",
+    "status": "completed",
+    "parent_decision": "reject",
+    "product_paths": []
+  },
+  {
+    "proposal": "05",
+    "agent": "/root/proposal05",
+    "status": "completed",
+    "parent_decision": "adopt",
+    "product_paths": [
+      "csubst/substitution_scan.py"
+    ]
+  },
+  {
+    "proposal": "06",
+    "agent": "/root/proposal06",
+    "status": "completed",
+    "parent_decision": "reject",
+    "product_paths": []
+  },
+  {
+    "proposal": "07",
+    "agent": "/root/proposal07",
+    "status": "completed",
+    "parent_decision": "adopt",
+    "product_paths": [
+      "csubst/substitution_scan.py"
+    ]
+  },
+  {
+    "proposal": "08",
+    "agent": "/root/proposal08",
+    "status": "completed",
+    "parent_decision": "reject",
+    "product_paths": []
+  },
+  {
+    "proposal": "09",
+    "agent": "/root/proposal09",
+    "status": "completed",
+    "parent_decision": "adopt",
+    "product_paths": [
+      "csubst/combination.py"
+    ]
+  },
+  {
+    "proposal": "10",
+    "agent": "/root/proposal10",
+    "status": "completed",
+    "parent_decision": "reject",
+    "product_paths": []
+  }
+]

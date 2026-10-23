@@ -1,0 +1,20 @@
+--- a/csubst/endpoint.py
++++ b/csubst/endpoint.py
+@@ -168,0 +169,3 @@
++        # Only borrow matrices that fit together in the existing bounded cache.
++        transitions = ([[None] * n for _ in range(nc)]
++                       if n * nc <= min(self._cache_items, 8192) else None)
+@@ -187 +190,8 @@
+-                            post[c, child] = inside[c, child] @ self.transition(child, c).T
++                            if transitions is None:
++                                transition = self.transition(child, c)
++                            else:
++                                transition = transitions[c][child]
++                                if transition is None:
++                                    transition = self.transition(child, c)
++                                    transitions[c][child] = transition
++                            post[c, child] = inside[c, child] @ transition.T
+@@ -221 +231,2 @@
+-                    transition = self.transition(child, c)
++                    transition = (self.transition(child, c) if transitions is None
++                                  else transitions[c][child])

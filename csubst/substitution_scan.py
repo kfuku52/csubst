@@ -1219,6 +1219,7 @@ def _build_permuted_trait_context(
     sample_original_foreground=True,
     rng=None,
     configuration=None,
+    include_units=True,
 ):
     if not sample_original_foreground:
         raise ValueError("Scan calibration must include the original foreground clades.")
@@ -1233,6 +1234,7 @@ def _build_permuted_trait_context(
     valid_set = set(int(v) for v in valid_branch_ids)
     unit_mode = normalize_scan_unit_mode(g.get("scan_unit_mode", "clade"))
     unit_specs: list[dict[str, Any]] = []
+    sampled_components = []
     for group_index, indices in enumerate(configuration):
         components = []
         for stem_index in indices:
@@ -1249,8 +1251,11 @@ def _build_permuted_trait_context(
                     int(bid) for bid in trait_cache["descendant_branch_ids_by_index"][stem_index]
                     if int(bid) in valid_set
                 ], dtype=np.int64),
-                "leaf_names": list(trait_cache["leaf_names_by_index"][stem_index]),
+                "leaf_names": list(trait_cache["leaf_names_by_index"][stem_index]) if include_units else [],
             })
+        if not include_units:
+            sampled_components.extend(components)
+            continue
         # Lineage groups (including the number of components in each bin) are
         # part of the sampled configuration. No rank-based reassignment occurs.
         component_groups = [components] if unit_mode == "lineage" else [[c] for c in components]
@@ -1265,6 +1270,28 @@ def _build_permuted_trait_context(
                 "clade_branch_ids": _component_ids(component_group, "clade_branch_ids"),
                 "leaf_names": sorted({str(name) for c in component_group for name in c["leaf_names"]}),
             })
+    if not include_units:
+        # Fixed candidates need branch unions, not per-unit display metadata.
+        # All unit sister sets exclude the same complete foreground union;
+        # their union therefore equals the sister set of that union.
+        all_fg_ids = _component_ids(sampled_components, "fg_branch_ids")
+        all_rate_fg_ids = _component_ids(sampled_components, "clade_branch_ids")
+        sister_ids = np.array([], dtype=np.int64)
+        if normalize_scan_other_scope(g.get("scan_other_scope", "all")) == "sister":
+            sister_ids = _unit_sister_branch_ids(
+                g=g, fg_branch_ids=all_fg_ids, all_fg_branch_ids=all_fg_ids,
+                node_by_id=_node_by_branch_id(g),
+            )
+            sister_ids = np.array([int(v) for v in sister_ids if int(v) in valid_set], dtype=np.int64)
+        return {
+            "units": None,
+            "fg_ids": all_fg_ids,
+            "rate_fg_ids": all_rate_fg_ids,
+            "sister_ids": sister_ids,
+            "fg_leaf_names": [],
+            "sampling_attempts": attempts,
+            "configuration": [[int(trait_cache["branch_ids"][i]) for i in group] for group in configuration],
+        }
     all_fg_ids = _component_ids(unit_specs, "fg_branch_ids")
     all_rate_fg_ids = _component_ids(unit_specs, "clade_branch_ids")
     node_by_id = _node_by_branch_id(g)
@@ -1304,6 +1331,7 @@ def _build_permuted_scan_context(
     sample_original_foreground=True,
     rng=None,
     configurations=None,
+    include_units=True,
 ):
     if rng is None:
         rng = randomness.next_generator(g, 'scan_permutation_context')
@@ -1312,6 +1340,7 @@ def _build_permuted_scan_context(
     rate_fg_ids = {}
     fg_leaf_names = {}
     sampled_configurations = {}
+    sister_ids = {}
     attempts = 0
     for trait_name in trait_names:
         trait_context = _build_permuted_trait_context(
@@ -1321,15 +1350,22 @@ def _build_permuted_scan_context(
             sample_original_foreground=sample_original_foreground,
             rng=rng,
             configuration=None if configurations is None else configurations[trait_name],
+            include_units=include_units,
         )
-        units.append(trait_context["units"])
+        if include_units:
+            units.append(trait_context["units"])
+        else:
+            sister_ids[trait_name] = trait_context["sister_ids"]
         fg_ids[trait_name] = trait_context["fg_ids"]
         rate_fg_ids[trait_name] = trait_context["rate_fg_ids"]
         fg_leaf_names[trait_name] = trait_context["fg_leaf_names"]
         sampled_configurations[trait_name] = trait_context["configuration"]
         attempts += trait_context["sampling_attempts"]
-    return {
-        "units": pd.concat(units, ignore_index=True) if units else pd.DataFrame(columns=list(SCAN_UNIT_COLUMNS)),
+    units_df = None
+    if include_units:
+        units_df = pd.concat(units, ignore_index=True) if units else pd.DataFrame(columns=list(SCAN_UNIT_COLUMNS))
+    context = {
+        "units": units_df,
         "fg_ids": fg_ids,
         "rate_fg_ids": rate_fg_ids,
         "fg_leaf_names": fg_leaf_names,
@@ -1338,6 +1374,9 @@ def _build_permuted_scan_context(
         "configuration": sampled_configurations,
         "configuration_id": _scan_configuration_id(sampled_configurations),
     }
+    if not include_units:
+        context["sister_ids"] = sister_ids
+    return context
 
 
 def _candidate_state_sets(match, group, num_state):
@@ -2125,6 +2164,18 @@ def _calc_conservation(state, orders, tip_ids, float_tol):
     }
     if tip_ids.shape[0] == 0:
         return prefix
+    # Bound the advanced-indexing copy while retaining tip summation order.
+    # One selected site is the minimum block, even if it exceeds the target.
+    max_block_bytes = 16 * 1024 * 1024
+    bytes_per_site = tip_ids.shape[0] * state.shape[2] * state.dtype.itemsize
+    sites_per_block = max(1, max_block_bytes // max(bytes_per_site, 1))
+    if num_site > sites_per_block:
+        for start in range(0, num_site, sites_per_block):
+            stop = min(start + sites_per_block, num_site)
+            values = _calc_conservation(state[:, start:stop, :], orders, tip_ids, float_tol)
+            for key in prefix:
+                prefix[key][start:stop] = values[key]
+        return prefix
     block = state[tip_ids, :, :]
     valid = block.sum(axis=2) > float(float_tol)
     prefix["valid_tip_count"] = valid.sum(axis=0).astype(np.int64, copy=False)
@@ -2665,7 +2716,7 @@ def _empirical_p_from_scores(score_obs, values, denominator_count, exact=False):
     return scan_statistics.empirical_pvalue(score_obs, values, denominator_count, exact=exact)
 
 
-def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutation_index):
+def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutation_index, include_units=True):
     rng = np.random.default_rng(_scan_permutation_seed(
         base_seed=int(g.get("scan_permutation_seed", 1)), permutation_index=permutation_index,
     ))
@@ -2678,6 +2729,7 @@ def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutat
     return _build_permuted_scan_context(
         g=g, trait_names=trait_names, valid_branch_ids=valid_branch_ids,
         sample_original_foreground=True, rng=rng, configurations=configurations,
+        include_units=include_units,
     )
 
 
@@ -2744,11 +2796,20 @@ def _candidate_fixed_permutation_scores(
         branch_key = (trait_name, target_class)
         if branch_key not in branch_sets:
             fg_ids = scan_context.get('rate_fg_ids', scan_context['fg_ids'])
-            units_trait = scan_context['units'].loc[scan_context['units']['trait'] == trait_name, :].reset_index(drop=True)
-            branch_sets[branch_key] = (
-                _target_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids),
-                _other_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids,
-                                           scan_other_scope, units_df=units_trait))
+            target_ids = _target_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids)
+            if scan_context['units'] is None:
+                if scan_other_scope == 'all':
+                    other_ids = valid_branch_ids
+                elif scan_other_scope == 'sister':
+                    other_ids = scan_context['sister_ids'][trait_name]
+                else:
+                    raise ValueError("Unsupported fixed-candidate control scope: " + str(scan_other_scope))
+                other_ids = np.setdiff1d(other_ids, target_ids)
+            else:
+                units_trait = scan_context['units'].loc[scan_context['units']['trait'] == trait_name, :].reset_index(drop=True)
+                other_ids = _other_branch_ids_from_maps(
+                    fg_ids, trait_name, target_class, valid_branch_ids, scan_other_scope, units_df=units_trait)
+            branch_sets[branch_key] = (target_ids, other_ids)
         target_branch_ids, other_branch_ids = branch_sets[branch_key]
         if branch_data is None:
             branch_data = _ScanRateMetadata(branch_meta)
@@ -2811,6 +2872,7 @@ def _run_scan_permutation(
             trait_names=trait_names,
             valid_branch_ids=valid_branch_ids,
             permutation_index=permutation_index,
+            include_units=calibration != "candidate_fixed",
         )
         for key in ("configuration_id", "configuration", "sampling_attempts"):
             diagnostic[key] = scan_context[key]

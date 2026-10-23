@@ -1,4 +1,6 @@
 
+import copy
+
 import pandas as pd
 import numpy as np
 import pytest
@@ -7,6 +9,47 @@ from csubst import ete
 from csubst import foreground
 from csubst import substitution_scan
 from scan_fixtures import make_scan_context as _toy_scan_context, make_endpoint_scan_context
+
+
+@pytest.mark.parametrize('unit_mode,other_scope,stem_only,sister_stem', [
+    ('lineage', 'all', False, False),
+    ('lineage', 'sister', True, False),
+    ('stem', 'sister', False, True),
+    ('clade', 'all', False, True),
+])
+def test_fixed_candidates_match_full_unit_context(
+        monkeypatch, unit_mode, other_scope, stem_only, sister_stem):
+    g, tensor = _toy_scan_context()
+    groups = [['A', 'B'], ['C']]
+    labels = {node.name: int(ete.get_prop(node, 'numerical_label')) for node in g['tree'].traverse()}
+    g['fg_df'] = pd.DataFrame({'name': ['A', 'B', 'C'], 'trait': [1, 1, 2]})
+    g['fg_leaf_names'] = {'trait': groups}
+    g['fg_ids'] = {'trait': np.array([labels[name] for name in ['A', 'B', 'C']])}
+    for node in g['tree'].traverse():
+        tips = set(ete.get_leaf_names(node))
+        flags = [tips.issubset(group) for group in groups]
+        ete.set_prop(node, 'is_fg_trait', any(flags))
+        for index, flag in enumerate(flags, 1):
+            ete.set_prop(node, 'is_lineage_fg_trait_' + str(index), flag)
+    g.update(scan_unit_mode=unit_mode, scan_other_scope=other_scope, fg_stem_only=stem_only,
+             scan_sister_stem_only=sister_stem, scan_pvalue_calibration='candidate_fixed',
+             scan_n_permutations=99, scan_min_support='1')
+    reference_g = copy.deepcopy(g)
+    actual, actual_units = substitution_scan.scan_substitutions(g, tensor)
+    original = substitution_scan._build_permuted_context_with_seed
+
+    def full_context(*args, **kwargs):
+        kwargs['include_units'] = True
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(substitution_scan, '_build_permuted_context_with_seed', full_context)
+    expected, expected_units = substitution_scan.scan_substitutions(reference_g, tensor)
+
+    assert not actual.empty
+    assert (actual['scan_permutation_success_count'] > 0).all()
+    pd.testing.assert_frame_equal(actual, expected, check_exact=True)
+    pd.testing.assert_frame_equal(actual_units, expected_units, check_exact=True)
+    assert g['scan_calibration_diagnostics'] == reference_g['scan_calibration_diagnostics']
 
 
 @pytest.mark.parametrize("calibration", ["candidate_fixed", "full_scan"])

@@ -1,0 +1,96 @@
+{
+  "proposal": 10,
+  "baseline": "624bb8a6dae536d0fa10891f666684ef1ad3dab0",
+  "idea": "Sort the substitution-count matrix once and factorize sorted rows in first-seen order.",
+  "decision": "rejected_inactive_supported_cli_path",
+  "reason": "No executable reference or literal-name lookup calls the helper in package source; its sole former orchestration call is commented out.",
+  "environment": {
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O"
+  },
+  "baseline_audit": {
+    "python_files_parsed": 94,
+    "definitions": [
+      {
+        "path": "csubst/combination.py",
+        "line": 1401
+      }
+    ],
+    "active_identifier_references": [],
+    "literal_name_lookups": [],
+    "commented_references": [
+      {
+        "path": "csubst/main_analyze.py",
+        "line": 279,
+        "text": "#cb = combination.calc_substitution_patterns(cb)"
+      }
+    ],
+    "source_sha256": {
+      "csubst/cli.py": "c7010b3339a2f0a45d820a2238db9052485056f306be5559f199246f9532a094",
+      "csubst/combination.py": "d140135311a4b7f9010fdf4b4fb31fea2e17d229d584abae74ef56a4344f9630",
+      "csubst/main_analyze.py": "72720c1e35394543a1ecc319fcdfd781ca62d25d24006f517e9f985d49f42c25"
+    }
+  },
+  "working_tree_audit": {
+    "python_files_parsed": 94,
+    "definitions": [
+      {
+        "path": "csubst/combination.py",
+        "line": 1401
+      }
+    ],
+    "active_identifier_references": [],
+    "literal_name_lookups": [],
+    "commented_references": [
+      {
+        "path": "csubst/main_analyze.py",
+        "line": 279,
+        "text": "#cb = combination.calc_substitution_patterns(cb)"
+      }
+    ],
+    "source_sha256": {
+      "csubst/cli.py": "c7010b3339a2f0a45d820a2238db9052485056f306be5559f199246f9532a094",
+      "csubst/combination.py": "d140135311a4b7f9010fdf4b4fb31fea2e17d229d584abae74ef56a4344f9630",
+      "csubst/main_analyze.py": "72720c1e35394543a1ecc319fcdfd781ca62d25d24006f517e9f985d49f42c25"
+    }
+  },
+  "baseline_cli_dispatch": {
+    "commands": [
+      "search",
+      "analyze"
+    ],
+    "handler": "command_search",
+    "orchestrator": "csubst.main_analyze.main_analyze",
+    "parser_line": 1321,
+    "handler_line": 1322,
+    "orchestrator_call_line": 295
+  },
+  "working_tree_cli_dispatch": {
+    "commands": [
+      "search",
+      "analyze"
+    ],
+    "handler": "command_search",
+    "orchestrator": "csubst.main_analyze.main_analyze",
+    "parser_line": 1321,
+    "handler_line": 1322,
+    "orchestrator_call_line": 295
+  },
+  "tracked_repository_symbol_matches_excluding_reports": [
+    "csubst/combination.py:1401:def calc_substitution_patterns(cb):",
+    "csubst/main_analyze.py:279:        #cb = combination.calc_substitution_patterns(cb)"
+  ],
+  "performance_measurements": null,
+  "performance_claim": null,
+  "coverage": {
+    "static_package_identifier_and_literal_name_audit": true,
+    "tracked_repository_symbol_search": true,
+    "baseline_snapshot_hash_checked_against_commit": true,
+    "cli_dispatch_ast_checked": true,
+    "prototype_contract_parity": false,
+    "timed_benchmark": false,
+    "runtime_cli_route_exhaustion": false,
+    "external_python_library_callers_audited": false
+  },
+  "skipped": "No prototype, workload timing, peak-memory measurement, or regression suite: production code is unchanged and an optimization cannot affect the audited CLI route."
+}

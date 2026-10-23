@@ -1,0 +1,75 @@
+--- a/csubst/scan_endpoint.py
++++ b/csubst/scan_endpoint.py
+@@ -133 +133,32 @@
+-def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids):
++def _posterior_site(context, state_cdn, state_nsy, site):
++    """Prepare one site of an immutable scan fit; never retain input arrays."""
++    parent = np.asarray(state_cdn[context["parent_ids"], int(site), :], dtype=float)
++    child = np.asarray(state_cdn[context["branch_ids"], int(site), :], dtype=float)
++    nsy_parent = np.asarray(state_nsy[context["parent_ids"], int(site), :], dtype=float)
++    nsy_child = np.asarray(state_nsy[context["branch_ids"], int(site), :], dtype=float)
++    for values in (parent, child, nsy_parent, nsy_child):
++        if not np.isfinite(values).all() or (values < 0).any():
++            raise ValueError("Scan endpoint posterior states must be finite and nonnegative.")
++        total = values.sum(axis=1)
++        if not np.all((total == 0) | np.isclose(total, 1, atol=1e-4, rtol=0)):
++            raise ValueError("Scan endpoint posterior rows must sum to one (or zero for missing states).")
++    mass = parent.sum(axis=1)
++    missing = (mass == 0) | (child.sum(axis=1) == 0) | (nsy_parent.sum(axis=1) == 0) | (nsy_child.sum(axis=1) == 0)
++    if "eligible" in context:
++        missing |= ~context["eligible"][context["branch_ids"], int(site)]
++    normalized = np.divide(parent, mass[:, None], out=np.zeros_like(parent), where=mass[:, None] > 0)
++    weighted_parent = None
++    if 'category_groups' in context:
++        category_states = context.get('category_states')
++        if category_states is None:
++            raise ValueError('Mixture exposure requires category-conditional joint posteriors.')
++        weighted_parent = (category_states.read_site(site)[:, context['parent_ids'], :]
++                           if isinstance(category_states, site_storage.SiteArray) else
++                           category_states[:, context['parent_ids'], int(site), :])
++        if (not np.isfinite(weighted_parent).all() or (weighted_parent < 0).any()
++                or not np.allclose(weighted_parent.sum(axis=0), parent, atol=1e-10, rtol=1e-8)):
++            raise ValueError('Category posterior states do not match scan parent marginals.')
++    return parent, normalized, missing, weighted_parent
++
++
++def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids, _site_cache=None):
+@@ -151,15 +182,8 @@
+-    parent = np.asarray(state_cdn[context["parent_ids"], int(site), :], dtype=float)
+-    child = np.asarray(state_cdn[context["branch_ids"], int(site), :], dtype=float)
+-    nsy_parent = np.asarray(state_nsy[context["parent_ids"], int(site), :], dtype=float)
+-    nsy_child = np.asarray(state_nsy[context["branch_ids"], int(site), :], dtype=float)
+-    for values in (parent, child, nsy_parent, nsy_child):
+-        if not np.isfinite(values).all() or (values < 0).any():
+-            raise ValueError("Scan endpoint posterior states must be finite and nonnegative.")
+-        total = values.sum(axis=1)
+-        if not np.all((total == 0) | np.isclose(total, 1, atol=1e-4, rtol=0)):
+-            raise ValueError("Scan endpoint posterior rows must sum to one (or zero for missing states).")
+-    mass = parent.sum(axis=1)
+-    missing = (mass == 0) | (child.sum(axis=1) == 0) | (nsy_parent.sum(axis=1) == 0) | (nsy_child.sum(axis=1) == 0)
+-    if "eligible" in context:
+-        missing |= ~context["eligible"][context["branch_ids"], int(site)]
+-    normalized = np.divide(parent, mass[:, None], out=np.zeros_like(parent), where=mass[:, None] > 0)
++    def prepare():
++        return _posterior_site(context, state_cdn, state_nsy, site)
++    if _site_cache is None:
++        parent, normalized, missing, weighted_parent = prepare()
++    else:
++        key = ('posterior_site', id(context), id(state_cdn), id(state_nsy), int(site))
++        parent, normalized, missing, weighted_parent = _site_cache.obtain(
++            key, prepare, lambda values: sum(value.nbytes for value in values if value is not None))
+@@ -167,9 +190,0 @@
+-        category_states = context.get('category_states')
+-        if category_states is None:
+-            raise ValueError('Mixture exposure requires category-conditional joint posteriors.')
+-        weighted_parent = (category_states.read_site(site)[:, context['parent_ids'], :]
+-                           if isinstance(category_states, site_storage.SiteArray) else
+-                           category_states[:, context['parent_ids'], int(site), :])
+-        if (not np.isfinite(weighted_parent).all() or (weighted_parent < 0).any()
+-                or not np.allclose(weighted_parent.sum(axis=0), parent, atol=1e-10, rtol=1e-8)):
+-            raise ValueError('Category posterior states do not match scan parent marginals.')
+--- a/csubst/substitution_scan.py
++++ b/csubst/substitution_scan.py
+@@ -1974 +1974 @@
+-            return scan_endpoint.expected_events(endpoint_context, state_cdn, state_nsy, site, from_ids, to_ids)
++            return scan_endpoint.expected_events(endpoint_context, state_cdn, state_nsy, site, from_ids, to_ids, exposure_cache)

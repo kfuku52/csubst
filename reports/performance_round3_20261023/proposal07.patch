@@ -1,0 +1,15 @@
+--- a/csubst/substitution_scan.py
++++ b/csubst/substitution_scan.py
+@@ -2126,0 +2127,12 @@
++        return prefix
++    # Bound the advanced-indexing copy while retaining tip summation order.
++    # One selected site is the minimum block, even if it exceeds the target.
++    max_block_bytes = 16 * 1024 * 1024
++    bytes_per_site = tip_ids.shape[0] * state.shape[2] * state.dtype.itemsize
++    sites_per_block = max(1, max_block_bytes // max(bytes_per_site, 1))
++    if num_site > sites_per_block:
++        for start in range(0, num_site, sites_per_block):
++            stop = min(start + sites_per_block, num_site)
++            values = _calc_conservation(state[:, start:stop, :], orders, tip_ids, float_tol)
++            for key in prefix:
++                prefix[key][start:stop] = values[key]

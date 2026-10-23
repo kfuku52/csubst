@@ -1,0 +1,268 @@
+[
+  {
+    "label": "focused",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/unit/test_endpoint_event_fallback.py",
+      "tests/unit/test_endpoint.py",
+      "tests/unit/test_endpoint_io.py",
+      "tests/unit/test_scan_statistics.py",
+      "tests/unit/test_scan_conservation.py",
+      "tests/integration/test_scan_permutations.py",
+      "tests/integration/test_scan_calibration_null.py",
+      "tests/integration/test_scan_execution.py",
+      "tests/integration/test_scan_candidate_cache.py",
+      "tests/integration/test_scan_candidates_and_rates.py",
+      "tests/integration/test_scan_endpoint.py",
+      "tests/integration/test_scan_ctmc.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 13.604300332954153,
+    "summaries": [
+      "364 passed in 10.95s"
+    ]
+  },
+  {
+    "label": "combination-focused",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/unit/test_combination_dependencies.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 4.48800645803567,
+    "summaries": [
+      "8 passed in 0.96s"
+    ]
+  },
+  {
+    "label": "fast-lint-types",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "test-fast",
+      "lint",
+      "typecheck"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 24.75689116702415,
+    "summaries": [
+      "1679 passed, 6 skipped, 8 warnings in 16.63s",
+      "All checks passed!",
+      "Repository hygiene checks passed.",
+      "Documentation checks passed: 22 documents, 23 commands, 1 help examples, 2 templates, 73 local links.",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file",
+      "Success: no issues found in 1 source file"
+    ]
+  },
+  {
+    "label": "full-native",
+    "command": [
+      "env",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "test",
+      "test-native"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 35.11552291701082,
+    "summaries": [
+      "2196 passed, 9 skipped, 8 warnings in 24.58s",
+      "5 passed in 6.42s",
+      "15 passed, 2195 deselected in 2.36s"
+    ]
+  },
+  {
+    "label": "fallback-full",
+    "command": [
+      "env",
+      "CSUBST_DISABLE_EXTENSIONS=1",
+      "PYTEST_ADDOPTS=-ra",
+      "make",
+      "PYTHON=/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "test"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 32.36017954198178,
+    "summaries": [
+      "2166 passed, 39 skipped, 8 warnings in 25.47s",
+      "5 passed in 5.88s"
+    ]
+  },
+  {
+    "label": "native-imports",
+    "command": [
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "-c",
+      "import importlib; from importlib.machinery import EXTENSION_SUFFIXES; names=[\"combination_cy\",\"substitution_cy\",\"substitution_sparse_cy\",\"recoding_cy\",\"parser_iqtree_cy\",\"omega_cy\"]; modules=[importlib.import_module(\"csubst.\"+name) for name in names]; assert all(any(module.__file__.endswith(suffix) for suffix in EXTENSION_SUFFIXES) for module in modules); print(\"Verified 6 compiled modules\")"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.09945637499913573,
+    "summaries": [
+      "Verified 6 compiled modules"
+    ]
+  },
+  {
+    "label": "fixed-fit-reference",
+    "command": [
+      "env",
+      "CSUBST_STRICT_EXTENSIONS=1",
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      ".github/scripts/sites_parity_check.py",
+      "--numerical-only",
+      "--workdir",
+      "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-round3-reference-copy-rhajc52_/runs",
+      "--output",
+      "${REPOSITORY}/reports/performance_round3_20261023/scientific_reference.tsv"
+    ],
+    "cwd": "/var/folders/xc/pydw8plj6vvf7mddh20v09sw0000gn/T/csubst-round3-reference-copy-rhajc52_/source",
+    "exit_code": 0,
+    "seconds": 30.543991249985993,
+    "summaries": [],
+    "copied_product_and_inputs": true,
+    "reference_values": {
+      "PGK": 1.910709,
+      "PEPC": 0.030734
+    }
+  },
+  {
+    "label": "reports-ruff",
+    "command": [
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "-m",
+      "ruff",
+      "check",
+      "reports/performance_round3_20261023"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 1,
+    "seconds": 0.13428095798008144,
+    "summaries": []
+  },
+  {
+    "label": "docs-final",
+    "command": [
+      "make",
+      "PYTHON=/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "docs-check"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.09991025005001575,
+    "summaries": [
+      "Documentation checks passed: 22 documents, 23 commands, 1 help examples, 2 templates, 73 local links."
+    ]
+  },
+  {
+    "label": "reports-ruff-final",
+    "command": [
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "-m",
+      "ruff",
+      "check",
+      "reports/performance_round3_20261023"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.036560915992595255,
+    "summaries": [
+      "All checks passed!"
+    ]
+  },
+  {
+    "label": "evidence-audit",
+    "command": [
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "reports/performance_round3_20261023/report_audit.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.07524654199369252,
+    "summaries": [
+      "Verified report evidence: {'json': 16, 'python': 15, 'local_links': 33, 'product_hashes': 83}"
+    ]
+  },
+  {
+    "label": "reports-format-final",
+    "command": [
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "-m",
+      "ruff",
+      "check",
+      "reports/performance_round3_20261023"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.09403083298821002,
+    "summaries": [
+      "All checks passed!"
+    ]
+  },
+  {
+    "label": "hygiene-staged",
+    "command": [
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      ".github/scripts/repository_hygiene_check.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.3423788339132443,
+    "summaries": [
+      "Repository hygiene checks passed."
+    ]
+  },
+  {
+    "label": "evidence-final",
+    "command": [
+      "/tmp/csubst-implementation-20261022-izutzskb/verify-venv/bin/python",
+      "reports/performance_round3_20261023/report_audit.py"
+    ],
+    "cwd": "${REPOSITORY}",
+    "exit_code": 0,
+    "seconds": 0.0617799999890849,
+    "summaries": [
+      "Verified report evidence: {'json': 17, 'python': 15, 'local_links': 33, 'product_hashes': 83}"
+    ]
+  }
+]

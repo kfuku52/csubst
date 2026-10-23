@@ -1,0 +1,10 @@
+--- a/csubst/combination.py
++++ b/csubst/combination.py
+@@ -1458,0 +1459 @@
++        # Child states are no longer needed after this parent consumes them.
+@@ -1460 +1461 @@
+-            not_selected_polynomial[id(child)]
++            not_selected_polynomial.pop(id(child))
+@@ -1464 +1465 @@
+-            all_polynomial[id(child)]
++            all_polynomial.pop(id(child))

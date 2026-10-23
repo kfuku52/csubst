@@ -23,7 +23,8 @@ def rate_score(x_target, l_target, x_other, l_other):
     Invalid counts/exposures are undefined, including absent control exposure.
     """
     x, a, y, b = map(float, (x_target, l_target, x_other, l_other))
-    if not np.isfinite([x, a, y, b]).all() or min(x, y) < 0 or min(a, b) <= 0:
+    if (not (math.isfinite(x) and math.isfinite(a) and math.isfinite(y) and math.isfinite(b))
+            or min(x, y) < 0 or min(a, b) <= 0):
         return np.nan, np.nan
     if x == 0 or (y > 0 and math.log(x) - math.log(a) <= math.log(y) - math.log(b)):
         return 0., 1.

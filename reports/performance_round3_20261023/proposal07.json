@@ -1,0 +1,1424 @@
+{
+  "proposal": 7,
+  "baseline": "624bb8a",
+  "environment": {
+    "commit": "624bb8a6dae536d0fa10891f666684ef1ad3dab0",
+    "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 12,
+    "numpy": "2.5.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.5",
+    "native_threads": 1
+  },
+  "exactness": {
+    "cases": 156,
+    "exact_arrays": 612,
+    "equal_exception_cases": [
+      {
+        "equal_exception": "IndexError"
+      },
+      {
+        "equal_exception": "IndexError"
+      },
+      {
+        "equal_exception": "IndexError"
+      }
+    ],
+    "float_bitwise_exact": true
+  },
+  "block_bytes": 16777216,
+  "method": "One warmup per implementation; seven alternating ordered repeats batched toward 50 ms CPU per implementation (1–50 calls); samples normalized per call; inputs/preparation outside timed section; all operations hold shared benchmark lock",
+  "benchmarks": {
+    "PGK_amino_observed": {
+      "shape": [
+        33,
+        417,
+        20
+      ],
+      "dtype": "float64",
+      "calls_per_repeat": 50,
+      "parity": {
+        "arrays_exact": 4,
+        "sites": 417
+      },
+      "samples": {
+        "baseline": [
+          {
+            "wall_s": 0.0009696574998088181,
+            "cpu_s": 0.0006567000000000034
+          },
+          {
+            "wall_s": 0.0005945341801270842,
+            "cpu_s": 0.0005580399999999974
+          },
+          {
+            "wall_s": 0.000533787498716265,
+            "cpu_s": 0.0005172200000000027
+          },
+          {
+            "wall_s": 0.0007070299983024598,
+            "cpu_s": 0.0005828999999999995
+          },
+          {
+            "wall_s": 0.0009261241601780057,
+            "cpu_s": 0.0006226200000000004
+          },
+          {
+            "wall_s": 0.0006758916587568819,
+            "cpu_s": 0.0005463400000000007
+          },
+          {
+            "wall_s": 0.0005064725014381111,
+            "cpu_s": 0.0005049999999999999
+          }
+        ],
+        "candidate": [
+          {
+            "wall_s": 0.0005184358195401728,
+            "cpu_s": 0.0005025199999999997
+          },
+          {
+            "wall_s": 0.0007312175002880394,
+            "cpu_s": 0.0006568599999999991
+          },
+          {
+            "wall_s": 0.0005998466606251896,
+            "cpu_s": 0.0005524600000000035
+          },
+          {
+            "wall_s": 0.0005564850009977817,
+            "cpu_s": 0.0005347200000000019
+          },
+          {
+            "wall_s": 0.0011496733198873698,
+            "cpu_s": 0.000663560000000003
+          },
+          {
+            "wall_s": 0.0009166733408346772,
+            "cpu_s": 0.0006271800000000028
+          },
+          {
+            "wall_s": 0.00058228415902704,
+            "cpu_s": 0.0005510200000000021
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "wall_s": {
+            "median": 0.0006758916587568819,
+            "min": 0.0005064725014381111,
+            "max": 0.0009696574998088181
+          },
+          "cpu_s": {
+            "median": 0.0005580399999999974,
+            "min": 0.0005049999999999999,
+            "max": 0.0006567000000000034
+          }
+        },
+        "candidate": {
+          "wall_s": {
+            "median": 0.0005998466606251896,
+            "min": 0.0005184358195401728,
+            "max": 0.0011496733198873698
+          },
+          "cpu_s": {
+            "median": 0.0005524600000000035,
+            "min": 0.0005025199999999997,
+            "max": 0.000663560000000003
+          }
+        }
+      },
+      "candidate_to_baseline_wall": 0.8874893673468964,
+      "memory": {
+        "baseline": {
+          "peak_traced_bytes": 2642666,
+          "returned_traced_bytes": 15072
+        },
+        "candidate": {
+          "peak_traced_bytes": 2642730,
+          "returned_traced_bytes": 15136
+        }
+      },
+      "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+    },
+    "PGK_codon_observed": {
+      "shape": [
+        33,
+        417,
+        61
+      ],
+      "dtype": "float64",
+      "calls_per_repeat": 36,
+      "parity": {
+        "arrays_exact": 4,
+        "sites": 417
+      },
+      "samples": {
+        "baseline": [
+          {
+            "wall_s": 0.0027880150559617,
+            "cpu_s": 0.0016120000000000023
+          },
+          {
+            "wall_s": 0.0028282060262022745,
+            "cpu_s": 0.0015683888888888891
+          },
+          {
+            "wall_s": 0.00252751388729343,
+            "cpu_s": 0.0016061666666666679
+          },
+          {
+            "wall_s": 0.0021002963055960005,
+            "cpu_s": 0.0013856388888888861
+          },
+          {
+            "wall_s": 0.003636108776037064,
+            "cpu_s": 0.001440805555555554
+          },
+          {
+            "wall_s": 0.0021901018626522273,
+            "cpu_s": 0.00141872222222223
+          },
+          {
+            "wall_s": 0.0013090185012616632,
+            "cpu_s": 0.0012823611111111176
+          }
+        ],
+        "candidate": [
+          {
+            "wall_s": 0.0016027337761544106,
+            "cpu_s": 0.0013625277777777765
+          },
+          {
+            "wall_s": 0.001943773166405865,
+            "cpu_s": 0.001486611111111116
+          },
+          {
+            "wall_s": 0.002078311333510404,
+            "cpu_s": 0.0016693888888888884
+          },
+          {
+            "wall_s": 0.001774102999156134,
+            "cpu_s": 0.0014412222222222233
+          },
+          {
+            "wall_s": 0.003463269667311882,
+            "cpu_s": 0.0017947777777777747
+          },
+          {
+            "wall_s": 0.002536207165879508,
+            "cpu_s": 0.001416333333333328
+          },
+          {
+            "wall_s": 0.001252146971334393,
+            "cpu_s": 0.0012521666666666592
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "wall_s": {
+            "median": 0.00252751388729343,
+            "min": 0.0013090185012616632,
+            "max": 0.003636108776037064
+          },
+          "cpu_s": {
+            "median": 0.001440805555555554,
+            "min": 0.0012823611111111176,
+            "max": 0.0016120000000000023
+          }
+        },
+        "candidate": {
+          "wall_s": {
+            "median": 0.001943773166405865,
+            "min": 0.001252146971334393,
+            "max": 0.003463269667311882
+          },
+          "cpu_s": {
+            "median": 0.0014412222222222233,
+            "min": 0.0012521666666666592,
+            "max": 0.0017947777777777747
+          }
+        }
+      },
+      "candidate_to_baseline_wall": 0.769045494142602,
+      "memory": {
+        "baseline": {
+          "peak_traced_bytes": 7995606,
+          "returned_traced_bytes": 33420
+        },
+        "candidate": {
+          "peak_traced_bytes": 7995670,
+          "returned_traced_bytes": 33484
+        }
+      },
+      "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+    },
+    "PEPC_amino_observed": {
+      "shape": [
+        71,
+        971,
+        20
+      ],
+      "dtype": "float64",
+      "calls_per_repeat": 29,
+      "parity": {
+        "arrays_exact": 4,
+        "sites": 971
+      },
+      "samples": {
+        "baseline": [
+          {
+            "wall_s": 0.0020059468626076804,
+            "cpu_s": 0.0016961724137931086
+          },
+          {
+            "wall_s": 0.0015942485850497052,
+            "cpu_s": 0.0015934482758620796
+          },
+          {
+            "wall_s": 0.002165281619266446,
+            "cpu_s": 0.001910862068965517
+          },
+          {
+            "wall_s": 0.0019972557563270473,
+            "cpu_s": 0.0017094482758620616
+          },
+          {
+            "wall_s": 0.004323464071635029,
+            "cpu_s": 0.0018481724137930998
+          },
+          {
+            "wall_s": 0.002962429622380898,
+            "cpu_s": 0.0016511724137931124
+          },
+          {
+            "wall_s": 0.0015436264501627662,
+            "cpu_s": 0.001524379310344816
+          }
+        ],
+        "candidate": [
+          {
+            "wall_s": 0.0015750589282733612,
+            "cpu_s": 0.0015750689655172402
+          },
+          {
+            "wall_s": 0.0015816465501898322,
+            "cpu_s": 0.0015816896551724192
+          },
+          {
+            "wall_s": 0.00211794827743594,
+            "cpu_s": 0.0019770344827586207
+          },
+          {
+            "wall_s": 0.002238492830656469,
+            "cpu_s": 0.0018830689655172305
+          },
+          {
+            "wall_s": 0.002656228450961925,
+            "cpu_s": 0.0020310344827586192
+          },
+          {
+            "wall_s": 0.0022062528958736822,
+            "cpu_s": 0.0019158620689655114
+          },
+          {
+            "wall_s": 0.0015743850320898767,
+            "cpu_s": 0.0015632068965517189
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "wall_s": {
+            "median": 0.0020059468626076804,
+            "min": 0.0015436264501627662,
+            "max": 0.004323464071635029
+          },
+          "cpu_s": {
+            "median": 0.0016961724137931086,
+            "min": 0.001524379310344816,
+            "max": 0.001910862068965517
+          }
+        },
+        "candidate": {
+          "wall_s": {
+            "median": 0.00211794827743594,
+            "min": 0.0015743850320898767,
+            "max": 0.002656228450961925
+          },
+          "cpu_s": {
+            "median": 0.0018830689655172305,
+            "min": 0.0015632068965517189,
+            "max": 0.0020310344827586192
+          }
+        }
+      },
+      "candidate_to_baseline_wall": 1.055834686808533,
+      "memory": {
+        "baseline": {
+          "peak_traced_bytes": 12090064,
+          "returned_traced_bytes": 32800
+        },
+        "candidate": {
+          "peak_traced_bytes": 12090128,
+          "returned_traced_bytes": 32864
+        }
+      },
+      "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+    },
+    "PEPC_codon_observed": {
+      "shape": [
+        71,
+        971,
+        61
+      ],
+      "dtype": "float64",
+      "calls_per_repeat": 7,
+      "parity": {
+        "arrays_exact": 4,
+        "sites": 971
+      },
+      "samples": {
+        "baseline": [
+          {
+            "wall_s": 0.006463220276470695,
+            "cpu_s": 0.006139000000000053
+          },
+          {
+            "wall_s": 0.006498321425169706,
+            "cpu_s": 0.006132000000000026
+          },
+          {
+            "wall_s": 0.007076101144775748,
+            "cpu_s": 0.006448571428571486
+          },
+          {
+            "wall_s": 0.008450416565340544,
+            "cpu_s": 0.006850285714285713
+          },
+          {
+            "wall_s": 0.006495797574254019,
+            "cpu_s": 0.006222571428571426
+          },
+          {
+            "wall_s": 0.007987541712022253,
+            "cpu_s": 0.006904857142857094
+          },
+          {
+            "wall_s": 0.008181297569535673,
+            "cpu_s": 0.0066787142857142835
+          }
+        ],
+        "candidate": [
+          {
+            "wall_s": 0.00480266658788813,
+            "cpu_s": 0.004394857142857145
+          },
+          {
+            "wall_s": 0.005307803579073932,
+            "cpu_s": 0.004476142857142865
+          },
+          {
+            "wall_s": 0.005063553573563695,
+            "cpu_s": 0.00417842857142852
+          },
+          {
+            "wall_s": 0.006254589284903237,
+            "cpu_s": 0.004876999999999957
+          },
+          {
+            "wall_s": 0.006870785711466202,
+            "cpu_s": 0.005061571428571427
+          },
+          {
+            "wall_s": 0.00757553571436022,
+            "cpu_s": 0.00454071428571431
+          },
+          {
+            "wall_s": 0.004372970151182797,
+            "cpu_s": 0.004119285714285706
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "wall_s": {
+            "median": 0.007076101144775748,
+            "min": 0.006463220276470695,
+            "max": 0.008450416565340544
+          },
+          "cpu_s": {
+            "median": 0.006448571428571486,
+            "min": 0.006132000000000026,
+            "max": 0.006904857142857094
+          }
+        },
+        "candidate": {
+          "wall_s": {
+            "median": 0.005307803579073932,
+            "min": 0.004372970151182797,
+            "max": 0.00757553571436022
+          },
+          "cpu_s": {
+            "median": 0.004476142857142865,
+            "min": 0.004119285714285706,
+            "max": 0.005061571428571427
+          }
+        }
+      },
+      "candidate_to_baseline_wall": 0.7501028420138762,
+      "memory": {
+        "baseline": {
+          "peak_traced_bytes": 36656692,
+          "returned_traced_bytes": 75524
+        },
+        "candidate": {
+          "peak_traced_bytes": 18343432,
+          "returned_traced_bytes": 76292
+        }
+      },
+      "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+    },
+    "large_float32": {
+      "shape": [
+        192,
+        8192,
+        20
+      ],
+      "dtype": "float32",
+      "calls_per_repeat": 1,
+      "parity": {
+        "arrays_exact": 4,
+        "sites": 8192
+      },
+      "samples": {
+        "baseline": [
+          {
+            "wall_s": 0.03421033301856369,
+            "cpu_s": 0.03421099999999999
+          },
+          {
+            "wall_s": 0.03666408406570554,
+            "cpu_s": 0.036094999999999544
+          },
+          {
+            "wall_s": 0.03963533299975097,
+            "cpu_s": 0.0358969999999994
+          },
+          {
+            "wall_s": 0.04077408299781382,
+            "cpu_s": 0.03483000000000036
+          },
+          {
+            "wall_s": 0.03517824993468821,
+            "cpu_s": 0.03333300000000072
+          },
+          {
+            "wall_s": 0.037166584050282836,
+            "cpu_s": 0.034734000000000265
+          },
+          {
+            "wall_s": 0.0351198751013726,
+            "cpu_s": 0.03295400000000015
+          }
+        ],
+        "candidate": [
+          {
+            "wall_s": 0.02577454096172005,
+            "cpu_s": 0.02576899999999993
+          },
+          {
+            "wall_s": 0.027220458025112748,
+            "cpu_s": 0.026817000000000313
+          },
+          {
+            "wall_s": 0.026026500039733946,
+            "cpu_s": 0.025742000000000154
+          },
+          {
+            "wall_s": 0.03270354098640382,
+            "cpu_s": 0.0276860000000001
+          },
+          {
+            "wall_s": 0.03421954205259681,
+            "cpu_s": 0.02802100000000074
+          },
+          {
+            "wall_s": 0.03364812501240522,
+            "cpu_s": 0.027584000000000053
+          },
+          {
+            "wall_s": 0.02683804207481444,
+            "cpu_s": 0.026399000000000505
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "wall_s": {
+            "median": 0.03666408406570554,
+            "min": 0.03421033301856369,
+            "max": 0.04077408299781382
+          },
+          "cpu_s": {
+            "median": 0.034734000000000265,
+            "min": 0.03295400000000015,
+            "max": 0.036094999999999544
+          }
+        },
+        "candidate": {
+          "wall_s": {
+            "median": 0.027220458025112748,
+            "min": 0.02577454096172005,
+            "max": 0.03421954205259681
+          },
+          "cpu_s": {
+            "median": 0.026817000000000313,
+            "min": 0.025742000000000154,
+            "max": 0.02802100000000074
+          }
+        }
+      },
+      "candidate_to_baseline_wall": 0.7424284205854178,
+      "memory": {
+        "baseline": {
+          "peak_traced_bytes": 135048176,
+          "returned_traced_bytes": 263872
+        },
+        "candidate": {
+          "peak_traced_bytes": 18304004,
+          "returned_traced_bytes": 264640
+        }
+      },
+      "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+    },
+    "large_float64": {
+      "shape": [
+        192,
+        8192,
+        20
+      ],
+      "dtype": "float64",
+      "calls_per_repeat": 1,
+      "parity": {
+        "arrays_exact": 4,
+        "sites": 8192
+      },
+      "samples": {
+        "baseline": [
+          {
+            "wall_s": 0.06324654095806181,
+            "cpu_s": 0.05465799999999987
+          },
+          {
+            "wall_s": 0.05254249996505678,
+            "cpu_s": 0.04886199999999974
+          },
+          {
+            "wall_s": 0.06663500005379319,
+            "cpu_s": 0.05799999999999983
+          },
+          {
+            "wall_s": 0.06825216603465378,
+            "cpu_s": 0.05011600000000005
+          },
+          {
+            "wall_s": 0.059185749967582524,
+            "cpu_s": 0.046801000000000315
+          },
+          {
+            "wall_s": 0.06745795800816268,
+            "cpu_s": 0.05219600000000035
+          },
+          {
+            "wall_s": 0.0527195839677006,
+            "cpu_s": 0.05018000000000011
+          }
+        ],
+        "candidate": [
+          {
+            "wall_s": 0.04686854197643697,
+            "cpu_s": 0.036729000000000234
+          },
+          {
+            "wall_s": 0.043502792017534375,
+            "cpu_s": 0.03820599999999974
+          },
+          {
+            "wall_s": 0.03956729196943343,
+            "cpu_s": 0.0367090000000001
+          },
+          {
+            "wall_s": 0.046754834009334445,
+            "cpu_s": 0.038470000000000226
+          },
+          {
+            "wall_s": 0.033425208064727485,
+            "cpu_s": 0.0334260000000004
+          },
+          {
+            "wall_s": 0.03397833299823105,
+            "cpu_s": 0.033768999999999494
+          },
+          {
+            "wall_s": 0.03635629208292812,
+            "cpu_s": 0.03494500000000045
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "wall_s": {
+            "median": 0.06324654095806181,
+            "min": 0.05254249996505678,
+            "max": 0.06825216603465378
+          },
+          "cpu_s": {
+            "median": 0.05018000000000011,
+            "min": 0.046801000000000315,
+            "max": 0.05799999999999983
+          }
+        },
+        "candidate": {
+          "wall_s": {
+            "median": 0.03956729196943343,
+            "min": 0.033425208064727485,
+            "max": 0.04686854197643697
+          },
+          "cpu_s": {
+            "median": 0.0367090000000001,
+            "min": 0.0334260000000004,
+            "max": 0.038470000000000226
+          }
+        }
+      },
+      "candidate_to_baseline_wall": 0.6256040467994941,
+      "memory": {
+        "baseline": {
+          "peak_traced_bytes": 266077920,
+          "returned_traced_bytes": 263872
+        },
+        "candidate": {
+          "peak_traced_bytes": 18018152,
+          "returned_traced_bytes": 264640
+        }
+      },
+      "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+    }
+  },
+  "source_sha256": "c3ef7e8baa89e12cd32cb4a2050c53d711fead052d226f9266e8e36dfde4a2ee",
+  "discarded_exploration_8MiB": {
+    "status": "Discarded; final patch uses 16 MiB to keep PEPC amino input in original unsplit computation",
+    "method_note": "Earlier harness version: seven alternating repeats of one call, not batched; 1000-site random cases and 1600-site tie cases; all other controls equivalent",
+    "data": {
+      "proposal": 7,
+      "baseline": "624bb8a",
+      "environment": {
+        "commit": "624bb8a6dae536d0fa10891f666684ef1ad3dab0",
+        "python": "3.14.7 | packaged by conda-forge | (main, Sep  2 2026, 21:04:32) [Clang 20.1.8 ]",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "cpu_count": 12,
+        "numpy": "2.5.3",
+        "scipy": "1.17.1",
+        "pandas": "3.0.5",
+        "native_threads": 1
+      },
+      "exactness": {
+        "cases": 156,
+        "exact_arrays": 612,
+        "equal_exception_cases": [
+          {
+            "equal_exception": "IndexError"
+          },
+          {
+            "equal_exception": "IndexError"
+          },
+          {
+            "equal_exception": "IndexError"
+          }
+        ],
+        "float_bitwise_exact": true
+      },
+      "block_bytes": 8388608,
+      "method": "One warmup per implementation; seven alternating ordered repeats; inputs/preparation outside timed section; all operations hold shared benchmark lock",
+      "benchmarks": {
+        "PGK_amino_observed": {
+          "shape": [
+            33,
+            417,
+            20
+          ],
+          "dtype": "float64",
+          "parity": {
+            "arrays_exact": 4,
+            "sites": 417
+          },
+          "samples": {
+            "baseline": [
+              {
+                "wall_s": 0.0011821669759228826,
+                "cpu_s": 0.0009559999999999569
+              },
+              {
+                "wall_s": 0.0006193340523168445,
+                "cpu_s": 0.0006010000000000737
+              },
+              {
+                "wall_s": 0.0009988340316340327,
+                "cpu_s": 0.0006229999999999292
+              },
+              {
+                "wall_s": 0.0006718749646097422,
+                "cpu_s": 0.0006610000000000227
+              },
+              {
+                "wall_s": 0.0009668340208008885,
+                "cpu_s": 0.0007559999999999789
+              },
+              {
+                "wall_s": 0.0008453339105471969,
+                "cpu_s": 0.0007409999999999917
+              },
+              {
+                "wall_s": 0.0006366249872371554,
+                "cpu_s": 0.0006380000000000274
+              }
+            ],
+            "candidate": [
+              {
+                "wall_s": 0.0011725419899448752,
+                "cpu_s": 0.0007300000000000084
+              },
+              {
+                "wall_s": 0.0024857500102370977,
+                "cpu_s": 0.0007890000000000397
+              },
+              {
+                "wall_s": 0.0010205840226262808,
+                "cpu_s": 0.0008069999999998911
+              },
+              {
+                "wall_s": 0.0008089579641819,
+                "cpu_s": 0.0007020000000000914
+              },
+              {
+                "wall_s": 0.0011577089317142963,
+                "cpu_s": 0.0008920000000000039
+              },
+              {
+                "wall_s": 0.0008180000586435199,
+                "cpu_s": 0.0006559999999999899
+              },
+              {
+                "wall_s": 0.0006311670877039433,
+                "cpu_s": 0.0006230000000000402
+              }
+            ]
+          },
+          "summary": {
+            "baseline": {
+              "wall_s": {
+                "median": 0.0008453339105471969,
+                "min": 0.0006193340523168445,
+                "max": 0.0011821669759228826
+              },
+              "cpu_s": {
+                "median": 0.0006610000000000227,
+                "min": 0.0006010000000000737,
+                "max": 0.0009559999999999569
+              }
+            },
+            "candidate": {
+              "wall_s": {
+                "median": 0.0010205840226262808,
+                "min": 0.0006311670877039433,
+                "max": 0.0024857500102370977
+              },
+              "cpu_s": {
+                "median": 0.0007300000000000084,
+                "min": 0.0006230000000000402,
+                "max": 0.0008920000000000039
+              }
+            }
+          },
+          "candidate_to_baseline_wall": 1.2073146597959639,
+          "memory": {
+            "baseline": {
+              "peak_traced_bytes": 2642666,
+              "returned_traced_bytes": 15072
+            },
+            "candidate": {
+              "peak_traced_bytes": 2642730,
+              "returned_traced_bytes": 15136
+            }
+          },
+          "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+        },
+        "PGK_codon_observed": {
+          "shape": [
+            33,
+            417,
+            61
+          ],
+          "dtype": "float64",
+          "parity": {
+            "arrays_exact": 4,
+            "sites": 417
+          },
+          "samples": {
+            "baseline": [
+              {
+                "wall_s": 0.003111459081992507,
+                "cpu_s": 0.0017220000000000013
+              },
+              {
+                "wall_s": 0.0017005420522764325,
+                "cpu_s": 0.0017019999999999813
+              },
+              {
+                "wall_s": 0.0013790000230073929,
+                "cpu_s": 0.0013110000000000621
+              },
+              {
+                "wall_s": 0.002132207970134914,
+                "cpu_s": 0.001859000000000055
+              },
+              {
+                "wall_s": 0.0015417500399053097,
+                "cpu_s": 0.001458999999999988
+              },
+              {
+                "wall_s": 0.0013110000872984529,
+                "cpu_s": 0.0013110000000000621
+              },
+              {
+                "wall_s": 0.0013218340463936329,
+                "cpu_s": 0.0013219999999999343
+              }
+            ],
+            "candidate": [
+              {
+                "wall_s": 0.0020306670339778066,
+                "cpu_s": 0.0016400000000000858
+              },
+              {
+                "wall_s": 0.002326791058294475,
+                "cpu_s": 0.0018759999999999888
+              },
+              {
+                "wall_s": 0.0012344589922577143,
+                "cpu_s": 0.0012339999999999574
+              },
+              {
+                "wall_s": 0.0020521669648587704,
+                "cpu_s": 0.0016000000000000458
+              },
+              {
+                "wall_s": 0.0016672919737175107,
+                "cpu_s": 0.00145099999999998
+              },
+              {
+                "wall_s": 0.001993125071749091,
+                "cpu_s": 0.001927000000000012
+              },
+              {
+                "wall_s": 0.0012796670198440552,
+                "cpu_s": 0.0012799999999999478
+              }
+            ]
+          },
+          "summary": {
+            "baseline": {
+              "wall_s": {
+                "median": 0.0015417500399053097,
+                "min": 0.0013110000872984529,
+                "max": 0.003111459081992507
+              },
+              "cpu_s": {
+                "median": 0.001458999999999988,
+                "min": 0.0013110000000000621,
+                "max": 0.001859000000000055
+              }
+            },
+            "candidate": {
+              "wall_s": {
+                "median": 0.001993125071749091,
+                "min": 0.0012344589922577143,
+                "max": 0.002326791058294475
+              },
+              "cpu_s": {
+                "median": 0.0016000000000000458,
+                "min": 0.0012339999999999574,
+                "max": 0.001927000000000012
+              }
+            }
+          },
+          "candidate_to_baseline_wall": 1.2927679715652893,
+          "memory": {
+            "baseline": {
+              "peak_traced_bytes": 7995606,
+              "returned_traced_bytes": 33420
+            },
+            "candidate": {
+              "peak_traced_bytes": 7995670,
+              "returned_traced_bytes": 33484
+            }
+          },
+          "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+        },
+        "PEPC_amino_observed": {
+          "shape": [
+            71,
+            971,
+            20
+          ],
+          "dtype": "float64",
+          "parity": {
+            "arrays_exact": 4,
+            "sites": 971
+          },
+          "samples": {
+            "baseline": [
+              {
+                "wall_s": 0.0016635420033708215,
+                "cpu_s": 0.0016639999999998878
+              },
+              {
+                "wall_s": 0.00180358299985528,
+                "cpu_s": 0.0017139999999999933
+              },
+              {
+                "wall_s": 0.001568333012983203,
+                "cpu_s": 0.0015680000000000138
+              },
+              {
+                "wall_s": 0.0018949159421026707,
+                "cpu_s": 0.0017610000000001236
+              },
+              {
+                "wall_s": 0.0015845829620957375,
+                "cpu_s": 0.001570999999999989
+              },
+              {
+                "wall_s": 0.0016246250597760081,
+                "cpu_s": 0.0016249999999999876
+              },
+              {
+                "wall_s": 0.0019444170175120234,
+                "cpu_s": 0.001899000000000095
+              }
+            ],
+            "candidate": [
+              {
+                "wall_s": 0.002718541072681546,
+                "cpu_s": 0.002718999999999916
+              },
+              {
+                "wall_s": 0.002728374907746911,
+                "cpu_s": 0.0027040000000000397
+              },
+              {
+                "wall_s": 0.0025251249317079782,
+                "cpu_s": 0.0025249999999998884
+              },
+              {
+                "wall_s": 0.002220708061940968,
+                "cpu_s": 0.0022200000000001108
+              },
+              {
+                "wall_s": 0.0025464160135015845,
+                "cpu_s": 0.0025460000000001592
+              },
+              {
+                "wall_s": 0.0023539579706266522,
+                "cpu_s": 0.0023529999999998275
+              },
+              {
+                "wall_s": 0.00258712493814528,
+                "cpu_s": 0.002513999999999905
+              }
+            ]
+          },
+          "summary": {
+            "baseline": {
+              "wall_s": {
+                "median": 0.0016635420033708215,
+                "min": 0.001568333012983203,
+                "max": 0.0019444170175120234
+              },
+              "cpu_s": {
+                "median": 0.0016639999999998878,
+                "min": 0.0015680000000000138,
+                "max": 0.001899000000000095
+              }
+            },
+            "candidate": {
+              "wall_s": {
+                "median": 0.0025464160135015845,
+                "min": 0.002220708061940968,
+                "max": 0.002728374907746911
+              },
+              "cpu_s": {
+                "median": 0.0025249999999998884,
+                "min": 0.0022200000000001108,
+                "max": 0.002718999999999916
+              }
+            }
+          },
+          "candidate_to_baseline_wall": 1.5307193977319495,
+          "memory": {
+            "baseline": {
+              "peak_traced_bytes": 12090064,
+              "returned_traced_bytes": 32800
+            },
+            "candidate": {
+              "peak_traced_bytes": 9222040,
+              "returned_traced_bytes": 33536
+            }
+          },
+          "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+        },
+        "PEPC_codon_observed": {
+          "shape": [
+            71,
+            971,
+            61
+          ],
+          "dtype": "float64",
+          "parity": {
+            "arrays_exact": 4,
+            "sites": 971
+          },
+          "samples": {
+            "baseline": [
+              {
+                "wall_s": 0.010034292005002499,
+                "cpu_s": 0.007639999999999869
+              },
+              {
+                "wall_s": 0.006583708920516074,
+                "cpu_s": 0.006584000000000145
+              },
+              {
+                "wall_s": 0.007408624980598688,
+                "cpu_s": 0.006753000000000009
+              },
+              {
+                "wall_s": 0.11324333294760436,
+                "cpu_s": 0.008267000000000024
+              },
+              {
+                "wall_s": 0.006248416029848158,
+                "cpu_s": 0.006248999999999949
+              },
+              {
+                "wall_s": 0.009447957971133292,
+                "cpu_s": 0.007560000000000011
+              },
+              {
+                "wall_s": 0.006454291986301541,
+                "cpu_s": 0.006180000000000074
+              }
+            ],
+            "candidate": [
+              {
+                "wall_s": 0.008904292015358806,
+                "cpu_s": 0.007745000000000113
+              },
+              {
+                "wall_s": 0.007127082906663418,
+                "cpu_s": 0.0066030000000001365
+              },
+              {
+                "wall_s": 0.0068510000128299,
+                "cpu_s": 0.006774000000000058
+              },
+              {
+                "wall_s": 0.008735917042940855,
+                "cpu_s": 0.006665999999999839
+              },
+              {
+                "wall_s": 0.006105625070631504,
+                "cpu_s": 0.006106000000000167
+              },
+              {
+                "wall_s": 0.006193957990035415,
+                "cpu_s": 0.00615600000000005
+              },
+              {
+                "wall_s": 0.006858583074063063,
+                "cpu_s": 0.006557000000000146
+              }
+            ]
+          },
+          "summary": {
+            "baseline": {
+              "wall_s": {
+                "median": 0.007408624980598688,
+                "min": 0.006248416029848158,
+                "max": 0.11324333294760436
+              },
+              "cpu_s": {
+                "median": 0.006753000000000009,
+                "min": 0.006180000000000074,
+                "max": 0.008267000000000024
+              }
+            },
+            "candidate": {
+              "wall_s": {
+                "median": 0.006858583074063063,
+                "min": 0.006105625070631504,
+                "max": 0.008904292015358806
+              },
+              "cpu_s": {
+                "median": 0.0066030000000001365,
+                "min": 0.006106000000000167,
+                "max": 0.007745000000000113
+              }
+            }
+          },
+          "candidate_to_baseline_wall": 0.9257565461909537,
+          "memory": {
+            "baseline": {
+              "peak_traced_bytes": 36656692,
+              "returned_traced_bytes": 75524
+            },
+            "candidate": {
+              "peak_traced_bytes": 9211336,
+              "returned_traced_bytes": 76228
+            }
+          },
+          "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+        },
+        "large_float32": {
+          "shape": [
+            192,
+            8192,
+            20
+          ],
+          "dtype": "float32",
+          "parity": {
+            "arrays_exact": 4,
+            "sites": 8192
+          },
+          "samples": {
+            "baseline": [
+              {
+                "wall_s": 0.3473958750255406,
+                "cpu_s": 0.04730699999999999
+              },
+              {
+                "wall_s": 0.386714999913238,
+                "cpu_s": 0.043885000000000174
+              },
+              {
+                "wall_s": 0.20369804103393108,
+                "cpu_s": 0.04444899999999996
+              },
+              {
+                "wall_s": 0.07042654196266085,
+                "cpu_s": 0.03837800000000002
+              },
+              {
+                "wall_s": 0.16405675001442432,
+                "cpu_s": 0.03575700000000004
+              },
+              {
+                "wall_s": 0.19539887504652143,
+                "cpu_s": 0.0436939999999999
+              },
+              {
+                "wall_s": 0.18842125008814037,
+                "cpu_s": 0.051210999999999895
+              }
+            ],
+            "candidate": [
+              {
+                "wall_s": 0.2446577090304345,
+                "cpu_s": 0.04738399999999987
+              },
+              {
+                "wall_s": 0.24048779194708914,
+                "cpu_s": 0.04792899999999989
+              },
+              {
+                "wall_s": 0.11184404196683317,
+                "cpu_s": 0.048310000000000075
+              },
+              {
+                "wall_s": 0.24679895804729313,
+                "cpu_s": 0.044421000000000044
+              },
+              {
+                "wall_s": 0.22031387500464916,
+                "cpu_s": 0.04488100000000017
+              },
+              {
+                "wall_s": 0.1833640830591321,
+                "cpu_s": 0.04083199999999998
+              },
+              {
+                "wall_s": 0.20087708393111825,
+                "cpu_s": 0.05356199999999989
+              }
+            ]
+          },
+          "summary": {
+            "baseline": {
+              "wall_s": {
+                "median": 0.19539887504652143,
+                "min": 0.07042654196266085,
+                "max": 0.386714999913238
+              },
+              "cpu_s": {
+                "median": 0.043885000000000174,
+                "min": 0.03575700000000004,
+                "max": 0.051210999999999895
+              }
+            },
+            "candidate": {
+              "wall_s": {
+                "median": 0.22031387500464916,
+                "min": 0.11184404196683317,
+                "max": 0.24679895804729313
+              },
+              "cpu_s": {
+                "median": 0.04738399999999987,
+                "min": 0.04083199999999998,
+                "max": 0.05356199999999989
+              }
+            }
+          },
+          "candidate_to_baseline_wall": 1.1275084104358117,
+          "memory": {
+            "baseline": {
+              "peak_traced_bytes": 135048176,
+              "returned_traced_bytes": 263872
+            },
+            "candidate": {
+              "peak_traced_bytes": 9285722,
+              "returned_traced_bytes": 264640
+            }
+          },
+          "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+        },
+        "large_float64": {
+          "shape": [
+            192,
+            8192,
+            20
+          ],
+          "dtype": "float64",
+          "parity": {
+            "arrays_exact": 4,
+            "sites": 8192
+          },
+          "samples": {
+            "baseline": [
+              {
+                "wall_s": 0.4051003339700401,
+                "cpu_s": 0.06456000000000017
+              },
+              {
+                "wall_s": 0.15555404196493328,
+                "cpu_s": 0.05647499999999983
+              },
+              {
+                "wall_s": 0.07191549998242408,
+                "cpu_s": 0.054209000000000174
+              },
+              {
+                "wall_s": 0.2681636249180883,
+                "cpu_s": 0.056929999999999925
+              },
+              {
+                "wall_s": 0.2078405829379335,
+                "cpu_s": 0.05628999999999973
+              },
+              {
+                "wall_s": 0.21476879203692079,
+                "cpu_s": 0.06300600000000012
+              },
+              {
+                "wall_s": 0.36936054192483425,
+                "cpu_s": 0.05815999999999999
+              }
+            ],
+            "candidate": [
+              {
+                "wall_s": 0.30997125001158565,
+                "cpu_s": 0.06893799999999972
+              },
+              {
+                "wall_s": 0.20660183392465115,
+                "cpu_s": 0.07224399999999997
+              },
+              {
+                "wall_s": 0.30587450007442385,
+                "cpu_s": 0.05903999999999998
+              },
+              {
+                "wall_s": 0.13605312502477318,
+                "cpu_s": 0.057792000000000066
+              },
+              {
+                "wall_s": 0.1222676660399884,
+                "cpu_s": 0.052744000000000124
+              },
+              {
+                "wall_s": 0.06302012503147125,
+                "cpu_s": 0.055057000000000134
+              },
+              {
+                "wall_s": 0.24566945806145668,
+                "cpu_s": 0.05702000000000007
+              }
+            ]
+          },
+          "summary": {
+            "baseline": {
+              "wall_s": {
+                "median": 0.21476879203692079,
+                "min": 0.07191549998242408,
+                "max": 0.4051003339700401
+              },
+              "cpu_s": {
+                "median": 0.056929999999999925,
+                "min": 0.054209000000000174,
+                "max": 0.06456000000000017
+              }
+            },
+            "candidate": {
+              "wall_s": {
+                "median": 0.20660183392465115,
+                "min": 0.06302012503147125,
+                "max": 0.30997125001158565
+              },
+              "cpu_s": {
+                "median": 0.057792000000000066,
+                "min": 0.052744000000000124,
+                "max": 0.07224399999999997
+              }
+            }
+          },
+          "candidate_to_baseline_wall": 0.96197325489047,
+          "memory": {
+            "baseline": {
+              "peak_traced_bytes": 266077920,
+              "returned_traced_bytes": 263872
+            },
+            "candidate": {
+              "peak_traced_bytes": 9142376,
+              "returned_traced_bytes": 264640
+            }
+          },
+          "memory_method": "tracemalloc includes NumPy data allocations; excludes preexisting input, imported modules and native allocator/RSS overhead"
+        }
+      },
+      "source_sha256": "c3ef7e8baa89e12cd32cb4a2050c53d711fead052d226f9266e8e36dfde4a2ee"
+    }
+  }
+}
