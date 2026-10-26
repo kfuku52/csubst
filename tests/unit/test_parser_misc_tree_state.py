@@ -61,28 +61,6 @@ def test_resolve_state_loading_enables_selective_mode_with_targeted_cb_only():
     )
 
 
-def test_get_required_state_branch_ids_accepts_scalar_target_id():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
-    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
-    g = {
-        "tree": tr,
-        "target_ids": {"trait1": np.int64(labels["N1"])},
-    }
-    out = parser_misc._get_required_state_branch_ids(g)
-    np.testing.assert_array_equal(out, np.array(sorted([labels["R"], labels["N1"]]), dtype=np.int64))
-
-
-def test_get_required_state_branch_ids_ignores_none_target_ids():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
-    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
-    g = {
-        "tree": tr,
-        "target_ids": {"trait1": None, "trait2": np.array([labels["N1"]], dtype=np.int64)},
-    }
-    out = parser_misc._get_required_state_branch_ids(g)
-    np.testing.assert_array_equal(out, np.array(sorted([labels["R"], labels["N1"]]), dtype=np.int64))
-
-
 def test_get_required_state_branch_ids_climbs_past_unnamed_internal_parent():
     tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,(B:1,C:1):1)X:1,D:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
@@ -102,26 +80,6 @@ def test_get_required_state_branch_ids_climbs_past_unnamed_internal_parent():
             dtype=np.int64,
         ),
     )
-
-
-def test_get_required_state_branch_ids_rejects_non_integer_target_ids():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    g = {
-        "tree": tr,
-        "target_ids": {"trait1": np.array(["x"])},
-    }
-    with pytest.raises(ValueError, match="integer-like"):
-        parser_misc._get_required_state_branch_ids(g)
-
-
-def test_get_required_state_branch_ids_rejects_non_integer_float_target_ids():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    g = {
-        "tree": tr,
-        "target_ids": {"trait1": np.array([1.5])},
-    }
-    with pytest.raises(ValueError, match="integer-like"):
-        parser_misc._get_required_state_branch_ids(g)
 
 
 def test_resolve_state_loading_disables_selective_mode_when_full_tree_outputs_requested():

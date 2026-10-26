@@ -184,19 +184,3 @@ def test_plot_lineage_tree_writes_pdf_and_applies_lineage_branch_colors(tmp_path
             assert color == lineage_rgb[bid]
         else:
             assert color == "black"
-
-
-def test_plot_lineage_tree_accepts_scalar_branch_id(tmp_path, tiny_tree):
-    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tiny_tree.traverse()}
-    target_id = np.int64(labels["X"])
-    g = {
-        "mode": "lineage",
-        "tree": tiny_tree,
-        "branch_ids": target_id,
-    }
-    outbase = tmp_path / "csubst_sites_scalar"
-    main_sites.plot_lineage_tree(g=g, outbase=str(outbase))
-    outfile = tmp_path / "csubst_sites_scalar.tree.pdf"
-    assert outfile.exists()
-    assert outfile.stat().st_size > 0
-    assert ete.get_prop(next(node for node in tiny_tree.traverse() if int(ete.get_prop(node, "numerical_label")) == int(target_id)), "color_PLACEHOLDER") != "black"

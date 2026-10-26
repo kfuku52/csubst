@@ -160,6 +160,7 @@ def test_get_global_parameters_keeps_min_sub_pp_unchanged_for_omega_pvalue(capsy
     )
     captured = capsys.readouterr()
     assert g["min_sub_pp"] == pytest.approx(0.0)
+    assert g["ml_anc"] is False
     assert "auto-set to" not in captured.err
 
 
@@ -195,6 +196,7 @@ def test_get_global_parameters_does_not_auto_set_min_sub_pp_when_ml_anc_yes(caps
     )
     captured = capsys.readouterr()
     assert g["min_sub_pp"] == pytest.approx(0.0)
+    assert g["ml_anc"] is True
     assert "auto-set to" not in captured.err
 
 

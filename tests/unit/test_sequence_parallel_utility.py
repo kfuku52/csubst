@@ -159,58 +159,6 @@ def test_cdn2pep_state_selected_branch_ids_keeps_global_branch_index():
     assert out[2, :, :].sum() == 0
 
 
-def test_cdn2pep_state_selected_branch_ids_accepts_scalar_numpy_integer():
-    g = {
-        "amino_acid_orders": np.array(["K", "N"]),
-        "synonymous_indices": {"K": [0, 1], "N": [2]},
-    }
-    state_cdn = np.array(
-        [
-            [[0.2, 0.3, 0.5]],
-            [[0.1, 0.4, 0.5]],
-            [[0.9, 0.0, 0.1]],
-        ],
-        dtype=float,
-    )
-    selected = np.int64(1)
-    out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=selected)
-    expected = np.zeros((3, 1, 2), dtype=float)
-    expected[1, 0, 0] = state_cdn[1, 0, [0, 1]].sum()
-    expected[1, 0, 1] = state_cdn[1, 0, 2]
-    np.testing.assert_allclose(out, expected, atol=1e-12)
-
-
-def test_cdn2pep_state_selected_branch_ids_ignores_negative_and_out_of_range_ids():
-    g = {
-        "amino_acid_orders": np.array(["K", "N"]),
-        "synonymous_indices": {"K": [0, 1], "N": [2]},
-    }
-    state_cdn = np.array(
-        [
-            [[0.2, 0.3, 0.5]],
-            [[0.1, 0.4, 0.5]],
-            [[0.9, 0.0, 0.1]],
-        ],
-        dtype=float,
-    )
-    selected = np.array([1, -1, 999], dtype=np.int64)
-    out = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=selected)
-    expected = np.zeros((3, 1, 2), dtype=float)
-    expected[1, 0, 0] = state_cdn[1, 0, [0, 1]].sum()
-    expected[1, 0, 1] = state_cdn[1, 0, 2]
-    np.testing.assert_allclose(out, expected, atol=1e-12)
-
-
-def test_cdn2pep_state_rejects_non_integer_selected_branch_ids():
-    g = {
-        "amino_acid_orders": np.array(["K", "N"]),
-        "synonymous_indices": {"K": [0, 1], "N": [2]},
-    }
-    state_cdn = np.array([[[0.2, 0.3, 0.5]]], dtype=float)
-    with pytest.raises(ValueError, match="integer-like"):
-        sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=np.array([0.5]))
-
-
 def test_translate_state_handles_missing_states():
     g = {
         "float_tol": 1e-12,

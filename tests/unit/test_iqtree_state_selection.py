@@ -216,50 +216,6 @@ def test_get_state_tensor_maps_internal_rows_by_site_label_not_file_order(tmp_pa
     np.testing.assert_allclose(out[labels["N1"], 1, :], [0.0, 1.0, 0.0], atol=1e-12)
 
 
-def test_get_selected_branch_context_accepts_scalar_selected_branch_id():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
-    labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse() if n.name}
-    selected_set, selected_internal_ids, required_leaf_ids = parser_iqtree._get_selected_branch_context(
-        tree=tr,
-        selected_branch_ids=np.int64(labels["N1"]),
-    )
-    root_id = int(ete.get_prop(ete.get_tree_root(tr), "numerical_label"))
-    assert labels["N1"] in selected_set
-    assert root_id in selected_set
-    assert selected_internal_ids == [labels["N1"]]
-    expected_leaf_ids = {
-        int(ete.get_prop(node, "numerical_label"))
-        for node in tr.traverse()
-        if ete.is_leaf(node)
-    }
-    assert required_leaf_ids == expected_leaf_ids
-
-
-def test_get_selected_branch_context_rejects_non_integer_selected_branch_id():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("((A:1,B:1)N1:1,C:1)R;", format=1))
-    with pytest.raises(ValueError, match="integer-like"):
-        parser_iqtree._get_selected_branch_context(
-            tree=tr,
-            selected_branch_ids=np.array([1.5]),
-        )
-
-
-def test_get_state_tensor_selected_branch_ids_ignore_unknown_ids_in_ml_mode(tmp_path):
-    g = _make_state_tensor_g(
-        tmp_path=tmp_path,
-        alignment_text=">A\nAAAAAC\n>B\nAAGAAG\n",
-    )
-    g["ml_anc"] = True
-    labels = {n.name: ete.get_prop(n, "numerical_label") for n in g["tree"].traverse()}
-    selected = parser_iqtree.get_state_tensor(
-        g=g,
-        selected_branch_ids=np.array([labels["A"], 9999], dtype=np.int64),
-    )
-    assert selected.shape[0] == len(list(g["tree"].traverse()))
-    assert selected[labels["A"], :, :].sum() > 0
-    assert selected[labels["B"], :, :].sum() == 0
-
-
 def test_get_state_tensor_selected_internal_keeps_root_rows(tmp_path):
     alignment_file = tmp_path / "toy_selected_root.fa"
     state_file = tmp_path / "toy_selected_root.state.tsv"

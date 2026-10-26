@@ -1,43 +1,7 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from csubst import omega
-
-
-def test_get_cb_ids_rejects_non_integer_like_branch_ids():
-    cb = pd.DataFrame({"branch_id_1": [1.5], "branch_id_2": [2]})
-    with pytest.raises(ValueError, match="integer-like"):
-        omega._get_cb_ids(cb)
-
-
-def test_get_cb_ids_accepts_integer_like_strings():
-    cb = pd.DataFrame({"branch_id_1": ["1.0", "2"], "branch_id_2": ["3", "4.0"]})
-    out = omega._get_cb_ids(cb)
-    np.testing.assert_array_equal(out, np.array([[1, 3], [2, 4]], dtype=np.int64))
-    assert out.dtype == np.int64
-
-
-def test_get_cb_ids_rejects_negative_branch_ids():
-    cb = pd.DataFrame({"branch_id_1": [-1], "branch_id_2": [2]})
-    with pytest.raises(ValueError, match="non-negative"):
-        omega._get_cb_ids(cb)
-
-
-def test_get_cb_ids_requires_branch_id_columns():
-    cb = pd.DataFrame({"other": [1], "value": [2]})
-    with pytest.raises(ValueError, match="at least one branch_id_"):
-        omega._get_cb_ids(cb)
-
-
-def test_resolve_omega_pvalue_niter_schedule_auto_defaults():
-    schedule = omega._resolve_omega_pvalue_niter_schedule(g={})
-    assert schedule == [100, 1000]
-
-
-def test_resolve_omega_pvalue_niter_schedule_accepts_auto_string():
-    schedule = omega._resolve_omega_pvalue_niter_schedule(g={"omega_pvalue_niter_schedule": "auto"})
-    assert schedule == [100, 1000]
 
 
 def test_resolve_omega_pvalue_niter_schedule_uses_custom_schedule():

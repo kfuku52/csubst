@@ -25,30 +25,6 @@ def test_node_combination_subsamples_rifle_handles_dep_ids_list_without_crashing
     assert len({tuple(sorted(row.tolist())) for row in id_combinations}) == 2
 
 
-def test_node_combination_subsamples_rifle_accepts_scalar_dep_ids():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1,C:1,D:1)R;", format=1))
-    sub_ids = [ete.get_prop(n, "numerical_label") for n in ete.iter_leaves(tr)]
-    g = {
-        "tree": tr,
-        "sub_branches": sub_ids,
-        "dep_ids": [np.int64(bid) for bid in sub_ids],
-    }
-    np.random.seed(0)
-    id_combinations = combination.node_combination_subsamples_rifle(g=g, arity=2, rep=2)
-    assert id_combinations.shape == (2, 2)
-    assert id_combinations.dtype == np.int64
-    assert set(id_combinations.ravel().tolist()).issubset(set(sub_ids))
-
-
-def test_node_combination_subsamples_rifle_rejects_non_integer_sub_branches():
-    g = {
-        "sub_branches": [1.5, 2, 3],
-        "dep_ids": [np.array([1], dtype=np.int64), np.array([2], dtype=np.int64), np.array([3], dtype=np.int64)],
-    }
-    with pytest.raises(ValueError, match="integer-like"):
-        combination.node_combination_subsamples_rifle(g=g, arity=2, rep=2)
-
-
 def test_node_combination_subsamples_rifle_tolerates_initial_duplicate_trials(monkeypatch):
     g = {
         "sub_branches": [1, 2, 3],

@@ -22,7 +22,7 @@ def test_get_substitution_tensor_asis_matches_manual_outer_products():
     state[labels["R"], :, :] = [[1.0, 0.0], [0.5, 0.5]]
     state[labels["A"], :, :] = [[0.0, 1.0], [1.0, 0.0]]
     state[labels["B"], :, :] = [[1.0, 0.0], [0.0, 1.0]]
-    g = {"tree": tr, "ml_anc": "yes", "float_tol": 1e-12}
+    g = {"tree": tr, "ml_anc": True, "float_tol": 1e-12}
     mmap_file = Path("tmp.csubst.sub_tensor.toy.mmap")
     try:
         out = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g, mmap_attr="toy")
@@ -32,34 +32,17 @@ def test_get_substitution_tensor_asis_matches_manual_outer_products():
         np.testing.assert_allclose(out_dense[labels["A"], 0, 0, :, :], [[0.0, 1.0], [0.0, 0.0]], atol=1e-12)
         # Branch A, site 1: parent [0.5, 0.5], child state 0 => only 1->0 survives diag masking.
         np.testing.assert_allclose(out_dense[labels["A"], 1, 0, :, :], [[0.0, 0.0], [0.5, 0.0]], atol=1e-12)
+        np.testing.assert_allclose(out_dense[labels["R"]], 0.0, atol=1e-12)
     finally:
         if mmap_file.exists():
             mmap_file.unlink()
 
 
-@pytest.mark.parametrize("ml_anc", [False, "no"])
-def test_apply_min_sub_pp_threshold(ml_anc):
-    g = {"min_sub_pp": 0.3, "ml_anc": ml_anc}
+def test_apply_min_sub_pp_threshold():
+    g = {"min_sub_pp": 0.3, "ml_anc": False}
     sub = np.array([[[[[0.2, 0.4], [0.1, 0.5]]]]], dtype=float)
     out = substitution.apply_min_sub_pp(g, sub)
     np.testing.assert_allclose(out, [[[[[0.0, 0.4], [0.0, 0.5]]]]], atol=1e-12)
-
-
-def test_get_substitution_tensor_treats_ml_anc_string_no_same_as_false():
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    labels = {n.name: ete.get_prop(n, "numerical_label") for n in tr.traverse()}
-    state = np.zeros((3, 1, 2), dtype=float)
-    state[labels["R"], 0, :] = [1.0, 0.0]
-    state[labels["A"], 0, :] = [0.0, 1.0]
-    state[labels["B"], 0, :] = [1.0, 0.0]
-
-    g_bool = {"tree": tr, "ml_anc": False, "float_tol": 1e-12}
-    g_str = {"tree": tr, "ml_anc": "no", "float_tol": 1e-12}
-    out_bool = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g_bool, mmap_attr="toy_bool")
-    out_str = substitution.get_substitution_tensor(state_tensor=state, mode="asis", g=g_str, mmap_attr="toy_str")
-    dense_bool = out_bool.to_dense()
-    np.testing.assert_allclose(dense_bool, out_str.to_dense(), atol=1e-12)
-    np.testing.assert_allclose(dense_bool[labels["R"], :, :, :, :], 0.0, atol=1e-12)
 
 
 def test_get_s_get_cs_and_get_bs_match_manual_values():
@@ -377,16 +360,6 @@ def test_get_substitution_tensor_requires_g():
             mode="asis",
             g=None,
         )
-
-
-def test_get_selected_branch_set_accepts_scalar_state_loaded_branch_ids():
-    out = substitution._get_selected_branch_set({"state_loaded_branch_ids": np.int64(7)})
-    assert out == {7}
-
-
-def test_get_selected_branch_set_rejects_non_integer_state_loaded_branch_ids():
-    with pytest.raises(ValueError, match="integer-like"):
-        substitution._get_selected_branch_set({"state_loaded_branch_ids": np.array([1.5])})
 
 
 def test_collect_sub_tensor_branch_pairs_includes_root_child_branches_when_root_state_exists():

@@ -4,7 +4,6 @@ import json
 import sys
 import types
 import urllib
-import numpy as np
 import pytest
 from csubst import tree
 from csubst import ete
@@ -181,14 +180,6 @@ def test_pdb_sequence_search_rejects_none_branch_ids_with_clear_error(monkeypatc
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     g = {"branch_ids": None, "tree": tr}
     with pytest.raises(ValueError, match="No branch IDs were provided"):
-        parser_biodb.pdb_sequence_search(g)
-
-
-def test_pdb_sequence_search_accepts_scalar_branch_id(monkeypatch):
-    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
-    tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    g = {"branch_ids": np.int64(999), "tree": tr}
-    with pytest.raises(ValueError, match="Representative branch ID 999 was not found"):
         parser_biodb.pdb_sequence_search(g)
 
 

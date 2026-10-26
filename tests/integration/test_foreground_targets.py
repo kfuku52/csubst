@@ -55,6 +55,8 @@ def test_get_target_ids_excludes_root_even_for_full_clade_foreground():
     lineages = np.array([1])
     g["tree"] = foreground.annotate_lineage_foreground(lineages=lineages, trait_name="PLACEHOLDER", g=g)
     target_ids = foreground.get_target_ids(lineages=lineages, trait_name="PLACEHOLDER", g=g)
+    assert target_ids.ndim == 1
+    assert target_ids.dtype == np.int64
     assert int(root_id) not in set(int(x) for x in target_ids.tolist())
 
 
@@ -84,7 +86,7 @@ def test_get_df_clade_size_handles_noncontiguous_branch_ids():
     assert not bool(out.loc[29, "is_fg_stem_traitA"])
 
 
-def test_get_marginal_branch_accepts_scalar_target_ids(tmp_path):
+def test_get_marginal_branch_adds_sister_and_writes_output_namespace(tmp_path):
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,(B:1,C:1)X:1)R;", format=1))
     labels = {n.name: int(ete.get_prop(n, "numerical_label")) for n in tr.traverse()}
     for node in tr.traverse():
@@ -93,7 +95,7 @@ def test_get_marginal_branch_accepts_scalar_target_ids(tmp_path):
     g = {
         "tree": tr,
         "fg_df": pd.DataFrame({"name": ["A", "B", "C"], "traitA": [0, 1, 0]}),
-        "target_ids": {"traitA": np.int64(labels["B"])},
+        "target_ids": {"traitA": np.array([labels["B"]], dtype=np.int64)},
         "mg_parent": False,
         "mg_sister": True,
         "mg_sister_stem_only": True,

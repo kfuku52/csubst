@@ -41,28 +41,6 @@ def test_read_foreground_file_rejects_invalid_fg_format2_shape(tmp_path):
         foreground.read_foreground_file(g)
 
 
-def test_build_clade_permutation_mode_accepts_scalar_randomized_branch_id():
-    out = foreground._build_clade_permutation_mode(
-        trait_name="traitA",
-        iteration=1,
-        randomized_bids=np.int64(42),
-        sample_original_foreground=False,
-    )
-    assert out == "randomization_traitA_iter1_bid42"
-
-
-def test_set_target_label_column_accepts_scalar_positive_index():
-    df = pd.DataFrame({"x": [1, 2, 3]}, index=[10, 11, 12])
-    out = foreground._set_target_label_column(
-        df=df.copy(),
-        column_name="is_target",
-        positive_index=np.int64(11),
-    )
-    assert out.loc[10, "is_target"] == "N"
-    assert out.loc[11, "is_target"] == "Y"
-    assert out.loc[12, "is_target"] == "N"
-
-
 def test_set_target_label_column_prefers_branch_id_column_over_index_labels():
     # index labels intentionally do not match the branch_id values.
     df = pd.DataFrame(
@@ -72,17 +50,11 @@ def test_set_target_label_column_prefers_branch_id_column_over_index_labels():
     out = foreground._set_target_label_column(
         df=df.copy(),
         column_name="is_target",
-        positive_index=np.int64(1),
+        positive_index=np.array([1], dtype=np.int64),
     )
     assert out.loc[0, "is_target"] == "N"
     assert out.loc[1, "is_target"] == "N"
     assert out.loc[2, "is_target"] == "Y"
-
-
-def test_count_branch_memberships_from_bid_matrix_accepts_scalar_ids():
-    bid_matrix = np.array([[1, 3], [2, 4]], dtype=np.int64)
-    out = foreground._count_branch_memberships_from_bid_matrix(bid_matrix=bid_matrix, ids=np.int64(3))
-    assert out.tolist() == [1, 0]
 
 
 def test_mark_dependent_foreground_rows_is_order_invariant_for_pairs():

@@ -178,34 +178,13 @@ def test_write_site_output_manifest_records_files_and_parameters(tmp_path):
     assert manifest_row["file_exists"] == "Y"
     assert int(manifest_row["file_size_bytes"]) == Path(manifest_path).stat().st_size
     site_row = out_df.loc[out_df.loc[:, "output_kind"] == "site_table_tsv", :].iloc[0]
+    assert site_row["branch_ids"] == "23,51"
+    assert int(site_row["branch_count"]) == 2
     assert site_row["file_exists"] == "Y"
     assert int(site_row["file_size_bytes"]) > 0
     skipped_row = out_df.loc[out_df.loc[:, "output_kind"] == "state_pattern_pdf", :].iloc[0]
     assert skipped_row["file_exists"] == "N"
     assert skipped_row["note"] == "skipped"
-
-
-def test_write_site_output_manifest_accepts_scalar_branch_id(tmp_path):
-    existing = tmp_path / "csubst_sites.tsv"
-    existing.write_text("x\n", encoding="utf-8")
-    g = {
-        "site_outdir": str(tmp_path),
-        "single_branch_mode": True,
-        "tree_site_plot": True,
-        "site_state_plot": False,
-        "tree_site_plot_format": "pdf",
-        "min_combinat_prob": 0.5,
-        "min_single_prob": 0.8,
-        "tree_site_plot_max_sites": 60,
-        "pdb": None,
-    }
-    rows = list()
-    main_sites.add_site_output_manifest_row(rows, str(existing), "site_table_tsv", g, np.int64(23))
-    manifest_path = main_sites.write_site_output_manifest(rows, g, np.int64(23))
-    out_df = pd.read_csv(manifest_path, sep="\t")
-    site_row = out_df.loc[out_df.loc[:, "output_kind"] == "site_table_tsv", :].iloc[0]
-    assert str(site_row["branch_ids"]) == "23"
-    assert int(site_row["branch_count"]) == 1
 
 
 def test_get_df_ad_add_site_stats_and_target_flag():

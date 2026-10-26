@@ -104,6 +104,17 @@ When pruning tests, record the lost or retained guarantee, run the affected suit
 and then run the full suite. Collection counts describe the change, not a target.
 The Cython sanitizer job separately exercises sparse and expected-state parity tests.
 
+Validate untrusted values at the responsible CLI, parameter, file, service, or
+cache boundary. Test the producer's normalized result and rely on that invariant
+in downstream tests; repeat validation only after mutation or a new trust
+boundary can invalidate it. Internal branch selections are one-dimensional
+`int64` arrays and `ml_anc` is a normalized boolean. Downstream tests therefore
+use those forms rather than requiring scalar IDs, text IDs, malformed derived
+IDs, or string booleans to work at every stage. Keep external identifier parsing,
+selected-state numerical parity, output protection, and cache compatibility
+checks. Internal compatibility cases for those alternate forms were pruned;
+production behavior and public compatibility remain unchanged.
+
 Output-lifecycle CLI checks use a six-tip, two-codon synthetic IQ-TREE-compatible
 bundle; they still run the real CLI and joint inference. Bundled-dataset numerical
 checks belong in the scientific parity lane. Scan tensor representations are

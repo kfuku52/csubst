@@ -138,12 +138,6 @@ def test_get_yvalues_for_lineage_branch_specific_rows():
     np.testing.assert_allclose(main_sites.get_yvalues(df, "_sub_branch_12", "S"), [0.6, 0.0], atol=1e-12)
 
 
-def test_get_set_expression_display_branch_ids_accepts_scalar_branch_id():
-    g = {"mode_expression": "117|48", "branch_ids": np.int64(117)}
-    out = main_sites._get_set_expression_display_branch_ids(g)
-    assert out.tolist() == [117]
-
-
 def test_get_yvalues_set_expression_prefers_probability_column():
     df = pd.DataFrame({"N_set_expr_prob": [0.0, 1.7, 2.0], "N_set_expr": [False, True, True]})
     np.testing.assert_allclose(main_sites.get_yvalues(df, "_set_expr", "N"), [0.0, 1.7, 2.0], atol=1e-12)

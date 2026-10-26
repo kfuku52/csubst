@@ -148,6 +148,8 @@ def test_resolve_site_jobs_intersection_mode_preserves_branch_set_and_outdir_pre
     g = {"tree": tiny_tree, "mode": "intersection", "branch_id": "{},{}".format(labels["A"], labels["C"])}
     out = main_sites.resolve_site_jobs(g)
     assert len(out["site_jobs"]) == 1
+    assert out["site_jobs"][0]["branch_ids"].ndim == 1
+    assert out["site_jobs"][0]["branch_ids"].dtype == np.int64
     np.testing.assert_array_equal(out["site_jobs"][0]["branch_ids"], [labels["A"], labels["C"]])
     assert out["site_jobs"][0]["site_outdir"].startswith("./csubst_sites.branch_id")
 
