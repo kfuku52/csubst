@@ -1,4 +1,4 @@
-<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=11; sha256=e029bf20aa611849e9fbfa6bbd70ec5e07bdbb0106e38f330b0c4aa4d6392034 -->
+<!-- BEGIN KF AGENT POLICY: source=https://github.com/kfuku52/kf-agent-policy; version=12; sha256=d38271eaba87f3f2c5c92b6c4ea821eca662d38f6f0db388fda5270edb5e9afa -->
 # Common agent policy
 
 Repository-specific instructions override these defaults.
@@ -15,9 +15,15 @@ Repository-specific instructions override these defaults.
 - Change or recommend branch protection only when explicitly asked. Honor explicit
   repository-specific direct-push exceptions; otherwise report a rejected push
   without bypassing protection or inventing a branch or PR.
+- Prefer the simplest design that meets established requirements. Avoid
+  complexity for speculative needs; extract helpers when they improve clarity
+  or enable reuse.
 - Unpublished implementation details may be redesigned; preserve existing public
   APIs, file formats, and saved-data compatibility unless a breaking change is
   authorized. Update affected producers, consumers, tests, examples, and docs.
+- Validate untrusted input at the responsible boundary; rely on established
+  invariants internally. Revalidate when mutation or a new trust boundary
+  invalidates those guarantees.
 - Fix verified root causes; do not hide failures with fallbacks or weaker checks.
   Document unavoidable workarounds and their removal conditions.
 - Read relevant docs and run the repository's check entrypoint for the change and
