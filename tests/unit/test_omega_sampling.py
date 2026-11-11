@@ -54,6 +54,19 @@ def test_urn_overlap_preserves_arithmetic_across_row_blocks(monkeypatch, arity, 
     np.testing.assert_array_equal(actual, reference)
 
 
+@pytest.mark.parametrize('weights,size,expected', [
+    ([1e-100, 2e-100, 1e-100], 1, [.25, .5, .25]),
+    ([1e300, 2e-300, 1e-300], 2, [1., 2/3, 1/3]),
+])
+def test_wallenius_sampling_preserves_extreme_positive_odds(weights, size, expected):
+    niter = 20_000
+    mask = omega._weighted_sample_without_replacement_masks(weights, size, niter, np.random.default_rng(71))
+    packed = omega._weighted_sample_without_replacement_packed(weights, size, niter, np.random.default_rng(71))
+    np.testing.assert_array_equal(packed, np.packbits(mask, axis=1))
+    np.testing.assert_array_equal(mask.sum(axis=1), size)
+    np.testing.assert_allclose(mask.mean(axis=0), expected, atol=.014, rtol=0.)
+
+
 @pytest.mark.native
 def test_native_packed_sampling_matches_boolean_masks_and_python_counts(monkeypatch):
     if omega.omega_cy is None:

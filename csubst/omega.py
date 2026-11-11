@@ -403,15 +403,11 @@ def _weighted_sample_without_replacement_packed(
         return packed
     if sampling_model not in ['wallenius', 'factorized_approx']:
         raise ValueError('Unsupported weighted sampling model: {}'.format(sampling_model))
-    # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
-    positive_weights = p[positive_sites].astype(np.float32, copy=False)
-    keys = rng.random((niter, num_positive_sites)).astype(np.float32, copy=False)
-    np.log(keys, out=keys)
-    keys /= positive_weights
-    kth = num_positive_sites - size
-    sampled_local_indices = np.argpartition(keys, kth=kth, axis=1)[:, kth:]
-    sampled_site_indices = positive_sites[sampled_local_indices]
-    return _pack_sampled_site_indices_to_uint8(sampled_site_indices=sampled_site_indices, num_site=num_site)
+    for start, sites in urn_expectation.wallenius_sample_blocks(
+        positive_sites, p[positive_sites], size, niter, rng,
+    ):
+        packed[start:start + len(sites)] = _pack_sampled_site_indices_to_uint8(sites, num_site)
+    return packed
 
 
 def _project_expected_state_block(parent_state_block, transition_prob, float_tol):
@@ -687,16 +683,11 @@ def _weighted_sample_without_replacement_masks(
             sampling_model='fisher',
         )
         return np.unpackbits(packed, axis=1)[:, :p.shape[0]].astype(bool, copy=False)
-    # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
-    positive_weights = p[positive_sites].astype(np.float32, copy=False)
-    keys = rng.random((niter, num_positive_sites)).astype(np.float32, copy=False)
-    np.log(keys, out=keys)
-    keys /= positive_weights
-    kth = num_positive_sites - size
-    sampled_local_indices = np.argpartition(keys, kth=kth, axis=1)[:, kth:]
-    sampled_site_indices = positive_sites[sampled_local_indices]
-    row_indices = np.arange(niter)[:, None]
-    masks[row_indices, sampled_site_indices] = True
+    for start, sites in urn_expectation.wallenius_sample_blocks(
+        positive_sites, p[positive_sites], size, niter, rng,
+    ):
+        rows = np.arange(start, start + len(sites))[:, None]
+        masks[rows, sites] = True
     return masks
 
 

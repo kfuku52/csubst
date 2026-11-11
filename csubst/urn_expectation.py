@@ -31,6 +31,40 @@ def fisher_suffix(log_weights, size):
     return suffix
 
 
+def wallenius_sample_blocks(positive_sites, positive_weights, size, niter, rng):
+    """Yield row blocks of Efraimidis-Spirakis weighted site draws."""
+    nsites = len(positive_sites)
+    kth = nsites - size
+    max_float = np.finfo(np.float32).max
+    # A positive Generator.random() draw has -log(u) < 37. Use log
+    # waiting times when direct float32 keys could overflow or lose weights.
+    wide = positive_weights.min() < 64. / max_float or positive_weights.max() > max_float
+    weights = normalized_log_weights(positive_weights) if wide else positive_weights.astype(np.float32)
+    block_size = max(1, (32 * 1024**2) // (16 * nsites))
+    for start in range(0, niter, block_size):
+        stop = min(start + block_size, niter)
+        uniforms = rng.random((stop - start, nsites))
+        if wide:
+            keys = uniforms
+            with np.errstate(divide='ignore'):
+                np.log(keys, out=keys)
+                np.negative(keys, out=keys)
+                np.log(keys, out=keys)
+            np.negative(keys, out=keys)
+            keys += weights
+        else:
+            keys = uniforms.astype(np.float32)
+            with np.errstate(divide='ignore'):
+                np.log(keys, out=keys)
+            keys /= weights
+        del uniforms
+        order = np.argpartition(keys, kth=kth, axis=1)
+        del keys
+        sites = positive_sites[order[:, kth:]]
+        del order
+        yield start, sites
+
+
 def wallenius_method(positive_weights, draw_size):
     weights = np.asarray(positive_weights, dtype=np.float64)
     n = weights.size
