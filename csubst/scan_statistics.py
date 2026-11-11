@@ -5,7 +5,6 @@ asymptotic tail below is a diagnostic, not a calibrated significance test.
 """
 
 import math
-from fractions import Fraction
 
 import numpy as np
 from scipy.special import log_ndtr
@@ -28,6 +27,21 @@ def _local_poisson_deviance(count, residual):
     return (count * residual) * residual * series
 
 
+def _relative_pooled_residuals(x, a, y, b):
+    # Express (x*b - y*a) / (a+b) in exact integer arithmetic before
+    # dividing by each event count. Near equal rates lose this residual
+    # if the products are rounded separately.
+    nx, dx = x.as_integer_ratio()
+    na, da = a.as_integer_ratio()
+    ny, dy = y.as_integer_ratio()
+    nb, db = b.as_integer_ratio()
+    residual = nx * nb * dy * da - ny * na * dx * db
+    if residual <= 0:
+        return None
+    exposure = na * db + nb * da
+    return residual / (nx * dy * exposure), -residual / (ny * dx * exposure)
+
+
 def rate_score(x_target, l_target, x_other, l_other):
     """Return (score, asymptotic diagnostic P), without rounding event mass.
 
@@ -48,15 +62,11 @@ def rate_score(x_target, l_target, x_other, l_other):
         log_count_odds = math.log(x) - math.log(y)
         gap = log_count_odds - log_exposure_odds
         if abs(gap) <= .001:
-            # The two log-likelihood terms cancel to first order near equal
-            # rates. Compute the pooled residual exactly from the float inputs
-            # before applying the local Poisson deviance to each group.
-            target, target_exposure, control, control_exposure = map(Fraction, (x, a, y, b))
-            residual = (target * control_exposure - control * target_exposure) / (target_exposure + control_exposure)
-            if residual <= 0:
+            residuals = _relative_pooled_residuals(x, a, y, b)
+            if residuals is None:
                 return 0., 1.
-            terms = (_local_poisson_deviance(x, float(residual / target))
-                     + _local_poisson_deviance(y, float(-residual / control)))
+            terms = (_local_poisson_deviance(x, residuals[0])
+                     + _local_poisson_deviance(y, residuals[1]))
         elif gap < 0:
             return 0., 1.
         else:
