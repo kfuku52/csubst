@@ -807,7 +807,9 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
     if method == 'approximate_mean' and policy == 'exact':
         raise ValueError('Exact Wallenius expectation exceeds the enumeration budget; '
                          'auto permits an approximate mean (see urn provenance).')
-    if method == 'exact_enumeration':
+    if method == 'exact_two_weight_groups':
+        out[positive_mask] = urn_expectation.two_group_wallenius_inclusion(positive_weights, draw_size)
+    elif method == 'exact_enumeration':
         out[positive_mask] = urn_expectation.enumerated_wallenius_inclusion(positive_weights, draw_size)
     else:
         out[positive_mask] = urn_expectation.wallenius_mean_inclusion(positive_weights, draw_size)

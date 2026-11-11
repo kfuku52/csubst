@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from scipy.special import beta
 
 from csubst import omega
 
@@ -45,6 +46,26 @@ def test_one_draw_does_not_overflow_sum_of_finite_weights():
 def test_explicit_exact_policy_rejects_large_approximation():
     with pytest.raises(ValueError, match='enumeration budget'):
         omega._calc_wallenius_inclusion_probabilities(np.arange(1., 101.), 50, policy='exact')
+
+
+def test_two_weight_groups_match_an_independent_last_draw_probability():
+    odds = .1
+    weights = np.array([1., odds, 0., odds] + [1.] * 34)
+    # If 36 of 37 sites are drawn, a particular light site is omitted when
+    # its exponential clock exceeds every other clock. Integrating its
+    # density against the other CDFs gives odds * (B(odds,36) - B(2*odds,36)).
+    light = 1. - odds * (beta(odds, 36) - beta(2*odds, 36))
+    heavy = (36 - 2 * light) / 35
+    expected = np.array([heavy, light, 0., light] + [heavy] * 34)
+    actual = omega._calc_wallenius_inclusion_probabilities(weights, 36, policy='exact')
+    np.testing.assert_allclose(actual, expected, atol=1e-14, rtol=0.)
+
+    g = {'urn_wallenius_expectation': 'exact'}
+    overlap = omega._calc_wallenius_expected_overlap(
+        np.array([[0, 1]]), weights, np.array([36., 36.]), g, np.float64,
+    )
+    np.testing.assert_allclose(overlap, [expected @ expected])
+    assert g['_urn_expectation_methods'] == {'exact_two_weight_groups': True}
 
 
 def test_approximation_is_scale_invariant_and_recorded():

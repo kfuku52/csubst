@@ -4,6 +4,8 @@ import numpy as np
 
 
 ENUMERATION_MAX_SITES = 20
+TWO_GROUP_MAX_DRAWS = 256
+TWO_GROUP_MAX_STATE_UPDATES = 8_192
 
 
 def normalized_log_weights(positive_weights):
@@ -34,10 +36,17 @@ def wallenius_method(positive_weights, draw_size):
     n = weights.size
     if draw_size == 0 or n == 0 or draw_size >= n:
         return 'exact_boundary'
-    if np.all(weights == weights[0]):
+    first = weights == weights[0]
+    first_size = int(np.count_nonzero(first))
+    if first_size == n:
         return 'exact_uniform'
     if draw_size <= 2:
         return 'exact_small_draw'
+    group_states = min(first_size, n - first_size, draw_size) + 1
+    if draw_size <= TWO_GROUP_MAX_DRAWS and draw_size * group_states <= TWO_GROUP_MAX_STATE_UPDATES:
+        rest = weights[~first]
+        if np.all(rest == rest[0]):
+            return 'exact_two_weight_groups'
     # Retain the original enumeration domain for larger draw sizes. Extending
     # it by final subset count alone can multiply work across many categories.
     # One/two-draw formulas above extend exactness without subset enumeration.
@@ -97,6 +106,45 @@ def enumerated_wallenius_inclusion(positive_weights, draw_size):
             if selected & bit:
                 inclusion[i] += probability
     return inclusion
+
+
+def two_group_wallenius_inclusion(positive_weights, draw_size):
+    """Exact recurrence on the number of sites selected from one weight group."""
+    first = positive_weights == positive_weights[0]
+    first_size = int(np.count_nonzero(first))
+    second_size = positive_weights.size - first_size
+    if first_size > second_size:
+        first = ~first
+        first_size, second_size = second_size, first_size
+    weights = np.array([positive_weights[first][0], positive_weights[~first][0]])
+    log_weights = normalized_log_weights(weights)
+    log_masses = []
+    for count, log_weight in zip((first_size, second_size), log_weights):
+        entries = np.empty(count + 1)
+        entries[0] = -np.inf
+        entries[1:] = log_weight + np.log(np.arange(1, count + 1))
+        log_masses.append(entries)
+    first_mass, second_mass = log_masses
+    selected_counts = np.arange(min(first_size, draw_size) + 1)
+    # The spare cell receives zero when no further first-group draw is possible.
+    probability = np.zeros(selected_counts.size + 1)
+    updated = np.zeros_like(probability)
+    probability[0] = 1.
+    for drawn in range(draw_size):
+        lo = max(0, drawn - second_size)
+        hi = min(drawn, first_size) + 1
+        selected = selected_counts[lo:hi]
+        log_odds = first_mass[first_size - selected] - second_mass[second_size - drawn + selected]
+        from_state = probability[lo:hi]
+        updated.fill(0.)
+        # Evaluate both choices directly to retain a small probability when the
+        # other group is almost certain to supply the next draw.
+        updated[lo:hi] = from_state * np.exp(-np.logaddexp(0., log_odds))
+        updated[lo + 1:hi + 1] += from_state * np.exp(-np.logaddexp(0., -log_odds))
+        probability, updated = updated, probability
+    first_inclusion = (probability[:-1] @ selected_counts) / first_size
+    second_inclusion = (probability[:-1] @ (draw_size - selected_counts)) / second_size
+    return np.clip(np.where(first, first_inclusion, second_inclusion), 0., 1.)
 
 
 def wallenius_mean_inclusion(positive_weights, draw_size):
