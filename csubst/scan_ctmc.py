@@ -230,13 +230,14 @@ def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_b
                 a = _normalize(a)
                 length = lengths[child]
                 transition, integrals = kernels[length]
-                outside[child] = _normalize(a @ transition)
+                child_message = a @ transition
+                outside[child] = _normalize(child_message)
                 b = down[child]
-                denom = np.einsum("si,ij,sj->s", a, transition, b)
+                denom = (child_message * b).sum(axis=1)
                 if (denom <= 0).any():
                     raise ValueError("Impossible edge evidence under fitted CTMC.")
                 coefficients = (a @ v)[:, :, None] * (b @ w.T)[:, None, :] * integrals
-                mass = np.einsum("ia,sab,bj->sij", w.T, coefficients, v.T, optimize=True)
+                mass = (w.T @ coefficients) @ v.T
                 mass *= q
                 mass[:, state_diagonal, state_diagonal] = 0
                 # Ill-conditioned evidence needs a stable direct Frechet derivative.
@@ -251,7 +252,7 @@ def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_b
                 np.maximum(mass, 0, out=mass)
                 if summaries is not None:
                     summaries["synonymous_counts"][child] += np.einsum("sij,ij->", mass, summaries["synonymous_mask"])
-                grouped = np.einsum("ig,sij,jh->sgh", projection, mass, projection, optimize=True)
+                grouped = (projection.T @ mass) @ projection
                 grouped[:, group_diagonal, group_diagonal] = 0
                 events[child, :, 0] = grouped
         if disk_backed:
