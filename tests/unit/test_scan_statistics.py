@@ -1,4 +1,5 @@
 import math
+from decimal import Decimal, localcontext
 
 import numpy as np
 import pandas as pd
@@ -62,6 +63,25 @@ def test_extreme_exposure_ratios_do_not_make_valid_scores_undefined():
     expected = -log_ndtr(-math.sqrt(4 * 600 * math.log(10))) / math.log(10)
     assert score == pytest.approx(expected)
     assert p == 0.
+
+
+@pytest.mark.parametrize('counts_exposures', [
+    (1.00000001, 1., 1., 1.),
+    (1.000000001e18, 1., 1e18, 1.),
+    (1e16 + 2., 1., 1e16, 1.),
+    (1.000000001e17, 1e-2, 1e19, 1.),
+])
+def test_nearly_equal_rates_match_high_precision_likelihood(counts_exposures):
+    with localcontext() as context:
+        context.prec = 80
+        x, a, y, b = map(Decimal.from_float, counts_exposures)
+        common = (x + y) / (a + b)
+        deviance = 2 * (x * (x / (a * common)).ln() + y * (y / (b * common)).ln())
+    expected = .5 * math.erfc(math.sqrt(float(deviance) / 2))
+    score, p = stats.rate_score(*counts_exposures)
+    assert p == pytest.approx(expected, abs=1e-15, rel=0)
+    assert score == pytest.approx(-math.log10(expected), abs=1e-15, rel=0)
+    assert stats.rate_score(*counts_exposures[2:], *counts_exposures[:2]) == (0., 1.)
 
 
 @pytest.mark.parametrize('values', [(-1,1,0,1), (1,0,0,1), (1,1,0,0), (np.nan,1,0,1), (1,np.inf,0,1)])

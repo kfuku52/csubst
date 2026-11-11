@@ -52,6 +52,9 @@ then follows `--fg_stem_only`.
 Poisson asymptotic tail. Larger values indicate greater foreground rate
 enrichment. Non-enrichment has score zero. The log-tail calculation preserves
 ordering even when its exponentiated diagnostic underflows to zero.
+When the rates nearly agree, a series for the pooled Poisson deviance preserves
+small positive likelihood ratios that cancel in a direct log-likelihood
+subtraction.
 
 `p_rate_enrichment_asymptotic` retains that approximate tail for inspection.
 For equal exposures and foreground/background counts 2/0, it is about

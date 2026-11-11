@@ -5,6 +5,7 @@ asymptotic tail below is a diagnostic, not a calibrated significance test.
 """
 
 import math
+from fractions import Fraction
 
 import numpy as np
 from scipy.special import log_ndtr
@@ -13,6 +14,18 @@ from scipy.special import log_ndtr
 SCORE_METHOD = 'negative_log10_one_sided_poisson_asymptotic_tail'
 BH_SCOPE = 'selected_candidates_within_trait_match'
 MAXIMUM_SCOPE = 'all_testable_selected_candidates_all_traits_matches_in_this_run'
+
+
+def _softplus(value):
+    return max(value, 0.) + math.log1p(math.exp(-abs(value)))
+
+
+def _local_poisson_deviance(count, residual):
+    # Series for -log1p(-r) - r, where r is the residual divided by
+    # the observed count. At |r| <= 0.0011, omitted terms are below roundoff.
+    high_terms = .2 + residual * (1/6 + residual/7)
+    series = .5 + residual * (1/3 + residual * (.25 + residual * high_terms))
+    return (count * residual) * residual * series
 
 
 def rate_score(x_target, l_target, x_other, l_other):
@@ -26,18 +39,31 @@ def rate_score(x_target, l_target, x_other, l_other):
     if (not (math.isfinite(x) and math.isfinite(a) and math.isfinite(y) and math.isfinite(b))
             or min(x, y) < 0 or min(a, b) <= 0):
         return np.nan, np.nan
-    if x == 0 or (y > 0 and math.log(x) - math.log(a) <= math.log(y) - math.log(b)):
+    if x == 0:
         return 0., 1.
-    # Calculate each allocation probability independently in log space. Forming
-    # p then 1-p loses the control exposure when p rounds to one; direct count
-    # or exposure ratios can also overflow even though the score is finite.
-    log_p = -float(np.logaddexp(0., math.log(b) - math.log(a)))
-    log_q = -float(np.logaddexp(0., math.log(a) - math.log(b)))
-    log_fraction_x = 0. if y == 0 else -float(np.logaddexp(0., math.log(y) - math.log(x)))
-    terms = x * (log_fraction_x - log_p)
-    if y > 0:
-        log_fraction_y = -float(np.logaddexp(0., math.log(x) - math.log(y)))
-        terms += y * (log_fraction_y - log_q)
+    log_exposure_odds = math.log(a) - math.log(b)
+    if y == 0:
+        terms = x * _softplus(-log_exposure_odds)
+    else:
+        log_count_odds = math.log(x) - math.log(y)
+        gap = log_count_odds - log_exposure_odds
+        if abs(gap) <= .001:
+            # The two log-likelihood terms cancel to first order near equal
+            # rates. Compute the pooled residual exactly from the float inputs
+            # before applying the local Poisson deviance to each group.
+            target, target_exposure, control, control_exposure = map(Fraction, (x, a, y, b))
+            residual = (target * control_exposure - control * target_exposure) / (target_exposure + control_exposure)
+            if residual <= 0:
+                return 0., 1.
+            terms = (_local_poisson_deviance(x, float(residual / target))
+                     + _local_poisson_deviance(y, float(-residual / control)))
+        elif gap < 0:
+            return 0., 1.
+        else:
+            # Compute each allocation probability in log space to retain the
+            # smaller group even when the larger probability rounds to one.
+            terms = x * (_softplus(-log_exposure_odds) - _softplus(-log_count_odds))
+            terms += y * (_softplus(log_exposure_odds) - _softplus(log_count_odds))
     deviance = max(0., 2 * terms)
     log_tail = float(log_ndtr(-math.sqrt(deviance)))
     return -log_tail / math.log(10), math.exp(log_tail)
