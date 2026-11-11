@@ -1,11 +1,13 @@
 """Numerical helpers for weighted-urn probabilities."""
 
+from math import prod
+
 import numpy as np
 
 
 ENUMERATION_MAX_SITES = 20
-TWO_GROUP_MAX_DRAWS = 256
-TWO_GROUP_MAX_STATE_UPDATES = 8_192
+GROUPED_MAX_DRAWS = 256
+GROUPED_MAX_STATE_UPDATES = 8_192
 
 
 def normalized_log_weights(positive_weights):
@@ -65,6 +67,11 @@ def wallenius_sample_blocks(positive_sites, positive_weights, size, niter, rng):
         yield start, sites
 
 
+def _tracked_group_shape(sorted_counts, draw_size):
+    # The number drawn from the largest group is implied by the other counts.
+    return tuple(int(min(count, draw_size)) + 1 for count in sorted_counts[:-1])
+
+
 def wallenius_method(positive_weights, draw_size):
     weights = np.asarray(positive_weights, dtype=np.float64)
     n = weights.size
@@ -77,10 +84,16 @@ def wallenius_method(positive_weights, draw_size):
     if draw_size <= 2:
         return 'exact_small_draw'
     group_states = min(first_size, n - first_size, draw_size) + 1
-    if draw_size <= TWO_GROUP_MAX_DRAWS and draw_size * group_states <= TWO_GROUP_MAX_STATE_UPDATES:
+    if draw_size <= GROUPED_MAX_DRAWS and draw_size * group_states <= GROUPED_MAX_STATE_UPDATES:
         rest = weights[~first]
         if np.all(rest == rest[0]):
             return 'exact_two_weight_groups'
+    if draw_size <= GROUPED_MAX_DRAWS:
+        _, counts = np.unique(weights, return_counts=True)
+        if 3 <= len(counts) <= 4:
+            states = prod(_tracked_group_shape(np.sort(counts), draw_size))
+            if draw_size * states <= GROUPED_MAX_STATE_UPDATES:
+                return 'exact_multiple_weight_groups'
     # Retain the original enumeration domain for larger draw sizes. Extending
     # it by final subset count alone can multiply work across many categories.
     # One/two-draw formulas above extend exactness without subset enumeration.
@@ -179,6 +192,52 @@ def two_group_wallenius_inclusion(positive_weights, draw_size):
     first_inclusion = (probability[:-1] @ selected_counts) / first_size
     second_inclusion = (probability[:-1] @ (draw_size - selected_counts)) / second_size
     return np.clip(np.where(first, first_inclusion, second_inclusion), 0., 1.)
+
+
+def grouped_wallenius_inclusion(positive_weights, draw_size):
+    """Exact sequential draw recurrence on counts of selected weight groups."""
+    unique, inverse, counts = np.unique(positive_weights, return_inverse=True, return_counts=True)
+    order = np.argsort(counts, kind='stable')
+    group_sizes = counts[order]
+    weights = unique[order, None]
+    tiny = np.finfo(float).tiny
+    wide = weights.min() / weights.max() < tiny
+    shape = _tracked_group_shape(group_sizes, draw_size)
+    occupancy = np.indices(shape).reshape(len(shape), -1)
+    total_tracked = occupancy.sum(axis=0)
+    remaining = group_sizes[:-1, None] - occupancy
+    strides = [prod(shape[axis+1:]) for axis in range(len(shape))]
+    probability = np.zeros(prod(shape))
+    updated = np.zeros_like(probability)
+    probability[0] = 1.
+    for drawn in range(draw_size):
+        active = np.flatnonzero(probability > 0)
+        last_remaining = group_sizes[-1] - drawn + total_tracked[active]
+        available = np.vstack((remaining[:, active], last_remaining))
+        present = available > 0
+        # Rescale each state after large-weight groups are depleted. Ratios
+        # between the remaining small weights then keep their precision.
+        scale = np.where(present, weights, 0.).max(axis=0)
+        ratios = np.divide(weights, scale, out=np.zeros(available.shape), where=present)
+        masses = ratios * available
+        if wide:
+            groups, states = np.nonzero(present & (ratios < tiny))
+            # The count can make a group mass representable even if its
+            # individual weight ratio rounded to zero.
+            masses[groups, states] = np.exp(
+                (np.log(weights[groups, 0]) - np.log(scale[states])) + np.log(available[groups, states])
+            )
+        next_prob = (masses / masses.sum(axis=0)) * probability[active]
+        updated.fill(0.)
+        updated[active] = next_prob[-1]
+        for axis, stride in enumerate(strides):
+            can_pick = present[axis]
+            updated[active[can_pick] + stride] += next_prob[axis, can_pick]
+        probability, updated = updated, probability
+    means = np.concatenate((occupancy @ probability, [(draw_size - total_tracked) @ probability]))
+    inclusion = np.empty_like(unique)
+    inclusion[order] = means / group_sizes
+    return np.clip(inclusion[inverse], 0., 1.)
 
 
 def wallenius_mean_inclusion(positive_weights, draw_size):

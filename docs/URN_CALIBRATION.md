@@ -80,11 +80,11 @@ replaced by a pooled or file prior.
 
 `--urn_wallenius_expectation auto` uses exact boundary and uniform cases,
 exact one/two-draw formulas, exact subset enumeration for at most 20
-positive-weight sites, and a bounded exact recurrence for two distinct
-positive weights. The recurrence tracks the selected count from the
-smaller weight group and shares its mean across that group's sites.
-It runs for up to 256 draws and 8,192 count-state updates, bounded by
-`draws * (1 + min(draws, smaller_group_size))`. Other larger nonuniform
+positive-weight sites, and bounded exact recurrences for two to four distinct
+positive weights. The recurrences track selected counts from all groups
+except the largest and share each group's mean across its sites.
+They run for up to 256 draws and 8,192 count-state updates, bounded by
+`draws * product(1 + min(draws, group_size))` over the tracked groups. Other larger nonuniform
 problems use the approximate mean equation. Scaling all weights leaves the
 answer unchanged, including very small weights. [Fog (2008)](https://doi.org/10.1080/03610910701790269)
 

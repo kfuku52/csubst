@@ -802,6 +802,8 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
                          'auto permits an approximate mean (see urn provenance).')
     if method == 'exact_two_weight_groups':
         out[positive_mask] = urn_expectation.two_group_wallenius_inclusion(positive_weights, draw_size)
+    elif method == 'exact_multiple_weight_groups':
+        out[positive_mask] = urn_expectation.grouped_wallenius_inclusion(positive_weights, draw_size)
     elif method == 'exact_enumeration':
         out[positive_mask] = urn_expectation.enumerated_wallenius_inclusion(positive_weights, draw_size)
     else:

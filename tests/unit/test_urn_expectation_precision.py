@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
+from scipy.integrate import quad
 from scipy.special import beta
 
-from csubst import omega
+from csubst import omega, urn_expectation
 
 
 def test_twenty_one_sites_two_draws_matches_independent_ordered_pairs():
@@ -68,6 +69,25 @@ def test_two_weight_groups_match_an_independent_last_draw_probability():
     assert g['_urn_expectation_methods'] == {'exact_two_weight_groups': True}
 
 
+@pytest.mark.parametrize('odds,counts', [([.1, .6, 1.], [1, 2, 34]), ([.1, .6, 1., 2.], [1, 2, 33, 1])])
+def test_multiple_weight_groups_match_independent_exponential_order_statistics(odds, counts):
+    odds = np.array(odds)
+    weights = np.repeat(odds, counts)
+    expected = []
+    for group, weight in enumerate(odds):
+        others = np.array(counts)
+        others[group] -= 1
+
+        def last_density(t):
+            return weight * np.exp(-weight * t) * np.prod((-np.expm1(-odds * t))**others)
+
+        omitted, _ = quad(last_density, 0., np.inf, epsabs=1e-13)
+        expected.append(1. - omitted)
+    actual = omega._calc_wallenius_inclusion_probabilities(weights, len(weights) - 1, policy='exact')
+    np.testing.assert_allclose(actual, np.repeat(expected, counts), rtol=1e-12, atol=2e-14)
+    assert urn_expectation.wallenius_method(weights, len(weights) - 1) == 'exact_multiple_weight_groups'
+
+
 def test_approximation_is_scale_invariant_and_recorded():
     weights = np.arange(1., 101.)
     expected = omega._calc_wallenius_inclusion_probabilities(weights, 50)
@@ -80,7 +100,7 @@ def test_approximation_is_scale_invariant_and_recorded():
 
 def test_mean_approximation_brackets_very_small_weights():
     weights = [1.] * 5 + [1e-100] * 40 + [2e-100] * 60
-    actual = omega._calc_wallenius_inclusion_probabilities(weights, 25)
+    actual = urn_expectation.wallenius_mean_inclusion(np.asarray(weights), 25)
     # The heavy sites are saturated. The mean equation for the other sites is
     # 40(1 - u) + 60(1 - u**2) = 20, where u is survival at the lighter weight.
     u = (-40 + np.sqrt(40**2 + 4*60*80)) / (2*60)
@@ -91,7 +111,7 @@ def test_mean_approximation_brackets_very_small_weights():
 
 def test_mean_approximation_balances_masses_below_roundoff_of_total():
     weights = [1.] * 5 + [1e-30] * 30 + [2e-30] * 40
-    actual = omega._calc_wallenius_inclusion_probabilities(weights, 5)
+    actual = urn_expectation.wallenius_mean_inclusion(np.asarray(weights), 5)
     np.testing.assert_array_equal(actual[:5], 1.)
     time = -np.log1p(-actual[5]) / weights[5]
     assert actual[5:].sum() == pytest.approx(5 * np.exp(-time), rel=5e-12, abs=0.)
