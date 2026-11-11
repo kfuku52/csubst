@@ -95,6 +95,18 @@ def test_wallenius_sampling_preserves_extreme_positive_odds(weights, size, expec
     np.testing.assert_allclose(mask.mean(axis=0), expected, atol=.014, rtol=0.)
 
 
+@pytest.mark.parametrize('arity', [1, 2, 3])
+def test_python_packed_counts_across_row_blocks(monkeypatch, arity):
+    rng = np.random.default_rng(191)
+    masks = rng.integers(0, 256, size=(6, 9, 4), dtype=np.uint8)
+    ids = rng.integers(0, len(masks), size=(7, arity))
+    monkeypatch.setattr(omega, 'omega_cy', None)
+    monkeypatch.setattr(omega, '_PACKED_COUNT_WORK_BYTES', 4 * masks.shape[1] * masks.shape[2])
+    reference = np.unpackbits(masks[ids], axis=-1).all(axis=1).sum(axis=-1, dtype=np.int32)
+    result = omega._calc_shared_counts_from_packed_masks(masks, ids)
+    np.testing.assert_array_equal(result, reference)
+
+
 @pytest.mark.native
 def test_native_packed_sampling_matches_boolean_masks_and_python_counts(monkeypatch):
     if omega.omega_cy is None:

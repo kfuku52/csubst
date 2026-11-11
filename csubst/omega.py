@@ -56,6 +56,7 @@ _UINT8_POPCOUNT = np.unpackbits(
 _DEFAULT_E_STAT_MIN_ITEMS_FOR_PARALLEL = 1000000000
 _DEFAULT_E_STAT_MIN_CATEGORIES_PER_JOB = 64
 _URN_OVERLAP_WORK_BYTES = 32 * 1024**2
+_PACKED_COUNT_WORK_BYTES = 32 * 1024**2
 _CYTHON_FALLBACK_WARNED = set()
 
 
@@ -300,18 +301,19 @@ def _calc_shared_counts_from_packed_masks(packed_masks, remapped_cb_ids):
             )
         except Exception as exc:
             _warn_cython_fallback('packed_shared_counts', exc)
-    arity = remapped_cb_ids.shape[1]
-    if arity == 1:
-        return _UINT8_POPCOUNT[packed_masks[remapped_cb_ids[:, 0], :, :]].sum(axis=2, dtype=np.int32)
-    if arity == 2:
-        return _UINT8_POPCOUNT[np.bitwise_and(
-            packed_masks[remapped_cb_ids[:, 0], :, :],
-            packed_masks[remapped_cb_ids[:, 1], :, :],
-        )].sum(axis=2, dtype=np.int32)
-    shared = packed_masks[remapped_cb_ids[:, 0], :, :].copy()
-    for col in range(1, arity):
-        shared = np.bitwise_and(shared, packed_masks[remapped_cb_ids[:, col], :, :])
-    return _UINT8_POPCOUNT[shared].sum(axis=2, dtype=np.int32)
+    _, iterations, packed_sites = packed_masks.shape
+    # Hold at most one working overlap and one gathered or popcount block.
+    bytes_per_row = max(1, 2 * iterations * packed_sites)
+    rows_per_block = max(1, _PACKED_COUNT_WORK_BYTES // bytes_per_row)
+    out = np.empty((len(remapped_cb_ids), iterations), dtype=np.int32)
+    for start in range(0, len(remapped_cb_ids), rows_per_block):
+        stop = min(start + rows_per_block, len(remapped_cb_ids))
+        ids = remapped_cb_ids[start:stop]
+        shared = packed_masks[ids[:, 0]]
+        for col in range(1, ids.shape[1]):
+            np.bitwise_and(shared, packed_masks[ids[:, col]], out=shared)
+        out[start:stop] = _UINT8_POPCOUNT[shared].sum(axis=2, dtype=np.int32)
+    return out
 
 
 def _pack_sampled_site_indices_to_uint8(sampled_site_indices, num_site):
