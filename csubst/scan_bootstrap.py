@@ -327,10 +327,9 @@ def calibrate(g, observed, model):
         print('Scan bootstrap failed; calibrated P values are undefined. See {}.'.format(manifest), flush=True)
     else:
         summary['status'] = 'model_conditional_parametric_bootstrap'
-        out['p_rate_enrichment_bootstrap_maxT'] = [
-            scan_statistics.empirical_pvalue(value, scores, requested)
-            for value in out['score_rate_enrichment'].to_numpy(dtype=float)
-        ]
+        out['p_rate_enrichment_bootstrap_maxT'] = scan_statistics.empirical_pvalues(
+            out['score_rate_enrichment'], scores, requested,
+        )
         summary['minimum_p'] = 1 / (requested + 1)
     out['scan_inference_status'] = summary['status']
     out['scan_bootstrap_success_count'] = summary['success_count']

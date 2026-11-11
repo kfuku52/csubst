@@ -113,17 +113,22 @@ def _empirical_upper_tail(observed, reference):
     return (observed - reference) <= (1e-12 + 1e-12 * observed)
 
 
+def _validated_reference(reference, expected_count):
+    values = np.asarray(reference, dtype=float)
+    if values.ndim != 1 or not values.size or np.isnan(values).any() or np.isposinf(values).any():
+        raise ValueError('A nonempty null reference without undefined replicates is required.')
+    if expected_count is not None and values.size != expected_count:
+        raise ValueError('Missing null replicates; success-conditioned calibration is not supported.')
+    return values
+
+
 def empirical_pvalue(observed, reference, expected_count=None, exact=False):
     """Inclusive upper tail; +1 for Monte Carlo, no offset for enumeration.
 
     -inf denotes a successful replicate with no candidate. Approximate ties
     are counted conservatively, including TSV serialization roundoff.
     """
-    values = np.asarray(reference, dtype=float)
-    if values.ndim != 1 or not values.size or np.isnan(values).any() or np.isposinf(values).any():
-        raise ValueError('A nonempty null reference without undefined replicates is required.')
-    if expected_count is not None and values.size != expected_count:
-        raise ValueError('Missing null replicates; success-conditioned calibration is not supported.')
+    values = _validated_reference(reference, expected_count)
     if np.isnan(observed) or np.isposinf(observed):
         return np.nan
     if observed <= 0:
@@ -131,3 +136,35 @@ def empirical_pvalue(observed, reference, expected_count=None, exact=False):
     exceedances = np.count_nonzero(_empirical_upper_tail(observed, values))
     offset = 0 if exact else 1
     return float((offset + exceedances) / (offset + values.size))
+
+
+
+def empirical_pvalues(observed, reference, expected_count=None, exact=False):
+    """Inclusive upper tails for multiple scores against one null reference."""
+    values = _validated_reference(reference, expected_count)
+    observed = np.asarray(observed, dtype=float)
+    pvalues = np.full(observed.shape, np.nan)
+    pvalues[observed <= 0] = 1.
+    testable = np.isfinite(observed) & (observed > 0)
+    scores = observed[testable]
+    offset = 0 if exact else 1
+    if len(scores) <= 4:
+        counts = [np.count_nonzero(_empirical_upper_tail(score, values)) for score in scores]
+    else:
+        ordered = np.empty(values.size + 1)
+        ordered[:-1] = values
+        ordered[:-1].sort()
+        ordered[-1] = np.inf
+        lower = np.zeros(len(scores), dtype=np.intp)
+        upper = np.full(len(scores), values.size, dtype=np.intp)
+        # Use the exact same comparison at every search step. A cutoff
+        # obtained by subtracting the tie tolerance can round across a tie.
+        with np.errstate(over='ignore'):
+            while (lower < upper).any():
+                middle = (lower + upper) // 2
+                in_tail = _empirical_upper_tail(scores, ordered[middle])
+                upper = np.where(in_tail, middle, upper)
+                lower = np.where(in_tail, lower, middle + 1)
+        counts = values.size - lower
+    pvalues[testable] = (offset + np.asarray(counts)) / (offset + values.size)
+    return pvalues

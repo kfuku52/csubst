@@ -724,8 +724,9 @@ def calibrate(g, observed):
         trials.append(dict(status="success", sampling_attempts=1, configuration_id=None,
                                          failure_reason="", maximum_score=None if maximum == -np.inf else maximum))
         del tensor, simulated
-    result["p_rate_enrichment_empirical_maxT"] = [
-        scan_statistics.empirical_pvalue(float(v), maxima, count) for v in result["score_rate_enrichment"]]
+    result["p_rate_enrichment_empirical_maxT"] = scan_statistics.empirical_pvalues(
+        result["score_rate_enrichment"], maxima, count,
+    )
     # This reference corrects the whole scan; do not apply candidate-wise BH to it.
     diagnostic["global_pvalue"] = scan_statistics.empirical_pvalue(observed_maximum, maxima, count)
     diagnostic["pvalue_resolution"] = 1 / (count + 1)

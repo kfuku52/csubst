@@ -104,6 +104,16 @@ def test_empirical_reference_preserves_ties_and_empty_draws():
         stats.empirical_pvalue(3, [2, np.inf], 2)
 
 
+@pytest.mark.parametrize('exact', [False, True])
+def test_batch_empirical_tails_preserve_scalar_ties(exact):
+    cutoff = 3. - 4e-12
+    reference = [-np.inf, np.nextafter(cutoff, 0.), cutoff, np.nextafter(cutoff, 4.), 3., 3., 5.]
+    observed = np.array([2., 3., np.nextafter(3., 4.), 3.1, 5., 6., 0., -np.inf, np.nan, np.inf])
+    expected = [stats.empirical_pvalue(score, reference, len(reference), exact=exact) for score in observed]
+    actual = stats.empirical_pvalues(observed, reference, len(reference), exact=exact)
+    np.testing.assert_array_equal(actual, expected)
+
+
 def test_empty_family_is_not_an_undefined_score():
     assert stats.maximum_score(pd.DataFrame({'score_rate_enrichment': []})) == -np.inf
     with pytest.raises(ValueError, match='Undefined'):

@@ -3244,9 +3244,9 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
     pvalues[enriched] = (offset + exceedances) / (offset + n_permutations)
     out["p_rate_enrichment_empirical"] = pvalues
     if calibration == "full_scan":
-        out["p_rate_enrichment_empirical_maxT"] = [
-            _empirical_p_from_scores(score, max_perm_score, n_permutations, exact=exact) for score in observed_scores
-        ]
+        out["p_rate_enrichment_empirical_maxT"] = scan_statistics.empirical_pvalues(
+            observed_scores, max_perm_score, n_permutations, exact=exact,
+        )
         diagnostic["global_pvalue"] = _empirical_p_from_scores(observed_maximum, max_perm_score, n_permutations, exact=exact)
     diagnostic["status"] = "conditional_assignment"
     return _finish_scan_calibration(g, out, diagnostic)
