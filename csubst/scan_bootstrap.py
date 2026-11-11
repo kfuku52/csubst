@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from scipy.linalg import expm
 
-from csubst import __version__, cli_io, ete, runtime, scan_statistics, sequence
+from csubst import __version__, cli_io, ete, runtime, scan_ctmc, scan_statistics, sequence
 
 
 def capture_options(args, parser):
@@ -201,12 +201,7 @@ def transition_matrices(model):
         p = expm(model['q'] * node.dist)
         if not np.isfinite(p).all() or p.min() < -1e-12 or not np.allclose(p.sum(axis=1), 1., atol=1e-10):
             raise ValueError('Invalid CTMC transition matrix in scan bootstrap.')
-        # Only machine-roundoff correction after validation, not a model fallback.
-        p = np.maximum(p, 0.)
-        p /= p.sum(axis=1, keepdims=True)
-        cumulative = p.cumsum(axis=1)
-        cumulative[:, -1] = 1.
-        matrices[node.dist] = cumulative
+        matrices[node.dist] = scan_ctmc._transition_cdf(p)
     return matrices
 
 
@@ -220,8 +215,7 @@ def simulate_alignment(model, rng, transitions=None):
         if ete.is_root(node):
             states[id(node)] = rng.choice(len(model['pi']), model['sites'], p=model['pi'])
         else:
-            cumulative = transitions[node.dist][states[id(node.up)]]
-            states[id(node)] = (rng.random(model['sites'])[:, None] > cumulative).sum(axis=1)
+            states[id(node)] = scan_ctmc._sample_transition_states(transitions[node.dist], states[id(node.up)], rng)
         if ete.is_leaf(node):
             tokens = model['codons'][states[id(node)]].copy()
             tokens[model['missing'][node.name]] = '---'

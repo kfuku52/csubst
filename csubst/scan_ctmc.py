@@ -379,8 +379,8 @@ def set_branch_length_summaries(g, tensor):
     return g
 
 
-def _tip_transition_cdf(q, length, rate):
-    p = np.maximum(expm(q * length * rate), 0)
+def _transition_cdf(transition):
+    p = np.maximum(transition, 0.)
     p /= p.sum(axis=1, keepdims=True)
     last_positive = p.shape[1] - 1 - (p[:, ::-1] > 0).argmax(axis=1)
     np.cumsum(p, axis=1, out=p)
@@ -389,6 +389,37 @@ def _tip_transition_cdf(q, length, rate):
     # to any impossible states at the end of the row.
     p[np.arange(p.shape[1]) >= last_positive[:, None]] = 1.
     return p
+
+
+def _tip_transition_cdf(q, length, rate):
+    return _transition_cdf(expm(q * length * rate))
+
+
+def _sample_transition_states(cdf, parent_states, rng):
+    nstates = cdf.shape[1]
+    binary = nstates >= 32 and len(parent_states) >= 512
+    # Limit the gathered CDFs or search workspace to about 8 MiB.
+    bytes_per_site = 48 if binary else nstates * (cdf.itemsize + 1)
+    block_size = max(1, (8 * 1024**2) // bytes_per_site)
+    states: np.ndarray = np.empty(len(parent_states), dtype=np.int64)
+    for start in range(0, len(parent_states), block_size):
+        stop = min(start + block_size, len(parent_states))
+        parent = parent_states[start:stop]
+        uniforms = rng.random(stop - start)
+        # The first cumulative probability strictly above u is selected.
+        # Zero-width intervals never generate a state.
+        if not binary:
+            states[start:stop] = (uniforms[:, None] >= cdf[parent]).sum(axis=1)
+            continue
+        position = states[start:stop]
+        position.fill(0)
+        step = 1 << ((nstates - 1).bit_length() - 1)
+        while step:
+            proposal = position + step
+            bound = cdf[parent, np.minimum(proposal, nstates) - 1]
+            position += step * ((proposal < nstates) & (uniforms >= bound))
+            step >>= 1
+    return states
 
 
 def simulate_tips(g, rng, ambiguity_partitions=None, *, transition_cdf=None):
@@ -409,8 +440,6 @@ def simulate_tips(g, rng, ambiguity_partitions=None, *, transition_cdf=None):
         category_sites = tuple(np.flatnonzero(categories == k) for k in range(len(rates)))
     else:
         category_sites = (np.arange(nsite),)
-    # Limit the gathered CDFs and Boolean comparisons to about 8 MiB.
-    draw_block = max(1, (8 * 1024**2) // (9 * len(pi)))
     draws = {}
     for node in g["tree"].traverse("preorder"):
         i = int(ete.get_prop(node, "numerical_label"))
@@ -423,12 +452,7 @@ def simulate_tips(g, rng, ambiguity_partitions=None, *, transition_cdf=None):
                 if not len(selected):
                     continue
                 cdf = transition_cdf(float(node.dist), float(rate))
-                for start in range(0, len(selected), draw_block):
-                    sites = selected[start:start + draw_block]
-                    uniforms = rng.random(len(sites))
-                    # Use the first cumulative probability strictly above u.
-                    # A zero-width interval never generates its state.
-                    draws[i][sites] = (uniforms[:, None] >= cdf[draws[parent][sites]]).sum(axis=1)
+                draws[i][selected] = _sample_transition_states(cdf, draws[parent][selected], rng)
         if not ete.get_children(node):
             state[i, np.arange(nsite), draws[i]] = 1
             state[i, original[i].sum(axis=1) == 0] = 0

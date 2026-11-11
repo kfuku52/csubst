@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from csubst import cli, ete, scan_bootstrap as boot
+from csubst import cli, ete, scan_bootstrap as boot, scan_ctmc
 
 
 def _model():
@@ -26,6 +26,28 @@ def test_simulator_matches_two_tip_ctmc_and_preserves_missingness():
     # Independently derived two-state CTMC probability across path length .5.
     assert (a[10:] != b[10:]).mean() == pytest.approx((1-np.exp(-2*.5))/2, abs=.012)
     assert (b == 'AAA').mean() == pytest.approx(.5, abs=.012)
+
+
+def test_batched_transition_search_agrees_with_half_open_cdf_intervals():
+    rng = np.random.default_rng(118)
+    p = rng.integers(0, 8, size=(61, 61)).astype(float)
+    p[:, :2] = p[:, -3:] = 0.
+    cumulative = scan_ctmc._transition_cdf(p)
+    parent = rng.integers(0, len(p), 513)
+    uniforms = rng.random(len(parent))
+    uniforms[::4] = 0.
+    uniforms[1::4] = cumulative[parent[1::4], 31]
+    uniforms[2::4] = np.nextafter(1., 0.)
+
+    class FixedRng:
+        def random(self, size):
+            assert size == len(uniforms)
+            return uniforms
+
+    expected = [np.searchsorted(cumulative[state], u, side='right') for state, u in zip(parent, uniforms)]
+    actual = scan_ctmc._sample_transition_states(cumulative, parent, FixedRng())
+    np.testing.assert_array_equal(actual, expected)
+    assert (p[parent, actual] > 0).all()
 
 
 def test_model_snapshot_uses_full_alignment_and_checks_stationarity(tmp_path, monkeypatch):
