@@ -84,18 +84,10 @@ def validate_model(g, branch_meta, codon_state_ids):
     return model, rates, priors, q, ids, num_group, lengths, off
 
 
-def build_context(g, branch_meta, codon_state_ids):
-    model, rates, priors, q, ids, num_group, lengths, off = validate_model(g, branch_meta, codon_state_ids)
-    # Only a branch x model-state x group tensor: no branch x site x codon-pair tensor.
-    group_projection = np.eye(num_group, dtype=float)[ids]
-    reachable = off > 0
-    np.fill_diagonal(reachable, True)
-    for via in range(len(q)):
-        reachable |= reachable[:, via, None] & reachable[None, via, :]
-    reachable_groups = (reachable.astype(int) @ group_projection) > 0
-    unique_lengths, inverse = np.unique(lengths, return_inverse=True)
+def _exposure_matrices(q, rates, unique_lengths, group_projection, bridge):
+    num_group = group_projection.shape[1]
     extra: dict = {}
-    if g.get("scan_observation") == "bridge":
+    if bridge:
         # Integral in rate-scaled time. This incorporates the category's rate
         # multiplier on Q when computing jump opportunities.
         augmented = np.zeros((2 * len(q), 2 * len(q)))
@@ -110,8 +102,7 @@ def build_context(g, branch_meta, codon_state_ids):
                         or not np.allclose(integrated.sum(axis=1), time, atol=1e-12, rtol=1e-9)):
                     raise ValueError("Invalid integrated CTMC transition probabilities.")
                 occupation[category, index] = np.maximum(integrated, 0)
-        extra = {"occupation": occupation if len(rates) > 1 else occupation[0],
-                 "jump_q": off, "reachable_states": reachable}
+        extra = {"occupation": occupation if len(rates) > 1 else occupation[0]}
     else:
         projected = np.empty((len(rates), len(unique_lengths), len(q), num_group), dtype=float)
         for category, rate in enumerate(rates):
@@ -124,6 +115,34 @@ def build_context(g, branch_meta, codon_state_ids):
         extra['transition_groups'] = projected[0]
         if len(rates) > 1:
             extra['category_groups'] = projected
+    return extra
+
+
+def build_context(g, branch_meta, codon_state_ids):
+    model, rates, priors, q, ids, num_group, lengths, off = validate_model(g, branch_meta, codon_state_ids)
+    # Only a branch x model-state x group tensor: no branch x site x codon-pair tensor.
+    group_projection = np.eye(num_group, dtype=float)[ids]
+    reachable = off > 0
+    np.fill_diagonal(reachable, True)
+    for via in range(len(q)):
+        reachable |= reachable[:, via, None] & reachable[None, via, :]
+    reachable_groups = (reachable.astype(int) @ group_projection) > 0
+    unique_lengths, inverse = np.unique(lengths, return_inverse=True)
+    bridge = g.get("scan_observation") == "bridge"
+    cache = g.get("_scan_fixed_exposure")
+    extra = None
+    if cache is not None:
+        key = (bridge, q.shape, q.tobytes(), rates.tobytes(), unique_lengths.tobytes(), ids.tobytes(), num_group)
+        if cache.get("key") == key:
+            extra = cache["matrices"].copy()
+    if extra is None:
+        extra = _exposure_matrices(q, rates, unique_lengths, group_projection, bridge)
+        if cache is not None:
+            cache.clear()
+            if sum(values.nbytes for values in extra.values()) <= 32 * 1024**2:
+                cache.update(key=key, matrices=extra.copy())
+    if bridge:
+        extra.update(jump_q=off, reachable_states=reachable)
     if len(rates) > 1:
         extra['category_states'] = g.get('scan_category_states')
     if "event_eligible" in g:

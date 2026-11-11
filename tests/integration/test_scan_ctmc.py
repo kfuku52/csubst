@@ -109,10 +109,12 @@ def test_parametric_bootstrap_repeats_asr_and_candidate_selection(monkeypatch, d
     updated, tensor = scan_ctmc.prepare(g)
     prepare = scan_ctmc.prepare
     replicate_tensors = []
-    def check_release(context):
+    models = []
+    def check_release(context, *, endpoint_model):
         if replicate_tensors:
             assert replicate_tensors[-1]() is None
-        result = prepare(context)
+        models.append(endpoint_model)
+        result = prepare(context, endpoint_model=endpoint_model)
         replicate_tensors.append(weakref.ref(result[1]))
         return result
     monkeypatch.setattr(scan_ctmc, 'prepare', check_release)
@@ -124,6 +126,7 @@ def test_parametric_bootstrap_repeats_asr_and_candidate_selection(monkeypatch, d
     monkeypatch.setattr(substitution_scan, '_scan_substitutions_core', wrapped)
     frame, _ = substitution_scan.scan_substitutions(updated, tensor, tensor)
     assert len(seen) == 4  # observed plus each full rerun
+    assert len(models) == 3 and models[0] is not None and all(model is models[0] for model in models)
     assert not np.array_equal(seen[0], seen[1])
     assert (frame['p_rate_enrichment_empirical_maxT'] >= .25).all()
     assert frame['p_rate_enrichment_empirical'].isna().all()

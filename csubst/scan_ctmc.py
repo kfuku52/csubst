@@ -150,24 +150,35 @@ def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
     return transform
 
 
-def _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights,
-                           disk_backed=False, bridge=False):
-    from csubst import endpoint, endpoint_io, site_storage
-    nodes = list(tree.traverse("preorder"))
-    n, sites, states = tip_states.shape
+def _endpoint_model(nodes, n, q, pi, rates, weights):
+    from csubst import endpoint
     parents = np.full(n, -1, dtype=int)
     lengths = np.zeros(n)
-    tips = {}
     for node in nodes:
-        i = int(ete.get_prop(node, "numerical_label"))
         if not ete.is_root(node):
+            i = int(ete.get_prop(node, "numerical_label"))
             parents[i] = int(ete.get_prop(node.up, "numerical_label"))
             lengths[i] = float(node.dist)
+    return endpoint.EndpointModel(parents, lengths, q, pi, rates, weights)
+
+
+def _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights,
+                           disk_backed=False, bridge=False, model=None):
+    from csubst import endpoint_io, site_storage
+    nodes = list(tree.traverse("preorder"))
+    n, sites, states = tip_states.shape
+    if model is None:
+        model = _endpoint_model(nodes, n, q, pi, rates, weights)
+    elif not (np.array_equal(model.q, q) and np.array_equal(model.pi, pi)
+              and np.array_equal(model.rates, rates) and np.array_equal(model.weights, weights)):
+        raise ValueError('Fitted transition parameters changed during fixed-model calibration.')
+    tips = {}
+    for node in nodes:
         if not ete.get_children(node):
+            i = int(ete.get_prop(node, "numerical_label"))
             values = np.asarray(tip_states[i], float).copy()
             values[values.sum(axis=1) == 0] = 1
             tips[i] = values
-    model = endpoint.EndpointModel(parents, lengths, q, pi, rates, weights)
     groups = np.asarray(groups, int)
     projection = np.eye(int(groups.max()) + 1)[groups]
     posterior = np.zeros_like(tip_states, dtype=float)
@@ -250,7 +261,7 @@ def _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summarie
 
 
 def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summaries=None,
-          rates=(1.,), weights=(1.,), disk_backed=False):
+          rates=(1.,), weights=(1.,), disk_backed=False, *, endpoint_model=None):
     """Return all-node marginals and a branch/site/group-pair event tensor.
 
     Input leaf rows are emission likelihoods; zero rows mean missing (ones).
@@ -260,10 +271,11 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
     if mode not in ("joint", "bridge"):
         raise ValueError("Unknown CTMC observation mode.")
     if mode == 'joint':
-        return _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights, disk_backed)
+        return _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights,
+                                      disk_backed, model=endpoint_model)
     if len(rates) != 1 or float(rates[0]) != 1 or len(weights) != 1 or float(weights[0]) != 1:
         return _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights,
-                            disk_backed, bridge=True)
+                                      disk_backed, bridge=True, model=endpoint_model)
     return _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_backed)
 
 
@@ -402,7 +414,7 @@ def _prepare_3di(g):
     return updated, tensor
 
 
-def prepare(g):
+def prepare(g, *, endpoint_model=None):
     if g.get('nonsyn_recode') == '3di20':
         return _prepare_3di(g)
     from csubst import endpoint_io, fitted_model, scan_endpoint, substitution_scan
@@ -427,7 +439,7 @@ def prepare(g):
     posterior, tensor = infer(g["tree"], g["state_cdn"], g["instantaneous_codon_rate_matrix"],
                               g["equilibrium_frequency"], groups, g["scan_observation"], summaries=summaries,
                               rates=rates, weights=weights, block_size=g.get('endpoint_block_size', 64),
-                              disk_backed=disk_backed)
+                              disk_backed=disk_backed, endpoint_model=endpoint_model)
     updated = dict(g)
     updated["event_eligible"] = eligible
     updated["scan_tip_emissions"] = g["state_cdn"]
@@ -602,7 +614,7 @@ def validate_parametric_inputs(g):
 
 def calibrate(g, observed):
     """Fixed-model ASR/discovery calibration using the common maximum score."""
-    from csubst import scan_statistics, substitution_scan
+    from csubst import endpoint_io, scan_statistics, substitution_scan
     ambiguity_partitions = validate_parametric_inputs(g)
     count = int(g.get("scan_n_permutations", 1000))
     if count < 1:
@@ -626,10 +638,18 @@ def calibrate(g, observed):
     q = g["instantaneous_codon_rate_matrix"]
     cache_items = max(1, (32 * 1024**2) // q.nbytes)
     transition_cdf = lru_cache(maxsize=cache_items)(partial(_tip_transition_cdf, q))
+    rates, weights = endpoint_io.model_rates(g)
+    model = None
+    if g["scan_observation"] == "joint" or len(rates) > 1 or rates[0] != 1.:
+        # Only the fitted transition matrices carry over between replicates.
+        model = _endpoint_model(list(g["tree"].traverse("preorder")), g["state_cdn"].shape[0],
+                                q.copy(), np.array(g["equilibrium_frequency"]), rates, weights)
+    exposure_cache: dict = {}
     for index in range(count):
         simulated = simulate_tips(g, rng, ambiguity_partitions, transition_cdf=transition_cdf)
         simulated["scan_pvalue_calibration"] = "none"
-        simulated, tensor = prepare(simulated)
+        simulated["_scan_fixed_exposure"] = exposure_cache
+        simulated, tensor = prepare(simulated, endpoint_model=model)
         simulated = set_branch_length_summaries(simulated, tensor)
         frame, _ = substitution_scan._scan_substitutions_core(simulated, tensor, tensor)
         maximum = scan_statistics.maximum_score(frame)

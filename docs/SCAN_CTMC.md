@@ -142,6 +142,8 @@ mode; use the global maxT column directly, without another BH correction.
 Fixed-model replicates reuse a run-local cache of cumulative transition
 probabilities, bounded to about 32 MiB. Tip simulation reads these probabilities
 in blocks and assigns zero-width intervals to impossible transitions.
+The replicates also reuse fitted transition and exposure matrices. Each
+replicate reconstructs its own node states and posterior category weights.
 
 `p_rate_enrichment_asymptotic` and its trait × match BH column remain exploratory
 diagnostics. `full_scan` calibration itself still permutes foreground clades
