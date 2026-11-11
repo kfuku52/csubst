@@ -59,6 +59,17 @@ def _add_advanced_argument(parser, *args, **kwargs):
     return parser.add_argument(*args, **kwargs)
 
 
+def _add_database_search_arguments(parser, *, show_advanced=True):
+    _add_advanced_argument(parser, '--database_search', show_advanced=show_advanced,
+                           choices=['remote', 'local'], default='remote',
+                           help='default=%(default)s. Where to run besthit sequence searches. '
+                                'Local mode keeps the query on this machine. Structure retrieval and annotation can use hit IDs online.')
+    _add_advanced_argument(parser, '--blastp_db', show_advanced=show_advanced, metavar='PATH',
+                           help='Local BLAST+ protein database prefix with UniProt accessions for swissmodel, alphafold, or alphafill.')
+    _add_advanced_argument(parser, '--mmseqs_db', show_advanced=show_advanced, metavar='PATH',
+                           help='Local MMseqs2 protein database prefix with PDB entry identifiers for pdb.')
+
+
 def _normalize_help_argv(argv):
     show_advanced = '--help-advanced' in argv
     normalized = ['--help' if token == '--help-advanced' else token for token in argv]
@@ -555,11 +566,12 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                         metavar='PATH/PDB_CODE/besthit', default='', type=str,
                         help='default=%(default)s: Experimental feature. Structure source for search-time epistasis degree generation. '
                              'PATH: local structure file; PDB code: fetched from PDB; '
-                             '"besthit": online sequence search + best-hit retrieval.')
+                             '"besthit": sequence search and best-hit retrieval. See --database_search.')
     _add_advanced_argument(advanced_epistasis, '--epistasis_database', show_advanced=show_advanced,
                         metavar='DATABASE1,DATABASE2,...', default='swissmodel,pdb,alphafold,alphafill', type=str,
                         help='default=%(default)s: Experimental feature. Comma-delimited database priority for --epistasis_pdb besthit. '
                              'Supported: swissmodel, pdb, alphafold, alphafill.')
+    _add_database_search_arguments(advanced_epistasis, show_advanced=show_advanced)
     _add_advanced_argument(advanced_epistasis, '--epistasis_database_evalue_cutoff', show_advanced=show_advanced,
                         metavar='FLOAT', default=1.0, type=float,
                         help='default=%(default)s: Experimental feature. E-value cutoff for --epistasis_pdb besthit searches.')
@@ -1232,17 +1244,16 @@ def _register_sites_parser(psr_as, psr_co, psr_iq, psr_out_sites, psr_output_man
                            'PDB CODE: e.g. 3SV0. PDB file will be fetched from the database. '
                            'The PDB protein sequence will be aligned with mafft, '
                            'and a pymol session will be generated. '
-                           'besthit: Run online sequence search and fetch the best-hit model. See --database.')
+                           'besthit: Run sequence search and fetch the best-hit model. See --database and --database_search.')
     site.add_argument('--database', metavar='DATABASE1,DATABASE2,...', default='swissmodel,pdb,alphafold,alphafill', required=False, type=str,
                       help='default=%(default)s: '
                            'Comma-delimited names of protein structure databases to search. '
                            'The top priority is given to the first. '
-                           'swissmodel: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best SWISS-MODEL homology model (https://swissmodel.expasy.org/). '
-                           'pdb: Run online MMseqs2 search against the RCSB PDB database (https://www.rcsb.org/) and fetch the best-hit PDB model. '
-                           'alphafold: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFold model (https://alphafold.ebi.ac.uk/). '
-                           'alphafill: Run online QBLAST search against the UniProt database (https://www.uniprot.org/) and fetch the best-hit AlphaFill model (https://alphafill.eu/).')
+                           'Use pdb for an RCSB PDB structure. Use swissmodel, alphafold, or alphafill '
+                           'to retrieve a model by UniProt accession.')
+    _add_database_search_arguments(site)
     site.add_argument('--database_evalue_cutoff', metavar='FLOAT', default=1.0, required=False, type=float,
-                      help='default=%(default)s: E-value cutoff in the database searches. Applied to MMseqs2 and QBLAST.')
+                      help='default=%(default)s: E-value cutoff in the database searches.')
     site.add_argument('--database_minimum_identity', metavar='FLOAT', default=0.25, required=False, type=float,
                       help='default=%(default)s: The minimum sequence identity for the database searches. Applied to MMseqs2. See https://search.rcsb.org/index.html#search-api')
     _add_advanced_argument(advanced_sites, '--database_timeout', show_advanced=show_advanced,

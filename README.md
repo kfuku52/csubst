@@ -145,6 +145,8 @@ For experimental urn expectations, see [ASRV training, precision and calibration
 
 Foreground formats, higher-order search, site outputs, structure mapping, and
 simulation guides are available in the [Wiki](https://github.com/kfuku52/csubst/wiki).
+For `--pdb besthit` with an existing BLAST+ or MMseqs2 database, see
+[local sequence searches](https://github.com/kfuku52/csubst/wiki/Mapping-convergent-substitutions-on-protein-structures#local-sequence-searches).
 Developer setup and checks are documented in [CONTRIBUTING.md](CONTRIBUTING.md),
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [TESTING.md](TESTING.md).
 

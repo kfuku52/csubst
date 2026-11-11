@@ -93,6 +93,21 @@ foreground combinations from search results, use `--branch_id fg` and supply
 `--cb_file csubst_search/csubst_cb_2.tsv` for the default search layout. The
 `--cb_file` default is `csubst_cb_2.tsv` in the working directory.
 
+## Local structure searches
+
+`--database_search local` runs the sequence search for `sites --pdb besthit`
+or `search --epistasis_pdb besthit` on the machine running CSUBST. Supply the
+local database prefixes needed by your chosen providers using `--blastp_db`
+and `--mmseqs_db`. Relative prefixes are resolved from the starting working
+directory.
+
+The query is neither submitted to a remote sequence-search service nor written
+to the CSUBST log. An empty result can advance to the next configured provider
+in local mode. A failed local search exits with an error. Structure retrieval
+and annotation can still make online requests using public hit identifiers.
+During a single `sites` run, jobs with identical queries and search settings
+reuse local hit lists in memory.
+
 ## Model resource checks
 
 `download --resource vesm-35m` always checks file sizes and SHA-256 hashes;

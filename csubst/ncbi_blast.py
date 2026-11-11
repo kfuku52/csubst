@@ -74,6 +74,8 @@ def parse_xml2_hits(response_text):
         root = ET.fromstring(response_text)
     except (ET.ParseError, DefusedXmlException) as exc:
         raise ValueError('NCBI BLAST returned malformed XML2 output.') from exc
+    if _local_name(root.tag) not in {'BlastXML2', 'BlastOutput2'}:
+        raise ValueError('NCBI BLAST returned malformed XML2 output.')
 
     hits = list()
     seen_accessions = set()

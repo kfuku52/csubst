@@ -55,6 +55,23 @@ def test_log_collision_protects_inferred_iqtree_input(tmp_path):
     assert '--log_file must not overwrite input --iqtree_state' in result.stderr
 
 
+@pytest.mark.parametrize('option,suffix', [('blastp_db', '.00.psq'), ('mmseqs_db', '_h.index')])
+def test_log_collision_preserves_local_database_sidecar(tmp_path, option, suffix):
+    prefix = tmp_path / 'local database'
+    source = Path(str(prefix) + suffix)
+    source.write_bytes(b'local database input')
+    if option == 'blastp_db':
+        prefix = tmp_path / 'local alias'
+        Path(str(prefix) + '.pal').write_text('DBLIST "local database.00"\n')
+    log = tmp_path / 'log-alias'
+    os.link(source, log)
+    result = run_csubst(['sites', '--pdb', 'besthit', '--threads', 'invalid',
+                         '--database_search', 'local', '--' + option, str(prefix), '--log_file', str(log)], tmp_path)
+    assert result.returncode == 2
+    assert source.read_bytes() == b'local database input'
+    assert '--log_file must not overwrite input --' + option in result.stderr
+
+
 @pytest.mark.parametrize('parse_error', [False, True])
 def test_log_collision_preserves_scan_analytic_profile(tmp_path, parse_error):
     profile = tmp_path / 'profile.json'

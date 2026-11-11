@@ -5,7 +5,7 @@ import os
 import re
 from collections.abc import Iterator, Sequence
 
-from csubst import output_safety, runtime
+from csubst import local_search_config, output_safety, runtime
 
 
 def _path_actions(parser: argparse.ArgumentParser) -> Iterator[argparse.Action]:
@@ -88,6 +88,9 @@ def input_paths(
                                   for candidate in base_candidates)
             for candidate in candidates:
                 yield 'input --' + dest, candidate
+                if dest in local_search_config.DATABASE_PATH_OPTIONS:
+                    for filename in local_search_config.database_files(dest, candidate):
+                        yield 'input --' + dest, filename
 
 
 def validate_log_destination(log_path, parser, args, argv):

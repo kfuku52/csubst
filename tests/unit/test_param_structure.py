@@ -251,6 +251,21 @@ def test_get_global_parameters_validates_database_timeout():
         param.get_global_parameters(_args(database_timeout=-1))
 
 
+@pytest.mark.parametrize('pdb_option,database_option,db_flag,provider', [
+    ('pdb', 'database', 'mmseqs_db', 'pdb'),
+    ('epistasis_pdb', 'epistasis_database', 'blastp_db', 'swissmodel'),
+])
+def test_local_structure_search_requires_only_selected_database(
+    tmp_path, monkeypatch, pdb_option, database_option, db_flag, provider,
+):
+    monkeypatch.chdir(tmp_path)
+    options = {pdb_option: 'besthit', database_option: provider, 'database_search': 'local'}
+    with pytest.raises(ValueError, match='requires --' + db_flag):
+        param.get_global_parameters(_args(**options))
+    config = param.get_global_parameters(_args(**options, **{db_flag: 'database prefix'}))
+    assert config[db_flag] == str(tmp_path / 'database prefix')
+
+
 def test_get_global_parameters_validates_site_database_and_pymol_ranges():
     g = param.get_global_parameters(
         _args(

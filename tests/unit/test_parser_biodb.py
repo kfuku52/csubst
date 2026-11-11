@@ -272,6 +272,54 @@ def test_pdb_sequence_search_pdb_request_uses_timeout_and_raise_for_status(monke
     assert state["raise_called"] is True
 
 
+@pytest.mark.parametrize('pdb_hits,blast_hits,expected', [
+    ([], [], (None, None, ['mmseqs', 'blastp'])),
+    ([], ['P69905'], ('alphafold', '/cache/model.pdb', ['mmseqs', 'blastp'])),
+    (['4hhh', '4hhb'], [], ('pdb', '4hhb', ['mmseqs', '4hhh', '4hhb'])),
+])
+def test_local_pdb_search_keeps_provider_order_and_reuses_blast_hits(monkeypatch, pdb_hits, blast_hits, expected):
+    parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('(A:1,B:1)R;', format=1))
+    tip = next(node for node in tr.traverse() if node.name == 'A')
+    monkeypatch.setattr(parser_biodb.sequence, 'translate_state', lambda **_kwargs: 'ACDEFGHIK')
+    calls = []
+
+    def local_mmseqs(*args):
+        calls.append('mmseqs')
+        return pdb_hits
+
+    def local_blast(*args):
+        calls.append('blastp')
+        return blast_hits
+
+    def initialize(pdb_id, g):
+        calls.append(pdb_id)
+
+    def get_model(source, structure_id, **_kwargs):
+        assert source == 'alphafold' and structure_id == 'P69905'
+        return '/cache/model.pdb'
+
+    def unexpected_search(*args, **kwargs):
+        calls.append('remote search')
+        raise AssertionError('Unexpected sequence submission')
+
+    monkeypatch.setattr(parser_biodb.local_sequence_search, 'mmseqs_pdb_ids', local_mmseqs)
+    monkeypatch.setattr(parser_biodb.local_sequence_search, 'blastp_accessions', local_blast)
+    monkeypatch.setattr(parser_biodb.parser_pymol, 'initialize_pymol', initialize)
+    monkeypatch.setattr(parser_biodb.parser_pymol, 'get_num_chain', lambda: 21 if calls[-1] == '4hhh' else 2)
+    monkeypatch.setattr(parser_biodb, 'get_swissmodel_download_info', lambda **_kwargs: (None, None))
+    monkeypatch.setattr(parser_biodb.structure_resources, 'ensure_remote_structure', get_model)
+    monkeypatch.setattr(parser_biodb.requests.Session, 'request', unexpected_search)
+
+    out = parser_biodb.pdb_sequence_search({
+        'branch_ids': [int(ete.get_prop(tip, 'numerical_label'))], 'tree': tr,
+        'database': 'pdb,swissmodel,alphafold', 'database_search': 'local',
+        'mmseqs_db': '/db/pdb', 'blastp_db': '/db/swissprot',
+        'database_evalue_cutoff': 1.0, 'database_minimum_identity': 0.25, 'pymol_max_num_chain': 20,
+    })
+    assert (out.get('selected_database'), out['pdb'], calls) == expected
+
+
 def test_pdb_sequence_search_uses_full_input_alignment_query_after_internal_filtering(monkeypatch, tmp_path):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))

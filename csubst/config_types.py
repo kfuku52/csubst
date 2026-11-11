@@ -23,6 +23,9 @@ class InputConfig(TypedDict, total=False):
     genetic_code: int
     epistasis_context_file: str
     epistasis_context_source: str
+    database_search: str
+    blastp_db: str | None
+    mmseqs_db: str | None
     resource: str
     resource_cache_dir: str
     resource_lock_poll: float

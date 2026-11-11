@@ -2300,6 +2300,11 @@ def main_sites(g):
     OS_tensor = substitution.get_substitution_tensor(state_tensor=g['state_cdn'], mode='syn', g=g, mmap_attr='S')
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
     g = _maybe_relocate_site_log_file(g)
+    local_searches = None
+    if g['run_pdb_sequence_search'] and g.get('database_search') == 'local' and len(g['site_jobs']) > 1:
+        from csubst.local_sequence_search import LocalSearchCache
+
+        local_searches = LocalSearchCache()
     for site_job in g['site_jobs']:
         branch_ids = _normalize_branch_ids(site_job['branch_ids'])
         g['single_branch_mode'] = site_job['single_branch_mode']
@@ -2367,7 +2372,7 @@ def main_sites(g):
             export2chimera(df, g)
         if g['run_pdb_sequence_search']:
             from csubst import parser_biodb
-            g = parser_biodb.pdb_sequence_search(g)
+            g = parser_biodb.pdb_sequence_search(g, local_searches=local_searches)
         if (g['pdb'] is not None):
             id_base = os.path.basename(g['pdb'])
             id_base = re.sub('.pdb$', '', id_base)

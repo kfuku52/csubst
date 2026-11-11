@@ -8,6 +8,8 @@ import time
 import urllib
 
 from csubst import sequence
+from csubst import local_search_config
+from csubst import local_sequence_search
 from csubst import ncbi_blast
 from csubst import parser_pymol
 from csubst import resource_cache
@@ -167,7 +169,49 @@ def get_swissmodel_download_info(top_hit_id, timeout=30):
     return download_url, download_info
 
 
-def pdb_sequence_search(g):
+def _remote_pdb_hit_ids(aa_query, g, network_timeout):
+    endpoint_url = 'https://search.rcsb.org/rcsbsearch/v2/query'
+    params = {
+        'evalue_cutoff': g['database_evalue_cutoff'],
+        'identity_cutoff': g['database_minimum_identity'],
+        'sequence_type': 'protein',
+        'value': aa_query,
+    }
+    query = {
+        'query': {'type': 'terminal', 'service': 'sequence', 'parameters': params},
+        'request_options': {'scoring_strategy': 'sequence'},
+        'return_type': 'polymer_entity',
+    }
+    start = time.time()
+    response = requests.post(
+        url=endpoint_url, data=json.dumps(query), headers={'Content-Type': 'application/json'},
+        timeout=network_timeout,
+    )
+    response.raise_for_status()
+    print('Time elapsed for MMseqs2 search: {:,} sec'.format(int(time.time() - start)))
+    hits = response.json()['result_set']
+    print('Top hits (up to 10 displayed)')
+    for hit in hits[:10]:
+        print('PDB identifier: {}  RCSB PDB Search Score: {}'.format(hit['identifier'], hit['score']))
+    return [hit['identifier'].rsplit('_', 1)[0] for hit in hits]
+
+
+def _select_pdb_hit(pdb_ids, g):
+    for pdb_id in pdb_ids:
+        parser_pymol.initialize_pymol(pdb_id=pdb_id, g=g)
+        num_chain = parser_pymol.get_num_chain()
+        if num_chain <= g['pymol_max_num_chain']:
+            print('MMseqs2 search against PDB: Best hit entry = {}'.format(pdb_id))
+            return pdb_id
+        print(f'Number of chains in {pdb_id} ({num_chain}) is larger than the maximum of '
+              f'{g["pymol_max_num_chain"]} (--pymol_max_num_chain). Unsuitable.', flush=True)
+    print('No suitable hit found in the PDB database.')
+    return None
+
+
+def pdb_sequence_search(g, *, local_searches=None):
+    if local_searches is None:
+        local_searches = local_sequence_search
     print('')
     branch_ids = _normalize_branch_ids(g.get('branch_ids', []))
     if len(branch_ids) == 0:
@@ -192,9 +236,10 @@ def pdb_sequence_search(g):
         raise ValueError('Representative amino acid query was empty.')
     g['structure_search_query_length_aa'] = int(len(aa_query))
     pdb_id = None
-    top_hit_ids = []
+    top_hit_ids = None
+    local_search = g.get('database_search', 'remote') == 'local'
     database_names = [db.strip().lower() for db in g['database'].split(',') if db.strip()]
-    allowed_database_names = {'pdb', 'swissmodel', 'alphafill', 'alphafold'}
+    allowed_database_names = local_search_config.UNIPROT_DATABASES | {'pdb'}
     if len(database_names) == 0:
         raise ValueError('No database was specified. Use --database with one or more of swissmodel,pdb,alphafold,alphafill.')
     unknown_database_names = [db for db in database_names if db not in allowed_database_names]
@@ -207,60 +252,29 @@ def pdb_sequence_search(g):
             break
         print('Starting the sequence similarity search against protein structure database: {}'.format(database_name))
         if (database_name=='pdb'):
-            print('MMseqs2 search against PDB: Query = {}'.format(representative_leaf.name))
-            print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
-            try:
-                endpoint_url = 'https://search.rcsb.org/rcsbsearch/v2/query'
-                headers = {'Content-Type':'application/json'}
-                param_dict = { # https://search.rcsb.org/index.html#building-search-request
-                    'evalue_cutoff':g['database_evalue_cutoff'],
-                    'identity_cutoff':g['database_minimum_identity'],
-                    'sequence_type':'protein',
-                    'value':aa_query,
-                }
-                query_dict = {
-                    'query':{'type':'terminal', 'service':'sequence', 'parameters':param_dict,},
-                    'request_options':{'scoring_strategy':'sequence',},
-                    'return_type':'polymer_entity',
-                }
-                query_json = json.dumps(query_dict)
-                start = time.time()
-                response = requests.post(
-                    url=endpoint_url,
-                    data=query_json,
-                    headers=headers,
-                    timeout=network_timeout,
+            if local_search:
+                pdb_hit_ids = local_searches.mmseqs_pdb_ids(
+                    aa_query, g['mmseqs_db'], g['database_evalue_cutoff'],
+                    g['database_minimum_identity'], g.get('threads', 1),
                 )
-                response.raise_for_status()
-                print('Time elapsed for MMseqs2 search: {:,} sec'.format(int(time.time() - start)))
-                mmseqs2_out = response.json()
-                print('Top hits (up to 10 displayed)')
-                best_hit = None
-                for hit in mmseqs2_out['result_set']:
-                    txt = 'PDB identifier: {}  RCSB PDB Search Score: {}'
-                    print(txt.format(hit['identifier'], hit['score']))
-                for hit in mmseqs2_out['result_set']:
-                    if best_hit is None:
-                        hit_pdb_id = re.sub('_.*', '', hit['identifier'])
-                        parser_pymol.initialize_pymol(pdb_id=hit_pdb_id, g=g)
-                        num_chain = parser_pymol.get_num_chain()
-                        if num_chain <= g['pymol_max_num_chain']:
-                            best_hit = hit
-                        else:
-                            print(f'Number of chains in {hit_pdb_id} ({num_chain}) is larger than the maximum number of chains allowed (--pymol_max_num_chain {g["pymol_max_num_chain"]}). Unsuitable.', flush=True)
-                if best_hit is None:
-                    print('No suitable hit found in the PDB database.')
-                    pdb_id = None
-                else:
-                    print('MMseqs2 search against PDB: Best hit identifier = {}'.format(best_hit['identifier']))
-                    pdb_id = re.sub('_.*', '', best_hit['identifier'])
+            try:
+                if not local_search:
+                    print('MMseqs2 search against PDB: Query = {}'.format(representative_leaf.name))
+                    print('MMseqs2 search against PDB: Query sequence = {}'.format(aa_query))
+                    pdb_hit_ids = _remote_pdb_hit_ids(aa_query, g, network_timeout)
+                pdb_id = _select_pdb_hit(pdb_hit_ids, g)
+                if pdb_id is not None:
                     g['selected_database'] = 'pdb'
             except Exception as e:
                 print(e)
                 print('MMseqs2 search against PDB was unsuccessful.')
                 pdb_id = None
-        elif database_name in ['swissmodel', 'alphafill', 'alphafold']:
-            if len(top_hit_ids)==0:
+        elif database_name in local_search_config.UNIPROT_DATABASES:
+            if local_search and top_hit_ids is None:
+                top_hit_ids = local_searches.blastp_accessions(
+                    aa_query, g['blastp_db'], g['database_evalue_cutoff'], g.get('threads', 1),
+                )
+            elif not local_search and not top_hit_ids:
                 try:
                     top_hit_ids = run_qblast(
                         aa_query,
@@ -272,8 +286,9 @@ def pdb_sequence_search(g):
                     print(e)
                     print('QBLAST search was unsuccessful.')
                     top_hit_ids = []
-            if len(top_hit_ids)==0:
-                print('No QBLAST hit with the E-value threshold of {}.'.format(g['database_evalue_cutoff']))
+            if not top_hit_ids:
+                backend = 'local BLAST+' if local_search else 'QBLAST'
+                print('No {} hit with the E-value threshold of {}.'.format(backend, g['database_evalue_cutoff']))
                 pdb_id = None
             else:
                 for i in range(len(top_hit_ids)):

@@ -4,10 +4,13 @@ import csv
 import json
 import os
 from pathlib import Path
+import urllib.request
 
 import pytest
+import requests
 
 from cli_runner import run_csubst
+from pymol_fakes import import_parser_pymol_with_fake_pymol
 
 
 @pytest.fixture
@@ -50,6 +53,89 @@ def doctor_inputs(tmp_path):
     tree.write_text('(A:0.1,B:0.1);')
     return ['doctor', '--alignment_file', str(alignment), '--rooted_tree_file', str(tree),
             '--outdir', str(tmp_path), '--check_iqtree_exe', 'no']
+
+
+@pytest.mark.parametrize('command,program', [('sites', 'mmseqs'), ('search', 'blastp')])
+def test_local_besthit_failure_never_submits_query(command, program, tiny_fit, tmp_path, monkeypatch):
+    from csubst import cli
+
+    import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta='')
+    network_attempts = []
+
+    def reject_network(*args, **kwargs):
+        network_attempts.append((args, kwargs))
+        raise AssertionError('Unexpected network request during local search')
+
+    monkeypatch.setattr(requests.Session, 'request', reject_network)
+    monkeypatch.setattr(urllib.request, 'urlopen', reject_network)
+
+    # Simulate a tool that echoes its input on failure.
+    backend = tmp_path / program
+    query_source = '"$2"' if program == 'mmseqs' else ''
+    backend.write_text('#!/bin/sh\ncat {} > "$TEST_QUERY"\ncat "$TEST_QUERY" >&2\nexit 17\n'.format(query_source))
+    backend.chmod(0o700)
+    recorded_query = tmp_path / 'query.received'
+    monkeypatch.setenv('TEST_QUERY', str(recorded_query))
+    monkeypatch.setenv('PATH', str(tmp_path) + os.pathsep + os.environ['PATH'])
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'pdb.dbtype').touch()
+    inputs, branch_ids = tiny_fit
+    if command == 'sites':
+        besthit_args = ['--pdb', 'besthit', '--branch_id', branch_ids, '--database', 'pdb,alphafold']
+    else:
+        besthit_args = [
+            '--epistasis_pdb', 'besthit', '--epistasis_database', 'alphafold,pdb',
+            '--expectation_method', 'urn', '--asrv', 'sn', '--epistasis_beta', '0.5',
+            '--epistasis_context_file', 'context.tsv', '--epistasis_context_source', 'test fixture',
+        ]
+    log = tmp_path / 'command.log'
+    with pytest.raises(SystemExit) as exc:
+        cli.main([command, *inputs, *besthit_args, '--outdir', str(tmp_path / 'out'), '--log_file', str(log),
+                  '--database_search', 'local', '--mmseqs_db', 'pdb', '--blastp_db', 'swissprot'])
+    assert exc.value.code == 2
+    assert recorded_query.read_text() in {'>query\nDK\n', '>query\nAK\n'}
+    assert network_attempts == []
+    logged = log.read_text()
+    assert 'Local {} failed (exit status 17)'.format(program) in logged
+    assert '>query' not in logged
+
+
+def test_sites_reuses_local_searches_for_identical_queries_only_within_a_run(tiny_fit, tmp_path, monkeypatch):
+    from csubst import cli, ete, local_sequence_search, tree
+
+    import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta='')
+    inputs, _ = tiny_fit
+    phylogeny = tree.add_numerical_node_labels(ete.PhyloNode(Path(inputs[3]).read_text().strip(), format=1))
+    ids = {node.name: ete.get_prop(node, 'numerical_label') for node in phylogeny.traverse() if ete.is_leaf(node)}
+    combinations = tmp_path / 'branch_pairs.tsv'
+    combinations.write_text('branch_id_1\tbranch_id_2\tis_fg\n' + ''.join(
+        '{}\t{}\tyes\n'.format(ids[first], ids[second]) for first, second in ('AC', 'BC', 'CD')
+    ))
+    calls = []
+
+    def run_mmseqs(sequence, *_):
+        calls.append(('mmseqs', sequence))
+        return []
+
+    def run_blastp(sequence, *_):
+        calls.append(('blastp', sequence))
+        return []
+
+    monkeypatch.setattr(local_sequence_search, 'mmseqs_pdb_ids', run_mmseqs)
+    monkeypatch.setattr(local_sequence_search, 'blastp_accessions', run_blastp)
+    monkeypatch.chdir(tmp_path)
+    args = [
+        'sites', *inputs, '--branch_id', 'fg', '--cb_file', str(combinations), '--pdb', 'besthit',
+        '--database_search', 'local', '--database', 'pdb,alphafold', '--mmseqs_db', 'pdb', '--blastp_db', 'swissprot',
+        '--site_summary_plot', 'no', '--site_state_plot', 'no', '--tree_site_plot', 'no',
+    ]
+    expected_calls = [('mmseqs', 'DK'), ('blastp', 'DK'), ('mmseqs', 'AK'), ('blastp', 'AK')]
+    for run in range(2):
+        outdir = tmp_path / f'out-{run}'
+        cli.main([*args, '--outdir', str(outdir)])
+        assert len(list(outdir.glob('csubst.branch_id*/csubst.tsv'))) == 3
+        assert calls == expected_calls
+        calls.clear()
 
 
 @pytest.mark.parametrize('alias', ['same', 'symlink', 'hardlink'])

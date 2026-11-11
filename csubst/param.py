@@ -805,6 +805,18 @@ def _normalize_variant_effect_parameters(g: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_structure_parameters(g: dict[str, Any]) -> dict[str, Any]:
+    if g.get('database_search', 'remote') == 'local':
+        if g.get('run_pdb_sequence_search'):
+            databases = g['database']
+        elif g.get('epistasis_pdb', '').lower() == 'besthit':
+            databases = g['epistasis_database']
+        else:
+            raise ValueError('--database_search local requires --pdb besthit or --epistasis_pdb besthit.')
+        from csubst import local_search_config
+
+        local_search_config.normalize_paths(g, databases)
+    elif g.get('blastp_db') or g.get('mmseqs_db'):
+        raise ValueError('--blastp_db and --mmseqs_db require --database_search local.')
     if 'database_timeout' in g.keys():
         g['database_timeout'] = _require_finite_float(
             value=float(g['database_timeout']),
