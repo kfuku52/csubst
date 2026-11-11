@@ -55,11 +55,43 @@ def _integrals(values, length):
     return length * np.exp(np.maximum(x, y)) * ratio
 
 
+@lru_cache(maxsize=6)
+def _quadrature_nodes(order):
+    nodes, weights = np.polynomial.legendre.leggauss(order)
+    return (nodes + 1) * .5, weights * .5
+
+
+def _bridge_integral_kernel(values, length):
+    """Compress the divided-difference matrix with checked quadrature factors."""
+    integrals = _integrals(values, length)
+    if len(values) < 16 or integrals.min() <= 0:
+        return integrals
+    scaled = (values * length)[:, None]
+    for order in (2, 4, 6, 8, 12, 16):
+        if order * 3 >= len(values):
+            break
+        nodes, weights = _quadrature_nodes(order)
+        scale = np.sqrt(length * weights)
+        # Each quadrature node contributes a separable exponential product.
+        left = np.exp(scaled * nodes) * scale
+        right = np.exp(scaled * (1 - nodes)) * scale
+        if np.all(np.abs(left @ right.T - integrals) <= 8e-15 * integrals):
+            return left, right
+    return integrals
+
+
 def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
     if (denom <= 0).any():
         raise ValueError("Impossible edge evidence under fitted CTMC.")
-    coefficients = (a @ v)[:, :, None] * (b @ w.T)[:, None, :] * integrals
-    mass = (w.T @ coefficients) @ v.T
+    left_message, right_message = a @ v, b @ w.T
+    if isinstance(integrals, tuple):
+        left, right = integrals
+        x = w.T @ (left_message[:, :, None] * left)
+        y = v @ (right_message[:, :, None] * right)
+        mass = x @ y.swapaxes(1, 2)
+    else:
+        coefficients = left_message[:, :, None] * right_message[:, None, :] * integrals
+        mass = (w.T @ coefficients) @ v.T
     mass *= q
     mass[:, diagonal, diagonal] = 0
     # Ill-conditioned evidence needs a stable direct Frechet derivative.
@@ -79,7 +111,7 @@ def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
 
     @lru_cache(maxsize=max(1, (32 * 1024**2) // q.nbytes))
     def integral_at(length):
-        return _integrals(values, length)
+        return _bridge_integral_kernel(values, length)
 
     def transform(left, right, transition, length, category_weight):
         active = category_weight > 0
@@ -245,7 +277,7 @@ def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_b
                 for i, node in zip(order, nodes)}
     lengths = {i: float(node.dist) for i, node in zip(order[1:], nodes[1:])}
     values, v, w = _bridge_spectral(q, pi)
-    kernels = {length: (expm(q * length), _integrals(values, length))
+    kernels = {length: (expm(q * length), _bridge_integral_kernel(values, length))
                for length in dict.fromkeys(lengths.values())}
     n, sites, states = tip_states.shape
     groups = np.asarray(groups, int)

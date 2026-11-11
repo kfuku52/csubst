@@ -57,6 +57,9 @@ for reversible Q; ill-conditioned boundary likelihoods use a direct adjoint
 Frechet derivative. For a discrete rate mixture, the calculation uses time
 `t × rate` separately in each category, then averages jump counts using
 P(category | all tips). A zero-rate category contributes zero jumps.
+Gauss–Legendre quadrature can factor the spectral integral into smaller
+matrix products. The implementation checks each reconstructed entry against
+the divided difference before using the factors. [NIST DLMF](https://dlmf.nist.gov/3.5#v)
 Pruning and jump calculations process bounded site blocks.
 When the grouped event tensor exceeds 64 MiB, bridge writes it to the same
 site-major temporary storage as joint inference. The scan reads back

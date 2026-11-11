@@ -234,6 +234,25 @@ def test_parametric_simulation_never_draws_an_impossible_state_at_cdf_boundary()
     np.testing.assert_array_equal(simulated[[ids['A'], ids['B'], ids['C']], :, 1], 1.)
 
 
+def test_quadrature_bridge_contraction_matches_direct_frechet():
+    rng = np.random.default_rng(837)
+    k = 61
+    pi = rng.dirichlet(np.ones(k) * 3)
+    rates = rng.random((k, k))
+    q = (rates + rates.T) * pi
+    np.fill_diagonal(q, 0.)
+    np.fill_diagonal(q, -q.sum(axis=1))
+    t = .7
+    values, v, w = scan_ctmc._bridge_spectral(q, pi)
+    kernel = scan_ctmc._bridge_integral_kernel(values, t)
+    assert isinstance(kernel, tuple)
+    a, b = (rng.dirichlet(np.ones(k), size=3) for _ in range(2))
+    evidence = ((a @ expm(q * t)) * b).sum(axis=1)
+    actual = scan_ctmc._conditioned_bridge_mass(q, t, a, b, evidence, v, w, kernel, np.arange(k))
+    expected = scan_ctmc.bridge_kernel(q, t, a, b) / evidence[:, None, None]
+    np.testing.assert_allclose(actual, expected, atol=2e-15, rtol=1e-12)
+
+
 def test_asymmetric_bridge_spectral_matches_frechet(monkeypatch):
     tr, ids, states, _ = fixture(1.2, 3)
     q = np.array([[-.25, .25], [1., -1.]])
