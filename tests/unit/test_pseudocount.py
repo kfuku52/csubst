@@ -66,6 +66,16 @@ def test_estimate_alpha_empirical_bayes_returns_positive_finite_alpha():
     assert np.isfinite(diag["fit_loglikelihood"])
 
 
+def test_alpha_fit_loglikelihood_with_repeated_counts_and_distinct_expectations():
+    from scipy.stats import nbinom
+
+    observed = np.tile([0, 1, 3, 5], 12)
+    expected = np.linspace(.1, 6., len(observed))
+    alpha, diagnostics = pseudocount.estimate_alpha_empirical_bayes([observed], [expected])
+    reference = nbinom.logpmf(observed, alpha, alpha / (alpha + expected)).sum()
+    assert diagnostics["fit_loglikelihood"] == pytest.approx(reference, abs=1e-12, rel=0.)
+
+
 def test_empirical_stat_alphas_respect_overlap_identities_when_stats_are_added():
     masses = {
         "any2any": 100.0,

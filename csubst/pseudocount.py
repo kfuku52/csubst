@@ -190,23 +190,6 @@ def _flatten_valid_pairs(obs, exp):
     return obs[is_valid], exp[is_valid]
 
 
-def _gamma_poisson_log_marginal(alpha, obs, exp, eps):
-    alpha = float(alpha)
-    if (not np.isfinite(alpha)) or (alpha <= 0):
-        return -np.inf
-    obs = np.asarray(obs, dtype=np.float64)
-    exp = np.asarray(exp, dtype=np.float64)
-    exp_safe = np.maximum(exp, float(eps))
-    with np.errstate(divide="ignore", invalid="ignore"):
-        ll = _gammaln(obs + alpha) - _gammaln(alpha) - _gammaln(obs + 1.0)
-        ll += alpha * (np.log(alpha) - np.log(alpha + exp_safe))
-        ll += obs * (np.log(exp_safe) - np.log(alpha + exp_safe))
-    ll_sum = float(np.nansum(ll, dtype=np.float64))
-    if not np.isfinite(ll_sum):
-        return -np.inf
-    return ll_sum
-
-
 def estimate_alpha_empirical_bayes(obs_list, exp_list, float_tol=1e-12, alpha_grid=None, max_samples=200000):
     if alpha_grid is None:
         alpha_grid = np.logspace(-4, 2, 121, dtype=np.float64)
@@ -243,10 +226,31 @@ def estimate_alpha_empirical_bayes(obs_list, exp_list, float_tol=1e-12, alpha_gr
         exp_all = exp_all[idx]
 
     eps = max(float(float_tol), np.finfo(np.float64).tiny)
-    ll = np.array(
-        [_gamma_poisson_log_marginal(alpha=a, obs=obs_all, exp=exp_all, eps=eps) for a in alpha_grid],
-        dtype=np.float64,
-    )
+    exp_safe = np.maximum(exp_all, eps)
+    log_exp = np.log(exp_safe)
+    log_factorial = _gammaln(obs_all + 1.)
+    # The gamma term depends on the count and alpha alone. Integer null draws
+    # repeat counts across rows even when their expected rates differ.
+    distinct_obs, inverse = np.unique(obs_all, return_inverse=True)
+    if 2 * distinct_obs.size >= obs_all.size:
+        distinct_obs, inverse = obs_all, None
+
+    def log_marginal(value):
+        alpha = float(value)
+        if not math.isfinite(alpha) or alpha <= 0:
+            return -np.inf
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log_gamma = _gammaln(distinct_obs + alpha)
+            if inverse is not None:
+                log_gamma = log_gamma[inverse]
+            ll = log_gamma - _gammaln(alpha) - log_factorial
+            log_total = np.log(alpha + exp_safe)
+            ll += alpha * (np.log(alpha) - log_total)
+            ll += obs_all * (log_exp - log_total)
+        ll_sum = float(np.nansum(ll, dtype=np.float64))
+        return ll_sum if np.isfinite(ll_sum) else -np.inf
+
+    ll = np.array([log_marginal(a) for a in alpha_grid], dtype=np.float64)
     best_idx = int(np.nanargmax(ll))
     best_alpha = float(alpha_grid[best_idx])
     best_ll = float(ll[best_idx])
@@ -256,10 +260,7 @@ def estimate_alpha_empirical_bayes(obs_list, exp_list, float_tol=1e-12, alpha_gr
         right = alpha_grid[min(best_idx + 1, alpha_grid.shape[0] - 1)]
         if (right > left) and np.isfinite(left) and np.isfinite(right):
             refine = np.logspace(np.log10(left), np.log10(right), 81, dtype=np.float64)
-            ll_refine = np.array(
-                [_gamma_poisson_log_marginal(alpha=a, obs=obs_all, exp=exp_all, eps=eps) for a in refine],
-                dtype=np.float64,
-            )
+            ll_refine = np.array([log_marginal(a) for a in refine], dtype=np.float64)
             ref_idx = int(np.nanargmax(ll_refine))
             if ll_refine[ref_idx] >= best_ll:
                 best_alpha = float(refine[ref_idx])
