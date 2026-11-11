@@ -100,6 +100,14 @@ it does not establish biological calibration of the urn null.
 For an external reference, [BiasedUrn's manual](https://cran.r-universe.dev/BiasedUrn/doc/manual.html)
 also distinguishes approximate multivariate means from full enumeration.
 
+## Fisher subset weights
+
+Fisher urn expectations and sampling use the same recurrence for sums of
+fixed-size subset weights. These sums are accumulated in log space, including
+when dividing a positive site weight by the largest weight would round it to
+zero. The recurrence applies to samples weighted by the product of the selected
+site weights. [Chen, Dempster and Liu (1994)](https://doi.org/10.1093/biomet/81.3.457)
+
 ## Meaning of Poisson and negative-binomial nulls
 
 `poisson` obtains a mean from the selected urn overlap model and shared

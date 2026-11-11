@@ -9,7 +9,6 @@ import pandas as pd
 from scipy.linalg import expm
 
 import itertools
-import math
 import re
 import sys
 import time
@@ -377,37 +376,22 @@ def _weighted_sample_without_replacement_packed(
         return packed
     sampling_model = str(sampling_model).strip().lower()
     if sampling_model == 'fisher':
-        weights = p[positive_sites].astype(np.float64, copy=False)
-        weights = weights / weights.max()
-        num_positive = int(weights.shape[0])
-        log_dp = np.full((num_positive + 1, size + 1), -np.inf, dtype=np.float64)
-        log_dp[num_positive, 0] = 0.0
-        for item_index in range(num_positive - 1, -1, -1):
-            log_dp[item_index, 0] = 0.0
-            max_pick = min(size, num_positive - item_index)
-            log_weight = math.log(float(weights[item_index]))
-            for pick in range(1, max_pick + 1):
-                log_dp[item_index, pick] = np.logaddexp(
-                    log_dp[item_index + 1, pick],
-                    log_weight + log_dp[item_index + 1, pick - 1],
-                )
+        log_weights = urn_expectation.fisher_log_weights(p[positive_sites])
+        log_dp = urn_expectation.fisher_suffix(log_weights, size)
         selected = np.zeros((niter, size), dtype=np.int64)
         remaining = np.full(niter, size, dtype=np.int64)
         write_index = np.zeros(niter, dtype=np.int64)
-        for item_index in range(num_positive):
+        for item_index, log_weight in enumerate(log_weights):
             active = np.flatnonzero(remaining > 0)
             if active.shape[0] == 0:
                 break
-            items_left = num_positive - item_index
+            items_left = num_positive_sites - item_index
             forced = remaining[active] >= items_left
             probability = np.ones(active.shape[0], dtype=np.float64)
             optional = ~forced
             if optional.any():
                 r = remaining[active[optional]]
-                log_numerator = (
-                    math.log(float(weights[item_index]))
-                    + log_dp[item_index + 1, r - 1]
-                )
+                log_numerator = log_weight + log_dp[item_index + 1, r - 1]
                 log_denominator = log_dp[item_index, r]
                 probability[optional] = np.exp(log_numerator - log_denominator)
             choose = forced | (rng.random(active.shape[0]) < probability)
@@ -897,27 +881,12 @@ def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.
     if draw_size >= num_positive:
         out[positive_mask] = 1.0
         return out.astype(float_type, copy=False)
-    weights = positive_weights / positive_weights.max()
-    log_weights = np.log(weights)
-    prefix = np.full((num_positive + 1, draw_size + 1), -np.inf, dtype=np.float64)
-    suffix = np.full((num_positive + 1, draw_size + 1), -np.inf, dtype=np.float64)
-    prefix[0, 0] = 0.0
-    suffix[num_positive, 0] = 0.0
-    for index in range(num_positive):
-        prefix[index + 1, :] = prefix[index, :]
-        prefix[index + 1, 1:] = np.logaddexp(
-            prefix[index + 1, 1:],
-            log_weights[index] + prefix[index, :-1],
-        )
-    for index in range(num_positive - 1, -1, -1):
-        suffix[index, :] = suffix[index + 1, :]
-        suffix[index, 1:] = np.logaddexp(
-            suffix[index, 1:],
-            log_weights[index] + suffix[index + 1, :-1],
-        )
+    log_weights = urn_expectation.fisher_log_weights(positive_weights)
+    prefix = urn_expectation.fisher_suffix(log_weights[::-1], draw_size)[::-1]
     log_denominator = prefix[num_positive, draw_size]
     if not np.isfinite(log_denominator):
         raise ValueError('Unable to normalize Fisher weighted-urn probabilities.')
+    suffix = urn_expectation.fisher_suffix(log_weights, draw_size)
     # Sites are independent in this contraction. Keep each site's original
     # left-pick addition order while avoiding Python's site-by-draw loop.
     inclusion = np.full(num_positive, -np.inf, dtype=np.float64)

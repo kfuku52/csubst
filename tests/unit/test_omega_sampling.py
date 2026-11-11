@@ -8,7 +8,7 @@ from csubst import omega
 
 
 @pytest.mark.parametrize('weights', [[0., 1., 2., 4.], [1., 1., 1., 1.],
-                                    [1e-100, .1, 1., 1e100]])
+                                    [1e-100, .1, 1., 1e100], [1e300, 2e-300, 1e-300]])
 @pytest.mark.parametrize('dtype', [np.float32, np.float64])
 def test_fisher_inclusion_matches_independent_weighted_subsets(weights, dtype):
     values = np.array(weights)
@@ -230,6 +230,19 @@ def test_calc_fisher_inclusion_probabilities_returns_valid_probabilities():
         sampling_model="fisher",
     )
     np.testing.assert_allclose(masks.mean(axis=0), fisher, atol=0.025)
+
+
+def test_fisher_samples_positive_weights_below_the_normalized_float_range():
+    masks = omega._weighted_sample_without_replacement_masks(
+        p=np.array([1e300, 2e-300, 0., 1e-300]),
+        size=2,
+        niter=12000,
+        rng=np.random.default_rng(80),
+        sampling_model='fisher',
+    )
+    assert masks[:, 0].all() and not masks[:, 2].any()
+    np.testing.assert_array_equal(masks.sum(axis=1), 2)
+    np.testing.assert_allclose(masks.mean(axis=0), [1., 2/3, 0., 1/3], atol=.02)
 
 
 def test_calc_urn_expected_overlap_factorized_approx_matches_legacy_tmp_E_sum():

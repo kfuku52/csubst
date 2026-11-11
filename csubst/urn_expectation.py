@@ -1,9 +1,32 @@
-"""Computation policy for Wallenius site inclusion probabilities."""
+"""Numerical helpers for weighted-urn probabilities."""
 
 import numpy as np
 
 
 ENUMERATION_MAX_SITES = 20
+
+
+def fisher_log_weights(positive_weights):
+    """Normalize positive weights in log space when their ratios are subnormal."""
+    largest = positive_weights.max()
+    ratios = positive_weights / largest
+    normal = ratios >= np.finfo(np.float64).tiny
+    np.log(ratios, out=ratios, where=normal)
+    ratios[~normal] = np.log(positive_weights[~normal]) - np.log(largest)
+    return ratios
+
+
+def fisher_suffix(log_weights, size):
+    """Log subset weights for each suffix and draw size."""
+    num_positive = len(log_weights)
+    suffix = np.full((num_positive + 1, size + 1), -np.inf, dtype=np.float64)
+    suffix[:, 0] = 0.
+    for index in range(num_positive - 1, -1, -1):
+        last = min(size, num_positive - index)
+        next_row = suffix[index + 1]
+        np.logaddexp(next_row[1:last + 1], log_weights[index] + next_row[:last],
+                     out=suffix[index, 1:last + 1])
+    return suffix
 
 
 def wallenius_method(positive_weights, draw_size):
