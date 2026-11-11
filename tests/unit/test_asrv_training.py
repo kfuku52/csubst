@@ -61,6 +61,32 @@ def test_concentration_is_total_mass_on_each_evaluation_mask():
     np.testing.assert_allclose(p[1], [.625, .125, .125, .125])
 
 
+@pytest.mark.parametrize('scale', [1e308, 4e-310])
+def test_file_weights_are_normalized_when_raw_total_or_reciprocal_overflows(scale):
+    g, raw, _ = context(mode='file', training='all', concentration=None)
+    g['iqtree_rate_values'] = np.ones(raw.shape[1])
+    prepare(g, raw)
+    g['is_site_nonmissing'][0] = [0, 1, 0, 0]
+    g['_asrv_nonmissing_site_indices'] = None
+    weights = np.array([scale, scale, 0., scale / 2])
+    probabilities = substitution._normalize_site_weights_by_branch(weights, g, dirichlet_alpha=0.)
+    np.testing.assert_array_equal(probabilities[0], [0., 1., 0., 0.])
+    np.testing.assert_allclose(probabilities[1], [.4, .4, 0., .2], atol=1e-14, rtol=0.)
+
+
+@pytest.mark.parametrize('scale', [1e308, np.nextafter(0., 1.)])
+def test_extreme_total_concentration_retains_its_prior_mass(scale):
+    g, raw, _ = context(concentration=scale)
+    prepare(g, raw)
+    weights = np.array([scale, 0., 0., 0.])
+    probabilities = substitution._normalize_site_weights_by_branch(weights, g)
+    np.testing.assert_allclose(probabilities, np.tile([.625, .125, .125, .125], (len(raw), 1)))
+    asrv.record_weight_diagnostics(g, 'scaled', weights, probabilities, alpha=1.)
+    diagnostics = g['_asrv_diagnostics']['scaled']
+    assert diagnostics['prior_fraction_min'] == .5
+    assert diagnostics['prior_fraction_max'] == .5
+
+
 def test_diagnostics_zero_mass_and_missing_masks_are_explicit(tmp_path):
     g, raw, _ = context()
     prepare(g, raw * 0)

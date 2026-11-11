@@ -7,7 +7,7 @@ import re
 import time
 from collections import OrderedDict, defaultdict
 
-from csubst import table
+from csubst import asrv, table
 from csubst import parallel
 from csubst import runtime
 from csubst._extensions import load_optional_extension, warn_extension_fallback
@@ -2505,7 +2505,7 @@ def _can_use_cython_site_weight_normalization(nonadjusted_sub_sites, is_site_non
     return True
 
 
-def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, g, dirichlet_alpha):
+def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, g, dirichlet_alpha, scaled=False):
     num_branch, num_site = g['is_site_nonmissing'].shape
     out = np.zeros(shape=(num_branch, num_site), dtype=g['float_type'])
     nonadjusted_sub_sites = np.asarray(nonadjusted_sub_sites, dtype=g['float_type']).reshape(-1)
@@ -2519,8 +2519,14 @@ def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, 
         if site_indices.shape[0] == 0:
             continue
         row_weights = nonadjusted_sub_sites[site_indices]
-        total_sub_sites = row_weights.sum(dtype=g['float_type'])
         tau = g.get('asrv_concentration')
+        if scaled:
+            mass, prior_per_site, prior = asrv.scaled_mass_parts(row_weights, dirichlet_alpha, tau)
+            total = mass.sum() + prior
+            if total > 0:
+                out[nl, site_indices] = (mass + prior_per_site) / total
+            continue
+        total_sub_sites = row_weights.sum(dtype=g['float_type'])
         row_alpha = dirichlet_alpha if tau is None else float(tau) / site_indices.shape[0]
         if row_alpha > 0:
             total_sub_sites = total_sub_sites + (row_alpha * site_indices.shape[0])
@@ -2541,9 +2547,24 @@ def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=
     if not np.isfinite(nonadjusted_sub_sites).all() or (nonadjusted_sub_sites < 0).any():
         raise ValueError('Site weights should be finite and non-negative.')
     tau = g.get('asrv_concentration')
-    if tau is not None and (not np.isfinite(float(tau)) or float(tau) < 0):
-        raise ValueError('--asrv_concentration must be finite and nonnegative.')
-    if g['float_type'] == np.float64 and g.get('asrv_concentration') is None:
+    if tau is not None:
+        tau = float(tau)
+        if not np.isfinite(tau) or tau < 0:
+            raise ValueError('--asrv_concentration must be finite and nonnegative.')
+    # Bound the ordinary row sum and the native reciprocal before dispatch.
+    # Extreme masses are scaled on each mask, so missing high-weight sites
+    # cannot erase small nonmissing weights on another branch.
+    limits = np.finfo(g['float_type'])
+    sites = max(1, len(nonadjusted_sub_sites))
+    row_limit = limits.max / (2 * sites)
+    scaled = float(nonadjusted_sub_sites.max(initial=0)) > row_limit
+    if tau is None:
+        scaled = scaled or dirichlet_alpha > row_limit or (0 < dirichlet_alpha < limits.tiny)
+        if dirichlet_alpha == 0:
+            scaled = scaled or ((nonadjusted_sub_sites > 0) & (nonadjusted_sub_sites < limits.tiny)).any()
+    else:
+        scaled = scaled or tau > limits.max / 2 or (0 < tau < limits.tiny * sites)
+    if not scaled and g['float_type'] == np.float64 and tau is None:
         is_site_nonmissing_u8 = _get_asrv_is_site_nonmissing_uint8(g=g)
         nonadjusted_sub_sites64 = nonadjusted_sub_sites.astype(np.float64, copy=False)
         if _can_use_cython_site_weight_normalization(
@@ -2565,6 +2586,7 @@ def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=
         branch_ids=branch_ids,
         g=g,
         dirichlet_alpha=dirichlet_alpha,
+        scaled=scaled,
     )
 
 

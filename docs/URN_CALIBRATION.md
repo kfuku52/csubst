@@ -182,6 +182,8 @@ rate-file source, urn/rounding policy, recoding provenance and null model.
 With `--asrv_report yes`, a serial audit also covers the four base categories
 and reports training mass, empty masks, zero empirical/normalized mass,
 minimum/maximum prior fraction and effective site count `1 / sum(p^2)`.
+Training mass is `null` if the raw total exceeds the representable range.
+The audit still reports finite prior fractions and effective site counts.
 Methods used by Wallenius, including the `poisson_full` means when requested,
 are collected in that audit. Without the detailed audit, worker-local method
 records can be incomplete and are explicitly marked as such. The report

@@ -113,6 +113,21 @@ def training_site_summary(sub_tensor, mode, ids):
     return out
 
 
+def scaled_mass_parts(mass, alpha, tau):
+    """Scale a nonempty branch mask and its prior by a common finite mass."""
+    if tau is not None:
+        tau = float(tau)
+    scale = max(float(mass.max()), alpha if tau is None else tau)
+    if scale == 0:
+        return mass, 0., 0.
+    scaled = np.asarray(mass, dtype=np.float64) / scale
+    if tau is None:
+        per_site = alpha / scale
+        return scaled, per_site, per_site * len(mass)
+    prior = tau / scale
+    return scaled, prior / len(mass), prior
+
+
 def record_weight_diagnostics(g, label, mass, probabilities, alpha):
     """Keep compact category summaries, not branch-by-site arrays."""
     masks = np.asarray(g['is_site_nonmissing'], dtype=bool)
@@ -120,16 +135,22 @@ def record_weight_diagnostics(g, label, mass, probabilities, alpha):
     masks = masks[ids]
     p = np.asarray(probabilities)[ids]
     sites = masks.sum(axis=1)
-    empirical = masks @ np.asarray(mass, dtype=np.float64)
+    mass = np.asarray(mass, dtype=np.float64)
     tau = g.get('asrv_concentration')
-    prior = np.where(sites > 0, float(tau), 0.0) if tau is not None else sites * alpha
-    total = empirical + prior
-    fraction = np.divide(prior, total, out=np.zeros_like(total), where=total > 0)
+    with np.errstate(over='ignore', invalid='ignore'):
+        empirical = masks @ mass
+        prior = np.where(sites > 0, float(tau), 0.0) if tau is not None else sites * alpha
+        total = empirical + prior
+        fraction = np.divide(prior, total, out=np.zeros_like(total), where=total > 0)
+        training_mass = float(mass.sum())
+    for index in np.flatnonzero(~np.isfinite(total)):
+        scaled, _, scaled_prior = scaled_mass_parts(mass[masks[index]], alpha, tau)
+        fraction[index] = scaled_prior / (scaled.sum() + scaled_prior)
     square_sum = (p * p).sum(axis=1)
     effective = np.divide(1., square_sum, out=np.zeros_like(square_sum), where=square_sum > 0)
     nonempty = sites > 0
     row = {
-        'category': label, 'training_mass': float(np.sum(mass)),
+        'category': label, 'training_mass': training_mass if np.isfinite(training_mass) else None,
         'evaluation_branches': len(ids), 'empty_mask_branches': int((~nonempty).sum()),
         'zero_empirical_mass_branches': int(((empirical == 0) & nonempty).sum()),
         'zero_weight_branches': int(((square_sum == 0) & nonempty).sum()),
