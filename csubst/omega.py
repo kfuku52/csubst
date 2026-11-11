@@ -383,15 +383,17 @@ def _weighted_sample_without_replacement_packed(
         weights = p[positive_sites]
         uniform = np.all(weights == weights[0])
         complement = size > num_positive_sites - size
-        log_weights = log_dp = None
-        if not uniform:
+        log_weights = None
+        if uniform:
+            suffix_rows = itertools.repeat((None, None), num_positive_sites)
+        else:
             log_weights = urn_expectation.normalized_log_weights(weights)
             # An omitted subset has reciprocal odds. Keep the forward draw
             # order and use its suffix weight to obtain each inclusion chance.
-            log_dp = (urn_expectation.fisher_suffix(-log_weights, num_positive_sites - size)
-                      if complement else urn_expectation.fisher_suffix(log_weights, size))
+            suffix_rows = (urn_expectation.fisher_suffix_rows(-log_weights, num_positive_sites - size)
+                           if complement else urn_expectation.fisher_suffix_rows(log_weights, size))
         remaining = np.full(niter, size, dtype=np.int64)
-        for item_index in range(num_positive_sites):
+        for item_index, (log_current, log_next) in enumerate(suffix_rows):
             active = np.flatnonzero(remaining > 0)
             if active.shape[0] == 0:
                 break
@@ -404,14 +406,14 @@ def _weighted_sample_without_replacement_packed(
                 if uniform:
                     probability[optional] = r / items_left
                 else:
-                    assert log_weights is not None and log_dp is not None
+                    assert log_weights is not None and log_current is not None and log_next is not None
                     if complement:
                         omitted = items_left - r
-                        log_numerator = log_dp[item_index + 1, omitted]
-                        log_denominator = log_dp[item_index, omitted]
+                        log_numerator = log_next[omitted]
+                        log_denominator = log_current[omitted]
                     else:
-                        log_numerator = log_weights[item_index] + log_dp[item_index + 1, r - 1]
-                        log_denominator = log_dp[item_index, r]
+                        log_numerator = log_weights[item_index] + log_next[r - 1]
+                        log_denominator = log_current[r]
                     probability[optional] = np.exp(log_numerator - log_denominator)
             choose = forced | (rng.random(active.shape[0]) < probability)
             chosen_rows = active[choose]
@@ -864,20 +866,30 @@ def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.
         # partition function with the site absent to avoid subtracting from 1.
         size = num_positive - draw_size
         log_weights = log_weights.min() - log_weights
-    prefix = urn_expectation.fisher_suffix(log_weights[::-1], size)[::-1]
-    log_denominator = prefix[num_positive, size]
+    prefix_tail = np.full(size + 1, -np.inf)
+    prefix_tail[0] = 0.
+    inclusion = np.full(num_positive, -np.inf, dtype=np.float64)
+    other_picks = size if complement else size - 1
+    for start, suffix in urn_expectation.fisher_suffix_blocks(log_weights, size):
+        stop = start + len(suffix) - 1
+        prefix = urn_expectation.fisher_suffix(log_weights[start:stop][::-1], size,
+                                               terminal=prefix_tail, following=start)[::-1]
+        prefix_tail = prefix[-1].copy()
+        selected = inclusion[start:stop]
+        if stop - start < num_positive:
+            # The workspace fits in one block. Reduce consecutive left-pick
+            # terms for each site before moving to the next block.
+            terms = prefix[:-1, :other_picks + 1] + suffix[1:, other_picks::-1]
+            np.logaddexp.reduce(terms, axis=1, out=selected)
+        else:
+            workspace = np.empty(num_positive, dtype=np.float64)
+            for left_pick in range(other_picks + 1):
+                right_pick = other_picks - left_pick
+                np.add(prefix[:-1, left_pick], suffix[1:, right_pick], out=workspace)
+                np.logaddexp(selected, workspace, out=selected)
+    log_denominator = prefix_tail[size]
     if not np.isfinite(log_denominator):
         raise ValueError('Unable to normalize Fisher weighted-urn probabilities.')
-    suffix = urn_expectation.fisher_suffix(log_weights, size)
-    # Sites are independent in this contraction. Keep each site's original
-    # left-pick addition order while avoiding Python's site-by-draw loop.
-    inclusion = np.full(num_positive, -np.inf, dtype=np.float64)
-    workspace = np.empty(num_positive, dtype=np.float64)
-    other_picks = size if complement else size - 1
-    for left_pick in range(other_picks + 1):
-        right_pick = other_picks - left_pick
-        np.add(prefix[:-1, left_pick], suffix[1:, right_pick], out=workspace)
-        np.logaddexp(inclusion, workspace, out=inclusion)
     if not complement:
         np.add(log_weights, inclusion, out=inclusion)
     np.subtract(inclusion, log_denominator, out=inclusion)

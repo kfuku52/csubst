@@ -4,7 +4,7 @@ import itertools
 import numpy as np
 import pytest
 
-from csubst import omega
+from csubst import omega, urn_expectation
 
 
 @pytest.mark.parametrize('weights', [[0., 1., 2., 4.], [1., 1., 1., 1.],
@@ -57,6 +57,23 @@ def test_large_uniform_fisher_inclusion_is_exact():
     weights[::4] = 0.
     actual = omega._calc_fisher_inclusion_probabilities(weights, 800)
     np.testing.assert_array_equal(actual, np.where(weights > 0, 800 / 900, 0.))
+
+
+@pytest.mark.parametrize('draw_size', [9, 19])
+def test_fisher_suffix_checkpoints_preserve_expectation_and_seeded_sampling(monkeypatch, draw_size):
+    weights = np.geomspace(1e-200, 1e200, 31)
+    weights[::7] = 0.
+    reference = omega._calc_fisher_inclusion_probabilities(weights, draw_size)
+    sample_reference = omega._weighted_sample_without_replacement_packed(
+        weights, draw_size, 128, np.random.default_rng(301), sampling_model='fisher',
+    )
+    monkeypatch.setattr(urn_expectation, '_FISHER_SUFFIX_BYTES', 0)
+    actual = omega._calc_fisher_inclusion_probabilities(weights, draw_size)
+    samples = omega._weighted_sample_without_replacement_packed(
+        weights, draw_size, 128, np.random.default_rng(301), sampling_model='fisher',
+    )
+    np.testing.assert_array_equal(actual, reference)
+    np.testing.assert_array_equal(samples, sample_reference)
 
 
 @pytest.mark.parametrize('arity', [1, 2, 3])

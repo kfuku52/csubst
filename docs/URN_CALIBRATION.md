@@ -121,6 +121,9 @@ probability is computed by summing the omitted subsets that exclude it.
 Dense samples use this recurrence for each forward choice as well.
 For equal weights, the next inclusion chance is the remaining draw size
 divided by the number of remaining sites.
+When a Fisher suffix table would exceed 64 MiB, expectation and sampling
+retain rows at block boundaries and reconstruct one block at a time.
+The extra recurrence pass reduces peak memory on large draws.
 
 ## Hypergeometric site-subset draws
 

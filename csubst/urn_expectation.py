@@ -1,6 +1,6 @@
 """Numerical helpers for weighted-urn probabilities."""
 
-from math import prod
+from math import isqrt, prod
 
 import numpy as np
 
@@ -8,6 +8,7 @@ import numpy as np
 ENUMERATION_MAX_SITES = 20
 GROUPED_MAX_DRAWS = 256
 GROUPED_MAX_STATE_UPDATES = 8_192
+_FISHER_SUFFIX_BYTES = 64 * 1024**2
 
 
 def normalized_log_weights(positive_weights):
@@ -20,17 +21,49 @@ def normalized_log_weights(positive_weights):
     return ratios
 
 
-def fisher_suffix(log_weights, size):
-    """Log subset weights for each suffix and draw size."""
+def fisher_suffix(log_weights, size, *, terminal=None, following=0):
+    """Log subset weights for each suffix, with an optional following block."""
     num_positive = len(log_weights)
     suffix = np.full((num_positive + 1, size + 1), -np.inf, dtype=np.float64)
     suffix[:, 0] = 0.
+    if terminal is not None:
+        suffix[-1] = terminal
     for index in range(num_positive - 1, -1, -1):
-        last = min(size, num_positive - index)
+        last = min(size, num_positive - index + following)
         next_row = suffix[index + 1]
         np.logaddexp(next_row[1:last + 1], log_weights[index] + next_row[:last],
                      out=suffix[index, 1:last + 1])
     return suffix
+
+
+def fisher_suffix_blocks(log_weights, size):
+    """Yield suffix tables, reconstructing large tables from boundary rows."""
+    n = len(log_weights)
+    if (n + 1) * (size + 1) * 8 <= _FISHER_SUFFIX_BYTES:
+        yield 0, fisher_suffix(log_weights, size)
+        return
+
+    # A square-root block size balances the saved boundary rows and the
+    # recomputed rows in one block. Both passes use the same recurrence.
+    block_size = max(1, isqrt(n))
+    starts = range(0, n, block_size)
+    terminal = np.full(size + 1, -np.inf)
+    terminal[0] = 0.
+    boundaries = {n: terminal}
+    for start in reversed(starts[1:]):
+        stop = min(start + block_size, n)
+        boundary = fisher_suffix(log_weights[start:stop], size, terminal=boundaries[stop], following=n - stop)
+        boundaries[start] = boundary[0].copy()
+        del boundary
+    for start in starts:
+        stop = min(start + block_size, n)
+        suffix = fisher_suffix(log_weights[start:stop], size, terminal=boundaries.pop(stop), following=n - stop)
+        yield start, suffix
+
+
+def fisher_suffix_rows(log_weights, size):
+    for _, suffix in fisher_suffix_blocks(log_weights, size):
+        yield from zip(suffix[:-1], suffix[1:])
 
 
 def wallenius_sample_blocks(positive_sites, positive_weights, size, niter, rng):
