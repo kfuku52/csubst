@@ -118,6 +118,9 @@ site weights. [Chen, Dempster and Liu (1994)](https://doi.org/10.1093/biomet/81.
 When most positive-weight sites are selected, inclusion probabilities sum
 over the smaller omitted subset with reciprocal weights. A site's inclusion
 probability is computed by summing the omitted subsets that exclude it.
+Dense samples use this recurrence for each forward choice as well.
+For equal weights, the next inclusion chance is the remaining draw size
+divided by the number of remaining sites.
 
 ## Hypergeometric site-subset draws
 

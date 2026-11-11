@@ -380,10 +380,18 @@ def _weighted_sample_without_replacement_packed(
         return packed
     sampling_model = str(sampling_model).strip().lower()
     if sampling_model == 'fisher':
-        log_weights = urn_expectation.normalized_log_weights(p[positive_sites])
-        log_dp = urn_expectation.fisher_suffix(log_weights, size)
+        weights = p[positive_sites]
+        uniform = np.all(weights == weights[0])
+        complement = size > num_positive_sites - size
+        log_weights = log_dp = None
+        if not uniform:
+            log_weights = urn_expectation.normalized_log_weights(weights)
+            # An omitted subset has reciprocal odds. Keep the forward draw
+            # order and use its suffix weight to obtain each inclusion chance.
+            log_dp = (urn_expectation.fisher_suffix(-log_weights, num_positive_sites - size)
+                      if complement else urn_expectation.fisher_suffix(log_weights, size))
         remaining = np.full(niter, size, dtype=np.int64)
-        for item_index, log_weight in enumerate(log_weights):
+        for item_index in range(num_positive_sites):
             active = np.flatnonzero(remaining > 0)
             if active.shape[0] == 0:
                 break
@@ -393,9 +401,18 @@ def _weighted_sample_without_replacement_packed(
             optional = ~forced
             if optional.any():
                 r = remaining[active[optional]]
-                log_numerator = log_weight + log_dp[item_index + 1, r - 1]
-                log_denominator = log_dp[item_index, r]
-                probability[optional] = np.exp(log_numerator - log_denominator)
+                if uniform:
+                    probability[optional] = r / items_left
+                else:
+                    assert log_weights is not None and log_dp is not None
+                    if complement:
+                        omitted = items_left - r
+                        log_numerator = log_dp[item_index + 1, omitted]
+                        log_denominator = log_dp[item_index, omitted]
+                    else:
+                        log_numerator = log_weights[item_index] + log_dp[item_index + 1, r - 1]
+                        log_denominator = log_dp[item_index, r]
+                    probability[optional] = np.exp(log_numerator - log_denominator)
             choose = forced | (rng.random(active.shape[0]) < probability)
             chosen_rows = active[choose]
             byte, bit = divmod(int(positive_sites[item_index]), 8)
@@ -831,6 +848,13 @@ def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.
         return out.astype(float_type, copy=False)
     if draw_size >= num_positive:
         out[positive_mask] = 1.0
+        return out.astype(float_type, copy=False)
+    if np.all(positive_weights == positive_weights[0]):
+        out[positive_mask] = draw_size / num_positive
+        return out.astype(float_type, copy=False)
+    if draw_size == 1:
+        scaled = positive_weights / positive_weights.max()
+        out[positive_mask] = scaled / scaled.sum()
         return out.astype(float_type, copy=False)
     log_weights = urn_expectation.normalized_log_weights(positive_weights)
     complement = draw_size > num_positive - draw_size

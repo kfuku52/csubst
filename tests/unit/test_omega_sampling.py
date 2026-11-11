@@ -42,6 +42,23 @@ def test_fisher_dense_draw_retains_tiny_inclusion_probability():
     np.testing.assert_allclose(actual, [1., 1., 1., 1.75e-40], atol=0., rtol=2e-14)
 
 
+def test_dense_fisher_sampling_matches_reciprocal_omission_probabilities():
+    weights = [1e-100, 2e-100, 5e-100, 1e100]
+    omitted = np.array([1., .5, .2, 1e-200]) / 1.7
+    samples = omega._weighted_sample_without_replacement_masks(
+        weights, 3, 30_000, np.random.default_rng(28), sampling_model='fisher',
+    )
+    np.testing.assert_array_equal(samples.sum(axis=1), 3)
+    np.testing.assert_allclose(samples.mean(axis=0), 1. - omitted, atol=.012, rtol=0.)
+
+
+def test_large_uniform_fisher_inclusion_is_exact():
+    weights = np.full(1200, 1e-309)
+    weights[::4] = 0.
+    actual = omega._calc_fisher_inclusion_probabilities(weights, 800)
+    np.testing.assert_array_equal(actual, np.where(weights > 0, 800 / 900, 0.))
+
+
 @pytest.mark.parametrize('arity', [1, 2, 3])
 @pytest.mark.parametrize('dtype', [np.float32, np.float64])
 def test_urn_overlap_preserves_arithmetic_across_row_blocks(monkeypatch, arity, dtype):
