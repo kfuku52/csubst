@@ -430,12 +430,9 @@ def _build(g, structural=False):
             kinds.append('AA')
             mappings['AA'] = _mapping(g, 'AA', k)
     model = endpoint.EndpointModel(parents, lengths, q, pi, rates, weights)
-    tips = {}
     observed, eligible = fitted_model.observation_masks(g["tree"], source)
-    for leaf in model.leaves:
-        values = np.array(source[leaf], dtype=float)
-        values[~observed[leaf]] = 1
-        tips[leaf] = values
+    tips = {leaf: source[leaf] for leaf in model.leaves}
+    missing = {leaf: ~observed[leaf] for leaf in model.leaves}
     expected = (str(g.get('expectation_method', 'codon_model')) == 'codon_model'
                 and g.get('subcommand', 'search') in ('search', 'analyze', 'benchmark'))
     cache = g.setdefault('_endpoint_tensors', {})
@@ -516,7 +513,7 @@ def _build(g, structural=False):
         for record in model.iter_blocks(tips, block_size=block_size, predictive=expected,
                                         transform=transform,
                                         predictive_transform=predictive_transform,
-                                        branch_ids=retained_branches, unselected_transform=totals_transform):
+                                        branch_ids=retained_branches, unselected_transform=totals_transform, tip_missing=missing):
             sl = slice(record.start, record.stop)
             node = record.child
             if node not in model.leaves:

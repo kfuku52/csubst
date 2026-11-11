@@ -144,7 +144,7 @@ class EndpointModel:
         return self._transitions[t]
 
     def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None,
-                    predictive_transform=None, category_nodes=False, unselected_transform=None, transform_rate_context=False):
+                    predictive_transform=None, category_nodes=False, unselected_transform=None, transform_rate_context=False, tip_missing=None):
         """Yield one edge/site block; root records only contain a node marginal.
 
         Tips are observation likelihoods, NOT posterior probabilities. Missing
@@ -157,6 +157,8 @@ class EndpointModel:
         outside branch_ids without constructing their detailed joint events.
         With transform_rate_context, reducers receive unweighted boundary
         messages, category-scaled time and the posterior site-category weights.
+        tip_missing can mark rows to read as all-ones emissions without copying
+        their full input tip arrays.
         """
         if isinstance(block_size, bool) or int(block_size) != block_size or block_size < 1:
             raise ValueError('Endpoint block size must be a positive integer.')
@@ -166,9 +168,19 @@ class EndpointModel:
         first = next(iter(arrays.values()))
         if first.ndim != 2 or first.shape[1] != self.pi.size:
             raise ValueError('Endpoint tip likelihoods must have site-by-state shape.')
-        for values in arrays.values():
-            if values.shape != first.shape or not np.isfinite(values).all() or np.any(values < 0):
+        missing = {} if tip_missing is None else {
+            node: np.asarray(mask, dtype=bool) for node, mask in tip_missing.items()
+        }
+        if any(node not in self.leaves or mask.shape != (first.shape[0],) for node, mask in missing.items()):
+            raise ValueError('Missing tip masks must identify leaf sites in the input alignment.')
+        for node, values in arrays.items():
+            if values.shape != first.shape:
                 raise ValueError('Endpoint tip likelihoods must be equal-sized, finite and nonnegative.')
+            if not np.isfinite(values).all() or np.any(values < 0):
+                invalid = (~np.isfinite(values) | (values < 0)).any(axis=1)
+                if node not in missing or np.any(invalid & ~missing[node]):
+                    raise ValueError('Endpoint tip likelihoods must be equal-sized, finite and nonnegative.')
+        missing = {node: mask for node, mask in missing.items() if mask.any()}
         selected = set(self.order[1:]) if branch_ids is None else {int(i) for i in branch_ids}
         if not selected.issubset(set(self.order) - {self.root}):
             raise ValueError('Endpoint branch selection contains a root or unknown branch.')
@@ -177,6 +189,7 @@ class EndpointModel:
         inside_buffer = np.empty((nc, n, capacity, k))
         post_buffer = np.empty_like(inside_buffer)
         scale_buffer = np.empty((nc, n, capacity))
+        internal_postorder = [node for node in reversed(self.order) if node not in arrays]
         for start in range(0, first.shape[0], int(block_size)):
             stop = min(start + int(block_size), first.shape[0])
             size = stop - start
@@ -185,19 +198,20 @@ class EndpointModel:
             scales = scale_buffer[:, :, :size]
             inside.fill(1)
             scales.fill(0)
+            for node, values in arrays.items():
+                inside[:, node] = values[start:stop]
+                if node in missing:
+                    inside[:, node, missing[node][start:stop]] = 1.
             for c in range(nc):
-                for node in reversed(self.order):
-                    if node in arrays:
-                        inside[c, node] = arrays[node][start:stop]
-                    else:
-                        for child in self.children[node]:
-                            post[c, child] = inside[c, child] @ self.transition(child, c).T
-                            inside[c, node] *= post[c, child]
-                            scales[c, node] += scales[c, child]
-                            norm = inside[c, node].max(axis=1)
-                            inside[c, node] /= np.where(norm > 0, norm, 1)[:, None]
-                            with np.errstate(divide='ignore'):
-                                scales[c, node] += np.log(norm)
+                for node in internal_postorder:
+                    for child in self.children[node]:
+                        post[c, child] = inside[c, child] @ self.transition(child, c).T
+                        inside[c, node] *= post[c, child]
+                        scales[c, node] += scales[c, child]
+                        norm = inside[c, node].max(axis=1)
+                        inside[c, node] /= np.where(norm > 0, norm, 1)[:, None]
+                        with np.errstate(divide='ignore'):
+                            scales[c, node] += np.log(norm)
             # Child slots hold pruning messages until the forward traversal
             # consumes them, then the same storage holds node posteriors.
             post[:, self.root].fill(0)

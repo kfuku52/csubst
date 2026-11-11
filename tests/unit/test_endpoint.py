@@ -203,3 +203,18 @@ def test_short_transition_series_covers_disconnected_components():
     expected = np.kron(np.eye(n // 2), [[1 - change, change], [change, 1 - change]])
     np.testing.assert_allclose(model.transition(1, 0), expected, rtol=2e-14, atol=0.)
     assert model._uniform_count < n
+
+
+def test_tip_mask_matches_explicit_unknown_likelihoods_without_mutation():
+    model = EndpointModel([-1, 0, 0], [0, .2, .3], [[-1., 1.], [1., -1.]], [.5, .5])
+    first = np.array([[1., 0.], [0., 0.], [.4, .4]])
+    second = np.array([[0., 1.], [1., 0.], [0., 1.]])
+    mask = np.array([False, True, True])
+    filled = first.copy()
+    filled[mask] = 1.
+    reference = list(model.iter_blocks({1: filled, 2: second}, block_size=2))
+    actual = list(model.iter_blocks({1: first, 2: second}, block_size=2, tip_missing={1: mask}))
+    for observed, expected in zip(actual, reference):
+        np.testing.assert_array_equal(observed.node, expected.node)
+        np.testing.assert_array_equal(observed.joint, expected.joint)
+    np.testing.assert_array_equal(first, [[1., 0.], [0., 0.], [.4, .4]])

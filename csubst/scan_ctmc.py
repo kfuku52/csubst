@@ -173,12 +173,12 @@ def _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summarie
               and np.array_equal(model.rates, rates) and np.array_equal(model.weights, weights)):
         raise ValueError('Fitted transition parameters changed during fixed-model calibration.')
     tips = {}
+    missing = {}
     for node in nodes:
         if not ete.get_children(node):
             i = int(ete.get_prop(node, "numerical_label"))
-            values = np.asarray(tip_states[i], float).copy()
-            values[values.sum(axis=1) == 0] = 1
-            tips[i] = values
+            tips[i] = np.asarray(tip_states[i], float)
+            missing[i] = tips[i].sum(axis=1) == 0
     groups = np.asarray(groups, int)
     projection = np.eye(int(groups.max()) + 1)[groups]
     posterior = np.zeros_like(tip_states, dtype=float)
@@ -224,7 +224,8 @@ def _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summarie
             category_states.write_block(block_start, category_block[:block_length])
 
     for record in model.iter_blocks(tips, block_size, transform=transform,
-                                    category_nodes=category_states is not None, transform_rate_context=bridge):
+                                    category_nodes=category_states is not None, transform_rate_context=bridge,
+                                    tip_missing=missing):
         if disk_backed and record.start != block_start:
             if block_start is not None:
                 flush_block()
