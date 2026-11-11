@@ -54,6 +54,7 @@ _UINT8_POPCOUNT = np.unpackbits(
 ).sum(axis=1).astype(np.uint8)
 _DEFAULT_E_STAT_MIN_ITEMS_FOR_PARALLEL = 1000000000
 _DEFAULT_E_STAT_MIN_CATEGORIES_PER_JOB = 64
+_URN_OVERLAP_WORK_BYTES = 32 * 1024**2
 _CYTHON_FALLBACK_WARNED = set()
 
 
@@ -581,19 +582,20 @@ def _calc_cb_site_overlap(cb_ids, sub_sites, float_type):
     arity = cb_ids.shape[1]
     if arity <= 0:
         raise ValueError('cb_ids should have at least one column.')
-    if arity == 1:
-        bids = cb_ids[:, 0]
-        return sub_sites[bids, :].sum(axis=1, dtype=float_type)
-    if arity == 2:
-        bid1 = cb_ids[:, 0]
-        bid2 = cb_ids[:, 1]
-        site_overlap = sub_sites[bid1, :] * sub_sites[bid2, :]
-        return site_overlap.sum(axis=1, dtype=float_type)
-    site_overlap = np.ones(shape=(cb_ids.shape[0], sub_sites.shape[1]), dtype=float_type)
-    for col in range(arity):
-        bids = cb_ids[:, col]
-        site_overlap *= sub_sites[bids, :]
-    return site_overlap.sum(axis=1, dtype=float_type)
+    # Each multiplication holds the working overlap and one gathered profile.
+    # Bound both arrays by chunking combination rows, keeping each site's
+    # multiplication order and each row's reduction order.
+    bytes_per_row = max(1, 2 * sub_sites.shape[1] * sub_sites.itemsize)
+    rows_per_block = max(1, _URN_OVERLAP_WORK_BYTES // bytes_per_row)
+    out = np.empty(cb_ids.shape[0], dtype=float_type)
+    for start in range(0, len(cb_ids), rows_per_block):
+        stop = min(start + rows_per_block, len(cb_ids))
+        ids = cb_ids[start:stop]
+        overlap = sub_sites[ids[:, 0]]
+        for col in range(1, arity):
+            overlap *= sub_sites[ids[:, col]]
+        out[start:stop] = overlap.sum(axis=1, dtype=float_type)
+    return out
 
 
 def _calc_cb_branch_factor(cb_ids, sub_branches, float_type):

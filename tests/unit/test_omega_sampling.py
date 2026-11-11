@@ -42,6 +42,18 @@ def test_fisher_dense_draw_retains_tiny_inclusion_probability():
     np.testing.assert_allclose(actual, [1., 1., 1., 1.75e-40], atol=0., rtol=2e-14)
 
 
+@pytest.mark.parametrize('arity', [1, 2, 3])
+@pytest.mark.parametrize('dtype', [np.float32, np.float64])
+def test_urn_overlap_preserves_arithmetic_across_row_blocks(monkeypatch, arity, dtype):
+    weights = np.arange(42, dtype=np.float64).reshape(6, 7)[:, ::2] / 100
+    ids = np.array([[0, 1, 2], [3, 4, 0], [1, 0, 5], [3, 1, 2], [2, 4, 1]])[:, :arity]
+    monkeypatch.setattr(omega, '_URN_OVERLAP_WORK_BYTES', 4 * weights.shape[1] * np.dtype(dtype).itemsize)
+    reference = weights.astype(dtype)[ids].prod(axis=1, dtype=dtype).sum(axis=1, dtype=dtype)
+    actual = omega._calc_cb_site_overlap(ids, weights, dtype)
+    assert actual.dtype == dtype
+    np.testing.assert_array_equal(actual, reference)
+
+
 @pytest.mark.native
 def test_native_packed_sampling_matches_boolean_masks_and_python_counts(monkeypatch):
     if omega.omega_cy is None:
