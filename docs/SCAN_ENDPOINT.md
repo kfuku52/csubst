@@ -13,7 +13,8 @@ including discrete G/R/I rates. MG/MGK use counted F1X4/F3X4 frequencies.
 For each site the expectation is summed over P(category | all tips) times the
 category-conditional parent posterior and exp(Q × category rate × length).
 The fitted category table is required; posterior mean rates cannot replace it.
-Marginal/bridge endpoint exposure remains limited to uniform unit rates.
+Marginal endpoint exposure requires uniform unit rates. Bridge exposure
+integrates category-specific jump opportunities as described in [SCAN_CTMC.md](SCAN_CTMC.md).
 The full codon Q, stationary frequencies, codon/group order and posterior
 states must be available.
 

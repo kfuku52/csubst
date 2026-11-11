@@ -139,7 +139,7 @@ class EndpointModel:
         return self._transitions[t]
 
     def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None,
-                    predictive_transform=None, category_nodes=False, unselected_transform=None):
+                    predictive_transform=None, category_nodes=False, unselected_transform=None, transform_rate_context=False):
         """Yield one edge/site block; root records only contain a node marginal.
 
         Tips are observation likelihoods, NOT posterior probabilities. Missing
@@ -150,6 +150,8 @@ class EndpointModel:
         transform's outputs are summed over rate categories before yielding.
         An optional unselected transform retains coarse summaries on branches
         outside branch_ids without constructing their detailed joint events.
+        With transform_rate_context, reducers receive unweighted boundary
+        messages, category-scaled time and the posterior site-category weights.
         """
         if isinstance(block_size, bool) or int(block_size) != block_size or block_size < 1:
             raise ValueError('Endpoint block size must be a positive integer.')
@@ -238,7 +240,11 @@ class EndpointModel:
                             reductions.append((reduced_pred, post[c, parent], np.ones_like(right),
                                                predictive_transform or observed_transform))
                         for target, lvalues, rvalues, reducer in reductions:
-                            values = reducer(lvalues * class_weight[c, :, None], rvalues, transition)
+                            if transform_rate_context:
+                                values = reducer(lvalues, rvalues, transition,
+                                                 self.lengths[child] * self.rates[c], class_weight[c])
+                            else:
+                                values = reducer(lvalues * class_weight[c, :, None], rvalues, transition)
                             for key, value in values.items():
                                 if key not in target:
                                     target[key] = value

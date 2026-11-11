@@ -54,7 +54,10 @@ This counts every within-edge jump, including changes on paths that return to
 the initial state. Synonymous/within-group jumps are excluded when accumulating
 the nonsynonymous tensor. Spectral divided differences evaluate the integral
 for reversible Q; ill-conditioned boundary likelihoods use a direct adjoint
-Frechet derivative. Pruning and jump calculations process bounded site blocks.
+Frechet derivative. For a discrete rate mixture, the calculation uses time
+`t × rate` separately in each category, then averages jump counts using
+P(category | all tips). A zero-rate category contributes zero jumps.
+Pruning and jump calculations process bounded site blocks.
 When the grouped event tensor exceeds 64 MiB, bridge writes it to the same
 site-major temporary storage as joint inference. The scan reads back
 individual sites or bounded blocks.
@@ -70,7 +73,9 @@ opportunity = sum_k,l (parent_posterior integral_0^t exp(Qu) du)[k] Q[k,l]
 
 It allows intermediate jumps before reaching a candidate's source state. The
 integrated transition matrix is calculated through a block matrix exponential,
-not an inverse of singular Q. Exposure conditions on the inferred parent
+which accommodates singular Q. For a discrete rate mixture, each integral
+uses category-scaled time and the category-conditional parent state, weighted
+by the category posterior. Exposure conditions on the inferred parent
 state, but not on the child evidence; the observation conditions on all tips.
 Their ratio and Poisson LRT remain exploratory scores. Calibration repeats
 this entire calculation under the null, including estimating parent states
@@ -124,7 +129,7 @@ repeated. This is model-conditional inference, not an exact test or a guarantee
 under model misspecification.
 
 The second mode is retained for controlled fixed-model experiments, including
-ECM/MG models and joint discrete-rate models. A category is drawn from its fitted
+ECM/MG and discrete-rate models. A category is drawn from its fitted
 prior once per simulated site and shared across the tree; each replicate
 recomputes posterior category weights from its own simulated tips. It replays missingness and the explicit partial-ambiguity
 observation model described below. It does not quantify model/branch-length
@@ -147,9 +152,10 @@ rate categories. It uses the shared endpoint engine and integrates categories
 with P(category | all tip data); expectations retain the category-conditional
 parent state. It never exponentiates a posterior mean site rate. MG/MGK use
 counted F1X4/F3X4 frequencies; see the [MG correction](ENDPOINT_POSTERIORS.md#mg-model-correction).
-Bridge remains limited to uniform rates, reversible Q and positive stationary
-frequencies. Mixtures of different Q matrices and native 3Di scan remain
-unsupported; select marginal explicitly for legacy 3Di scan. Raw model lengths,
+Bridge supports uniform and fitted discrete G/R/I rates with reversible Q
+and positive stationary frequencies. Native 3Di uses joint observations,
+with marginal available for the legacy estimator. Mixtures of different Q
+matrices are outside the supported models. Raw model lengths,
 `--ml_anc no` and `--min_sub_pp 0` are required for joint/bridge.
 IQ-TREE documents
 codon-model lengths per codon site, rather than the DNA per-nucleotide scale

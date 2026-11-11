@@ -55,7 +55,71 @@ def _integrals(values, length):
     return length * np.exp(np.maximum(x, y)) * ratio
 
 
-def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights, disk_backed=False):
+def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
+    if (denom <= 0).any():
+        raise ValueError("Impossible edge evidence under fitted CTMC.")
+    coefficients = (a @ v)[:, :, None] * (b @ w.T)[:, None, :] * integrals
+    mass = (w.T @ coefficients) @ v.T
+    mass *= q
+    mass[:, diagonal, diagonal] = 0
+    # Ill-conditioned evidence needs a stable direct Frechet derivative.
+    unstable = (mass.min(axis=(1, 2)) < -1e-10 * denom) | (denom < 1e-10)
+    if unstable.any():
+        mass[unstable] = bridge_kernel(q, length, a[unstable], b[unstable])
+    mass /= denom[:, None, None]
+    if mass.min() < -1e-8 or not np.isfinite(mass).all():
+        raise ValueError("Numerically invalid CTMC posterior event mass.")
+    return mass
+
+
+def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
+    values, v, w = _bridge_spectral(q, pi)
+    state_diagonal = np.arange(len(q))
+    group_diagonal = np.arange(projection.shape[1])
+
+    @lru_cache(maxsize=max(1, (32 * 1024**2) // q.nbytes))
+    def integral_at(length):
+        return _integrals(values, length)
+
+    def transform(left, right, transition, length, category_weight):
+        active = category_weight > 0
+        if length == 0 or not active.any():
+            result = {'events': np.zeros((len(left), projection.shape[1], projection.shape[1]))}
+            if synonymous_mask is not None:
+                result['synonymous'] = np.zeros(len(left))
+            return result
+        partial = not active.all()
+        if partial:
+            left, right, category_weight = left[active], right[active], category_weight[active]
+        # Normalize the boundary message before forming the integral.
+        a = left / left.max(axis=1, keepdims=True)
+        denom = ((a @ transition) * right).sum(axis=1)
+        mass = _conditioned_bridge_mass(q, length, a, right, denom, v, w, integral_at(length), state_diagonal)
+        np.maximum(mass, 0, out=mass)
+        mass *= category_weight[:, None, None]
+        events = (projection.T @ mass) @ projection
+        events[:, group_diagonal, group_diagonal] = 0
+        if partial:
+            grouped = np.zeros((len(active), projection.shape[1], projection.shape[1]))
+            grouped[active] = events
+        else:
+            grouped = events
+        result = {'events': grouped}
+        if synonymous_mask is not None:
+            values = np.einsum("sij,ij->s", mass, synonymous_mask)
+            if partial:
+                synonymous = np.zeros(len(active))
+                synonymous[active] = values
+            else:
+                synonymous = values
+            result['synonymous'] = synonymous
+        return result
+
+    return transform
+
+
+def _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights,
+                           disk_backed=False, bridge=False):
     from csubst import endpoint, endpoint_io, site_storage
     nodes = list(tree.traverse("preorder"))
     n, sites, states = tip_states.shape
@@ -92,16 +156,20 @@ def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, 
     if summaries is not None:
         summaries['synonymous_counts'] = np.zeros(n)
 
-    # Reuse the classified endpoint reducer instead of materializing every
-    # codon pair and contracting it through two one-hot matrices.
-    event_transform = endpoint_io._event_transform({}, ['N'], {'N': projection})
+    if bridge:
+        transform = _mixture_bridge_transform(model.q, model.pi, projection,
+                                              summaries['synonymous_mask'] if summaries is not None else None)
+    else:
+        # Reuse the classified endpoint reducer instead of materializing every
+        # codon pair and contracting it through two one-hot matrices.
+        event_transform = endpoint_io._event_transform({}, ['N'], {'N': projection})
 
-    def transform(left, right, transition):
-        grouped = event_transform(left, right, transition)['N', 'events'][:, 0]
-        result = {'events': grouped}
-        if summaries is not None:
-            result['synonymous'] = ((left @ (transition * summaries['synonymous_mask'])) * right).sum(axis=1)
-        return result
+        def transform(left, right, transition):
+            grouped = event_transform(left, right, transition)['N', 'events'][:, 0]
+            result = {'events': grouped}
+            if summaries is not None:
+                result['synonymous'] = ((left @ (transition * summaries['synonymous_mask'])) * right).sum(axis=1)
+            return result
 
     block_start = None
     block_length = 0
@@ -113,7 +181,7 @@ def _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, 
             category_states.write_block(block_start, category_block[:block_length])
 
     for record in model.iter_blocks(tips, block_size, transform=transform,
-                                    category_nodes=category_states is not None):
+                                    category_nodes=category_states is not None, transform_rate_context=bridge):
         if disk_backed and record.start != block_start:
             if block_start is not None:
                 flush_block()
@@ -160,9 +228,10 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
     if mode not in ("joint", "bridge"):
         raise ValueError("Unknown CTMC observation mode.")
     if mode == 'joint':
-        return _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights, disk_backed)
+        return _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights, disk_backed)
     if len(rates) != 1 or float(rates[0]) != 1 or len(weights) != 1 or float(weights[0]) != 1:
-        raise ValueError('CTMC bridge currently requires uniform unit rates; use joint for discrete rate mixtures.')
+        return _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights,
+                            disk_backed, bridge=True)
     return _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_backed)
 
 
@@ -234,19 +303,12 @@ def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_b
                 outside[child] = _normalize(child_message)
                 b = down[child]
                 denom = (child_message * b).sum(axis=1)
-                if (denom <= 0).any():
-                    raise ValueError("Impossible edge evidence under fitted CTMC.")
-                coefficients = (a @ v)[:, :, None] * (b @ w.T)[:, None, :] * integrals
-                mass = (w.T @ coefficients) @ v.T
-                mass *= q
-                mass[:, state_diagonal, state_diagonal] = 0
-                # Ill-conditioned evidence needs a stable direct Frechet derivative.
-                unstable = (mass.min(axis=(1, 2)) < -1e-10 * denom) | (denom < 1e-10)
-                if unstable.any():
-                    mass[unstable] = bridge_kernel(q, length, a[unstable], b[unstable])
-                mass /= denom[:, None, None]
-                if mass.min() < -1e-8 or not np.isfinite(mass).all():
-                    raise ValueError("Numerically invalid CTMC posterior event mass.")
+                if length == 0:
+                    if (denom <= 0).any():
+                        raise ValueError("Impossible edge evidence under fitted CTMC.")
+                    events[child, :, 0] = 0
+                    continue
+                mass = _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, state_diagonal)
                 if summaries is not None and "eligible" in summaries:
                     mass[~summaries["eligible"][child, sl]] = 0
                 np.maximum(mass, 0, out=mass)

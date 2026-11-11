@@ -411,5 +411,68 @@ def test_mixture_joint_and_exposure_match_complete_enumeration(tmp_path, block_s
         actual, missing, _ = scan_endpoint.expected_events(ctx, post, post, site, [0], [1])
         assert not missing.any()
         np.testing.assert_allclose(actual, [expected], atol=1e-14)
-    with pytest.raises(ValueError, match='uniform'):
-        scan_ctmc.infer(tr, states, q, [.5, .5], [0, 1], mode='bridge', rates=rates, weights=priors)
+
+
+@pytest.mark.parametrize('disk_backed', [False, True])
+def test_bridge_rate_mixture_matches_exact_hidden_states_and_jump_integrals(tmp_path, disk_backed):
+    import pandas as pd
+    from csubst import scan_endpoint
+
+    tr, ids, states, _ = fixture(.7, 3)
+    states[ids['A'], 1] = [0., 1.]
+    states[ids['C'], 2] = 0.
+    states[ids['B'], 2] = [.3, .7]
+    pi = np.array([.3, .7])
+    q = np.array([[-1., 1.], [1., -1.]]) / (2 * pi[:, None])
+    rates, priors = np.array([0., .5, 2.5]), np.array([.15, .6, .25])
+    synonymous_mask = np.array([[False, False], [True, False]])
+    summaries = {'synonymous_mask': synonymous_mask}
+    posterior, events = scan_ctmc.infer(tr, states, q, pi, [0, 1], mode='bridge', summaries=summaries,
+                                        block_size=2, rates=rates, weights=priors, disk_backed=disk_backed)
+    report = tmp_path / 'fit.iqtree'
+    report.write_text('Category Relative_rate Proportion\n1 0 .15\n2 .5 .6\n3 2.5 .25\n')
+    g = dict(tree=tr, substitution_model='GY+FQ+R3', scan_observation='bridge', scan_rate_length='raw',
+             state_cdn=posterior, state_nsy=posterior, equilibrium_frequency=pi, instantaneous_codon_rate_matrix=q,
+             scan_category_states=summaries['category_states'], path_iqtree_iqtree=str(report))
+    branch_meta = pd.DataFrame({'branch_id': [ids['X']], 'parent_id': [ids['R']], 'raw_length': [.7]})
+    context = scan_endpoint.build_context(g, branch_meta, np.arange(2))
+
+    def transition(t):
+        return pi + np.exp(q.trace() * t) * (np.eye(2) - pi)
+
+    expected_synonymous = 0.
+    for site in range(3):
+        likelihood = 0.
+        root_mass = np.zeros((len(rates), 2))
+        jump_mass = np.zeros(2)
+        expected_exposure = 0.
+        for category, (rate, prior) in enumerate(zip(rates, priors)):
+            t = .7 * rate
+            p = transition(t)
+            jumps = np.array([
+                [[q[src, dst] * quad(lambda u: transition(u)[a, src] * transition(t-u)[dst, b], 0., t)[0]
+                  for b in range(2)] for a in range(2)]
+                for src, dst in ((0, 1), (1, 0))
+            ])
+            root_opportunity = np.array([q[0, 1] * quad(lambda u: transition(u)[r, 0], 0., t)[0]
+                                         for r in range(2)])
+            for r, x, a, b, c in itertools.product(range(2), repeat=5):
+                partial = prior * pi[r] * p[x, a] * p[x, b] * p[r, c]
+                for name, assignment in (('A', a), ('B', b), ('C', c)):
+                    emission = states[ids[name], site]
+                    partial *= emission[assignment] if emission.any() else 1.
+                full = partial * p[r, x]
+                likelihood += full
+                root_mass[category, r] += full
+                jump_mass += partial * jumps[:, r, x]
+                expected_exposure += full * root_opportunity[r]
+        selected = events.read_site(site)[ids['X'], 0] if disk_backed else events[ids['X'], site, 0]
+        np.testing.assert_allclose(selected[[0, 1], [1, 0]], jump_mass / likelihood, atol=2e-14)
+        expected_synonymous += jump_mass[1] / likelihood
+        categories = summaries['category_states']
+        parent = categories.read_site(site)[:, ids['R']] if disk_backed else categories[:, ids['R'], site]
+        np.testing.assert_allclose(parent, root_mass / likelihood, atol=2e-14)
+        exposure, missing, _ = scan_endpoint.expected_events(context, posterior, posterior, site, [0], [1])
+        assert not missing.any()
+        np.testing.assert_allclose(exposure, [expected_exposure / likelihood], atol=2e-14)
+    assert summaries['synonymous_counts'][ids['X']] == pytest.approx(expected_synonymous, abs=2e-14)
