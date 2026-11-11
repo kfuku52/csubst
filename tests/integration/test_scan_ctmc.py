@@ -217,6 +217,23 @@ def test_parametric_simulation_replays_partial_ambiguity_and_missingness():
     assert {tuple(row) for row in simulated[ids['A']]} == allowed
 
 
+def test_parametric_simulation_never_draws_an_impossible_state_at_cdf_boundary():
+    tr, ids, states, q = fixture(0., 3)
+    g = dict(tree=tr, state_cdn=states, instantaneous_codon_rate_matrix=q,
+             equilibrium_frequency=np.array([.5, .5]), substitution_model='GY')
+
+    class BoundaryRng:
+        def choice(self, n, size, p):
+            return np.ones(size, dtype=np.int64)
+
+        def random(self, size):
+            return np.zeros(size)
+
+    simulated = scan_ctmc.simulate_tips(g, BoundaryRng(), {})['state_cdn']
+    np.testing.assert_array_equal(simulated[[ids['A'], ids['B'], ids['C']], :, 0], 0.)
+    np.testing.assert_array_equal(simulated[[ids['A'], ids['B'], ids['C']], :, 1], 1.)
+
+
 def test_asymmetric_bridge_spectral_matches_frechet(monkeypatch):
     tr, ids, states, _ = fixture(1.2, 3)
     q = np.array([[-.25, .25], [1., -1.]])

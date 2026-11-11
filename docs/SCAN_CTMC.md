@@ -131,6 +131,10 @@ observation model described below. It does not quantify model/branch-length
 estimation uncertainty. Candidate-wise empirical columns are undefined in this
 mode; use the global maxT column directly, without another BH correction.
 
+Fixed-model replicates reuse a run-local cache of cumulative transition
+probabilities, bounded to about 32 MiB. Tip simulation reads these probabilities
+in blocks and assigns zero-width intervals to impossible transitions.
+
 `p_rate_enrichment_asymptotic` and its trait × match BH column remain exploratory
 diagnostics. `full_scan` calibration itself still permutes foreground clades
 against fixed ASR tensors; it does not simulate sequences or refit ancestors.

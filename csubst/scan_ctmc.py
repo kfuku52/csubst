@@ -3,6 +3,8 @@
 Stationary codon models with discrete rate categories, conditional on fitted Q/tree.
 No sampled ancestral states or products of separately inferred marginals.
 """
+from functools import lru_cache, partial
+
 import numpy as np
 from scipy.linalg import eigh, expm, expm_frechet
 
@@ -376,7 +378,19 @@ def set_branch_length_summaries(g, tensor):
     return g
 
 
-def simulate_tips(g, rng, ambiguity_partitions=None):
+def _tip_transition_cdf(q, length, rate):
+    p = np.maximum(expm(q * length * rate), 0)
+    p /= p.sum(axis=1, keepdims=True)
+    last_positive = p.shape[1] - 1 - (p[:, ::-1] > 0).argmax(axis=1)
+    np.cumsum(p, axis=1, out=p)
+    np.minimum(p, 1., out=p)
+    # Close the final supported interval without assigning rounding residue
+    # to any impossible states at the end of the row.
+    p[np.arange(p.shape[1]) >= last_positive[:, None]] = 1.
+    return p
+
+
+def simulate_tips(g, rng, ambiguity_partitions=None, *, transition_cdf=None):
     """Simulate whole alignments; retain the observed missing-tip mask."""
     if ambiguity_partitions is None:
         ambiguity_partitions = validate_parametric_inputs(g)
@@ -384,11 +398,18 @@ def simulate_tips(g, rng, ambiguity_partitions=None):
     original = g.get("scan_tip_emissions", g["state_cdn"])
     state = np.zeros_like(original)
     nsite = original.shape[1]
-    q = g["instantaneous_codon_rate_matrix"]
+    if transition_cdf is None:
+        transition_cdf = partial(_tip_transition_cdf, g["instantaneous_codon_rate_matrix"])
     pi = g["equilibrium_frequency"]
     from csubst import endpoint_io
     rates, weights = endpoint_io.model_rates(g)
-    categories = rng.choice(len(rates), size=nsite, p=weights) if len(rates) > 1 else np.zeros(nsite, dtype=int)
+    if len(rates) > 1:
+        categories = rng.choice(len(rates), size=nsite, p=weights)
+        category_sites = tuple(np.flatnonzero(categories == k) for k in range(len(rates)))
+    else:
+        category_sites = (np.arange(nsite),)
+    # Limit the gathered CDFs and Boolean comparisons to about 8 MiB.
+    draw_block = max(1, (8 * 1024**2) // (9 * len(pi)))
     draws = {}
     for node in g["tree"].traverse("preorder"):
         i = int(ete.get_prop(node, "numerical_label"))
@@ -397,11 +418,16 @@ def simulate_tips(g, rng, ambiguity_partitions=None):
         else:
             parent = int(ete.get_prop(node.up, "numerical_label"))
             draws[i] = np.zeros(nsite, dtype=int)
-            for category, rate in enumerate(rates):
-                selected = np.flatnonzero(categories == category)
-                p = np.maximum(expm(q * float(node.dist) * rate), 0)
-                p /= p.sum(axis=1, keepdims=True)
-                draws[i][selected] = (rng.random(len(selected))[:, None] > np.cumsum(p[draws[parent][selected]], axis=1)).sum(axis=1)
+            for rate, selected in zip(rates, category_sites):
+                if not len(selected):
+                    continue
+                cdf = transition_cdf(float(node.dist), float(rate))
+                for start in range(0, len(selected), draw_block):
+                    sites = selected[start:start + draw_block]
+                    uniforms = rng.random(len(sites))
+                    # Use the first cumulative probability strictly above u.
+                    # A zero-width interval never generates its state.
+                    draws[i][sites] = (uniforms[:, None] >= cdf[draws[parent][sites]]).sum(axis=1)
         if not ete.get_children(node):
             state[i, np.arange(nsite), draws[i]] = 1
             state[i, original[i].sum(axis=1) == 0] = 0
@@ -478,8 +504,11 @@ def calibrate(g, observed):
     observed_maximum = scan_statistics.maximum_score(observed)
     rng = np.random.default_rng(diagnostic["seed"])
     maxima = []
+    q = g["instantaneous_codon_rate_matrix"]
+    cache_items = max(1, (32 * 1024**2) // q.nbytes)
+    transition_cdf = lru_cache(maxsize=cache_items)(partial(_tip_transition_cdf, q))
     for index in range(count):
-        simulated = simulate_tips(g, rng, ambiguity_partitions)
+        simulated = simulate_tips(g, rng, ambiguity_partitions, transition_cdf=transition_cdf)
         simulated["scan_pvalue_calibration"] = "none"
         simulated, tensor = prepare(simulated)
         simulated = set_branch_length_summaries(simulated, tensor)
