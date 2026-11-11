@@ -256,6 +256,26 @@ def test_quadrature_bridge_contraction_matches_direct_frechet():
     np.testing.assert_allclose(actual, expected, atol=2e-15, rtol=1e-12)
 
 
+def test_short_bridge_retains_rare_return_jumps_in_a_sparse_chain():
+    n = 8
+    edges = np.arange(n - 1)
+    rates = .5 + edges / 8
+    q = np.zeros((n, n))
+    q[edges, edges + 1] = q[edges + 1, edges] = rates
+    np.fill_diagonal(q, -q.sum(axis=1))
+    length = 1e-8
+    a, b = np.eye(n)[[0]], np.eye(n)[[-1]]
+    evidence = expm(q * length)[[0], -1]
+    values, v, w = scan_ctmc._bridge_spectral(q, np.full(n, 1/n))
+    kernel = scan_ctmc._bridge_integral_kernel(values, length)
+    mass = scan_ctmc._conditioned_bridge_mass(q, length, a, b, evidence, v, w, kernel, np.arange(n))
+    # Crossing the chain takes n-1 forward jumps. A return on edge i adds
+    # its two jump rates and two time factors to the leading path term.
+    expected_reverse = (length * rates)**2 / (n * (n + 1))
+    np.testing.assert_allclose(mass[0, edges + 1, edges], expected_reverse, rtol=2e-7, atol=0.)
+    np.testing.assert_allclose(mass[0, edges, edges + 1], 1., rtol=0., atol=1e-14)
+
+
 def test_asymmetric_bridge_spectral_matches_frechet(monkeypatch):
     tr, ids, states, _ = fixture(1.2, 3)
     q = np.array([[-.25, .25], [1., -1.]])

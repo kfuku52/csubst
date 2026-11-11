@@ -80,8 +80,62 @@ def _bridge_integral_kernel(values, length):
     return integrals
 
 
+def _uniformized_bridge_mass(q, length, left, right, rate):
+    """Evaluate short-branch jump integrals using nonnegative powers."""
+    from scipy.sparse.csgraph import shortest_path
+
+    off = q > 0
+    distances = shortest_path(off, directed=True, unweighted=True)
+    reachable = np.isfinite(distances)
+    max_distance = int(np.max(distances, where=reachable, initial=0.))
+    # Both legs of an integral must include their shortest paths.
+    minimum_order = max(6, 2 * max_distance)
+    if minimum_order > 32:
+        return None
+    transition = np.eye(len(q)) + q / rate
+    tau = rate * length
+    row_norm = transition.sum(axis=1).max()
+    # Bound the tail using the actual row norm of the floating-point kernel.
+    tau_bound = tau * row_norm
+    if not 0 < tau_bound <= .05 or (transition < 0).any():
+        return None
+    source = (left > 0) @ reachable
+    target = (right > 0) @ reachable.T
+    possible = off & source[:, :, None] & target[:, None, :]
+    forward = [left]
+    backward = [right]
+    poisson = [np.exp(-tau)]
+    norm = left.sum(axis=1) * right.max(axis=1)
+    tolerance = np.finfo(float).eps / 4
+    for order in range(minimum_order, 33, 4):
+        while len(forward) <= order:
+            forward.append(forward[-1] @ transition)
+            backward.append(backward[-1] @ transition.T)
+            poisson.append(poisson[-1] * tau / (len(forward) - 1))
+        forward_array = np.stack(forward, axis=-1)
+        probabilities = np.asarray(poisson)
+        evidence = np.einsum('bki,bk,i->b', forward_array, right, probabilities)
+        tail = poisson[-1] * row_norm**order * tau_bound / (order + 1 - tau_bound)
+        error = norm * tail
+        if (evidence <= 0).any() or (error > tolerance * evidence).any():
+            continue
+        counts = np.arange(order + 1)
+        total = counts[:, None] + counts[None, :]
+        coefficients = probabilities / (1 + counts)
+        convolution = np.where(total <= order, coefficients[np.minimum(total, order)], 0.)
+        integral = (forward_array @ (length * convolution)) @ np.stack(backward, axis=1)
+        too_small = (integral <= 0) | (length * error[:, None, None] > tolerance * integral)
+        if (possible & too_small).any():
+            continue
+        mass = (integral / evidence[:, None, None]) * np.where(off, q, 0.)
+        if np.isfinite(mass).all():
+            return mass
+    return None
+
+
 def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
-    if (denom <= 0).any():
+    minimum_evidence = denom.min()
+    if minimum_evidence <= 0:
         raise ValueError("Impossible edge evidence under fitted CTMC.")
     left_message, right_message = a @ v, b @ w.T
     if isinstance(integrals, tuple):
@@ -94,11 +148,23 @@ def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
         mass = (w.T @ coefficients) @ v.T
     mass *= q
     mass[:, diagonal, diagonal] = 0
-    # Ill-conditioned evidence needs a stable direct Frechet derivative.
+    # Cancellation can dominate the spectral result when evidence is small.
     unstable = (mass.min(axis=(1, 2)) < -1e-10 * denom) | (denom < 1e-10)
-    if unstable.any():
-        mass[unstable] = bridge_kernel(q, length, a[unstable], b[unstable])
-    mass /= denom[:, None, None]
+    has_unstable = unstable.any()
+    short = unstable
+    replacement = None
+    if has_unstable or minimum_evidence < 1e-8:
+        rate = -q.diagonal().min()
+        if 0 < length * rate <= .05:
+            short = unstable | (denom < 1e-8)
+            replacement = _uniformized_bridge_mass(q, length, a[short], b[short], rate)
+    if replacement is not None:
+        np.divide(mass, denom[:, None, None], out=mass, where=~short[:, None, None])
+        mass[short] = replacement
+    else:
+        if has_unstable:
+            mass[unstable] = bridge_kernel(q, length, a[unstable], b[unstable])
+        mass /= denom[:, None, None]
     if mass.min() < -1e-8 or not np.isfinite(mass).all():
         raise ValueError("Numerically invalid CTMC posterior event mass.")
     return mass
