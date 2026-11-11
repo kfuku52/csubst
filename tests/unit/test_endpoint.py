@@ -192,3 +192,14 @@ def test_shared_transition_nonreversible_and_zero_generator():
         np.testing.assert_allclose(model.transition(branch, 0), expm(q * model.lengths[branch]), atol=1e-15)
     zero = EndpointModel([-1, 0], [0, 10], np.zeros((3, 3)), np.ones(3) / 3)
     np.testing.assert_array_equal(zero.transition(1, 0), np.eye(3))
+
+
+def test_short_transition_series_covers_disconnected_components():
+    n = 16
+    t = 1e-8
+    q = np.kron(np.eye(n // 2), [[-1., 1.], [1., -1.]])
+    model = EndpointModel([-1, 0], [0, t], q, np.full(n, 1/n))
+    change = -.5 * np.expm1(-2 * t)
+    expected = np.kron(np.eye(n // 2), [[1 - change, change], [change, 1 - change]])
+    np.testing.assert_allclose(model.transition(1, 0), expected, rtol=2e-14, atol=0.)
+    assert model._uniform_count < n

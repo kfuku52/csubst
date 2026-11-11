@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy.linalg import expm
+from scipy.sparse.csgraph import shortest_path
 from scipy.special import logsumexp
 
 
@@ -77,6 +78,10 @@ class EndpointModel:
         self.leaves = {i for i, children in enumerate(self.children) if not children}
         self._transitions = OrderedDict()
         self._uniform_rate = float(np.max(-np.diag(self.q)))
+        # The truncated sum needs to include a path to every reachable pair
+        # before a relative Poisson-tail bound can certify all entries.
+        distances = shortest_path(off > 0, directed=True, unweighted=True)
+        self._support_steps = int(np.max(distances, where=np.isfinite(distances), initial=0.))
         # Share nonnegative uniformization powers across all edge lengths and
         # categories. Cap this cache independently of the transition cache.
         capacity = min(256, max(1, (8 * 1024 * 1024) // (8 * k * k)))
@@ -100,14 +105,14 @@ class EndpointModel:
         if tau == 0:
             return np.eye(self.pi.size)
         capacity = self._uniform_powers.shape[0]
-        if tau > 32 or capacity < self.pi.size:
+        if tau > 32 or capacity <= self._support_steps:
             return None
         coefficients = np.empty(capacity)
         coefficients[0] = np.exp(-tau)
         target = 1e-18
         for n in range(1, capacity):
             coefficients[n] = coefficients[n - 1] * tau / n
-            if n < self.pi.size - 1 or n + 1 <= tau:
+            if n < self._support_steps or n + 1 <= tau:
                 continue
             tail = coefficients[n] * tau / (n + 1 - tau)
             if tail > target:
