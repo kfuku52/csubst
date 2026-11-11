@@ -276,6 +276,48 @@ def test_short_bridge_retains_rare_return_jumps_in_a_sparse_chain():
     np.testing.assert_allclose(mass[0, edges, edges + 1], 1., rtol=0., atol=1e-14)
 
 
+@pytest.mark.parametrize('rates,weights', [((1.,), (1.,)), ((1., 1.), (.5, .5))])
+def test_bridge_tree_resolves_short_branches_with_many_required_jumps(rates, weights):
+    n = 20
+    first, second = 1e-4, 2e-4
+    tr = tree.add_numerical_node_labels(ete.PhyloNode(f'(L:{first},R:{second})root;', format=1))
+    ids = {node.name: int(ete.get_prop(node, 'numerical_label')) for node in tr.traverse()}
+    tips = np.zeros((len(ids), 1, n))
+    tips[ids['L'], 0, 0] = tips[ids['R'], 0, -1] = 1.
+    edges = np.arange(n - 1)
+    q = np.zeros((n, n))
+    q[edges, edges + 1] = q[edges + 1, edges] = 1.
+    moves = q / 2
+    np.fill_diagonal(q, -q.sum(axis=1))
+    walk = np.eye(n) + q / 2
+
+    def path_moments(length):
+        # Count moves directly in the embedded chain, carrying the first
+        # moment along each path. The common exp(-2*length) cancels below.
+        state = np.eye(n)[0]
+        count = np.zeros(n)
+        likelihood, mass = state.copy(), count.copy()
+        coefficient = 1.
+        for steps in range(1, 81):
+            count = count @ walk + state @ moves
+            state = state @ walk
+            coefficient *= 2 * length / steps
+            likelihood += coefficient * state
+            mass += coefficient * count
+        return likelihood, mass
+
+    left, _ = path_moments(first)
+    right, _ = path_moments(second)
+    root = left * right[::-1]
+    likelihood, mass = path_moments(first + second)
+    posterior, events = scan_ctmc.infer(tr, tips, q, np.full(n, 1/n), np.arange(n), 'bridge',
+                                       rates=rates, weights=weights)
+    np.testing.assert_allclose(posterior[ids['root'], 0], root / root.sum(), rtol=2e-13, atol=0.)
+    # Reversibility makes the two-edge path equivalent to one edge whose
+    # length is the sum, including the number of state-changing jumps.
+    assert events.sum() == pytest.approx(mass[-1] / likelihood[-1], rel=5e-14)
+
+
 def test_asymmetric_bridge_spectral_matches_frechet(monkeypatch):
     tr, ids, states, _ = fixture(1.2, 3)
     q = np.array([[-.25, .25], [1., -1.]])

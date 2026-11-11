@@ -11,6 +11,8 @@ from scipy.linalg import eigh, expm, expm_frechet
 from csubst import ete
 
 _SCAN_IN_MEMORY_BYTES = 64 * 1024**2
+_SHORT_BRIDGE_TAU = .05
+_BRIDGE_MAX_UNIFORMIZATION_ORDER = 128
 
 
 def _normalize(x):
@@ -90,14 +92,14 @@ def _uniformized_bridge_mass(q, length, left, right, rate):
     max_distance = int(np.max(distances, where=reachable, initial=0.))
     # Both legs of an integral must include their shortest paths.
     minimum_order = max(6, 2 * max_distance)
-    if minimum_order > 32:
+    if minimum_order > _BRIDGE_MAX_UNIFORMIZATION_ORDER:
         return None
     transition = np.eye(len(q)) + q / rate
     tau = rate * length
     row_norm = transition.sum(axis=1).max()
     # Bound the tail using the actual row norm of the floating-point kernel.
     tau_bound = tau * row_norm
-    if not 0 < tau_bound <= .05 or (transition < 0).any():
+    if not 0 < tau_bound <= _SHORT_BRIDGE_TAU or (transition < 0).any():
         return None
     source = (left > 0) @ reachable
     target = (right > 0) @ reachable.T
@@ -107,7 +109,7 @@ def _uniformized_bridge_mass(q, length, left, right, rate):
     poisson = [np.exp(-tau)]
     norm = left.sum(axis=1) * right.max(axis=1)
     tolerance = np.finfo(float).eps / 4
-    for order in range(minimum_order, 33, 4):
+    for order in range(minimum_order, _BRIDGE_MAX_UNIFORMIZATION_ORDER + 1, 4):
         while len(forward) <= order:
             forward.append(forward[-1] @ transition)
             backward.append(backward[-1] @ transition.T)
@@ -155,7 +157,7 @@ def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
     replacement = None
     if has_unstable or minimum_evidence < 1e-8:
         rate = -q.diagonal().min()
-        if 0 < length * rate <= .05:
+        if 0 < length * rate <= _SHORT_BRIDGE_TAU:
             short = unstable | (denom < 1e-8)
             replacement = _uniformized_bridge_mass(q, length, a[short], b[short], rate)
     if replacement is not None:
@@ -235,9 +237,6 @@ def _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summarie
     n, sites, states = tip_states.shape
     if model is None:
         model = _endpoint_model(nodes, n, q, pi, rates, weights)
-    elif not (np.array_equal(model.q, q) and np.array_equal(model.pi, pi)
-              and np.array_equal(model.rates, rates) and np.array_equal(model.weights, weights)):
-        raise ValueError('Fitted transition parameters changed during fixed-model calibration.')
     tips = {}
     missing = {}
     for node in nodes:
@@ -337,28 +336,36 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
     """
     if mode not in ("joint", "bridge"):
         raise ValueError("Unknown CTMC observation mode.")
+    if endpoint_model is not None and not (
+        np.array_equal(endpoint_model.q, q) and np.array_equal(endpoint_model.pi, pi)
+        and np.array_equal(endpoint_model.rates, rates) and np.array_equal(endpoint_model.weights, weights)
+    ):
+        raise ValueError('Fitted transition parameters changed during fixed-model calibration.')
     if mode == 'joint':
         return _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights,
                                       disk_backed, model=endpoint_model)
     if len(rates) != 1 or float(rates[0]) != 1 or len(weights) != 1 or float(weights[0]) != 1:
         return _infer_endpoint_blocks(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights,
                                       disk_backed, bridge=True, model=endpoint_model)
-    return _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_backed)
+    return _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_backed, model=endpoint_model)
 
 
-def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_backed):
+def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_backed, model=None):
     from csubst import site_storage
 
-    q, pi = np.asarray(q, float), np.asarray(pi, float)
     nodes = list(tree.traverse("preorder"))
+    n, sites, states = tip_states.shape
+    if model is None:
+        model = _endpoint_model(nodes, n, q, pi, (1.,), (1.,))
+    q, pi = model.q, model.pi
     order = [int(ete.get_prop(node, "numerical_label")) for node in nodes]
     children = {i: [int(ete.get_prop(child, "numerical_label")) for child in ete.get_children(node)]
                 for i, node in zip(order, nodes)}
     lengths = {i: float(node.dist) for i, node in zip(order[1:], nodes[1:])}
     values, v, w = _bridge_spectral(q, pi)
-    kernels = {length: (expm(q * length), _bridge_integral_kernel(values, length))
-               for length in dict.fromkeys(lengths.values())}
-    n, sites, states = tip_states.shape
+    length_to_child = {length: child for child, length in lengths.items()}
+    kernels = {length: (model.transition(child, 0), _bridge_integral_kernel(values, length))
+               for length, child in length_to_child.items()}
     groups = np.asarray(groups, int)
     num_groups = int(groups.max()) + 1
     projection = np.eye(num_groups)[groups]
@@ -706,11 +713,9 @@ def calibrate(g, observed):
     cache_items = max(1, (32 * 1024**2) // q.nbytes)
     transition_cdf = lru_cache(maxsize=cache_items)(partial(_tip_transition_cdf, q))
     rates, weights = endpoint_io.model_rates(g)
-    model = None
-    if g["scan_observation"] == "joint" or len(rates) > 1 or rates[0] != 1.:
-        # Only the fitted transition matrices carry over between replicates.
-        model = _endpoint_model(list(g["tree"].traverse("preorder")), g["state_cdn"].shape[0],
-                                q.copy(), np.array(g["equilibrium_frequency"]), rates, weights)
+    # Only the fitted transition matrices carry over between replicates.
+    model = _endpoint_model(list(g["tree"].traverse("preorder")), g["state_cdn"].shape[0],
+                            q.copy(), np.array(g["equilibrium_frequency"]), rates, weights)
     exposure_cache: dict = {}
     for index in range(count):
         simulated = simulate_tips(g, rng, ambiguity_partitions, transition_cdf=transition_cdf)

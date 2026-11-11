@@ -56,8 +56,11 @@ the nonsynonymous tensor. Spectral divided differences evaluate the integral
 for reversible Q; ill-conditioned boundary likelihoods use a direct adjoint
 Frechet derivative or a positive uniformization series on short branches.
 The series checks the omitted Poisson tail against both the likelihood and
-the jump integrals. For a discrete rate mixture, the calculation uses time
-`t × rate` separately in each category, then averages jump counts using
+the jump integrals. Both uniform-rate and mixture pruning use the shared
+transition calculation, which resolves rare transitions on sparse branches
+with a nonnegative series when its tail bound is met. For a discrete rate
+mixture, the calculation uses time `t × rate` separately in each category,
+then averages jump counts using
 P(category | all tips). A zero-rate category contributes zero jumps.
 Gauss–Legendre quadrature can factor the spectral integral into smaller
 matrix products. The implementation checks each reconstructed entry against
