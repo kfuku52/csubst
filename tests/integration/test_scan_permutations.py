@@ -176,6 +176,29 @@ def test_empirical_pvalue_rejects_an_inconsistent_denominator():
         )
 
 
+def test_permutation_chunk_counts_ties_and_absent_candidates(monkeypatch):
+    observed = pd.DataFrame({
+        'trait': 'trait', 'target_class': 'foreground', 'scan_match': 'any2spe',
+        'site': [0, 1, 2, 3], 'from_state_ids': '0', 'to_state_ids': '1',
+        'score_rate_enrichment': [2., 2., 0., np.nan],
+    })
+    keys = [substitution_scan._scan_row_key(row) for row in observed.to_dict('records')]
+    scores = [{keys[0]: 2. - 1e-13, keys[1]: 2. - 4e-12}, {}, {keys[0]: 3.}]
+
+    def permutation(permutation_index, **kwargs):
+        candidates = scores[permutation_index - 1]
+        return dict(success=True, diagnostic={}, candidate_scores=candidates,
+                    max_score=max(candidates.values(), default=-np.inf))
+
+    monkeypatch.setattr(substitution_scan, '_run_scan_permutation', permutation)
+    result = substitution_scan._run_scan_permutation_chunk(
+        np.arange(1, 4), {}, observed, set(keys), 'full_scan', [], None, None, None, None, {'q_context': {}},
+    )
+    assert result['success_count'] == 3
+    np.testing.assert_array_equal(result['exceedances'], [2, 0])
+    assert result['max_score'] == [2. - 1e-13, -np.inf, 3.]
+
+
 def test_scan_rate_event_mode_posterior_sum_keeps_low_pp_background_mass_for_rates():
     g, on_tensor = _toy_scan_context()
     labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in g["tree"].traverse()}

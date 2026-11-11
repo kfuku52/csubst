@@ -98,6 +98,11 @@ def calibration_score(row):
     raise ValueError('Undefined rate score in selected candidates; null replicate cannot be omitted.')
 
 
+def _empirical_upper_tail(observed, reference):
+    # The inclusive tail also counts roundoff-sized gaps below observation.
+    return (observed - reference) <= (1e-12 + 1e-12 * observed)
+
+
 def empirical_pvalue(observed, reference, expected_count=None, exact=False):
     """Inclusive upper tail; +1 for Monte Carlo, no offset for enumeration.
 
@@ -113,7 +118,6 @@ def empirical_pvalue(observed, reference, expected_count=None, exact=False):
         return np.nan
     if observed <= 0:
         return 1.0  # No foreground enrichment, even when null draws have no candidate.
-    ties = np.isclose(values, observed, rtol=1e-12, atol=1e-12)
-    exceedances = np.count_nonzero((values >= observed) | ties)
+    exceedances = np.count_nonzero(_empirical_upper_tail(observed, values))
     offset = 0 if exact else 1
     return float((offset + exceedances) / (offset + values.size))

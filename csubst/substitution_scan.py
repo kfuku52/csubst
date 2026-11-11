@@ -2712,6 +2712,9 @@ def _scan_permutation_seed(base_seed, permutation_index):
     return int((int(base_seed) + int(permutation_index)) % modulus)
 
 
+_SCAN_KEY_COLUMNS = ["trait", "target_class", "scan_match", "site", "from_state_ids", "to_state_ids"]
+
+
 def _scan_row_key(row):
     return (
         str(row["trait"]),
@@ -2913,10 +2916,9 @@ def _run_scan_permutation(
         # Empty/testability-excluded families are successful no-test outcomes.
         # Every configuration contributes once, even when a key is absent.
         max_score = float(scores.max()) if len(scores) else -np.inf
-        row_key_to_score = {key: [float(perm_by_key.get(key, -np.inf))] for key in observed_keys}
         diagnostic.update(status="success", max_score=None if max_score == -np.inf else max_score)
         return {
-            "success": True, "max_score": max_score, "row_key_to_score": row_key_to_score,
+            "success": True, "max_score": max_score, "candidate_scores": perm_by_key,
             "failure_reason": "", "diagnostic": diagnostic,
         }
     except Exception as exc:
@@ -2925,7 +2927,7 @@ def _run_scan_permutation(
         if isinstance(exc, scan_permutation.SamplingError):
             diagnostic["sampling_attempts"] = exc.attempts
         return {
-            "success": False, "max_score": np.nan, "row_key_to_score": {},
+            "success": False, "max_score": np.nan, "candidate_scores": {},
             "failure_reason": reason, "diagnostic": diagnostic,
         }
 
@@ -2946,17 +2948,23 @@ def _run_scan_permutation_chunk(
     g, scan_static = _unpack_scan_worker_context(g=g, scan_static=scan_static)
     ON_tensor = _unpack_scan_tensor_for_worker(ON_tensor)
     rate_ON_tensor = _unpack_scan_tensor_for_worker(rate_ON_tensor)
+    records = observed_df.loc[:, _SCAN_KEY_COLUMNS].to_dict('records')
     if calibration == 'candidate_fixed':
         scan_static['_fixed_candidates'] = [
             (row, _parse_id_list(row['from_state_ids']), _parse_id_list(row['to_state_ids']))
-            for row in observed_df.to_dict('records')]
+            for row in records]
+    scores = observed_df['score_rate_enrichment'].to_numpy(dtype=np.float64)
+    enriched = np.isfinite(scores) & (scores > 0)
+    test_keys = tuple(_scan_row_key(records[i]) for i in np.flatnonzero(enriched))
+    tested_scores = scores[enriched]
+    exceedances = np.zeros(len(test_keys), dtype=np.int64)
     summary: dict[str, Any] = {
         "success_count": 0,
         "failure_count": 0,
         "failure_reasons": [],
         "diagnostics": [],
         "max_score": [],
-        "row_key_to_score": {},
+        "exceedances": exceedances,
     }
     for permutation_index in np.asarray(
         permutation_indices, dtype=np.int64
@@ -2983,10 +2991,12 @@ def _run_scan_permutation_chunk(
             continue
         summary["success_count"] += 1
         summary["max_score"].append(float(result["max_score"]))
-        for key, pvalues in result.get("row_key_to_score", {}).items():
-            summary["row_key_to_score"].setdefault(key, []).extend(
-                float(value) for value in pvalues
-            )
+        reference = result["candidate_scores"]
+        trial_scores = np.fromiter((reference.get(key, -np.inf) for key in test_keys),
+                                   dtype=np.float64, count=len(test_keys))
+        # Absent candidates contribute -inf. Only positive observed scores need
+        # a tail count, and each assignment still contributes to the denominator.
+        exceedances += scan_statistics._empirical_upper_tail(tested_scores, trial_scores)
     return summary
 
 
@@ -3153,8 +3163,8 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         return _finish_scan_calibration(g, observed_df, diagnostic)
     observed_scores = observed_df["score_rate_enrichment"].to_numpy(dtype=np.float64)
     diagnostic["observed"]["max_score"] = None if observed_maximum == -np.inf else observed_maximum
-    row_key_to_perm_score: dict[tuple, list[float]] = {_scan_row_key(row): [] for _, row in observed_df.iterrows()}
-    observed_keys = set(row_key_to_perm_score)
+    observed_candidates = observed_df.loc[:, _SCAN_KEY_COLUMNS + ["score_rate_enrichment"]]
+    observed_keys = {_scan_row_key(row) for row in observed_candidates.to_dict('records')}
     if len(observed_keys) != len(observed_df):
         raise ValueError("Duplicate observed candidate keys in scan calibration.")
     exact = sampler.configurations is not None and len(sampler.configurations) <= requested_count
@@ -3182,7 +3192,7 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         worker_g, worker_scan_static = g, scan_static
         worker_ON_tensor, worker_rate_ON_tensor = ON_tensor, rate_ON_tensor
     permutation_args = [
-        (chunk, worker_g, observed_df, observed_keys, calibration, trait_names, branch_meta,
+        (chunk, worker_g, observed_candidates, observed_keys, calibration, trait_names, branch_meta,
          valid_branch_ids, worker_ON_tensor, worker_rate_ON_tensor, worker_scan_static)
         for chunk in permutation_chunks
     ]
@@ -3198,8 +3208,6 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
     for result in chunk_results:
         diagnostic["trials"].extend(result["diagnostics"])
         max_perm_score.extend(result["max_score"])
-        for key, values in result["row_key_to_score"].items():
-            row_key_to_perm_score[key].extend(values)
     diagnostic["trials"].sort(key=lambda trial: trial["permutation_index"])
     out = observed_df.copy()
     out["scan_permutation_backend"] = backend
@@ -3213,10 +3221,16 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
         ), flush=True)
         # Never silently change the null to the subset of successful trials.
         return _finish_scan_calibration(g, out, diagnostic)
-    out["p_rate_enrichment_empirical"] = [
-        _empirical_p_from_scores(float(row["score_rate_enrichment"]), row_key_to_perm_score[_scan_row_key(row)], n_permutations, exact=exact)
-        for _, row in out.iterrows()
-    ]
+    if sum(result["success_count"] for result in chunk_results) != n_permutations:
+        raise ValueError("Each scan configuration must contribute exactly one null statistic.")
+    enriched = np.isfinite(observed_scores) & (observed_scores > 0)
+    pvalues = np.full(len(out), np.nan)
+    pvalues[observed_scores <= 0] = 1.
+    exceedances = sum((result["exceedances"] for result in chunk_results),
+                      np.zeros(np.count_nonzero(enriched), dtype=np.int64))
+    offset = 0 if exact else 1
+    pvalues[enriched] = (offset + exceedances) / (offset + n_permutations)
+    out["p_rate_enrichment_empirical"] = pvalues
     if calibration == "full_scan":
         out["p_rate_enrichment_empirical_maxT"] = [
             _empirical_p_from_scores(score, max_perm_score, n_permutations, exact=exact) for score in observed_scores
