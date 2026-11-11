@@ -54,9 +54,10 @@ This counts every within-edge jump, including changes on paths that return to
 the initial state. Synonymous/within-group jumps are excluded when accumulating
 the nonsynonymous tensor. Spectral divided differences evaluate the integral
 for reversible Q; ill-conditioned boundary likelihoods use a direct adjoint
-Frechet derivative. Calculations process bounded site blocks, without storing
-a full branch × site × codon × codon posterior array. The final grouped event
-tensor and pruning messages are held in memory.
+Frechet derivative. Pruning and jump calculations process bounded site blocks.
+When the grouped event tensor exceeds 64 MiB, bridge writes it to the same
+site-major temporary storage as joint inference. The scan reads back
+individual sites or bounded blocks.
 
 `endpoint` exposure with `joint` observations uses the finite-time endpoint
 opportunity described in [SCAN_ENDPOINT.md](SCAN_ENDPOINT.md). With `bridge`

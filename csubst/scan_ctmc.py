@@ -161,80 +161,101 @@ def infer(tree, tip_states, q, pi, groups, mode="joint", block_size=32, summarie
         return _joint_infer(tree, tip_states, q, pi, groups, block_size, summaries, rates, weights, disk_backed)
     if len(rates) != 1 or float(rates[0]) != 1 or len(weights) != 1 or float(weights[0]) != 1:
         raise ValueError('CTMC bridge currently requires uniform unit rates; use joint for discrete rate mixtures.')
+    return _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_backed)
+
+
+def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_backed):
+    from csubst import site_storage
+
     q, pi = np.asarray(q, float), np.asarray(pi, float)
     nodes = list(tree.traverse("preorder"))
-    def label(node):
-        return int(ete.get_prop(node, "numerical_label"))
+    order = [int(ete.get_prop(node, "numerical_label")) for node in nodes]
+    children = {i: [int(ete.get_prop(child, "numerical_label")) for child in ete.get_children(node)]
+                for i, node in zip(order, nodes)}
+    lengths = {i: float(node.dist) for i, node in zip(order[1:], nodes[1:])}
+    values, v, w = _bridge_spectral(q, pi)
+    kernels = {length: (expm(q * length), _integrals(values, length))
+               for length in dict.fromkeys(lengths.values())}
     n, sites, states = tip_states.shape
     groups = np.asarray(groups, int)
-    projection = np.eye(int(groups.max()) + 1)[groups]
-    transition = {label(node): expm(q * float(node.dist)) for node in nodes if not ete.is_root(node)}
-    down = np.ones((n, sites, states))
-    messages = {}
-    for node in reversed(nodes):
-        i = label(node)
-        children = ete.get_children(node)
-        if not children:
-            emission = np.asarray(tip_states[i], float).copy()
-            emission[emission.sum(axis=1) == 0] = 1
-            down[i] = _normalize(emission)
-        else:
-            for child in children:
-                j = label(child)
-                messages[j] = down[j] @ transition[j].T
-                down[i] = _normalize(down[i] * messages[j])
-    outside = np.zeros_like(down)
-    root_id = label(tree)
-    outside[root_id] = pi
-    posterior = np.zeros_like(down)
-    tensor = np.zeros((n, sites, 1, projection.shape[1], projection.shape[1]))
+    num_groups = int(groups.max()) + 1
+    projection = np.eye(num_groups)[groups]
+    shape = (n, sites, 1, num_groups, num_groups)
+    posterior = np.zeros_like(tip_states, dtype=float)
+    if disk_backed:
+        per_site = n * num_groups**2 * 8
+        block_size = min(block_size, max(1, (32 * 1024**2) // per_site))
+        tensor = site_storage.SiteEventTensor(shape)
+        event_buffer = np.zeros((min(block_size, sites), n, *shape[2:]))
+    else:
+        tensor = np.zeros(shape)
     if summaries is not None:
         summaries["synonymous_counts"] = np.zeros(n)
-    spectral = _bridge_spectral(q, pi) if mode == "bridge" else None
-    for node in nodes:
-        i = label(node)
-        posterior[i] = _normalize(outside[i] * down[i])
-        children = ete.get_children(node)
-        for child in children:
-            j = label(child)
-            a = outside[i].copy()
-            for sibling in children:
-                if sibling is not child:
-                    a = _normalize(a * messages[label(sibling)])
-            a = _normalize(a)
-            outside[j] = _normalize(a @ transition[j])
-            b = down[j]
-            denom = np.einsum("si,ij,sj->s", a, transition[j], b)
-            if (denom <= 0).any():
-                raise ValueError("Impossible edge evidence under fitted CTMC.")
-            if spectral is not None:
-                values, v, w = spectral
-                integrals = _integrals(values, float(child.dist))
-            for start in range(0, sites, block_size):
-                stop = min(start + block_size, sites)
-                aa, bb = a[start:stop], b[start:stop]
-                if mode == "joint":
-                    mass = aa[:, :, None] * transition[j] * bb[:, None, :]
-                else:
-                    coefficients = (aa @ v)[:, :, None] * (bb @ w.T)[:, None, :] * integrals
-                    mass = np.einsum("ia,sab,bj->sij", w.T, coefficients, v.T, optimize=True) * q
-                    ix = np.arange(states)
-                    mass[:, ix, ix] = 0
-                    # Ill-conditioned evidence needs a stable direct Frechet derivative.
-                    unstable = (mass.min(axis=(1, 2)) < -1e-10 * denom[start:stop]) | (denom[start:stop] < 1e-10)
-                    if unstable.any():
-                        mass[unstable] = bridge_kernel(q, float(child.dist), aa[unstable], bb[unstable])
-                mass /= denom[start:stop, None, None]
+
+    workspace = (n, min(block_size, sites), states)
+    down_buffer = np.empty(workspace)
+    outside_buffer = np.empty(workspace)
+    messages_buffer = np.empty(workspace)
+    state_diagonal = np.arange(states)
+    group_diagonal = np.arange(num_groups)
+    for start in range(0, sites, block_size):
+        stop = min(start + block_size, sites)
+        sl = slice(start, stop)
+        size = stop - start
+        down = down_buffer[:, :size]
+        outside = outside_buffer[:, :size]
+        messages = messages_buffer[:, :size]
+        events = event_buffer[:size].swapaxes(0, 1) if disk_backed else tensor[:, sl]
+        for i in reversed(order):
+            if not children[i]:
+                emission = np.asarray(tip_states[i, sl], float).copy()
+                emission[emission.sum(axis=1) == 0] = 1
+                down[i] = _normalize(emission)
+            else:
+                down[i].fill(1)
+                for child in children[i]:
+                    transition, _ = kernels[lengths[child]]
+                    messages[child] = down[child] @ transition.T
+                    down[i] = _normalize(down[i] * messages[child])
+        outside[order[0]] = pi
+        for i in order:
+            posterior[i, sl] = _normalize(outside[i] * down[i])
+            for child in children[i]:
+                a = outside[i].copy()
+                for sibling in children[i]:
+                    if sibling != child:
+                        a = _normalize(a * messages[sibling])
+                a = _normalize(a)
+                length = lengths[child]
+                transition, integrals = kernels[length]
+                outside[child] = _normalize(a @ transition)
+                b = down[child]
+                denom = np.einsum("si,ij,sj->s", a, transition, b)
+                if (denom <= 0).any():
+                    raise ValueError("Impossible edge evidence under fitted CTMC.")
+                coefficients = (a @ v)[:, :, None] * (b @ w.T)[:, None, :] * integrals
+                mass = np.einsum("ia,sab,bj->sij", w.T, coefficients, v.T, optimize=True)
+                mass *= q
+                mass[:, state_diagonal, state_diagonal] = 0
+                # Ill-conditioned evidence needs a stable direct Frechet derivative.
+                unstable = (mass.min(axis=(1, 2)) < -1e-10 * denom) | (denom < 1e-10)
+                if unstable.any():
+                    mass[unstable] = bridge_kernel(q, length, a[unstable], b[unstable])
+                mass /= denom[:, None, None]
                 if mass.min() < -1e-8 or not np.isfinite(mass).all():
                     raise ValueError("Numerically invalid CTMC posterior event mass.")
                 if summaries is not None and "eligible" in summaries:
-                    mass[~summaries["eligible"][j, start:stop]] = 0
+                    mass[~summaries["eligible"][child, sl]] = 0
+                np.maximum(mass, 0, out=mass)
                 if summaries is not None:
-                    summaries["synonymous_counts"][j] += np.einsum("sij,ij->", np.maximum(mass, 0), summaries["synonymous_mask"])
-                grouped = np.einsum("ig,sij,jh->sgh", projection, np.maximum(mass, 0), projection, optimize=True)
-                ix = np.arange(projection.shape[1])
-                grouped[:, ix, ix] = 0
-                tensor[j, start:stop, 0] = grouped
+                    summaries["synonymous_counts"][child] += np.einsum("sij,ij->", mass, summaries["synonymous_mask"])
+                grouped = np.einsum("ig,sij,jh->sgh", projection, mass, projection, optimize=True)
+                grouped[:, group_diagonal, group_diagonal] = 0
+                events[child, :, 0] = grouped
+        if disk_backed:
+            tensor.write_block(start, event_buffer[:size])
+    if disk_backed:
+        tensor.seal()
     return posterior, tensor
 
 
@@ -303,9 +324,9 @@ def prepare(g):
     rates, weights = endpoint_io.model_rates(g)
     n, sites, states = g['state_cdn'].shape
     stored_bytes = n * sites * (int(groups.max() + 1)**2 + (len(rates) * states if len(rates) > 1 else 0)) * 8
-    disk_backed = g['scan_observation'] == 'joint' and stored_bytes > _SCAN_IN_MEMORY_BYTES
+    disk_backed = stored_bytes > _SCAN_IN_MEMORY_BYTES
     if disk_backed:
-        print('Scan endpoints: storing {:,} bytes in site-major temporary files; bounded site reads.'.format(stored_bytes), flush=True)
+        print('Scan CTMC events: storing {:,} bytes in site-major temporary files; bounded site reads.'.format(stored_bytes), flush=True)
     posterior, tensor = infer(g["tree"], g["state_cdn"], g["instantaneous_codon_rate_matrix"],
                               g["equilibrium_frequency"], groups, g["scan_observation"], summaries=summaries,
                               rates=rates, weights=weights, block_size=g.get('endpoint_block_size', 64),

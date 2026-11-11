@@ -245,7 +245,7 @@ alive until their work finishes. Small inputs retain the in-memory route.
 This trades disk I/O and temporary space for lower peak RAM. The files are
 cleaned up with their owning arrays/run; `CSUBST_TMPDIR` selects the run's
 temporary directory. Scan endpoint metadata records `storage` as `memory` or
-`site_files`. CTMC bridge mode retains its existing storage implementation.
+`site_files`. CTMC bridge mode uses the same threshold for its jump event tensor.
 
 Joint scan uses the same classified-event reducer as search to avoid expanding
 every codon pair before amino-acid aggregation. Synonymous totals are contracted

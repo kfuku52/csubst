@@ -68,6 +68,30 @@ def test_missing_data_and_group_aggregation():
     assert grouped.sum() == 0
 
 
+def test_bridge_site_blocks_match_dense_with_masks_and_synonymous_counts():
+    from csubst import site_storage
+
+    tr, ids, states, q = fixture(.25, 5)
+    states[ids['A'], 1] = 0.
+    states[ids['B'], 2] = [.25, .75]
+    states[ids['C'], 3] = [1., 0.]
+    eligible = np.ones(states.shape[:2], dtype=bool)
+    eligible[ids['A'], 1] = False
+    mask = np.array([[False, False], [True, False]])
+    dense_summary = dict(eligible=eligible, synonymous_mask=mask)
+    disk_summary = dict(dense_summary)
+    post, dense = scan_ctmc.infer(tr, states, q, [.5, .5], [0, 1], 'bridge',
+                                  block_size=5, summaries=dense_summary)
+    actual_post, disk = scan_ctmc.infer(tr, states, q, [.5, .5], [0, 1], 'bridge',
+                                         block_size=2, summaries=disk_summary, disk_backed=True)
+    assert isinstance(disk, site_storage.SiteEventTensor)
+    np.testing.assert_allclose(actual_post, post, atol=1e-14, rtol=1e-13)
+    np.testing.assert_allclose(disk.read_sites(0, 5).swapaxes(0, 1), dense, atol=1e-14, rtol=1e-13)
+    np.testing.assert_allclose(disk.branch_site, dense.sum(axis=(2, 3, 4)))
+    np.testing.assert_allclose(disk_summary['synonymous_counts'], dense_summary['synonymous_counts'])
+    assert not disk.read_site(1)[ids['A']].any()
+
+
 @pytest.mark.parametrize('disk_backed', [False, True])
 def test_parametric_bootstrap_repeats_asr_and_candidate_selection(monkeypatch, disk_backed):
     if disk_backed:
