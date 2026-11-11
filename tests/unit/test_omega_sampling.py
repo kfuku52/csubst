@@ -54,6 +54,34 @@ def test_urn_overlap_preserves_arithmetic_across_row_blocks(monkeypatch, arity, 
     np.testing.assert_array_equal(actual, reference)
 
 
+@pytest.mark.parametrize('rounding,expected_calls', [('round', 3), ('stochastic', 4)])
+def test_urn_overlap_reuses_identical_profiles_and_draw_sizes(rounding, expected_calls):
+    weights = np.array([[.4, .3, .2, .1], [.4, .3, .2, .1], [.4, .3, .2, .1], [.1, .2, .3, .4]])
+    branch_sizes = np.array([1.2, 1.2, 2., 1.2])
+    ids = np.array([[0, 1], [0, 2], [2, 3]])
+    g = {'omega_pvalue_rounding': rounding}
+    calls = []
+
+    def inclusion(site_weights, draw_size, float_type):
+        calls.append((site_weights[0], draw_size))
+        return omega._calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type)
+
+    actual = omega._calc_weighted_urn_expected_overlap(ids, weights, branch_sizes, g, np.float64, inclusion)
+    assert len(calls) == expected_calls
+    assert len(calls) == len(set(calls))
+    reference = []
+    for row, size in zip(weights, branch_sizes):
+        lo = int(size)
+        first = omega._calc_fisher_inclusion_probabilities(row, lo)
+        if rounding == 'stochastic':
+            frac = size - lo
+            second = omega._calc_fisher_inclusion_probabilities(row, lo + 1)
+            first = (1. - frac) * first + frac * second
+        reference.append(first)
+    expected = omega._calc_cb_site_overlap(ids, reference, np.float64)
+    np.testing.assert_array_equal(actual, expected)
+
+
 @pytest.mark.parametrize('weights,size,expected', [
     ([1e-100, 2e-100, 1e-100], 1, [.25, .5, .25]),
     ([1e300, 2e-300, 1e-300], 2, [1., 2/3, 1/3]),

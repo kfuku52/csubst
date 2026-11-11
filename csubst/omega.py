@@ -14,6 +14,7 @@ import sys
 import time
 import warnings
 from collections import defaultdict
+from functools import lru_cache
 
 from csubst.omega_statistics import (
     _count_rates,
@@ -873,6 +874,20 @@ def _normalize_sub_sites_for_urn_overlap(sub_sites, num_branch):
     return sub_sites
 
 
+def _urn_weight_profile_ids(sub_sites):
+    """Identify exact repeated branch weight rows without retaining row copies."""
+    if sub_sites.strides[0] == 0:
+        return np.zeros(len(sub_sites), dtype=np.int64)
+    representatives: dict[int, int] = {}
+    ids = np.arange(len(sub_sites), dtype=np.int64)
+    for branch_id, row in enumerate(sub_sites):
+        digest = hash(row.tobytes())
+        first = representatives.setdefault(digest, branch_id)
+        if first != branch_id and np.array_equal(row, sub_sites[first]):
+            ids[branch_id] = first
+    return ids
+
+
 def _calc_weighted_urn_expected_overlap(
     cb_ids,
     sub_sites,
@@ -899,53 +914,45 @@ def _calc_weighted_urn_expected_overlap(
     if sub_sites.shape[0] <= cb_ids.max():
         raise ValueError('cb_ids contain out-of-range branch IDs.')
 
+    profile_ids = _urn_weight_profile_ids(sub_sites)
+    reuse_profiles = np.any(profile_ids != np.arange(len(sub_sites)))
+    positive_counts = np.full(len(sub_sites), -1, dtype=np.int64)
+
+    def inclusion(branch_id, draw_size):
+        return inclusion_probability_func(
+            site_weights=sub_sites[branch_id], draw_size=draw_size, float_type=np.float64,
+        )
+
+    if reuse_profiles:
+        profile_bytes = max(1, sub_sites[0].nbytes)
+        inclusion = lru_cache(maxsize=max(1, min(64, (8 * 1024**2) // profile_bytes)))(inclusion)
+
     rounding_mode = _resolve_omega_pvalue_rounding_mode(g=g)
-    inclusion_prob = np.zeros(shape=sub_sites.shape, dtype=np.float64)
     if rounding_mode == 'stochastic':
         base = np.floor(sub_branches).astype(np.int64, copy=False)
-        frac = sub_branches - base
-        for branch_id in range(sub_sites.shape[0]):
-            branch_weights = sub_sites[branch_id, :]
-            num_positive = int((branch_weights > 0).sum())
-            if num_positive == 0:
-                continue
-            size_lo = int(np.clip(base[branch_id], a_min=0, a_max=num_positive))
-            size_hi = int(np.clip(base[branch_id] + 1, a_min=0, a_max=num_positive))
-            prob_lo = inclusion_probability_func(
-                site_weights=branch_weights,
-                draw_size=size_lo,
-                float_type=np.float64,
-            )
-            if (frac[branch_id] <= 0) or (size_lo == size_hi):
-                inclusion_prob[branch_id, :] = prob_lo
-            else:
-                prob_hi = inclusion_probability_func(
-                    site_weights=branch_weights,
-                    draw_size=size_hi,
-                    float_type=np.float64,
-                )
-                inclusion_prob[branch_id, :] = (
-                    (1.0 - float(frac[branch_id])) * prob_lo +
-                    float(frac[branch_id]) * prob_hi
-                )
+        fraction = sub_branches - base
     else:
-        rounded_sizes = _prepare_permutation_branch_sizes(
-            sub_branches=sub_branches,
-            niter=1,
-            g=g,
-        )
-        rounded_sizes = np.asarray(rounded_sizes, dtype=np.int64).reshape(-1)
-        for branch_id in range(sub_sites.shape[0]):
-            branch_weights = sub_sites[branch_id, :]
-            num_positive = int((branch_weights > 0).sum())
-            if num_positive == 0:
-                continue
-            draw_size = int(np.clip(rounded_sizes[branch_id], a_min=0, a_max=num_positive))
-            inclusion_prob[branch_id, :] = inclusion_probability_func(
-                site_weights=branch_weights,
-                draw_size=draw_size,
-                float_type=np.float64,
-            )
+        rounded_sizes = _prepare_permutation_branch_sizes(sub_branches=sub_branches, niter=1, g=g)
+        base = np.asarray(rounded_sizes, dtype=np.int64).reshape(-1)
+        fraction = None
+    inclusion_prob = np.zeros(shape=sub_sites.shape, dtype=np.float64)
+    for branch_id in range(sub_sites.shape[0]):
+        profile_id = int(profile_ids[branch_id])
+        num_positive = int(positive_counts[profile_id])
+        if num_positive < 0:
+            num_positive = np.count_nonzero(sub_sites[profile_id] > 0)
+            positive_counts[profile_id] = num_positive
+        if num_positive == 0:
+            continue
+        size = int(base[branch_id])
+        size_lo = min(max(size, 0), num_positive)
+        prob = inclusion(profile_id, size_lo)
+        if fraction is not None and fraction[branch_id] > 0:
+            size_hi = min(max(size + 1, 0), num_positive)
+            if size_hi != size_lo:
+                frac = float(fraction[branch_id])
+                prob = (1.0 - frac) * prob + frac * inclusion(profile_id, size_hi)
+        inclusion_prob[branch_id] = prob
     return _calc_cb_site_overlap(
         cb_ids=cb_ids,
         sub_sites=inclusion_prob,
