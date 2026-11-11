@@ -86,6 +86,11 @@ small-draw formulas extend exactness without expanding subset enumeration
 across thousands of categories. Scaling all weights leaves the
 answer unchanged, including very small weights.
 
+The approximate mean equation is solved in log time with bounds derived from
+the smallest and largest positive weights. Its fitted inclusion probabilities
+sum to the requested draw size, including when the weights span many orders
+of magnitude.
+
 `--urn_wallenius_expectation exact` rejects a case that would need the
 approximation. It is available only for the Wallenius urn expectation model.
 No universal error bound is asserted for `auto`. Detailed provenance records

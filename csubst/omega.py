@@ -376,7 +376,7 @@ def _weighted_sample_without_replacement_packed(
         return packed
     sampling_model = str(sampling_model).strip().lower()
     if sampling_model == 'fisher':
-        log_weights = urn_expectation.fisher_log_weights(p[positive_sites])
+        log_weights = urn_expectation.normalized_log_weights(p[positive_sites])
         log_dp = urn_expectation.fisher_suffix(log_weights, size)
         remaining = np.full(niter, size, dtype=np.int64)
         for item_index, log_weight in enumerate(log_weights):
@@ -807,54 +807,10 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
     if method == 'approximate_mean' and policy == 'exact':
         raise ValueError('Exact Wallenius expectation exceeds the enumeration budget; '
                          'auto permits an approximate mean (see urn provenance).')
-    # Normalize odds before enumeration/root finding: scaling all odds cannot
-    # alter an urn distribution and must not alter numerical convergence.
-    positive_weights = positive_weights / positive_weights.max()
     if method == 'exact_enumeration':
-        distribution = {0: 1.0}
-        for _ in range(draw_size):
-            next_distribution = {}
-            for mask, probability in distribution.items():
-                remaining_weight = float(sum(
-                    positive_weights[index]
-                    for index in range(num_positive)
-                    if not (mask & (1 << index))
-                ))
-                for index, weight in enumerate(positive_weights):
-                    bit = 1 << index
-                    if mask & bit:
-                        continue
-                    next_mask = mask | bit
-                    next_distribution[next_mask] = next_distribution.get(next_mask, 0.0) + (
-                        probability * float(weight) / remaining_weight
-                    )
-            distribution = next_distribution
-        inclusion = np.zeros(num_positive, dtype=np.float64)
-        for mask, probability in distribution.items():
-            for index in range(num_positive):
-                if mask & (1 << index):
-                    inclusion[index] += probability
-        out[positive_mask] = inclusion
-        return out.astype(float_type, copy=False)
-
-    target = float(draw_size)
-    lo = 0.0
-    hi = 1.0
-    for _ in range(128):
-        current = (-np.expm1(-hi * positive_weights)).sum(dtype=np.float64)
-        if current >= target:
-            break
-        hi *= 2.0
-    for _ in range(96):
-        mid = (lo + hi) / 2.0
-        current = (-np.expm1(-mid * positive_weights)).sum(dtype=np.float64)
-        if current < target:
-            lo = mid
-        else:
-            hi = mid
-    lam = (lo + hi) / 2.0
-    out_positive = -np.expm1(-lam * positive_weights)
-    out[positive_mask] = np.clip(out_positive, a_min=0.0, a_max=1.0)
+        out[positive_mask] = urn_expectation.enumerated_wallenius_inclusion(positive_weights, draw_size)
+    else:
+        out[positive_mask] = urn_expectation.wallenius_mean_inclusion(positive_weights, draw_size)
     return out.astype(float_type, copy=False)
 
 
@@ -876,7 +832,7 @@ def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.
     if draw_size >= num_positive:
         out[positive_mask] = 1.0
         return out.astype(float_type, copy=False)
-    log_weights = urn_expectation.fisher_log_weights(positive_weights)
+    log_weights = urn_expectation.normalized_log_weights(positive_weights)
     complement = draw_size > num_positive - draw_size
     size = draw_size
     if complement:

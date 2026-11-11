@@ -6,7 +6,7 @@ import numpy as np
 ENUMERATION_MAX_SITES = 20
 
 
-def fisher_log_weights(positive_weights):
+def normalized_log_weights(positive_weights):
     """Normalize positive weights in log space when their ratios are subnormal."""
     largest = positive_weights.max()
     ratios = positive_weights / largest
@@ -50,11 +50,82 @@ def two_draw_inclusion(weights):
     Prefix/suffix sums retain the small remaining mass when a single weight
     dominates. Subtracting the largest weight from the total can erase it.
     """
-    w = np.asarray(weights, dtype=np.longdouble)
-    w = w / w.max()
+    remaining = np.array(weights, dtype=np.longdouble, copy=True)
+    largest = int(remaining.argmax())
+    w = remaining / remaining[largest]
     prefix = np.concatenate((np.zeros(1, dtype=w.dtype), np.cumsum(w)[:-1]))
     suffix = np.concatenate((np.cumsum(w[::-1])[-2::-1], np.zeros(1, dtype=w.dtype)))
-    ratio = w / (prefix + suffix)
+    ratio = np.zeros_like(w)
+    others = np.arange(w.size) != largest
+    np.divide(w, prefix + suffix, out=ratio, where=others)
     before = np.concatenate((np.zeros(1, dtype=w.dtype), np.cumsum(ratio)[:-1]))
     after = np.concatenate((np.cumsum(ratio[::-1])[-2::-1], np.zeros(1, dtype=w.dtype)))
-    return np.asarray(np.clip((w / w.sum()) * (1 + before + after), 0, 1), dtype=np.float64)
+    first = w / w.sum()
+    inclusion = first * (1 + before + after)
+    # Handle the largest site as the first draw in its own scale. The
+    # remaining weights may all vanish when scaled by that site's weight.
+    remaining[largest] = 0
+    remaining /= remaining.max()
+    inclusion += first[largest] * (remaining / remaining.sum())
+    return np.asarray(np.clip(inclusion, 0, 1), dtype=np.float64)
+
+
+def enumerated_wallenius_inclusion(positive_weights, draw_size):
+    """Accumulate all sequential draw probabilities by selected subset."""
+    scaled = positive_weights / positive_weights.max()
+    rescale = bool((scaled < np.finfo(float).tiny).any())
+    weights = positive_weights if rescale else scaled
+    sites = [(1 << i, float(weight)) for i, weight in enumerate(weights)]
+    distribution = {0: 1.}
+    for _ in range(draw_size):
+        next_distribution: dict[int, float] = {}
+        for selected, probability in distribution.items():
+            remaining = [(bit, weight) for bit, weight in sites if not (selected & bit)]
+            if rescale:
+                # Once the large sites are removed, tiny weights may have
+                # substantial conditional probability among those still left.
+                largest = max(weight for _, weight in remaining)
+                remaining = [(bit, weight / largest) for bit, weight in remaining]
+            total = sum(weight for _, weight in remaining)
+            for bit, weight in remaining:
+                updated = selected | bit
+                next_distribution[updated] = next_distribution.get(updated, 0.) + probability * (weight / total)
+        distribution = next_distribution
+    inclusion = np.zeros(len(sites), dtype=np.float64)
+    for selected, probability in distribution.items():
+        for i, (bit, _) in enumerate(sites):
+            if selected & bit:
+                inclusion[i] += probability
+    return inclusion
+
+
+def wallenius_mean_inclusion(positive_weights, draw_size):
+    """Solve the approximate Wallenius mean equation in log time."""
+    from scipy.optimize import brentq
+
+    log_weights = normalized_log_weights(positive_weights)
+    split = log_weights.size - draw_size
+    order = np.argpartition(log_weights, split)
+    log_weights -= log_weights[order[split]]
+    top = log_weights[order[split:]]
+    rest = log_weights[order[:split]]
+    # Once the clock exceeds 746, its survival probability rounds to zero.
+    saturation = np.log(746.)
+
+    def clock(log_time, weights):
+        return np.exp(np.minimum(log_time + weights, saturation))
+
+    def residual(log_time):
+        # Balance the top sites' deficits against the other sites' inclusion
+        # masses so probabilities rounded to one cannot flatten the equation.
+        included = -np.expm1(-clock(log_time, rest))
+        excluded = np.exp(-clock(log_time, top))
+        return included.sum() - excluded.sum()
+
+    # All probabilities lie on the same side of draw_size / n at either
+    # bound. Pad the log-time interval to allow for rounding at the endpoints.
+    uniform_time = np.log(-np.log1p(-draw_size / log_weights.size))
+    lo = uniform_time - log_weights.max() - 1.
+    hi = uniform_time - log_weights.min() + 1.
+    root = brentq(residual, lo, hi, xtol=np.finfo(float).eps, maxiter=200)
+    return -np.expm1(-clock(root, log_weights))
