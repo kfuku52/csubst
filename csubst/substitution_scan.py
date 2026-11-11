@@ -587,7 +587,7 @@ def _pack_scan_worker_context(g, scan_static):
                        "scan_observed_state_nsy", "scan_observed_state_pep"]:
         worker_g.pop(unused_key, None)
     worker_static = dict(scan_static)
-    for key in ('_event_cache', '_exposure_cache', '_fixed_candidates'):
+    for key in ('_event_cache', '_exposure_cache', '_fixed_candidates', '_fixed_rate_cache', '_fixed_rate_metadata'):
         worker_static.pop(key, None)
     endpoint_context = q_context.get("endpoint_context")
     if endpoint_context is not None:
@@ -604,7 +604,7 @@ def _unpack_scan_worker_context(g, scan_static):
     worker_g = dict(g)
     worker_g["state_nsy"] = _unpack_scan_tensor_for_worker(worker_g.get("state_nsy", None))
     worker_static = dict(scan_static)
-    for key in ('_event_cache', '_exposure_cache', '_fixed_candidates'):
+    for key in ('_event_cache', '_exposure_cache', '_fixed_candidates', '_fixed_rate_cache', '_fixed_rate_metadata'):
         worker_static.pop(key, None)
     q_context = dict(worker_static["q_context"])
     packed_state_cdn = q_context.get("state_cdn", None)
@@ -1927,7 +1927,7 @@ def _q_weighted_opportunity(
 
 
 class _ScanRateMetadata:
-    """Borrow fixed branch columns only for one foreground assignment."""
+    """Borrow the fixed branch columns used to score foreground assignments."""
 
     def __init__(self, branch_meta):
         self.branch_meta = branch_meta
@@ -1978,30 +1978,11 @@ class _ScanRateMetadata:
         return self._parent_ids
 
 
-def _rate_summary(
-    candidate_events,
-    branch_meta,
-    state_nsy,
-    site,
-    from_ids,
-    to_ids,
-    target_branch_ids,
-    rate_length,
-    rate_exposure,
-    other_branch_ids=None,
-    q_matrix=None,
-    state_cdn=None,
-    codon_q_matrix=None,
-    codon_state_ids=None,
-    endpoint_context=None,
-    exposure_cache=None,
-    *,
-    score_only=False,
-    prepared_branch=None,
+def _rate_branch_values(
+    candidate_events, branch_data, state_nsy, site, from_ids, to_ids, rate_length, rate_exposure,
+    *, q_matrix, state_cdn, codon_q_matrix, codon_state_ids, endpoint_context, exposure_cache,
 ):
-    if prepared_branch is None:
-        prepared_branch = _ScanRateMetadata(branch_meta).prepare(target_branch_ids, other_branch_ids)
-    branch_data, is_target, is_other = prepared_branch
+    branch_meta = branch_data.branch_meta
     branch_ids = branch_data.branch_ids
     if isinstance(candidate_events, _PosteriorBranchValues):
         event_values = branch_data.select_events(candidate_events)
@@ -2014,7 +1995,8 @@ def _rate_summary(
             # Called events retain pandas' compensated summation.
             event_by_branch = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
         event_values = np.array([float(event_by_branch.get(int(bid), 0.0)) for bid in branch_ids], dtype=np.float64)
-    chosen_length, raw_length, sn_length, n_length = branch_data.get_lengths(rate_length)
+    chosen_length = branch_data.get_lengths(rate_length)[0]
+    missing_exposure = exposure_reasons = None
     if rate_exposure == "endpoint":
         if rate_length != "raw" or endpoint_context is None:
             raise ValueError("Scan endpoint requires raw model lengths and a fitted endpoint context.")
@@ -2054,6 +2036,10 @@ def _rate_summary(
         txt = "--scan_rate_exposure should be one of {}."
         raise ValueError(txt.format(", ".join(SCAN_RATE_EXPOSURES)))
     exposure = opportunity if rate_exposure == "endpoint" else chosen_length * opportunity
+    return event_values, exposure, missing_exposure, exposure_reasons
+
+
+def _score_rate_branches(event_values, exposure, is_target, is_other, rate_exposure):
     target_event = float(event_values[is_target].sum())
     other_event = float(event_values[is_other].sum())
     target_exposure = float(exposure[is_target].sum())
@@ -2068,17 +2054,52 @@ def _rate_summary(
     invalid_endpoint = rate_exposure == "endpoint" and impossible[is_target | is_other].any()
     if invalid_endpoint:
         score = pvalue = np.nan
+    return {
+        "score_rate_enrichment": score,
+        "target_event_count": target_event,
+        "other_event_count": other_event,
+        "target_exposure": target_exposure,
+        "other_exposure": other_exposure,
+    }, pvalue, impossible
+
+
+def _rate_summary(
+    candidate_events,
+    branch_meta,
+    state_nsy,
+    site,
+    from_ids,
+    to_ids,
+    target_branch_ids,
+    rate_length,
+    rate_exposure,
+    other_branch_ids=None,
+    q_matrix=None,
+    state_cdn=None,
+    codon_q_matrix=None,
+    codon_state_ids=None,
+    endpoint_context=None,
+    exposure_cache=None,
+    *,
+    score_only=False,
+    prepared_branch=None,
+):
+    if prepared_branch is None:
+        prepared_branch = _ScanRateMetadata(branch_meta).prepare(target_branch_ids, other_branch_ids)
+    branch_data, is_target, is_other = prepared_branch
+    event_values, exposure, missing_exposure, exposure_reasons = _rate_branch_values(
+        candidate_events, branch_data, state_nsy, site, from_ids, to_ids, rate_length, rate_exposure,
+        q_matrix=q_matrix, state_cdn=state_cdn, codon_q_matrix=codon_q_matrix, codon_state_ids=codon_state_ids,
+        endpoint_context=endpoint_context, exposure_cache=exposure_cache,
+    )
+    branch_ids = branch_data.branch_ids
+    rate, pvalue, impossible = _score_rate_branches(event_values, exposure, is_target, is_other, rate_exposure)
     if score_only:
-        # Assignment calibration consumes only these fields. Share validation,
-        # exposure and score calculations with the full output path so their
-        # failure/no-test semantics cannot drift apart.
-        return {
-            "score_rate_enrichment": score,
-            "target_event_count": target_event,
-            "other_event_count": other_event,
-            "target_exposure": target_exposure,
-            "other_exposure": other_exposure,
-        }
+        return rate
+    score = rate["score_rate_enrichment"]
+    target_event, other_event = rate["target_event_count"], rate["other_event_count"]
+    target_exposure, other_exposure = rate["target_exposure"], rate["other_exposure"]
+    _, raw_length, sn_length, n_length = branch_data.get_lengths(rate_length)
     if rate_exposure != "endpoint":
         missing_exposure = np.zeros(branch_ids.shape[0], dtype=bool)
         exposure_reasons = np.full(branch_ids.shape[0], "ok", dtype="U24")
@@ -2784,33 +2805,38 @@ def _candidate_fixed_permutation_scores(
     if candidates is None:
         candidates = [(row, _parse_id_list(row['from_state_ids']), _parse_id_list(row['to_state_ids']))
                       for row in observed_df.to_dict('records')]
-    branch_sets = {}
-    branch_data = None
     branch_masks = {}
+    branch_data = scan_static.get('_fixed_rate_metadata') if scan_static is not None else None
+    if branch_data is None:
+        branch_data = _ScanRateMetadata(branch_meta)
+    cache = scan_static.get('_fixed_rate_cache') if scan_static is not None else None
+    projection = scan_static.get('rate_event_projection') if scan_static is not None else None
+    state_nsy = np.asarray(g["state_nsy"])
+    float_tol = float(g.get("float_tol", 1e-12))
+
+    def values_for(site, from_ids, to_ids):
+        if rate_event_mode == "called":
+            mask = _event_mask_for_candidate(events=called_events, site=site, from_ids=from_ids, to_ids=to_ids)
+            rate_events = called_events.loc[mask, :]
+        else:
+            events = extract_candidate_posterior_events(
+                rate_ON_tensor, site, from_ids, to_ids, float_tol, projection,
+            )
+            rate_events = _PosteriorBranchValues(events, rate_ON_tensor.shape[0])
+        values = _rate_branch_values(
+            rate_events, branch_data, state_nsy, site, from_ids, to_ids, rate_length, rate_exposure,
+            q_matrix=q_context["q_matrix"], state_cdn=q_context["state_cdn"], codon_q_matrix=q_context["codon_q_matrix"],
+            codon_state_ids=q_context["codon_state_ids"], endpoint_context=q_context.get("endpoint_context"),
+            exposure_cache=None,
+        )
+        return values[:2]
+
     for row, from_ids, to_ids in candidates:
         trait_name = str(row["trait"])
         target_class = str(row["target_class"])
         site = int(row["site"])
-        if rate_event_mode == "called":
-            mask = _event_mask_for_candidate(
-                events=called_events,
-                site=site,
-                from_ids=from_ids,
-                to_ids=to_ids,
-            )
-            rate_events = called_events.loc[mask, :].copy()
-        else:
-            rate_events = _cached_posterior_events(
-                scan_static=scan_static,
-                sub_tensor=rate_ON_tensor,
-                site=site,
-                from_ids=from_ids,
-                to_ids=to_ids,
-                float_tol=float(g.get("float_tol", 1e-12)),
-                branch_values=True,
-            )
         branch_key = (trait_name, target_class)
-        if branch_key not in branch_sets:
+        if branch_key not in branch_masks:
             fg_ids = scan_context.get('rate_fg_ids', scan_context['fg_ids'])
             target_ids = _target_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids)
             if scan_context['units'] is None:
@@ -2825,32 +2851,15 @@ def _candidate_fixed_permutation_scores(
                 units_trait = scan_context['units'].loc[scan_context['units']['trait'] == trait_name, :].reset_index(drop=True)
                 other_ids = _other_branch_ids_from_maps(
                     fg_ids, trait_name, target_class, valid_branch_ids, scan_other_scope, units_df=units_trait)
-            branch_sets[branch_key] = (target_ids, other_ids)
-        target_branch_ids, other_branch_ids = branch_sets[branch_key]
-        if branch_data is None:
-            branch_data = _ScanRateMetadata(branch_meta)
-        if branch_key not in branch_masks:
-            branch_masks[branch_key] = branch_data.prepare(target_branch_ids, other_branch_ids)
-        rate = _rate_summary(
-            candidate_events=rate_events,
-            branch_meta=branch_meta,
-            state_nsy=np.asarray(g["state_nsy"]),
-            site=site,
-            from_ids=from_ids,
-            to_ids=to_ids,
-            target_branch_ids=target_branch_ids,
-            rate_length=rate_length,
-            rate_exposure=rate_exposure,
-            other_branch_ids=other_branch_ids,
-            q_matrix=q_context["q_matrix"],
-            state_cdn=q_context["state_cdn"],
-            codon_q_matrix=q_context["codon_q_matrix"],
-            codon_state_ids=q_context["codon_state_ids"],
-            endpoint_context=q_context.get("endpoint_context"),
-            exposure_cache=_scan_candidate_cache(scan_static, '_exposure_cache'),
-            score_only=True,
-            prepared_branch=branch_masks[branch_key],
-        )
+            branch_masks[branch_key] = branch_data.prepare(target_ids, other_ids)
+        if cache is None:
+            values = values_for(site, from_ids, to_ids)
+        else:
+            key = (site, tuple(from_ids), tuple(to_ids))
+            values = cache.obtain(key, lambda: values_for(site, from_ids, to_ids),
+                                  lambda arrays: sum(array.nbytes for array in arrays))
+        _, is_target, is_other = branch_masks[branch_key]
+        rate, _, _ = _score_rate_branches(*values, is_target, is_other, rate_exposure)
         out[_scan_row_key(row)] = scan_statistics.calibration_score(rate)
     return out
 
@@ -2950,6 +2959,9 @@ def _run_scan_permutation_chunk(
     rate_ON_tensor = _unpack_scan_tensor_for_worker(rate_ON_tensor)
     records = observed_df.loc[:, _SCAN_KEY_COLUMNS].to_dict('records')
     if calibration == 'candidate_fixed':
+        # Candidate events and exposures depend only on this worker's fixed fit.
+        scan_static['_fixed_rate_metadata'] = _ScanRateMetadata(branch_meta)
+        scan_static['_fixed_rate_cache'] = _scan_candidate_cache(scan_static, '_fixed_rate_cache')
         scan_static['_fixed_candidates'] = [
             (row, _parse_id_list(row['from_state_ids']), _parse_id_list(row['to_state_ids']))
             for row in records]
