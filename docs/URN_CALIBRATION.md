@@ -117,6 +117,14 @@ When most positive-weight sites are selected, inclusion probabilities sum
 over the smaller omitted subset with reciprocal weights. A site's inclusion
 probability is computed by summing the omitted subsets that exclude it.
 
+## Hypergeometric site-subset draws
+
+Each null replicate samples a subset independently for each branch,
+conditional on the fitted site weights and the rounded branch draw size.
+Combinations containing the same branch share that branch's subset within
+the replicate. Equal weights and draw sizes on distinct branches still
+produce independent subsets, including with deterministic rounding.
+
 ## Meaning of Poisson and negative-binomial nulls
 
 `poisson` obtains a mean from the selected urn overlap model and shared

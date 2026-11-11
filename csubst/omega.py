@@ -1089,72 +1089,34 @@ def _get_permutations_fast(
     if (sub_branches < 0).any():
         raise ValueError('sub_branches should be non-negative.')
     p = np.asarray(p, dtype=np.float64)
+    shared_positive_count = None
     if p.ndim == 1:
-        num_site = p.shape[0]
-        shared_site_p = p
-        branch_site_p = None
+        shared_positive_count = int(np.count_nonzero(p > 0))
+        site_profiles = np.broadcast_to(p, (sub_branches.shape[0], p.size))
     elif p.ndim == 2:
         if p.shape[0] != sub_branches.shape[0]:
             txt = 'When p is 2D, its number of rows ({}) should match sub_branches length ({}).'
             raise ValueError(txt.format(p.shape[0], sub_branches.shape[0]))
-        num_site = p.shape[1]
-        shared_site_p = None
-        branch_site_p = p
+        site_profiles = p
     else:
         raise ValueError('p should be a 1D or 2D array.')
+    if shared_positive_count == 0:
+        return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
+    num_packed_site = (site_profiles.shape[1] + 7) // 8
     if is_per_iteration_sizes:
         active_branch_ids, inverse_branch_ids = np.unique(cb_ids, return_inverse=True)
         remapped_cb_ids = inverse_branch_ids.reshape(cb_ids.shape)
-        active_sub_branches = sub_branches[active_branch_ids, :]
-        num_branch = active_sub_branches.shape[0]
-        num_packed_site = (num_site + 7) // 8
-        packed_masks = np.zeros(shape=(num_branch, niter, num_packed_site), dtype=np.uint8)
-        if shared_site_p is not None:
-            num_positive_sites = int((shared_site_p > 0).sum())
-            if num_positive_sites == 0:
-                return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
-            for branch_id in range(num_branch):
-                size_values = active_sub_branches[branch_id, :]
-                if (size_values > 0).sum() == 0:
-                    continue
+        packed_masks = np.zeros((len(active_branch_ids), niter, num_packed_site), dtype=np.uint8)
+        for index, branch_id in enumerate(active_branch_ids):
+            size_values = sub_branches[branch_id]
+            if size_values.any():
                 _fill_packed_masks_for_sizes(
-                    packed_masks_branch=packed_masks[branch_id, :, :],
-                    site_p=shared_site_p,
+                    packed_masks_branch=packed_masks[index],
+                    site_p=site_profiles[branch_id],
                     size_values=size_values,
                     rng=rng,
                     sampling_model=sampling_model,
                 )
-        else:
-            active_site_p = branch_site_p[active_branch_ids, :]
-            first_site_p = active_site_p[0, :]
-            is_shared_site_p = np.array_equal(active_site_p, np.broadcast_to(first_site_p, active_site_p.shape))
-            if is_shared_site_p:
-                num_positive_sites = int((first_site_p > 0).sum())
-                if num_positive_sites == 0:
-                    return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
-                for branch_id in range(num_branch):
-                    size_values = active_sub_branches[branch_id, :]
-                    if (size_values > 0).sum() == 0:
-                        continue
-                    _fill_packed_masks_for_sizes(
-                        packed_masks_branch=packed_masks[branch_id, :, :],
-                        site_p=first_site_p,
-                        size_values=size_values,
-                        rng=rng,
-                        sampling_model=sampling_model,
-                    )
-            else:
-                for branch_id in range(num_branch):
-                    size_values = active_sub_branches[branch_id, :]
-                    if (size_values > 0).sum() == 0:
-                        continue
-                    _fill_packed_masks_for_sizes(
-                        packed_masks_branch=packed_masks[branch_id, :, :],
-                        site_p=active_site_p[branch_id, :],
-                        size_values=size_values,
-                        rng=rng,
-                        sampling_model=sampling_model,
-                    )
         return _calc_shared_counts_from_packed_masks(
             packed_masks=packed_masks,
             remapped_cb_ids=remapped_cb_ids,
@@ -1167,81 +1129,19 @@ def _get_permutations_fast(
     active_cb_ids = cb_ids[active_row_indices, :]
     active_branch_ids, inverse_branch_ids = np.unique(active_cb_ids, return_inverse=True)
     remapped_active_cb_ids = inverse_branch_ids.reshape(active_cb_ids.shape)
-    active_sub_branches = sub_branches[active_branch_ids]
-
-    num_branch = active_sub_branches.shape[0]
-    num_packed_site = (num_site + 7) // 8
-    packed_masks = np.zeros(shape=(num_branch, niter, num_packed_site), dtype=np.uint8)
-    if shared_site_p is not None:
-        num_positive_sites = int((shared_site_p > 0).sum())
-        if num_positive_sites == 0:
-            return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
-        previous_branch_id_by_size = dict()
-        for branch_id in range(num_branch):
-            size = int(active_sub_branches[branch_id])
-            if size == 0:
-                continue
-            # Rounding from floating substitution counts can slightly exceed the
-            # number of positive-probability sites. Cap to valid bounds.
-            if size > num_positive_sites:
-                size = num_positive_sites
-            if size in previous_branch_id_by_size:
-                prev_branch_id = previous_branch_id_by_size[size]
-                packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, rng.permutation(niter), :]
-                continue
-            previous_branch_id_by_size[size] = branch_id
-            packed_masks[branch_id, :, :] = _weighted_sample_without_replacement_packed(
-                p=shared_site_p,
-                size=size,
-                niter=niter,
-                rng=rng,
-                sampling_model=sampling_model,
+    packed_masks = np.zeros((len(active_branch_ids), niter, num_packed_site), dtype=np.uint8)
+    for index, branch_id in enumerate(active_branch_ids):
+        site_p = site_profiles[branch_id]
+        num_positive = (shared_positive_count if shared_positive_count is not None
+                        else int(np.count_nonzero(site_p > 0)))
+        # Keep one independent sample per branch within a replicate, even
+        # when weights and draw size match across branches. Shuffling a
+        # shared sample would sometimes pair a draw with itself.
+        size = min(int(sub_branches[branch_id]), num_positive)
+        if size:
+            packed_masks[index] = _weighted_sample_without_replacement_packed(
+                p=site_p, size=size, niter=niter, rng=rng, sampling_model=sampling_model,
             )
-    else:
-        active_site_p = branch_site_p[active_branch_ids, :]
-        first_site_p = active_site_p[0, :]
-        is_shared_site_p = np.array_equal(active_site_p, np.broadcast_to(first_site_p, active_site_p.shape))
-        if is_shared_site_p:
-            num_positive_sites = int((first_site_p > 0).sum())
-            if num_positive_sites == 0:
-                return np.zeros((cb_ids.shape[0], niter), dtype=np.int32)
-            previous_branch_id_by_size = dict()
-            for branch_id in range(num_branch):
-                size = int(active_sub_branches[branch_id])
-                if size == 0:
-                    continue
-                if size > num_positive_sites:
-                    size = num_positive_sites
-                if size in previous_branch_id_by_size:
-                    prev_branch_id = previous_branch_id_by_size[size]
-                    packed_masks[branch_id, :, :] = packed_masks[prev_branch_id, rng.permutation(niter), :]
-                    continue
-                previous_branch_id_by_size[size] = branch_id
-                packed_masks[branch_id, :, :] = _weighted_sample_without_replacement_packed(
-                    p=first_site_p,
-                    size=size,
-                    niter=niter,
-                    rng=rng,
-                    sampling_model=sampling_model,
-                )
-        else:
-            for branch_id in range(num_branch):
-                size = int(active_sub_branches[branch_id])
-                if size == 0:
-                    continue
-                site_p = active_site_p[branch_id, :]
-                num_positive_sites = int((site_p > 0).sum())
-                if num_positive_sites == 0:
-                    continue
-                if size > num_positive_sites:
-                    size = num_positive_sites
-                packed_masks[branch_id, :, :] = _weighted_sample_without_replacement_packed(
-                    p=site_p,
-                    size=size,
-                    niter=niter,
-                    rng=rng,
-                    sampling_model=sampling_model,
-                )
 
     active_out = _calc_shared_counts_from_packed_masks(
         packed_masks=packed_masks,

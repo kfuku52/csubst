@@ -80,6 +80,23 @@ def test_weighted_sample_without_replacement_masks_raises_when_size_exceeds_posi
         omega._weighted_sample_without_replacement_masks(p=p, size=2, niter=8)
 
 
+@pytest.mark.parametrize('shared_profile', [True, False])
+def test_equal_size_branches_draw_independent_uniform_subsets(shared_profile):
+    rng = np.random.default_rng(208)
+    profiles = np.full(5, .2)
+    if not shared_profile:
+        profiles = np.tile(profiles, (2, 1))
+    ids = np.array([[0, 1], [1, 0]])
+    counts = np.concatenate([
+        omega._get_permutations_fast(ids, [2, 2], profiles, 4, rng=rng)
+        for _ in range(256)
+    ], axis=1)
+    np.testing.assert_array_equal(counts[0], counts[1])
+    # Conditional on either branch, one of C(5, 2) independent subsets
+    # has full overlap. Reordering one shared sample overstates that event.
+    assert np.mean(counts[0] == 2) == pytest.approx(.1, abs=.04)
+
+
 def test_get_permutations_fast_returns_expected_shape_and_bounds():
     cb_ids = np.array([[0, 1], [1, 2], [0, 2]], dtype=np.int64)
     sub_branches = np.array([2, 3, 5], dtype=np.int64)
