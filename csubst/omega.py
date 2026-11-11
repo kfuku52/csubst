@@ -378,9 +378,7 @@ def _weighted_sample_without_replacement_packed(
     if sampling_model == 'fisher':
         log_weights = urn_expectation.fisher_log_weights(p[positive_sites])
         log_dp = urn_expectation.fisher_suffix(log_weights, size)
-        selected = np.zeros((niter, size), dtype=np.int64)
         remaining = np.full(niter, size, dtype=np.int64)
-        write_index = np.zeros(niter, dtype=np.int64)
         for item_index, log_weight in enumerate(log_weights):
             active = np.flatnonzero(remaining > 0)
             if active.shape[0] == 0:
@@ -396,15 +394,12 @@ def _weighted_sample_without_replacement_packed(
                 probability[optional] = np.exp(log_numerator - log_denominator)
             choose = forced | (rng.random(active.shape[0]) < probability)
             chosen_rows = active[choose]
-            selected[chosen_rows, write_index[chosen_rows]] = positive_sites[item_index]
-            write_index[chosen_rows] += 1
+            byte, bit = divmod(int(positive_sites[item_index]), 8)
+            packed[chosen_rows, byte] |= 1 << (7 - bit)
             remaining[chosen_rows] -= 1
         if (remaining != 0).any():
             raise RuntimeError('Fisher weighted sampling did not select the requested sample size.')
-        return _pack_sampled_site_indices_to_uint8(
-            sampled_site_indices=selected,
-            num_site=num_site,
-        )
+        return packed
     if sampling_model not in ['wallenius', 'factorized_approx']:
         raise ValueError('Unsupported weighted sampling model: {}'.format(sampling_model))
     # Efraimidis-Spirakis weighted sampling without replacement (A-ES).
@@ -882,20 +877,29 @@ def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.
         out[positive_mask] = 1.0
         return out.astype(float_type, copy=False)
     log_weights = urn_expectation.fisher_log_weights(positive_weights)
-    prefix = urn_expectation.fisher_suffix(log_weights[::-1], draw_size)[::-1]
-    log_denominator = prefix[num_positive, draw_size]
+    complement = draw_size > num_positive - draw_size
+    size = draw_size
+    if complement:
+        # The omitted subset has Fisher weights proportional to 1/w. Use its
+        # partition function with the site absent to avoid subtracting from 1.
+        size = num_positive - draw_size
+        log_weights = log_weights.min() - log_weights
+    prefix = urn_expectation.fisher_suffix(log_weights[::-1], size)[::-1]
+    log_denominator = prefix[num_positive, size]
     if not np.isfinite(log_denominator):
         raise ValueError('Unable to normalize Fisher weighted-urn probabilities.')
-    suffix = urn_expectation.fisher_suffix(log_weights, draw_size)
+    suffix = urn_expectation.fisher_suffix(log_weights, size)
     # Sites are independent in this contraction. Keep each site's original
     # left-pick addition order while avoiding Python's site-by-draw loop.
     inclusion = np.full(num_positive, -np.inf, dtype=np.float64)
     workspace = np.empty(num_positive, dtype=np.float64)
-    for left_pick in range(draw_size):
-        right_pick = draw_size - 1 - left_pick
+    other_picks = size if complement else size - 1
+    for left_pick in range(other_picks + 1):
+        right_pick = other_picks - left_pick
         np.add(prefix[:-1, left_pick], suffix[1:, right_pick], out=workspace)
         np.logaddexp(inclusion, workspace, out=inclusion)
-    np.add(log_weights, inclusion, out=inclusion)
+    if not complement:
+        np.add(log_weights, inclusion, out=inclusion)
     np.subtract(inclusion, log_denominator, out=inclusion)
     np.exp(inclusion, out=inclusion)
     out[positive_mask] = np.clip(inclusion, a_min=0.0, a_max=1.0)

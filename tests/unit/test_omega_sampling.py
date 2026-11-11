@@ -35,6 +35,13 @@ def test_fisher_inclusion_matches_independent_weighted_subsets(weights, dtype):
     assert not values.flags.writeable
 
 
+def test_fisher_dense_draw_retains_tiny_inclusion_probability():
+    # Selecting three sites normally omits the fourth. Its small probability
+    # of inclusion is still representable even when 1 - P(omission) is zero.
+    actual = omega._calc_fisher_inclusion_probabilities([1., 2., 4., 1e-40], 3)
+    np.testing.assert_allclose(actual, [1., 1., 1., 1.75e-40], atol=0., rtol=2e-14)
+
+
 @pytest.mark.native
 def test_native_packed_sampling_matches_boolean_masks_and_python_counts(monkeypatch):
     if omega.omega_cy is None:

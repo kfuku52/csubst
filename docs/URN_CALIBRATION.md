@@ -108,6 +108,10 @@ when dividing a positive site weight by the largest weight would round it to
 zero. The recurrence applies to samples weighted by the product of the selected
 site weights. [Chen, Dempster and Liu (1994)](https://doi.org/10.1093/biomet/81.3.457)
 
+When most positive-weight sites are selected, inclusion probabilities sum
+over the smaller omitted subset with reciprocal weights. A site's inclusion
+probability is computed by summing the omitted subsets that exclude it.
+
 ## Meaning of Poisson and negative-binomial nulls
 
 `poisson` obtains a mean from the selected urn overlap model and shared
