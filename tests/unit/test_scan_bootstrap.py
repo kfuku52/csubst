@@ -150,8 +150,14 @@ def test_failed_draw_cannot_be_excluded_from_bootstrap(tmp_path, monkeypatch):
 
 
 def test_child_options_recompute_asr_and_preserve_analysis_choices(tmp_path, monkeypatch):
+    model = _model()
+    model['topology'] = '((A:.2,C:.1)X:.25,B:.3,D:.2)R;'
+    model['missing'].update(C=np.zeros(model['sites'], dtype=bool), D=np.zeros(model['sites'], dtype=bool))
+    transitions = boot.transition_matrices(model)
+    sequences = boot.simulate_alignment(model, np.random.default_rng(123), transitions)
+    assert list(sequences) == ['A', 'C', 'B', 'D']
     rooted = tmp_path / 'tree.nwk'
-    rooted.write_text(_model()['topology'])
+    rooted.write_text(model['topology'])
     fg = tmp_path / 'foreground.tsv'
     fg.write_text('1\t^A$\n2\t^B$\n')
     options = dict(rooted_tree_file=str(rooted), foreground=str(fg),
@@ -162,6 +168,7 @@ def test_child_options_recompute_asr_and_preserve_analysis_choices(tmp_path, mon
                    full_cds_alignment_file='')
     def fake_run(command, **kwargs):
         run_dir = Path(kwargs['cwd'])
+        assert (run_dir/'input.fa').read_text() == ''.join(f'>{name}\n{bases}\n' for name, bases in sequences.items())
         pd.DataFrame({'score_rate_enrichment': [2.123456789012345]}).to_csv(run_dir/'csubst_scan.tsv', sep='\t', index=False)
         parsed = cli._build_parser(show_advanced=True).parse_args(command[3:])
         assert parsed.iqtree_state == parsed.iqtree_treefile == 'infer'
@@ -174,7 +181,7 @@ def test_child_options_recompute_asr_and_preserve_analysis_choices(tmp_path, mon
         assert Path(parsed.foreground).parent == run_dir
         assert parsed.full_cds_alignment_file == ''
     monkeypatch.setattr(boot.subprocess, 'run', fake_run)
-    score = boot.run_replicate(options, _model(), tmp_path/'replicate', 123, boot.transition_matrices(_model()))
+    score = boot.run_replicate(options, model, tmp_path/'replicate', 123, transitions)
     assert score == pytest.approx(2.123456789012345)
     assert 'command.json' in [p.name for p in (tmp_path/'replicate').iterdir()]
     assert options['iqtree_state'] == '/observed/input.state'

@@ -205,22 +205,34 @@ def transition_matrices(model):
     return matrices
 
 
-def simulate_alignment(model, rng, transitions=None):
+def _simulate_sequences(model, rng, transitions):
     if transitions is None:
         transitions = transition_matrices(model)
     tr = ete.PhyloNode(model['topology'], format=1)
-    states = {}
-    sequences = {}
+    parents: dict[int, tuple[np.ndarray, int]] = {}
     for node in tr.traverse('preorder'):
         if ete.is_root(node):
-            states[id(node)] = rng.choice(len(model['pi']), model['sites'], p=model['pi'])
+            states = rng.choice(len(model['pi']), model['sites'], p=model['pi'])
         else:
-            states[id(node)] = scan_ctmc._sample_transition_states(transitions[node.dist], states[id(node.up)], rng)
-        if ete.is_leaf(node):
-            tokens = model['codons'][states[id(node)]].copy()
+            parent = id(node.up)
+            parent_states, remaining = parents[parent]
+            states = scan_ctmc._sample_transition_states(transitions[node.dist], parent_states, rng)
+            if remaining == 1:
+                del parents[parent]
+            else:
+                parents[parent] = (parent_states, remaining - 1)
+            del parent_states
+        children = ete.get_children(node)
+        if children:
+            parents[id(node)] = (states, len(children))
+        else:
+            tokens = model['codons'][states].copy()
             tokens[model['missing'][node.name]] = '---'
-            sequences[node.name] = ''.join(tokens)
-    return sequences
+            yield node.name, ''.join(tokens)
+
+
+def simulate_alignment(model, rng, transitions=None):
+    return dict(_simulate_sequences(model, rng, transitions))
 
 
 def replicate_seed(seed, index):
@@ -231,8 +243,9 @@ def run_replicate(options, model, directory, seed, transitions):
     """Run in a fresh directory: no observed ASR, filters or learned groups reused."""
     directory = Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=False)
-    sequences = simulate_alignment(model, np.random.default_rng(seed), transitions)
-    (directory / 'input.fa').write_text(''.join('>{}\n{}\n'.format(k, v) for k, v in sequences.items()))
+    with (directory / 'input.fa').open('w') as handle:
+        for name, bases in _simulate_sequences(model, np.random.default_rng(seed), transitions):
+            handle.write('>{}\n{}\n'.format(name, bases))
     shutil.copyfile(options['rooted_tree_file'], directory / 'input.nwk')
     shutil.copyfile(options['foreground'], directory / 'foreground.tsv')
     local = dict(options)
