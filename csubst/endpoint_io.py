@@ -430,6 +430,10 @@ def _build(g, structural=False):
             kinds.append('AA')
             mappings['AA'] = _mapping(g, 'AA', k)
     model = endpoint.EndpointModel(parents, lengths, q, pi, rates, weights)
+    retain_rate_posterior = not structural and g.get('asrv_posterior_draws', 0) > 0
+    if retain_rate_posterior:
+        g['_asrv_rate_categories'] = rates
+        g['_asrv_rate_posterior'] = np.empty((len(rates), num_site))
     observed, eligible = fitted_model.observation_masks(g["tree"], source)
     tips = {leaf: source[leaf] for leaf in model.leaves}
     missing = {leaf: ~observed[leaf] for leaf in model.leaves}
@@ -513,7 +517,8 @@ def _build(g, structural=False):
         for record in model.iter_blocks(tips, block_size=block_size, predictive=expected,
                                         transform=transform,
                                         predictive_transform=predictive_transform,
-                                        branch_ids=retained_branches, unselected_transform=totals_transform, tip_missing=missing):
+                                        branch_ids=retained_branches, unselected_transform=totals_transform,
+                                        tip_missing=missing, rate_posterior=retain_rate_posterior):
             sl = slice(record.start, record.stop)
             node = record.child
             if node not in model.leaves:
@@ -526,6 +531,8 @@ def _build(g, structural=False):
                     if 'N' in mappings:
                         g['state_nsy'][node, sl] = pp @ mappings['N']
             if record.parent < 0:
+                if record.rate_posterior is not None:
+                    g['_asrv_rate_posterior'][:, sl] = record.rate_posterior
                 continue
             valid = eligible[node, sl]
             if record.joint is not None:
@@ -653,7 +660,7 @@ def _input_fingerprint(g):
     for key in ('subcommand', 'expectation_method', 'nonsyn_recode', 'nonsynonymous_indices',
                 'synonymous_indices', 'amino_acid_orders', 'nonsyn_state_orders', 'output_stats',
                 'b', 'cs', 'cbs', 'max_arity', 'calibrate_longtail', 'min_sub_pp', '_endpoint_retained_branches',
-                'calc_omega_pvalue', 'asrv_report', 'epistasis_requested', 'asrv_training_branches',
+                'calc_omega_pvalue', 'asrv_report', 'epistasis_requested', 'asrv_training_branches', 'asrv_posterior_draws',
                 'site_filter_report', 'fg_clade_permutation', 'max_synonymous_size'):
         digest.update(str((key, g.get(key))).encode())
     return digest.hexdigest()
@@ -693,6 +700,8 @@ def prepare(g):
 
 def invalidate(g):
     for key in ('_endpoint_tensors', '_endpoint_reducers', '_endpoint_manifest', '_endpoint_input_fingerprint', 'EN_reducer', 'ES_reducer'):
+        g.pop(key, None)
+    for key in ('_asrv_rate_categories', '_asrv_rate_posterior'):
         g.pop(key, None)
 
 

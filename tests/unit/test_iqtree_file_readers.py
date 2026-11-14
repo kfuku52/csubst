@@ -182,6 +182,7 @@ def test_read_rate_prefers_posterior_mean_rate_and_retains_categorized_rate(tmp_
 
     np.testing.assert_allclose(out, [0.25, 1.75], atol=1e-12)
     np.testing.assert_allclose(g["iqtree_categorized_rate_values"], [0.10, 2.00], atol=1e-12)
+    assert g['iqtree_rate_column'] == 'Rate'
 
 
 def test_read_rate_accepts_whitespace_padded_column_name(tmp_path):
@@ -194,6 +195,7 @@ def test_read_rate_accepts_whitespace_padded_column_name(tmp_path):
     g = {"path_iqtree_rate": str(rate_file), "num_input_site": 1}
     out = parser_iqtree.read_rate(g)
     np.testing.assert_allclose(out, [0.25], atol=1e-12)
+    assert g['iqtree_rate_column'] == 'C_Rate'
 
 
 def test_read_rate_accepts_case_insensitive_c_rate_header(tmp_path):
@@ -226,6 +228,17 @@ def test_read_rate_uses_num_input_site_when_rate_file_has_no_rows(tmp_path):
     g = {"path_iqtree_rate": str(rate_file), "num_input_site": 3}
     out = parser_iqtree.read_rate(g)
     np.testing.assert_allclose(out, [1.0, 1.0, 1.0], atol=1e-12)
+    assert g['iqtree_rate_column'] is None
+
+
+@pytest.mark.parametrize('mode', ['file', 'file_each'])
+def test_read_rate_requires_rows_for_file_weighted_urn_with_freerate(tmp_path, mode):
+    rate_file = tmp_path / 'fit.rate'
+    rate_file.write_text('Site\tRate\tCat\tC_Rate\n')
+    g = dict(path_iqtree_rate=str(rate_file), num_input_site=2, asrv=mode, expectation_method='urn')
+    with pytest.raises(ValueError, match=r'requires site-rate rows for fitted model GY\+FQ\+R3'):
+        parser_iqtree.read_rate(dict(g, substitution_model='GY+FQ+R3'))
+    np.testing.assert_array_equal(parser_iqtree.read_rate(dict(g, substitution_model='GY+FQ')), [1., 1.])
 
 
 def test_read_rate_rejects_site_count_mismatch(tmp_path):

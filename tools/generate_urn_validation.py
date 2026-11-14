@@ -34,9 +34,13 @@ def codon_generator():
     return codons, q
 
 
-def simulate_alignment(codons, q, num_sites, rng, heterogeneous=False, signal_sites=0, missing=0.):
+def simulate_alignment(codons, q, num_sites, rng, heterogeneous=False, signal_sites=0, missing=0.,
+                       branch_scale=1., rate_spread=1.):
     tr = ete.PhyloNode(TREE, format=1)
     rates = np.array([.2, 1., 3.]) if heterogeneous else np.array([1.])
+    if rate_spread != 1.:
+        with np.errstate(over='ignore'):
+            rates = np.exp(rate_spread * np.log(rates / rates.max()))
     rates /= rates.mean()
     classes = rng.integers(0, len(rates), num_sites)
     states = {id(tr): rng.integers(0, len(codons), num_sites)}
@@ -47,9 +51,9 @@ def simulate_alignment(codons, q, num_sites, rng, heterogeneous=False, signal_si
         source = states[id(node.up)]
         result = np.empty(num_sites, dtype=int)
         for k, rate in enumerate(rates):
-            key = (float(node.dist), float(rate))
+            key = (float(node.dist) * branch_scale, float(rate))
             if key not in transitions:
-                p = np.clip(expm(q * node.dist * rate), 0, None)
+                p = np.clip(expm(q * key[0] * rate), 0, None)
                 p /= p.sum(axis=1, keepdims=True)
                 cumulative = p.cumsum(axis=1)
                 cumulative[:, -1] = 1.
@@ -82,12 +86,20 @@ def main():
     parser.add_argument('--signal-sites', type=int, default=20)
     parser.add_argument('--missing', type=float, default=0.)
     parser.add_argument('--heterogeneous', action='store_true')
+    parser.add_argument('--branch-scale', type=float, default=1.)
+    parser.add_argument('--rate-spread', type=float, default=1.,
+                        help='Power applied to the simulated rates before normalizing to mean one.')
+    parser.add_argument('--compare-freerate-asrv', action='store_true',
+                        help='Simulate three rate classes and fit GY+FQ+R3 under file, each and file_each ASRV.')
     parser.add_argument('--seed', type=int, default=12120910)
     args = parser.parse_args()
+    heterogeneous = args.heterogeneous or args.compare_freerate_asrv
     if min(args.calibration, args.validation, args.sites) < 1 or args.alternatives < 0:
         raise ValueError('Positive calibration/validation/site counts are required.')
     if not 0 <= args.signal_sites <= args.sites or not 0 <= args.missing < 1:
         raise ValueError('Invalid signal-site or missing-data setting.')
+    if not np.isfinite([args.branch_scale, args.rate_spread]).all() or min(args.branch_scale, args.rate_spread) <= 0:
+        raise ValueError('Branch scale and rate spread must be positive and finite.')
     args.outdir.mkdir(parents=True, exist_ok=False)
     (args.outdir / 'tree.nwk').write_text(TREE + '\n')
     (args.outdir / 'foreground.tsv').write_text('1\t^a$\n2\t^e$\n')
@@ -101,8 +113,8 @@ def main():
         for _ in range(count):
             name = 'rep{:05d}'.format(index)
             sequences = simulate_alignment(codons, q, args.sites, np.random.default_rng(seeds[index]),
-                                           args.heterogeneous, args.signal_sites if truth == 'alternative' else 0,
-                                           args.missing)
+                                           heterogeneous, args.signal_sites if truth == 'alternative' else 0,
+                                           args.missing, args.branch_scale, args.rate_spread)
             (args.outdir / (name + '.fa')).write_text(''.join('>{}\n{}\n'.format(k, v) for k, v in sequences.items()))
             replicates.append(dict(id=name, role=role, truth=truth, alignment=name + '.fa',
                                    tree='tree.nwk', foreground='foreground.tsv'))
@@ -111,8 +123,9 @@ def main():
         'schema_version': 1,
         'simulator': {'independent_replicates': True, 'generator': 'symmetric_single_step_codon_CTMC',
                       'alternative': 'shared_terminal_GCT_injection', 'seed': args.seed, 'sites': args.sites,
-                      'heterogeneous': args.heterogeneous, 'missing': args.missing,
-                      'signal_sites': args.signal_sites},
+                      'heterogeneous': heterogeneous, 'missing': args.missing,
+                      'signal_sites': args.signal_sites, 'branch_scale': args.branch_scale,
+                      'rate_spread': args.rate_spread},
         'analysis_options': {'iqtree_model': 'GY+F', 'drop_invariant_tip_sites': False},
         'configurations': [
             {'name': 'each_all', 'options': {'asrv': 'each'}},
@@ -125,6 +138,10 @@ def main():
                       'minimum_counts': {'OCNany2spe': 1., 'OCSany2spe': 1.}},
         'replicates': replicates,
     }
+    if args.compare_freerate_asrv:
+        manifest['analysis_options'].update(iqtree_model='GY+FQ+R3', urn_model='wallenius')
+        manifest['configurations'] = [{'name': mode, 'options': {'asrv': mode}}
+                                      for mode in ('file', 'each', 'file_each')]
     labeled = tree.add_numerical_node_labels(ete.PhyloNode(TREE, format=1))
     # The product intentionally leaves root/root-adjacent EC undefined.
     # Declare the testable family from topology, before observing any scores.

@@ -31,7 +31,7 @@ from csubst.omega_statistics import (
     _calibrate_dsc_vector as _calibrate_dsc_vector,
     _needs_omega_pvalue_upper_tail_edge_refinement as _needs_omega_pvalue_upper_tail_edge_refinement,
 )
-from csubst import urn_expectation
+from csubst import asrv, urn_expectation
 from csubst import parallel
 from csubst import randomness
 from csubst import substitution
@@ -164,13 +164,13 @@ def prepare_epistasis(g, ON_tensor, OS_tensor):
     if g.get('asrv', 'each') != 'sn':
         raise ValueError('Structure weighting requires --asrv sn.')
     features = np.asarray(g['epistasis_site_feature_matrix_internal'], dtype=np.float64)
-    mask = np.asarray(g['is_site_nonmissing'], dtype=bool)
-    context, groups, partitions = epistasis.prepare_layout(g, mask.shape[0], features.shape[1])
+    context, groups, partitions = epistasis.prepare_layout(g, ON_tensor.shape[0], features.shape[1])
     g['_epistasis_provenance']['site_features'] = features.tolist()
     g['_epistasis_provenance']['feature_mode'] = g.get('epistasis_feature_mode_resolved', 'single')
     state = {}
     for channel in _resolve_epistasis_channels(g):
         tensor = ON_tensor if channel == 'N' else OS_tensor
+        mask = substitution.get_asrv_site_mask(g, channel)
         counts = _get_epistasis_branch_site_counts(tensor, g)
         fitted = epistasis.crossfit(counts, context, features, mask, groups, partitions, g)
         eligible = (partitions >= 0) & mask.any(axis=1)
@@ -563,17 +563,14 @@ def _build_expected_state_projector(inst, float_tol, stationary=None):
 
 
 def _resolve_sub_sites(g, sub_sg, mode, sg, a, d, obs_col):
-    if g['asrv'] in ['each', 'file_each']:
-        sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g)
-        return _apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col=obs_col, g=g)
-    if (g['asrv']=='sn'):
-        if (obs_col.startswith('OCS')):
-            sub_sites = g['sub_sites']['S']
-            return _apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col=obs_col, g=g)
-        if (obs_col.startswith('OCN')):
-            sub_sites = g['sub_sites']['N']
-            return _apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col=obs_col, g=g)
-    sub_sites = g['sub_sites'][g['asrv']]
+    asrv_mode = g['asrv']
+    channel = 'N' if obs_col.startswith('OCN') else 'S'
+    if asrv_mode in ('each', 'file_each'):
+        sub_sites = substitution.get_each_sub_sites(sub_sg, mode, sg, a, d, g, channel=channel)
+    else:
+        weights = g['sub_sites']
+        key = channel if channel in weights else asrv_mode
+        sub_sites = weights[key]
     return _apply_epistasis_to_sub_sites(sub_sites=sub_sites, obs_col=obs_col, g=g)
 
 
@@ -794,8 +791,8 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
         raise ValueError('site_weights should be a 1D array.')
     if not np.isfinite(site_weights).all() or (site_weights < 0).any():
         raise ValueError('Site weights should be finite and non-negative.')
-    if policy not in ('auto', 'exact'):
-        raise ValueError('Wallenius expectation policy must be auto or exact.')
+    if policy not in ('auto', 'exact', 'quadrature'):
+        raise ValueError('Wallenius expectation policy must be auto, exact, or quadrature.')
     draw_size = int(draw_size)
     if draw_size < 0:
         raise ValueError('draw_size should be >= 0.')
@@ -828,6 +825,8 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
         out[positive_mask] = urn_expectation.grouped_wallenius_inclusion(positive_weights, draw_size)
     elif method == 'exact_enumeration':
         out[positive_mask] = urn_expectation.enumerated_wallenius_inclusion(positive_weights, draw_size)
+    elif policy == 'quadrature':
+        out[positive_mask] = urn_expectation.wallenius_quadrature_inclusion(positive_weights, draw_size)
     else:
         out[positive_mask] = urn_expectation.wallenius_mean_inclusion(positive_weights, draw_size)
     return out.astype(float_type, copy=False)
@@ -933,6 +932,7 @@ def _calc_weighted_urn_expected_overlap(
     g,
     float_type,
     inclusion_probability_func,
+    profile_inclusion=None,
 ):
     cb_ids = np.asarray(cb_ids, dtype=np.int64)
     if cb_ids.ndim != 2:
@@ -956,14 +956,17 @@ def _calc_weighted_urn_expected_overlap(
     reuse_profiles = np.any(profile_ids != np.arange(len(sub_sites)))
     positive_counts = np.full(len(sub_sites), -1, dtype=np.int64)
 
-    def inclusion(branch_id, draw_size):
-        return inclusion_probability_func(
-            site_weights=sub_sites[branch_id], draw_size=draw_size, float_type=np.float64,
-        )
+    if profile_inclusion is None:
+        def inclusion(branch_id, draw_size):
+            return inclusion_probability_func(
+                site_weights=sub_sites[branch_id], draw_size=draw_size, float_type=np.float64,
+            )
 
-    if reuse_profiles:
-        profile_bytes = max(1, sub_sites[0].nbytes)
-        inclusion = lru_cache(maxsize=max(1, min(64, (8 * 1024**2) // profile_bytes)))(inclusion)
+        if reuse_profiles:
+            profile_bytes = max(1, sub_sites[0].nbytes)
+            inclusion = lru_cache(maxsize=max(1, min(64, (8 * 1024**2) // profile_bytes)))(inclusion)
+    else:
+        inclusion = profile_inclusion
 
     rounding_mode = _resolve_omega_pvalue_rounding_mode(g=g)
     if rounding_mode == 'stochastic':
@@ -998,16 +1001,20 @@ def _calc_weighted_urn_expected_overlap(
     )
 
 
-def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
+def _wallenius_inclusion_for_policy(site_weights, draw_size, g):
+    policy = g.get('urn_wallenius_expectation', 'auto')
+    result = _calc_wallenius_inclusion_probabilities(site_weights, draw_size, policy=policy)
+    positive = np.asarray(site_weights)[np.asarray(site_weights) > 0]
+    method = urn_expectation.wallenius_method(positive, draw_size)
+    if method == 'approximate_mean' and policy == 'quadrature':
+        method = 'quadrature'
+    g.setdefault('_urn_expectation_methods', {})[method] = True
+    return result
+
+
+def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type, profile_inclusion=None):
     def inclusion(site_weights, draw_size, float_type):
-        result = _calc_wallenius_inclusion_probabilities(
-            site_weights, draw_size, float_type,
-            policy=g.get('urn_wallenius_expectation', 'auto'),
-        )
-        positive = np.asarray(site_weights)[np.asarray(site_weights) > 0]
-        method = urn_expectation.wallenius_method(positive, draw_size)
-        g.setdefault('_urn_expectation_methods', {})[method] = True
-        return result
+        return _wallenius_inclusion_for_policy(site_weights, draw_size, g)
 
     return _calc_weighted_urn_expected_overlap(
         cb_ids=cb_ids,
@@ -1016,6 +1023,7 @@ def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_t
         g=g,
         float_type=float_type,
         inclusion_probability_func=inclusion,
+        profile_inclusion=profile_inclusion,
     )
 
 
@@ -1833,7 +1841,8 @@ def _get_fused_expected_sparse_reducer(g, mode, selected_base_stats):
     }
 
 
-def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g, static_sub_sites=None, cb_site_overlap=None):
+def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g, static_sub_sites=None,
+                cb_site_overlap=None, profile_inclusion=None):
     E_b = np.zeros(shape=(cb_ids.shape[0],), dtype=g['float_type'])
     for i,sg,a,d in list_igad:
         if (a==d):
@@ -1843,13 +1852,12 @@ def calc_E_mean(mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g, static_sub_
         else:
             sub_sites = static_sub_sites
         sub_branches = substitution.get_sub_branches(sub_bg, mode, sg, a, d)
-        E_b += _calc_urn_expected_overlap(
-            cb_ids=cb_ids,
-            sub_sites=sub_sites,
-            sub_branches=sub_branches,
-            g=g,
-            float_type=g['float_type'],
-        )
+        if profile_inclusion is None:
+            E_b += _calc_urn_expected_overlap(cb_ids, sub_sites, sub_branches, g, g['float_type'])
+        else:
+            E_b += _calc_wallenius_expected_overlap(
+                cb_ids, sub_sites, sub_branches, g, g['float_type'], profile_inclusion=profile_inclusion,
+            )
     return E_b
 
 
@@ -2077,6 +2085,31 @@ def calc_E_stat(cb, sub_tensor, mode, stat='mean', SN='', g=None):
     txt = 'E{}{}: Total number of substitution categories after NaN removals: {}'
     print(txt.format(SN, mode, num_gad_combinat))
     cb_ids = _get_cb_ids(cb)
+    if g.get('asrv_posterior_draws'):
+        asrv.posterior_rate_seed(g)
+        rates = g['_asrv_rate_categories']
+        if np.all(rates == rates[0]):
+            rate_draws = (np.full(sub_sg.shape[0], rates[0]),)
+            count = 1
+        else:
+            rate_draws = asrv.posterior_site_rate_draws(g)
+            count = g['asrv_posterior_draws']
+        total = np.zeros(len(cb_ids))
+        # Rate draws change the site profile but keep the observed branch
+        # totals fixed. Integrate the overlap conditional on each profile.
+        for site_rates in rate_draws:
+            weights = substitution._normalize_site_weights_by_branch(site_rates, g, 0., channel=SN)
+            profile_bytes = max(1, weights.shape[1] * np.dtype(np.float64).itemsize)
+
+            @lru_cache(maxsize=min(512, (8 * 1024**2) // profile_bytes))
+            def inclusion(branch_id, draw_size):
+                return _wallenius_inclusion_for_policy(weights[branch_id], draw_size, g)
+
+            total += calc_E_mean(
+                mode, cb_ids, sub_sg, sub_bg, obs_col, list_igad, g,
+                static_sub_sites=weights, profile_inclusion=inclusion,
+            )
+        return (total / count).astype(g['float_type'], copy=False)
     static_sub_sites = _get_static_sub_sites_if_available(g=g, sub_sg=sub_sg, mode=mode, obs_col=obs_col)
     cb_site_overlap = None
     n_jobs, estimated_work = _resolve_E_stat_n_jobs(

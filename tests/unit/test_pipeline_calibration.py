@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 
 import numpy as np
@@ -61,3 +62,36 @@ def test_manifest_rejects_reused_calibration_data(tmp_path):
                                dict(id='b', role='validation', truth='null', alignment='a.fa', tree='t.nwk')]}
     with pytest.raises(ValueError, match='reused'):
         module.validate_manifest(manifest, tmp_path)
+
+
+def test_runner_compares_each_configuration_against_its_own_reference(tmp_path, monkeypatch):
+    script = Path(__file__).resolve().parents[2] / 'tools' / 'evaluate_urn_pipeline.py'
+    spec = importlib.util.spec_from_file_location('urn_pipeline_runner', script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    ids = ['calibration', 'validation']
+    for name in ids:
+        (tmp_path / (name + '.fa')).write_text('>a\nGCT\n')
+    (tmp_path / 'tree.nwk').write_text('(a:1,b:1);')
+    manifest_path = tmp_path / 'manifest.json'
+    manifest_path.write_text(json.dumps({
+        'schema_version': 1, 'simulator': {'independent_replicates': True},
+        'replicates': [dict(id=name, role=name, truth='null', alignment=name + '.fa', tree='tree.nwk')
+                       for name in ids],
+        'configurations': [{'name': 'file'}, {'name': 'each'}],
+        'selection': {'statistic': 'omegaCany2spe', 'arity': 2},
+    }))
+    scores = {'calibration': {'file': 10., 'each': 1.}, 'validation': {'file': 9., 'each': 2.}}
+
+    def fake_run(row, config, *_):
+        return scores[row['id']][config['name']]
+
+    outdir = tmp_path / 'result'
+    monkeypatch.setattr(module, 'run_configuration', fake_run)
+    monkeypatch.setattr(module.sys, 'argv', [str(script), '--manifest', str(manifest_path),
+                                            '--outdir', str(outdir), '--level', '.5', '--fpr-limit', '.75'])
+    module.main()
+    summary = json.loads((outdir / 'summary.json').read_text())
+    assert summary['validation']['null']['rejections'] == 0
+    assert summary['by_configuration']['file']['validation']['null']['rejections'] == 0
+    assert summary['by_configuration']['each']['validation']['null']['rejections'] == 1

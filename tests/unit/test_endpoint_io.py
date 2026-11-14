@@ -88,6 +88,47 @@ def test_3di_changes_do_not_change_codon_S_or_AA(tmp_path):
     assert not np.array_equal(first['_endpoint_tensors']['N'].to_dense(), second['_endpoint_tensors']['N'].to_dense())
 
 
+@pytest.mark.parametrize('asrv_mode', ['file', 'file_each', 'sn'])
+def test_urn_site_weights_use_joint_eligibility_after_thresholding(tmp_path, asrv_mode):
+    g, ids = toy_context(tmp_path, structural=True)
+    a = ids['A']
+    g.update(expectation_method='urn', asrv=asrv_mode, min_sub_pp=0.01,
+             iqtree_rate_values=np.array([1., 3., 9.]))
+    g['state_cdn'][a, 1] = 1. / 3  # Fully ambiguous emission, with a nonzero row sum.
+    g['state_nsy'][a, 0] = 0.  # Independent structural stream is missing at site 0.
+    tensors = {}
+    for kind, state, mode in [('S', g['state_cdn'], 'syn'), ('N', g['state_nsy'], 'asis')]:
+        tensor = substitution.get_substitution_tensor(state, mode=mode, g=g)
+        tensors[kind] = substitution.apply_min_sub_pp(g, tensor)
+    s = substitution.get_s(tensors['S'], attr='S')
+    n = substitution.get_s(tensors['N'], attr='N')
+    substitution.get_sub_sites(g, s, n, g['state_cdn'], tensors['S'], tensors['N'])
+    site_mass = np.ones((3, 1))
+    for kind, expected in [('S', [1., 0., 0.]), ('N', [0., 1., 0.])]:
+        weights = omega._resolve_sub_sites(g, site_mass, 'any2any', 0, 'any2', '2any', 'OC' + kind + 'any2any')
+        np.testing.assert_array_equal(weights[a] > 0, np.asarray(expected, dtype=bool))
+        np.testing.assert_allclose(weights[a], expected, rtol=0, atol=1e-15)
+        assert omega._calc_wallenius_expected_overlap(
+            [[a, ids['B']]], weights, np.ones(len(weights)), g, np.float64,
+        )[0] == pytest.approx(weights[ids['B']] @ expected)
+
+
+def test_joint_rate_posterior_is_available_on_the_filtered_site_axis(tmp_path):
+    g, _ = toy_context(tmp_path)
+    g.update(expectation_method='urn', asrv='file', asrv_posterior_draws=16, substitution_model='GY+F+R2')
+    with open(g['path_iqtree_iqtree'], 'w') as report:
+        report.write('Category  Relative_rate  Proportion\n 1 0.1 0.25\n 2 1.3 0.75\n')
+    endpoint_io.prepare(g)
+    first = g['_asrv_rate_posterior'].copy()
+    np.testing.assert_allclose(first[:, 2], [.25, .75])
+    assert first[1, 0] > .75  # Tips with different codons support the faster category.
+    g.update(drop_invariant_tip_sites=True, drop_invariant_tip_sites_mode='zero_sub_mass',
+             num_input_site=3, site_index_alignment=np.arange(3))
+    parser_misc.drop_invariant_tip_sites(g)
+    endpoint_io.prepare(g)
+    np.testing.assert_allclose(g['_asrv_rate_posterior'], first[:, :2])
+
+
 def test_block_size_and_filtered_rebuild(tmp_path):
     first, _ = toy_context(tmp_path)
     second = copy.deepcopy(first)

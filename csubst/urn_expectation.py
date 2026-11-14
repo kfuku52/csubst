@@ -1,5 +1,6 @@
 """Numerical helpers for weighted-urn probabilities."""
 
+from functools import lru_cache
 from math import isqrt, prod
 
 import numpy as np
@@ -303,3 +304,93 @@ def wallenius_mean_inclusion(positive_weights, draw_size):
     hi = uniform_time - log_weights.min() + 1.
     root = brentq(residual, lo, hi, xtol=np.finfo(float).eps, maxiter=200)
     return -np.expm1(-clock(root, log_weights))
+
+
+@lru_cache(maxsize=4)
+def _quadrature_rule(order):
+    return np.polynomial.legendre.leggauss(order)
+
+
+def _wallenius_clock_density(log_time, log_weights, draw_size):
+    """Density of each log arrival time with rank at most draw_size."""
+    num_sites = len(log_weights)
+    log_clock = log_time[:, None] + log_weights
+    saturation = np.log(746.)
+    clock = np.exp(np.minimum(log_clock, saturation))
+    survival = np.exp(-clock)
+    arrived = -np.expm1(-clock)
+    # At a fixed time all other arrivals are independent Bernoulli trials.
+    # Count the shorter tail, keeping the probability of reaching its bound
+    # in a separate, absorbing bin.
+    upper_tail = num_sites - draw_size < draw_size
+    limit = num_sites - draw_size if upper_tail else draw_size
+    success, failure = (survival, arrived) if upper_tail else (arrived, survival)
+    prefix = np.zeros((num_sites, len(log_time), limit + 1))
+    prefix[0, :, 0] = 1.
+    for site in range(num_sites - 1):
+        previous = prefix[site]
+        current = prefix[site + 1]
+        p, q = success[:, site, None], failure[:, site, None]
+        current[:, :-1] = previous[:, :-1] * q
+        current[:, 1:-1] += previous[:, :-2] * p
+        current[:, -1] = previous[:, -1] + previous[:, -2] * p[:, 0]
+    suffix = prefix[0].copy()
+    probability = np.empty_like(clock)
+    for site in range(num_sites - 1, -1, -1):
+        if upper_tail:
+            tail = np.cumsum(suffix[:, :0:-1], axis=1)
+            probability[:, site] = prefix[site, :, -1] + (prefix[site, :, :-1] * tail).sum(axis=1)
+        else:
+            head = np.cumsum(suffix[:, :-1], axis=1)[:, ::-1]
+            probability[:, site] = (prefix[site, :, :-1] * head).sum(axis=1)
+        p, q = success[:, site, None], failure[:, site, None]
+        suffix[:, -1] += suffix[:, -2] * p[:, 0]
+        suffix[:, 1:-1] = suffix[:, 1:-1] * q + suffix[:, :-2] * p
+        suffix[:, 0] *= q[:, 0]
+    log_density = np.where(log_clock < saturation, log_clock - clock, -np.inf)
+    return np.exp(log_density) * probability
+
+
+def wallenius_quadrature_inclusion(positive_weights, draw_size):
+    """Integrate the exponential arrival density against a Poisson-binomial CDF."""
+    log_weights = normalized_log_weights(positive_weights)
+    limit = min(draw_size, len(log_weights) - draw_size)
+    if 8 * len(log_weights) * (limit + 1) > 64 * 1024**2:
+        raise ValueError('Wallenius quadrature requires more than 64 MiB for one integration point.')
+    # For every site the omitted clock mass at either end is at most 1e-14.
+    tail = 1e-14
+    lower = np.log(tail)
+    upper = np.log(-np.log(tail)) - log_weights.min()
+    boundaries = np.linspace(lower, upper, int(np.ceil((upper - lower) / 4)) + 1)
+    pending = [(lo, hi, 0) for lo, hi in zip(boundaries[:-1], boundaries[1:])]
+    total = np.zeros_like(log_weights)
+    # Bound the number of time points in the prefix workspace. A single time
+    # point still requires n * (limit + 1) doubles.
+    batch_size = max(1, (32 * 1024**2) // (8 * len(log_weights) * (limit + 1)))
+
+    def integrate(lo, hi, order):
+        nodes, weights = _quadrature_rule(order)
+        half = (hi - lo) / 2
+        value = np.zeros_like(log_weights)
+        for start in range(0, order, batch_size):
+            sl = slice(start, start + batch_size)
+            points = lo + half * (1. + nodes[sl])
+            density = _wallenius_clock_density(points, log_weights, draw_size)
+            value += weights[sl] @ density
+        return half * value
+
+    while pending:
+        lo, hi, depth = pending.pop()
+        coarse = integrate(lo, hi, 8)
+        fine = integrate(lo, hi, 16)
+        if np.all(np.abs(coarse - fine) <= 1e-11 * (hi - lo) / (upper - lower) + 1e-9 * fine):
+            total += fine
+        elif depth < 12:
+            middle = (lo + hi) / 2
+            pending.extend(((lo, middle, depth + 1), (middle, hi, depth + 1)))
+        else:
+            raise ValueError('Wallenius quadrature did not converge.')
+    if (total.max() > 1. + 1e-9
+            or not np.isclose(total.sum(), draw_size, rtol=1e-8, atol=1e-10)):
+        raise ValueError('Wallenius quadrature did not recover the branch draw size.')
+    return np.minimum(total, 1.)

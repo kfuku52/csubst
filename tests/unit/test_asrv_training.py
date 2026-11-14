@@ -1,6 +1,7 @@
 import json
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from csubst import asrv, ete, omega, substitution, substitution_sparse, tree
@@ -142,3 +143,21 @@ def test_legacy_concentration_recovers_per_site_alpha():
     g['asrv_concentration'] = 2.
     total = substitution._normalize_site_weights_by_branch(c, g)
     np.testing.assert_allclose(legacy, total, atol=1e-15)
+
+
+def test_shared_rate_assignments_are_integrated_before_branch_overlap():
+    g, raw, names = context(mode='file', training='all', concentration=None)
+    g.update(asrv_posterior_draws=64, _asrv_rate_categories=np.array([0., 1.]),
+             _asrv_rate_posterior=np.full((2, 4), .5), random_seed=12)
+    raw.fill(0.)
+    raw[[names['a'], names['b']], 0, 0, 0, 1] = 1.
+    prepare(g, raw)
+    a, b = names['a'], names['b']
+    cb = pd.DataFrame({'branch_id_1': [a], 'branch_id_2': [b]})
+    draws = list(asrv.posterior_site_rate_draws(g))
+    # With one draw per branch, overlap is 1/k if k sites share positive
+    # rates, or zero when all four sites are in the zero-rate category.
+    expected = np.mean([1 / row.sum() if row.any() else 0. for row in draws])
+    actual = omega.calc_E_stat(cb, raw, 'any2any', SN='N', g=g)[0]
+    assert actual == pytest.approx(expected)
+    assert actual > .25  # Plug-in mean weights give 1/4.

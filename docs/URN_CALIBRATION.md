@@ -43,6 +43,11 @@ training sets and per-site alpha. See [structure weighting](STRUCTURE_WEIGHTING.
 not a claim of independence or proof of calibration. A site-rate file fitted
 to the tested alignment is also data-dependent.
 
+With joint endpoint posteriors, each S or N urn uses the eligible branch-sites
+of its corresponding substitution tensor. Fully ambiguous tips with no
+observation likelihood information cannot receive urn weight on their terminal
+branches. Event thresholds change the retained mass and branch totals.
+
 ## Two different ASRV concentration conventions
 
 In `sn/each/file_each`, the legacy convention adds
@@ -76,9 +81,26 @@ this hybrid is not a pure rate-profile prior. Zero file rates can receive
 positive probability from the uniform prior. Neither convention is silently
 replaced by a pooled or file prior.
 
+`file` and `file_each` use the posterior mean `Rate` column of the IQ-TREE
+`.rate` file when present and use `C_Rate` otherwise. With a fitted `+R` or
+`+G` model these modes require site-rate rows. The chosen column is recorded as
+`site_rate_column` in the urn provenance.
+
+`--asrv file --asrv_posterior_draws N` with joint Wallenius urn expectations
+uses the fitted codon rate-category posterior. It draws one category per
+retained site, shares that assignment across the tree and the S/N channels,
+and averages conditional expected overlaps over the assignments. Branch
+totals remain fixed at their inferred values. Use this experimental option
+for sensitivity analysis of rate-category uncertainty. The default of zero
+draws uses fixed site weights. The option supports EC and omegaC for codon
+or amino-acid recoding and uses `--random_seed` for reproducibility.
+The conditional P-value, long-tail
+calibration, and fixed-weight ASRV report options require fixed site weights.
+
 ## Wallenius precision
 
-`--urn_wallenius_expectation auto` uses exact boundary and uniform cases,
+For Wallenius urn expectations, the default `--urn_wallenius_expectation auto`
+uses exact boundary and uniform cases,
 exact one/two-draw formulas, exact subset enumeration for at most 20
 positive-weight sites, and bounded exact recurrences for two to four distinct
 positive weights. The recurrences track selected counts from all groups
@@ -95,6 +117,17 @@ of magnitude.
 
 `--urn_wallenius_expectation exact` rejects a case that would need the
 approximation. It is available only for the Wallenius urn expectation model.
+`--urn_wallenius_expectation quadrature` checks the numerical precision of
+ECN and ECS when weights concentrate on a few sites. It keeps the exact
+cases. For the remaining profiles, it integrates the site's exponential
+arrival density against the probability that fewer than
+the required number of other sites have arrived. A truncated count recurrence
+computes this probability. The adaptive quadrature checks convergence and
+that inclusion probabilities sum to the draw size. Runtime grows with the
+number of sites and the shorter of the selected and omitted counts.
+The solver raises an error if it fails to converge or one integration point
+would require more than 64 MiB for the count table. The quadrature error
+check combines relative and absolute tolerances.
 No universal error bound is asserted for `auto`. Detailed provenance records
 the methods encountered for the input categories and branch draw sizes.
 Stochastic rounding uses both neighboring integer draw sizes.
@@ -236,8 +269,21 @@ inject shared terminal GCT states in tips a and e and serve only as a
 synthetic sensitivity control, not a fitted alternative evolutionary model.
 The generated manifest excludes root/root-adjacent branches by their known
 topological IDs, because CSUBST intentionally leaves their EC undefined.
-The supplied configurations compare all-branch ASRV, background ASRV with
+The default configurations compare all-branch ASRV, background ASRV with
 fixed total concentration, and automatic recoding with background ASRV.
+For a paired comparison of `file`, `each`, and `file_each` under Wallenius, use
+`--compare-freerate-asrv` on the generator. It simulates three rate classes
+and fits `GY+FQ+R3` for every replicate and configuration. `summary.json`
+reports null rejection rates and alternative detection rates with binomial
+intervals in `by_configuration`, using a separate empirical reference for
+each method. The top-level summary continues to use the maximum across all
+configurations and evaluates selection over the entire family.
+`--branch-scale`, `--rate-spread`, and `--missing` vary the simulated
+branch lengths, rate dispersion, and missingness. Use independent calibration
+and validation datasets within each scenario.
+To compare precision or shared-rate assignments, set `asrv: "file"` in the
+configuration options and add `urn_wallenius_expectation: "quadrature"` or
+`asrv_posterior_draws: 64` to the configurations that use those methods.
 
 For another independent simulator, supply manifest schema 1 with:
 

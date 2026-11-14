@@ -69,6 +69,7 @@ class ModelConfig(TypedDict, total=False):
     asrv_training_branches: str
     asrv_concentration: float | None
     asrv_report: bool
+    asrv_posterior_draws: int
     urn_wallenius_expectation: str
     epistasis_cv_clades: int
     epistasis_beta_partition: str
@@ -99,6 +100,11 @@ class AnalysisState(TypedDict, total=False):
     state_pep: np.ndarray | None
     state_nsy: np.ndarray | None
     state_loaded_branch_ids: np.ndarray | None
+    iqtree_rate_column: str | None
+    _asrv_nonsynonymous_site_mask: np.ndarray
+    _asrv_rate_categories: np.ndarray
+    _asrv_rate_posterior: np.ndarray
+    _asrv_posterior_seed: int
     EN_reducer: dict[str, Any]
     ES_reducer: dict[str, Any]
     sub_branches: list[int]

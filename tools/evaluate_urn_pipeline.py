@@ -89,7 +89,7 @@ def run_configuration(row, config, common, selection, outdir, seed):
     options.setdefault('calibrate_longtail', 'no')
     options.setdefault('output_stat', selection['statistic'].removeprefix('omegaC').removesuffix('_nocalib'))
     options.setdefault('threads', 1)
-    options.setdefault('asrv_report', True)
+    options.setdefault('asrv_report', not options.get('asrv_posterior_draws', 0))
     shutil.copyfile(row['alignment'], run_dir / 'input.fa')
     shutil.copyfile(row['tree'], run_dir / 'input.nwk')
     options.update(alignment_file=str(run_dir / 'input.fa'), rooted_tree_file=str(run_dir / 'input.nwk'),
@@ -140,6 +140,14 @@ def main():
                             selected_statistic=max(scores.values()), **{'score_' + k: v for k, v in scores.items()}))
         pd.DataFrame(records).to_csv(outdir / 'replicate_scores.tsv', sep='\t', index=False)
     validation, summary = pipeline_calibration.summarize_validation(records, args.level, args.fpr_limit)
+    if len(manifest['configurations']) > 1:
+        summary['by_configuration'] = {}
+        for config in manifest['configurations']:
+            name = config['name']
+            config_records = [dict(row, selected_statistic=row['score_' + name]) for row in records]
+            _, summary['by_configuration'][name] = pipeline_calibration.summarize_validation(
+                config_records, args.level, args.fpr_limit,
+            )
     pd.DataFrame(validation).to_csv(outdir / 'validation.tsv', sep='\t', index=False)
     (outdir / 'summary.json').write_text(json.dumps(summary, indent=2, allow_nan=False) + '\n')
     print(json.dumps(summary, indent=2))

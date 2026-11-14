@@ -135,6 +135,7 @@ class EndpointBlock:
     reduced: dict | None = None
     reduced_predictive: dict | None = None
     category_node: np.ndarray | None = None
+    rate_posterior: np.ndarray | None = None
 
 
 class EndpointModel:
@@ -205,7 +206,8 @@ class EndpointModel:
         return self._transitions[t]
 
     def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None,
-                    predictive_transform=None, category_nodes=False, unselected_transform=None, transform_rate_context=False, tip_missing=None):
+                    predictive_transform=None, category_nodes=False, unselected_transform=None,
+                    transform_rate_context=False, tip_missing=None, rate_posterior=False):
         """Yield one edge/site block; root records only contain a node marginal.
 
         Tips are observation likelihoods, NOT posterior probabilities. Missing
@@ -222,6 +224,7 @@ class EndpointModel:
         the factors may use a conditional transition and unit right message.
         tip_missing can mark rows to read as all-ones emissions without copying
         their full input tip arrays.
+        With rate_posterior, the root record exposes the site-category posteriors.
         """
         if isinstance(block_size, bool) or int(block_size) != block_size or block_size < 1:
             raise ValueError('Endpoint block size must be a positive integer.')
@@ -304,7 +307,8 @@ class EndpointModel:
             yield EndpointBlock(start, stop, self.root, -1,
                                 np.einsum('cs,csk->sk', class_weight, post[:, self.root]), None, None,
                                 category_node=(class_weight[:, :, None] * post[:, self.root]
-                                               if category_nodes else None))
+                                               if category_nodes else None),
+                                rate_posterior=class_weight if rate_posterior else None)
             for child in self.order[1:]:
                 parent = int(self.parents[child])
                 wanted = child in selected

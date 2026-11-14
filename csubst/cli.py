@@ -432,14 +432,19 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'When --calibrate_longtail is active, uncalibrated P/Q columns are retained as "_nocalib" and calibrated P/Q values are recomputed.')
     advanced_statistics = parser.add_argument_group('advanced statistical tuning')
     _add_advanced_argument(advanced_statistics, '--urn_wallenius_expectation', show_advanced=show_advanced,
-                        choices=['auto', 'exact'], default='auto',
-                        help='auto uses exact special cases/bounded enumeration, then an approximate mean. '
-                             'exact rejects cases exceeding the enumeration budget instead of approximating.')
+                        choices=['auto', 'exact', 'quadrature'], default='auto',
+                        help='Default: auto. Uses exact special cases and bounded enumeration, then an approximate mean. '
+                             'exact rejects cases exceeding the enumeration budget. '
+                             'quadrature uses numerical integration for precision checks.')
     _add_advanced_argument(advanced_statistics, '--asrv_training_branches', show_advanced=show_advanced,
                         default='all', metavar='all|background|IDS',
                         help='Branches used to learn empirical site weights. background excludes the union '
                              'of foreground and marginal target branches. IDS are comma-separated branch IDs. '
                              'Evaluation branch totals are unchanged; ASR can still share information.')
+    _add_advanced_argument(advanced_statistics, '--asrv_posterior_draws', show_advanced=show_advanced,
+                        metavar='INTEGER', default=0, type=int,
+                        help='Average Wallenius expectations over this many shared site-rate assignments from joint ASR. '
+                             'Requires --asrv file. The default (0) uses fixed site-rate weights.')
     _add_advanced_argument(advanced_statistics, '--asrv_concentration', show_advanced=show_advanced,
                         default=None, type=float, metavar='FLOAT',
                         help='Optional total uniform-prior mass for sn/each/file_each. Overrides per-site '

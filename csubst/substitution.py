@@ -1007,6 +1007,7 @@ def apply_min_sub_pp(g, sub_tensor):
             return sub_tensor.thresholded(g['min_sub_pp'])
         if _is_sparse_sub_tensor(sub_tensor):
             threshold = g['min_sub_pp']
+            eligible = getattr(sub_tensor, 'eligible', None)
             new_matrix = sub_tensor.matrix.copy()
             is_small = new_matrix.data < threshold
             if is_small.any():
@@ -1017,6 +1018,8 @@ def apply_min_sub_pp(g, sub_tensor):
                 dtype=sub_tensor.dtype,
                 matrix=new_matrix,
             )
+            if eligible is not None:
+                sub_tensor.eligible = eligible
         else:
             sub_tensor[(sub_tensor<g['min_sub_pp'])] = 0
     return sub_tensor
@@ -2453,30 +2456,31 @@ def _get_asrv_branch_ids(g, num_branch=None):
         g['_asrv_branch_ids'] = branch_ids
     if num_branch is not None:
         if ((branch_ids < 0) | (branch_ids >= int(num_branch))).any():
-            txt = 'Tree branch IDs should be in [0, {}).'
+            txt = 'Tree branch IDs out of bounds. Expected [0, {}).'
             raise ValueError(txt.format(int(num_branch)))
     return branch_ids
 
 
-def _get_asrv_nonmissing_site_indices(g):
-    branch_ids = _get_asrv_branch_ids(g=g, num_branch=g['is_site_nonmissing'].shape[0])
-    cached = g.get('_asrv_nonmissing_site_indices', None)
-    if cached is None or len(cached) != int(branch_ids.shape[0]):
-        cached = tuple(
-            np.where(g['is_site_nonmissing'][int(nl), :])[0].astype(np.int64, copy=False)
-            for nl in branch_ids.tolist()
-        )
-        g['_asrv_nonmissing_site_indices'] = cached
-    return cached
+def get_asrv_site_mask(g, channel=None):
+    if channel == 'N' and '_asrv_nonsynonymous_site_mask' in g:
+        return g['_asrv_nonsynonymous_site_mask']
+    return g['is_site_nonmissing']
 
 
-def _get_asrv_is_site_nonmissing_uint8(g):
-    cached = g.get('_asrv_is_site_nonmissing_uint8', None)
-    is_site_nonmissing = np.asarray(g['is_site_nonmissing'])
-    if (cached is None) or (cached.shape != is_site_nonmissing.shape):
-        cached = is_site_nonmissing.astype(np.uint8, copy=False)
-        g['_asrv_is_site_nonmissing_uint8'] = cached
-    return cached
+def _get_asrv_nonmissing_site_indices(g, mask, branch_ids, mask_key):
+    cache = g.get('_asrv_nonmissing_site_indices') or {}
+    if mask_key not in cache:
+        cache[mask_key] = tuple(np.flatnonzero(mask[nl]) for nl in branch_ids)
+        g['_asrv_nonmissing_site_indices'] = cache
+    return cache[mask_key]
+
+
+def _get_asrv_is_site_nonmissing_uint8(g, mask, mask_key):
+    cache = g.get('_asrv_is_site_nonmissing_uint8') or {}
+    if mask_key not in cache:
+        cache[mask_key] = mask.astype(np.uint8, copy=False)
+        g['_asrv_is_site_nonmissing_uint8'] = cache
+    return cache[mask_key]
 
 
 def _can_use_cython_site_weight_normalization(nonadjusted_sub_sites, is_site_nonmissing_u8, branch_ids):
@@ -2505,8 +2509,9 @@ def _can_use_cython_site_weight_normalization(nonadjusted_sub_sites, is_site_non
     return True
 
 
-def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, g, dirichlet_alpha, scaled=False):
-    num_branch, num_site = g['is_site_nonmissing'].shape
+def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, g, dirichlet_alpha,
+                                             mask, mask_key, scaled=False):
+    num_branch, num_site = mask.shape
     out = np.zeros(shape=(num_branch, num_site), dtype=g['float_type'])
     nonadjusted_sub_sites = np.asarray(nonadjusted_sub_sites, dtype=g['float_type']).reshape(-1)
     if nonadjusted_sub_sites.shape[0] != num_site:
@@ -2514,7 +2519,7 @@ def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, 
         raise ValueError(txt.format(nonadjusted_sub_sites.shape[0], num_site))
     if (nonadjusted_sub_sites < 0).any():
         raise ValueError('Site weights should be non-negative.')
-    nonmissing_site_indices = _get_asrv_nonmissing_site_indices(g=g)
+    nonmissing_site_indices = _get_asrv_nonmissing_site_indices(g, mask, branch_ids, mask_key)
     for nl, site_indices in zip(branch_ids.tolist(), nonmissing_site_indices):
         if site_indices.shape[0] == 0:
             continue
@@ -2540,9 +2545,11 @@ def _normalize_site_weights_by_branch_python(nonadjusted_sub_sites, branch_ids, 
     return out
 
 
-def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=1.0):
+def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=1.0, channel=None):
     dirichlet_alpha = _resolve_asrv_dirichlet_alpha({'asrv_dirichlet_alpha': dirichlet_alpha})
-    branch_ids = _get_asrv_branch_ids(g=g, num_branch=g['is_site_nonmissing'].shape[0])
+    mask = get_asrv_site_mask(g, channel)
+    mask_key = 'S' if mask is g['is_site_nonmissing'] else 'N'
+    branch_ids = _get_asrv_branch_ids(g=g, num_branch=mask.shape[0])
     nonadjusted_sub_sites = np.asarray(nonadjusted_sub_sites, dtype=g['float_type']).reshape(-1)
     if not np.isfinite(nonadjusted_sub_sites).all() or (nonadjusted_sub_sites < 0).any():
         raise ValueError('Site weights should be finite and non-negative.')
@@ -2565,7 +2572,7 @@ def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=
     else:
         scaled = scaled or tau > limits.max / 2 or (0 < tau < limits.tiny * sites)
     if not scaled and g['float_type'] == np.float64 and tau is None:
-        is_site_nonmissing_u8 = _get_asrv_is_site_nonmissing_uint8(g=g)
+        is_site_nonmissing_u8 = _get_asrv_is_site_nonmissing_uint8(g, mask, mask_key)
         nonadjusted_sub_sites64 = nonadjusted_sub_sites.astype(np.float64, copy=False)
         if _can_use_cython_site_weight_normalization(
             nonadjusted_sub_sites=nonadjusted_sub_sites64,
@@ -2586,6 +2593,8 @@ def _normalize_site_weights_by_branch(nonadjusted_sub_sites, g, dirichlet_alpha=
         branch_ids=branch_ids,
         g=g,
         dirichlet_alpha=dirichlet_alpha,
+        mask=mask,
+        mask_key=mask_key,
         scaled=scaled,
     )
 
@@ -2620,20 +2629,19 @@ def get_sub_sites(g, sS, sN, state_tensor, OS_tensor=None, ON_tensor=None):
     asrv_mode = _resolve_asrv_mode(g)
     g['asrv'] = asrv_mode
     dirichlet_alpha = _resolve_asrv_dirichlet_alpha(g)
-    g['is_site_nonmissing'] = np.zeros(shape=[num_branch, num_site], dtype=bool)
-    branch_ids = []
-    for node in g['tree'].traverse():
-        nl = int(ete.get_prop(node, "numerical_label"))
-        if (nl < 0) or (nl >= num_branch):
-            txt = 'Branch ID {} is out of bounds for state_tensor with {} branches.'
-            raise ValueError(txt.format(nl, num_branch))
-        branch_ids.append(nl)
-        g['is_site_nonmissing'][nl,:] = (state_tensor[nl,:,:].sum(axis=1)!=0)
-    g['_asrv_branch_ids'] = np.array(branch_ids, dtype=np.int64)
-    g['_asrv_nonmissing_site_indices'] = tuple(
-        np.where(g['is_site_nonmissing'][int(nl), :])[0].astype(np.int64, copy=False)
-        for nl in g['_asrv_branch_ids'].tolist()
-    )
+    g.pop('_asrv_branch_ids', None)
+    branch_ids = _get_asrv_branch_ids(g, num_branch)
+    syn_mask = getattr(OS_tensor, 'eligible', None)
+    nonsyn_mask = getattr(ON_tensor, 'eligible', None)
+    if syn_mask is None:
+        syn_mask = np.zeros((num_branch, num_site), dtype=bool)
+        for nl in branch_ids:
+            syn_mask[nl] = state_tensor[nl].sum(axis=1) != 0
+    g['is_site_nonmissing'] = syn_mask
+    g.pop('_asrv_nonsynonymous_site_mask', None)
+    if nonsyn_mask is not None and nonsyn_mask is not syn_mask:
+        g['_asrv_nonsynonymous_site_mask'] = nonsyn_mask
+    g['_asrv_nonmissing_site_indices'] = None
     g['_asrv_is_site_nonmissing_uint8'] = None
     from csubst import asrv
     asrv.resolve_training_ids(g, num_branch)
@@ -2649,30 +2657,14 @@ def get_sub_sites(g, sS, sN, state_tensor, OS_tensor=None, ON_tensor=None):
         sN['N_sub'] = asrv.training_site_summary(ON_tensor, 'any2any', ids).sum(axis=1)
     g['sub_sites'] = dict()
     g['_asrv_static_mass'] = {}
+    if asrv_mode == 'file' and g.get('asrv_posterior_draws'):
+        return g
     if asrv_mode == 'no':
         sub_sites = np.ones(shape=[num_site,]) / num_site
-        g['_asrv_static_mass'][asrv_mode] = np.array(sub_sites, copy=True)
-        g['sub_sites'][asrv_mode] = _normalize_site_weights_by_branch(
-            nonadjusted_sub_sites=sub_sites,
-            g=g,
-            dirichlet_alpha=0.0,
-        )
     elif asrv_mode == 'pool':
         sub_sites = sS['S_sub'].values + sN['N_sub'].values
-        g['_asrv_static_mass'][asrv_mode] = np.array(sub_sites, copy=True)
-        g['sub_sites'][asrv_mode] = _normalize_site_weights_by_branch(
-            nonadjusted_sub_sites=sub_sites,
-            g=g,
-            dirichlet_alpha=0.0,
-        )
     elif asrv_mode == 'file':
         sub_sites = _get_file_site_rates(g=g, num_site=num_site)
-        g['_asrv_static_mass'][asrv_mode] = np.array(sub_sites, copy=True)
-        g['sub_sites'][asrv_mode] = _normalize_site_weights_by_branch(
-            nonadjusted_sub_sites=sub_sites,
-            g=g,
-            dirichlet_alpha=0.0,
-        )
     elif asrv_mode == 'sn':
         for SN, df in zip(['S', 'N'], [sS, sN]):
             sub_sites = df[SN + '_sub'].values
@@ -2681,15 +2673,21 @@ def get_sub_sites(g, sS, sN, state_tensor, OS_tensor=None, ON_tensor=None):
                 nonadjusted_sub_sites=sub_sites,
                 g=g,
                 dirichlet_alpha=dirichlet_alpha,
+                channel=SN,
             )
+        return g
     elif asrv_mode in ['each', 'file_each']:
         # These ASRV modes are resolved per substitution category in get_each_sub_sites().
-        pass
+        return g
     else:
         raise ValueError('Unsupported --asrv value: {}'.format(asrv_mode))
+    g['_asrv_static_mass'][asrv_mode] = np.array(sub_sites, copy=True)
+    g['sub_sites'][asrv_mode] = _normalize_site_weights_by_branch(sub_sites, g, dirichlet_alpha=0.0)
+    if '_asrv_nonsynonymous_site_mask' in g:
+        g['sub_sites']['N'] = _normalize_site_weights_by_branch(sub_sites, g, dirichlet_alpha=0.0, channel='N')
     return g
 
-def get_each_sub_sites(sub_sg, mode, sg, a, d, g): # sub_sites for each "sg" group
+def get_each_sub_sites(sub_sg, mode, sg, a, d, g, channel=None):
     nonadjusted_sub_sites = _get_mode_nonadjusted_sub_sites(sub_sg=sub_sg, mode=mode, sg=sg, a=a, d=d)
     if _resolve_asrv_mode(g) == 'file_each':
         rate_values = _get_file_site_rates(g=g, num_site=nonadjusted_sub_sites.shape[0])
@@ -2699,6 +2697,7 @@ def get_each_sub_sites(sub_sg, mode, sg, a, d, g): # sub_sites for each "sg" gro
         nonadjusted_sub_sites=nonadjusted_sub_sites,
         g=g,
         dirichlet_alpha=dirichlet_alpha,
+        channel=channel,
     )
     return sub_sites
 

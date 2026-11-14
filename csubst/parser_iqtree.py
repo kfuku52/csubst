@@ -579,6 +579,14 @@ def read_rate(g):
     rate_table = pd.read_csv(g['path_iqtree_rate'], sep='\t', header=0, comment='#')
     rate_table.columns = [str(col).strip() for col in rate_table.columns]
     if rate_table.shape[0] == 0:
+        model = g.get('substitution_model', '')
+        asrv_mode = g.get('asrv', 'each')
+        if (g.get('expectation_method') == 'urn' and asrv_mode in ('file', 'file_each')
+                and not g.get('asrv_posterior_draws')
+                and re.search(r'\+(?:G\d*|R\d*)(?=\+|\{|$)', model, re.I)):
+            raise ValueError('--asrv {} requires site-rate rows for fitted model {} in {}.'.format(
+                asrv_mode, model, g['path_iqtree_rate']))
+        g['iqtree_rate_column'] = None
         g['iqtree_categorized_rate_values'] = np.ones(g['num_input_site'])
         return np.ones(g['num_input_site'])
     column_by_lower = {str(col).lower(): str(col) for col in rate_table.columns}
@@ -639,6 +647,7 @@ def read_rate(g):
         g['iqtree_categorized_rate_values'] = categorized
     else:
         g['iqtree_categorized_rate_values'] = None
+    g['iqtree_rate_column'] = rate_col
     return rate_sites
 
 def _read_mg_frequencies(g, report):

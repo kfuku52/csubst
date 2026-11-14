@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from csubst import ete
+from csubst import ete, randomness
 
 
 def parse_training_branches(value):
@@ -42,11 +42,43 @@ def validate_options(g):
     if g['asrv_training_branches'] != 'all' and g.get('asrv') in ('no', 'file'):
         raise ValueError('--asrv_training_branches requires empirical ASRV: pool/sn/each/file_each.')
     policy = str(g.get('urn_wallenius_expectation', 'auto')).strip().lower()
-    if policy not in ('auto', 'exact'):
-        raise ValueError('--urn_wallenius_expectation must be auto or exact.')
-    if policy == 'exact' and (g.get('expectation_method') != 'urn' or g.get('urn_model', 'wallenius') != 'wallenius'):
-        raise ValueError('--urn_wallenius_expectation exact requires urn with the Wallenius model.')
+    if policy not in ('auto', 'exact', 'quadrature'):
+        raise ValueError('--urn_wallenius_expectation must be auto, exact, or quadrature.')
+    if policy != 'auto' and (g.get('expectation_method') != 'urn' or g.get('urn_model', 'wallenius') != 'wallenius'):
+        raise ValueError('--urn_wallenius_expectation {} requires urn with the Wallenius model.'.format(policy))
     g['urn_wallenius_expectation'] = policy
+    draws = g.get('asrv_posterior_draws', 0)
+    if isinstance(draws, bool) or int(draws) != draws or draws < 0:
+        raise ValueError('--asrv_posterior_draws must be a nonnegative integer.')
+    if draws:
+        if (g.get('expectation_method') != 'urn' or g.get('urn_model', 'wallenius') != 'wallenius'
+                or g.get('asrv') != 'file' or g.get('substitution_posterior') != 'joint'):
+            raise ValueError('--asrv_posterior_draws requires joint, Wallenius urn, and --asrv file.')
+        if g.get('nonsyn_recode') == '3di20':
+            raise ValueError('--asrv_posterior_draws requires S and N to use the same codon fit.')
+        if g.get('calc_omega_pvalue') or str(g.get('calibrate_longtail', False)).lower() in ('yes', 'true', '1'):
+            raise ValueError('--asrv_posterior_draws supports EC and omegaC only; use external pipeline calibration.')
+        if g.get('asrv_report'):
+            raise ValueError('--asrv_posterior_draws does not support fixed-weight --asrv_report diagnostics.')
+
+
+def posterior_rate_seed(g):
+    if '_asrv_posterior_seed' not in g:
+        g['_asrv_posterior_seed'] = randomness.derive_seed(randomness.configured_seed(g), 'asrv-rate-posterior')
+    return g['_asrv_posterior_seed']
+
+
+def posterior_site_rate_draws(g):
+    """Repeat the same assignments across all branch combinations and channels."""
+    rates = g['_asrv_rate_categories']
+    posterior = g['_asrv_rate_posterior']
+    cdf = np.cumsum(posterior, axis=0)
+    cdf[:-1] /= cdf[-1]
+    cdf = cdf[:-1]
+    rng = np.random.default_rng(posterior_rate_seed(g))
+    for _ in range(g['asrv_posterior_draws']):
+        category = (rng.random(cdf.shape[1]) >= cdf).sum(axis=0)
+        yield rates[category]
 
 
 def resolve_training_ids(g, num_branch):
@@ -128,9 +160,11 @@ def scaled_mass_parts(mass, alpha, tau):
     return scaled, prior / len(mass), prior
 
 
-def record_weight_diagnostics(g, label, mass, probabilities, alpha):
+def record_weight_diagnostics(g, label, mass, probabilities, alpha, channel=None):
     """Keep compact category summaries, not branch-by-site arrays."""
-    masks = np.asarray(g['is_site_nonmissing'], dtype=bool)
+    from csubst import substitution
+
+    masks = substitution.get_asrv_site_mask(g, channel)
     ids = np.asarray(g['_asrv_branch_ids'], dtype=np.int64)
     masks = masks[ids]
     p = np.asarray(probabilities)[ids]
@@ -175,6 +209,8 @@ def write_provenance(g, path):
         'asrv_alpha_per_site': None if g.get('asrv_concentration') is not None else g.get('asrv_dirichlet_alpha', 1.0),
         'asrv_total_concentration': g.get('asrv_concentration'),
         'site_rate_file': str(g.get('path_iqtree_rate', g.get('iqtree_rate', ''))),
+        'site_rate_column': (g.get('iqtree_rate_column') if g.get('asrv') in ('file', 'file_each')
+                             and not g.get('asrv_posterior_draws') else None),
         'site_rate_independence': 'not_established',
         'urn_model': g.get('urn_model', 'wallenius'),
         'urn_rounding': g.get('omega_pvalue_rounding', 'stochastic'),
@@ -194,6 +230,12 @@ def write_provenance(g, path):
         'weight_diagnostics_requested': bool(g.get('asrv_report', False)),
         'wallenius_methods_complete': bool(g.get('_asrv_diagnostics_complete', False)),
     }
+    if g.get('asrv_posterior_draws'):
+        payload['site_rate_posterior'] = {
+            'draws': g['asrv_posterior_draws'],
+            'seed': g.get('_asrv_posterior_seed'),
+            'sharing': 'one_category_per_site_shared_across_branches',
+        }
     if g.get('epistasis_enabled', False):
         payload['structure_weighting'] = g['_epistasis_provenance']
         payload['training_branches'] = 'per_prediction_clade_excluded'
@@ -236,7 +278,7 @@ def collect_diagnostics(g, OS_tensor, ON_tensor):
                     mass = g['_asrv_static_mass'][key]
                     alpha = float(g.get('asrv_dirichlet_alpha', 1.0)) if asrv_mode == 'sn' else 0.
                 label = '{}:{}:{}:{}'.format(obs_col, group, ancestral, derived)
-                record_weight_diagnostics(g, label, mass, p, alpha)
+                record_weight_diagnostics(g, label, mass, p, alpha, channel=channel)
                 if omega._resolve_urn_model(g) == 'wallenius':
                     totals = substitution.get_sub_branches(bg, mode, group, ancestral, derived)
                     # This reducer evaluates inclusion for every branch; the

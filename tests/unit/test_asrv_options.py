@@ -17,6 +17,30 @@ def test_cli_and_parameters_accept_training_concentration_report():
     assert result['urn_wallenius_expectation'] == 'exact'
 
 
+def test_cli_accepts_quadrature_and_shared_rate_draws():
+    args = cli._build_parser(show_advanced=True).parse_args([
+        'search', '--expectation_method', 'urn', '--asrv', 'file',
+        '--urn_wallenius_expectation', 'quadrature', '--asrv_posterior_draws', '64',
+    ])
+    result = param.get_global_parameters(args)
+    assert result['urn_wallenius_expectation'] == 'quadrature'
+    assert result['asrv_posterior_draws'] == 64
+
+
+@pytest.mark.parametrize('additional, expected', [
+    (['--substitution_posterior', 'marginal'], 'requires joint'),
+    (['--calibrate_longtail', 'yes'], 'external pipeline calibration'),
+    (['--asrv_report', 'yes'], 'fixed-weight'),
+])
+def test_shared_rate_draws_reject_incompatible_estimators(additional, expected):
+    args = cli._build_parser(show_advanced=True).parse_args([
+        'search', '--expectation_method', 'urn', '--asrv', 'file',
+        '--asrv_posterior_draws', '64', *additional,
+    ])
+    with pytest.raises(ValueError, match=expected):
+        param.get_global_parameters(args)
+
+
 @pytest.mark.parametrize('options,match', [
     ({'asrv_concentration': -1}, 'concentration'),
     ({'asrv_concentration': float('nan')}, 'concentration'),
