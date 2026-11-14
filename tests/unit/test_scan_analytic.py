@@ -84,6 +84,23 @@ def test_analytical_likelihood_retains_all_root_states_in_rare_sibling_products(
     assert engine.test(tips, [3], [0], [2]) == pytest.approx((.5, math.log(2.)), abs=2e-13, rel=0.)
 
 
+@pytest.mark.parametrize(('multiplier', 'destination', 'gain'), [(1., 1, 1.), (10., 1, 5.5), (None, 2, .5)])
+def test_partial_participation_retains_subnormal_transition_likelihood(multiplier, destination, gain):
+    length = np.nextafter(0., 1.)
+    model = EndpointModel([-1, 0, 0], [0., 0., length], np.ones((3, 3)) - 3 * np.eye(3), np.ones(3) / 3)
+    profile = {'version': 1, 'atoms': [{'multiplier': multiplier, 'participation': .5, 'weight': 1.}]}
+    engine = EndpointEnrichment(model, np.arange(3), profile)
+    tips = {1: np.eye(3)[0], 2: np.eye(3)[1]}
+
+    # The zero-length edge fixes the root at 0. A single jump of mass length
+    # explains the other tip. The mixed atom multiplies that mass by gain.
+    null = math.log(length) + math.log(1. / 3)
+    np.testing.assert_allclose(engine.log_likelihoods(tips, [2], [0], [destination]),
+                               [null, null + math.log(gain)], rtol=0., atol=2e-13)
+    assert engine.test(tips, [2], [0], [destination]) == pytest.approx(
+        (min(1., 1. / gain), math.log(gain)), abs=2e-13, rel=0.)
+
+
 def test_no_target_missing_data_and_zero_length_are_uninformative():
     model = EndpointModel(np.array([-1, 0, 0]), [0, 0, .1], [[-1, 1], [1, -1]], [.5, .5])
     engine = EndpointEnrichment(model, np.arange(2))

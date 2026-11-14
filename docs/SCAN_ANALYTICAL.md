@@ -39,8 +39,9 @@ They enrich endpoints; they are not fitted branch-rate multipliers in a CTMC Q.
 Scaled tree pruning computes the null and four alternative likelihoods,
 summing over shared ancestors and the site-wide rate category. It recomputes
 exceptionally small sibling likelihood products in log space to preserve
-the contributions of competing ancestral states. It uses tip
-observations, not reconstructed ancestral marginals or called substitutions.
+the contributions of competing ancestral states. This recomputation also mixes
+partial-participation likelihoods in log space to preserve subnormal terms.
+It uses tip observations, not reconstructed ancestral marginals or called substitutions.
 Missing tips contribute an all-ones likelihood vector. Foreground branches
 come from the topology and phenotype-defined clades, including branches with
 no ASR row; candidate support cannot select which branches enter the test.

@@ -55,6 +55,25 @@ def default_profile():
                                 for m in (*MULTIPLIERS, None)])
 
 
+def _log_mixed_message(transition, child, event, factors, participation, conditional):
+    """Propagate rare child evidence without rounding weighted mixtures first."""
+    with np.errstate(divide='ignore'):
+        log_transition = np.log(transition)
+        log_child = np.log(child)[:, None, :]
+        log_tilted = log_transition + np.where(event, np.log(factors)[:, None, None], 0.)
+        log_tilted -= logsumexp(log_tilted, axis=2, keepdims=True)
+        if conditional.any():
+            selected = np.where(event, log_transition, -np.inf)
+            mass = logsumexp(selected, axis=1, keepdims=True)
+            possible = np.isfinite(mass)
+            log_tilted[conditional] = np.where(possible, selected - np.where(possible, mass, 0.),
+                                              log_transition)
+        base = logsumexp(log_transition + log_child, axis=2)
+        tilted = logsumexp(log_tilted + log_child, axis=2)
+        return np.logaddexp(base + np.log1p(-participation)[:, None],
+                            tilted + np.log(participation)[:, None])
+
+
 class EndpointEnrichment:
     def __init__(self, model, mapping, profile=None):
         self.profile = validate_profile(default_profile() if profile is None else profile)
@@ -79,6 +98,10 @@ class EndpointEnrichment:
         # Infinite-tilt rows are formed without infinities.
         factors = np.array([1.] + [a["multiplier"] or 1. for a in self.atoms])
         participation = np.array([0.] + [a["participation"] for a in self.atoms])
+        conditional = np.array([False] + [a["multiplier"] is None for a in self.atoms])
+        conditional_indices = np.flatnonzero(conditional)
+        mixed = (participation > 0) & (participation < 1)
+        has_mixed = mixed.any()
         likelihoods = []
         for category, weight in enumerate(model.weights):
             partial: dict[int, np.ndarray] = {}
@@ -95,7 +118,9 @@ class EndpointEnrichment:
                 rare = None
                 for child in model.children[node]:
                     transition = model.transition(child, category)
-                    if child in branches:
+                    child_partial = partial.pop(child)
+                    targeted = child in branches
+                    if targeted:
                         tilted = transition[None, :, :] * np.where(event, factors[:, None, None], 1.)
                         tilted /= tilted.sum(axis=2, keepdims=True)
                         selected = transition * event
@@ -103,16 +128,15 @@ class EndpointEnrichment:
                         # If the null gives this row zero event probability
                         # (e.g. zero branch length), every finite tilt is the
                         # original row, so its limit is also the original row.
-                        for index, atom in enumerate(self.atoms, 1):
-                            if atom["multiplier"] is None:
-                                np.divide(selected, mass, out=tilted[index], where=mass > 0)
+                        for index in conditional_indices:
+                            np.divide(selected, mass, out=tilted[index], where=mass > 0)
                         tilted = (participation[:, None, None] * tilted
                                   + (1 - participation[:, None, None]) * transition)
-                        message = np.einsum('aij,aj->ai', tilted, partial.pop(child))
+                        message = np.einsum('aij,aj->ai', tilted, child_partial)
                     else:
-                        message = partial.pop(child) @ transition.T
+                        message = child_partial @ transition.T
                     child_scale = scales.pop(child)
-                    messages.append((message, child_scale))
+                    messages.append((child, message, child_scale, child_partial if targeted and has_mixed else None))
                     value *= message
                     scale += child_scale
                     normalizer = value.max(axis=1)
@@ -130,9 +154,20 @@ class EndpointEnrichment:
                     # product and compute the scale from the original messages.
                     log_value = np.zeros_like(value[rare])
                     log_scale = np.zeros_like(scale[rare])
+                    rare_mixed = mixed[rare]
+                    mixed_indices = np.flatnonzero(rare & mixed)
                     with np.errstate(divide='ignore'):
-                        for message, child_scale in messages:
-                            log_value += np.log(message[rare])
+                        for child, message, child_scale, targeted_partial in messages:
+                            log_message = np.log(message[rare])
+                            if targeted_partial is not None and mixed_indices.size:
+                                # The two weighted probabilities can round to
+                                # zero before their sum reaches float64 range.
+                                log_message[rare_mixed] = _log_mixed_message(
+                                    model.transition(child, category), targeted_partial[mixed_indices],
+                                    event, factors[mixed_indices],
+                                    participation[mixed_indices], conditional[mixed_indices],
+                                )
+                            log_value += log_message
                             log_scale += child_scale[rare]
                     maximum = log_value.max(axis=1)
                     value[rare] = np.exp(log_value - np.where(np.isfinite(maximum), maximum, 0.)[:, None])
