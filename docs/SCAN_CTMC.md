@@ -52,11 +52,14 @@ E[N_ij | all tips] = Q[i,j] / L * integral_0^t
 
 This counts every within-edge jump, including changes on paths that return to
 the initial state. Synonymous/within-group jumps are excluded when accumulating
-the nonsynonymous tensor. Spectral divided differences evaluate the integral
-for reversible Q; ill-conditioned boundary likelihoods use a direct adjoint
-Frechet derivative or a positive uniformization series on short branches.
-The series checks the omitted Poisson tail against both the likelihood and
-the jump integrals. Both uniform-rate and mixture pruning use the shared
+the nonsynonymous tensor. Very short branches (maximum exit rate × time
+at most 0.001) first use a positive uniformization series to resolve rare
+jumps, including excursions between likely endpoints. The series also handles
+ill-conditioned boundary likelihoods on short branches. It checks the omitted
+Poisson tail against both the likelihood and the jump integrals. Spectral
+divided differences evaluate the remaining integrals for reversible Q, with
+a direct adjoint Frechet derivative for ill-conditioned boundary likelihoods.
+Both uniform-rate and mixture pruning use the shared
 transition calculation, which resolves rare transitions on sparse branches
 with a nonnegative series when its tail bound is met. For a discrete rate
 mixture, the calculation uses time `t × rate` separately in each category,

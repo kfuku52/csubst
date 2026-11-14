@@ -251,7 +251,8 @@ def test_quadrature_bridge_contraction_matches_direct_frechet():
     assert isinstance(kernel, tuple)
     a, b = (rng.dirichlet(np.ones(k), size=3) for _ in range(2))
     evidence = ((a @ expm(q * t)) * b).sum(axis=1)
-    actual = scan_ctmc._conditioned_bridge_mass(q, t, a, b, evidence, v, w, kernel, np.arange(k))
+    actual = scan_ctmc._conditioned_bridge_mass(q, t, a, b, evidence, v, w, kernel, np.arange(k),
+                                               short_bridge=scan_ctmc._ShortBridge(q))
     expected = scan_ctmc.bridge_kernel(q, t, a, b) / evidence[:, None, None]
     np.testing.assert_allclose(actual, expected, atol=2e-15, rtol=1e-12)
 
@@ -268,12 +269,37 @@ def test_short_bridge_retains_rare_return_jumps_in_a_sparse_chain():
     evidence = expm(q * length)[[0], -1]
     values, v, w = scan_ctmc._bridge_spectral(q, np.full(n, 1/n))
     kernel = scan_ctmc._bridge_integral_kernel(values, length)
-    mass = scan_ctmc._conditioned_bridge_mass(q, length, a, b, evidence, v, w, kernel, np.arange(n))
+    mass = scan_ctmc._conditioned_bridge_mass(q, length, a, b, evidence, v, w, kernel, np.arange(n),
+                                             short_bridge=scan_ctmc._ShortBridge(q))
     # Crossing the chain takes n-1 forward jumps. A return on edge i adds
     # its two jump rates and two time factors to the leading path term.
     expected_reverse = (length * rates)**2 / (n * (n + 1))
     np.testing.assert_allclose(mass[0, edges + 1, edges], expected_reverse, rtol=2e-7, atol=0.)
     np.testing.assert_allclose(mass[0, edges, edges + 1], 1., rtol=0., atol=1e-14)
+
+
+@pytest.mark.parametrize('rates,weights', [((1.,), (1.,)), ((.5, 1.5), (.5, .5))])
+def test_short_bridge_with_likely_endpoints_preserves_rare_round_trip(rates, weights):
+    from math import factorial
+
+    length = 1e-8
+    tr = tree.add_numerical_node_labels(ete.PhyloNode(f'(L:0,R:{length})root;', format=1))
+    ids = {node.name: int(ete.get_prop(node, 'numerical_label')) for node in tr.traverse()}
+    n = 8
+    q = np.diag(np.ones(n - 1), 1) + np.diag(np.ones(n - 1), -1)
+    np.fill_diagonal(q, -q.sum(axis=1))
+    tips = np.zeros((len(ids), 1, n))
+    tips[ids['L'], 0, 0] = tips[ids['R'], 0, 0] = 1.
+    _, events = scan_ctmc.infer(tr, tips, q, np.full(n, 1/n), np.arange(n), 'bridge',
+                               rates=rates, weights=weights)
+
+    # The shortest path reaching the last state and returning to zero
+    # visits each direction of the final edge once. The leading term is
+    # t^(2(n-1))/(2(n-1))!, and the remaining terms are O(t) relative.
+    moves = 2 * (n - 1)
+    leading = sum(weight * (rate * length)**moves / factorial(moves) for rate, weight in zip(rates, weights))
+    np.testing.assert_allclose(events[ids['R'], 0, 0, [n - 2, n - 1], [n - 1, n - 2]],
+                               leading, rtol=5e-8, atol=0.)
 
 
 @pytest.mark.parametrize('rates,weights', [((1.,), (1.,)), ((1., 1.), (.5, .5))])

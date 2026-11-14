@@ -3,15 +3,17 @@
 Stationary codon models with discrete rate categories, conditional on fitted Q/tree.
 No sampled ancestral states or products of separately inferred marginals.
 """
-from functools import lru_cache, partial
+from functools import cached_property, lru_cache, partial
 
 import numpy as np
 from scipy.linalg import eigh, expm, expm_frechet
+from scipy.sparse.csgraph import shortest_path
 
 from csubst import ete
 
 _SCAN_IN_MEMORY_BYTES = 64 * 1024**2
 _SHORT_BRIDGE_TAU = .05
+_VERY_SHORT_BRIDGE_TAU = .001
 _BRIDGE_MAX_UNIFORMIZATION_ORDER = 128
 
 
@@ -82,63 +84,93 @@ def _bridge_integral_kernel(values, length):
     return integrals
 
 
-def _uniformized_bridge_mass(q, length, left, right, rate):
-    """Evaluate short-branch jump integrals using nonnegative powers."""
-    from scipy.sparse.csgraph import shortest_path
+class _ShortBridge:
+    """Evaluate short-branch jump integrals with nonnegative powers."""
 
-    off = q > 0
-    distances = shortest_path(off, directed=True, unweighted=True)
-    reachable = np.isfinite(distances)
-    max_distance = int(np.max(distances, where=reachable, initial=0.))
-    # Both legs of an integral must include their shortest paths.
-    minimum_order = max(6, 2 * max_distance)
-    if minimum_order > _BRIDGE_MAX_UNIFORMIZATION_ORDER:
-        return None
-    transition = np.eye(len(q)) + q / rate
-    tau = rate * length
-    row_norm = transition.sum(axis=1).max()
-    # Bound the tail using the actual row norm of the floating-point kernel.
-    tau_bound = tau * row_norm
-    if not 0 < tau_bound <= _SHORT_BRIDGE_TAU or (transition < 0).any():
-        return None
-    source = (left > 0) @ reachable
-    target = (right > 0) @ reachable.T
-    possible = off & source[:, :, None] & target[:, None, :]
-    forward = [left]
-    backward = [right]
-    poisson = [np.exp(-tau)]
-    norm = left.sum(axis=1) * right.max(axis=1)
-    tolerance = np.finfo(float).eps / 4
-    for order in range(minimum_order, _BRIDGE_MAX_UNIFORMIZATION_ORDER + 1, 4):
-        while len(forward) <= order:
-            forward.append(forward[-1] @ transition)
-            backward.append(backward[-1] @ transition.T)
-            poisson.append(poisson[-1] * tau / (len(forward) - 1))
-        forward_array = np.stack(forward, axis=-1)
-        probabilities = np.asarray(poisson)
-        evidence = np.einsum('bki,bk,i->b', forward_array, right, probabilities)
-        tail = poisson[-1] * row_norm**order * tau_bound / (order + 1 - tau_bound)
-        error = norm * tail
-        if (evidence <= 0).any() or (error > tolerance * evidence).any():
-            continue
+    def __init__(self, q):
+        self.rate = -q.diagonal().min()
+        self.jump_q = np.where(q > 0, q, 0.)
+        np.fill_diagonal(self.jump_q, 0.)
+        self.transition = np.eye(len(q))
+        if self.rate > 0:
+            self.transition += q / self.rate
+        self.row_norm = float(self.transition.sum(axis=1).max())
+        self.nonnegative = bool((self.transition >= 0).all())
+        self.coefficients_at = lru_cache(maxsize=256)(self._coefficients)
+        # Each entry holds at most (129 x 129) float64 values.
+        self.convolution_at = lru_cache(maxsize=128)(self._convolution)
+
+    def _coefficients(self, length):
+        tau = self.rate * length
+        weights = np.empty(_BRIDGE_MAX_UNIFORMIZATION_ORDER + 1)
+        weights[0] = np.exp(-tau)
+        for order in range(1, len(weights)):
+            weights[order] = weights[order - 1] * tau / order
+        return weights
+
+    def _convolution(self, length, order):
+        weights = self.coefficients_at(length)[:order + 1] / np.arange(1, order + 2)
         counts = np.arange(order + 1)
-        total = counts[:, None] + counts[None, :]
-        coefficients = probabilities / (1 + counts)
-        convolution = np.where(total <= order, coefficients[np.minimum(total, order)], 0.)
-        integral = (forward_array @ (length * convolution)) @ np.stack(backward, axis=1)
-        too_small = (integral <= 0) | (length * error[:, None, None] > tolerance * integral)
-        if (possible & too_small).any():
-            continue
-        mass = (integral / evidence[:, None, None]) * np.where(off, q, 0.)
-        if np.isfinite(mass).all():
-            return mass
-    return None
+        total = counts[:, None] + counts
+        return np.where(total <= order, weights[np.minimum(total, order)], 0.)
+
+    @cached_property
+    def support(self):
+        edges = self.jump_q > 0
+        distances = shortest_path(edges, directed=True, unweighted=True)
+        reachable = np.isfinite(distances)
+        max_distance = int(np.max(distances, where=reachable, initial=0.))
+        return edges, reachable, max(6, 2 * max_distance)
+
+    def mass(self, length, left, right):
+        tau_bound = self.rate * length * self.row_norm
+        if not 0 < tau_bound <= _SHORT_BRIDGE_TAU or not self.nonnegative:
+            return None
+        edges, reachable, minimum_order = self.support
+        if reachable.all():
+            possible = edges
+        else:
+            source = (left > 0) @ reachable
+            target = (right > 0) @ reachable.T
+            possible = edges & source[:, :, None] & target[:, None, :]
+        forward = [left]
+        backward = [right]
+        norm = left.sum(axis=1) * right.max(axis=1)
+        tolerance = np.finfo(float).eps / 4
+        probabilities = self.coefficients_at(length)
+        for order in range(minimum_order, len(probabilities), 4):
+            while len(forward) <= order:
+                forward.append(forward[-1] @ self.transition)
+                backward.append(backward[-1] @ self.transition.T)
+            forward_array = np.stack(forward, axis=-1)
+            evidence = np.einsum('bki,bk,i->b', forward_array, right, probabilities[:order + 1])
+            tail = probabilities[order] * self.row_norm**order * tau_bound / (order + 1 - tau_bound)
+            error = norm * tail
+            if (evidence <= 0).any() or (error > tolerance * evidence).any():
+                continue
+            # Work with the mean integrand so t does not underflow before
+            # conditioning on rare endpoint evidence.
+            mean = (forward_array @ self.convolution_at(length, order)) @ np.stack(backward, axis=1)
+            too_small = (mean <= 0) | (error[:, None, None] > tolerance * mean)
+            if (possible & too_small).any():
+                continue
+            mass = (mean / evidence[:, None, None]) * (length * self.jump_q)
+            if np.isfinite(mass).all():
+                return mass
+        return None
 
 
-def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
+def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal, *, short_bridge):
     minimum_evidence = denom.min()
     if minimum_evidence <= 0:
         raise ValueError("Impossible edge evidence under fitted CTMC.")
+    tau = length * short_bridge.rate
+    if 0 < tau <= _VERY_SHORT_BRIDGE_TAU:
+        # Even for likely endpoints, individual excursions on very short
+        # branches can be rare enough to cancel in the spectral sum.
+        mass = short_bridge.mass(length, a, b)
+        if mass is not None:
+            return mass
     left_message, right_message = a @ v, b @ w.T
     if isinstance(integrals, tuple):
         left, right = integrals
@@ -154,20 +186,18 @@ def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
     # Cancellation can dominate the spectral result when evidence is small.
     unstable = (mass.min(axis=(1, 2)) < -1e-10 * denom) | (denom < 1e-10)
     has_unstable = unstable.any()
-    short = unstable
     replacement = None
-    if has_unstable or minimum_evidence < 1e-8:
-        rate = -q.diagonal().min()
-        if 0 < length * rate <= _SHORT_BRIDGE_TAU:
-            short = unstable | (denom < 1e-8)
-            replacement = _uniformized_bridge_mass(q, length, a[short], b[short], rate)
-    if replacement is not None:
-        np.divide(mass, denom[:, None, None], out=mass, where=~short[:, None, None])
-        mass[short] = replacement
-    else:
+    if (has_unstable or minimum_evidence < 1e-8) and 0 < tau <= _SHORT_BRIDGE_TAU:
+        short = unstable | (denom < 1e-8)
+        if tau > _VERY_SHORT_BRIDGE_TAU or not short.all():
+            replacement = short_bridge.mass(length, a[short], b[short])
+    if replacement is None:
         if has_unstable:
             mass[unstable] = bridge_kernel(q, length, a[unstable], b[unstable])
         mass /= denom[:, None, None]
+    else:
+        np.divide(mass, denom[:, None, None], out=mass, where=~short[:, None, None])
+        mass[short] = replacement
     if mass.min() < -1e-8 or not np.isfinite(mass).all():
         raise ValueError("Numerically invalid CTMC posterior event mass.")
     return mass
@@ -175,6 +205,7 @@ def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
 
 def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
     values, v, w = _bridge_spectral(q, pi)
+    short_bridge = _ShortBridge(q)
     state_diagonal = np.arange(len(q))
     group_diagonal = np.arange(projection.shape[1])
     group_events = partial(_group_bridge_events, projection, group_diagonal)
@@ -201,7 +232,8 @@ def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
         # Normalize the boundary message before forming the integral.
         a = left / left.max(axis=1, keepdims=True)
         denom = ((a @ transition) * right).sum(axis=1)
-        mass = _conditioned_bridge_mass(q, length, a, right, denom, v, w, integral_at(length), state_diagonal)
+        mass = _conditioned_bridge_mass(q, length, a, right, denom, v, w, integral_at(length), state_diagonal,
+                                        short_bridge=short_bridge)
         np.maximum(mass, 0, out=mass)
         mass *= category_weight[:, None, None]
         events = group_events(mass)
@@ -380,6 +412,7 @@ def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_b
                 for i, node in zip(order, nodes)}
     lengths = {i: float(node.dist) for i, node in zip(order[1:], nodes[1:])}
     values, v, w = _bridge_spectral(q, pi)
+    short_bridge = _ShortBridge(q)
     length_to_child = {length: child for child, length in lengths.items()}
     kernels = {length: (model.transition(child, 0), _bridge_integral_kernel(values, length))
                for length, child in length_to_child.items()}
@@ -443,7 +476,8 @@ def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_b
                         raise ValueError("Impossible edge evidence under fitted CTMC.")
                     events[child, :, 0] = 0
                     continue
-                mass = _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, state_diagonal)
+                mass = _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, state_diagonal,
+                                                short_bridge=short_bridge)
                 if summaries is not None and "eligible" in summaries:
                     mass[~summaries["eligible"][child, sl]] = 0
                 np.maximum(mass, 0, out=mass)
