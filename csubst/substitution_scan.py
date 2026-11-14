@@ -1508,6 +1508,12 @@ def _index_event_sites(events):
     return events.groupby(events["site"].to_numpy(dtype=int), sort=False).indices
 
 
+def _matches_candidate_states(states, ids):
+    if ids.size == 1:
+        return states == ids[0]
+    return np.isin(states, ids)
+
+
 def _candidate_event_positions(events, event_sites, site, from_ids, to_ids):
     positions = event_sites.get(int(site))
     if positions is None:
@@ -1516,7 +1522,9 @@ def _candidate_event_positions(events, event_sites, site, from_ids, to_ids):
     to_ids = np.asarray(to_ids, dtype=np.int64).reshape(-1)
     ancestral = events["from_state_id"].to_numpy(dtype=int)[positions]
     derived = events["to_state_id"].to_numpy(dtype=int)[positions]
-    keep = np.isin(ancestral, from_ids) & np.isin(derived, to_ids) & (ancestral != derived)
+    keep = (_matches_candidate_states(ancestral, from_ids)
+            & _matches_candidate_states(derived, to_ids)
+            & (ancestral != derived))
     return positions[keep]
 
 
