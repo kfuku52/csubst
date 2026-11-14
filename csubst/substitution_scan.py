@@ -1502,17 +1502,22 @@ def build_candidates(events, scan_matches, state_orders):
     return pd.DataFrame(rows)
 
 
-def _event_mask_for_candidate(events, site, from_ids, to_ids):
-    if events.shape[0] == 0:
-        return np.zeros(shape=(0,), dtype=bool)
+def _index_event_sites(events):
+    if events.empty:
+        return {}
+    return events.groupby(events["site"].to_numpy(dtype=int), sort=False).indices
+
+
+def _candidate_event_positions(events, event_sites, site, from_ids, to_ids):
+    positions = event_sites.get(int(site))
+    if positions is None:
+        return np.empty(0, dtype=np.intp)
     from_ids = np.asarray(from_ids, dtype=np.int64).reshape(-1)
     to_ids = np.asarray(to_ids, dtype=np.int64).reshape(-1)
-    mask = events["site"].to_numpy(dtype=int) == int(site)
-    positions = np.flatnonzero(mask)
     ancestral = events["from_state_id"].to_numpy(dtype=int)[positions]
     derived = events["to_state_id"].to_numpy(dtype=int)[positions]
-    mask[positions] &= np.isin(ancestral, from_ids) & np.isin(derived, to_ids) & (ancestral != derived)
-    return mask
+    keep = np.isin(ancestral, from_ids) & np.isin(derived, to_ids) & (ancestral != derived)
+    return positions[keep]
 
 
 def _support_for_unit(branch_event, branch_ids, min_event_pp):
@@ -2482,6 +2487,7 @@ def _build_scan_static_context(g, ON_tensor, rate_ON_tensor=None):
         )
     return {
         "events": events,
+        "event_sites": _index_event_sites(events),
         "branch_meta": branch_meta,
         "valid_branch_ids": branch_meta["branch_id"].astype(int).to_numpy(copy=False),
         "rate_exposure": rate_exposure,
@@ -2516,6 +2522,7 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
         rate_ON_tensor = ON_tensor
     q_context = scan_static["q_context"]
     events = scan_static["events"]
+    event_sites = scan_static["event_sites"]
     branch_meta = scan_static["branch_meta"]
     valid_branch_ids = scan_static["valid_branch_ids"]
     if scan_context is None:
@@ -2598,13 +2605,8 @@ def _scan_substitutions_core(g, ON_tensor, rate_ON_tensor=None, scan_context=Non
             site = int(cand["site"])
             from_ids = np.array([int(v) for v in str(cand["from_state_ids"]).split(",") if v != ""], dtype=np.int64)
             to_ids = np.array([int(v) for v in str(cand["to_state_ids"]).split(",") if v != ""], dtype=np.int64)
-            mask = _event_mask_for_candidate(
-                events=events,
-                site=site,
-                from_ids=from_ids,
-                to_ids=to_ids,
-            )
-            matched_events = events.loc[mask, :].copy()
+            positions = _candidate_event_positions(events, event_sites, site, from_ids, to_ids)
+            matched_events = events.take(positions)
             candidate_support = _summarize_unit_support(
                 candidate_events=matched_events,
                 units_df=units_trait,
@@ -2796,15 +2798,18 @@ def _candidate_fixed_permutation_scores(
     scan_other_scope = normalize_scan_other_scope(g.get("scan_other_scope", "all"))
     min_event_pp = scan_event_threshold(g)
     called_events = None
+    called_sites = None
     if rate_event_mode == "called":
         if scan_static is not None:
             called_events = scan_static["events"]
+            called_sites = scan_static["event_sites"]
         else:
             called_events = extract_atomic_events(
                 sub_tensor=ON_tensor,
                 min_event_pp=min_event_pp,
                 float_tol=float(g.get("float_tol", 1e-12)),
             )
+            called_sites = _index_event_sites(called_events)
     q_context = scan_static["q_context"] if scan_static is not None else _build_scan_q_context(
         g=g,
         rate_exposure=rate_exposure,
@@ -2825,8 +2830,8 @@ def _candidate_fixed_permutation_scores(
 
     def values_for(site, from_ids, to_ids):
         if rate_event_mode == "called":
-            mask = _event_mask_for_candidate(events=called_events, site=site, from_ids=from_ids, to_ids=to_ids)
-            rate_events = called_events.loc[mask, :]
+            positions = _candidate_event_positions(called_events, called_sites, site, from_ids, to_ids)
+            rate_events = called_events.take(positions)
         else:
             events = extract_candidate_posterior_events(
                 rate_ON_tensor, site, from_ids, to_ids, float_tol, projection,

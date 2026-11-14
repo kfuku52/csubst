@@ -220,17 +220,18 @@ def test_unit_support_sums_events_on_each_branch_before_applying_threshold():
     assert support["support_pp_mean"] == .6
 
 
-def test_candidate_event_mask_preserves_row_order_and_excludes_diagonal_mass():
+def test_candidate_event_positions_preserve_row_order_and_exclude_diagonal_mass():
     events = pd.DataFrame({
         'site': ['2', '0', '2', '2', '2', '2'],
         'from_state_id': ['0', '0', '1', '2', '0', '0'],
         'to_state_id': ['1', '1', '1', '1', '2', '1'],
     }, index=[8, 4, 3, 3, 1, 0])
-    mask = substitution_scan._event_mask_for_candidate(events, 2, [0, 1], [1])
-    assert mask.tolist() == [True, False, False, False, False, True]
-    assert not substitution_scan._event_mask_for_candidate(events, 3, [0], [1]).any()
-    assert not substitution_scan._event_mask_for_candidate(events, 2, [], [1]).any()
-    assert substitution_scan._event_mask_for_candidate(events.iloc[:0], 2, [0], [1]).shape == (0,)
+    sites = substitution_scan._index_event_sites(events)
+    positions = substitution_scan._candidate_event_positions
+    assert positions(events, sites, 2, [0, 1], [1]).tolist() == [0, 5]
+    assert positions(events, sites, 3, [0], [1]).size == 0
+    assert positions(events, sites, 2, [], [1]).size == 0
+    assert substitution_scan._index_event_sites(events.iloc[:0]) == {}
 
 
 @pytest.mark.parametrize("third_branch_pp, expected_count, expected_ids", [
