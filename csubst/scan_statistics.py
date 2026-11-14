@@ -14,6 +14,8 @@ from scipy.special import log_ndtr
 SCORE_METHOD = 'negative_log10_one_sided_poisson_asymptotic_tail'
 BH_SCOPE = 'selected_candidates_within_trait_match'
 MAXIMUM_SCOPE = 'all_testable_selected_candidates_all_traits_matches_in_this_run'
+_LOCAL_LOG_RATE_GAP = .01
+_LOCAL_DEVIANCE_COEFFICIENTS = tuple(1 / order for order in range(9, 1, -1))
 
 
 def _softplus(value):
@@ -21,10 +23,11 @@ def _softplus(value):
 
 
 def _local_poisson_deviance(count, residual):
-    # Series for -log1p(-r) - r, where r is the residual divided by
-    # the observed count. At |r| <= 0.0011, omitted terms are below roundoff.
-    high_terms = .2 + residual * (1/6 + residual/7)
-    series = .5 + residual * (1/3 + residual * (.25 + residual * high_terms))
+    # Series for -log1p(-r) - r. Each relative residual is at most
+    # expm1(0.01) in magnitude when the log rate ratio is at most 0.01.
+    series = 1 / 10
+    for coefficient in _LOCAL_DEVIANCE_COEFFICIENTS:
+        series = coefficient + residual * series
     return (count * residual) * residual * series
 
 
@@ -84,7 +87,7 @@ def rate_score(x_target, l_target, x_other, l_other):
     else:
         log_count_odds = math.log(x) - math.log(y)
         gap = log_count_odds - log_exposure_odds
-        if abs(gap) <= .001:
+        if abs(gap) <= _LOCAL_LOG_RATE_GAP:
             residuals = _relative_pooled_residuals(x, a, y, b)
             if residuals is None:
                 return 0., 1.
@@ -98,7 +101,7 @@ def rate_score(x_target, l_target, x_other, l_other):
             target_log_ratio = _softplus(-log_exposure_odds) - _softplus(-log_count_odds)
             other_log_ratio = _softplus(log_exposure_odds) - _softplus(log_count_odds)
             terms = x * target_log_ratio + y * other_log_ratio
-    if log_exposure_odds > 700 and (y == 0 or gap > .001):
+    if log_exposure_odds > 700 and (y == 0 or gap > _LOCAL_LOG_RATE_GAP):
         terms = _small_exposure_deviance(x, a, y, b)
     if terms > sys.float_info.max / 2:
         # At this scale the normal log tail differs from -terms by less

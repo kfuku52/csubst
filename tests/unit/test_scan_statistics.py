@@ -105,6 +105,7 @@ def test_tiny_exposure_ratio_retains_finite_deviance_after_count_scaling(other_c
     (1.000000001e18, 1., 1e18, 1.),
     (1e16 + 2., 1., 1e16, 1.),
     (1.000000001e17, 1e-2, 1e19, 1.),
+    (1e16, 1e100, 100., 1.0011e86),
 ])
 def test_nearly_equal_rates_match_high_precision_likelihood(counts_exposures):
     with localcontext() as context:
@@ -117,6 +118,23 @@ def test_nearly_equal_rates_match_high_precision_likelihood(counts_exposures):
     assert p == pytest.approx(expected, abs=1e-15, rel=0)
     assert score == pytest.approx(-math.log10(expected), abs=1e-15, rel=0)
     assert stats.rate_score(*counts_exposures[2:], *counts_exposures[:2]) == (0., 1.)
+
+
+@pytest.mark.parametrize('counts_exposures', [
+    (1e300, 1e300, 1e294, 1.0011e294),
+    (1e200, 1e200, 1e200, 1.0099e200),
+])
+def test_nearly_equal_large_rates_retain_significant_score_digits(counts_exposures):
+    with localcontext() as context:
+        context.prec = 80
+        x, a, y, b = map(Decimal.from_float, counts_exposures)
+        common = (x + y) / (a + b)
+        terms = x * (x / (a * common)).ln() + y * (y / (b * common)).ln()
+        # At these magnitudes the lower-order log-tail terms are below one ulp.
+        expected = float(terms / Decimal(10).ln())
+    score, p = stats.rate_score(*counts_exposures)
+    assert score == pytest.approx(expected, rel=3e-15)
+    assert p == 0.
 
 
 @pytest.mark.parametrize('values', [(-1,1,0,1), (1,0,0,1), (1,1,0,0), (np.nan,1,0,1), (1,np.inf,0,1)])
