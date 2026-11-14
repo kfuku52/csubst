@@ -154,7 +154,14 @@ class _ShortBridge:
             too_small = (mean <= 0) | (error[:, None, None] > tolerance * mean)
             if (possible & too_small).any():
                 continue
-            mass = (mean / evidence[:, None, None]) * (length * self.jump_q)
+            if evidence.min() < np.finfo(float).tiny:
+                # The ratio of the mean integrand to subnormal evidence
+                # can overflow even when the final jump count is finite.
+                with np.errstate(divide='ignore'):
+                    mass = np.exp(np.log(mean) + np.log(length) + np.log(self.jump_q)
+                                  - np.log(evidence[:, None, None]))
+            else:
+                mass = (mean / evidence[:, None, None]) * (length * self.jump_q)
             if np.isfinite(mass).all():
                 return mass
         return None

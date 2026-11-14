@@ -35,6 +35,23 @@ def test_joint_equals_enumeration_and_not_marginal_product():
     assert abs(joint[0, 1] - joint.sum(axis=1)[0]*joint.sum(axis=0)[1]) > .01
 
 
+@pytest.mark.parametrize('mode', ['joint', 'bridge'])
+def test_scan_preserves_a_confirmed_change_on_an_extremely_short_edge(mode):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('(A:0,B:1e-310)R;', format=1))
+    ids = {node.name: int(ete.get_prop(node, 'numerical_label')) for node in tr.traverse()}
+    tips = np.zeros((len(ids), 1, 2))
+    tips[ids['A'], 0, 0] = tips[ids['B'], 0, 1] = 1.
+    # Include an impossible invariant category and exercise the mixed-rate
+    # bridge reducer, which needs an outside message rather than a joint.
+    with np.errstate(over='raise', invalid='raise'):
+        posterior, events = scan_ctmc.infer(tr, tips, [[-1., 1.], [1., -1.]], [.5, .5], [0, 1],
+                                            mode=mode, rates=[0., 1.], weights=[.5, .5])
+    np.testing.assert_array_equal(posterior[ids['R'], 0], [1., 0.])
+    np.testing.assert_array_equal(posterior[ids['B'], 0], [0., 1.])
+    assert events[ids['B'], 0, 0, 0, 1] == pytest.approx(1., abs=2e-13, rel=0.)
+    assert events[ids['B'], 0, 0, 1, 0] == 0.
+
+
 @pytest.mark.parametrize('length', [0., 1e-8, .7, 10., 100.])
 def test_bridge_against_independent_quadrature(length):
     tr, ids, states, q = fixture(length)

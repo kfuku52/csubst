@@ -17,6 +17,25 @@ from scipy.special import logsumexp
 _PRUNING_LOG_THRESHOLD = np.sqrt(np.finfo(float).tiny)
 
 
+def _conditional_transition(transition, log_right):
+    """Normalize P times child evidence separately for each parent state."""
+    with np.errstate(divide='ignore'):
+        log_mass = np.log(transition) + log_right
+    maximum = log_mass.max(axis=1, keepdims=True)
+    mass = np.exp(log_mass - np.where(np.isfinite(maximum), maximum, 0.))
+    total = mass.sum(axis=1, keepdims=True)
+    np.divide(mass, total, out=mass, where=total > 0)
+    return mass
+
+
+def _scaled_outside(parent, denominator):
+    # Bridge reducers need an outside message and are invariant to its scale.
+    with np.errstate(divide='ignore'):
+        log_outside = np.log(parent) - np.log(np.where(denominator > 0, denominator, 1.))
+    log_outside[denominator == 0] = -np.inf
+    return np.exp(log_outside - log_outside.max(axis=1, keepdims=True))
+
+
 def _recover_rare_pruning_rows(inside, messages, scales, node, children, sites):
     """Recompute the child product before a lost state can bias the posterior."""
     log_inside = np.zeros((len(sites), inside.shape[-1]))
@@ -199,6 +218,8 @@ class EndpointModel:
         outside branch_ids without constructing their detailed joint events.
         With transform_rate_context, reducers receive unweighted boundary
         messages, category-scaled time and the posterior site-category weights.
+        Other observed reducers contract the factored joint. For rare rows,
+        the factors may use a conditional transition and unit right message.
         tip_missing can mark rows to read as all-ones emissions without copying
         their full input tip arrays.
         """
@@ -227,6 +248,7 @@ class EndpointModel:
         if not selected.issubset(set(self.order) - {self.root}):
             raise ValueError('Endpoint branch selection contains a root or unknown branch.')
         n, k, nc = self.parents.size, self.pi.size, self.rates.size
+        forward_floor = (2 * k) / np.finfo(float).max
         capacity = min(int(block_size), first.shape[0])
         inside_buffer = np.empty((nc, n, capacity, k))
         post_buffer = np.empty_like(inside_buffer)
@@ -296,9 +318,22 @@ class EndpointModel:
                     denominator = post[c, child]
                     # Conditioning the child on its parent avoids retaining
                     # outside likelihoods or a joint for every branch.
-                    left = np.divide(post[c, parent], denominator,
-                                     out=np.zeros_like(denominator), where=denominator > 0)
                     right = inside[c, child]
+                    parent_weights = post[c, parent]
+                    positive = denominator > 0
+                    rare_forward_sites: tuple | np.ndarray = ()
+                    if denominator.min() < forward_floor:
+                        # A posterior at most one cannot overflow the dot
+                        # product when the message exceeds this floor.
+                        rare = ((denominator < forward_floor) & positive & (parent_weights > 0)).any(axis=1)
+                        if rare.any():
+                            rare_forward_sites = np.flatnonzero(rare)
+                            positive[rare] = False
+                    left = np.divide(parent_weights, denominator, out=np.zeros_like(denominator), where=positive)
+                    if len(rare_forward_sites) and observed_transform is not None and transform_rate_context:
+                        left[rare_forward_sites] = _scaled_outside(
+                            parent_weights[rare_forward_sites], denominator[rare_forward_sites],
+                        )
                     post[c, child] = (left @ transition) * right
                     if edge is not None:
                         edge += ((left * class_weight[c, :, None])[:, :, None]
@@ -322,6 +357,21 @@ class EndpointModel:
                                     target[key] = value
                                 else:
                                     target[key] += value
+                    for site in rare_forward_sites:
+                        with np.errstate(divide='ignore'):
+                            log_right = np.log(right[site])
+                        conditional = _conditional_transition(transition, log_right)
+                        post[c, child, site] = parent_weights[site] @ conditional
+                        weighted_parent = parent_weights[site] * class_weight[c, site]
+                        if edge is not None:
+                            edge[site] += weighted_parent[:, None] * conditional
+                        if observed_transform is not None and not transform_rate_context:
+                            # A reducer's factored joint is unchanged by
+                            # supplying the conditional kernel and unit right.
+                            for key, value in observed_transform(
+                                weighted_parent[None, :], np.ones((1, k)), conditional,
+                            ).items():
+                                reduced[key][site] += value[0]
                 yield EndpointBlock(start, stop, child, parent,
                                     np.einsum('cs,csk->sk', class_weight, post[:, child]), edge, pred,
                                     reduced, reduced_pred,

@@ -208,6 +208,9 @@ For exceptionally small sibling likelihood products, pruning recomputes the
 affected site rows in log space before normalizing them. This retains competing
 ancestral states when the product of individually representable child messages
 falls below the floating-point range.
+When division by a tiny child message would overflow during the forward pass,
+the engine forms the conditional child distribution for the affected site
+before weighting it by the parent posterior.
 
 Search consumers needing full events or additional summaries retain the full sparse
 representation: `spe2spe` outside the bounded arity-2 route, CS/CBS tables, positive `min_sub_pp`, urn,

@@ -97,6 +97,32 @@ def test_pruning_retains_all_states_when_sibling_likelihood_products_are_tiny():
         np.testing.assert_allclose(record.node, tips[record.child], rtol=2e-13)
 
 
+@pytest.mark.parametrize('reduce_events', [False, True])
+def test_forward_pass_normalizes_before_weighting_improbable_transitions(reduce_events):
+    # The first tip fixes the root in state 0, while the second tip on the
+    # first site fixes a change to state 1 with a subnormal likelihood.
+    model = EndpointModel([-1, 0, 0], [0., 0., 1e-310],
+                          [[-1., 1.], [1., -1.]], [.5, .5],
+                          rates=[0., 1.], weights=[.5, .5])
+    tips = {1: np.array([[1., 0.], [1., 0.]]), 2: np.array([[0., 1.], [1., 0.]])}
+
+    def transform(left, right, transition):
+        return {'joint': left[:, :, None] * transition * right[:, None, :]}
+
+    with np.errstate(over='raise', invalid='raise'):
+        records = list(model.iter_blocks(tips, predictive=True,
+                                        transform=transform if reduce_events else None))
+    leaf = records[2]
+    np.testing.assert_array_equal(leaf.node, tips[2])
+    expected = np.zeros((2, 2, 2))
+    expected[:, 0, :] = tips[2]
+    joint = leaf.reduced['joint'] if reduce_events else leaf.joint
+    np.testing.assert_array_equal(joint, expected)
+    prediction = leaf.reduced_predictive['joint'] if reduce_events else leaf.predictive
+    assert prediction[0, 0, 1] == pytest.approx(1e-310, rel=1e-12, abs=0.)
+    assert prediction[1, 0, 1] == pytest.approx(5e-311, rel=1e-12, abs=0.)
+
+
 def test_state_permutation_and_selected_edges():
     tips = {1: np.array([[.1, .9]]), 2: np.array([[1., 0.]])}
     q = np.array([[-.3, .3], [.7, -.7]])
