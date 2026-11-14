@@ -628,7 +628,11 @@ def extract_atomic_events(sub_tensor, min_event_pp=0.5, float_tol=1e-12):
     rows = []
     if isinstance(sub_tensor, site_storage.SiteEventTensor):
         for start, values in sub_tensor.iter_site_blocks():
-            site, branch, _sg, anc, der = np.where(values >= threshold)
+            # Scan the contiguous mask first and decode coordinates only at hits.
+            hits = np.flatnonzero(values >= threshold)
+            if hits.size == 0:
+                continue
+            site, branch, _sg, anc, der = np.unravel_index(hits, values.shape)
             keep = anc != der
             if keep.any():
                 site, branch, anc, der = site[keep], branch[keep], anc[keep], der[keep]
