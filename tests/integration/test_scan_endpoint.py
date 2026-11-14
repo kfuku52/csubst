@@ -134,6 +134,24 @@ def test_zero_and_missing_reasons_and_positive_count_conflict():
     assert np.isnan(out["p_rate_enrichment_asymptotic"])
 
 
+def test_fixed_score_checks_cached_conflicts_against_each_assignment():
+    events = np.array([1., 1., .1])
+    exposure = np.array([0., 2., 2.])
+    target = np.array([False, True, False])
+    conflict = np.array([0])
+    for other in (np.array([True, False, True]), np.array([False, False, True])):
+        full, _, _ = substitution_scan._score_rate_branches(events, exposure, target, other, 'endpoint')
+        cached, _, _ = substitution_scan._score_rate_branches(
+            events, exposure, target, other, 'endpoint', impossible_indices=conflict,
+        )
+        np.testing.assert_equal(cached, full)
+        if other[0]:
+            with pytest.raises(ValueError, match='Undefined rate score'):
+                scan_statistics.calibration_score(cached)
+        else:
+            assert scan_statistics.calibration_score(cached) > 0.
+
+
 @pytest.mark.parametrize('mode', ['valid', 'zero_target', 'zero_control', 'missing', 'invalid'])
 def test_score_only_preserves_endpoint_validation_and_testability(mode):
     lengths = (0., 1.) if mode == 'zero_target' else (1., 0.) if mode == 'zero_control' else (1., 2.)

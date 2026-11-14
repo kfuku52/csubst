@@ -2043,7 +2043,7 @@ def _rate_branch_values(
     return event_values, exposure, missing_exposure, exposure_reasons
 
 
-def _score_rate_branches(event_values, exposure, is_target, is_other, rate_exposure):
+def _score_rate_branches(event_values, exposure, is_target, is_other, rate_exposure, impossible_indices=None):
     target_event = float(event_values[is_target].sum())
     other_event = float(event_values[is_other].sum())
     target_exposure = float(exposure[is_target].sum())
@@ -2054,8 +2054,13 @@ def _score_rate_branches(event_values, exposure, is_target, is_other, rate_expos
         x_other=other_event,
         l_other=other_exposure,
     )
-    impossible = (event_values > 0) & (exposure == 0)
-    invalid_endpoint = rate_exposure == "endpoint" and impossible[is_target | is_other].any()
+    if impossible_indices is None:
+        impossible = (event_values > 0) & (exposure == 0)
+        invalid_endpoint = rate_exposure == "endpoint" and impossible[is_target | is_other].any()
+    else:
+        impossible = None
+        invalid_endpoint = (rate_exposure == "endpoint" and impossible_indices.size
+                            and (is_target[impossible_indices] | is_other[impossible_indices]).any())
     if invalid_endpoint:
         score = pvalue = np.nan
     return {
@@ -2774,6 +2779,14 @@ def _build_permuted_context_with_seed(g, trait_names, valid_branch_ids, permutat
     )
 
 
+def _fixed_scan_candidates(records):
+    for row in records:
+        key = _scan_row_key(row)
+        from_ids = tuple(_parse_id_list(row['from_state_ids']))
+        to_ids = tuple(_parse_id_list(row['to_state_ids']))
+        yield key, key[:2], (key[3], from_ids, to_ids)
+
+
 def _candidate_fixed_permutation_scores(
     g,
     observed_df,
@@ -2807,8 +2820,7 @@ def _candidate_fixed_permutation_scores(
     out = {}
     candidates = scan_static.get('_fixed_candidates') if scan_static is not None else None
     if candidates is None:
-        candidates = [(row, _parse_id_list(row['from_state_ids']), _parse_id_list(row['to_state_ids']))
-                      for row in observed_df.to_dict('records')]
+        candidates = _fixed_scan_candidates(observed_df.to_dict('records'))
     branch_masks = {}
     branch_data = scan_static.get('_fixed_rate_metadata') if scan_static is not None else None
     if branch_data is None:
@@ -2827,20 +2839,17 @@ def _candidate_fixed_permutation_scores(
                 rate_ON_tensor, site, from_ids, to_ids, float_tol, projection,
             )
             rate_events = _PosteriorBranchValues(events, rate_ON_tensor.shape[0])
-        values = _rate_branch_values(
+        event_values, exposure, _, _ = _rate_branch_values(
             rate_events, branch_data, state_nsy, site, from_ids, to_ids, rate_length, rate_exposure,
             q_matrix=q_context["q_matrix"], state_cdn=q_context["state_cdn"], codon_q_matrix=q_context["codon_q_matrix"],
             codon_state_ids=q_context["codon_state_ids"], endpoint_context=q_context.get("endpoint_context"),
             exposure_cache=None,
         )
-        return values[:2]
+        return event_values, exposure, np.flatnonzero((event_values > 0) & (exposure == 0))
 
-    for row, from_ids, to_ids in candidates:
-        trait_name = str(row["trait"])
-        target_class = str(row["target_class"])
-        site = int(row["site"])
-        branch_key = (trait_name, target_class)
+    for row_key, branch_key, values_key in candidates:
         if branch_key not in branch_masks:
+            trait_name, target_class = branch_key
             fg_ids = scan_context.get('rate_fg_ids', scan_context['fg_ids'])
             target_ids = _target_branch_ids_from_maps(fg_ids, trait_name, target_class, valid_branch_ids)
             if scan_context['units'] is None:
@@ -2857,14 +2866,16 @@ def _candidate_fixed_permutation_scores(
                     fg_ids, trait_name, target_class, valid_branch_ids, scan_other_scope, units_df=units_trait)
             branch_masks[branch_key] = branch_data.prepare(target_ids, other_ids)
         if cache is None:
-            values = values_for(site, from_ids, to_ids)
+            event_values, exposure, impossible_indices = values_for(*values_key)
         else:
-            key = (site, tuple(from_ids), tuple(to_ids))
-            values = cache.obtain(key, lambda: values_for(site, from_ids, to_ids),
-                                  lambda arrays: sum(array.nbytes for array in arrays))
+            event_values, exposure, impossible_indices = cache.obtain(
+                values_key, lambda: values_for(*values_key), lambda arrays: sum(array.nbytes for array in arrays),
+            )
         _, is_target, is_other = branch_masks[branch_key]
-        rate, _, _ = _score_rate_branches(*values, is_target, is_other, rate_exposure)
-        out[_scan_row_key(row)] = scan_statistics.calibration_score(rate)
+        rate, _, _ = _score_rate_branches(
+            event_values, exposure, is_target, is_other, rate_exposure, impossible_indices=impossible_indices,
+        )
+        out[row_key] = scan_statistics.calibration_score(rate)
     return out
 
 
@@ -2966,9 +2977,7 @@ def _run_scan_permutation_chunk(
         # Candidate events and exposures depend only on this worker's fixed fit.
         scan_static['_fixed_rate_metadata'] = _ScanRateMetadata(branch_meta)
         scan_static['_fixed_rate_cache'] = _scan_candidate_cache(scan_static, '_fixed_rate_cache')
-        scan_static['_fixed_candidates'] = [
-            (row, _parse_id_list(row['from_state_ids']), _parse_id_list(row['to_state_ids']))
-            for row in records]
+        scan_static['_fixed_candidates'] = list(_fixed_scan_candidates(records))
     scores = observed_df['score_rate_enrichment'].to_numpy(dtype=np.float64)
     enriched = np.isfinite(scores) & (scores > 0)
     test_keys = tuple(_scan_row_key(records[i]) for i in np.flatnonzero(enriched))
