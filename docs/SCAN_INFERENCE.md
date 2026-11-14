@@ -54,6 +54,9 @@ enrichment. Non-enrichment has score zero. The log-tail calculation preserves
 ordering even when its exponentiated diagnostic underflows to zero.
 For extreme finite inputs, the calculation also preserves the score when
 intermediate deviance values exceed the floating-point range.
+An extremely small control-to-foreground exposure ratio is combined with the
+observed count before rounding, so a representable contribution to the
+deviance survives even if the ratio itself is too small to represent.
 When the rates nearly agree, a series for the pooled Poisson deviance preserves
 small positive likelihood ratios that cancel in a direct log-likelihood
 subtraction.

@@ -43,6 +43,26 @@ def _relative_pooled_residuals(x, a, y, b):
     return residual / (nx * dy * exposure), -residual / (ny * dx * exposure)
 
 
+def _small_exposure_deviance(x, a, y, b):
+    # The control expectation is x*b/a up to a relative correction of
+    # order b/a. Separate exponents so b/a need not be representable.
+    x_mantissa, x_exponent = math.frexp(x)
+    a_mantissa, a_exponent = math.frexp(a)
+    b_mantissa, b_exponent = math.frexp(b)
+    mean = math.ldexp(x_mantissa * b_mantissa / a_mantissa,
+                      x_exponent + b_exponent - a_exponent)
+    if y == 0:
+        return mean
+    if y >= mean:
+        return 0.
+    deficit = mean - y
+    if y >= mean / 2:
+        log_ratio = math.log1p(-deficit / mean)
+    else:
+        log_ratio = math.log(y) - math.log(mean)
+    return deficit + y * log_ratio
+
+
 def rate_score(x_target, l_target, x_other, l_other):
     """Return (score, asymptotic diagnostic P), without rounding event mass.
 
@@ -78,6 +98,8 @@ def rate_score(x_target, l_target, x_other, l_other):
             target_log_ratio = _softplus(-log_exposure_odds) - _softplus(-log_count_odds)
             other_log_ratio = _softplus(log_exposure_odds) - _softplus(log_count_odds)
             terms = x * target_log_ratio + y * other_log_ratio
+    if log_exposure_odds > 700 and (y == 0 or gap > .001):
+        terms = _small_exposure_deviance(x, a, y, b)
     if terms > sys.float_info.max / 2:
         # At this scale the normal log tail differs from -terms by less
         # than one float64 ulp. Compute the base-10 score without doubling

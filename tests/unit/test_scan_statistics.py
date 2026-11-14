@@ -83,6 +83,23 @@ def test_extreme_exposure_ratios_do_not_make_valid_scores_undefined():
     assert p == 0.
 
 
+@pytest.mark.parametrize('other_count', [0., 1e-21, 9e-21])
+def test_tiny_exposure_ratio_retains_finite_deviance_after_count_scaling(other_count):
+    args = (1e308, 1e308, other_count, 1e-20)
+    with localcontext() as context:
+        context.prec = 400
+        x, a, y, b = map(Decimal.from_float, args)
+        pooled = (x + y) / (a + b)
+        terms = x * (x / (a * pooled)).ln()
+        if y:
+            terms += y * (y / (b * pooled)).ln()
+    expected = .5 * math.erfc(math.sqrt(float(terms)))
+    score, p = stats.rate_score(*args)
+    assert expected < .5
+    assert p == pytest.approx(expected, rel=0., abs=1e-16)
+    assert score == pytest.approx(-math.log10(expected), rel=0., abs=1e-16)
+
+
 @pytest.mark.parametrize('counts_exposures', [
     (1.00000001, 1., 1., 1.),
     (1.000000001e18, 1., 1e18, 1.),
