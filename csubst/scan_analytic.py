@@ -55,11 +55,14 @@ def default_profile():
                                 for m in (*MULTIPLIERS, None)])
 
 
-def _log_mixed_message(transition, child, event, factors, participation, conditional):
-    """Propagate rare child evidence without rounding weighted mixtures first."""
+def _log_child_message(transition, child, event=None, factors=None, participation=None, conditional=None):
+    """Propagate rare child evidence before rounding transition products."""
     with np.errstate(divide='ignore'):
         log_transition = np.log(transition)
         log_child = np.log(child)[:, None, :]
+        base = logsumexp(log_transition + log_child, axis=2)
+        if event is None:
+            return base
         log_tilted = log_transition + np.where(event, np.log(factors)[:, None, None], 0.)
         log_tilted -= logsumexp(log_tilted, axis=2, keepdims=True)
         if conditional.any():
@@ -68,7 +71,6 @@ def _log_mixed_message(transition, child, event, factors, participation, conditi
             possible = np.isfinite(mass)
             log_tilted[conditional] = np.where(possible, selected - np.where(possible, mass, 0.),
                                               log_transition)
-        base = logsumexp(log_transition + log_child, axis=2)
         tilted = logsumexp(log_tilted + log_child, axis=2)
         return np.logaddexp(base + np.log1p(-participation)[:, None],
                             tilted + np.log(participation)[:, None])
@@ -101,8 +103,6 @@ class EndpointEnrichment:
         participation = np.array([0.] + [a["participation"] for a in self.atoms])
         conditional = np.array([False] + [a["multiplier"] is None for a in self.atoms])
         conditional_indices = np.flatnonzero(conditional)
-        mixed = (participation > 0) & (participation < 1)
-        has_mixed = mixed.any()
         likelihoods = []
         for category, weight in enumerate(model.weights):
             partial: dict[int, np.ndarray] = {}
@@ -143,7 +143,7 @@ class EndpointEnrichment:
                     else:
                         message = child_partial @ transition.T
                     child_scale = scales.pop(child)
-                    messages.append((child, message, child_scale, child_partial if targeted and has_mixed else None))
+                    messages.append((child, child_partial, child_scale))
                     value *= message
                     scale += child_scale
                     normalizer = value.max(axis=1)
@@ -161,21 +161,16 @@ class EndpointEnrichment:
                     # product and compute the scale from the original messages.
                     log_value = np.zeros_like(value[rare])
                     log_scale = np.zeros_like(scale[rare])
-                    rare_mixed = mixed[rare]
-                    mixed_indices = np.flatnonzero(rare & mixed)
-                    with np.errstate(divide='ignore'):
-                        for child, message, child_scale, targeted_partial in messages:
-                            log_message = np.log(message[rare])
-                            if targeted_partial is not None and mixed_indices.size:
-                                # The two weighted probabilities can round to
-                                # zero before their sum reaches float64 range.
-                                log_message[rare_mixed] = _log_mixed_message(
-                                    model.transition(child, category), targeted_partial[mixed_indices],
-                                    event, factors[mixed_indices],
-                                    participation[mixed_indices], conditional[mixed_indices],
-                                )
-                            log_value += log_message
-                            log_scale += child_scale[rare]
+                    for child, child_partial, child_scale in messages:
+                        transition = model.transition(child, category)
+                        if child in branches:
+                            log_value += _log_child_message(
+                                transition, child_partial[rare], event,
+                                factors[rare], participation[rare], conditional[rare],
+                            )
+                        else:
+                            log_value += _log_child_message(transition, child_partial[rare])
+                        log_scale += child_scale[rare]
                     maximum = log_value.max(axis=1)
                     value[rare] = np.exp(log_value - np.where(np.isfinite(maximum), maximum, 0.)[:, None])
                     scale[rare] = log_scale + maximum

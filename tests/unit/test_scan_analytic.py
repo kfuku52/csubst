@@ -132,6 +132,28 @@ def test_no_target_missing_data_and_zero_length_are_uninformative():
         engine.test({1: np.ones(2), 2: np.ones(2)}, [0], [0], [1])
 
 
+@pytest.mark.parametrize('targeted', [False, True])
+def test_analytical_likelihood_retains_subnormal_edge_with_fractional_emission(targeted):
+    length = np.nextafter(0., 1.)
+    model = EndpointModel([-1, 0, 0], [0., 0., length], [[-1., 1.], [1., -1.]], [.5, .5])
+    engine = EndpointEnrichment(model, np.arange(2))
+    tips = {1: np.array([1., 0.]), 2: np.array([0., .5])}
+    branches = [2] if targeted else []
+
+    # The first edge fixes the root at 0. State 1 on the second edge
+    # has likelihood length * .5, before accounting for the root prior.
+    null = math.log(length) + math.log(.25)
+    expected = [null] * 5
+    if targeted:
+        expected = [null + math.log(factor) for factor in (1., 2., 10., 100.)] + [math.log(.25)]
+    np.testing.assert_allclose(engine.log_likelihoods(tips, branches, [0], [1]),
+                               expected, rtol=0., atol=2e-13)
+    p, log_e = engine.test(tips, branches, [0], [1])
+    assert math.isfinite(log_e)
+    if not targeted:
+        assert (p, log_e) == pytest.approx((1., 0.))
+
+
 def test_largest_finite_tilt_normalizes_rows_rounded_above_one(monkeypatch):
     model = EndpointModel([-1, 0, 0], [0., .2, 0.],
                           np.ones((3, 3)) - 3 * np.eye(3), np.ones(3) / 3)

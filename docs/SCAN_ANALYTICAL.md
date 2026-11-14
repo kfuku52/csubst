@@ -38,9 +38,9 @@ They enrich endpoints; they are not fitted branch-rate multipliers in a CTMC Q.
 
 Scaled tree pruning computes the null and four alternative likelihoods,
 summing over shared ancestors and the site-wide rate category. It recomputes
-exceptionally small sibling likelihood products in log space to preserve
-the contributions of competing ancestral states. This recomputation also mixes
-partial-participation likelihoods in log space to preserve subnormal terms.
+exceptionally small likelihoods in log space, starting with the transition
+from each child. This preserves subnormal transition products, likelihood
+mixtures, and the contributions of competing ancestral states.
 The final sum over root states is evaluated in log space if the weighted
 likelihood is subnormal or rounds to zero.
 It uses tip observations, not reconstructed ancestral marginals or called substitutions.
