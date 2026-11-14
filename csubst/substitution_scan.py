@@ -1529,19 +1529,16 @@ def _candidate_event_positions(events, event_sites, site, from_ids, to_ids):
 
 
 def _support_for_unit(branch_event, branch_ids, min_event_pp):
-    branch_ids = np.asarray(branch_ids, dtype=np.int64).reshape(-1)
-    if branch_ids.shape[0] == 0:
-        return 0.0, []
-    values = []
+    maximum = 0.0
     supporting = []
-    for bid in branch_ids.tolist():
-        value = float(branch_event.get(int(bid), 0.0))
-        if (value > 0.0) and (value >= float(min_event_pp)):
-            values.append(value)
-            supporting.append(int(bid))
-    if len(values) == 0:
-        return 0.0, []
-    return max(values), supporting
+    if isinstance(branch_ids, np.ndarray):
+        branch_ids = branch_ids.tolist()
+    for bid in branch_ids:
+        value = float(branch_event.get(bid, 0.0))
+        if value > 0.0 and value >= min_event_pp:
+            maximum = max(maximum, value)
+            supporting.append(bid)
+    return maximum, supporting
 
 
 def _format_lineage_id_list(values):
@@ -1554,7 +1551,7 @@ def _scan_unit_support_plan(units_df):
     """Parse fixed branch membership once per trait/foreground assignment."""
     branch_lists = units_df.get("fg_branch_ids", [""] * len(units_df))
     return [
-        (unit_id, lineage_value, _parse_id_list(branch_ids))
+        (unit_id, lineage_value, _parse_id_list(branch_ids).tolist())
         for unit_id, lineage_value, branch_ids in zip(
             units_df["unit_id"], units_df["lineage_value"], branch_lists,
         )
@@ -1593,17 +1590,15 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
     support_lineages = set()
     if unit_plan is None:
         unit_plan = _scan_unit_support_plan(units_df)
+    threshold = float(min_event_pp)
     for unit_id, lineage_value, fg_ids in unit_plan:
-        if fg_ids.size > 0:
+        if len(fg_ids):
             analyzable_lineages[lineage_value] = None
-        fg_pp, fg_support_branches = _support_for_unit(branch_event, fg_ids, min_event_pp)
-        is_support = len(fg_support_branches) > 0
-        pp = fg_pp
-        branches = fg_support_branches
-        if is_support:
+        pp, branches = _support_for_unit(branch_event, fg_ids, threshold)
+        if branches:
             support_units.append(int(unit_id))
-            support_pp.append(float(pp))
-            support_branches.extend([int(v) for v in branches])
+            support_pp.append(pp)
+            support_branches.extend(branches)
             support_lineages.add(lineage_value)
     unit_total = int(units_df.shape[0])
     support_count = int(len(support_units))
