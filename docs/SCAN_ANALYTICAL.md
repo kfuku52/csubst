@@ -57,6 +57,10 @@ Under a **fixed correct null**, `E0[E] <= 1`. Markov's inequality gives
 asymptotic chi-square tail. The alternatives are averaged, never selected by
 maximizing the observed likelihood. Calculations use log likelihoods, and
 `log_e_endpoint_enrichment` retains evidence when P underflows float64.
+When a raw P value is subnormal or rounds to zero, both multiple-testing
+corrections rank and adjust the log probabilities before converting back to
+float64. An adjusted probability can therefore be positive even when the
+printed raw P value is zero.
 There is no Monte Carlo resolution floor.
 
 This tests compatibility with the specified **site-wide evolutionary null** in

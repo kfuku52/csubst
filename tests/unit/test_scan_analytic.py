@@ -1,3 +1,4 @@
+from decimal import Decimal, localcontext
 from itertools import product
 import math
 
@@ -54,7 +55,9 @@ def test_family_includes_unreported_hypotheses_and_by_dependence_factor():
     from scipy.stats import false_discovery_control
     padded = np.r_[p, np.ones(97)]
     for method in ('BH', 'BY'):
-        np.testing.assert_allclose(adjusted_pvalues(p, 100, method), false_discovery_control(padded, method=method.lower())[:3])
+        expected = false_discovery_control(padded, method=method.lower())[:3]
+        np.testing.assert_allclose(adjusted_pvalues(p, 100, method), expected)
+        np.testing.assert_allclose(adjusted_pvalues(np.log(p), 100, method, log_scale=True), expected)
     assert adjusted_pvalues([], 80000).size == 0
     with pytest.raises(ValueError):
         family_size(1, 20, 1, 1, ['dif2spe'])
@@ -125,6 +128,41 @@ def test_prepare_freezes_family_before_filter_and_annotation_uses_only_tips(tmp_
     g['scan_match'] = 'dif2spe'
     with pytest.raises(ValueError, match='supports'):
         scan_analytic.prepare(g)
+
+
+def test_analytical_scan_adjusts_underflowed_pvalues_using_log_evidence(monkeypatch, tmp_path):
+    from csubst import scan_analytic, substitution_scan
+    from scan_fixtures import make_scan_context
+
+    g, tensor = make_scan_context()
+    report = tmp_path / 'fit.iqtree'
+    report.write_text('Model of rate heterogeneity: Uniform\n')
+    g.update(scan_analytic_pvalue='endpoint_mixture', substitution_model='GY+FQ',
+             path_iqtree_iqtree=str(report), state_cdn=g['state_nsy'],
+             instantaneous_codon_rate_matrix=np.array([[-1., 1.], [1., -1.]]),
+             equilibrium_frequency=np.full(2, .5), nonsynonymous_indices={'A': [0], 'K': [1]})
+    engine = scan_analytic.prepare(g)
+    frame, units = substitution_scan.scan_substitutions(g, tensor)
+    frame = frame.loc[frame.index.repeat(2)].reset_index(drop=True)
+    # Both raw probabilities round to zero. Put the weaker hypothesis
+    # first so a stable sort of rounded zeros would assign it rank one.
+    log_evidence = (749, 750)
+    results = iter((0., float(log_e)) for log_e in log_evidence)
+    monkeypatch.setattr(engine, 'test', lambda *args: next(results))
+    total = 240_000
+    g['scan_analytic_summary']['family_size'] = total
+
+    annotated = scan_analytic.annotate(g, frame, units, engine)
+    np.testing.assert_array_equal(annotated['p_endpoint_enrichment_analytic'], 0.)
+    with localcontext() as ctx:
+        ctx.prec = 80
+        bh = [Decimal(total) * (-Decimal(749)).exp() / 2,
+              Decimal(total) * (-Decimal(750)).exp()]
+        harmonic = sum(Decimal(1) / rank for rank in range(1, total + 1))
+        by = [p * harmonic for p in bh]
+    for method, expected in [('bh', bh), ('by', by)]:
+        np.testing.assert_array_equal(annotated['q_endpoint_enrichment_analytic_' + method],
+                                      [float(p) for p in expected])
 
 
 def test_option_validation_and_display_use_new_p_only_when_enabled():

@@ -151,10 +151,11 @@ class EndpointEnrichment:
         return min(1., math.exp(min(0., -log_e))), log_e
 
 
-def adjusted_pvalues(pvalues, family_size, dependence='BH'):
-    """Unreported prespecified hypotheses have P=1, never shrink the family."""
+def adjusted_pvalues(pvalues, family_size, dependence='BH', *, log_scale=False):
+    """Adjust probabilities (or their natural logs) for the full family."""
     p = np.asarray(pvalues, dtype=float)
-    if (p.ndim != 1 or not np.isfinite(p).all() or np.any((p < 0) | (p > 1))
+    invalid = np.isnan(p) | (p > 0) if log_scale else ~np.isfinite(p) | (p < 0) | (p > 1)
+    if (p.ndim != 1 or invalid.any()
             or int(family_size) != family_size or family_size < p.size):
         raise ValueError('Invalid analytical P-values or prespecified family size.')
     if dependence not in ('BH', 'BY'):
@@ -166,9 +167,17 @@ def adjusted_pvalues(pvalues, family_size, dependence='BH'):
         from scipy.special import digamma
         factor = float(digamma(family_size + 1) + np.euler_gamma)
     order = np.argsort(p, kind='stable')
-    ranked = p[order] * family_size * factor / np.arange(1, len(p) + 1)
+    ranks = np.arange(1, len(p) + 1)
+    if log_scale:
+        ranked = p[order] + math.log(family_size) + math.log(factor) - np.log(ranks)
+        adjusted = np.minimum(0., np.minimum.accumulate(ranked[::-1])[::-1])
+        with np.errstate(under='ignore'):
+            adjusted = np.exp(adjusted)
+    else:
+        ranked = p[order] * family_size * factor / ranks
+        adjusted = np.minimum(1., np.minimum.accumulate(ranked[::-1])[::-1])
     out = np.empty_like(p)
-    out[order] = np.minimum(1., np.minimum.accumulate(ranked[::-1])[::-1])
+    out[order] = adjusted
     return out
 
 
@@ -269,6 +278,11 @@ def annotate(g, frame, units, engine):
     out['log_e_endpoint_enrichment'] = logs
     out['scan_analytic_family_size'] = total
     out['scan_analytic_status'] = 'model_conditional_fitted_null'
-    out['q_endpoint_enrichment_analytic_bh'] = adjusted_pvalues(values, total)
-    out['q_endpoint_enrichment_analytic_by'] = adjusted_pvalues(values, total, 'BY')
+    pvalues = np.asarray(values, dtype=float)
+    log_scale = pvalues.min(initial=1.) < np.finfo(float).tiny
+    if log_scale:
+        # Recover ordering and apply the family-size factor before rounding.
+        pvalues = np.minimum(0., -np.asarray(logs, dtype=float))
+    out['q_endpoint_enrichment_analytic_bh'] = adjusted_pvalues(pvalues, total, log_scale=log_scale)
+    out['q_endpoint_enrichment_analytic_by'] = adjusted_pvalues(pvalues, total, 'BY', log_scale=log_scale)
     return out
