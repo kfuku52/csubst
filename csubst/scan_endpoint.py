@@ -6,9 +6,8 @@ the grouped instantaneous matrix is generally not a lumped CTMC generator.
 """
 
 import numpy as np
-from scipy.linalg import expm
 
-from csubst import endpoint_io, ete, expectation_3di, site_storage
+from csubst import endpoint, endpoint_io, ete, expectation_3di, site_storage
 
 
 def validate_options(g):
@@ -87,17 +86,15 @@ def validate_model(g, branch_meta, codon_state_ids):
 def _exposure_matrices(q, rates, unique_lengths, group_projection, bridge):
     num_group = group_projection.shape[1]
     extra: dict = {}
+    series = endpoint.TransitionSeries(q)
     if bridge:
         # Integral in rate-scaled time. This incorporates the category's rate
         # multiplier on Q when computing jump opportunities.
-        augmented = np.zeros((2 * len(q), 2 * len(q)))
-        augmented[:len(q), :len(q)] = q
-        augmented[:len(q), len(q):] = np.eye(len(q))
         occupation = np.empty((len(rates), len(unique_lengths), len(q), len(q)))
         for category, rate in enumerate(rates):
             for index, length in enumerate(unique_lengths):
                 time = length * rate
-                integrated = expm(augmented * time)[:len(q), len(q):]
+                integrated = series.occupation(time)
                 if (not np.isfinite(integrated).all() or (integrated < -1e-10).any()
                         or not np.allclose(integrated.sum(axis=1), time, atol=1e-12, rtol=1e-9)):
                     raise ValueError("Invalid integrated CTMC transition probabilities.")
@@ -107,7 +104,7 @@ def _exposure_matrices(q, rates, unique_lengths, group_projection, bridge):
         projected = np.empty((len(rates), len(unique_lengths), len(q), num_group), dtype=float)
         for category, rate in enumerate(rates):
             for index, length in enumerate(unique_lengths):
-                p = expm(q * length * rate)
+                p = series.transition(length * rate)
                 if (not np.isfinite(p).all() or (p < -1e-12).any()
                         or not np.allclose(p.sum(axis=1), 1, atol=1e-10, rtol=0)):
                     raise ValueError("Invalid scan endpoint transition probabilities.")

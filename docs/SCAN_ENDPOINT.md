@@ -77,8 +77,10 @@ emissions, before missing tips are imputed. The same mask excludes observed
 event mass and exposure. For explicit marginal observations, only branch/site
 pairs with nonmissing codon and reported-state rows at both endpoints contribute. Nonmissing rows must sum to one within ASR
 text precision; parent codon rows are normalized to absorb that rounding.
-Very small positive transition probabilities are retained. Negative numerical
-roundoff is removed only after validating the transition matrix.
+The shared nonnegative transition series preserves rare multi-step probabilities
+when its relative tail bound is met. Outside that range the calculation uses
+a matrix exponential. Negative numerical roundoff is removed only after
+validating the transition matrix.
 
 ## Output and zero diagnostics
 

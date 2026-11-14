@@ -80,8 +80,10 @@ opportunity = sum_k,l (parent_posterior integral_0^t exp(Qu) du)[k] Q[k,l]
 ```
 
 It allows intermediate jumps before reaching a candidate's source state. The
-integrated transition matrix is calculated through a block matrix exponential,
-which accommodates singular Q. For a discrete rate mixture, each integral
+integrated transition matrix uses the same nonnegative transition powers as
+joint inference. When the bounded series cannot meet its relative error check,
+the integral uses a block matrix exponential. Both methods accommodate singular
+Q. For a discrete rate mixture, each integral
 uses category-scaled time and the category-conditional parent state, weighted
 by the category posterior. Exposure conditions on the inferred parent
 state, but not on the child evidence; the observation conditions on all tips.

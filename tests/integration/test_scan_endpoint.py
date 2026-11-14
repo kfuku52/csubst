@@ -1,3 +1,5 @@
+from decimal import Decimal, localcontext
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -53,6 +55,40 @@ def test_endpoint_fixes_zero_direct_q_without_multiplying_by_length_again():
     assert new["scan_exposure_units"] == "expected_endpoint_events"
     assert np.isnan(new["target_exposure_branch_length"])
     assert np.isfinite(new["p_rate_enrichment_asymptotic"])
+
+
+@pytest.mark.parametrize("bridge", [False, True])
+def test_exposure_preserves_rare_paths_on_short_branches(bridge):
+    states, time = 8, 1e-8
+    off = states / (2 * (states - 1))
+    q = np.diag(np.full(states - 1, off), 1) + np.diag(np.full(states - 1, off), -1)
+    np.fill_diagonal(q, -q.sum(axis=1))
+    g, meta, _ = context((time, 0.))
+    posterior = np.zeros((3, 1, states))
+    posterior[:, 0, 0] = 1
+    pi = np.full(states, 1 / states)
+    g.update(state_cdn=posterior, state_nsy=posterior, instantaneous_codon_rate_matrix=q,
+             equilibrium_frequency=pi, scan_observation="bridge" if bridge else "joint")
+    ctx = scan_endpoint.build_context(g, meta, np.arange(states))
+    source, target = ([states - 1], [states - 2]) if bridge else ([0], [states - 1])
+    actual, missing, reasons = scan_endpoint.expected_events(ctx, posterior, posterior, 0, source, target)
+
+    # Independently expand the exponential (or its integral) in Decimal.
+    # For bridge exposure, the only counted jump starts at the far end.
+    with localcontext() as ctx:
+        ctx.prec = 100
+        t = Decimal.from_float(time)
+        matrix = [[Decimal.from_float(value) * t for value in row] for row in q]
+        term = [Decimal(i == 0) for i in range(states)]
+        expected = Decimal(0)
+        for n in range(32):
+            expected += term[-1] * (t / (n + 1) if bridge else 1)
+            term = [sum(v * row[j] for v, row in zip(term, matrix)) / (n + 1) for j in range(states)]
+        if bridge:
+            expected *= Decimal.from_float(off)
+    np.testing.assert_allclose(actual, [float(expected), 0.], rtol=1e-13, atol=0.)
+    assert not missing.any()
+    assert reasons.tolist() == ["ok", "zero_model_length"]
 
 
 def test_exposure_cache_reuses_only_vectors_and_recomputes_assignment_summaries(monkeypatch):

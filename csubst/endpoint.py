@@ -14,6 +14,79 @@ from scipy.sparse.csgraph import shortest_path
 from scipy.special import logsumexp
 
 
+class TransitionSeries:
+    """Reuse nonnegative CTMC transition powers across lengths and rates."""
+
+    def __init__(self, q):
+        self.q = q
+        self.rate = float(np.max(-np.diag(q)))
+        # A partial sum must include a path to every reachable pair before a
+        # relative tail bound can certify all entries.
+        distances = shortest_path(q > 0, directed=True, unweighted=True)
+        self._support_steps = int(np.max(distances, where=np.isfinite(distances), initial=0.))
+        capacity = min(256, max(1, (8 * 1024**2) // q.nbytes))
+        self._powers = np.empty((capacity, *q.shape))
+        identity = np.eye(len(q))
+        self._powers[0] = identity
+        self._count = 1
+        self._kernel = identity + q / self.rate if self.rate > 0 else identity
+        self._row_norm = float(self._kernel.sum(axis=1).max())
+        self._nonnegative = bool((self._kernel >= 0).all())
+
+    def _sum(self, time, *, occupation=False):
+        # exp(Qt) is a Poisson-weighted sum of powers of I + Q / rate.
+        tau = self.rate * time
+        if tau == 0:
+            return np.eye(len(self.q))
+        capacity = len(self._powers)
+        tau_bound = tau * self._row_norm
+        if tau_bound > 32 or capacity <= self._support_steps or not self._nonnegative:
+            return None
+        coefficients = np.empty(capacity)
+        coefficients[0] = np.exp(-tau)
+        target = 1e-18
+        for n in range(1, capacity):
+            coefficients[n] = coefficients[n - 1] * tau / n
+            if n < self._support_steps or n + 1 <= tau_bound:
+                continue
+            # The next Poisson terms have a bounded geometric ratio. In the
+            # integrated series their weight is spread over lower powers.
+            tail = coefficients[n] * max(1., self._row_norm)**n * tau_bound / (n + 1 - tau_bound)
+            if tail > target:
+                continue
+            while self._count <= n:
+                i = self._count
+                self._powers[i] = self._powers[i - 1] @ self._kernel
+                self._count += 1
+            weights = coefficients[:n + 1]
+            if occupation:
+                # For the mean transition over [0, t], integrate each
+                # embedded-chain power. At order n this distributes the
+                # Poisson mass of j equally over powers 0 through j.
+                weights = np.cumsum((weights / np.arange(1, n + 2))[::-1])[::-1]
+            matrix = (weights @ self._powers[:n + 1].reshape(n + 1, -1)).reshape(self.q.shape)
+            target = float(matrix[matrix > 0].min() * np.finfo(float).eps * .25)
+            if tail <= target:
+                return matrix
+        return None
+
+    def transition(self, time):
+        """Return exp(Q * time)."""
+        matrix = self._sum(time)
+        return expm(self.q * time) if matrix is None else matrix
+
+    def occupation(self, time):
+        """Return the integral of exp(Q * u) over [0, time]."""
+        matrix = self._sum(time, occupation=True)
+        if matrix is not None:
+            return time * matrix
+        k = len(self.q)
+        augmented = np.zeros((2 * k, 2 * k))
+        augmented[:k, :k] = self.q
+        augmented[:k, k:] = np.eye(k)
+        return expm(augmented * time)[:k, k:]
+
+
 @dataclass
 class EndpointBlock:
     start: int
@@ -76,63 +149,15 @@ class EndpointModel:
         if len(self.order) != p.size:
             raise ValueError('Endpoint tree is disconnected.')
         self.leaves = {i for i, children in enumerate(self.children) if not children}
+        self._transition_series = TransitionSeries(self.q)
         self._transitions = OrderedDict()
-        self._uniform_rate = float(np.max(-np.diag(self.q)))
-        # The truncated sum needs to include a path to every reachable pair
-        # before a relative Poisson-tail bound can certify all entries.
-        distances = shortest_path(off > 0, directed=True, unweighted=True)
-        self._support_steps = int(np.max(distances, where=np.isfinite(distances), initial=0.))
-        # Share nonnegative uniformization powers across all edge lengths and
-        # categories. Cap this cache independently of the transition cache.
-        capacity = min(256, max(1, (8 * 1024 * 1024) // (8 * k * k)))
-        self._uniform_powers = np.empty((capacity, k, k))
-        self._uniform_powers[0] = np.eye(k)
-        self._uniform_count = 1
-        self._uniform_kernel = (np.eye(k) + self.q / self._uniform_rate
-                                if self._uniform_rate > 0 else np.eye(k))
         # Cap the transition cache independently of the number of sites/nodes.
-        self._cache_items = max(1, (32 * 1024 * 1024) // (8 * k * k))
-
-    def _uniform_transition(self, t):
-        """exp(Qt) = exp(-mu*t) sum_n (mu*t)^n/n! (I + Q/mu)^n.
-
-        All terms are nonnegative. The omitted Poisson tail bounds every
-        matrix entry; compare it with the smallest positive partial entry to
-        protect relative accuracy even for rare transitions. Use expm outside
-        the bounded power workspace, without changing the model or threshold.
-        """
-        tau = self._uniform_rate * t
-        if tau == 0:
-            return np.eye(self.pi.size)
-        capacity = self._uniform_powers.shape[0]
-        if tau > 32 or capacity <= self._support_steps:
-            return None
-        coefficients = np.empty(capacity)
-        coefficients[0] = np.exp(-tau)
-        target = 1e-18
-        for n in range(1, capacity):
-            coefficients[n] = coefficients[n - 1] * tau / n
-            if n < self._support_steps or n + 1 <= tau:
-                continue
-            tail = coefficients[n] * tau / (n + 1 - tau)
-            if tail > target:
-                continue
-            while self._uniform_count <= n:
-                i = self._uniform_count
-                self._uniform_powers[i] = self._uniform_powers[i - 1] @ self._uniform_kernel
-                self._uniform_count += 1
-            matrix = (coefficients[:n + 1] @ self._uniform_powers[:n + 1].reshape(n + 1, -1)).reshape(self.q.shape)
-            target = float(matrix[matrix > 0].min() * np.finfo(float).eps * 0.25)
-            if tail <= target:
-                return matrix
-        return None
+        self._cache_items = max(1, (32 * 1024 * 1024) // self.q.nbytes)
 
     def transition(self, child, category):
         t = float(self.lengths[child] * self.rates[category])
         if t not in self._transitions:
-            matrix = self._uniform_transition(t)
-            if matrix is None:
-                matrix = expm(self.q * t)
+            matrix = self._transition_series.transition(t)
             if matrix.min() < -1e-12 or not np.allclose(matrix.sum(axis=1), 1, atol=1e-10):
                 raise ValueError('Invalid CTMC transition matrix.')
             matrix = np.maximum(matrix, 0)

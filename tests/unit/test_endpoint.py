@@ -182,7 +182,7 @@ def test_shared_transition_powers_match_expm_for_rare_events(length):
                     break
             expected = np.array(total, dtype=float)
     np.testing.assert_allclose(model.transition(1, 0), expected, atol=1e-300, rtol=3e-14)
-    assert model._uniform_powers.nbytes <= 8 * 1024 * 1024
+    assert model._transition_series._powers.nbytes <= 8 * 1024 * 1024
 
 
 def test_shared_transition_nonreversible_and_zero_generator():
@@ -202,7 +202,7 @@ def test_short_transition_series_covers_disconnected_components():
     change = -.5 * np.expm1(-2 * t)
     expected = np.kron(np.eye(n // 2), [[1 - change, change], [change, 1 - change]])
     np.testing.assert_allclose(model.transition(1, 0), expected, rtol=2e-14, atol=0.)
-    assert model._uniform_count < n
+    assert model._transition_series._count < n
 
 
 def test_tip_mask_matches_explicit_unknown_likelihoods_without_mutation():
