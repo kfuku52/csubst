@@ -209,6 +209,17 @@ def test_unit_support_counts_foreground_lineages_once_and_rejects_non_foreground
         )
 
 
+def test_unit_support_sums_events_on_each_branch_before_applying_threshold():
+    events = pd.DataFrame({"branch_id": [1, 2, 1], "event_pp": [.3, .55, .3]})
+    units = pd.DataFrame({"unit_id": [1], "lineage_value": [7], "fg_branch_ids": ["1,2"]})
+
+    support = substitution_scan._summarize_unit_support(events, units, "fg", .5)
+
+    assert support["support_branch_ids"] == "1,2"
+    assert support["support_pp_sum"] == .6
+    assert support["support_pp_mean"] == .6
+
+
 def test_candidate_event_mask_preserves_row_order_and_excludes_diagonal_mass():
     events = pd.DataFrame({
         'site': ['2', '0', '2', '2', '2', '2'],

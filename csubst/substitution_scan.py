@@ -1565,7 +1565,14 @@ def _summarize_unit_support(candidate_events, units_df, target_class, min_event_
             "support_lineage_fraction": np.nan,
             "support_lineage_ids": "",
         }
-    branch_event = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
+    branch_ids = candidate_events["branch_id"]
+    event_pp = candidate_events["event_pp"]
+    branch_event = {}
+    if branch_ids.dtype == np.int64 and event_pp.dtype == np.float64:
+        branch_event = dict(zip(branch_ids.to_numpy(copy=False), event_pp.to_numpy(copy=False)))
+    if len(branch_event) != len(candidate_events):
+        # Keep the grouped sum when a branch contributes multiple events.
+        branch_event = candidate_events.groupby("branch_id")["event_pp"].sum().to_dict()
     support_pp = []
     support_units = []
     support_branches = []
