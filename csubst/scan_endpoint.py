@@ -172,17 +172,18 @@ def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids):
     child = np.asarray(state_cdn[context["branch_ids"], int(site), :], dtype=float)
     nsy_parent = np.asarray(state_nsy[context["parent_ids"], int(site), :], dtype=float)
     nsy_child = np.asarray(state_nsy[context["branch_ids"], int(site), :], dtype=float)
+    row_totals = []
     for values in (parent, child, nsy_parent, nsy_child):
         if not np.isfinite(values).all() or (values < 0).any():
             raise ValueError("Scan endpoint posterior states must be finite and nonnegative.")
         total = values.sum(axis=1)
         if not np.all((total == 0) | np.isclose(total, 1, atol=1e-4, rtol=0)):
             raise ValueError("Scan endpoint posterior rows must sum to one (or zero for missing states).")
-    mass = parent.sum(axis=1)
-    missing = (mass == 0) | (child.sum(axis=1) == 0) | (nsy_parent.sum(axis=1) == 0) | (nsy_child.sum(axis=1) == 0)
+        row_totals.append(total)
+    mass, child_mass, nsy_parent_mass, nsy_child_mass = row_totals
+    missing = (mass == 0) | (child_mass == 0) | (nsy_parent_mass == 0) | (nsy_child_mass == 0)
     if "eligible" in context:
         missing |= ~context["eligible"][context["branch_ids"], int(site)]
-    normalized = np.divide(parent, mass[:, None], out=np.zeros_like(parent), where=mass[:, None] > 0)
     if 'category_states' in context:
         category_states = context['category_states']
         if category_states is None:
@@ -195,6 +196,7 @@ def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids):
             raise ValueError('Category posterior states do not match scan parent marginals.')
     else:
         weighted_parent = None
+        normalized = np.divide(parent, mass[:, None], out=np.zeros_like(parent), where=mass[:, None] > 0)
     if "occupation" in context:
         target = np.isin(ids, to_ids)
         jump_rates = (context["jump_q"][:, target] *
@@ -218,6 +220,8 @@ def expected_events(context, state_cdn, state_nsy, site, from_ids, to_ids):
     expected = np.maximum(expected, 0)
     reasons: np.ndarray = np.full(len(expected), "ok", dtype="U24")
     zero = expected == 0
+    if not zero.any():
+        return expected, missing, reasons
     reachable_candidate = (context["reachable_groups"][:, to_ids] & candidate_mask).any(axis=1)
     if "occupation" in context:
         reachable_candidate = context["reachable_states"][:, jump_rates > 0].any(axis=1)
