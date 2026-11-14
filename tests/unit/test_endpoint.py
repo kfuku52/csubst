@@ -81,6 +81,22 @@ def test_zero_likelihood_fails_instead_of_fabricating_posterior():
         list(model.iter_blocks({1: np.array([[1., 0]]), 2: np.array([[0., 1]])}))
 
 
+def test_pruning_retains_all_states_when_sibling_likelihood_products_are_tiny():
+    # Each root state matches one tip and needs two changes on the other
+    # edges. The three possible root states therefore have equal likelihood
+    # by symmetry, even though each unscaled product is below float64 range.
+    model = EndpointModel([-1, 0, 0, 0], [0., 1e-170, 1e-170, 1e-170],
+                          np.ones((3, 3)) - 3 * np.eye(3), np.ones(3) / 3,
+                          rates=[0., 1.], weights=[.5, .5])
+    tips = {i: np.eye(3)[[i - 1]] for i in (1, 2, 3)}
+    records = list(model.iter_blocks(tips, category_nodes=True))
+    np.testing.assert_allclose(records[0].node[0], np.ones(3) / 3, rtol=2e-13)
+    np.testing.assert_array_equal(records[0].category_node[0], 0.)
+    for record in records[1:]:
+        np.testing.assert_allclose(record.joint[0, :, record.child - 1], np.ones(3) / 3, rtol=2e-13)
+        np.testing.assert_allclose(record.node, tips[record.child], rtol=2e-13)
+
+
 def test_state_permutation_and_selected_edges():
     tips = {1: np.array([[.1, .9]]), 2: np.array([[1., 0.]])}
     q = np.array([[-.3, .3], [.7, -.7]])

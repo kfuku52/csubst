@@ -14,6 +14,23 @@ from scipy.sparse.csgraph import shortest_path
 from scipy.special import logsumexp
 
 
+_PRUNING_LOG_THRESHOLD = np.sqrt(np.finfo(float).tiny)
+
+
+def _recover_rare_pruning_rows(inside, messages, scales, node, children, sites):
+    """Recompute the child product before a lost state can bias the posterior."""
+    log_inside = np.zeros((len(sites), inside.shape[-1]))
+    log_scale = np.zeros(len(sites))
+    with np.errstate(divide='ignore'):
+        for child in children:
+            log_inside += np.log(messages[child, sites])
+            log_scale += scales[child, sites]
+    maximum = log_inside.max(axis=1)
+    finite = np.isfinite(maximum)
+    inside[node, sites] = np.exp(log_inside - np.where(finite, maximum, 0.)[:, None])
+    scales[node, sites] = log_scale + maximum
+
+
 class TransitionSeries:
     """Reuse nonnegative CTMC transition powers across lengths and rates."""
 
@@ -229,14 +246,25 @@ class EndpointModel:
                     inside[:, node, missing[node][start:stop]] = 1.
             for c in range(nc):
                 for node in internal_postorder:
-                    for child in self.children[node]:
+                    children = self.children[node]
+                    rare_sites = None
+                    for child in children:
                         post[c, child] = inside[c, child] @ self.transition(child, c).T
                         inside[c, node] *= post[c, child]
                         scales[c, node] += scales[c, child]
                         norm = inside[c, node].max(axis=1)
+                        if norm.min() < _PRUNING_LOG_THRESHOLD:
+                            # Once an intermediate product is very small, an
+                            # earlier multiplication can already have lost a
+                            # state that matters to a later sibling.
+                            rare = norm < _PRUNING_LOG_THRESHOLD
+                            rare_sites = rare if rare_sites is None else rare_sites | rare
                         inside[c, node] /= np.where(norm > 0, norm, 1)[:, None]
                         with np.errstate(divide='ignore'):
                             scales[c, node] += np.log(norm)
+                    if rare_sites is not None:
+                        _recover_rare_pruning_rows(inside[c], post[c], scales[c], node, children,
+                                                   np.flatnonzero(rare_sites))
             # Child slots hold pruning messages until the forward traversal
             # consumes them, then the same storage holds node posteriors.
             post[:, self.root].fill(0)

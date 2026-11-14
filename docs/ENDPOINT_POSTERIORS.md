@@ -204,6 +204,10 @@ exponential per length/category, while nonnegative terms preserve rare
 transition probabilities. The remaining Poisson tail is checked against the
 smallest positive partial matrix entry. Very large times or insufficient cache
 capacity use `expm`; no branch length or posterior probability is truncated.
+For exceptionally small sibling likelihood products, pruning recomputes the
+affected site rows in log space before normalizing them. This retains competing
+ancestral states when the product of individually representable child messages
+falls below the floating-point range.
 
 Search consumers needing full events or additional summaries retain the full sparse
 representation: `spe2spe` outside the bounded arity-2 route, CS/CBS tables, positive `min_sub_pp`, urn,
