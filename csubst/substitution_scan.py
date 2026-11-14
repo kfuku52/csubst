@@ -1383,28 +1383,11 @@ def _build_permuted_scan_context(
     return context
 
 
-def _candidate_state_sets(match, group, num_state):
-    all_states = np.arange(num_state, dtype=np.int64)
-    observed_from = np.array(sorted(group["from_state_id"].astype(int).unique().tolist()), dtype=np.int64)
-    observed_to = np.array(sorted(group["to_state_id"].astype(int).unique().tolist()), dtype=np.int64)
-    anc_token, der_token = match.split("2", 1)
-    if anc_token == "any":
-        from_set = all_states
-    else:
-        from_set = observed_from
-    if der_token == "any":
-        to_set = all_states
-    else:
-        to_set = observed_to
-    if anc_token == "spe" and observed_from.shape[0] != 1:
-        return None
-    if anc_token == "dif" and observed_from.shape[0] < 2:
-        return None
-    if der_token == "spe" and observed_to.shape[0] != 1:
-        return None
-    if der_token == "dif" and observed_to.shape[0] < 2:
-        return None
-    return from_set, to_set, observed_from, observed_to
+def _observed_candidate_states(values):
+    ids = values.to_numpy(copy=False)
+    if ids.dtype != np.int64:
+        ids = values.astype(int).to_numpy(copy=False)
+    return np.unique(ids)
 
 
 def _candidate_group_columns(match):
@@ -1451,6 +1434,7 @@ def _candidate_distribution_label(values, state_orders):
 def build_candidates(events, scan_matches, state_orders):
     rows = []
     num_state = int(state_orders.shape[0])
+    all_states = np.arange(num_state, dtype=np.int64)
     summaries = {}
     for match in scan_matches:
         if events.shape[0] == 0:
@@ -1474,13 +1458,13 @@ def build_candidates(events, scan_matches, state_orders):
             records = []
             for key, group in events.groupby(list(group_cols), sort=True):
                 key = key if isinstance(key, tuple) else (key,)
-                _, _, observed_from, observed_to = _candidate_state_sets('any2any', group, num_state)
+                observed_from = _observed_candidate_states(group['from_state_id'])
+                observed_to = _observed_candidate_states(group['to_state_id'])
                 records.append((int(group['site'].iloc[0]), observed_from, observed_to,
                                 distributions['from_state_id'][key], distributions['to_state_id'][key],
                                 float(group['event_pp'].sum())))
             summaries[group_cols] = records
         ancestral, derived = match.split('2')
-        all_states = np.arange(num_state, dtype=np.int64)
         for site, observed_from, observed_to, from_distribution, to_distribution, total in summaries[group_cols]:
             if ((ancestral == 'spe' and len(observed_from) != 1)
                     or (ancestral == 'dif' and len(observed_from) < 2)
