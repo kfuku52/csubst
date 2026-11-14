@@ -41,6 +41,8 @@ summing over shared ancestors and the site-wide rate category. It recomputes
 exceptionally small sibling likelihood products in log space to preserve
 the contributions of competing ancestral states. This recomputation also mixes
 partial-participation likelihoods in log space to preserve subnormal terms.
+The final sum over root states is evaluated in log space if the weighted
+likelihood is subnormal or rounds to zero.
 It uses tip observations, not reconstructed ancestral marginals or called substitutions.
 Missing tips contribute an all-ones likelihood vector. Foreground branches
 come from the topology and phenotype-defined clades, including branches with

@@ -173,8 +173,16 @@ class EndpointEnrichment:
                     value[rare] = np.exp(log_value - np.where(np.isfinite(maximum), maximum, 0.)[:, None])
                     scale[rare] = log_scale + maximum
                 partial[node], scales[node] = value, scale
+            root_partial = partial[model.root]
+            root_mass = root_partial @ model.pi
             with np.errstate(divide='ignore'):
-                likelihoods.append(np.log(partial[model.root] @ model.pi) + scales[model.root] + math.log(weight))
+                log_root = np.log(root_mass)
+                subnormal = root_mass < np.finfo(float).tiny
+                if subnormal.any():
+                    # The root prior can make every compatible term round to
+                    # zero even when the scaled conditional likelihood is positive.
+                    log_root[subnormal] = logsumexp(np.log(root_partial[subnormal]) + np.log(model.pi), axis=1)
+            likelihoods.append(log_root + scales[model.root] + math.log(weight))
         return logsumexp(likelihoods, axis=0)
 
     def test(self, tips, branches, from_ids, to_ids):

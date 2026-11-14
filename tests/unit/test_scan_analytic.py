@@ -84,6 +84,28 @@ def test_analytical_likelihood_retains_all_root_states_in_rare_sibling_products(
     assert engine.test(tips, [3], [0], [2]) == pytest.approx((.5, math.log(2.)), abs=2e-13, rel=0.)
 
 
+@pytest.mark.parametrize('root_mass_units', [1., 4.])
+def test_analytical_likelihood_retains_subnormal_root_prior_terms(root_mass_units):
+    root_mass = root_mass_units * np.nextafter(0., 1.)
+    q = np.zeros((4, 4))
+    q[:2, :2] = [[-1., 1.], [1., -1.]]
+    model = EndpointModel([-1, 0, 0], [0., .2, 0.], q, [root_mass, root_mass, 0., 1.])
+    profile = {'version': 1, 'atoms': [{'multiplier': 4., 'participation': 1., 'weight': 1.}]}
+    engine = EndpointEnrichment(model, np.arange(4), profile)
+    tips = {1: np.array([0., 1., 1., 0.]), 2: np.array([1., 0., 1., 0.])}
+
+    # Only root state 0 has both a positive prior and a path to the tips.
+    # State 2 fits both observations but has zero prior. State 3 has the
+    # remaining prior mass and cannot reach either observation.
+    change = -math.expm1(-.4) / 2
+    tilted = 4 * change / (1 + 3 * change)
+    expected = math.log(root_mass) + np.log([change, tilted])
+    np.testing.assert_allclose(engine.log_likelihoods(tips, [1], [0], [1]),
+                               expected, rtol=0., atol=2e-13)
+    assert engine.test(tips, [1], [0], [1]) == pytest.approx(
+        (change / tilted, math.log(tilted / change)), abs=2e-13, rel=0.)
+
+
 @pytest.mark.parametrize(('multiplier', 'destination', 'gain'), [(1., 1, 1.), (10., 1, 5.5), (None, 2, .5)])
 def test_partial_participation_retains_subnormal_transition_likelihood(multiplier, destination, gain):
     length = np.nextafter(0., 1.)
