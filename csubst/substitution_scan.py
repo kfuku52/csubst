@@ -2043,11 +2043,13 @@ def _rate_branch_values(
     return event_values, exposure, missing_exposure, exposure_reasons
 
 
-def _score_rate_branches(event_values, exposure, is_target, is_other, rate_exposure, impossible_indices=None):
-    target_event = float(event_values[is_target].sum())
-    other_event = float(event_values[is_other].sum())
-    target_exposure = float(exposure[is_target].sum())
-    other_exposure = float(exposure[is_other].sum())
+def _score_rate_branches(event_values, exposure, is_target, is_other, rate_exposure, impossible_indices=None,
+                         *, branch_indices=None):
+    target, other = (is_target, is_other) if branch_indices is None else branch_indices
+    target_event = float(event_values[target].sum())
+    other_event = float(event_values[other].sum())
+    target_exposure = float(exposure[target].sum())
+    other_exposure = float(exposure[other].sum())
     score, pvalue = scan_statistics.rate_score(
         x_target=target_event,
         l_target=target_exposure,
@@ -2864,16 +2866,20 @@ def _candidate_fixed_permutation_scores(
                 units_trait = scan_context['units'].loc[scan_context['units']['trait'] == trait_name, :].reset_index(drop=True)
                 other_ids = _other_branch_ids_from_maps(
                     fg_ids, trait_name, target_class, valid_branch_ids, scan_other_scope, units_df=units_trait)
-            branch_masks[branch_key] = branch_data.prepare(target_ids, other_ids)
+            _, is_target, is_other = branch_data.prepare(target_ids, other_ids)
+            # Retain branch order so indexed sums round like the masked sums.
+            branch_indices = np.flatnonzero(is_target), np.flatnonzero(is_other)
+            branch_masks[branch_key] = is_target, is_other, branch_indices
         if cache is None:
             event_values, exposure, impossible_indices = values_for(*values_key)
         else:
             event_values, exposure, impossible_indices = cache.obtain(
                 values_key, lambda: values_for(*values_key), lambda arrays: sum(array.nbytes for array in arrays),
             )
-        _, is_target, is_other = branch_masks[branch_key]
+        is_target, is_other, branch_indices = branch_masks[branch_key]
         rate, _, _ = _score_rate_branches(
             event_values, exposure, is_target, is_other, rate_exposure, impossible_indices=impossible_indices,
+            branch_indices=branch_indices,
         )
         out[row_key] = scan_statistics.calibration_score(rate)
     return out

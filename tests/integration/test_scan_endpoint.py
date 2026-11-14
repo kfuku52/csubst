@@ -143,6 +143,7 @@ def test_fixed_score_checks_cached_conflicts_against_each_assignment():
         full, _, _ = substitution_scan._score_rate_branches(events, exposure, target, other, 'endpoint')
         cached, _, _ = substitution_scan._score_rate_branches(
             events, exposure, target, other, 'endpoint', impossible_indices=conflict,
+            branch_indices=(np.flatnonzero(target), np.flatnonzero(other)),
         )
         np.testing.assert_equal(cached, full)
         if other[0]:
