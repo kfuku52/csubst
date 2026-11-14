@@ -53,6 +53,24 @@ def test_large_counts_keep_distinct_finite_scores_after_p_underflow():
     assert np.isfinite([score1, score2]).all() and score2 > score1
 
 
+@pytest.mark.parametrize('other_count,other_exposure', [(0., 2.), (0., 9.), (1e308, 10.), (1e308, 60.)])
+def test_rate_score_survives_intermediate_deviance_overflow(other_count, other_exposure):
+    args = (1e308, 1., other_count, other_exposure)
+    with localcontext() as context:
+        context.prec = 80
+        x, a, y, b = map(Decimal.from_float, args)
+        pooled = (x + y) / (a + b)
+        likelihood_ratio = x * (x / (a * pooled)).ln()
+        if y:
+            likelihood_ratio += y * (y / (b * pooled)).ln()
+        # The correction to the leading normal log-tail term is O(log D),
+        # negligible compared with D at this scale.
+        expected = float(likelihood_ratio / Decimal(10).ln())
+    score, p = stats.rate_score(*args)
+    assert score == pytest.approx(expected, rel=3e-15)
+    assert p == 0.
+
+
 def test_extreme_exposure_ratios_do_not_make_valid_scores_undefined():
     score, p = stats.rate_score(2, 1e20, 0, 1)
     assert np.isfinite(score) and p == pytest.approx(.5)

@@ -5,6 +5,7 @@ asymptotic tail below is a diagnostic, not a calibrated significance test.
 """
 
 import math
+import sys
 
 import numpy as np
 from scipy.special import log_ndtr
@@ -57,7 +58,9 @@ def rate_score(x_target, l_target, x_other, l_other):
         return 0., 1.
     log_exposure_odds = math.log(a) - math.log(b)
     if y == 0:
-        terms = x * _softplus(-log_exposure_odds)
+        target_log_ratio = _softplus(-log_exposure_odds)
+        other_log_ratio = 0.
+        terms = x * target_log_ratio
     else:
         log_count_odds = math.log(x) - math.log(y)
         gap = log_count_odds - log_exposure_odds
@@ -72,8 +75,18 @@ def rate_score(x_target, l_target, x_other, l_other):
         else:
             # Compute each allocation probability in log space to retain the
             # smaller group even when the larger probability rounds to one.
-            terms = x * (_softplus(-log_exposure_odds) - _softplus(-log_count_odds))
-            terms += y * (_softplus(log_exposure_odds) - _softplus(log_count_odds))
+            target_log_ratio = _softplus(-log_exposure_odds) - _softplus(-log_count_odds)
+            other_log_ratio = _softplus(log_exposure_odds) - _softplus(log_count_odds)
+            terms = x * target_log_ratio + y * other_log_ratio
+    if terms > sys.float_info.max / 2:
+        # At this scale the normal log tail differs from -terms by less
+        # than one float64 ulp. Compute the base-10 score without doubling
+        # the log likelihood ratio or overflowing its individual terms.
+        if math.isinf(terms):
+            scale = max(x, y)
+            scaled_terms = (x / scale) * target_log_ratio + (y / scale) * other_log_ratio
+            return scale * (scaled_terms / math.log(10)), 0.
+        return terms / math.log(10), 0.
     deviance = max(0., 2 * terms)
     log_tail = float(log_ndtr(-math.sqrt(deviance)))
     return -log_tail / math.log(10), math.exp(log_tail)
