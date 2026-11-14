@@ -132,6 +132,30 @@ def test_no_target_missing_data_and_zero_length_are_uninformative():
         engine.test({1: np.ones(2), 2: np.ones(2)}, [0], [0], [1])
 
 
+def test_largest_finite_tilt_normalizes_rows_rounded_above_one(monkeypatch):
+    model = EndpointModel([-1, 0, 0], [0., .2, 0.],
+                          np.ones((3, 3)) - 3 * np.eye(3), np.ones(3) / 3)
+    # Emulate a float64 transition row whose sum rounds slightly above one.
+    # A zero-length second edge fixes the root to state 0.
+    transition = model.transition(1, 0).copy()
+    transition[0] = [1e-20, .5, .5 + np.finfo(float).eps]
+    monkeypatch.setattr(model, 'transition', lambda child, category: transition if child == 1 else np.eye(3))
+    multiplier = float(np.finfo(float).max)
+    profile = {'version': 1, 'atoms': [{'multiplier': multiplier, 'participation': 1., 'weight': 1.}]}
+    engine = EndpointEnrichment(model, np.arange(3), profile)
+    tips = {1: np.eye(3)[1], 2: np.eye(3)[0]}
+    with localcontext() as context:
+        context.prec = 80
+        values = list(map(Decimal.from_float, transition[0]))
+        factor = Decimal.from_float(multiplier)
+        tilted = values[1] / (sum(values[1:]) + values[0] / factor)
+        expected = [math.log(values[1] / 3), math.log(tilted / 3)]
+
+    with np.errstate(over='raise'):
+        logs = engine.log_likelihoods(tips, [1], [0], [1, 2])
+    np.testing.assert_allclose(logs, expected, rtol=0., atol=4e-16)
+
+
 def test_prepare_freezes_family_before_filter_and_annotation_uses_only_tips(tmp_path):
     from csubst import scan_analytic, substitution_scan
     from scan_fixtures import make_scan_context

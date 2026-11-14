@@ -97,6 +97,7 @@ class EndpointEnrichment:
                  & (self.mapping[:, None] != self.mapping[None, :]))
         # Infinite-tilt rows are formed without infinities.
         factors = np.array([1.] + [a["multiplier"] or 1. for a in self.atoms])
+        large_tilts = np.flatnonzero(factors > np.finfo(float).max / 2)
         participation = np.array([0.] + [a["participation"] for a in self.atoms])
         conditional = np.array([False] + [a["multiplier"] is None for a in self.atoms])
         conditional_indices = np.flatnonzero(conditional)
@@ -122,9 +123,15 @@ class EndpointEnrichment:
                     targeted = child in branches
                     if targeted:
                         tilted = transition[None, :, :] * np.where(event, factors[:, None, None], 1.)
-                        tilted /= tilted.sum(axis=2, keepdims=True)
                         selected = transition * event
                         mass = selected.sum(axis=1, keepdims=True)
+                        if large_tilts.size:
+                            # Halve rows whose matching mass could push their sum
+                            # out of range, preserving their relative weights.
+                            heavy_rows = mass[:, 0] > .5
+                            for index in large_tilts:
+                                tilted[index, heavy_rows] *= .5
+                        tilted /= tilted.sum(axis=2, keepdims=True)
                         # If the null gives this row zero event probability
                         # (e.g. zero branch length), every finite tilt is the
                         # original row, so its limit is also the original row.
