@@ -147,7 +147,8 @@ def _conditioned_bridge_mass(q, length, a, b, denom, v, w, integrals, diagonal):
         mass = x @ y.swapaxes(1, 2)
     else:
         coefficients = left_message[:, :, None] * right_message[:, None, :] * integrals
-        mass = (w.T @ coefficients) @ v.T
+        # Use one matrix multiplication for the right transform across sites.
+        mass = (((w.T @ coefficients).reshape(-1, len(q))) @ v.T).reshape(coefficients.shape)
     mass *= q
     mass[:, diagonal, diagonal] = 0
     # Cancellation can dominate the spectral result when evidence is small.
@@ -176,6 +177,12 @@ def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
     values, v, w = _bridge_spectral(q, pi)
     state_diagonal = np.arange(len(q))
     group_diagonal = np.arange(projection.shape[1])
+    group_events = partial(_group_bridge_events, projection, group_diagonal)
+    if synonymous_mask is not None:
+        syn_from, syn_to = np.nonzero(synonymous_mask)
+        syn_weights = synonymous_mask[syn_from, syn_to]
+        if np.all(syn_weights == 1):
+            syn_weights = None
 
     @lru_cache(maxsize=max(1, (32 * 1024**2) // q.nbytes))
     def integral_at(length):
@@ -197,8 +204,7 @@ def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
         mass = _conditioned_bridge_mass(q, length, a, right, denom, v, w, integral_at(length), state_diagonal)
         np.maximum(mass, 0, out=mass)
         mass *= category_weight[:, None, None]
-        events = (projection.T @ mass) @ projection
-        events[:, group_diagonal, group_diagonal] = 0
+        events = group_events(mass)
         if partial:
             grouped = np.zeros((len(active), projection.shape[1], projection.shape[1]))
             grouped[active] = events
@@ -206,7 +212,10 @@ def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
             grouped = events
         result = {'events': grouped}
         if synonymous_mask is not None:
-            values = np.einsum("sij,ij->s", mass, synonymous_mask)
+            pairs = mass[:, syn_from, syn_to]
+            if syn_weights is not None:
+                pairs *= syn_weights
+            values = pairs.sum(axis=1)
             if partial:
                 synonymous = np.zeros(len(active))
                 synonymous[active] = values
@@ -216,6 +225,14 @@ def _mixture_bridge_transform(q, pi, projection, synonymous_mask):
         return result
 
     return transform
+
+
+def _group_bridge_events(projection, diagonal, mass):
+    # Project destinations in one matrix multiplication across the site axis.
+    by_destination = mass.reshape(-1, projection.shape[0]) @ projection
+    events = projection.T @ by_destination.reshape(len(mass), *projection.shape)
+    events[:, diagonal, diagonal] = 0
+    return events
 
 
 def _endpoint_model(nodes, n, q, pi, rates, weights):
@@ -432,9 +449,7 @@ def _bridge_infer(tree, tip_states, q, pi, groups, block_size, summaries, disk_b
                 np.maximum(mass, 0, out=mass)
                 if summaries is not None:
                     summaries["synonymous_counts"][child] += np.einsum("sij,ij->", mass, summaries["synonymous_mask"])
-                grouped = (projection.T @ mass) @ projection
-                grouped[:, group_diagonal, group_diagonal] = 0
-                events[child, :, 0] = grouped
+                events[child, :, 0] = _group_bridge_events(projection, group_diagonal, mass)
         if disk_backed:
             tensor.write_block(start, event_buffer[:size])
     if disk_backed:
