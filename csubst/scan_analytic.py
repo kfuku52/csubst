@@ -91,6 +91,8 @@ class EndpointEnrichment:
                     if tip.shape != model.pi.shape or not np.isfinite(tip).all() or np.any(tip < 0):
                         raise ValueError('Invalid leaf observation likelihood.')
                     value *= tip
+                messages = []
+                rare = None
                 for child in model.children[node]:
                     transition = model.transition(child, category)
                     if child in branches:
@@ -106,16 +108,35 @@ class EndpointEnrichment:
                                 np.divide(selected, mass, out=tilted[index], where=mass > 0)
                         tilted = (participation[:, None, None] * tilted
                                   + (1 - participation[:, None, None]) * transition)
-                        value *= np.einsum('aij,aj->ai', tilted, partial.pop(child))
+                        message = np.einsum('aij,aj->ai', tilted, partial.pop(child))
                     else:
-                        value *= partial.pop(child) @ transition.T
-                    scale += scales.pop(child)
+                        message = partial.pop(child) @ transition.T
+                    child_scale = scales.pop(child)
+                    messages.append((message, child_scale))
+                    value *= message
+                    scale += child_scale
                     normalizer = value.max(axis=1)
+                    if normalizer.min() < endpoint._PRUNING_LOG_THRESHOLD:
+                        small = (normalizer < endpoint._PRUNING_LOG_THRESHOLD) & np.isfinite(scale)
+                        if small.any():
+                            rare = small if rare is None else rare | small
                     # A zero likelihood is legitimate for an impossible category.
                     positive = normalizer > 0
                     value[positive] /= normalizer[positive, None]
                     with np.errstate(divide='ignore'):
                         scale += np.log(normalizer)
+                if rare is not None:
+                    # Recover states lost in any intermediate sibling
+                    # product and compute the scale from the original messages.
+                    log_value = np.zeros_like(value[rare])
+                    log_scale = np.zeros_like(scale[rare])
+                    with np.errstate(divide='ignore'):
+                        for message, child_scale in messages:
+                            log_value += np.log(message[rare])
+                            log_scale += child_scale[rare]
+                    maximum = log_value.max(axis=1)
+                    value[rare] = np.exp(log_value - np.where(np.isfinite(maximum), maximum, 0.)[:, None])
+                    scale[rare] = log_scale + maximum
                 partial[node], scales[node] = value, scale
             with np.errstate(divide='ignore'):
                 likelihoods.append(np.log(partial[model.root] @ model.pi) + scales[model.root] + math.log(weight))

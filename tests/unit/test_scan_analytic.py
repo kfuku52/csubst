@@ -1,4 +1,5 @@
 from itertools import product
+import math
 
 import numpy as np
 import pytest
@@ -59,6 +60,25 @@ def test_family_includes_unreported_hypotheses_and_by_dependence_factor():
         family_size(1, 20, 1, 1, ['dif2spe'])
     with pytest.raises(ValueError):
         adjusted_pvalues([np.nan], 10)
+
+
+def test_analytical_likelihood_retains_all_root_states_in_rare_sibling_products():
+    length = 1e-170
+    model = EndpointModel([-1, 0, 0, 0], [0., length, length, length],
+                         np.ones((3, 3)) - 3 * np.eye(3), np.ones(3) / 3,
+                         rates=[0., 1.], weights=[.5, .5])
+    profile = {'version': 1, 'atoms': [{'multiplier': 4., 'participation': 1., 'weight': 1.}]}
+    engine = EndpointEnrichment(model, np.arange(3), profile)
+    tips = {i: np.eye(3)[i - 1] for i in (1, 2, 3)}
+
+    # The invariant class is impossible. Each root state contributes two
+    # O(length) changes, with the same leading coefficient under the null.
+    # Tilting 0 -> 2 on edge 3 multiplies only the root-0 term by four.
+    expected_null = math.log(.5) + 2 * math.log(length)
+    expected_alternative = 2 * math.log(length)
+    np.testing.assert_allclose(engine.log_likelihoods(tips, [3], [0], [2]),
+                               [expected_null, expected_alternative], rtol=0., atol=2e-13)
+    assert engine.test(tips, [3], [0], [2]) == pytest.approx((.5, math.log(2.)), abs=2e-13, rel=0.)
 
 
 def test_no_target_missing_data_and_zero_length_are_uninformative():

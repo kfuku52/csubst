@@ -37,7 +37,9 @@ Each multiplier defines a probability distribution `Pa(D)` on the same data.
 They enrich endpoints; they are not fitted branch-rate multipliers in a CTMC Q.
 
 Scaled tree pruning computes the null and four alternative likelihoods,
-summing over shared ancestors and the site-wide rate category. It uses tip
+summing over shared ancestors and the site-wide rate category. It recomputes
+exceptionally small sibling likelihood products in log space to preserve
+the contributions of competing ancestral states. It uses tip
 observations, not reconstructed ancestral marginals or called substitutions.
 Missing tips contribute an all-ones likelihood vector. Foreground branches
 come from the topology and phenotype-defined clades, including branches with
