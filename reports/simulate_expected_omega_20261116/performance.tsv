@@ -1,0 +1,13 @@
+site_rates	version	repetition	wall_seconds	peak_rss_mib
+uniform	before	1	5.36	448.17
+uniform	before	2	3.35	430.98
+uniform	before	3	3.42	428.95
+uniform	final	1	3.52	321.11
+uniform	final	2	2.96	318.53
+uniform	final	3	2.92	318.20
+asrv	before	1	16.87	704.88
+asrv	before	2	17.88	684.19
+asrv	before	3	16.49	709.16
+asrv	final	1	8.63	657.47
+asrv	final	2	9.06	651.66
+asrv	final	3	9.06	657.94

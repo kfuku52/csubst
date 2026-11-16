@@ -1,0 +1,5 @@
+dataset	scenario	seed	omega_sim	variant	zero_frequency_codons	min_positive_frequency	omega_iqtree	omega_profile	log_likelihood_reported	log_likelihood_replayed	log_likelihood_profile	log_likelihood_gain
+PGK	baseline	101	0.2868049488	freq_floor	0	0.0002331002331	0.286743777	0.2866947687	-8617.905	-8617.90496	-8617.904958	2.862301699e-06
+PGK	baseline	202	0.2868049488	freq_floor	0	0.0001	0.2845938391	0.284590618	-8621.3093	-8621.309281	-8621.309281	1.02645572e-08
+PGK	baseline	404	0.2868049488	freq_floor	0	0.0001	0.2907197292	0.2908087528	-8854.5631	-8854.563079	-8854.563069	9.345760191e-06
+PGK	strong_constraint	303	0.0717012372	freq_floor	0	0.0001	0.05876783103	0.05876778574	-7668.8164	-7668.816424	-7668.816424	-1.03682396e-10
