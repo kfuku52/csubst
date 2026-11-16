@@ -93,6 +93,8 @@ null sensitivity analyses, see [long-tail calibration](docs/LONGTAIL_CALIBRATION
 
 Analysis commands default to [joint endpoint posteriors](docs/ENDPOINT_POSTERIORS.md).
 Use `--substitution_posterior marginal` for the legacy estimator.
+For exact observed `any2spe` counts across two branches, use
+`search --pair_posterior joint --output_stat any2spe`.
 For new fits, `search` and `benchmark` default to `ECMK07_GY0K+F+R4`, which
 estimates one nonsynonymous rate multiplier for the alignment.
 

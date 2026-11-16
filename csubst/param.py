@@ -1028,6 +1028,16 @@ def _normalize_output_parameters(g: dict[str, Any]) -> dict[str, Any]:
     g['output_stat'] = ','.join(g['output_stats'])
     g['output_base_stats'] = output_stat.get_required_base_stats(g['output_stats'])
     g['output_dif_stats'] = output_stat.get_required_dif_stats(g['output_stats'])
+    if g.get('pair_posterior') == 'joint':
+        required = {'substitution_posterior': 'joint', 'expectation_method': 'codon_model', 'output_stat': 'any2spe',
+                    'max_arity': 2, 'nonsyn_recode': 'no', 'min_sub_pp': 0, 'cb': True}
+        for key, value in required.items():
+            if g[key] != value:
+                label = 'yes' if value is True else value
+                raise ValueError('--pair_posterior joint requires --{} {}.'.format(key, label))
+        for key in ('cs', 'cbs', 'site_filter_report', 'calibrate_longtail', 'fg_clade_permutation'):
+            if g.get(key):
+                raise ValueError('--pair_posterior joint is incompatible with --{}.'.format(key))
     if 'cutoff_stat' in g.keys():
         if str(g['cutoff_stat']) == output_stat.DEFAULT_CUTOFF_STAT:
             adjusted = output_stat.get_default_cutoff_stat_for_output_stats(g['output_stats'])

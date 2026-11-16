@@ -666,6 +666,8 @@ def _input_fingerprint(g):
                 'calc_omega_pvalue', 'asrv_report', 'epistasis_requested', 'asrv_training_branches', 'asrv_posterior_draws',
                 'site_filter_report', 'fg_clade_permutation', 'max_synonymous_size'):
         digest.update(str((key, g.get(key))).encode())
+    if g.get('pair_posterior') == 'joint':
+        digest.update(b'joint_observed_any2spe')
     return digest.hexdigest()
 
 
@@ -696,9 +698,29 @@ def prepare(g):
                          'branch_combinations': 'factorized_edge_scores',
                          'block_size': int(g.get('endpoint_block_size', 64)),
                          'codon_parameter_precision': g.get('fitted_model_provenance', 'provided_model_matrix')})
+        if g.get('pair_posterior') == 'joint':
+            manifest['branch_combinations'] = 'joint_observed_any2spe'
+            manifest['pair_block_size'] = min(4, int(g.get('endpoint_block_size', 64)))
         with open(runtime.output_path(g, 'endpoint_model.json'), 'w') as handle:
             json.dump(manifest, handle, indent=2)
             handle.write('\n')
+
+
+def observed_pair_counts(g, pairs):
+    """Use the same fitted endpoint model and observation masks as the edge tensors."""
+    from csubst.endpoint_pair import count_any2spe
+
+    source = g['state_cdn']
+    parents, lengths = _tree_arrays(g, structural=False)
+    rates, weights = model_rates(g)
+    pi = g.get('equilibrium_frequency', g.get('empirical_eq_freq'))
+    model = endpoint.EndpointModel(parents, lengths, g['instantaneous_codon_rate_matrix'], pi, rates, weights)
+    observed, eligible = fitted_model.observation_masks(g['tree'], source)
+    tips = {leaf: source[leaf] for leaf in model.leaves}
+    missing = {leaf: ~observed[leaf] for leaf in model.leaves}
+    amino = _mapping(g, 'AA', len(pi)).argmax(axis=1)
+    size = min(4, int(g.get('endpoint_block_size', 64)))
+    return count_any2spe(model, tips, amino, pairs, size, tip_missing=missing, eligible=eligible)
 
 
 def invalidate(g):

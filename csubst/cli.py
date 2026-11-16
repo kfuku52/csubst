@@ -1340,6 +1340,10 @@ def _register_search_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_analyze, psr
     analyze = subparsers.add_parser('search', aliases=['analyze'], help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_analyze])
     analyze.set_defaults(handler=command_search)
     _add_search_subcommand_args(analyze, show_advanced=show_advanced)
+    analyze.add_argument('--pair_posterior', choices=['separate', 'joint'], default='separate',
+                         help='default=%(default)s: Compute observed any2spe counts using separate branch '
+                              'probabilities or their joint posterior. Joint requires --output_stat any2spe '
+                              'and --max_arity 2. Expected counts use the selected fitted codon model as usual.')
 
 
 def _register_inspect_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_inspect, psr_output_manifest, psr_rc, psr_treeplot, show_advanced, subparsers):

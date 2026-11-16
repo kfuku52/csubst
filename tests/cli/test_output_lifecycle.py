@@ -55,6 +55,34 @@ def doctor_inputs(tmp_path):
             '--outdir', str(tmp_path), '--check_iqtree_exe', 'no']
 
 
+def test_search_pair_joint_changes_observed_counts_only(tmp_path, tiny_fit):
+    import numpy as np
+    import pandas as pd
+
+    inputs, _ = tiny_fit
+    base = ['search', *inputs, '--output_stat', 'any2spe', '--exclude_sister_pair', 'no', '--float_digit', '12']
+    frames = {}
+    for mode in ('separate', 'joint'):
+        result = run_csubst([*base, '--pair_posterior', mode, '--outdir', mode], tmp_path)
+        assert result.returncode == 0, result.stderr
+        out = tmp_path / mode
+        manifest = json.loads((out / 'csubst_endpoint_model.json').read_text())
+        assert manifest['branch_combinations'] == {'separate': 'factorized_edge_scores',
+                                                   'joint': 'joint_observed_any2spe'}[mode]
+        assert json.loads((out / 'csubst_search_run.json').read_text())['status'] == 'complete'
+        frames[mode] = pd.read_csv(out / 'csubst_cb_2.tsv', sep='\t')
+    ids_and_expected = ['branch_id_1', 'branch_id_2', 'ECNany2spe', 'ECSany2spe']
+    pd.testing.assert_frame_equal(frames['separate'][ids_and_expected], frames['joint'][ids_and_expected])
+    assert not np.allclose(frames['separate']['OCSany2spe'], frames['joint']['OCSany2spe'])
+
+
+def test_search_pair_joint_rejects_unavailable_combination_statistics(tmp_path, tiny_fit):
+    inputs, _ = tiny_fit
+    result = run_csubst(['search', *inputs, '--pair_posterior', 'joint'], tmp_path)
+    assert result.returncode == 2
+    assert '--pair_posterior joint requires --output_stat any2spe' in result.stderr
+
+
 @pytest.mark.parametrize('command,program', [('sites', 'mmseqs'), ('search', 'blastp')])
 def test_local_besthit_failure_never_submits_query(command, program, tiny_fit, tmp_path, monkeypatch):
     from csubst import cli

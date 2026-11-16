@@ -360,12 +360,27 @@ uses one warmup and three measurements per condition, and verifies all captured
 unrounded output tables and branch/cutoff decisions. `--profile` instead runs
 one diagnostic baseline profile per condition; it is separate from timing runs.
 
-## Remaining statistical scope
+## Joint observed counts for branch pairs
 
-CB/CS/CBS still multiply per-branch scores. Exact single-edge joints do not make
-that product a joint posterior across branches. Endpoints also do not count
-multiple hits or reversions. Whole-tree posterior sampling and stochastic
-mapping are separate extensions, not enabled by this option.
+`csubst search --pair_posterior joint --output_stat any2spe` integrates one
+state at the common ancestor and one rate category for each site when
+computing `OCNany2spe` and `OCSany2spe` in `cb_2.tsv`. It computes `dNC`,
+`dSC`, and `omegaC` from these observed totals and the usual fitted
+codon-model expected totals. The default `--pair_posterior separate`
+multiplies the per-branch event probabilities as before.
+
+Joint pairs require unthresholded, unreduced codon analysis with
+`--substitution_posterior joint`, `--expectation_method codon_model`,
+`--max_arity 2`, and `--cb yes`. The pair option does not support `--cs`,
+`--cbs`, `--site_filter_report`, `--calibrate_longtail`, or foreground clade
+permutations. Single-branch and single-site summaries retain their usual
+interpretation. Sister-pair eligibility is controlled by `--exclude_sister_pair`.
+The endpoint manifest records `branch_combinations: joint_observed_any2spe`
+and the pair site block size (four by default, or a smaller positive
+`--endpoint_block_size`). See the [joint-pair timing report](../reports/omega_low_count_20261116/PAIR_PATH_COMPOSITION.md).
+
+Both estimators count changes between endpoints. Multiple hits and
+reversions within an edge require stochastic mapping.
 
 Related methods: [SubRecon](https://doi.org/10.1093/bioinformatics/bty101) for
 adjacent-node joint probabilities and [Minin & Suchard](https://doi.org/10.1007/s00285-007-0120-8)

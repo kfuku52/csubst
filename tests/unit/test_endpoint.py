@@ -6,6 +6,7 @@ import pytest
 from scipy.linalg import expm
 
 from csubst.endpoint import EndpointModel
+from csubst.endpoint_pair import count_any2spe
 
 
 def enumerate_model(parents, lengths, q, pi, tips, rates, weights):
@@ -36,6 +37,58 @@ def enumerate_model(parents, lengths, q, pi, tips, rates, weights):
         edges[child] /= norm[:, None, None]
         prediction[child] /= norm[:, None, None]
     return nodes, edges, prediction, np.log(norm)
+
+
+def test_pair_any2spe_matches_enumeration_with_missing_events():
+    parents = [-1, 0, 1, 1, 0]
+    lengths = [0., .3, .7, .2, .5]
+    pi = np.array([.2, .3, .5])
+    q = np.tile(pi, (3, 1)) - np.eye(3)
+    rates, weights = [0., .2, 2.], [.2, .4, .4]
+    tips = {2: np.array([[1., 1., 0.], [0., 0., 0.], [1., 0., 0.]]),
+            3: np.eye(3)[[0, 2, 1]], 4: np.eye(3)[[0, 2, 0]]}
+    missing = {2: np.array([False, True, False])}
+    eligible = np.ones((len(parents), 3), dtype=bool)
+    eligible[2] = ~missing[2]
+    pairs = [(2, 3), (2, 4), (1, 4), (3, 4)]
+    amino = np.array([0, 0, 1])
+    states = np.array(list(itertools.product(range(3), repeat=len(parents))))
+    mass = np.zeros((len(states), 3))
+    for rate, weight in zip(rates, weights):
+        prior = weight * pi[states[:, 0]]
+        for child in range(1, len(parents)):
+            p = expm(q * lengths[child] * rate)
+            prior *= p[states[:, parents[child]], states[:, child]]
+        likelihood = np.broadcast_to(prior[:, None], mass.shape).copy()
+        for leaf, emissions in tips.items():
+            rows = np.where(missing[leaf][:, None], 1., emissions) if leaf in missing else emissions
+            likelihood *= rows[:, states[:, leaf]].T
+        mass += likelihood
+    posterior = mass / mass.sum(axis=0)
+    expected = []
+    for a, b in pairs:
+        aa, ab = states[:, parents[a]], states[:, parents[b]]
+        da, db = states[:, a], states[:, b]
+        ena, enb = amino[aa] != amino[da], amino[ab] != amino[db]
+        n = ena & enb & (amino[da] == amino[db])
+        s = ~ena & ~enb & (da == db) & (aa != da) & (ab != db)
+        expected.append([posterior[event][:, eligible[a] & eligible[b]].sum() for event in (n, s)])
+    model = EndpointModel(parents, lengths, q, pi, rates, weights)
+    for block_size in (1, 2, 4):
+        values = count_any2spe(model, tips, amino, pairs, block_size, tip_missing=missing, eligible=eligible)
+        np.testing.assert_allclose(values, expected, atol=2e-14, rtol=0)
+
+
+def test_pair_any2spe_compresses_called_patterns_with_explicit_tip_masks():
+    pi = np.array([.2, .3, .5])
+    q = np.tile(pi, (3, 1)) - np.eye(3)
+    model = EndpointModel([-1, 0, 0], [0., .6, .3], q, pi)
+    tips = {1: np.eye(3)[[0, 0, 1, 0]], 2: np.eye(3)[[0, 0, 1, 0]]}
+    amino = np.array([0, 0, 1])
+    expected = count_any2spe(model, tips, amino, [(1, 2)], 2)
+    masks = {leaf: np.zeros(4, dtype=bool) for leaf in tips}
+    actual = count_any2spe(model, tips, amino, [(1, 2)], 2, tip_missing=masks)
+    np.testing.assert_array_equal(actual, expected)
 
 
 @pytest.mark.parametrize('block_size', [1, 2, 64])

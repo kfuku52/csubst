@@ -137,6 +137,23 @@ def _select_high_order_candidates(cb, g):
     return selected.loc[:, list(dict.fromkeys(columns + stat_columns))].reset_index(drop=True)
 
 
+def _get_observed_cb(g, id_combinations, OS_tensor, ON_tensor):
+    if g.get('pair_posterior') == 'joint':
+        from csubst import endpoint_io
+
+        print('Preparing joint observed any2spe counts for {:,} branch pairs.'.format(len(id_combinations)), flush=True)
+        counts = endpoint_io.observed_pair_counts(g, id_combinations)
+        cb = pd.DataFrame(id_combinations, columns=['branch_id_1', 'branch_id_2'])
+        cb['OCSany2spe'], cb['OCNany2spe'] = counts[:, 1], counts[:, 0]
+        return table.set_substitution_dtype(table.sort_branch_ids(cb))
+    tables = []
+    for attr, tensor in (('OCS', OS_tensor), ('OCN', ON_tensor)):
+        print('Preparing {} table with up to {:,} process(es).'.format(attr, g['threads']), flush=True)
+        tables.append(substitution.get_cb(id_combinations, tensor, g, attr,
+                                          selected_base_stats=g.get('output_base_stats')))
+    return table.merge_tables(*tables)
+
+
 def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
     if int(g['max_arity']) < 2:
         raise ValueError('--max_arity should be >= 2.')
@@ -196,24 +213,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             txt = 'Arity (K) = {:,}: No eligible independent branch combinations remain. Ending higher-order search at K = {:,}.'
             print(txt.format(current_arity, current_arity))
             break
-        print('Preparing OCS table with up to {:,} process(es).'.format(g['threads']), flush=True)
-        cbOS = substitution.get_cb(
-            id_combinations,
-            OS_tensor_reducer,
-            g,
-            'OCS',
-            selected_base_stats=g.get('output_base_stats'),
-        )
-        print('Preparing OCN table with up to {:,} process(es).'.format(g['threads']), flush=True)
-        cbON = substitution.get_cb(
-            id_combinations,
-            ON_tensor_reducer,
-            g,
-            'OCN',
-            selected_base_stats=g.get('output_base_stats'),
-        )
-        cb = table.merge_tables(cbOS, cbON)
-        del cbOS, cbON
+        cb = _get_observed_cb(g, id_combinations, OS_tensor_reducer, ON_tensor_reducer)
         cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='OC', output_stats=g.get('output_stats'))
         cb, g = omega.calc_omega(cb, OS_tensor_reducer, ON_tensor_reducer, g)
         if bool(g.get('epistasis_enabled', False)):
