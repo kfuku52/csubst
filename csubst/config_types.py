@@ -41,6 +41,7 @@ class OutputConfig(TypedDict, total=False):
     iqtree_outdir: str
     float_format: str
     float_digit: int
+    export_expected_omega: bool
 
 
 class NumericConfig(TypedDict, total=False):

@@ -773,16 +773,17 @@ def _make_common_parser(show_advanced):
     return psr_co
 
 
-def _make_iqtree_parser(show_advanced):
+def _make_iqtree_parser(show_advanced, default_model='ECMK07+F+R4'):
     psr_iq = argparse.ArgumentParser(add_help=False)
     psr_iq.add_argument('--iqtree_exe', metavar='PATH', default='iqtree', type=str, required=False,
                         help='default=%(default)s: PATH to the IQ-TREE executable')
     psr_iq.add_argument('--iqtree_outdir', metavar='PATH', default='csubst_iqtree', type=str, required=False,
                         help='default=%(default)s: Shared directory used when --iqtree_* paths are "infer".')
-    psr_iq.add_argument('--iqtree_model', metavar='STR', default='ECMK07+F+R4', type=str, required=False,
+    psr_iq.add_argument('--iqtree_model', metavar='STR', default=default_model, type=str, required=False,
                         help='default=%(default)s: Codon substitution model for ancestral state reconstruction. '
                              'An explicitly supplied complete fit keeps its reported model unless --iqtree_redo yes. '
                              'Base models of "MG", "GY", "ECMK07", and "ECMrest" are supported. '
+                             '"ECMK07_GY0K+F" estimates one nonsynonymous multiplier on ECMK07. '
                              'Among-site rate heterogeneity and codon frequencies can be specified. '
                              'See here for details: https://iqtree.github.io/doc/Substitution-Models')
     psr_iq.add_argument('--iqtree_redo', metavar='yes|no', default='no', type=strtobool,
@@ -1082,10 +1083,9 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
                                '"randomN" specifies randomly selected N amino acids. '
                                '"random0" does not cause convergence.')
     simulate.add_argument('--percent_biased_sub', metavar='FLOAT', default=90, type=float,
-                          help='default=%(default)s: Approximately this percentage of nonsynonymous substitutions '
-                               'in the foreground branches/sites are biased toward amino acids specified by '
-                               '--convergent_amino_acids, while preserving the original relative codon frequencies '
-                               'among the synonymous codons.')
+                          help='default=%(default)s: Controls the enrichment of nonsynonymous Q rates '
+                               'toward the target amino acids. Zero still applies the historical enrichment; '
+                               'use --convergent_amino_acids random0 to disable directional bias.')
     simulate.add_argument('--simulate_seed', metavar='INT', default=-1, type=int,
                           help='default=%(default)s: Random seed for simulation. '
                                'Set -1 to use non-deterministic seed.')
@@ -1094,7 +1094,7 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
                           help='default=%(default)s: Among-site rate variation mode for simulation. '
                                '"no" uses a single-rate process across sites. '
                                '"file" applies site rates from IQ-TREE .rate '
-                               '(C_Rate if present, otherwise Rate) to pyvolve per site.')
+                               '(Rate if present, otherwise C_Rate) to Pyvolve per site.')
     simulate.add_argument('--simulate_eq_freq', metavar='auto|iqtree|alignment', default='auto', type=str,
                           choices=['auto', 'iqtree', 'alignment'],
                           help='default=%(default)s: Source of codon equilibrium frequencies for simulation Q. '
@@ -1104,6 +1104,9 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
     simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
                           help='default=%(default)s: Export true ancestral-state bundle from simulation '
                                '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for search-time evaluation.')
+    simulate.add_argument('--export_expected_omega', metavar='yes|no', default='no', type=strtobool,
+                          help='default=%(default)s: Export Q-based expected omegaCany2spe for independent '
+                               'branch pairs, with realized counts when true ASR is exported.')
     simulate.add_argument('--true_asr_prefix', metavar='PATH_PREFIX', default='', type=str,
                           help='default=infer from --outdir/--output_prefix: Output path prefix for true-ASR bundle files.')
     simulate.set_defaults(handler=command_simulate)
@@ -1413,6 +1416,7 @@ def _build_parser(show_advanced=False):
 
     # shared: IQ-TREE inputs
     psr_iq = _make_iqtree_parser(show_advanced)
+    psr_iq_search = _make_iqtree_parser(show_advanced, default_model='ECMK07_GY0K+F+R4')
 
     # shared: Ancestral_state
     psr_as = _make_ancestral_parser()
@@ -1436,7 +1440,7 @@ def _build_parser(show_advanced=False):
 
     _register_scan_parser(psr_as, psr_co, psr_fg_scan, psr_iq, psr_out_scan, psr_rc, psr_treeplot, show_advanced, subparsers)
 
-    _register_benchmark_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_benchmark, psr_output_manifest, psr_rc, show_advanced, subparsers)
+    _register_benchmark_parser(psr_as, psr_co, psr_fg, psr_iq_search, psr_out_benchmark, psr_output_manifest, psr_rc, show_advanced, subparsers)
 
     _register_benchmark_plot_parser(psr_out_benchmark_plot, psr_output_manifest, subparsers)
 
@@ -1444,7 +1448,7 @@ def _build_parser(show_advanced=False):
 
     _register_sites_parser(psr_as, psr_co, psr_iq, psr_out_sites, psr_output_manifest, psr_rc, psr_treeplot, show_advanced, subparsers)
 
-    _register_search_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_analyze, psr_rc, show_advanced, subparsers)
+    _register_search_parser(psr_as, psr_co, psr_fg, psr_iq_search, psr_out_analyze, psr_rc, show_advanced, subparsers)
 
     _register_inspect_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_inspect, psr_output_manifest, psr_rc, psr_treeplot, show_advanced, subparsers)
     for subparser in set(subparsers.choices.values()):

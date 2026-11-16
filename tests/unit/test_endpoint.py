@@ -35,7 +35,7 @@ def enumerate_model(parents, lengths, q, pi, tips, rates, weights):
     for child in edges:
         edges[child] /= norm[:, None, None]
         prediction[child] /= norm[:, None, None]
-    return nodes, edges, prediction
+    return nodes, edges, prediction, np.log(norm)
 
 
 @pytest.mark.parametrize('block_size', [1, 2, 64])
@@ -48,8 +48,11 @@ def test_joint_and_prediction_match_exhaustive_assignments(block_size, rates, we
     tips = {2: np.array([[1., 0, 0], [0, 1, 0], [1, 1, 1]]),
             3: np.array([[0., 1, 0], [0, 1, 0], [1, 1, 1]]),
             4: np.array([[1., 1, 0], [.1, .5, .8], [1, 1, 1]])}
-    nodes, edges, predictions = enumerate_model(parents, lengths, q, pi, tips, rates, weights)
+    nodes, edges, predictions, log_likelihood = enumerate_model(parents, lengths, q, pi, tips, rates, weights)
     model = EndpointModel(parents, lengths, q, pi, rates, weights)
+    evidence = list(model.iter_blocks(tips, block_size=block_size, likelihood_only=True))
+    assert all(record.child == model.root for record in evidence)
+    np.testing.assert_allclose(np.concatenate([r.site_log_likelihood for r in evidence]), log_likelihood, atol=2e-14)
     for record in model.iter_blocks(tips, block_size=block_size, predictive=True):
         sl = slice(record.start, record.stop)
         np.testing.assert_allclose(record.node, nodes[record.child, sl], atol=2e-14, rtol=0)
@@ -146,7 +149,7 @@ def test_transformed_selected_and_unselected_edges_match_enumeration(predictive,
     tips = {2: np.array([[1., 0, 0], [0, 1, 0], [1, 1, 1]]),
             3: np.array([[0., 1, 0], [0, 1, 0], [1, 1, 1]]),
             4: np.array([[1., 1, 0], [.1, .5, .8], [1, 1, 1]])}
-    nodes, edges, predictions = enumerate_model(parents, lengths, q, pi, tips, rates, weights)
+    nodes, edges, predictions, _ = enumerate_model(parents, lengths, q, pi, tips, rates, weights)
     prediction_calls = []
 
     def full(left, right, transition):

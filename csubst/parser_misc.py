@@ -372,6 +372,8 @@ def _all_iqtree_intermediate_paths_are_explicit(g):
 
 def generate_intermediate_files(g, force_notree_run=False):
     if g['infile_type'] == 'iqtree':
+        from csubst import fitted_model, iqtree_fit
+        previous_omega_check = None
         g,all_exist = parser_iqtree.check_intermediate_files(g)
         if (all_exist)&(not g['iqtree_redo']):
             explicit_paths = _all_iqtree_intermediate_paths_are_explicit(g)
@@ -395,16 +397,27 @@ def generate_intermediate_files(g, force_notree_run=False):
                     print('Using the model in the explicitly supplied IQ-TREE fit: {}. Use --iqtree_redo to refit.'.format(iqtree_model))
                     return g
                 if iqtree_model == g['iqtree_model']:
-                    txt = 'The model in the IQ-TREE\'s output ({}) matched --iqtree_model ({}). Skipping IQ-TREE.'
+                    can_reuse = True
+                    if iqtree_fit.checks_hybrid_omega(g):
+                        can_reuse = fitted_model.checkpoint_path(g['path_iqtree_state']).is_file()
+                        if can_reuse:
+                            previous_omega_check = iqtree_fit.audit_hybrid_omega(g)
+                            can_reuse = previous_omega_check is None or not previous_omega_check.stalled
+                        else:
+                            print('The inferred ECMK07 hybrid fit lacks a checkpoint. Refitting IQ-TREE.')
+                    if can_reuse:
+                        txt = 'The model in the IQ-TREE\'s output ({}) matched --iqtree_model ({}). Skipping IQ-TREE.'
+                        print(txt.format(iqtree_model, g['iqtree_model']))
+                        return g
+                else:
+                    txt = 'The model in the IQ-TREE\'s output ({}) did not match --iqtree_model ({}). Redoing IQ-TREE.'
                     print(txt.format(iqtree_model, g['iqtree_model']))
-                    return g
-                txt = 'The model in the IQ-TREE\'s output ({}) did not match --iqtree_model ({}). Redoing IQ-TREE.'
-                print(txt.format(iqtree_model, g['iqtree_model']))
         if (all_exist)&(g['iqtree_redo']):
             print('--iqtree_redo is set.')
         print('Starting IQ-TREE to estimate parameters and ancestral states.', flush=True)
         parser_iqtree.check_iqtree_dependency(g)
-        parser_iqtree.run_iqtree_ancestral(g, force_notree_run=force_notree_run)
+        parser_iqtree.run_iqtree_ancestral(g, force_notree_run=force_notree_run,
+                                         previous_omega_check=previous_omega_check)
     else:
         raise ValueError('Unsupported infile_type: {}'.format(g['infile_type']))
     return g
@@ -431,12 +444,19 @@ def read_input(g, state_metadata_only=False):
     print(txt.format(base_model))
     txt = 'Transition matrix will be generated using the model in the ancestral state reconstruction: {}'
     print(txt.format(g['substitution_model']))
+    if g['substitution_model'].startswith(('ECMK07_', 'ECMrest_')):
+        endpoint_io.validate_codon_model(g['substitution_model'])
     if (g['substitution_model'].startswith('ECMK07')):
         matrix_file = 'substitution_matrix/ECMunrest.dat'
         g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
         g['exchangeability_eq_freq'] = read_exchangeability_eq_freq(file=matrix_file, g=g)
         g['empirical_eq_freq'] = get_equilibrium_frequency(g, mode='cdn')
-        g['instantaneous_codon_rate_matrix'] = exchangeability2Q(g['exchangeability_matrix'], g['empirical_eq_freq'])
+        if g['substitution_model'].split('+', 1)[0] != 'ECMK07_GY0K':
+            g['instantaneous_codon_rate_matrix'] = exchangeability2Q(
+                g['exchangeability_matrix'], g['empirical_eq_freq'],
+            )
+        # The hybrid's multiplier is loaded by fitted_model.prepare below.
+        # IQ-TREE reports omega_E (a derived ratio) in the text files.
     elif (g['substitution_model'].startswith('ECMrest')):
         matrix_file = 'substitution_matrix/ECMrest.dat'
         g['exchangeability_matrix'] = read_exchangeability_matrix(matrix_file, g['codon_orders'])
@@ -632,6 +652,29 @@ def exchangeability2Q(ex, eq):
     inst = scale_instantaneous_rate_matrix(inst, eq)
     inst = fill_instantaneous_rate_matrix_diagonal(inst)
     return inst
+
+
+def codon_nonsynonymous_mask(g):
+    aa = np.empty(len(g['codon_orders']), dtype=int)
+    for index, codon_indices in enumerate(g['synonymous_indices'].values()):
+        aa[codon_indices] = index
+    return aa[:, None] != aa
+
+
+def get_ecm_omega_rate_matrix(g):
+    """Rebuild the IQ-TREE ECMK07_GY0K generator, including multi-hit entries."""
+    omega = g.get('omega')
+    if omega is None or not np.isfinite(omega) or omega < 0:
+        raise ValueError('ECMK07_GY0K requires a finite, nonnegative fitted omega from IQ-TREE.')
+    if g.get('kappa') not in (None, 1.0):
+        raise ValueError('ECMK07_GY0K requires kappa = 1.')
+    exchange = g['exchangeability_matrix']
+    if omega != 1.0:
+        # GY0K contributes only an N multiplier in the hybrid. Keep the
+        # empirical exchangeabilities for codons separated by 2 or 3 bases.
+        exchange = exchange.copy()
+        exchange[codon_nonsynonymous_mask(g)] *= omega
+    return exchangeability2Q(exchange, g['equilibrium_frequency'])
 
 def get_equilibrium_frequency(g, mode):
     if 'equilibrium_frequency' in g.keys():

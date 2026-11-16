@@ -3,9 +3,11 @@ import hashlib
 import json
 import math
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 from collections import OrderedDict
 from contextlib import closing
 from itertools import zip_longest
@@ -14,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from csubst import genetic_code
+from csubst import output_safety
 from csubst import resource_cache
 from csubst import runtime
 from csubst import sequence
@@ -23,6 +26,7 @@ from csubst import ete
 from csubst._extensions import load_optional_extension
 
 parser_iqtree_cy = load_optional_extension('parser_iqtree_cy')
+_FIT_EXTENSIONS = ('iqtree', 'log', 'rate', 'state', 'treefile')
 
 
 def _parse_version_tuple(version_text):
@@ -227,10 +231,10 @@ def _estimate_empirical_codon_frequency_from_alignment(alignment_file, codon_ord
 
 
 def _get_state_file_path(g):
-    state_path = str(g.get('iqtree_state', '')).strip()
+    state_path = str(g.get('path_iqtree_state', '')).strip()
     if state_path != '':
         return state_path
-    return str(g.get('path_iqtree_state', '')).strip()
+    return str(g.get('iqtree_state', '')).strip()
 
 
 def _open_state_text(state_path):
@@ -489,8 +493,7 @@ def check_intermediate_files(g):
         alignment_file=g.get('alignment_file', ''),
         iqtree_outdir=g['iqtree_outdir'],
     )
-    extensions = ['iqtree','log','rate','state','treefile']
-    for ext in extensions:
+    for ext in _FIT_EXTENSIONS:
         if (g['iqtree_'+ext]=='infer'):
             g['path_iqtree_'+ext] = iqtree_prefix+'.'+ext
         else:
@@ -500,7 +503,71 @@ def check_intermediate_files(g):
             all_exist = False
     return g,all_exist
 
-def run_iqtree_ancestral(g, force_notree_run=False):
+def _run_iqtree(command):
+    returncode = runtime.run_subprocess_tee(command)
+    if returncode != 0:
+        raise AssertionError('IQ-TREE did not finish safely (exit code {}).'.format(returncode))
+
+
+def _set_fit_paths(g, prefix):
+    g.update({'path_iqtree_' + ext: prefix + '.' + ext for ext in _FIT_EXTENSIONS})
+
+
+def _run_guarded_hybrid(g, command, prefix, previous_check):
+    from csubst import iqtree_fit
+
+    lock = resource_cache.resolve_path_lock_path(prefix + '.state', lock_label='iqtree-fit')
+    with resource_cache.acquire_exclusive_lock(lock, lock_label='IQ-TREE fit'):
+        with tempfile.TemporaryDirectory(prefix='.csubst-iqtree-', dir=os.path.dirname(prefix)) as work:
+            local = dict(g)
+
+            def run_in_stage(name, extra_args=()):
+                folder = Path(work) / name
+                folder.mkdir()
+                staged_prefix = str(folder / os.path.basename(prefix))
+                local_command = command.copy()
+                local_command[local_command.index('--prefix') + 1] = staged_prefix
+                _run_iqtree([*local_command, *extra_args])
+                _set_fit_paths(local, staged_prefix)
+                return folder
+
+            if previous_check is None or not previous_check.stalled:
+                folder = run_in_stage('initial')
+                previous_check = iqtree_fit.audit_hybrid_omega(local)
+            if previous_check is not None and previous_check.stalled:
+                print('IQ-TREE omega remained at {} with a nearby log-likelihood gain of {:.6g}. '
+                      'Refitting with a codon frequency floor of {}.'.format(
+                          previous_check.omega, previous_check.probe_gain, iqtree_fit.FREQUENCY_FLOOR,
+                      ), flush=True)
+                folder = run_in_stage('retry', ('--inc-zero-freq', '--min-freq', iqtree_fit.FREQUENCY_FLOOR))
+                recovered = iqtree_fit.audit_hybrid_omega(local, verify_refit=True)
+                iqtree_fit.validate_recovery(previous_check, recovered)
+                print('Accepted IQ-TREE refit: omega={:.8g}, log-likelihood gain={:.6g}.'.format(
+                    recovered.omega, recovered.reported - previous_check.reported,
+                ), flush=True)
+            # Validate every file before publishing any of them. A failed
+            # fitting attempt leaves the existing bundle and its manifest intact.
+            required = {os.path.basename(prefix) + '.' + ext for ext in (*_FIT_EXTENSIONS, 'ckp.gz')}
+            staged = {path.name: path for path in folder.iterdir() if path.is_file()}
+            if not required.issubset(staged):
+                raise ValueError('IQ-TREE did not produce a complete model fit.')
+            destinations = {name: Path(prefix).with_name(name) for name in staged}
+            mutable = {os.path.basename(prefix) + '.' + ext: 'input --iqtree_' + ext for ext in _FIT_EXTENSIONS}
+            mutable[os.path.basename(prefix) + '.ckp.gz'] = 'input IQ-TREE checkpoint'
+            for name, path in destinations.items():
+                output_safety.validate_destination(path, mutable_input_label=mutable.get(name))
+                if path.exists() and not path.is_file():
+                    raise ValueError('IQ-TREE output is not a regular file: {}'.format(path))
+            _set_fit_paths(g, prefix)
+            manifest = Path(_get_iqtree_manifest_path(g))
+            output_safety.validate_destination(manifest)
+            manifest.unlink(missing_ok=True)
+            for name, path in destinations.items():
+                os.replace(staged[name], path)
+            _write_iqtree_manifest(g)
+
+
+def run_iqtree_ancestral(g, force_notree_run=False, previous_omega_check=None):
     file_tree = runtime.temp_path('tmp.csubst.nwk')
     tree.write_tree(g['rooted_tree'], outfile=file_tree, add_numerical_label=False)
     g = runtime.ensure_iqtree_layout(g, create_dir=True)
@@ -528,21 +595,22 @@ def run_iqtree_ancestral(g, force_notree_run=False):
                 raise ValueError('--rooted_tree and --alignment_file are not consistent.')
         if g.get('random_seed') is not None:
             command.extend(['-seed', str(int(g['random_seed']))])
+        keep_model_precision = str(g.get('iqtree_model', '')).startswith(('GY', 'MG', 'ECMK07_GY0K'))
         if (g.get('subcommand') == 'scan' or g.get('scan_pvalue_calibration') == 'parametric_bootstrap'
-                or str(g.get('iqtree_model', '')).startswith(('GY', 'MG'))):
+                or keep_model_precision):
             command.append('-v')  # Preserve empirical frequencies at full log precision.
-        returncode = runtime.run_subprocess_tee(command)
-        if returncode != 0:
-            msg = 'IQ-TREE did not finish safely (exit code {}).'
-            raise AssertionError(msg.format(returncode))
-        for ext in ['iqtree', 'log', 'rate', 'state', 'treefile']:
-            g['path_iqtree_' + ext] = iqtree_prefix + '.' + ext
+        from csubst import iqtree_fit
+        if iqtree_fit.checks_hybrid_omega(g):
+            _run_guarded_hybrid(g, command, iqtree_prefix, previous_omega_check)
+            return None
+        _run_iqtree(command)
+        _set_fit_paths(g, iqtree_prefix)
         _write_iqtree_manifest(g)
         ckp_paths = [g['alignment_file']+'.ckp.gz', iqtree_prefix+'.ckp.gz']
         for ckp_path in ckp_paths:
             if (os.path.exists(ckp_path) and g.get('scan_pvalue_calibration') != 'parametric_bootstrap'
                     and g.get('scan_observation', 'marginal') == 'marginal'
-                    and not str(g.get('iqtree_model', '')).startswith(('GY', 'MG'))):
+                    and not keep_model_precision):
                 os.remove(ckp_path)
     finally:
         if os.path.exists(file_tree):

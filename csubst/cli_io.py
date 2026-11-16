@@ -88,6 +88,8 @@ def input_paths(
                                   for candidate in base_candidates)
             for candidate in candidates:
                 yield 'input --' + dest, candidate
+                if dest == 'iqtree_state':
+                    yield 'input IQ-TREE checkpoint', candidate.removesuffix('.state') + '.ckp.gz'
                 if dest in local_search_config.DATABASE_PATH_OPTIONS:
                     for filename in local_search_config.database_files(dest, candidate):
                         yield 'input --' + dest, filename
@@ -113,6 +115,8 @@ def validate_output_destinations(layout, args, protected):
         suffixes.extend(['doctor_summary.tsv', 'doctor_summary.json'])
         if getattr(args, 'output_manifest', True):
             suffixes.append('outputs.tsv')
+    elif command == 'simulate':
+        suffixes.append('expected_omega.tsv')
     elif command in ('search', 'analyze'):
         suffixes.extend(['search_run.json', 'cb_stats.tsv', 'b.tsv', 'bs.tsv',
                          's.tsv', 'cs.tsv', 'cbs.tsv'])

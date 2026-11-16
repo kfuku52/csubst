@@ -4,7 +4,7 @@ import gzip
 import numpy as np
 import pytest
 
-from csubst import fitted_model
+from csubst import endpoint_io, fitted_model
 
 
 def context(tmp_path, scheme='F'):
@@ -60,6 +60,74 @@ def test_mismatched_fitted_sidecars_are_rejected(tmp_path, key, value):
     g[key] = value
     with pytest.raises(ValueError, match='mismatch'):
         fitted_model.prepare(g)
+
+
+@pytest.mark.parametrize('model', ['ECMK07_GY0K+F+R4', 'ECMK07_GY0K+FQ'])
+def test_ecm_hybrid_scales_all_nonsynonymous_exchangeabilities(tmp_path, model):
+    g = context(tmp_path, 'FQ' if model.endswith('FQ') else 'F')
+    g.update(
+        substitution_model=model, kappa=1.0, omega=0.4,
+        codon_orders=np.array(['AAG', 'AAA', 'TTC', 'TTT']),
+        synonymous_indices={'K': [0, 1], 'F': [2, 3]},
+        equilibrium_frequency=np.array([.3, .1, .2, .4]) if '+F+' in model else np.full(4, .25),
+        exchangeability_matrix=np.array([[0, 4, 1, 2], [4, 0, 3, 1], [1, 3, 0, 8], [2, 1, 8, 0.]]),
+    )
+    with gzip.open(tmp_path/'fit.ckp.gz', 'wt') as handle:
+        handle.write('ModelCodon:\n kappa: 1\n omega: 0.4000000123\nOther:\n value: 1\n')
+    (tmp_path/'fit.log').write_text('Empirical nonsynonymous/synonymous ratio (omega_E): 0.0613\n'
+                                   'Empirical state frequencies: 0.1 0.3 0.2 0.4\n')
+
+    endpoint_io.validate_codon_model(model)
+    g.pop('instantaneous_codon_rate_matrix')
+    g['omega'] = None  # IQ-TREE does not print the actual multiplier in its report.
+    fitted_model.prepare(g)
+    q, pi = g['instantaneous_codon_rate_matrix'], g['equilibrium_frequency']
+    assert g['omega'] == 0.4000000123
+    assert g['fitted_model_provenance']['precision'] == 'checkpoint_and_precise_frequencies'
+    exchange = q / pi[None, :]
+    # These N transitions differ by multiple nucleotides. Compare ratios to
+    # a synonymous rate so the overall normalization cancels.
+    np.testing.assert_allclose(exchange[0, 2:] / exchange[0, 1], g['omega'] * np.array([1., 2.]) / 4)
+    assert exchange[2, 3] / exchange[0, 1] == pytest.approx(2)
+    np.testing.assert_allclose(q.sum(axis=1), 0, atol=1e-15)
+    assert pi @ -q.diagonal() == pytest.approx(1)
+    assert g['exchangeability_matrix'][0, 2] == 1
+    report = tmp_path/'fit.iqtree'
+    g['path_iqtree_iqtree'] = str(report)
+    report.write_text('Empirical nonsynonymous/synonymous ratio (omega_E): 0.5000\n')
+    with pytest.raises(ValueError, match='omega_E mismatch'):
+        fitted_model.prepare(g)
+    (tmp_path/'fit.ckp.gz').unlink()
+    with pytest.raises(ValueError, match='matching IQ-TREE .ckp.gz'):
+        fitted_model.prepare(g)
+
+
+def test_hybrid_checkpoint_frequencies_validate_the_reported_floor(tmp_path):
+    g = context(tmp_path)
+    g.update(
+        substitution_model='ECMK07_GY0K+F+R4', kappa=1.0, omega=None,
+        codon_orders=np.array(['AAG', 'AAA', 'TTC', 'TTT']),
+        synonymous_indices={'K': [0, 1], 'F': [2, 3]},
+        equilibrium_frequency=np.array([.3, .6, 0, .1]),
+        exchangeability_matrix=np.array([[0, 4, 1, 2], [4, 0, 3, 1], [1, 3, 0, 8], [2, 1, 8, 0.]]),
+    )
+    with gzip.open(tmp_path/'fit.ckp.gz', 'wt') as handle:
+        handle.write('ModelCodon:\n kappa: 1\n omega: 0.4\n state_freq: 0.5999, 0.3, 0.0001, 0.1\n')
+    log = tmp_path/'fit.log'
+    raw = 'Empirical state frequencies: 0.6 0.3 0 0.1\n'
+    log.write_text(raw)
+    with pytest.raises(ValueError, match='frequency mismatch'):
+        fitted_model.prepare(g)
+    log.write_text('Command: iqtree --inc-zero-freq --min-freq 0.0001\n')
+    fitted_model.prepare(g)
+    np.testing.assert_allclose(g['equilibrium_frequency'], [.3, .5999, .0001, .1])
+    assert g['fitted_model_provenance']['frequency_source'] == 'checkpoint_state_freq'
+
+
+@pytest.mark.parametrize('model', ['ECMK07_GY+F', 'ECMK07_GY0K+F3X4', 'ECMK07_GY0K'])
+def test_unverified_empirical_mechanistic_model_options_are_rejected(model):
+    with pytest.raises(ValueError, match='Supported codon models'):
+        endpoint_io.validate_codon_model(model)
 
 
 @pytest.mark.parametrize('redo', [False, True])

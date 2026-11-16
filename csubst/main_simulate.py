@@ -57,42 +57,56 @@ class suppress_stdout_stderr(object):
             os.close(fd)
 
 
-def _make_pyvolve_custom_model(pyvolve, g, name, q_matrix):
+def _make_pyvolve_custom_model(pyvolve, g, name, q_matrix, rate_factor=1.0):
+    # Scaling a nonzero Q preserves its stationary distribution. For an
+    # invariant site, recover that distribution before setting Q to zero.
+    invariant = rate_factor == 0
+    matrix = _scale_rate_matrix(q_matrix, 1.0 if invariant else rate_factor)
     kwargs = {
         'model_type': 'custom',
         'name': name,
-        'parameters': {'matrix': q_matrix},
+        'parameters': {'matrix': matrix},
     }
     save_path = str(g.get('simulate_custom_frequency_file', '')).strip()
     if save_path != '':
         kwargs['save_custom_frequencies'] = save_path
     with suppress_stdout_stderr():
-        return pyvolve.Model(**kwargs)
+        model = pyvolve.Model(**kwargs)
+    if invariant:
+        model.matrix = np.zeros_like(matrix)
+    return model
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
         node.dist = (node.dist or 0.0) * scaling_factor
     return tree
 
-def get_pyvolve_newick(tree, trait_name):
-    for node in tree.traverse():
-        ete.set_prop(node, 'dist2', node.dist)
-        node.dist = ete.get_prop(node, "numerical_label")
-    newick_txt = ete.write_tree(tree, format=1)
-    for node in tree.traverse():
-        sub_from = str(ete.get_prop(node, "numerical_label"))
-        is_fg = ete.get_prop(node, 'is_fg_' + trait_name, False)
-        if is_fg:
-            fg_lineage = ete.get_prop(node, 'foreground_lineage_id_' + trait_name, 0)
-            sub_to = str(ete.get_prop(node, 'dist2')) + '#m' + str(fg_lineage)
-        else:
-            sub_to = str(ete.get_prop(node, 'dist2'))
-        newick_txt = re.sub(r':{}(?=,)'.format(re.escape(sub_from)), ':'+sub_to, newick_txt)
-        newick_txt = re.sub(r':{}(?=\))'.format(re.escape(sub_from)), ':'+sub_to, newick_txt)
-    for node in tree.traverse():
-        node.dist = ete.get_prop(node, 'dist2')
-        ete.del_prop(node, 'dist2')
-    return newick_txt
+def get_pyvolve_newick(tree, trait_name, foreground_scaling_factor=1.0, *, encode_names=False):
+    nodes = [(node, node.dist, node.name) for node in tree.traverse()]
+    branches = {}
+    try:
+        for node, distance, _ in nodes:
+            branch_id = ete.get_prop(node, 'numerical_label')
+            if encode_names:
+                node.name = f'b{branch_id}'
+            if ete.is_root(node):
+                if encode_names:
+                    node.dist = 0.0
+                continue
+            tag, length = 'root', distance
+            if ete.get_prop(node, 'is_fg_' + trait_name, False):
+                tag = 'm' + str(ete.get_prop(node, 'foreground_lineage_id_' + trait_name, 0))
+                length *= foreground_scaling_factor
+            # Pyvolve inherits the parent's model on untagged branches.
+            branches[str(branch_id)] = f':{length}#{tag}'
+            node.dist = branch_id
+        newick = ete.write_tree(tree, format=1)
+    finally:
+        for node, distance, name in nodes:
+            node.dist = distance
+            if encode_names:
+                node.name = name
+    return re.sub(r':([0-9]+)(?=[,)])', lambda match: branches[match[1]], newick)
 
 
 def ensure_internal_node_names(tree_obj, prefix='N'):
@@ -162,7 +176,7 @@ def get_biased_amino_acids(convergent_amino_acids, codon_table, rng=None):
             aa_index = rng.choice(a=np.arange(amino_acids.shape[0]), size=num_random_aa, replace=False)
         biased_aas = amino_acids[aa_index]
     else:
-        biased_aas = np.array(list(convergent_amino_acids))
+        biased_aas = np.array(list(dict.fromkeys(convergent_amino_acids)))
         invalid = sorted(list(set([aa for aa in biased_aas.tolist() if aa not in amino_acids])))
         if len(invalid) > 0:
             invalid_txt = ','.join(invalid)
@@ -369,7 +383,7 @@ def _resolve_simulation_site_rates(g):
     return np.resize(source_rates, num_site).astype(float)
 
 
-def evolve_convergent_partitions(g):
+def evolve_convergent_partitions(g, expected_omega=None):
     pyvolve = _require_pyvolve()
     num_fl = foreground.get_num_foreground_lineages(tree=g['tree'], trait_name=g['trait_name'])
     model_names = ['root',] + [ 'm'+str(i+1) for i in range(num_fl) ]
@@ -379,7 +393,7 @@ def evolve_convergent_partitions(g):
         txt = 'simulate_rate_convergent length ({}) did not match num_convergent_site ({}).'
         raise ValueError(txt.format(site_rates.shape[0], num_convergent_partition))
     convergent_partitions = list()
-    biased_substitution_fractions = list()
+    biased_q_fractions = list()
     biased_context_cache = dict()
     model_cache = dict()
     bg_total_nsy_Q = get_total_Q(g['background_Q'], g['all_nsy_cdn_index'])
@@ -433,7 +447,7 @@ def evolve_convergent_partitions(g):
               '{:,.1f}% ({:,.1f}/{:,.1f}) and {:,.1f}% ({:,.1f}/{:,.1f})'
         print(txt.format(bg_fraction_biased_Q*100, bg_total_biased_Q, bg_total_nsy_Q,
                          fraction_biased_Q*100, total_biased_Q, total_nsy_Q))
-        biased_substitution_fractions.append(fraction_biased_Q)
+        biased_q_fractions.append(fraction_biased_Q)
         models = list()
         for model_name in model_names:
             is_nonroot_model = (model_name!='root')
@@ -444,15 +458,12 @@ def evolve_convergent_partitions(g):
             )
             model = model_cache.get(model_key, None)
             if model is None:
-                if is_nonroot_model:
-                    q_matrix = _scale_rate_matrix(biased_Q, site_rate)
-                else:
-                    q_matrix = _scale_rate_matrix(g['background_Q'], site_rate)
                 model = _make_pyvolve_custom_model(
                     pyvolve=pyvolve,
                     g=g,
                     name=model_name,
-                    q_matrix=q_matrix,
+                    q_matrix=biased_Q if is_nonroot_model else g['background_Q'],
+                    rate_factor=site_rate,
                 )
                 model_cache[model_key] = model
             models.append(model)
@@ -464,17 +475,10 @@ def evolve_convergent_partitions(g):
         # site. Preserve Pyvolve's historical side effect: the frequency file
         # describes the foreground model of that final site.
         np.savetxt(save_path, models[-1].params['state_freqs'])
-    if len(biased_substitution_fractions):
-        mean_biased_substitution_fraction = np.array(biased_substitution_fractions).mean()
-    else:
-        mean_biased_substitution_fraction = 0
-    txt = '{:,.2f}% of substitutions in {} sites in the foreground branches are ' \
-          'expected to result from the introduced bias in Q matrix.'
-    fraction_convergent_site = g['num_convergent_site'] / g['num_simulated_site']
-    print(txt.format(mean_biased_substitution_fraction*fraction_convergent_site*100, g['num_simulated_site']))
-    txt = '{:,.2f}% of substitutions in {} convergent sites in the foreground branches are ' \
-          'expected to result from the introduced bias in Q matrix.'
-    print(txt.format(mean_biased_substitution_fraction*100, g['num_convergent_site']))
+    if biased_q_fractions:
+        txt = 'Mean share of foreground nonsynonymous Q rates entering target amino acids ' \
+              'over {:,} convergent sites: {:,.2f}%'
+        print(txt.format(num_convergent_partition, np.mean(biased_q_fractions) * 100))
     evolver = pyvolve.Evolver(partitions=convergent_partitions, tree=g['foreground_tree'])
     kwargs = dict(
         ratefile=runtime.temp_path('tmp.csubst.simulate_convergent_ratefile.txt'),
@@ -485,8 +489,10 @@ def evolve_convergent_partitions(g):
     if g.get('simulate_seed_convergent', None) is not None:
         kwargs['seed'] = int(g['simulate_seed_convergent'])
     evolver(**kwargs)
+    if expected_omega is not None:
+        expected_omega.add_evolution(evolver)
 
-def evolve_nonconvergent_partition(g):
+def evolve_nonconvergent_partition(g, expected_omega=None):
     pyvolve = _require_pyvolve()
     if (g['num_convergent_site']==0):
         site_start = 1
@@ -501,14 +507,22 @@ def evolve_nonconvergent_partition(g):
         raise ValueError(txt.format(site_rates.shape[0], num_nonconvergent_site))
     if (str(g.get('simulate_asrv', 'no')).strip().lower() == 'file'):
         partitions = list()
+        models_by_rate = {}
         for site_rate in site_rates:
-            q_matrix = _scale_rate_matrix(g['background_Q'], site_rate)
-            model = _make_pyvolve_custom_model(pyvolve=pyvolve, g=g, name='root', q_matrix=q_matrix)
+            model = models_by_rate.get(site_rate)
+            if model is None:
+                model = _make_pyvolve_custom_model(
+                    pyvolve=pyvolve, g=g, name='root', q_matrix=g['background_Q'],
+                    rate_factor=site_rate,
+                )
+                models_by_rate[site_rate] = model
             partitions.append(pyvolve.Partition(models=model, size=1))
+        save_path = str(g.get('simulate_custom_frequency_file', '')).strip()
+        if save_path != '' and len(models_by_rate) < len(partitions):
+            np.savetxt(save_path, model.params['state_freqs'])
         evolver = pyvolve.Evolver(partitions=partitions, tree=g['background_tree'])
     else:
-        q_matrix = _scale_rate_matrix(g['background_Q'], 1.0)
-        model = _make_pyvolve_custom_model(pyvolve=pyvolve, g=g, name='root', q_matrix=q_matrix)
+        model = _make_pyvolve_custom_model(pyvolve=pyvolve, g=g, name='root', q_matrix=g['background_Q'])
         partition = pyvolve.Partition(models=model, size=num_nonconvergent_site)
         evolver = pyvolve.Evolver(partitions=partition, tree=g['background_tree'])
     kwargs = dict(
@@ -520,16 +534,27 @@ def evolve_nonconvergent_partition(g):
     if g.get('simulate_seed_nonconvergent', None) is not None:
         kwargs['seed'] = int(g['simulate_seed_nonconvergent'])
     evolver(**kwargs)
+    if expected_omega is not None:
+        expected_omega.add_evolution(evolver)
 
 def get_pyvolve_tree(tree, foreground_scaling_factor, trait_name):
     pyvolve = _require_pyvolve()
     if (foreground_scaling_factor!=1):
         print('Foreground branches are rescaled by {}.'.format(foreground_scaling_factor))
-    for node in tree.traverse():
-        if ete.get_prop(node, 'is_fg_' + trait_name, False):
-            node.dist *= foreground_scaling_factor
-    newick_txt = get_pyvolve_newick(tree=tree, trait_name=trait_name)
+    # Pyvolve treats underscores and hashes as model delimiters and removes
+    # whitespace. Pass safe temporary names and restore full FASTA labels.
+    newick_txt = get_pyvolve_newick(
+        tree=tree, trait_name=trait_name, foreground_scaling_factor=foreground_scaling_factor,
+        encode_names=True,
+    )
     pyvolve_tree = pyvolve.read_tree(tree=newick_txt)
+    names = {f'b{ete.get_prop(node, "numerical_label")}': node.name for node in tree.traverse()}
+    pyvolve_tree.name = tree.name
+    pending = list(pyvolve_tree.children)
+    while pending:
+        node = pending.pop()
+        node.name = names[node.name]
+        pending.extend(node.children)
     return pyvolve_tree
 
 
@@ -922,6 +947,10 @@ def _export_true_asr_bundle(g, file_all):
 
 def main_simulate(g, Q_method='auto'):
     g = _initialize_simulation_output_context(g)
+    expected_omega_path = (
+        runtime.output_path(g, 'expected_omega.tsv')
+        if g.get('export_expected_omega', False) else None
+    )
     g = _prepare_simulation_input_context(g)
     g['simulate_asrv'] = str(g.get('simulate_asrv', 'no')).strip().lower()
     g['export_true_asr'] = bool(g.get('export_true_asr', True))
@@ -980,10 +1009,17 @@ def main_simulate(g, Q_method='auto'):
         ), flush=True)
     txt = '{:,} out of {:,} sites ({:.1f}%) will evolve convergently in the foreground lineages.'
     print(txt.format(g['num_convergent_site'], g['num_simulated_site'], g['percent_convergent_site']))
+    evolution_kwargs = {}
+    if expected_omega_path is not None:
+        from csubst.simulate_omega import ExpectedOmega
+        expected_omega = ExpectedOmega(
+            g['tree'], g['codon_table'], g['pyvolve_codon_orders'], g['trait_name'],
+        )
+        evolution_kwargs['expected_omega'] = expected_omega
     if (g['num_convergent_site'] > 0):
-        evolve_convergent_partitions(g)
+        evolve_convergent_partitions(g, **evolution_kwargs)
     if (g['num_no_convergent_site'] > 0):
-        evolve_nonconvergent_partition(g)
+        evolve_nonconvergent_partition(g, **evolution_kwargs)
     file_conv = runtime.temp_path('tmp.csubst.simulate_convergent.fa')
     file_noconv = runtime.temp_path('tmp.csubst.simulate_nonconvergent.fa')
     file_out, file_all = _materialize_simulated_alignment(
@@ -993,5 +1029,9 @@ def main_simulate(g, Q_method='auto'):
     )
     if g['export_true_asr']:
         _export_true_asr_bundle(g=g, file_all=file_all)
+    if expected_omega_path is not None:
+        sequences = read_fasta(file_all) if g['export_true_asr'] else None
+        expected_omega.write(expected_omega_path, sequences)
+        print('Expected omegaCany2spe: {}'.format(expected_omega_path), flush=True)
 
     runtime.cleanup_legacy_temp_artifacts()

@@ -643,6 +643,11 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
         )
     else:
         g['export_true_asr'] = True
+    if 'export_expected_omega' in g:
+        g['export_expected_omega'] = _parse_bool_like(
+            value=g['export_expected_omega'],
+            param_name='--export_expected_omega',
+        )
     if 'true_asr_prefix' in g.keys():
         if g['true_asr_prefix'] is None:
             g['true_asr_prefix'] = ''

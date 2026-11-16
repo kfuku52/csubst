@@ -72,6 +72,18 @@ def test_3di_default_backend_is_esm3di(command):
     assert _get_cli_parser(False).parse_args([command]).sa_backend == 'esm3di-35m'
 
 
+@pytest.mark.parametrize('command', ['search', 'analyze', 'benchmark'])
+def test_search_iqtree_model_default_and_override(command):
+    parser = _get_cli_parser(False)
+    assert parser.parse_args([command]).iqtree_model == 'ECMK07_GY0K+F+R4'
+    assert parser.parse_args([command, '--iqtree_model', 'ECMK07+F+R4']).iqtree_model == 'ECMK07+F+R4'
+
+
+@pytest.mark.parametrize('command', ['simulate', 'scan', 'doctor', 'sites', 'inspect'])
+def test_other_iqtree_commands_keep_ecmk07_default(command):
+    assert _get_cli_parser(False).parse_args([command]).iqtree_model == 'ECMK07+F+R4'
+
+
 def test_download_default_resource_matches_3di_backend():
     parser = _get_cli_parser(False)
     assert parser.parse_args(['download']).resource == parser.parse_args(['sites']).sa_backend

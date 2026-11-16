@@ -92,3 +92,50 @@ def test_scan_fit_passes_seed_and_retains_checkpoint_for_precise_models(tmp_path
     monkeypatch.setattr(parser_iqtree, '_write_iqtree_manifest', lambda g: None)
     parser_iqtree.run_iqtree_ancestral(g)
     assert created[0].exists()  # GY sidecars are shared by every estimator and command.
+
+
+@pytest.mark.parametrize('retry_gain', [None, 0., 10.])
+def test_guarded_fit_publishes_only_a_verified_improvement(tmp_path, monkeypatch, retry_gain):
+    from pathlib import Path
+
+    from csubst import iqtree_fit
+
+    extensions = (*parser_iqtree._FIT_EXTENSIONS, 'ckp.gz')
+    prefix = str(tmp_path / 'fit')
+    paths = [Path(prefix + '.' + ext) for ext in extensions]
+    manifest = Path(prefix + '.state.csubst-manifest.json')
+    for path in (*paths, manifest):
+        path.write_text('existing')
+    initial = iqtree_fit.OmegaCheck(1, -100, -100, 5 if retry_gain is not None else -.1, .002)
+    calls = []
+
+    def fake_fit(command):
+        calls.append(command)
+        staged = command[command.index('--prefix') + 1]
+        assert staged != prefix
+        for ext in extensions:
+            Path(staged + '.' + ext).write_text('retry' if '--inc-zero-freq' in command else 'initial')
+        return 0
+
+    def fake_audit(g, verify_refit=False):
+        assert Path(g['path_iqtree_state']).read_text() == ('retry' if verify_refit else 'initial')
+        if verify_refit:
+            assert retry_gain is not None
+            return iqtree_fit.OmegaCheck(.4, -100 + retry_gain, -100 + retry_gain, -.1, .002)
+        return initial
+
+    monkeypatch.setattr(parser_iqtree.runtime, 'run_subprocess_tee', fake_fit)
+    monkeypatch.setattr(iqtree_fit, 'audit_hybrid_omega', fake_audit)
+    monkeypatch.setattr(parser_iqtree, '_write_iqtree_manifest', lambda g: manifest.write_text('accepted'))
+    if retry_gain is None or retry_gain > 0:
+        parser_iqtree._run_guarded_hybrid({}, ['iqtree', '--prefix', prefix], prefix, None)
+        assert all(path.read_text() == ('initial' if retry_gain is None else 'retry') for path in paths)
+        assert manifest.read_text() == 'accepted'
+    else:
+        with pytest.raises(ValueError, match='optimization did not recover'):
+            parser_iqtree._run_guarded_hybrid({}, ['iqtree', '--prefix', prefix], prefix, None)
+        assert all(path.read_text() == 'existing' for path in (*paths, manifest))
+    assert len(calls) == (1 if retry_gain is None else 2)
+    if retry_gain is not None:
+        assert calls[1][-3:] == ['--inc-zero-freq', '--min-freq', '0.0001']
+    assert not list(tmp_path.glob('.csubst-iqtree-*'))

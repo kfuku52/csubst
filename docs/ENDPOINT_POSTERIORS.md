@@ -31,7 +31,8 @@ endpoint distributions without sampling ancestral histories. An inserted root
 is inferred from the model. This can make root-adjacent branches eligible that
 were previously excluded because the root had no ASR row.
 
-- Codons: ECMK07, ECMrest, GY, MG and MGK, with uniform rates or an IQ-TREE discrete
+- Codons: ECMK07, ECMrest, GY, MG, MGK, and ECMK07_GY0K with `+F` or `+FQ`,
+  with uniform rates or an IQ-TREE discrete
   rate-category table. Categories use posterior weights given the whole site,
   not a posterior-mean site rate.
   A pure `+I` fit with zero invariant proportion is read as a single unit-rate
@@ -53,17 +54,42 @@ were previously excluded because the root had no ASR row.
 
 All commands use the same fitted codon model loader. When all five IQ-TREE
 intermediate paths are explicitly supplied, their reported model is authoritative;
-`--iqtree_model` selects a new fit only with `--iqtree_redo` or inferred inputs. GY+F/GY+FQ (also with
-rate categories) use matching checkpoint parameters and precise log frequencies
-when available. Report-only fits use the same reported precision in every
-command; scan does not independently refit or replace their model. Fitted
+`--iqtree_model` selects a new fit only with `--iqtree_redo` or inferred inputs.
+GY fits with `+F` or `+FQ` (also with rate categories) use checkpoint
+parameters and precise log frequencies when available. ECMK07_GY0K requires
+the matching checkpoint.
+The reported `omega_E` is a derived ratio, while the checkpoint contains
+the fitted multiplier for the nonsynonymous ECMK07 exchangeabilities.
+For ECMK07_GY0K+F, CSUBST prioritizes the checkpoint's fitted `state_freq`
+vector when present. Older checkpoints use the verbose IQ-TREE frequency
+log. CSUBST checks the frequencies against the report or the expected
+frequencies under the recorded IQ-TREE options.
+Report-only fits of other supported models use the same reported precision
+in every command. Fitted
 bootstrap still requires precise sidecars; finite likelihood mismatches warn
 and are recorded in provenance while bootstrap continues.
 The posterior is conditional on the selected parameters. The 3Di generator
 retains checkpoint precision. Sources and the generator hash, rates and branch
-lengths are recorded in `*_endpoint_model.json`. Fresh GY/MG fits retain their
+lengths are recorded in `*_endpoint_model.json`. Fresh GY/MG and ECMK07_GY0K fits retain their
 checkpoint and verbose log. Unsupported missing frequency schemes fail instead
 of being replaced with empirical codon frequencies.
+
+For new fits, `search` and `benchmark` default to `ECMK07_GY0K+F+R4`.
+IQ-TREE fits one multiplier for the alignment. CSUBST applies it to the codon Q
+used for ancestral inference and expected substitution counts. Set
+`--iqtree_model ECMK07+F+R4` to use the fixed ECMK07 exchangeabilities in a new
+fit or reuse a compatible fit made with that model.
+
+With `ECMK07_GY0K+F` and optional FreeRate categories, `search` and
+`benchmark` check an inferred multiplier that remains at IQ-TREE's starting
+value of 1. The check reconstructs the fit and probes multipliers on either
+side of 1 with the fitted branch lengths, frequencies, and rate mixture held
+fixed. If a probe increases the likelihood, CSUBST refits once with an IQ-TREE
+frequency floor of 0.0001. The replacement must improve the reported likelihood,
+reproduce its fitted likelihood from the retained files, and pass the same
+nearby-parameter check. A failed recovery raises an error and leaves any
+existing fit in place. This check can also recover an older inferred fit
+that is reused from the shared IQ-TREE directory.
 
 ### Observation eligibility and TSV output
 

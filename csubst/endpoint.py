@@ -136,6 +136,7 @@ class EndpointBlock:
     reduced_predictive: dict | None = None
     category_node: np.ndarray | None = None
     rate_posterior: np.ndarray | None = None
+    site_log_likelihood: np.ndarray | None = None
 
 
 class EndpointModel:
@@ -207,7 +208,7 @@ class EndpointModel:
 
     def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None,
                     predictive_transform=None, category_nodes=False, unselected_transform=None,
-                    transform_rate_context=False, tip_missing=None, rate_posterior=False):
+                    transform_rate_context=False, tip_missing=None, rate_posterior=False, likelihood_only=False):
         """Yield one edge/site block; root records only contain a node marginal.
 
         Tips are observation likelihoods, NOT posterior probabilities. Missing
@@ -225,6 +226,8 @@ class EndpointModel:
         tip_missing can mark rows to read as all-ones emissions without copying
         their full input tip arrays.
         With rate_posterior, the root record exposes the site-category posteriors.
+        With likelihood_only, yield one root evidence record per block and skip
+        the downward pass.
         """
         if isinstance(block_size, bool) or int(block_size) != block_size or block_size < 1:
             raise ValueError('Endpoint block size must be a positive integer.')
@@ -301,6 +304,10 @@ class EndpointModel:
             if not np.isfinite(evidence).all():
                 bad = start + int(np.flatnonzero(~np.isfinite(evidence))[0])
                 raise ValueError('Zero likelihood under endpoint model at site {}.'.format(bad + 1))
+            if likelihood_only:
+                yield EndpointBlock(start, stop, self.root, -1, np.empty(0), None, None,
+                                    site_log_likelihood=evidence)
+                continue
             class_weight = np.exp(log_weight - evidence)
             np.divide(root_unnormalized, root_sum[:, :, None],
                       out=post[:, self.root], where=root_sum[:, :, None] > 0)

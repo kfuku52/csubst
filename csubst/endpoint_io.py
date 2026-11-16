@@ -24,8 +24,11 @@ def enabled(g):
 def validate_codon_model(name):
     pattern = r'(?:ECMK07|ECMrest|GY)(?:\+(?:F(?:O|Q|1X4|3X4)?|G\d*|R\d*|I))*'
     mg_pattern = r'MGK?(?:\+(?:F1X4|F3X4|G\d*|R\d*|I))*'
-    if not re.fullmatch(pattern, name) and not re.fullmatch(mg_pattern, name):
-        raise ValueError('Joint codon endpoints support ECMK07, ECMrest, GY and MG/MGK with counted F1X4/F3X4; unsupported modifiers and mixtures of Q matrices require their own verified likelihood models.')
+    hybrid_pattern = r'ECMK07_GY0K\+FQ?(?:\+(?:G\d*|R\d*|I))*'
+    if not any(re.fullmatch(model, name) for model in (pattern, mg_pattern, hybrid_pattern)):
+        raise ValueError('Supported codon models are ECMK07, ECMrest, GY, ECMK07_GY0K with +F or +FQ, '
+                         'and MG/MGK with counted F1X4/F3X4. Other modifiers and mixtures of Q matrices '
+                         'require their own verified likelihood models.')
 
 
 def model_rates(g):

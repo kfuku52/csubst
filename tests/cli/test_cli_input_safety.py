@@ -55,6 +55,18 @@ def test_log_collision_protects_inferred_iqtree_input(tmp_path):
     assert '--log_file must not overwrite input --iqtree_state' in result.stderr
 
 
+def test_log_collision_preserves_iqtree_checkpoint(tmp_path):
+    state = tmp_path / 'input.state'
+    checkpoint = state.with_suffix('.ckp.gz')
+    checkpoint.write_bytes(b'precomputed checkpoint')
+    log = tmp_path / 'alias.log'
+    os.link(checkpoint, log)
+    result = run_csubst(['search', '--iqtree_state', str(state), '--log_file', str(log)], tmp_path)
+    assert result.returncode == 2
+    assert checkpoint.read_bytes() == b'precomputed checkpoint'
+    assert '--log_file must not overwrite input IQ-TREE checkpoint' in result.stderr
+
+
 @pytest.mark.parametrize('option,suffix', [('blastp_db', '.00.psq'), ('mmseqs_db', '_h.index')])
 def test_log_collision_preserves_local_database_sidecar(tmp_path, option, suffix):
     prefix = tmp_path / 'local database'
@@ -84,6 +96,22 @@ def test_log_collision_preserves_scan_analytic_profile(tmp_path, parse_error):
     assert result.returncode == 2
     assert profile.read_bytes() == original
     assert '--log_file must not overwrite input --scan_analytic_profile' in result.stderr
+
+
+@pytest.mark.parametrize('parse_error', [False, True])
+def test_simulate_log_collision_preserves_expected_omega(tmp_path, parse_error):
+    table = tmp_path / 'sim_expected_omega.tsv'
+    table.write_bytes(b'existing simulation expectations\n')
+    log = tmp_path / 'output.log'
+    os.link(table, log)
+    args = ['simulate', '--outdir', str(tmp_path), '--output_prefix', 'sim',
+            '--export_expected_omega', 'yes', '--log_file', str(log)]
+    if parse_error:
+        args[1:1] = ['--threads', 'invalid']
+    result = run_csubst(args, tmp_path)
+    assert result.returncode == 2
+    assert table.read_bytes() == b'existing simulation expectations\n'
+    assert 'Output must not overwrite log --log_file' in result.stderr
 
 
 def test_all_failed_benchmarks_exit_nonzero_and_keep_summary(tmp_path):

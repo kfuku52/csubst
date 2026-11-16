@@ -71,11 +71,13 @@ Run these commands in an empty working directory:
 csubst dataset --name PGK
 
 # Run csubst search
-csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk --foreground foreground.txt
+csubst search --alignment_file alignment.fa.gz --rooted_tree_file tree.nwk \
+  --foreground foreground.txt --iqtree_model ECMK07+F+R4
 ```
 
-The bundled dataset includes a reusable IQ-TREE fit; a new fit requires the
-IQ-TREE executable (default name `iqtree`, configurable with `--iqtree_exe`).
+The example selects `ECMK07+F+R4` to reuse the bundled IQ-TREE fit. A new fit
+requires the IQ-TREE executable (default name `iqtree`, configurable with
+`--iqtree_exe`).
 The main result is `csubst_search/csubst_cb_2.tsv`; check
 `csubst_search/csubst_search_run.json` for `complete` status before interpreting it.
 See [input, output, and rerun behavior](docs/CLI_SAFETY.md) for path resolution
@@ -91,6 +93,8 @@ null sensitivity analyses, see [long-tail calibration](docs/LONGTAIL_CALIBRATION
 
 Analysis commands default to [joint endpoint posteriors](docs/ENDPOINT_POSTERIORS.md).
 Use `--substitution_posterior marginal` for the legacy estimator.
+For new fits, `search` and `benchmark` default to `ECMK07_GY0K+F+R4`, which
+estimates one nonsynonymous rate multiplier for the alignment.
 
 CSUBST provides ten main subcommands:
 
@@ -142,6 +146,8 @@ or the original ProstT5 generator. See [3Di predictors and CPU inference](docs/S
 for the optional `csubst[3di]` dependencies and model-specific limitations.
 
 For experimental urn expectations, see [ASRV training, precision and calibration](docs/URN_CALIBRATION.md).
+
+For simulation truth comparisons, see [Q-based branch-pair expectations](docs/SIMULATE_EXPECTED_OMEGA.md).
 
 Foreground formats, higher-order search, site outputs, structure mapping, and
 simulation guides are available in the [Wiki](https://github.com/kfuku52/csubst/wiki).

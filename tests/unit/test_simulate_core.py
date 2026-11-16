@@ -139,6 +139,13 @@ def test_get_biased_amino_acids_random_mode_is_reproducible_with_rng():
     np.testing.assert_array_equal(out_a2, out_b2)
 
 
+def test_explicit_biased_amino_acids_form_a_set():
+    codon_table = [["K", "AAA"], ["N", "AAC"]]
+    np.testing.assert_array_equal(
+        main_simulate.get_biased_amino_acids("KNK", codon_table), ["K", "N"],
+    )
+
+
 def test_apply_percent_biased_sub_preserves_foreground_omega():
     mat = np.array(
         [[-1.0, 0.5, 0.5], [0.5, -1.0, 0.5], [0.5, 0.5, -1.0]],
@@ -311,6 +318,7 @@ def test_evolve_nonconvergent_partition_uses_sitewise_rates_when_asrv_file(monke
     call_kwargs = {}
     model_matrices = []
     partition_sizes = []
+    partition_models = []
 
     class DummyModel:
         def __init__(self, *args, **kwargs):
@@ -319,6 +327,7 @@ def test_evolve_nonconvergent_partition_uses_sitewise_rates_when_asrv_file(monke
     class DummyPartition:
         def __init__(self, *args, **kwargs):
             partition_sizes.append(int(kwargs["size"]))
+            partition_models.append(kwargs["models"])
 
     class DummyEvolver:
         def __init__(self, *args, **kwargs):
@@ -335,16 +344,17 @@ def test_evolve_nonconvergent_partition_uses_sitewise_rates_when_asrv_file(monke
     monkeypatch.setattr(main_simulate, "_PYVOLVE", DummyPyvolve())
     g = {
         "num_convergent_site": 1,
-        "num_simulated_site": 4,
+        "num_simulated_site": 5,
         "background_Q": np.array([[-1.0, 1.0], [1.0, -1.0]], dtype=float),
         "background_tree": object(),
         "simulate_asrv": "file",
-        "simulate_rate_nonconvergent": np.array([0.5, 2.0, 3.0], dtype=float),
+        "simulate_rate_nonconvergent": np.array([0.5, 2.0, 3.0, 0.5], dtype=float),
         "simulate_seed_nonconvergent": 2026,
     }
     main_simulate.evolve_nonconvergent_partition(g)
     assert call_kwargs["seed"] == 2026
-    assert partition_sizes == [1, 1, 1]
+    assert partition_sizes == [1, 1, 1, 1]
+    assert partition_models[0] is partition_models[3]
     assert len(model_matrices) == 3
     assert model_matrices[0][0, 1] == pytest.approx(0.5)
     assert model_matrices[1][0, 1] == pytest.approx(2.0)
@@ -399,6 +409,38 @@ def test_get_pyvolve_newick_marks_foreground_without_mutating_distances():
     out = main_simulate.get_pyvolve_newick(tr, "t")
     assert "#m1" in out
     assert pytest.approx(a_node.dist, rel=0, abs=1e-12) == 0.1
+
+
+def test_foreground_stem_uses_biased_model_only_on_the_stem():
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('((A#1:0.1,B:0.2)U_stem:0.3,C:0.4)R_root;', format=1))
+    stem = next(node for node in tr.traverse() if node.name == 'U_stem')
+    ete.set_prop(stem, 'is_fg_t', True)
+    ete.set_prop(stem, 'foreground_lineage_id_t', 1)
+    simulated = main_simulate.get_pyvolve_tree(tr, foreground_scaling_factor=2, trait_name='t')
+    assert simulated.name == 'R_root'
+    biased = next(node for node in simulated.children if node.name == 'U_stem')
+    assert (biased.model_flag, biased.branch_length) == ('m1', 0.6)
+    assert {node.name: (node.model_flag, node.branch_length) for node in biased.children} == {
+        'A#1': ('root', 0.1), 'B': ('root', 0.2),
+    }
+    assert stem.name == 'U_stem' and stem.dist == 0.3
+
+
+def test_invariant_site_keeps_stationary_root_frequencies(tmp_path):
+    pyvolve = main_simulate._require_pyvolve()
+    frequencies = np.array([0.1, 0.2, 0.3, 0.4])
+    matrix = np.broadcast_to(frequencies, (4, 4)).copy() - np.eye(4)
+    model = main_simulate._make_pyvolve_custom_model(
+        pyvolve, {'simulate_custom_frequency_file': tmp_path / 'frequencies.txt'}, 'root',
+        matrix, rate_factor=0,
+    )
+    np.testing.assert_allclose(model.params['state_freqs'], frequencies)
+    np.testing.assert_array_equal(model.matrix, np.zeros((4, 4)))
+    part = pyvolve.Partition(models=model, size=100)
+    evolver = pyvolve.Evolver(partitions=part, tree=pyvolve.read_tree(tree='(A:1,B:2)R;'))
+    evolver(seed=4, seqfile=None, ratefile=None, infofile=None)
+    assert len(set(evolver.evolved_seqs.values())) == 1
+    assert len(set(evolver.evolved_seqs['R'])) == 4
 
 
 def test_scale_tree_multiplies_every_branch_length():

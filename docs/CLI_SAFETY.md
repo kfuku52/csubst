@@ -16,6 +16,7 @@ output-path and TSV/manifest writers reject input/log aliases for dynamically
 resolved outputs. A rejected destination exits with status 2.
 Figure files and writable analysis caches use the same destination check.
 Chimera attribute and amino-acid FASTA exports also reject input/log aliases.
+The simulation's expected omegaC table is checked before the CLI opens its log.
 The ProstT5/3Di state/VESM caches may update their own configured cache paths;
 they still cannot overwrite another input or the CLI log, including through
 symlink and hardlink aliases.
@@ -83,6 +84,18 @@ For analysis, inferred IQ-TREE files are reused only when all five files
 compatible. Otherwise CSUBST attempts a new fit. Explicitly supplying all five
 `--iqtree_*` file paths uses their reported model without requiring the
 provenance manifest; `--iqtree_redo yes` requests a new fit.
+
+`search` (including `analyze`) and `benchmark` request `ECMK07_GY0K+F+R4`
+by default. To reuse a compatible inferred fit from an earlier version or
+from `dataset` made with `ECMK07+F+R4`, select that model explicitly. To reuse
+a new default `search` fit in another subcommand such as `sites`, pass
+`--iqtree_model ECMK07_GY0K+F+R4` and use the same `--iqtree_outdir`.
+For the search default, CSUBST checks inferred fits whose nonsynonymous
+multiplier remains at 1. A verified likelihood improvement can trigger a
+frequency-floor refit. CSUBST stages the fit and publishes the accepted files
+before writing their provenance manifest. A failed refit leaves the previous
+files in place. Explicitly supplied bundles are used as provided unless a
+refit is requested. Keep the matching checkpoint and verbose IQ-TREE log.
 
 `doctor` checks the IQ-TREE executable by default even when a bundled fit can
 be reused. For a check of existing inputs without the executable check, use
