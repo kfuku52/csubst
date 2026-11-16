@@ -8,6 +8,9 @@ Integrating only the shared site-rate category produces little change.
 The largest gain is for sister branches, which the default search excludes.
 The [runtime benchmark](PERFORMANCE.md) measures the cost of applying the
 exact branch-pair estimator to the pairs eligible in default `search`.
+The estimator is available through `search --pair_posterior joint --output_stat any2spe`.
+The [PEPC missingness experiment](MISSINGNESS.md) tests this option with
+clustered gaps and across independently fitted models.
 
 ![Coverage of synonymous-count intervals versus the generating endpoint counts](posterior_coverage.png)
 
