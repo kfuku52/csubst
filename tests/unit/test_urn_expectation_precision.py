@@ -98,6 +98,21 @@ def test_approximation_is_scale_invariant_and_recorded():
     assert g['_urn_expectation_methods'] == {'approximate_mean': True}
 
 
+def test_wallenius_stream_includes_fractional_draws_and_records_zero_boundaries():
+    profile = np.array([[1., 2., 0.], [1., 2., 3.], [0., 4., 0.], [0., 0., 0.], [2., 1., 1.]])
+    totals = np.array([0., .3, .5, .9, 2.3])
+    g = {}
+    actual = omega.wallenius_inclusion_profiles(profile, totals, g)
+    expected = []
+    for row, total in zip(profile, totals):
+        lo = int(total)
+        fraction = total - lo
+        expected.append((1 - fraction) * omega._calc_wallenius_inclusion_probabilities(row, lo)
+                        + fraction * omega._calc_wallenius_inclusion_probabilities(row, lo + 1))
+    np.testing.assert_allclose(actual, expected, atol=1e-15, rtol=1e-15)
+    assert g['_urn_expectation_methods'] == {'exact_boundary': True, 'exact_small_draw': True}
+
+
 @pytest.mark.parametrize('draw_size', [3, 6])
 def test_quadrature_matches_exact_sequential_draws_on_both_tails(draw_size):
     weights = np.array([.03, .05, .13, .25, .6, 2., 7.])

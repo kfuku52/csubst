@@ -55,6 +55,8 @@ def fit_site_rates(counts, eligible):
 
 def _event_totals(tensor, routes):
     """Reduce one sparse branch at a time, without a dense event tensor."""
+    if getattr(tensor, 'event_totals', None) is not None:
+        return tensor.branch_site, tensor.event_totals
     nb, ns, ng, na, nd = tensor.shape
     site = np.zeros((nb, ns))
     shape = (na, nd) if routes else (ng, nd)
@@ -81,6 +83,16 @@ def _pool_n_totals(count, exposure, routes, eval_profile, eval_effort):
     return eval_profile.sum(axis=1) * (scale * eval_effort)[:, None]
 
 
+def _pair_overlaps(pairs, inclusions):
+    # Dense fold pairs share most of their branch rows. Reuse the dot
+    # products without gathering a pair-by-site array for each destination.
+    n = len(inclusions)
+    if n <= 512 and len(pairs) * 8 >= n * n:
+        left, right = pairs.T
+        return (inclusions @ inclusions.T)[left, right]
+    return omega._calc_cb_site_overlap(pairs, inclusions, np.float64)
+
+
 def _add_group_overlaps(result, pairs, profile, totals, g):
     use_any = 'any2any' in result
     use_spe = 'any2spe' in result
@@ -92,9 +104,9 @@ def _add_group_overlaps(result, pairs, profile, totals, g):
         if use_any:
             all_dest += included
         if use_spe:
-            result['any2spe'] += omega._calc_cb_site_overlap(pairs, included, np.float64)
+            result['any2spe'] += _pair_overlaps(pairs, included)
     if use_any:
-        result['any2any'] += omega._calc_cb_site_overlap(pairs, all_dest, np.float64)
+        result['any2any'] += _pair_overlaps(pairs, all_dest)
 
 
 def _paired_counts(g, pairs, ids, train, parents, aa_parent, groups, eligible, ns_counts, route_totals, syn_totals, stats):

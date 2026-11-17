@@ -433,6 +433,38 @@ def test_streaming_retains_projections_when_later_consumers_need_them(tmp_path, 
     assert not isinstance(g['_endpoint_tensors']['N'], PairwiseSubstitutionSummary)
 
 
+def test_empirical_urn_stream_retains_learning_totals_and_observed_counts(tmp_path):
+    import pandas as pd
+    from csubst import empirical_urn
+    from csubst.substitution_sparse import PairwiseSubstitutionSummary
+
+    streamed, ids = toy_context(tmp_path)
+    stats = ['any2any', 'any2spe']
+    streamed.update(subcommand='search', max_arity=2, num_node=len(ids), expectation_method='urn', asrv='empirical',
+                    output_stats=stats, b=True)
+    full = copy.deepcopy(streamed)
+    full['cs'] = True
+    endpoint_io.prepare(streamed)
+    endpoint_io.prepare(full)
+    pairs = np.array([[ids['A'], ids['B']], [ids['A'], ids['C']]])
+    for kind, routes in [('N', True), ('S', False)]:
+        a = streamed['_endpoint_tensors'][kind]
+        b = full['_endpoint_tensors'][kind]
+        assert isinstance(a, PairwiseSubstitutionSummary)
+        for saved, reduced in zip(empirical_urn._event_totals(a, routes), empirical_urn._event_totals(b, routes)):
+            np.testing.assert_allclose(saved, reduced, atol=1e-14)
+        np.testing.assert_array_equal(a.eligible, b.eligible)
+        pd.testing.assert_frame_equal(substitution.get_cb(pairs, a, streamed, 'OC' + kind, stats),
+                                      substitution.get_cb(pairs, b, full, 'OC' + kind, stats),
+                                      check_exact=False, atol=1e-14, rtol=1e-12)
+        pd.testing.assert_frame_equal(substitution.get_b(streamed, a, kind, routes),
+                                      substitution.get_b(full, b, kind, routes),
+                                      check_exact=False, atol=1e-14, rtol=1e-12)
+    streamed['asrv'] = 'each'
+    endpoint_io.prepare(streamed)
+    assert not isinstance(streamed['_endpoint_tensors']['N'], PairwiseSubstitutionSummary)
+
+
 def test_streamed_full_statistics_accept_empty_site_axis(tmp_path):
     g, _ = toy_context(tmp_path)
     g.update(subcommand='search', max_arity=2)

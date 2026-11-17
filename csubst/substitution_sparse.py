@@ -399,21 +399,25 @@ class ProjectedSubstitutionTensor(SparseSubstitutionTensor):
 class PairwiseSubstitutionSummary(ProjectedSubstitutionTensor):
     """Final arity-2 scores plus branch/site counts; no all-site projections."""
 
-    def __init__(self, shape, dtype, pairwise, branch_site, sitewise_max=None):
+    def __init__(self, shape, dtype, pairwise, branch_site, sitewise_max=None, event_totals=None):
         self.shape = tuple(shape)
         self.dtype = np.dtype(dtype)
         self.pairwise = pairwise
         self.branch_site = branch_site
         self.sitewise_max = sitewise_max
+        self.event_totals = event_totals
         self.projections = {}
         for matrix in pairwise.values():
             matrix.flags.writeable = False
         self.branch_site.flags.writeable = False
+        if self.event_totals is not None:
+            self.event_totals.flags.writeable = False
 
     @property
     def nbytes(self):
-        return self.branch_site.nbytes + sum(x.nbytes for x in self.pairwise.values()) + (
-            0 if self.sitewise_max is None else sum(x.nbytes for x in self.sitewise_max))
+        return (self.branch_site.nbytes + sum(x.nbytes for x in self.pairwise.values())
+                + (0 if self.sitewise_max is None else sum(x.nbytes for x in self.sitewise_max))
+                + (0 if self.event_totals is None else self.event_totals.nbytes))
 
     def project(self, stat):
         raise ValueError('Site projections were not retained by the arity-2 streaming reducer.')

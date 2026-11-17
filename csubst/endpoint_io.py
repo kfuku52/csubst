@@ -261,8 +261,10 @@ def _use_projected_search(g, selected_stats):
     # These consumers require individual events or additional null summaries.
     # Keep their full, exact representation rather than approximate a missing
     # statistic from a coarser projection.
+    expectation = g.get('expectation_method', 'codon_model')
+    empirical = expectation == 'urn' and g.get('asrv') == 'empirical' and _pairwise_search(g)
     return (g.get('subcommand') in ('search', 'analyze', 'benchmark')
-            and g.get('expectation_method', 'codon_model') == 'codon_model'
+            and (expectation == 'codon_model' or empirical)
             and not any(g.get(key, False) for key in (
                 'cs', 'cbs', 'calc_omega_pvalue', 'asrv_report', 'calibrate_longtail'))
             and not g.get('epistasis_requested', False)
@@ -469,9 +471,10 @@ def _build(g, structural=False):
             block_size = max(1, block_size // 2)
         pairwise = _pairwise_storage_bound(n, num_site, shapes, kinds, selected_stats,
                                            block_size, g) <= 64 * 1024 * 1024
-    if 'spe2spe' in selected_stats and not pairwise:
+    empirical = g.get('asrv') == 'empirical'
+    if ('spe2spe' in selected_stats or empirical) and not pairwise:
         projected = False
-    direct = projected and 'AA' not in kinds and 'spe2spe' not in selected_stats
+    direct = projected and 'AA' not in kinds and 'spe2spe' not in selected_stats and not empirical
     retained_branches = g.get('_endpoint_retained_branches') if g.get('subcommand') == 'sites' else None
     if retained_branches is not None:
         retained_branches = frozenset(int(v) for v in retained_branches)
@@ -490,6 +493,7 @@ def _build(g, structural=False):
         obuilders = {}
         maxima = {}
         branch_sites = {}
+        urn_totals = {}
         if retained_branches is not None:
             branch_sites = {kind: np.zeros((n, num_site)) for kind in kinds}
 
@@ -506,6 +510,8 @@ def _build(g, structural=False):
                                    for stat in observed_stats}
                 if pairwise:
                     branch_sites[kind] = np.zeros((n, num_site))
+                    if empirical:
+                        urn_totals[kind] = np.zeros((n, ns, ns) if kind == 'N' else (n, ng, ns))
                 if g.get('b', False):
                     maxima[kind] = (np.zeros((n, num_site)), np.zeros((n, num_site), dtype=np.int32),
                                     np.zeros((n, num_site), dtype=np.int32))
@@ -558,6 +564,11 @@ def _build(g, structural=False):
                 if projected:
                     if pairwise:
                         branch_sites[kind][node, sl] = projections['any2any'].sum(axis=1)
+                        if kind in urn_totals:
+                            if kind == 'N':
+                                urn_totals[kind][node] += events[:, 0].sum(axis=0, dtype=np.float64)
+                            else:
+                                urn_totals[kind][node] += projections['any2spe'].sum(axis=0, dtype=np.float64)
                     for stat, accumulator in obuilders[kind].items():
                         accumulator.append(node, projections[stat], record.start, num_site)
                     if kind in maxima:
@@ -590,7 +601,7 @@ def _build(g, structural=False):
                 cache[kind] = substitution_sparse.PairwiseSubstitutionSummary(
                     shapes[kind], source.dtype,
                     {stat: accumulator.finish() for stat, accumulator in obuilders[kind].items()},
-                    branch_sites[kind], maxima.get(kind))
+                    branch_sites[kind], maxima.get(kind), event_totals=urn_totals.get(kind))
             elif projected:
                 cache[kind] = substitution_sparse.ProjectedSubstitutionTensor(
                     shapes[kind], source.dtype,
@@ -666,6 +677,8 @@ def _input_fingerprint(g):
                 'calc_omega_pvalue', 'asrv_report', 'epistasis_requested', 'asrv_training_branches', 'asrv_posterior_draws',
                 'site_filter_report', 'fg_clade_permutation', 'max_synonymous_size'):
         digest.update(str((key, g.get(key))).encode())
+    if g.get('asrv') == 'empirical':
+        digest.update(b'empirical_urn_event_totals')
     if g.get('pair_posterior') == 'joint':
         digest.update(b'joint_observed_any2spe')
     return digest.hexdigest()

@@ -786,6 +786,11 @@ def _prepare_permutation_branch_sizes(sub_branches, niter, g, rng=None):
 
 
 def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=np.float64, policy="auto"):
+    probabilities, _ = _wallenius_inclusion_details(site_weights, draw_size, policy)
+    return probabilities.astype(float_type, copy=False)
+
+
+def _wallenius_inclusion_details(site_weights, draw_size, policy):
     site_weights = np.asarray(site_weights, dtype=np.float64).reshape(-1)
     if site_weights.ndim != 1:
         raise ValueError('site_weights should be a 1D array.')
@@ -801,21 +806,22 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
     positive_weights = site_weights[positive_mask]
     num_positive = int(positive_weights.shape[0])
     if (draw_size == 0) or (num_positive == 0):
-        return out.astype(float_type, copy=False)
+        return out, 'exact_boundary'
     if draw_size >= num_positive:
         out[positive_mask] = 1.0
-        return out.astype(float_type, copy=False)
+        return out, 'exact_boundary'
     if draw_size == 1:
         scaled = positive_weights / positive_weights.max()
         out[positive_mask] = scaled / scaled.sum(dtype=np.float64)
-        return out.astype(float_type, copy=False)
+        method = 'exact_uniform' if np.all(positive_weights == positive_weights[0]) else 'exact_small_draw'
+        return out, method
     method = urn_expectation.wallenius_method(positive_weights, draw_size)
     if method == 'exact_uniform':
         out[positive_mask] = draw_size / num_positive
-        return out.astype(float_type, copy=False)
+        return out, method
     if draw_size == 2:
         out[positive_mask] = urn_expectation.two_draw_inclusion(positive_weights)
-        return out.astype(float_type, copy=False)
+        return out, method
     if method == 'approximate_mean' and policy == 'exact':
         raise ValueError('Exact Wallenius expectation exceeds the enumeration budget; '
                          'auto permits an approximate mean (see urn provenance).')
@@ -827,9 +833,10 @@ def _calc_wallenius_inclusion_probabilities(site_weights, draw_size, float_type=
         out[positive_mask] = urn_expectation.enumerated_wallenius_inclusion(positive_weights, draw_size)
     elif policy == 'quadrature':
         out[positive_mask] = urn_expectation.wallenius_quadrature_inclusion(positive_weights, draw_size)
+        method = 'quadrature'
     else:
         out[positive_mask] = urn_expectation.wallenius_mean_inclusion(positive_weights, draw_size)
-    return out.astype(float_type, copy=False)
+    return out, method
 
 
 def _calc_fisher_inclusion_probabilities(site_weights, draw_size, float_type=np.float64):
@@ -949,7 +956,8 @@ def _calc_weighted_urn_expected_overlap(
     return _calc_cb_site_overlap(cb_ids, inclusion, float_type)
 
 
-def _weighted_urn_inclusion_profiles(sub_sites, sub_branches, g, inclusion_probability_func, profile_inclusion=None):
+def _weighted_urn_inclusion_profiles(sub_sites, sub_branches, g, inclusion_probability_func, profile_inclusion=None,
+                                     wallenius_zero=False):
     sub_branches = np.asarray(sub_branches, dtype=np.float64).reshape(-1)
     if sub_branches.ndim != 1:
         raise ValueError('sub_branches should be a 1D array.')
@@ -992,6 +1000,13 @@ def _weighted_urn_inclusion_profiles(sub_sites, sub_branches, g, inclusion_proba
             continue
         size = int(base[branch_id])
         size_lo = min(max(size, 0), num_positive)
+        if size_lo == 0 and wallenius_zero:
+            # The output buffer is already zero. Fractional counts below one
+            # only need the one-draw probabilities and their rounding weight.
+            g.setdefault('_urn_expectation_methods', {})['exact_boundary'] = True
+            if fraction is not None and fraction[branch_id] > 0.:
+                inclusion_prob[branch_id] = fraction[branch_id] * inclusion(profile_id, 1)
+            continue
         prob = inclusion(profile_id, size_lo)
         if fraction is not None and fraction[branch_id] > 0:
             size_hi = min(max(size + 1, 0), num_positive)
@@ -1004,11 +1019,7 @@ def _weighted_urn_inclusion_profiles(sub_sites, sub_branches, g, inclusion_proba
 
 def _wallenius_inclusion_for_policy(site_weights, draw_size, g):
     policy = g.get('urn_wallenius_expectation', 'auto')
-    result = _calc_wallenius_inclusion_probabilities(site_weights, draw_size, policy=policy)
-    positive = np.asarray(site_weights)[np.asarray(site_weights) > 0]
-    method = urn_expectation.wallenius_method(positive, draw_size)
-    if method == 'approximate_mean' and policy == 'quadrature':
-        method = 'quadrature'
+    result, method = _wallenius_inclusion_details(site_weights, draw_size, policy)
     g.setdefault('_urn_expectation_methods', {})[method] = True
     return result
 
@@ -1032,7 +1043,7 @@ def wallenius_inclusion_profiles(sub_sites, draw_totals, g):
     def inclusion(site_weights, draw_size, float_type):
         return _wallenius_inclusion_for_policy(site_weights, draw_size, g)
 
-    return _weighted_urn_inclusion_profiles(sub_sites, draw_totals, g, inclusion)
+    return _weighted_urn_inclusion_profiles(sub_sites, draw_totals, g, inclusion, wallenius_zero=True)
 
 
 def _calc_fisher_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
