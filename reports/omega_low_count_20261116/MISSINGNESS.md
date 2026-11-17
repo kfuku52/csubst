@@ -28,10 +28,15 @@ directly.
 
 True N and S counts use the simulated tip and internal sequences and
 exclude sites where either edge has no observed descendants. The truth on
-complete data reproduces every exported true count. The Q-based null
-totals scale by the retained fraction for each pair, since the background
-null has the same generator and rate at every site. For pooled summaries
-each count is summed before taking ratios. Rows sharing branches or an
+complete data reproduces every exported true count. This report scales the
+Q-based null totals by each pair's retained fraction. This is exact for
+the homogeneous background-Q runs. For the biased runs it approximates
+site-specific null contributions, since the foreground generator can
+change upstream ancestral-state distributions. The expectation follow-up
+removes the generating contribution of the omitted sites directly.
+[Shared expected counts](SHARED_EXPECTED.md)
+
+Pooled summaries sum each count before taking ratios. Rows sharing branches or an
 alignment are dependent, so results are descriptive across these seeds.
 
 ## Results
@@ -54,6 +59,8 @@ joint calculation assigned more probability to shared-parent changes,
 increasing N RMSE in every biased seed. In the masked fixed-fit replay,
 the same 207 biased sister pairs had S RMSE 0.732 → 0.673 and N RMSE
 0.0027 → 0.0256. This difference therefore also occurs without refitting.
+The site-level follow-up separates uncertainty in parent amino acids,
+site rates, branch lengths, and the generator. [Sister-pair N diagnosis](SISTER_N.md)
 
 In the background-Q mask, pooled ECN relative to the generating-Q
 expectation was 1.068 with the complete-data fit and 1.032 after refitting.

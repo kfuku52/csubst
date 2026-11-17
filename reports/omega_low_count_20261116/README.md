@@ -49,6 +49,10 @@ and ancestral states jointly within each site and compares count intervals
 with the realized counts under uniform rates, heterogeneous rates, and
 directional bias. Rows sharing branches or alignments are dependent.
 
+The [Wallenius urn simulation](URN_ACCURACY.md) uses the PEPC alignments
+to check expected counts against the generating Q and compare sampled
+tail probabilities across the same scenarios.
+
 ## Reproduce
 
 Use the saved panel directory and the recovered fit directory from the

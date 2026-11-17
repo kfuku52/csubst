@@ -30,9 +30,9 @@ BIAS_PANEL = {
 METHODS = ('factorized', 'shared_rate', 'joint_fitted', 'joint_oracle')
 
 
-def fitted_generator(rep, report, metadata):
+def fitted_generator(rep, report, metadata, alignment=None):
     g = {
-        'alignment_file': str(rep / 'sim/sim.fa'), 'float_type': np.float64,
+        'alignment_file': str(rep / 'sim/sim.fa' if alignment is None else alignment), 'float_type': np.float64,
         'codon_table': genetic_code.get_codon_table(1),
         **{f'path_iqtree_{ext}': str(report.with_suffix('.' + ext)) for ext in ('state', 'log', 'iqtree')},
     }
