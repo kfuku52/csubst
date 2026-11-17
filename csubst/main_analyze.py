@@ -775,7 +775,8 @@ def _main_analyze(g: AnalysisConfig) -> None:
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if _resolve_expectation_method(g) != 'codon_model':
-        g['state_cdn'] = None
+        if g.get('asrv') != 'empirical':
+            g['state_cdn'] = None
         g['state_pep'] = None
         g['state_nsy'] = None
 

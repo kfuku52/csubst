@@ -40,11 +40,19 @@ def fitted_generator(rep, report, metadata, alignment=None):
     parser_iqtree.read_iqtree(g)
     parser_iqtree.read_log(g)
     codons = g['codon_orders']
-    g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(
-        'substitution_matrix/ECMunrest.dat', codons,
-    )
+    model = g['substitution_model'].split('+', 1)[0]
+    if model in ('ECMK07', 'ECMK07_GY0K'):
+        g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(
+            'substitution_matrix/ECMunrest.dat', codons,
+        )
+        if model == 'ECMK07':
+            g['instantaneous_codon_rate_matrix'] = parser_misc.exchangeability2Q(
+                g['exchangeability_matrix'], g['equilibrium_frequency'],
+            )
+    elif model.startswith(('GY', 'MG')):
+        g['instantaneous_codon_rate_matrix'] = parser_misc.get_mechanistic_instantaneous_rate_matrix(g)
     fitted_model.prepare(g)
-    if metadata['parameter_source']['frequency_source'] == 'verbose_log_or_FQ':
+    if model == 'ECMK07_GY0K' and metadata['parameter_source'].get('frequency_source') == 'verbose_log_or_FQ':
         # The original panel used raw log frequencies before checkpoint
         # support was added. Replay the actual saved generator in that case.
         logs = report.with_suffix('.log').read_text()

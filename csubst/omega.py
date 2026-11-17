@@ -941,7 +941,15 @@ def _calc_weighted_urn_expected_overlap(
         return np.zeros(shape=(0,), dtype=float_type)
     if (cb_ids < 0).any():
         raise ValueError('cb_ids should be non-negative.')
+    if cb_ids.max() >= np.size(sub_branches):
+        raise ValueError('cb_ids contain out-of-range branch IDs.')
+    inclusion = _weighted_urn_inclusion_profiles(
+        sub_sites, sub_branches, g, inclusion_probability_func, profile_inclusion,
+    )
+    return _calc_cb_site_overlap(cb_ids, inclusion, float_type)
 
+
+def _weighted_urn_inclusion_profiles(sub_sites, sub_branches, g, inclusion_probability_func, profile_inclusion=None):
     sub_branches = np.asarray(sub_branches, dtype=np.float64).reshape(-1)
     if sub_branches.ndim != 1:
         raise ValueError('sub_branches should be a 1D array.')
@@ -949,9 +957,6 @@ def _calc_weighted_urn_expected_overlap(
         raise ValueError('sub_branches should be finite.')
     np.clip(sub_branches, a_min=0.0, a_max=None, out=sub_branches)
     sub_sites = _normalize_sub_sites_for_urn_overlap(sub_sites=sub_sites, num_branch=sub_branches.shape[0])
-    if sub_sites.shape[0] <= cb_ids.max():
-        raise ValueError('cb_ids contain out-of-range branch IDs.')
-
     profile_ids = _urn_weight_profile_ids(sub_sites)
     reuse_profiles = np.any(profile_ids != np.arange(len(sub_sites)))
     positive_counts = np.full(len(sub_sites), -1, dtype=np.int64)
@@ -994,11 +999,7 @@ def _calc_weighted_urn_expected_overlap(
                 frac = float(fraction[branch_id])
                 prob = (1.0 - frac) * prob + frac * inclusion(profile_id, size_hi)
         inclusion_prob[branch_id] = prob
-    return _calc_cb_site_overlap(
-        cb_ids=cb_ids,
-        sub_sites=inclusion_prob,
-        float_type=float_type,
-    )
+    return inclusion_prob
 
 
 def _wallenius_inclusion_for_policy(site_weights, draw_size, g):
@@ -1025,6 +1026,13 @@ def _calc_wallenius_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_t
         inclusion_probability_func=inclusion,
         profile_inclusion=profile_inclusion,
     )
+
+
+def wallenius_inclusion_profiles(sub_sites, draw_totals, g):
+    def inclusion(site_weights, draw_size, float_type):
+        return _wallenius_inclusion_for_policy(site_weights, draw_size, g)
+
+    return _weighted_urn_inclusion_profiles(sub_sites, draw_totals, g, inclusion)
 
 
 def _calc_fisher_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
@@ -2207,7 +2215,12 @@ def get_E(cb, g, ON_tensor, OS_tensor):
     requested_output_stats = _resolve_requested_output_stats(g)
     base_stats = output_stat.get_required_base_stats(requested_output_stats)
     filter_report = site_filter.start_count_report(g, cb, ON_tensor, OS_tensor, base_stats)
-    if expectation_method == 'urn':
+    if expectation_method == 'urn' and g.get('asrv') == 'empirical':
+        from csubst import empirical_urn
+        pairs = cb.loc[:, cb.columns.str.startswith('branch_id_')].to_numpy(dtype=np.int64)
+        for column, values in empirical_urn.expected_counts(g, pairs, ON_tensor, OS_tensor, base_stats).items():
+            cb[column] = values
+    elif expectation_method == 'urn':
         ON_gad, ON_ga, ON_gd = substitution.get_group_state_totals(ON_tensor)
         OS_gad, OS_ga, OS_gd = substitution.get_group_state_totals(OS_tensor)
         g['N_ind_nomissing_gad'] = np.where(ON_gad!=0)

@@ -773,7 +773,7 @@ def dummy_foreground_annotation(tree, trait_name):
         ete.add_features(node, **{'labelcolor_' + trait_name: 'black'})
     return tree
 
-def get_foreground_branch(g, simulate=False):
+def get_foreground_branch(g, simulate=False, write=True):
     if g['foreground'] is None:
         trait_name = 'PLACEHOLDER'
         g['tree'] = dummy_foreground_annotation(tree=g['tree'], trait_name=trait_name)
@@ -791,7 +791,7 @@ def get_foreground_branch(g, simulate=False):
             if g['fg_df'].shape[1] > 2:
                 g['fg_df'] = g['fg_df'].iloc[:,[0,1]]
             g['fg_df'].columns = ['name','PLACEHOLDER']
-        g = get_foreground_ids(g=g, write=True)
+        g = get_foreground_ids(g=g, write=write)
     g = _invalidate_clade_permutation_cache(g)
     g['_foreground_annotation_ready'] = True
     return g

@@ -5,9 +5,43 @@ totals, ancestral-state estimates, filtering and recoding can all depend on
 the same alignment. Conditional randomization under those fitted quantities
 does not establish false-positive control for the entire analysis.
 
-These options remain experimental. The ordinary default expectation method
-is unchanged. A fixed amino-acid grouping tests convergence to that group;
-it does not test identity of individual amino acids or structural states.
+The ordinary search expectation is `codon_model`. A fixed amino-acid
+grouping tests convergence to that group. Consult the effective `asrv`
+and the urn settings in `csubst_urn_provenance.json` for every urn run.
+
+## Default pairwise urn
+
+With `--expectation_method urn`, `--asrv auto` selects `empirical` for
+joint codon branch-pair expectations with the Wallenius urn and the
+`any2spe`, `any2any`, and `any2dif` output statistics. Specify
+`--asrv each` to use the previous destination-specific pooled site weights.
+With higher arity, source-specific statistics, recoding, marginal ASR,
+alternative urn laws, count P values, long-tail calibration, or custom
+legacy weight settings, `auto` reports its choice of `each`. Requesting
+`--asrv empirical` with one of these settings raises an error.
+
+The empirical urn assigns branches to four folds by branch ID modulo
+four. For each pair, it trains on eligible branches outside both folds.
+Each training branch's N+S endpoint masses contribute to a site-rate
+profile. The mixture with uniform site weights is fitted by
+leave-one-training-branch-out log scoring. N weights combine these
+rates with empirical parent-to-destination amino-acid rates learned
+with a 0.5-count destination-pooled prior. The observed N+S mass of an
+evaluation branch anchors its N destination totals. A scale estimated
+from the training branches fixes their pooled predicted N mass to their
+pooled observed N mass. Synonymous weights use parental codon
+compatibility and the original empirical site weights based on a
+0.5-count per-site prior, with observed synonymous destination totals.
+
+Each destination has its own Wallenius inclusion probabilities.
+`any2spe` sums overlaps within destinations. `any2any` sums overlaps
+over destination combinations within the same substitution group, so
+`any2dif` is their difference. In the absence of eligible training
+branches for a pair's held-out folds, the corresponding expected counts
+are unavailable. The ASR conditions on the entire alignment and the fitted
+codon model. Folds affect the learning of urn weights and N totals.
+Provenance records the fitted uniform weights and training sizes per fold.
+[PEPC estimator study](../reports/omega_low_count_20261116/URN_ECN_BIAS.md)
 
 ## Learning ASRV weights
 

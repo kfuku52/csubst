@@ -33,7 +33,7 @@ def validate_options(g):
         concentration = float(concentration)
         if not np.isfinite(concentration) or concentration < 0:
             raise ValueError('--asrv_concentration must be finite and nonnegative.')
-        if g.get('asrv', 'each') not in ('sn', 'each', 'file_each'):
+        if g.get('asrv', 'each') not in ('auto', 'sn', 'each', 'file_each'):
             raise ValueError('--asrv_concentration applies only to sn/each/file_each.')
     g['asrv_concentration'] = concentration
     customized = concentration is not None or g['asrv_training_branches'] != 'all' or g.get('asrv_report', False)
@@ -60,6 +60,39 @@ def validate_options(g):
             raise ValueError('--asrv_posterior_draws supports EC and omegaC only; use external pipeline calibration.')
         if g.get('asrv_report'):
             raise ValueError('--asrv_posterior_draws does not support fixed-weight --asrv_report diagnostics.')
+
+
+def effective_mode(g):
+    requested = g.get('asrv', 'each')
+    if requested not in ('auto', 'empirical'):
+        return requested
+    if g.get('expectation_method', 'codon_model') != 'urn':
+        if requested == 'empirical':
+            raise ValueError('--asrv empirical requires --expectation_method urn.')
+        return 'each'
+    from csubst import empirical_urn, output_stat
+
+    reasons = []
+    if g.get('urn_model', 'wallenius') != 'wallenius':
+        reasons.append('Wallenius urn')
+    if g.get('substitution_posterior', 'joint') != 'joint' or g.get('nonsyn_recode', 'no') != 'no':
+        reasons.append('joint codon ASR with amino-acid N substitutions')
+    stats = g.get('output_base_stats', output_stat.get_required_base_stats(output_stat.DEFAULT_OUTPUT_STATS))
+    if int(g.get('max_arity', 2)) != 2 or not set(stats).issubset(empirical_urn.SUPPORTED_STATS):
+        reasons.append('branch pairs and any2any/any2spe/any2dif output')
+    if g.get('calc_omega_pvalue') or g.get('calibrate_longtail'):
+        reasons.append('expectations without the legacy count calibration')
+    if (g.get('epistasis_requested') or g.get('asrv_report') or g.get('asrv_posterior_draws')
+            or g.get('asrv_training_branches', 'all') != 'all' or g.get('asrv_concentration') is not None
+            or g.get('asrv_dirichlet_alpha', 1.) != 1.):
+        reasons.append('its own fold-based training and site-weight regularization')
+    if not reasons:
+        return 'empirical'
+    message = 'Cross-fitted empirical urn requires ' + '; '.join(reasons) + '.'
+    if requested == 'empirical':
+        raise ValueError(message + ' Use --asrv each for the legacy urn.')
+    print('Automatic ASRV resolved to each. ' + message, flush=True)
+    return 'each'
 
 
 def posterior_rate_seed(g):
@@ -206,7 +239,8 @@ def write_provenance(g, path):
         'asrv': g.get('asrv', 'each'),
         'training_branches': g.get('asrv_training_branches', 'all'),
         'training_branch_ids': np.asarray(g.get('_asrv_training_ids', []), dtype=int).tolist(),
-        'asrv_alpha_per_site': None if g.get('asrv_concentration') is not None else g.get('asrv_dirichlet_alpha', 1.0),
+        'asrv_alpha_per_site': (None if g.get('asrv') == 'empirical' or g.get('asrv_concentration') is not None
+                                else g.get('asrv_dirichlet_alpha', 1.0)),
         'asrv_total_concentration': g.get('asrv_concentration'),
         'site_rate_file': str(g.get('path_iqtree_rate', g.get('iqtree_rate', ''))),
         'site_rate_column': (g.get('iqtree_rate_column') if g.get('asrv') in ('file', 'file_each')
@@ -230,6 +264,17 @@ def write_provenance(g, path):
         'weight_diagnostics_requested': bool(g.get('asrv_report', False)),
         'wallenius_methods_complete': bool(g.get('_asrv_diagnostics_complete', False)),
     }
+    if g.get('asrv') == 'empirical':
+        from csubst import empirical_urn
+        payload['empirical_urn'] = {
+            'branch_fold_count': empirical_urn.FOLD_COUNT,
+            'fold_assignment': 'branch_id_modulo_fold_count',
+            'site_regularization': 'leave_one_training_branch_out_log_score',
+            'route_prior_count': empirical_urn.ROUTE_PRIOR_COUNT,
+            'n_draw_totals': 'pooled_branch_n_plus_s',
+            's_draw_totals': 'observed_destination_mass',
+            'folds': g.get('_empirical_urn_folds', []),
+        }
     if g.get('asrv_posterior_draws'):
         payload['site_rate_posterior'] = {
             'draws': g['asrv_posterior_draws'],

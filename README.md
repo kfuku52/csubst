@@ -107,7 +107,7 @@ CSUBST provides ten main subcommands:
 - [`csubst scan`](https://github.com/kfuku52/csubst/wiki/csubst-scan): find recurrent foreground substitutions and compare rates, with [support grouped by foreground ID](docs/SCAN_INFERENCE.md#support-grouped-by-foreground-lineage-id). See [scores and bootstrap inference](docs/SCAN_INFERENCE.md) and [clade calibration](docs/SCAN_CALIBRATION.md). [Joint and CTMC bridge](docs/SCAN_CTMC.md) both support fitted discrete codon-rate categories. Joint is the default.
 - [`csubst inspect`](https://github.com/kfuku52/csubst/wiki/csubst-inspect): summarize branch mappings, inspect ancestral states, and report exact topology-derived independent branch-combination counts without enumerating combinations.
 - [`csubst sites`](https://github.com/kfuku52/csubst/wiki/csubst-sites) (legacy alias: `csubst site`): compute site-wise combinatorial substitutions for selected branch combinations, generate tree and site-summary plots, and optionally map sites to protein structures.
-- [`csubst simulate`](https://github.com/kfuku52/csubst/wiki/csubst-simulate): simulate codon sequence evolution under user-defined convergence scenarios.
+- [`csubst simulate`](https://github.com/kfuku52/csubst/wiki/csubst-simulate): simulate codon sequence evolution with custom settings or [evaluation scenario presets](docs/SIMULATE_SCENARIOS.md).
 - [`csubst benchmark`](https://github.com/kfuku52/csubst/wiki/csubst-benchmark): run `csubst search` over parameter grids on the same input data and summarize runtime and output metrics.
 - [`csubst benchmark-plot`](https://github.com/kfuku52/csubst/wiki/csubst-benchmark-plot): collect existing benchmark outputs, compare performance across parameter settings, and write an overview figure.
 

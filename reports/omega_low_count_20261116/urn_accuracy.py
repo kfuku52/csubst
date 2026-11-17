@@ -32,12 +32,10 @@ def load_search(root, outdir):
     return pd.read_csv(out / 'csubst_cb_2.tsv', sep='\t'), endpoint_manifest
 
 
-def run_search(root, mode, seed, draws, read_existing):
+def search_argv(mode, seed, draws):
     profile = {'oracle_file': 'file', 'each_tau2': 'each'}.get(mode, mode)
     method = 'codon_model' if mode == 'codon_model' else 'urn'
     outdir = mode if method == 'codon_model' else 'urn-' + mode
-    if read_existing:
-        return load_search(root, outdir)
     argv = ['search', '--alignment_file', 'sim.fa', '--rooted_tree_file', 'tree.nwk',
             '--threads', '1', '--blas_threads', '1', '--b', 'no', '--exclude_sister_pair', 'no',
             '--output_stat', 'any2spe', '--float_digit', '12', '--random_seed', str(seed),
@@ -47,11 +45,18 @@ def run_search(root, mode, seed, draws, read_existing):
     for ext in ('iqtree', 'state', 'rate', 'treefile', 'log'):
         path = 'generating.rate' if mode == 'oracle_file' and ext == 'rate' else 'fit.' + ext
         argv += ['--iqtree_' + ext, path]
-    if mode in SAMPLED:
+    if draws > 0 and mode in SAMPLED:
         argv += ['--calc_omega_pvalue', 'yes', '--omega_pvalue_null_model', 'hypergeom',
                  '--omega_pvalue_niter_schedule', str(draws), '--min_sub_pp', '0']
     if mode == 'each_tau2':
         argv += ['--asrv_concentration', '2']
+    return outdir, argv
+
+
+def run_search(root, mode, seed, draws, read_existing):
+    outdir, argv = search_argv(mode, seed, draws)
+    if read_existing:
+        return load_search(root, outdir)
     log = root / (outdir + '.log')
     with log.open('w') as f:
         try:
@@ -151,7 +156,7 @@ def run_case(args):
         np.testing.assert_allclose(merged[OBS], paired[OBS], rtol=1e-9, atol=6e-12)
         if not np.isfinite(merged[EXPECTED]).all().all():
             raise ValueError('Urn EC is missing for an eligible paired row.')
-        tests = merged[[PVALUE, QVALUE, *DRAW_COUNTS]].to_numpy() if mode in SAMPLED else None
+        tests = merged[[PVALUE, QVALUE, *DRAW_COUNTS]].to_numpy() if draws > 0 and mode in SAMPLED else None
         if tests is not None:
             if not np.isfinite(tests[:, 0]).any():
                 raise ValueError('The urn sampler returned no finite p-values.')
@@ -168,14 +173,17 @@ def main():
     p.add_argument('work', type=Path)
     p.add_argument('output', type=Path)
     p.add_argument('--jobs', type=int, default=3)
-    p.add_argument('--draws', type=int, default=999)
-    p.add_argument('--modes', nargs='+', choices=['each', 'file', 'no', 'oracle_file', 'each_tau2'],
+    p.add_argument('--draws', type=int, default=999, help='Use 0 for expected counts without sampled tails.')
+    p.add_argument('--modes', nargs='+',
+                   choices=['no', 'pool', 'sn', 'each', 'file', 'file_each', 'oracle_file', 'each_tau2'],
                    default=['each', 'file', 'no', 'oracle_file'])
     p.add_argument('--scenarios', nargs='+', choices=['baseline', 'biased', 'rate_mixture'],
                    default=['baseline', 'biased', 'rate_mixture'])
     p.add_argument('--seeds', nargs='+', type=int, default=[101, 202, 303])
     p.add_argument('--read-existing', action='store_true')
     args = p.parse_args()
+    if args.draws < 0:
+        p.error('--draws should be nonnegative')
     jobs = [(args.panel.resolve() / 'PEPC' / f'{scenario}-{seed}', args.cases.resolve(),
              args.work.resolve(), args.modes, args.draws, args.read_existing)
             for scenario in args.scenarios for seed in args.seeds]

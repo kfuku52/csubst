@@ -1,5 +1,12 @@
 # Q-based expected omegaC for simulated branch pairs
 
+Named [simulation scenarios](SIMULATE_SCENARIOS.md) enable the same table.
+For distance-dependent preference, the calculation also integrates the
+joint distribution of the two preferred amino acids. Terminal focal
+edges use their preference-specific endpoint kernels for simulated
+counts and the background kernel for null counts. The paths to their
+parents use the background Q in both calculations.
+
 `csubst simulate --export_expected_omega yes` adds
 `<output_prefix>_expected_omega.tsv` to the simulation output directory.
 The default is off. The table covers `any2spe` for every pair of branches

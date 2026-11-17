@@ -308,9 +308,9 @@ def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'asrv' in g.keys():
         g['asrv'] = str(g['asrv']).strip().lower()
     else:
-        g['asrv'] = 'each'
-    if g['asrv'] not in ['no', 'pool', 'sn', 'each', 'file', 'file_each']:
-        raise ValueError('--asrv should be one of no, pool, sn, each, file, file_each.')
+        g['asrv'] = 'auto'
+    if g['asrv'] not in ['auto', 'empirical', 'no', 'pool', 'sn', 'each', 'file', 'file_each']:
+        raise ValueError('--asrv should be one of auto, empirical, no, pool, sn, each, file, file_each.')
     if 'asrv_dirichlet_alpha' in g.keys():
         g['asrv_dirichlet_alpha'] = _require_finite_float(
             value=float(g['asrv_dirichlet_alpha']),
@@ -615,6 +615,10 @@ def _normalize_state_parameters(g: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
+    from csubst import simulate_scenarios
+
+    if g.get('subcommand') == 'simulate' or 'simulate_scenario' in g:
+        simulate_scenarios.apply_defaults(g)
     if 'num_simulated_site' in g.keys():
         g['num_simulated_site'] = int(g['num_simulated_site'])
         if (g['num_simulated_site'] != -1) and (g['num_simulated_site'] < 1):
@@ -634,8 +638,8 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
         g['simulate_asrv'] = str(g['simulate_asrv']).strip().lower()
     else:
         g['simulate_asrv'] = 'no'
-    if g['simulate_asrv'] not in ['no', 'file']:
-        raise ValueError('--simulate_asrv should be one of no, file.')
+    if g['simulate_asrv'] not in ['no', 'file', 'mixture']:
+        raise ValueError('--simulate_asrv should be one of no, file, mixture.')
     if 'export_true_asr' in g.keys():
         g['export_true_asr'] = _parse_bool_like(
             value=g['export_true_asr'],
@@ -676,6 +680,8 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
             omega_txt = str(raw_background_omega).strip().lower()
             if omega_txt in ['', 'none', 'auto', 'infer', 'iqtree']:
                 g['background_omega'] = None
+            elif omega_txt == 'model':
+                g['background_omega'] = 'model'
             else:
                 g['background_omega'] = _require_finite_float(
                     value=float(raw_background_omega),
@@ -683,7 +689,9 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
                 )
                 if g['background_omega'] < 0:
                     raise ValueError('--background_omega should be >= 0.')
-    if 'foreground_omega' in g.keys():
+    if 'foreground_omega' in g and str(g['foreground_omega']).strip().lower() == 'background':
+        g['foreground_omega'] = 'background'
+    elif 'foreground_omega' in g.keys():
         g['foreground_omega'] = _require_finite_float(
             value=float(g['foreground_omega']),
             param_name='--foreground_omega',
@@ -696,6 +704,8 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
         g['simulate_eq_freq'] = 'auto'
     if g['simulate_eq_freq'] not in ['auto', 'iqtree', 'alignment']:
         raise ValueError('--simulate_eq_freq should be one of auto, iqtree, alignment.')
+    if g.get('background_omega') == 'model' and g['simulate_eq_freq'] == 'alignment':
+        raise ValueError('--background_omega model requires fitted codon frequencies (--simulate_eq_freq auto or iqtree).')
     if 'convergent_amino_acids' in g.keys():
         conv_aa = str(g['convergent_amino_acids']).strip()
         if conv_aa == '':
@@ -722,6 +732,30 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
         )
         if (g['percent_biased_sub'] < 0) or (g['percent_biased_sub'] >= 100):
             raise ValueError('--percent_biased_sub should be between 0 and <100.')
+    epistasis = simulate_scenarios.epistasis_mode(g)
+    if epistasis is not None:
+        for key in ('simulate_epistasis_distance_scale', 'simulate_epistasis_preference_multiplier'):
+            g[key] = _require_finite_float(float(g[key]), '--' + key)
+        if g['simulate_epistasis_distance_scale'] <= 0.:
+            raise ValueError('--simulate_epistasis_distance_scale should be positive.')
+        if g['simulate_epistasis_preference_multiplier'] < 1.:
+            raise ValueError('--simulate_epistasis_preference_multiplier should be at least 1.')
+        g['simulate_focal_tips'] = int(g['simulate_focal_tips'])
+        if g['simulate_focal_tips'] < 2:
+            raise ValueError('--simulate_focal_tips should be at least 2.')
+        if str(g['simulate_focal_branch_length']).strip().lower() == 'input':
+            g['simulate_focal_branch_length'] = None
+        else:
+            g['simulate_focal_branch_length'] = _require_finite_float(
+                float(g['simulate_focal_branch_length']), '--simulate_focal_branch_length',
+            )
+            if g['simulate_focal_branch_length'] < 0.:
+                raise ValueError('--simulate_focal_branch_length should be nonnegative.')
+        if (g['foreground_omega'] != 'background' or g['convergent_amino_acids'] != 'random0'
+                or g.get('percent_biased_sub', 90.) != 90.):
+            raise ValueError('Epistasis scenarios use --simulate_epistasis_preference_multiplier for the selection effect.')
+    elif g.get('simulate_scenario', 'custom') != 'custom' and g['percent_convergent_site'] > 0. and not g.get('foreground'):
+        raise ValueError('This simulation scenario requires --foreground for the selected sites.')
     return g
 
 
@@ -1086,6 +1120,8 @@ def get_global_parameters(args: Any) -> runtime.RunContext:
     g = _normalize_execution_parameters(g)
     g = _normalize_recoding_parameters(g)
     g = _normalize_output_parameters(g)
+    if g.get('subcommand') != 'benchmark':
+        g['asrv'] = asrv.effective_mode(g)
     g['site_filter_report'] = _parse_bool_like(g.get('site_filter_report', False), '--site_filter_report')
     if g['site_filter_report']:
         from csubst import site_filter

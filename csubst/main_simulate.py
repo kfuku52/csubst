@@ -10,6 +10,7 @@ from csubst import foreground
 from csubst import parser_misc
 from csubst import runtime
 from csubst import sequence_io
+from csubst import simulate_scenarios
 from csubst import tree
 from csubst import ete
 from csubst import output_safety
@@ -365,6 +366,8 @@ def _resolve_simulation_site_rates(g):
     mode = str(g.get('simulate_asrv', 'no')).strip().lower()
     if mode == 'no':
         return np.ones(num_site, dtype=float)
+    if mode == 'mixture':
+        return np.resize(np.array([0., 0.2, 0.8, 3.]), num_site)
     if mode != 'file':
         raise ValueError('Unsupported --simulate_asrv mode: {}'.format(mode))
     if ('iqtree_rate_values' not in g) or (g['iqtree_rate_values'] is None):
@@ -505,7 +508,7 @@ def evolve_nonconvergent_partition(g, expected_omega=None):
     if site_rates.shape[0] != num_nonconvergent_site:
         txt = 'simulate_rate_nonconvergent length ({}) did not match non-convergent site count ({}).'
         raise ValueError(txt.format(site_rates.shape[0], num_nonconvergent_site))
-    if (str(g.get('simulate_asrv', 'no')).strip().lower() == 'file'):
+    if (str(g.get('simulate_asrv', 'no')).strip().lower() in ('file', 'mixture')):
         partitions = list()
         models_by_rate = {}
         for site_rate in site_rates:
@@ -672,6 +675,10 @@ def _resolve_simulation_eq_freq(g):
 
 
 def get_background_Q(g, Q_method):
+    if g.get('background_omega') == 'model':
+        order = parser_misc.get_codon_order_index(g['pyvolve_codon_orders'], g['codon_orders'])
+        print('Using the fitted codon Q without scaling its nonsynonymous rates.', flush=True)
+        return np.asarray(g['instantaneous_codon_rate_matrix'])[np.ix_(order, order)]
     q_method = str(Q_method).strip().lower()
     if (q_method == 'auto'):
         base_model = _get_model_base_name(g.get('substitution_model', ''))
@@ -952,6 +959,9 @@ def main_simulate(g, Q_method='auto'):
         if g.get('export_expected_omega', False) else None
     )
     g = _prepare_simulation_input_context(g)
+    epistasis = simulate_scenarios.epistasis_mode(g)
+    if g.get('simulate_scenario', 'custom') != 'custom':
+        print('Simulation scenario: {}'.format(g['simulate_scenario']), flush=True)
     g['simulate_asrv'] = str(g.get('simulate_asrv', 'no')).strip().lower()
     g['export_true_asr'] = bool(g.get('export_true_asr', True))
     g['trait_name'] = 'PLACEHOLDER'
@@ -967,8 +977,10 @@ def main_simulate(g, Q_method='auto'):
         g['simulate_seed_convergent'] = base_seed
         g['simulate_seed_nonconvergent'] = base_seed + 1
         g['simulate_rng'] = np.random.default_rng(base_seed)
-        txt = 'Simulation seeds: convergent={}, nonconvergent={}'
-        print(txt.format(g['simulate_seed_convergent'], g['simulate_seed_nonconvergent']), flush=True)
+        if epistasis is None:
+            print('Simulation seeds: convergent={}, nonconvergent={}'.format(base_seed, base_seed + 1), flush=True)
+        else:
+            print('Simulation seeds: codons={}, preferences={}'.format(base_seed, base_seed + 100_000), flush=True)
     else:
         g['simulate_seed_convergent'] = None
         g['simulate_seed_nonconvergent'] = None
@@ -983,14 +995,30 @@ def main_simulate(g, Q_method='auto'):
     # Re-annotate the tree chosen for simulation/plotting so lineage colors and
     # lineage IDs in --foreground are reflected in simulate_branch_id.pdf and
     # pyvolve model tags.
-    g = foreground.get_foreground_branch(g, simulate=True)
+    if epistasis is None:
+        g = foreground.get_foreground_branch(g, simulate=True)
+    else:
+        from csubst import simulate_epistasis
+
+        g, focal = simulate_epistasis.configure_focal_branches(g)
+        print('Epistasis scenario: {} focal tips, distance scale {}, preference rate multiplier {}.'.format(
+            len(focal), g['simulate_epistasis_distance_scale'], g['simulate_epistasis_preference_multiplier'],
+        ), flush=True)
     tree.plot_branch_category(g, file_base=g['simulate_branch_plot_base'], label='all')
-    g['background_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=1, trait_name=g['trait_name'])
-    g['foreground_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=g['foreground_scaling_factor'], trait_name=g['trait_name'])
-    g['background_omega'] = _resolve_simulation_background_omega(g)
+    if epistasis is None:
+        g['background_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=1, trait_name=g['trait_name'])
+        g['foreground_tree'] = get_pyvolve_tree(g['tree'], foreground_scaling_factor=g['foreground_scaling_factor'], trait_name=g['trait_name'])
+    use_fitted_q = g.get('background_omega') == 'model'
+    if not use_fitted_q:
+        g['background_omega'] = _resolve_simulation_background_omega(g)
     g['eq_freq'] = _resolve_simulation_eq_freq(g)
     g['background_Q'] = get_background_Q(g, Q_method)
-    if g['foreground'] is None:
+    if use_fitted_q:
+        g['background_omega'] = (get_total_Q(g['background_Q'], g['all_nsy_cdn_index'])
+                                 / get_total_Q(g['background_Q'], g['all_syn_cdn_index']))
+    if g.get('foreground_omega') == 'background':
+        g['foreground_omega'] = g['background_omega']
+    if g['foreground'] is None and epistasis is None:
         print('--foreground was not provided. --percent_convergent_site will be set to 0.')
         g['num_convergent_site'] = 0
     else:
@@ -999,9 +1027,10 @@ def main_simulate(g, Q_method='auto'):
     g['simulate_site_rates'] = _resolve_simulation_site_rates(g)
     g['simulate_rate_convergent'] = g['simulate_site_rates'][:g['num_convergent_site']]
     g['simulate_rate_nonconvergent'] = g['simulate_site_rates'][g['num_convergent_site']:]
-    if g['simulate_asrv'] == 'file':
-        txt = 'Simulation ASRV (--simulate_asrv file): min={:.4f}, median={:.4f}, max={:.4f}, mean={:.4f}'
+    if g['simulate_asrv'] in ('file', 'mixture'):
+        txt = 'Simulation ASRV (--simulate_asrv {}): min={:.4f}, median={:.4f}, max={:.4f}, mean={:.4f}'
         print(txt.format(
+            g['simulate_asrv'],
             float(np.min(g['simulate_site_rates'])),
             float(np.median(g['simulate_site_rates'])),
             float(np.max(g['simulate_site_rates'])),
@@ -1009,28 +1038,39 @@ def main_simulate(g, Q_method='auto'):
         ), flush=True)
     txt = '{:,} out of {:,} sites ({:.1f}%) will evolve convergently in the foreground lineages.'
     print(txt.format(g['num_convergent_site'], g['num_simulated_site'], g['percent_convergent_site']))
-    evolution_kwargs = {}
+    expected_omega = None
     if expected_omega_path is not None:
         from csubst.simulate_omega import ExpectedOmega
         expected_omega = ExpectedOmega(
             g['tree'], g['codon_table'], g['pyvolve_codon_orders'], g['trait_name'],
         )
-        evolution_kwargs['expected_omega'] = expected_omega
-    if (g['num_convergent_site'] > 0):
-        evolve_convergent_partitions(g, **evolution_kwargs)
-    if (g['num_no_convergent_site'] > 0):
-        evolve_nonconvergent_partition(g, **evolution_kwargs)
-    file_conv = runtime.temp_path('tmp.csubst.simulate_convergent.fa')
-    file_noconv = runtime.temp_path('tmp.csubst.simulate_nonconvergent.fa')
-    file_out, file_all = _materialize_simulated_alignment(
-        g=g,
-        file_conv=file_conv,
-        file_noconv=file_noconv,
-    )
-    if g['export_true_asr']:
-        _export_true_asr_bundle(g=g, file_all=file_all)
+    sequences = None
+    if epistasis is None:
+        evolution_kwargs = {} if expected_omega is None else {'expected_omega': expected_omega}
+        if g['num_convergent_site'] > 0:
+            evolve_convergent_partitions(g, **evolution_kwargs)
+        if g['num_no_convergent_site'] > 0:
+            evolve_nonconvergent_partition(g, **evolution_kwargs)
+        _, file_all = _materialize_simulated_alignment(
+            g=g,
+            file_conv=runtime.temp_path('tmp.csubst.simulate_convergent.fa'),
+            file_noconv=runtime.temp_path('tmp.csubst.simulate_nonconvergent.fa'),
+        )
+        if g['export_true_asr']:
+            _export_true_asr_bundle(g=g, file_all=file_all)
+            if expected_omega is not None:
+                sequences = read_fasta(file_all)
+    else:
+        simulated = simulate_epistasis.evolve(g, focal, epistasis, expected=expected_omega)
+        np.savetxt(g['simulate_custom_frequency_file'], g['eq_freq'])
+        if g['export_true_asr']:
+            file_all = runtime.temp_path('tmp.csubst.simulate_all.fa')
+            write_fasta(simulated, file_all)
+            _export_true_asr_bundle(g=g, file_all=file_all)
+            sequences = simulated
+        else:
+            write_fasta({leaf.name: simulated[leaf.name] for leaf in ete.iter_leaves(g['tree'])}, g['simulate_alignment_file'])
     if expected_omega_path is not None:
-        sequences = read_fasta(file_all) if g['export_true_asr'] else None
         expected_omega.write(expected_omega_path, sequences)
         print('Expected omegaCany2spe: {}'.format(expected_omega_path), flush=True)
 

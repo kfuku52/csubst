@@ -490,10 +490,12 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'integer draw sizes in randomization for --calc_omega_pvalue. '
                              '"round" reproduces legacy behavior; "stochastic" applies per-iteration '
                              'stochastic rounding; "floor"/"ceil" provide deterministic lower/upper bounds.')
-    parser.add_argument('--asrv', metavar='no|pool|sn|each|file|file_each', default='each', type=str,
-                        choices=['no', 'pool', 'sn', 'each', 'file', 'file_each'],
-                        help='default=%(default)s: Experimental. Correct among-site rate variation in omega calculation. '
+    parser.add_argument('--asrv', metavar='auto|empirical|no|pool|sn|each|file|file_each', default='auto', type=str,
+                        choices=['auto', 'empirical', 'no', 'pool', 'sn', 'each', 'file', 'file_each'],
+                        help='default=%(default)s: Select site weighting for urn expectations. '
                              'This option is used with --expectation_method urn but not with --expectation_method codon_model. '
+                             'Auto uses the cross-fitted empirical urn for supported joint codon branch-pair expectations, '
+                             'and each for other workflows. Use empirical to require cross-fitted routes, site rates, and N totals. '
                              '"no", No ASRV, meaning a uniform rate among sites. '
                              '"pool", All categories of substitutions are pooled to calculate a single set of ASRV. '
                              '"sn", Synonymous and nonsynonymous substitutions are processed individually '
@@ -1055,30 +1057,34 @@ def _register_download_parser(show_advanced, subparsers):
 
 def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparsers):
     # simulate
+    from csubst.simulate_scenarios import PRESETS
+
     help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
     simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_out_simulate])
-    simulate.add_argument('--background_omega', metavar='FLOAT', default=None, type=float,
+    simulate.add_argument('--simulate_scenario', default='custom', choices=tuple(PRESETS),
+                          help='Preset for a simulation evaluation. Explicit options override preset defaults.')
+    simulate.add_argument('--background_omega', metavar='FLOAT|auto|model', default=None,
                           help='default=IQ-TREE estimate (fallback 0.2): dN/dS for background branches. '
-                               'Set explicitly to override IQ-TREE estimated omega.')
-    simulate.add_argument('--foreground_omega', metavar='FLOAT', default=0.2, type=float,
-                          help='default=%(default)s: dN/dS for foreground branches.')
-    simulate.add_argument('--num_simulated_site', metavar='INT', default=-1, type=int,
-                          help='default=%(default)s: Number of codon sites to simulate. '
+                               'Use model to preserve the fitted background Q without N/S rescaling.')
+    simulate.add_argument('--foreground_omega', metavar='FLOAT|background', default=None,
+                          help='Default with custom scenario: 0.2. Use background to match the generating Q N/S mass.')
+    simulate.add_argument('--num_simulated_site', metavar='INT', default=None, type=int,
+                          help='Default with custom scenario: -1. Number of codon sites to simulate. '
                                '-1 to set the size of input alignment.')
-    simulate.add_argument('--percent_convergent_site', metavar='FLOAT', default=100, type=float,
-                          help='default=%(default)s: Percentage of codon sites to evolve convergently.'
+    simulate.add_argument('--percent_convergent_site', metavar='FLOAT', default=None, type=float,
+                          help='Default with custom scenario: 100. Percentage of codon sites to evolve convergently. '
                                'If --convergent_amino_acids randomN, '
                                'Convergent amino acids are randomly selected within each partition. ')
     simulate.add_argument('--optimized_branch_length', metavar='yes|no', default='no', type=strtobool,
                           help='default=%(default)s: Whether to use the branch lengths optimized by IQ-TREE. '
                                'If "no", the branch lengths in the input tree are used.')
-    simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=1, type=float,
-                          help='default=%(default)s: Branch lengths are multiplied by this value.')
-    simulate.add_argument('--foreground_scaling_factor', metavar='FLOAT', default=1, type=float,
-                          help='default=%(default)s: In the codon sites specified by --percent_convergent_site, '
+    simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=None, type=float,
+                          help='Default with custom scenario: 1. Branch lengths are multiplied by this value.')
+    simulate.add_argument('--foreground_scaling_factor', metavar='FLOAT', default=None, type=float,
+                          help='Default with custom scenario: 1. In the codon sites specified by --percent_convergent_site, '
                                'branch lengths in foreground lineages are multiplied by this value.')
-    simulate.add_argument('--convergent_amino_acids', metavar='STR', default='random1', type=str,
-                          help='default=%(default)s: Non-delimited list of amino acids the sequences converge into. '
+    simulate.add_argument('--convergent_amino_acids', metavar='STR', default=None, type=str,
+                          help='Default with custom scenario: random1. Non-delimited list of favored amino acids. '
                                'e.g, AQTS, ACQ, WDETS... '
                                '"randomN" specifies randomly selected N amino acids. '
                                '"random0" does not cause convergence.')
@@ -1089,12 +1095,20 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
     simulate.add_argument('--simulate_seed', metavar='INT', default=-1, type=int,
                           help='default=%(default)s: Random seed for simulation. '
                                'Set -1 to use non-deterministic seed.')
-    simulate.add_argument('--simulate_asrv', metavar='no|file', default='no', type=str,
-                          choices=['no', 'file'],
-                          help='default=%(default)s: Among-site rate variation mode for simulation. '
+    simulate.add_argument('--simulate_asrv', metavar='no|file|mixture', default=None, type=str,
+                          choices=['no', 'file', 'mixture'],
+                          help='Default with custom scenario: no. Among-site rate variation mode for simulation. '
                                '"no" uses a single-rate process across sites. '
-                               '"file" applies site rates from IQ-TREE .rate '
-                               '(Rate if present, otherwise C_Rate) to Pyvolve per site.')
+                               '"file" uses IQ-TREE .rate (Rate if present, otherwise C_Rate). '
+                               '"mixture" repeats rates 0, 0.2, 0.8, and 3.')
+    simulate.add_argument('--simulate_epistasis_distance_scale', type=float, metavar='FLOAT',
+                          help='Distance scale d0 for epistasis_inverse. The preference retention is 1/(1+d/d0).')
+    simulate.add_argument('--simulate_epistasis_preference_multiplier', type=float, metavar='FLOAT',
+                          help='Multiplier on rates into the preferred amino acid in epistasis scenarios.')
+    simulate.add_argument('--simulate_focal_tips', type=int, metavar='INT',
+                          help='Number of evenly spaced focal tips in epistasis scenarios without --foreground.')
+    simulate.add_argument('--simulate_focal_branch_length', metavar='FLOAT|input',
+                          help='Focal terminal length in epistasis scenarios. Use input to keep the scaled tree lengths.')
     simulate.add_argument('--simulate_eq_freq', metavar='auto|iqtree|alignment', default='auto', type=str,
                           choices=['auto', 'iqtree', 'alignment'],
                           help='default=%(default)s: Source of codon equilibrium frequencies for simulation Q. '
@@ -1104,8 +1118,8 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
     simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
                           help='default=%(default)s: Export true ancestral-state bundle from simulation '
                                '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for search-time evaluation.')
-    simulate.add_argument('--export_expected_omega', metavar='yes|no', default='no', type=strtobool,
-                          help='default=%(default)s: Export Q-based expected omegaCany2spe for independent '
+    simulate.add_argument('--export_expected_omega', metavar='yes|no', default=None, type=strtobool,
+                          help='Default: yes with a named preset, no with custom. Export Q-based expected omegaCany2spe for independent '
                                'branch pairs, with realized counts when true ASR is exported.')
     simulate.add_argument('--true_asr_prefix', metavar='PATH_PREFIX', default='', type=str,
                           help='default=infer from --outdir/--output_prefix: Output path prefix for true-ASR bundle files.')

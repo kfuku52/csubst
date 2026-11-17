@@ -71,6 +71,7 @@ class ModelConfig(TypedDict, total=False):
     asrv_training_branches: str
     asrv_concentration: float | None
     asrv_report: bool
+    asrv: str
     asrv_posterior_draws: int
     urn_wallenius_expectation: str
     epistasis_cv_clades: int
@@ -107,6 +108,7 @@ class AnalysisState(TypedDict, total=False):
     _asrv_rate_categories: np.ndarray
     _asrv_rate_posterior: np.ndarray
     _asrv_posterior_seed: int
+    _empirical_urn_folds: list[dict[str, Any]]
     EN_reducer: dict[str, Any]
     ES_reducer: dict[str, Any]
     sub_branches: list[int]
@@ -155,6 +157,14 @@ class ScanConfig(TypedDict, total=False):
     scan_no_test_reason: str
 
 
+class SimulationConfig(TypedDict, total=False):
+    simulate_scenario: str
+    simulate_epistasis_distance_scale: float
+    simulate_epistasis_preference_multiplier: float
+    simulate_focal_tips: int
+    simulate_focal_branch_length: float | None
+
+
 class AnalysisConfig(
     InputConfig,
     OutputConfig,
@@ -164,6 +174,7 @@ class AnalysisConfig(
     OutputSwitches,
     InternalControls,
     ScanConfig,
+    SimulationConfig,
     total=False,
 ):
     """Compatibility view of the combined pipeline mapping."""

@@ -4,6 +4,27 @@ from factories import make_args
 from csubst import cli, param
 
 
+@pytest.mark.parametrize('extra, expected', [
+    ([], 'empirical'),
+    (['--output_stat', 'any2spe'], 'empirical'),
+    (['--asrv', 'each'], 'each'),
+    (['--max_arity', '3'], 'each'),
+    (['--urn_model', 'fisher'], 'each'),
+    (['--calc_omega_pvalue', 'yes', '--output_stat', 'any2spe'], 'each'),
+])
+def test_resolve_search_urn_default(extra, expected):
+    args = cli._build_parser().parse_args(['search', '--expectation_method', 'urn', *extra])
+    assert param.get_global_parameters(args)['asrv'] == expected
+
+
+def test_explicit_empirical_rejects_incompatible_statistics():
+    args = cli._build_parser().parse_args([
+        'search', '--expectation_method', 'urn', '--asrv', 'empirical', '--output_stat', 'spe2spe',
+    ])
+    with pytest.raises(ValueError, match='destination|any2any/any2spe/any2dif'):
+        param.get_global_parameters(args)
+
+
 def test_cli_and_parameters_accept_training_concentration_report():
     args = cli._build_parser(show_advanced=True).parse_args([
         'search', '--expectation_method', 'urn', '--asrv_training_branches', 'background',

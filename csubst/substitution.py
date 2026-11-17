@@ -2676,7 +2676,7 @@ def get_sub_sites(g, sS, sN, state_tensor, OS_tensor=None, ON_tensor=None):
                 channel=SN,
             )
         return g
-    elif asrv_mode in ['each', 'file_each']:
+    elif asrv_mode in ['each', 'file_each', 'empirical']:
         # These ASRV modes are resolved per substitution category in get_each_sub_sites().
         return g
     else:

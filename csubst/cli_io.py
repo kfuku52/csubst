@@ -117,6 +117,8 @@ def validate_output_destinations(layout, args, protected):
             suffixes.append('outputs.tsv')
     elif command == 'simulate':
         suffixes.append('expected_omega.tsv')
+        if getattr(args, 'foreground', None) or getattr(args, 'simulate_scenario', '').startswith('epistasis_'):
+            suffixes.append('foreground_branch.txt')
     elif command in ('search', 'analyze'):
         suffixes.extend(['search_run.json', 'cb_stats.tsv', 'b.tsv', 'bs.tsv',
                          's.tsv', 'cs.tsv', 'cbs.tsv'])

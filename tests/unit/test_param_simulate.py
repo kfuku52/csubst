@@ -3,7 +3,7 @@ from factories import make_args as _args
 
 import pytest
 
-from csubst import param
+from csubst import cli, param
 
 
 
@@ -45,8 +45,38 @@ def test_get_global_parameters_validates_simulate_asrv_mode():
     assert g["simulate_asrv"] == "no"
     g = param.get_global_parameters(_args(simulate_asrv="FiLe"))
     assert g["simulate_asrv"] == "file"
+    assert param.get_global_parameters(_args(simulate_asrv="mixture"))["simulate_asrv"] == "mixture"
     with pytest.raises(ValueError, match="simulate_asrv"):
         param.get_global_parameters(_args(simulate_asrv="maybe"))
+
+
+def test_simulation_presets_and_explicit_overrides():
+    parser = cli._build_parser()
+    args = parser.parse_args([
+        'simulate', '--simulate_scenario', 'rate_mixture_bias', '--foreground', 'fg.tsv',
+        '--num_simulated_site', '40', '--simulate_asrv', 'no', '--export_expected_omega', 'no',
+    ])
+    g = param.get_global_parameters(args)
+    assert g['num_simulated_site'] == 40
+    assert g['simulate_asrv'] == 'no'
+    assert g['percent_convergent_site'] == 20.
+    assert g['background_omega'] == .2
+    assert g['export_expected_omega'] is False
+    g = param.get_global_parameters(parser.parse_args(['simulate', '--simulate_scenario', 'epistasis_inverse']))
+    assert g['num_simulated_site'] == 1200
+    assert g['background_omega'] == 'model'
+    assert g['simulate_focal_branch_length'] == .08
+    assert g['simulate_epistasis_distance_scale'] == .18
+    assert g['export_expected_omega'] is True
+
+
+def test_epistasis_preset_validates_decay_and_input_branch_lengths():
+    parser = cli._build_parser()
+    argv = ['simulate', '--simulate_scenario', 'epistasis_inverse']
+    args = parser.parse_args([*argv, '--simulate_focal_branch_length', 'input'])
+    assert param.get_global_parameters(args)['simulate_focal_branch_length'] is None
+    with pytest.raises(ValueError, match='distance_scale'):
+        param.get_global_parameters(parser.parse_args([*argv, '--simulate_epistasis_distance_scale', '0']))
 
 
 def test_get_global_parameters_validates_simulate_eq_freq_mode():
