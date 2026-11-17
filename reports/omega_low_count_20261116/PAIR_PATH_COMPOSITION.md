@@ -1,5 +1,8 @@
 # Composing paths for exact branch-pair convergence counts
 
+A follow-up benchmarks compact terminal events when some sites are
+ineligible because of missing data. [Masked-pair benchmark](MASKED_PAIR_PERFORMANCE.md)
+
 The second optimization keeps the observed `OCNany2spe` and `OCSany2spe`
 estimands and the fitted endpoint model from the first optimization.
 [Previous benchmark](PAIR_OPTIMIZATION.md)

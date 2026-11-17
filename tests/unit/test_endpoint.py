@@ -39,17 +39,20 @@ def enumerate_model(parents, lengths, q, pi, tips, rates, weights):
     return nodes, edges, prediction, np.log(norm)
 
 
-def test_pair_any2spe_matches_enumeration_with_missing_events():
+@pytest.mark.parametrize('first_tip', [[0., 1., 0.], [1., 1., 0.]])
+@pytest.mark.parametrize('exclude_missing', [False, True])
+def test_pair_any2spe_matches_enumeration_with_missing_events(first_tip, exclude_missing):
     parents = [-1, 0, 1, 1, 0]
     lengths = [0., .3, .7, .2, .5]
     pi = np.array([.2, .3, .5])
     q = np.tile(pi, (3, 1)) - np.eye(3)
     rates, weights = [0., .2, 2.], [.2, .4, .4]
-    tips = {2: np.array([[1., 1., 0.], [0., 0., 0.], [1., 0., 0.]]),
+    tips = {2: np.array([first_tip, [0., 0., 0.], [1., 0., 0.]]),
             3: np.eye(3)[[0, 2, 1]], 4: np.eye(3)[[0, 2, 0]]}
     missing = {2: np.array([False, True, False])}
     eligible = np.ones((len(parents), 3), dtype=bool)
-    eligible[2] = ~missing[2]
+    if exclude_missing:
+        eligible[2] = ~missing[2]
     pairs = [(2, 3), (2, 4), (1, 4), (3, 4)]
     amino = np.array([0, 0, 1])
     states = np.array(list(itertools.product(range(3), repeat=len(parents))))

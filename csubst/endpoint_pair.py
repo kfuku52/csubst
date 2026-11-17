@@ -53,6 +53,30 @@ def _called_codons(values):
     return None
 
 
+def _called_terminal_codons(tips, tip_missing, eligible):
+    """Use the one-destination representation on sites eligible for the focal event."""
+    missing = {} if tip_missing is None else tip_missing
+    called = {}
+    for leaf, values in tips.items():
+        active = None if eligible is None else eligible[leaf]
+        unavailable = missing.get(leaf)
+        if unavailable is not None and (unavailable if active is None else unavailable & active).any():
+            continue
+        if active is None or active.all():
+            codes = _called_codons(values)
+        else:
+            retained = _called_codons(values[active])
+            if retained is None:
+                continue
+            # The event feature is zeroed on these rows after construction.
+            # The original emission still participates in tree pruning.
+            codes = np.zeros(len(values), dtype=retained.dtype)
+            codes[active] = retained
+        if codes is not None:
+            called[leaf] = codes
+    return called
+
+
 class _EdgeEvidence:
     def __init__(self, rate_count):
         self.rate_count = rate_count
@@ -213,9 +237,7 @@ def count_any2spe(model, tips, amino, pairs, block_size, *, tip_missing=None, el
         return totals
     groups = make_plan(model.parents, pairs)
     site_count = len(next(iter(tips.values())))
-    missing = {} if tip_missing is None else tip_missing
-    called = {leaf: codes for leaf, values in tips.items()
-              if (leaf not in missing or not missing[leaf].any()) and (codes := _called_codons(values)) is not None}
+    called = _called_terminal_codons(tips, tip_missing, eligible)
     if eligible is None or eligible[np.arange(len(model.parents)) != model.root].all():
         tips, called, multiplicity = _compress_patterns(tips, called)
         eligible = None
