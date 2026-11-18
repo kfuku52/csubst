@@ -19,13 +19,11 @@ higher arities. The root and its immediate children do not contribute to
 training or receive expected counts. Adding a higher arity or selecting a
 foreground does not change the training population.
 
-To reproduce the former pairwise default, use `--asrv empirical --max_arity 2`:
-each branch is assigned to a fold by its ID modulo four, and a pair uses
-only branches outside its members' folds. For the former higher-arity
-default, use `--asrv each` (observed totals and category-specific pooled
-site weights). Source-specific statistics, marginal ASR, recoding, other
-urn laws, count P values, long-tail calibration or custom legacy weight
-settings still select `each` under `auto`; explicitly requesting an
+The optional pairwise mode `--asrv empirical` assigns each branch to one
+of four folds by its ID modulo four. A pair uses only branches outside
+its members' folds. Under `auto`, source-specific statistics, marginal
+ASR, recoding, other urn laws, count P values, long-tail calibration and
+custom site-weight settings select `each`. Explicitly requesting an
 incompatible empirical mode raises an error.
 
 Each training branch's N+S endpoint masses contribute to a site-rate
