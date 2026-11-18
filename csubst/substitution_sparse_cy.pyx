@@ -922,9 +922,19 @@ cpdef project_endpoint_events_double(
     cdef numpy.intp_t[:, ::1] sites
     cdef numpy.intp_t[::1] counts
     cdef Py_ssize_t i
+    if pairs.shape[0] <= features // 2:
+        # Synonymous groups leave many unused event bins. Write the active
+        # pairs in site order without transposing a padded output block.
+        events = numpy.zeros((size, features))
+        output = events
+        with nogil:
+            for s in range(size):
+                for p in range(pairs.shape[0]):
+                    target, a, d = pairs[p, 0], pairs[p, 1], pairs[p, 2]
+                    output[s, target] += left[s, a] * transition[a, d] * right[s, d]
+        return events.reshape(size, num_group, num_state, num_state)
     # At observed tips only a few child states usually have likelihood at
-    # each site. Reuse their site lists across all incoming codon pairs.
-    # Short pair lists (e.g. synonymous events) favor the dense vector loop.
+    # each site. Index their sites when many incoming pairs can reuse them.
     # Only omit zero terms when left * transition is guaranteed finite.
     if (pairs.shape[0] > 4 * k and
             numpy.count_nonzero(right) * 4 < size * k and

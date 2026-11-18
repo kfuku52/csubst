@@ -510,8 +510,8 @@ def test_native_classified_events_match_full_mapping(tmp_path, monkeypatch, size
 
 
 @pytest.mark.native
-@pytest.mark.parametrize('exceptional', [None, 'nonfinite_left', 'overflow'])
-def test_native_sparse_child_events_match_ordered_pair_sum(exceptional):
+@pytest.mark.parametrize('exceptional,num_state', [(None, 2), (None, 20), ('nonfinite_left', 2), ('overflow', 2)])
+def test_native_child_events_match_ordered_pair_sum(exceptional, num_state):
     cy = endpoint_io.substitution_sparse.substitution_sparse_cy
     if cy is None:
         pytest.skip('Endpoint event extension is not built.')
@@ -531,12 +531,12 @@ def test_native_sparse_child_events_match_ordered_pair_sum(exceptional):
     elif exceptional == 'overflow':
         left[0, 0] = np.finfo(float).max
         transition[0, 0] = 2
-    expected = np.zeros((size, 4))
+    expected = np.zeros((size, num_state**2))
     with np.errstate(over='ignore', invalid='ignore'):
         for feature, a, d in pairs:
             expected[:, feature] += left[:, a] * transition[a, d] * right[:, d]
-    events = cy.project_endpoint_events_double(left, right, transition, pairs, 1, 2)
-    np.testing.assert_allclose(events.reshape(size, 4), expected, rtol=1e-14, atol=0)
+    events = cy.project_endpoint_events_double(left, right, transition, pairs, 1, num_state)
+    np.testing.assert_allclose(events.reshape(size, -1), expected, rtol=1e-14, atol=0)
 
 
 @pytest.mark.parametrize('structural', [False, True])

@@ -225,14 +225,20 @@ def _score(g, combos, select, data, rates, stats, out):
     local = inverse.reshape(-1, combos.shape[1])
     n_counts = {stat: np.zeros(len(local)) for stat in stats}
     s_counts = {stat: np.zeros(len(local)) for stat in stats}
-    n_rate = rates.n_rate * data.eligible[ids]
-    n_weights = (data.aa_parent[ids] @ rates.routes) * n_rate[:, :, None]
+    # Gathering all selected parents would copy a second branch-by-site-by-AA
+    # tensor. Fill the destination weights one branch at a time.
+    n_weights = np.empty((len(ids), data.aa_parent.shape[1], rates.routes.shape[1]),
+                         dtype=np.result_type(data.aa_parent, rates.routes, rates.n_rate))
+    for row, branch in enumerate(ids):
+        np.matmul(data.aa_parent[branch], rates.routes, out=n_weights[row])
+        n_weights[row] *= (rates.n_rate * data.eligible[branch])[:, None]
     if g.get('asrv') == 'empirical_all':
         observed_n = data.route_totals[ids].sum(axis=(1, 2))
         n_total = _allocate_branch_totals(n_weights.sum(axis=1), observed_n, 'N')
     else:
         n_total = _pool_n_totals(rates.count, rates.exposure, rates.routes, n_weights, data.effort[ids])
     _add_group_overlaps(n_counts, local, n_weights, n_total, g)
+    del n_weights
     state = g['state_cdn']
     s_rate = rates.s_rate * data.eligible[ids]
     s_draws = data.syn_totals if rates.s_draw_totals is None else rates.s_draw_totals
