@@ -199,7 +199,8 @@ def _parse_float_from_log_line(line, label):
         return float(m.group(1))
     return None
 
-def _estimate_empirical_codon_frequency_from_alignment(alignment_file, codon_orders, float_type):
+def _estimate_empirical_codon_frequency_from_alignment(alignment_file, codon_orders, float_type, *,
+                                                      include_ambiguous=True):
     seq_dict = sequence.read_fasta(alignment_file)
     codon_orders = np.array(codon_orders, dtype=object)
     codon_state_lookup = sequence.build_state_index_lookup(codon_orders)
@@ -212,17 +213,16 @@ def _estimate_empirical_codon_frequency_from_alignment(alignment_file, codon_ord
             codon = seq[s:s+3]
             codon_idx_direct = codon_state_lookup.get(codon, None)
             if codon_idx_direct is not None:
-                codon_idx = [int(codon_idx_direct)]
-            else:
+                counts[int(codon_idx_direct)] += 1
+            elif include_ambiguous:
                 codon_idx = sequence.get_state_index(
                     codon,
                     codon_orders,
                     genetic_code.ambiguous_table,
                     state_lookup=codon_state_lookup,
                 )
-            if len(codon_idx)==0:
-                continue
-            counts[codon_idx] += 1 / len(codon_idx)
+                if len(codon_idx):
+                    counts[codon_idx] += 1 / len(codon_idx)
     total = counts.sum()
     if not (total > 0):
         raise AssertionError('Failed to estimate codon frequencies from alignment file.')
@@ -807,6 +807,8 @@ def read_iqtree(g, eq=True):
                     alignment_file=g['alignment_file'],
                     codon_orders=g['codon_orders'],
                     float_type=g['float_type'],
+                    # The hybrid fit's +F checkpoint counts fully resolved sense codons.
+                    include_ambiguous=g['substitution_model'].split('+')[0] != 'ECMK07_GY0K',
                 )
             else:
                 raise e

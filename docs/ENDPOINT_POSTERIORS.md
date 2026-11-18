@@ -63,7 +63,9 @@ the fitted multiplier for the nonsynonymous ECMK07 exchangeabilities.
 For ECMK07_GY0K+F, CSUBST prioritizes the checkpoint's fitted `state_freq`
 vector when present. Older checkpoints use the verbose IQ-TREE frequency
 log. CSUBST checks the frequencies against the report or the expected
-frequencies under the recorded IQ-TREE options.
+frequencies under the recorded IQ-TREE options. When the IQ-TREE 3 report
+omits codon frequencies for this model, CSUBST counts fully resolved sense
+codons in the fitted alignment to check the checkpoint's empirical frequencies.
 Report-only fits of other supported models use the same reported precision
 in every command. Fitted
 bootstrap still requires precise sidecars; finite likelihood mismatches warn

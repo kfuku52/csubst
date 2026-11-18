@@ -309,8 +309,8 @@ def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
         g['asrv'] = str(g['asrv']).strip().lower()
     else:
         g['asrv'] = 'auto'
-    if g['asrv'] not in ['auto', 'empirical', 'no', 'pool', 'sn', 'each', 'file', 'file_each']:
-        raise ValueError('--asrv should be one of auto, empirical, no, pool, sn, each, file, file_each.')
+    if g['asrv'] not in ['auto', *asrv.EMPIRICAL_MODES, 'no', 'pool', 'sn', 'each', 'file', 'file_each']:
+        raise ValueError('--asrv should be one of auto, empirical_all, empirical, no, pool, sn, each, file, file_each.')
     if 'asrv_dirichlet_alpha' in g.keys():
         g['asrv_dirichlet_alpha'] = _require_finite_float(
             value=float(g['asrv_dirichlet_alpha']),

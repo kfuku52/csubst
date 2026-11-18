@@ -67,3 +67,36 @@ python reports/omega_low_count_20261116/benchmark_empirical_urn.py \
   --case pepc520 "$small_fa" "$small_tree" "$small_fit" \
   --case pepc1200 "$large_fa" "$large_tree" "$large_fit" --repeats 3
 ```
+
+## Batched one-draw profiles and bounded mean clocks
+
+The `b782efd` profile for 1,200 codons spent 4.0 seconds computing
+Wallenius inclusion profiles under profiler overhead. About 1.9 seconds
+were in the approximate mean solver. The next change normalizes
+fractional draws up to one in batches, and uses a bounded direct solve
+of the same mean equation when all inclusion probabilities at the
+solution are at most one half. More concentrated profiles and larger
+depletion continue through the log-clock solver. Exact methods and
+quadrature keep their existing numerical rules.
+
+We reran the fixed-fit benchmark with the same two alignments, native
+extensions and thread settings. Within each case and mode we alternated
+the execution order of the two source snapshots. The table gives medians
+over three runs per snapshot after a warmup. The paired measurements
+carry the `b782efd` and `bounded_clock` labels in the
+[recorded timings](empirical_urn_timing.tsv).
+
+| Codons | ASRV | Previous wall (s) | New wall (s) | Previous peak RSS (MiB) | New peak RSS (MiB) |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 520 | `each` | 7.04 | 7.24 | 694 | 683 |
+| 520 | `empirical` | 3.91 | 3.35 | 354 | 350 |
+| 1,200 | `each` | 12.80 | 12.86 | 1,412 | 1,337 |
+| 1,200 | `empirical` | 6.64 | 4.93 | 433 | 432 |
+
+The empirical wall time fell by 14.5% and 25.7% at the two sizes.
+The legacy medians differed by at most 2.8% in the paired runs.
+Across all 16 before/after TSV comparisons, including the
+warmups, `any2spe` observed and expected count columns agreed exactly
+at the 12-digit TSV precision. The maximum absolute change in any
+count column was 1.1e-12. The fitted fold weights, missing-value masks,
+and sets of Wallenius methods matched.

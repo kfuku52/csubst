@@ -66,39 +66,49 @@ def fit_case(rep, scenario, seed, base, iqtree):
     print('Fitted', rep.name, base, flush=True)
 
 
-def urn_case(rep, seed, base):
+def urn_case(rep, seed, base, method):
+    # Keep the historical output name for the four-fold fit. Omit --asrv for
+    # the pooled run so its provenance also verifies the search default.
+    asrv_args = ['--asrv', 'empirical'] if method == 'urn' else []
     root = rep / base
     report, = (root / 'iqtree').glob('*.iqtree')
     fit_args = [token for ext in ('treefile', 'state', 'rate', 'iqtree', 'log')
                 for token in ('--iqtree_' + ext, report.with_suffix('.' + ext))]
     start = perf_counter()
-    run_cli(root, 'urn.stdout', [
+    run_cli(root, method + '.stdout', [
         'search', '--alignment_file', rep / 'sim/sim.fa', '--rooted_tree_file', rep / 'sim/sim_true_asr.treefile',
-        *fit_args, '--expectation_method', 'urn', '--outdir', 'urn', '--random_seed', seed, *SEARCH,
+        *fit_args, '--expectation_method', 'urn', *asrv_args, '--outdir', method, '--random_seed', seed, *SEARCH,
     ])
-    (root / 'urn.wall').write_text(f'{perf_counter() - start:.6f}\n')
-    print('Compared', rep.name, base, flush=True)
+    (root / (method + '.wall')).write_text(f'{perf_counter() - start:.6f}\n')
+    print('Compared', rep.name, base, method, flush=True)
 
 
 def comparison(rep, scenario, base, truth):
     root = rep / base
     codon, codon_meta = load_search(root, 'codon')
-    urn, urn_meta = load_search(root, 'urn')
-    provenance = json.loads((root / 'urn/csubst_urn_provenance.json').read_text())
-    assert provenance['asrv'] == 'empirical'
-    assert provenance['empirical_urn']['n_draw_totals'] == 'pooled_branch_n_plus_s'
-    assert len(provenance['empirical_urn']['folds']) == 10
     assert codon_meta['parameter_source']['model'] == fitted_model(base, scenario)
-    for key in ('rates', 'weights', 'branch_lengths'):
-        assert codon_meta[key] == urn_meta[key]
-    assert codon_meta['parameter_source']['generator_sha256'] == urn_meta['parameter_source']['generator_sha256']
-    np.testing.assert_array_equal(codon[KEY], urn[KEY])
-    np.testing.assert_allclose(codon[OBS], urn[OBS], rtol=1e-10, atol=6e-12)
     keep = codon[EXPECTED].notna().all(axis=1)
-    np.testing.assert_array_equal(keep, urn[EXPECTED].notna().all(axis=1))
     frame = codon.loc[keep].merge(truth, on=KEY, how='left', validate='one_to_one')
     np.testing.assert_array_equal(frame[KEY], codon.loc[keep, KEY])
-    counts = {'codon_model': codon.loc[keep, EXPECTED].to_numpy(), 'urn': urn.loc[keep, EXPECTED].to_numpy()}
+    counts = {'codon_model': codon.loc[keep, EXPECTED].to_numpy()}
+    for method in ('urn', 'empirical_all'):
+        urn, urn_meta = load_search(root, method)
+        provenance = json.loads((root / method / 'csubst_urn_provenance.json').read_text())
+        settings = provenance['empirical_urn']
+        assert settings['n_draw_totals'] == 'pooled_branch_n_plus_s'
+        if method == 'urn':
+            assert provenance['asrv'] == 'empirical' and len(settings['folds']) == 10
+        else:
+            assert provenance['asrv'] == 'empirical_all'
+            assert settings['training_scope'] == 'all_eligible_branches' and not settings['folds']
+            assert len(set(provenance['training_branch_ids'])) == 138
+        for key in ('rates', 'weights', 'branch_lengths'):
+            assert codon_meta[key] == urn_meta[key]
+        assert codon_meta['parameter_source']['generator_sha256'] == urn_meta['parameter_source']['generator_sha256']
+        np.testing.assert_array_equal(codon[KEY], urn[KEY])
+        np.testing.assert_allclose(codon[OBS], urn[OBS], rtol=1e-10, atol=6e-12)
+        np.testing.assert_array_equal(keep, urn[EXPECTED].notna().all(axis=1))
+        counts[method] = urn.loc[keep, EXPECTED].to_numpy()
     return frame, counts
 
 
@@ -121,7 +131,7 @@ def score_case(rep, scenario, seed):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('work', type=Path)
-    parser.add_argument('--stage', choices=('fit', 'urn', 'score'), required=True)
+    parser.add_argument('--stage', choices=('fit', 'urn', 'empirical_all', 'score'), required=True)
     parser.add_argument('--iqtree', default='iqtree')
     parser.add_argument('--jobs', type=int, default=8)
     args = parser.parse_args()
@@ -137,9 +147,12 @@ def main():
             for job in [pool.submit(fit_case, *case, base, args.iqtree) for case in cases for base in MODELS]:
                 job.result()
         else:
-            if args.stage == 'urn':
-                for job in [pool.submit(urn_case, rep, seed, base) for rep, _, seed in cases for base in MODELS]:
-                    job.result()
+            if args.stage in ('urn', 'empirical_all'):
+                methods = ('urn', 'empirical_all') if args.stage == 'urn' else ('empirical_all',)
+                for method in methods:
+                    for job in [pool.submit(urn_case, rep, seed, base, method)
+                                for rep, _, seed in cases for base in MODELS]:
+                        job.result()
             jobs = [pool.submit(score_case, *case) for case in cases]
             rows = [row for job in jobs for row in job.result()]
             pd.DataFrame(rows).to_csv(work / 'summary.tsv', sep='\t', index=False, float_format='%.12g')

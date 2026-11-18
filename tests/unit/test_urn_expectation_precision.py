@@ -113,6 +113,41 @@ def test_wallenius_stream_includes_fractional_draws_and_records_zero_boundaries(
     assert g['_urn_expectation_methods'] == {'exact_boundary': True, 'exact_small_draw': True}
 
 
+def test_wallenius_one_draw_batch_matches_scalar_profiles_with_extreme_weights():
+    profile = np.array([[1., 2., 0.], [1e308, 1e308, 0.], [0., 1e-320, 0.],
+                        [0., 0., 0.], [1e300, 1., 1e-300], [2., 1., 1.],
+                        [2., 1., 1.], [1., 2., 3.], [1., 2., 3.], [1., 2., 3.]])
+    totals = np.array([0., .5, .75, .9, 1., 1., .2, 0., .3, 2.3])
+    per_branch = np.vstack([omega.wallenius_inclusion_profiles(row, [total], {})[0]
+                            for row, total in zip(profile, totals)])
+    provenance = {}
+    actual = omega.wallenius_inclusion_profiles(profile, totals, provenance)
+    np.testing.assert_allclose(actual, per_branch, rtol=1e-15, atol=0.)
+    assert set(provenance['_urn_expectation_methods']) == {'exact_boundary', 'exact_small_draw', 'exact_uniform'}
+
+
+def test_wallenius_one_draw_batch_without_supported_sites_records_no_method():
+    g = {}
+    probabilities = omega.wallenius_inclusion_profiles(np.zeros((8, 0)), np.full(8, .5), g)
+    assert probabilities.shape == (8, 0)
+    assert '_urn_expectation_methods' not in g
+
+
+@pytest.mark.parametrize('draws', [3, 12, 48])
+def test_short_mean_clock_matches_log_solver_without_using_it(monkeypatch, draws):
+    weights = np.linspace(.15, 1., 200)
+    reference = urn_expectation._wallenius_mean_inclusion_log(weights, draws)
+
+    def unexpected_fallback(*args):
+        pytest.fail('the bounded short-clock case should converge directly')
+
+    monkeypatch.setattr(urn_expectation, '_wallenius_mean_inclusion_log', unexpected_fallback)
+    for scale in (1e-200, 1., 1e200):
+        result = urn_expectation.wallenius_mean_inclusion(weights * scale, draws)
+        np.testing.assert_allclose(result, reference, rtol=8e-15, atol=0.)
+        assert result.sum() == pytest.approx(draws, abs=1e-12, rel=0.)
+
+
 @pytest.mark.parametrize('draw_size', [3, 6])
 def test_quadrature_matches_exact_sequential_draws_on_both_tails(draw_size):
     weights = np.array([.03, .05, .13, .25, .6, 2., 7.])

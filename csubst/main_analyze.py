@@ -775,7 +775,7 @@ def _main_analyze(g: AnalysisConfig) -> None:
         print(("Elapsed time: {:,.1f} sec\n".format(elapsed_time)), flush=True)
 
     if _resolve_expectation_method(g) != 'codon_model':
-        if g.get('asrv') != 'empirical':
+        if g.get('asrv') not in asrv.EMPIRICAL_MODES:
             g['state_cdn'] = None
         g['state_pep'] = None
         g['state_nsy'] = None
@@ -869,7 +869,14 @@ def _main_analyze(g: AnalysisConfig) -> None:
         # rebuild expected reducers later in the same arity.
         g['_release_state_after_expected_reducer'] = int(g.get('fg_clade_permutation', 0)) <= 0
         g['df_cb_stats_main'] = pd.DataFrame()
-        g,cb = cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True)
+        # The training data stay fixed across arities and clade permutations.
+        if g.get('asrv') == 'empirical_all':
+            from csubst import empirical_urn
+            g['_empirical_urn_fit'] = empirical_urn.fit_all_branches(g, ON_tensor, OS_tensor)
+        try:
+            g,cb = cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True)
+        finally:
+            g.pop('_empirical_urn_fit', None)
         #if (g['fg_clade_permutation']>0):
         #    g = foreground.clade_permutation(cb, g)
         #del cb

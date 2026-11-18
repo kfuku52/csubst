@@ -157,7 +157,7 @@ def search_case(job, path, iqtree):
     report, = (rep / 'iqtree').glob('*.iqtree')
     fitted = [term for ext in ('iqtree', 'log', 'state', 'rate', 'treefile')
               for term in ('--iqtree_' + ext, report.with_suffix('.' + ext))]
-    run_cli(rep, 'urn.stdout', [*common, *fitted, '--expectation_method', 'urn', '--outdir', 'urn'])
+    run_cli(rep, 'urn.stdout', [*common, *fitted, '--expectation_method', 'urn', '--asrv', 'empirical', '--outdir', 'urn'])
     print(f'Completed {rep.name}', flush=True)
 
 

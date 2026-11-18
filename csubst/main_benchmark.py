@@ -78,7 +78,7 @@ def _normalize_expectation_method_token(token):
 
 def _normalize_asrv_token(token):
     normalized = str(token).strip().lower()
-    if normalized not in ["auto", "empirical", "no", "pool", "sn", "each", "file", "file_each"]:
+    if normalized not in ["auto", *asrv.EMPIRICAL_MODES, "no", "pool", "sn", "each", "file", "file_each"]:
         raise ValueError(
             'Unsupported benchmark ASRV mode "{}".'.format(token)
         )
@@ -176,7 +176,7 @@ def _iter_benchmark_configs(g):
                 "sa_asr_mode": str(sa_asr_mode).strip().lower(),
                 "pseudocount_mode": str(pseudocount_mode).strip().lower(),
             }
-            if expectation_method == "codon_model" and asrv_mode == "empirical":
+            if expectation_method == "codon_model" and asrv_mode in asrv.EMPIRICAL_MODES:
                 config["asrv"] = "each"
             config["asrv"] = asrv.effective_mode(dict(g, **config))
             config["label"] = _build_config_label(config)

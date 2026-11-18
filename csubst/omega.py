@@ -1043,7 +1043,50 @@ def wallenius_inclusion_profiles(sub_sites, draw_totals, g):
     def inclusion(site_weights, draw_size, float_type):
         return _wallenius_inclusion_for_policy(site_weights, draw_size, g)
 
-    return _weighted_urn_inclusion_profiles(sub_sites, draw_totals, g, inclusion, wallenius_zero=True)
+    draw_totals = np.asarray(draw_totals, dtype=np.float64).reshape(-1)
+    small = draw_totals <= 1.
+    if np.count_nonzero(small) < 8 or _resolve_omega_pvalue_rounding_mode(g) != 'stochastic':
+        return _weighted_urn_inclusion_profiles(sub_sites, draw_totals, g, inclusion, wallenius_zero=True)
+    if not np.isfinite(draw_totals).all():
+        raise ValueError('sub_branches should be finite.')
+    site_weights = _normalize_sub_sites_for_urn_overlap(sub_sites, num_branch=len(draw_totals))
+    weights = site_weights[small]
+    if (not np.isfinite(weights).all()
+            or g.get('urn_wallenius_expectation', 'auto') not in ('auto', 'exact', 'quadrature')):
+        return _weighted_urn_inclusion_profiles(site_weights, draw_totals, g, inclusion, wallenius_zero=True)
+    # Fractional draw sizes up to one are a mixture of the empty subset and
+    # a single weighted draw. Normalize those rows as a block.
+    probabilities = np.empty(site_weights.shape, dtype=np.float64)
+    probabilities[small] = _wallenius_single_draw_rows(weights, draw_totals[small], g)
+    if not small.all():
+        probabilities[~small] = _weighted_urn_inclusion_profiles(
+            site_weights[~small], draw_totals[~small], g, inclusion, wallenius_zero=True,
+        )
+    return probabilities
+
+
+def _wallenius_single_draw_rows(weights, totals, g):
+    """Normalize an owned array of rows with at most one expected draw."""
+    positive = weights > 0.
+    support = np.count_nonzero(positive, axis=1)
+    if not support.any():
+        weights.fill(0.)
+        return weights
+    largest = weights.max(axis=1)
+    smallest = weights.min(axis=1, where=positive, initial=np.inf)
+    methods = g.setdefault('_urn_expectation_methods', {})
+    if ((support > 0) & ((totals < 1.) | (support == 1))).any():
+        methods['exact_boundary'] = True
+    single = (totals > 0.) & (support > 1)
+    if (single & (smallest == largest)).any():
+        methods['exact_uniform'] = True
+    if (single & (smallest != largest)).any():
+        methods['exact_small_draw'] = True
+    np.divide(weights, largest[:, None], where=largest[:, None] > 0., out=weights)
+    mass = weights.sum(axis=1, keepdims=True)
+    np.divide(weights, mass, where=mass > 0., out=weights)
+    weights *= np.maximum(totals, 0.)[:, None]
+    return weights
 
 
 def _calc_fisher_expected_overlap(cb_ids, sub_sites, sub_branches, g, float_type):
@@ -2226,10 +2269,10 @@ def get_E(cb, g, ON_tensor, OS_tensor):
     requested_output_stats = _resolve_requested_output_stats(g)
     base_stats = output_stat.get_required_base_stats(requested_output_stats)
     filter_report = site_filter.start_count_report(g, cb, ON_tensor, OS_tensor, base_stats)
-    if expectation_method == 'urn' and g.get('asrv') == 'empirical':
+    if expectation_method == 'urn' and g.get('asrv') in asrv.EMPIRICAL_MODES:
         from csubst import empirical_urn
-        pairs = cb.loc[:, cb.columns.str.startswith('branch_id_')].to_numpy(dtype=np.int64)
-        for column, values in empirical_urn.expected_counts(g, pairs, ON_tensor, OS_tensor, base_stats).items():
+        combos = cb.loc[:, cb.columns.str.startswith('branch_id_')].to_numpy(dtype=np.int64)
+        for column, values in empirical_urn.expected_counts(g, combos, ON_tensor, OS_tensor, base_stats).items():
             cb[column] = values
     elif expectation_method == 'urn':
         ON_gad, ON_ga, ON_gd = substitution.get_group_state_totals(ON_tensor)

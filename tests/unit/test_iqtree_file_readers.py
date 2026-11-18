@@ -94,6 +94,17 @@ Model of substitution: ECMK07+F+R4
         parser_iqtree.read_iqtree(g, eq=True)
 
 
+@pytest.mark.parametrize('model, expected', [
+    ('ECMK07_GY0K+F+R4', [2/3, 1/3, 0]),
+    ('ECMK07+F+R4', [2.5/4, 1/4, .5/4]),
+])
+def test_missing_report_frequencies_with_an_ambiguous_codon(tmp_path, model, expected):
+    report = f'IQ-TREE multicore version 3.1.4\nModel of substitution: {model}\n'
+    g = _get_base_g(tmp_path, report, '')
+    (tmp_path / 'sample.fa').write_text('>seq1\nAAAAACAAR\n>seq2\nAAA---TGA\n')
+    np.testing.assert_allclose(parser_iqtree.read_iqtree(g)['equilibrium_frequency'], expected)
+
+
 @pytest.mark.parametrize('version', ['2.3.6', '3.0.1'])
 def test_equal_frequency_model_does_not_require_pi_entries_or_use_empirical_counts(tmp_path, version):
     text = 'IQ-TREE multicore version {}\nModel of substitution: GY+FQ\n'.format(version)

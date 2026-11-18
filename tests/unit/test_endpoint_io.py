@@ -433,14 +433,15 @@ def test_streaming_retains_projections_when_later_consumers_need_them(tmp_path, 
     assert not isinstance(g['_endpoint_tensors']['N'], PairwiseSubstitutionSummary)
 
 
-def test_empirical_urn_stream_retains_learning_totals_and_observed_counts(tmp_path):
+@pytest.mark.parametrize('mode, arity', [('empirical', 2), ('empirical_all', 2), ('empirical_all', 3)])
+def test_empirical_urn_stream_retains_learning_totals_and_observed_counts(tmp_path, mode, arity):
     import pandas as pd
     from csubst import empirical_urn
-    from csubst.substitution_sparse import PairwiseSubstitutionSummary
+    from csubst.substitution_sparse import PairwiseSubstitutionSummary, ProjectedSubstitutionTensor
 
     streamed, ids = toy_context(tmp_path)
     stats = ['any2any', 'any2spe']
-    streamed.update(subcommand='search', max_arity=2, num_node=len(ids), expectation_method='urn', asrv='empirical',
+    streamed.update(subcommand='search', max_arity=arity, num_node=len(ids), expectation_method='urn', asrv=mode,
                     output_stats=stats, b=True)
     full = copy.deepcopy(streamed)
     full['cs'] = True
@@ -450,7 +451,8 @@ def test_empirical_urn_stream_retains_learning_totals_and_observed_counts(tmp_pa
     for kind, routes in [('N', True), ('S', False)]:
         a = streamed['_endpoint_tensors'][kind]
         b = full['_endpoint_tensors'][kind]
-        assert isinstance(a, PairwiseSubstitutionSummary)
+        assert isinstance(a, ProjectedSubstitutionTensor)
+        assert isinstance(a, PairwiseSubstitutionSummary) == (arity == 2)
         for saved, reduced in zip(empirical_urn._event_totals(a, routes), empirical_urn._event_totals(b, routes)):
             np.testing.assert_allclose(saved, reduced, atol=1e-14)
         np.testing.assert_array_equal(a.eligible, b.eligible)

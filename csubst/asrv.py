@@ -13,6 +13,9 @@ import numpy as np
 from csubst import ete, randomness
 
 
+EMPIRICAL_MODES = ("empirical_all", "empirical")
+
+
 def parse_training_branches(value):
     token = str(value).strip().lower()
     if token in ('all', 'background'):
@@ -64,11 +67,11 @@ def validate_options(g):
 
 def effective_mode(g):
     requested = g.get('asrv', 'each')
-    if requested not in ('auto', 'empirical'):
+    if requested != 'auto' and requested not in EMPIRICAL_MODES:
         return requested
     if g.get('expectation_method', 'codon_model') != 'urn':
-        if requested == 'empirical':
-            raise ValueError('--asrv empirical requires --expectation_method urn.')
+        if requested in EMPIRICAL_MODES:
+            raise ValueError('--asrv {} requires --expectation_method urn.'.format(requested))
         return 'each'
     from csubst import empirical_urn, output_stat
 
@@ -78,18 +81,20 @@ def effective_mode(g):
     if g.get('substitution_posterior', 'joint') != 'joint' or g.get('nonsyn_recode', 'no') != 'no':
         reasons.append('joint codon ASR with amino-acid N substitutions')
     stats = g.get('output_base_stats', output_stat.get_required_base_stats(output_stat.DEFAULT_OUTPUT_STATS))
-    if int(g.get('max_arity', 2)) != 2 or not set(stats).issubset(empirical_urn.SUPPORTED_STATS):
-        reasons.append('branch pairs and any2any/any2spe/any2dif output')
+    if requested == 'empirical' and int(g.get('max_arity', 2)) != 2:
+        reasons.append('branch pairs (--max_arity 2)')
+    if not set(stats).issubset(empirical_urn.SUPPORTED_STATS):
+        reasons.append('any2any/any2spe/any2dif output')
     if g.get('calc_omega_pvalue') or g.get('calibrate_longtail'):
         reasons.append('expectations without the legacy count calibration')
     if (g.get('epistasis_requested') or g.get('asrv_report') or g.get('asrv_posterior_draws')
             or g.get('asrv_training_branches', 'all') != 'all' or g.get('asrv_concentration') is not None
             or g.get('asrv_dirichlet_alpha', 1.) != 1.):
-        reasons.append('its own fold-based training and site-weight regularization')
+        reasons.append('its own training and site-weight regularization')
     if not reasons:
-        return 'empirical'
-    message = 'Cross-fitted empirical urn requires ' + '; '.join(reasons) + '.'
-    if requested == 'empirical':
+        return 'empirical' if requested == 'empirical' else 'empirical_all'
+    message = 'Empirical urn requires ' + '; '.join(reasons) + '.'
+    if requested in EMPIRICAL_MODES:
         raise ValueError(message + ' Use --asrv each for the legacy urn.')
     print('Automatic ASRV resolved to each. ' + message, flush=True)
     return 'each'
@@ -239,7 +244,7 @@ def write_provenance(g, path):
         'asrv': g.get('asrv', 'each'),
         'training_branches': g.get('asrv_training_branches', 'all'),
         'training_branch_ids': np.asarray(g.get('_asrv_training_ids', []), dtype=int).tolist(),
-        'asrv_alpha_per_site': (None if g.get('asrv') == 'empirical' or g.get('asrv_concentration') is not None
+        'asrv_alpha_per_site': (None if g.get('asrv') in EMPIRICAL_MODES or g.get('asrv_concentration') is not None
                                 else g.get('asrv_dirichlet_alpha', 1.0)),
         'asrv_total_concentration': g.get('asrv_concentration'),
         'site_rate_file': str(g.get('path_iqtree_rate', g.get('iqtree_rate', ''))),
@@ -264,17 +269,23 @@ def write_provenance(g, path):
         'weight_diagnostics_requested': bool(g.get('asrv_report', False)),
         'wallenius_methods_complete': bool(g.get('_asrv_diagnostics_complete', False)),
     }
-    if g.get('asrv') == 'empirical':
+    if g.get('asrv') in EMPIRICAL_MODES:
         from csubst import empirical_urn
+        cross_fit = g['asrv'] == 'empirical'
         payload['empirical_urn'] = {
-            'branch_fold_count': empirical_urn.FOLD_COUNT,
-            'fold_assignment': 'branch_id_modulo_fold_count',
+            'training_scope': 'outside_pair_folds' if cross_fit else 'all_eligible_branches',
+            'branch_fold_count': empirical_urn.FOLD_COUNT if cross_fit else 0,
+            'fold_assignment': 'branch_id_modulo_fold_count' if cross_fit else None,
             'site_regularization': 'leave_one_training_branch_out_log_score',
             'route_prior_count': empirical_urn.ROUTE_PRIOR_COUNT,
-            'n_draw_totals': 'pooled_branch_n_plus_s',
-            's_draw_totals': 'observed_destination_mass',
-            'folds': g.get('_empirical_urn_folds', []),
+            'n_draw_totals': ('pooled_branch_n_plus_s' if cross_fit
+                              else 'observed_branch_n_with_pooled_route_rates'),
+            's_draw_totals': ('observed_destination_mass' if cross_fit
+                              else 'observed_branch_s_with_pooled_destination_rates'),
+            'folds': g.get('_empirical_urn_folds', []) if cross_fit else [],
         }
+        if not cross_fit:
+            payload['empirical_urn']['uniform_weight'] = g.get('_empirical_urn_uniform_weight')
     if g.get('asrv_posterior_draws'):
         payload['site_rate_posterior'] = {
             'draws': g['asrv_posterior_draws'],

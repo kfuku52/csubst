@@ -108,6 +108,8 @@ class AnalysisState(TypedDict, total=False):
     _asrv_rate_categories: np.ndarray
     _asrv_rate_posterior: np.ndarray
     _asrv_posterior_seed: int
+    _empirical_urn_fit: tuple[Any, Any]
+    _empirical_urn_uniform_weight: float | None
     _empirical_urn_folds: list[dict[str, Any]]
     EN_reducer: dict[str, Any]
     ES_reducer: dict[str, Any]

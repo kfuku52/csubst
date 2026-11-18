@@ -490,12 +490,14 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'integer draw sizes in randomization for --calc_omega_pvalue. '
                              '"round" reproduces legacy behavior; "stochastic" applies per-iteration '
                              'stochastic rounding; "floor"/"ceil" provide deterministic lower/upper bounds.')
-    parser.add_argument('--asrv', metavar='auto|empirical|no|pool|sn|each|file|file_each', default='auto', type=str,
-                        choices=['auto', 'empirical', 'no', 'pool', 'sn', 'each', 'file', 'file_each'],
+    parser.add_argument('--asrv', metavar='auto|empirical_all|empirical|no|pool|sn|each|file|file_each', default='auto', type=str,
+                        choices=['auto', 'empirical_all', 'empirical', 'no', 'pool', 'sn', 'each', 'file', 'file_each'],
                         help='default=%(default)s: Select site weighting for urn expectations. '
                              'This option is used with --expectation_method urn but not with --expectation_method codon_model. '
-                             'Auto uses the cross-fitted empirical urn for supported joint codon branch-pair expectations, '
-                             'and each for other workflows. Use empirical to require cross-fitted routes, site rates, and N totals. '
+                             'Auto uses empirical_all for supported joint codon expectations at every arity, '
+                             'preserving each branch\'s observed N and S totals and fitting rates on all eligible '
+                             'branches, including evaluated branches. '
+                             'Use empirical for four-fold cross-fitting at K=2. Auto uses each for other workflows. '
                              '"no", No ASRV, meaning a uniform rate among sites. '
                              '"pool", All categories of substitutions are pooled to calculate a single set of ASRV. '
                              '"sn", Synonymous and nonsynonymous substitutions are processed individually '

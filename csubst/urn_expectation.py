@@ -275,7 +275,32 @@ def grouped_wallenius_inclusion(positive_weights, draw_size):
 
 
 def wallenius_mean_inclusion(positive_weights, draw_size):
-    """Solve the approximate Wallenius mean equation in log time."""
+    """Solve the approximate Wallenius mean equation."""
+    scaled = positive_weights / positive_weights.max()
+    total = scaled.sum()
+    fraction = draw_size / total
+    if fraction <= .5 and scaled.min() >= np.finfo(np.float64).tiny:
+        # When max(w) = 1, k/sum(w) is a lower bound on the clock and
+        # -log(1-k/sum(w)) is an upper bound by concavity in w. Here every
+        # site's inclusion stays below one half and Newton needs no log
+        # clock or subtraction of nearly saturated probabilities.
+        clock = fraction
+        upper = -np.log1p(-fraction)
+        tolerance = 4. * np.finfo(np.float64).eps * draw_size
+        for _ in range(6):
+            inclusion = -np.expm1(-clock * scaled)
+            discrepancy = draw_size - inclusion.sum()
+            if abs(discrepancy) <= tolerance:
+                return inclusion
+            next_clock = clock + discrepancy / (total - scaled @ inclusion)
+            if not clock < next_clock <= upper:
+                break
+            clock = next_clock
+    return _wallenius_mean_inclusion_log(positive_weights, draw_size)
+
+
+def _wallenius_mean_inclusion_log(positive_weights, draw_size):
+    """Solve with log clocks even when the site's weights span many orders of magnitude."""
     from scipy.optimize import brentq
 
     log_weights = normalized_log_weights(positive_weights)

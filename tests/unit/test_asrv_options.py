@@ -5,10 +5,13 @@ from csubst import cli, param
 
 
 @pytest.mark.parametrize('extra, expected', [
-    ([], 'empirical'),
-    (['--output_stat', 'any2spe'], 'empirical'),
+    ([], 'empirical_all'),
+    (['--asrv', 'empirical'], 'empirical'),
+    (['--asrv', 'empirical_all'], 'empirical_all'),
+    (['--output_stat', 'any2spe'], 'empirical_all'),
     (['--asrv', 'each'], 'each'),
-    (['--max_arity', '3'], 'each'),
+    (['--max_arity', '3'], 'empirical_all'),
+    (['--max_arity', '3', '--output_stat', 'spe2spe'], 'each'),
     (['--urn_model', 'fisher'], 'each'),
     (['--calc_omega_pvalue', 'yes', '--output_stat', 'any2spe'], 'each'),
 ])
@@ -17,9 +20,18 @@ def test_resolve_search_urn_default(extra, expected):
     assert param.get_global_parameters(args)['asrv'] == expected
 
 
-def test_explicit_empirical_rejects_incompatible_statistics():
+def test_cross_fitted_empirical_still_requires_pairs():
     args = cli._build_parser().parse_args([
-        'search', '--expectation_method', 'urn', '--asrv', 'empirical', '--output_stat', 'spe2spe',
+        'search', '--expectation_method', 'urn', '--asrv', 'empirical', '--max_arity', '3',
+    ])
+    with pytest.raises(ValueError, match='branch pairs'):
+        param.get_global_parameters(args)
+
+
+@pytest.mark.parametrize('mode', ['empirical', 'empirical_all'])
+def test_explicit_empirical_rejects_incompatible_statistics(mode):
+    args = cli._build_parser().parse_args([
+        'search', '--expectation_method', 'urn', '--asrv', mode, '--output_stat', 'spe2spe',
     ])
     with pytest.raises(ValueError, match='destination|any2any/any2spe/any2dif'):
         param.get_global_parameters(args)

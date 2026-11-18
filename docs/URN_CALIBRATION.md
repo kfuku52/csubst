@@ -9,38 +9,68 @@ The ordinary search expectation is `codon_model`. A fixed amino-acid
 grouping tests convergence to that group. Consult the effective `asrv`
 and the urn settings in `csubst_urn_provenance.json` for every urn run.
 
-## Default pairwise urn
+## Default empirical urn
 
-With `--expectation_method urn`, `--asrv auto` selects `empirical` for
-joint codon branch-pair expectations with the Wallenius urn and the
-`any2spe`, `any2any`, and `any2dif` output statistics. Specify
-`--asrv each` to use the previous destination-specific pooled site weights.
-With higher arity, source-specific statistics, recoding, marginal ASR,
-alternative urn laws, count P values, long-tail calibration, or custom
-legacy weight settings, `auto` reports its choice of `each`. Requesting
-`--asrv empirical` with one of these settings raises an error.
+With `--expectation_method urn`, the default `--asrv auto` selects
+`empirical_all` for joint codon expectations under the Wallenius urn with
+`any2spe`, `any2any`, or `any2dif` output. This fits one shared profile to
+all eligible branches, **including the evaluated branches**, for K=2 and
+higher arities. The root and its immediate children do not contribute to
+training or receive expected counts. Adding a higher arity or selecting a
+foreground does not change the training population.
 
-The empirical urn assigns branches to four folds by branch ID modulo
-four. For each pair, it trains on eligible branches outside both folds.
+To reproduce the former pairwise default, use `--asrv empirical --max_arity 2`:
+each branch is assigned to a fold by its ID modulo four, and a pair uses
+only branches outside its members' folds. For the former higher-arity
+default, use `--asrv each` (observed totals and category-specific pooled
+site weights). Source-specific statistics, marginal ASR, recoding, other
+urn laws, count P values, long-tail calibration or custom legacy weight
+settings still select `each` under `auto`; explicitly requesting an
+incompatible empirical mode raises an error.
+
 Each training branch's N+S endpoint masses contribute to a site-rate
 profile. The mixture with uniform site weights is fitted by
 leave-one-training-branch-out log scoring. N weights combine these
 rates with empirical parent-to-destination amino-acid rates learned
-with a 0.5-count destination-pooled prior. The observed N+S mass of an
-evaluation branch anchors its N destination totals. A scale estimated
-from the training branches fixes their pooled predicted N mass to their
-pooled observed N mass. Synonymous weights use parental codon
-compatibility and the original empirical site weights based on a
-0.5-count per-site prior, with observed synonymous destination totals.
+with a 0.5-count destination-pooled prior. Synonymous site weights combine
+parental codon compatibility with the empirical site profile based on a
+0.5-count per-site prior.
 
-Each destination has its own Wallenius inclusion probabilities.
+In `empirical_all`, **each branch keeps its own observed N and S totals**.
+These totals are sums of joint endpoint posterior probabilities and can be
+fractional. For N, sum the site weights for each destination amino acid on
+the branch. Allocate the branch's observed N total in proportion to these
+sums across destinations. A branch with zero observed N mass receives zero
+N draws. Thus ECN asks how much overlap is expected given the amount of
+amino-acid change on each branch. Constraints that relax at the same sites
+on several branches can still change where the observed events occur.
+
+For S, the branch total includes all synonymous families. Destination rates
+are fully pooled across eligible branches. For a branch `b` and destination
+codon `d`, the opportunity
+`U[b,d]` sums the S site weights times the parental probability of another
+synonymous codon at eligible sites. If `S[b]` is the branch's observed S mass
+and `L[b]` its number of eligible sites, the rate for `d` is its observed
+tree-wide mass divided by `sum_b [(S[b] / L[b]) * U[b,d]]`. Allocate `S[b]`
+in proportion to `U[b,d]` times these rates. A destination with no training
+mass receives zero draws. This fit is reused at each arity. The pairwise
+cross-fitted `empirical` mode uses observed branch-by-destination S masses
+and predicts N totals from branch N+S mass and amino-acid opportunities.
+It scales the predicted N mass to the observed N mass across training branches.
+[PEPC accuracy and timing comparison](../reports/omega_low_count_20261116/PEPC_FULL_POOLING.md)
+
+For each site and destination, the K-way overlap is the product of the K
+branches’ Wallenius inclusion probabilities.
 `any2spe` sums overlaps within destinations. `any2any` sums overlaps
 over destination combinations within the same substitution group, so
 `any2dif` is their difference. In the absence of eligible training
 branches for a pair's held-out folds, the corresponding expected counts
 are unavailable. The ASR conditions on the entire alignment and the fitted
 codon model. Folds affect the learning of urn weights and N totals.
-Provenance records the fitted uniform weights and training sizes per fold.
+Provenance records the training scope, eligible branch IDs and either a
+single fitted uniform weight or diagnostics for the held-out folds.
+Including evaluated branches can absorb some of their signal into the
+expected counts; see the [PEPC all-branch comparison](../reports/omega_low_count_20261116/PEPC_ALL_BRANCH_URN.md).
 [PEPC estimator study](../reports/omega_low_count_20261116/URN_ECN_BIAS.md)
 
 ## Learning ASRV weights
@@ -144,10 +174,11 @@ They run for up to 256 draws and 8,192 count-state updates, bounded by
 problems use the approximate mean equation. Scaling all weights leaves the
 answer unchanged, including very small weights. [Fog (2008)](https://doi.org/10.1080/03610910701790269)
 
-The approximate mean equation is solved in log time with bounds derived from
-the smallest and largest positive weights. Its fitted inclusion probabilities
-sum to the requested draw size, including when the weights span many orders
-of magnitude.
+The approximate mean equation uses a short bounded clock when the draw
+size is small relative to the sum of the weights scaled to a maximum of
+one. The general solver uses log time with bounds derived from the
+smallest and largest positive weights. Both solve for inclusion
+probabilities that sum to the requested draw size.
 
 `--urn_wallenius_expectation exact` rejects a case that would need the
 approximation. It is available only for the Wallenius urn expectation model.

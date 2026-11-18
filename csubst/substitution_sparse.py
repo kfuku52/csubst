@@ -370,13 +370,18 @@ class ProjectedSubstitutionTensor(SparseSubstitutionTensor):
     Full event consumers must request the ordinary SparseSubstitutionTensor.
     """
 
-    def __init__(self, shape, dtype, projections, sitewise_max=None):
+    def __init__(self, shape, dtype, projections, sitewise_max=None, *, branch_site=None, event_totals=None):
         self.shape = tuple(shape)
         self.dtype = np.dtype(dtype)
         self.projections = projections
         self.sitewise_max = sitewise_max
-        self.branch_site = projections['any2any'].toarray().reshape(
-            self.num_branch, self.num_group, self.num_site).sum(axis=1)
+        if branch_site is None:
+            branch_site = projections['any2any'].toarray().reshape(
+                self.num_branch, self.num_group, self.num_site).sum(axis=1)
+        self.branch_site = branch_site
+        self.event_totals = event_totals
+        if event_totals is not None:
+            event_totals.flags.writeable = False
         for matrix in projections.values():
             matrix.data.flags.writeable = False
             matrix.indices.flags.writeable = False
@@ -388,9 +393,10 @@ class ProjectedSubstitutionTensor(SparseSubstitutionTensor):
 
     @property
     def nbytes(self):
-        return self.branch_site.nbytes + sum(
-            x.data.nbytes + x.indices.nbytes + x.indptr.nbytes for x in self.projections.values()
-        ) + (0 if self.sitewise_max is None else sum(x.nbytes for x in self.sitewise_max))
+        projection_bytes = sum(x.data.nbytes + x.indices.nbytes + x.indptr.nbytes for x in self.projections.values())
+        return (self.branch_site.nbytes + projection_bytes
+                + (0 if self.sitewise_max is None else sum(x.nbytes for x in self.sitewise_max))
+                + (0 if self.event_totals is None else self.event_totals.nbytes))
 
     def project(self, stat):
         return self.projections[stat]
