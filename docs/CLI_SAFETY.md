@@ -67,6 +67,12 @@ its new summary.
 When a tree/site category table is disabled, `sites` leaves an existing table
 untouched and omits it from the current output manifest.
 
+For `sites --mode intersection`, a per-job directory name over 255 UTF-8 bytes
+is shortened to `csubst.branch_id.sha256-<digest>`. All selected branch IDs are
+recorded in the output manifest when it is enabled. Consumers can predict the
+directory name with `csubst.site_output.intersection_job_dirname` using the
+comma-separated integer IDs in the order supplied to CSUBST.
+
 ## Input paths and bundled examples
 
 Relative alignment, tree, foreground, and `--iqtree_outdir` paths are resolved

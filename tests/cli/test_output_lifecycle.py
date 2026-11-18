@@ -16,20 +16,26 @@ from pymol_fakes import import_parser_pymol_with_fake_pymol
 @pytest.fixture
 def tiny_fit(tmp_path):
     """Six tips and two codons suffice for real CLI output-lifecycle checks."""
+    args, ids = write_sites_test_fit(
+        tmp_path, '((A:0.1,B:0.1)X:0.1,((C:0.1,D:0.1)Y:0.1,(E:0.1,F:0.1)Z:0.1)W:0.1)R;', {'A', 'C', 'E'},
+    )
+    return args, ','.join(str(ids[name]) for name in 'AC')
+
+
+def write_sites_test_fit(tmp_path, newick, derived_tips):
     import numpy as np
     from csubst import ete, main_simulate, tree
 
-    phylogeny = tree.add_numerical_node_labels(ete.PhyloNode(
-        '((A:0.1,B:0.1)X:0.1,((C:0.1,D:0.1)Y:0.1,(E:0.1,F:0.1)Z:0.1)W:0.1)R;',
-        format=1,
-    ))
+    phylogeny = tree.add_numerical_node_labels(ete.PhyloNode(newick, format=1))
     alignment = tmp_path / 'alignment.fa'
     alignment.write_text(''.join(
-        '>{}\n{}\n'.format(name, 'GATAAG' if name in 'ACE' else 'GCTAAA')
-        for name in 'ABCDEF'
+        '>{}\n{}\n'.format(node.name, 'GATAAG' if node.name in derived_tips else 'GCTAAA')
+        for node in phylogeny.traverse() if ete.is_leaf(node)
     ))
     ancestors = tmp_path / 'ancestors.fa'
-    ancestors.write_text(''.join('>{}\nGCTAAA\n'.format(name) for name in 'XYZWR'))
+    ancestors.write_text(''.join(
+        '>{}\nGCTAAA\n'.format(node.name) for node in phylogeny.traverse() if not ete.is_leaf(node)
+    ))
     files = main_simulate.write_true_asr_bundle(
         dict(tree=phylogeny, eq_freq=np.full(61, 1 / 61), substitution_model='GY+F',
              genetic_code=1, background_omega=0.2, kappa=2.),
@@ -43,7 +49,33 @@ def tiny_fit(tmp_path):
                         ('iqtree', 'iqtree'), ('log', 'log')]:
         args += ['--iqtree_' + option, files[key]]
     ids = {node.name: int(ete.get_prop(node, 'numerical_label')) for node in phylogeny.traverse()}
-    return args, ','.join(str(ids[name]) for name in 'AC')
+    return args, ids
+
+
+def test_sites_writes_long_branch_list_under_short_directory(tmp_path):
+    tips = [f'T{i}' for i in range(128)]
+    level = tips
+    depth = 0
+    while len(level) > 1:
+        level = [f'({level[i]}:0.1,{level[i + 1]}:0.1)I{depth}_{i}' for i in range(0, len(level), 2)]
+        depth += 1
+    inputs, ids = write_sites_test_fit(tmp_path, level[0] + ';', tips[::2])
+    selected = [str(i) for i in sorted(ids.values()) if 100 <= i <= 180]
+    branch_ids = ','.join(selected)
+    assert len(selected) == 81
+    assert len('csubst.branch_id' + branch_ids) > 255
+    result = run_csubst([
+        'sites', *inputs, '--branch_id', branch_ids, '--site_state_plot', 'no', '--tree_site_plot', 'no',
+    ], tmp_path)
+    assert result.returncode == 0, result.stderr
+    manifest, = (tmp_path / 'csubst_sites').glob('csubst.branch_id.sha256-*/csubst.outputs.tsv')
+    with manifest.open() as handle:
+        rows = {row['output_kind']: row for row in csv.DictReader(handle, delimiter='\t')}
+    for kind in ('site_table_tsv', 'site_summary_pdf'):
+        row = rows[kind]
+        assert row['branch_ids'] == branch_ids
+        assert row['branch_count'] == str(len(selected))
+        assert (manifest.parent / row['output_file']).stat().st_size > 0
 
 
 def doctor_inputs(tmp_path):

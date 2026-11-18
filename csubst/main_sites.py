@@ -12,6 +12,7 @@ from csubst import output_safety
 from csubst import parser_misc
 from csubst import runtime
 from csubst import sequence
+from csubst import site_output
 from csubst import substitution
 from csubst import substitution_sparse
 from csubst import tree
@@ -1894,7 +1895,7 @@ def _build_site_outdir(
     output_prefix='csubst_sites',
 ):
     if mode == 'intersection':
-        suffix = '.branch_id' + branch_txt
+        return os.path.join(str(base_dir), site_output.intersection_job_dirname(branch_txt, str(output_prefix)))
     elif mode == 'lineage':
         suffix = '.lineage.branch_id' + lineage_input_branch_txt
     elif mode == 'set':
