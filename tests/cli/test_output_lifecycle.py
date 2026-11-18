@@ -161,7 +161,7 @@ def test_local_besthit_failure_never_submits_query(command, program, tiny_fit, t
 
 
 def test_sites_reuses_local_searches_for_identical_queries_only_within_a_run(tiny_fit, tmp_path, monkeypatch):
-    from csubst import cli, ete, local_sequence_search, tree
+    from csubst import cli, ete, local_sequence_search, structure_resources, tree
 
     import_parser_pymol_with_fake_pymol(monkeypatch, pdb_fasta='')
     inputs, _ = tiny_fit
@@ -179,17 +179,27 @@ def test_sites_reuses_local_searches_for_identical_queries_only_within_a_run(tin
 
     def run_blastp(sequence, *_):
         calls.append(('blastp', sequence))
-        return []
+        return ['P12345']
+
+    def latest(accession, timeout):
+        calls.append(('alphafold', accession))
+        return 7, 'https://alphafold.ebi.ac.uk/files/example.pdb'
+
+    def unavailable(*_):
+        raise FileNotFoundError('Structure unavailable')
 
     monkeypatch.setattr(local_sequence_search, 'mmseqs_pdb_ids', run_mmseqs)
     monkeypatch.setattr(local_sequence_search, 'blastp_accessions', run_blastp)
+    monkeypatch.setattr(structure_resources, 'get_latest_alphafold_model', latest)
+    monkeypatch.setattr(structure_resources, '_download_url_bytes', unavailable)
     monkeypatch.chdir(tmp_path)
     args = [
         'sites', *inputs, '--branch_id', 'fg', '--cb_file', str(combinations), '--pdb', 'besthit',
         '--database_search', 'local', '--database', 'pdb,alphafold', '--mmseqs_db', 'pdb', '--blastp_db', 'swissprot',
+        '--resource_cache_dir', str(tmp_path / 'cache'),
         '--site_summary_plot', 'no', '--site_state_plot', 'no', '--tree_site_plot', 'no',
     ]
-    expected_calls = [('mmseqs', 'DK'), ('blastp', 'DK'), ('mmseqs', 'AK'), ('blastp', 'AK')]
+    expected_calls = [('mmseqs', 'DK'), ('blastp', 'DK'), ('alphafold', 'P12345'), ('mmseqs', 'AK'), ('blastp', 'AK')]
     for run in range(2):
         outdir = tmp_path / f'out-{run}'
         cli.main([*args, '--outdir', str(outdir)])

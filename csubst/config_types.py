@@ -24,6 +24,7 @@ class InputConfig(TypedDict, total=False):
     epistasis_context_file: str
     epistasis_context_source: str
     database_search: str
+    alphafold_version: str
     blastp_db: str | None
     mmseqs_db: str | None
     resource: str

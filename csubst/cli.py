@@ -60,6 +60,10 @@ def _add_advanced_argument(parser, *args, **kwargs):
 
 
 def _add_database_search_arguments(parser, *, show_advanced=True):
+    _add_advanced_argument(parser, '--alphafold_version', show_advanced=show_advanced,
+                           metavar='latest|N', default='latest',
+                           help='default=%(default)s. AlphaFold DB model version for besthit retrieval. '
+                                'Use latest to follow the prediction API, or a positive version number to pin the model.')
     _add_advanced_argument(parser, '--database_search', show_advanced=show_advanced,
                            choices=['remote', 'local'], default='remote',
                            help='default=%(default)s. Where to run besthit sequence searches. '

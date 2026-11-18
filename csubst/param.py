@@ -844,6 +844,12 @@ def _normalize_variant_effect_parameters(g: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_structure_parameters(g: dict[str, Any]) -> dict[str, Any]:
+    version = str(g.get('alphafold_version', 'latest')).strip().lower()
+    if version != 'latest':
+        version = version.removeprefix('v')
+        if not re.fullmatch(r'[1-9][0-9]*', version):
+            raise ValueError('--alphafold_version should be latest or a positive version number (e.g. 6).')
+    g['alphafold_version'] = version
     if g.get('database_search', 'remote') == 'local':
         if g.get('run_pdb_sequence_search'):
             databases = g['database']

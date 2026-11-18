@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 import itertools
+from functools import lru_cache
 import os
 import re
 import sys
@@ -2302,10 +2303,16 @@ def main_sites(g):
     OS_tensor = substitution.apply_min_sub_pp(g, OS_tensor)
     g = _maybe_relocate_site_log_file(g)
     local_searches = None
-    if g['run_pdb_sequence_search'] and g.get('database_search') == 'local' and len(g['site_jobs']) > 1:
-        from csubst.local_sequence_search import LocalSearchCache
+    alphafold_lookup = None
+    if g['run_pdb_sequence_search'] and len(g['site_jobs']) > 1:
+        from csubst import structure_resources
 
-        local_searches = LocalSearchCache()
+        # Recheck current versions on the next run, including after a database release.
+        alphafold_lookup = lru_cache(maxsize=128)(structure_resources.get_latest_alphafold_model)
+        if g.get('database_search') == 'local':
+            from csubst.local_sequence_search import LocalSearchCache
+
+            local_searches = LocalSearchCache()
     for site_job in g['site_jobs']:
         branch_ids = _normalize_branch_ids(site_job['branch_ids'])
         g['single_branch_mode'] = site_job['single_branch_mode']
@@ -2373,7 +2380,7 @@ def main_sites(g):
             export2chimera(df, g)
         if g['run_pdb_sequence_search']:
             from csubst import parser_biodb
-            g = parser_biodb.pdb_sequence_search(g, local_searches=local_searches)
+            g = parser_biodb.pdb_sequence_search(g, local_searches=local_searches, alphafold_lookup=alphafold_lookup)
         if (g['pdb'] is not None):
             id_base = os.path.basename(g['pdb'])
             id_base = re.sub('.pdb$', '', id_base)

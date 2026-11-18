@@ -209,7 +209,49 @@ def _select_pdb_hit(pdb_ids, g):
     return None
 
 
-def pdb_sequence_search(g, *, local_searches=None):
+def _fetch_hit_structure(provider, accession, alphafold_version, cache_options, alphafold_lookup):
+    if provider == 'alphafold':
+        try:
+            return structure_resources.ensure_alphafold_structure(
+                accession, alphafold_version, latest_lookup=alphafold_lookup, **cache_options,
+            )
+        except Exception as exc:
+            print(f'AlphaFold DB retrieval failed for {accession} (version {alphafold_version}): {exc}', flush=True)
+            return None
+
+    download_info = None
+    if provider == 'swissmodel':
+        try:
+            download_url, download_info = get_swissmodel_download_info(
+                top_hit_id=accession, timeout=cache_options['network_timeout'],
+            )
+        except Exception as exc:
+            print(f'SWISS-MODEL lookup failed for {accession} ({exc})', flush=True)
+            return None
+        if download_url is None:
+            print(f'No SWISS-MODEL homology model found for: {accession}', flush=True)
+            return None
+        filename = accession + '.swissmodel.pdb'
+    else:  # alphafill
+        download_url = 'https://alphafill.eu/v1/aff/' + accession
+        filename = os.path.basename(download_url) + '.cif'
+    try:
+        path = structure_resources.ensure_remote_structure(
+            source=provider, structure_id=accession, url=download_url, filename=filename, **cache_options,
+        )
+    except Exception as exc:
+        print(f'Structure download failed at: {download_url} ({exc})', flush=True)
+        return None
+    if download_info is not None:
+        txt = 'SWISS-MODEL best hit: template={} GMQE={} identity={} range={}-{}'
+        print(txt.format(
+            download_info.get('template', ''), download_info.get('gmqe', ''),
+            download_info.get('identity', ''), download_info.get('from', ''), download_info.get('to', ''),
+        ), flush=True)
+    return path
+
+
+def pdb_sequence_search(g, *, local_searches=None, alphafold_lookup=None):
     if local_searches is None:
         local_searches = local_sequence_search
     print('')
@@ -274,7 +316,7 @@ def pdb_sequence_search(g, *, local_searches=None):
                 top_hit_ids = local_searches.blastp_accessions(
                     aa_query, g['blastp_db'], g['database_evalue_cutoff'], g.get('threads', 1),
                 )
-            elif not local_search and not top_hit_ids:
+            elif not local_search and top_hit_ids is None:
                 try:
                     top_hit_ids = run_qblast(
                         aa_query,
@@ -285,69 +327,29 @@ def pdb_sequence_search(g, *, local_searches=None):
                 except Exception as e:
                     print(e)
                     print('QBLAST search was unsuccessful.')
-                    top_hit_ids = []
+                    # Leave the search pending so another provider can retry a failed request.
+                    continue
             if not top_hit_ids:
                 backend = 'local BLAST+' if local_search else 'QBLAST'
                 print('No {} hit with the E-value threshold of {}.'.format(backend, g['database_evalue_cutoff']))
                 pdb_id = None
             else:
-                for i in range(len(top_hit_ids)):
-                    print('Retrieving protein structure: {}'.format(top_hit_ids[i]), flush=True)
-                    download_info = None
-                    if (database_name == 'swissmodel'):
-                        try:
-                            download_url, download_info = get_swissmodel_download_info(
-                                top_hit_id=top_hit_ids[i],
-                                timeout=network_timeout,
-                            )
-                        except Exception as exc:
-                            print('SWISS-MODEL lookup failed for {} ({})'.format(top_hit_ids[i], exc), flush=True)
-                            download_url = None
-                        if download_url is None:
-                            print('No SWISS-MODEL homology model found for: {}'.format(top_hit_ids[i]), flush=True)
-                            pdb_id = None
-                            continue
-                    elif (database_name=='alphafill'):
-                        download_url = 'https://alphafill.eu/v1/aff/'+top_hit_ids[i]
-                    elif (database_name=='alphafold'):
-                        download_url = 'https://alphafold.ebi.ac.uk/files/AF-' + top_hit_ids[i] + '-F1-model_v2.pdb'
-                    try:
-                        if (database_name == 'swissmodel'):
-                            structure_filename = top_hit_ids[i] + '.swissmodel.pdb'
-                        elif (database_name == 'alphafill'):
-                            structure_filename = os.path.basename(download_url)+'.cif'
-                        elif (database_name=='alphafold'):
-                            structure_filename = os.path.basename(download_url)
-                        structure_path = structure_resources.ensure_remote_structure(
-                            source=database_name,
-                            structure_id=top_hit_ids[i],
-                            url=download_url,
-                            filename=structure_filename,
-                            cache_dir=g.get('resource_cache_dir', ''),
-                            network_timeout=network_timeout,
-                            poll_seconds=float(
-                                g.get('resource_lock_poll', resource_cache.DEFAULT_LOCK_POLL_SECONDS)
-                            ),
-                            lock_timeout_seconds=float(
-                                g.get('resource_lock_timeout', resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS)
-                            ),
-                        )
-                        print('Structure download/cache ready: {}'.format(structure_path), flush=True)
-                        if (database_name == 'swissmodel') and (download_info is not None):
-                            txt = 'SWISS-MODEL best hit: template={} GMQE={} identity={} range={}-{}'
-                            print(txt.format(
-                                download_info.get('template', ''),
-                                download_info.get('gmqe', ''),
-                                download_info.get('identity', ''),
-                                download_info.get('from', ''),
-                                download_info.get('to', ''),
-                            ), flush=True)
-                        pdb_id = structure_path
-                        g['selected_database'] = database_name
-                        break
-                    except Exception as exc:
-                        print('Structure download failed at: {} ({})'.format(download_url, exc), flush=True)
-                        pdb_id = None
+                cache_options = {
+                    'cache_dir': g.get('resource_cache_dir', ''),
+                    'network_timeout': network_timeout,
+                    'poll_seconds': float(g.get('resource_lock_poll', resource_cache.DEFAULT_LOCK_POLL_SECONDS)),
+                    'lock_timeout_seconds': float(g.get('resource_lock_timeout', resource_cache.DEFAULT_LOCK_TIMEOUT_SECONDS)),
+                }
+                for accession in top_hit_ids:
+                    print('Retrieving protein structure: {}'.format(accession), flush=True)
+                    pdb_id = _fetch_hit_structure(
+                        database_name, accession, g.get('alphafold_version', 'latest'), cache_options, alphafold_lookup,
+                    )
+                    if pdb_id is None:
+                        continue
+                    print('Structure download/cache ready: {}'.format(pdb_id), flush=True)
+                    g['selected_database'] = database_name
+                    break
     g['pdb'] = pdb_id
     if g['pdb'] is not None:
         print('Selected database and ID: {} and {}'.format(g['selected_database'], g['pdb']))

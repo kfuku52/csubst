@@ -260,6 +260,7 @@ def test_sites_help_shows_output_manifest_and_removed_site_output_manifest_is_re
     assert "default=swissmodel,pdb,alphafold,alphafill" in help_text
     assert "--database_search {remote,local}" in help_text
     assert "default=remote" in help_text
+    assert "--alphafold_version latest|N" in help_text
     proc, log_text = _run_cli("sites", "--branch_id", "0", "--site_output_manifest", "no")
     assert proc.returncode == 2
     assert "unrecognized arguments: --site_output_manifest no" in log_text
@@ -280,6 +281,7 @@ def test_epistasis_options_are_advanced_only(subcommand):
     assert "swissmodel" in help_text
     assert "--epistasis_beta" in help_text
     assert "--epistasis_pdb" in help_text
+    assert "--alphafold_version latest|N" in help_text
     assert "--database_search {remote,local}" in help_text
 
 

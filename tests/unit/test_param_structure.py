@@ -251,6 +251,15 @@ def test_get_global_parameters_validates_database_timeout():
         param.get_global_parameters(_args(database_timeout=-1))
 
 
+def test_alphafold_version_defaults_to_latest_and_accepts_positive_pins():
+    assert param.get_global_parameters(_args())['alphafold_version'] == 'latest'
+    for version in ['6', 'v6']:
+        assert param.get_global_parameters(_args(alphafold_version=version))['alphafold_version'] == '6'
+    for invalid in ['0', '-1', '6.5', 'next', 'v']:
+        with pytest.raises(ValueError, match='--alphafold_version'):
+            param.get_global_parameters(_args(alphafold_version=invalid))
+
+
 @pytest.mark.parametrize('pdb_option,database_option,db_flag,provider', [
     ('pdb', 'database', 'mmseqs_db', 'pdb'),
     ('epistasis_pdb', 'epistasis_database', 'blastp_db', 'swissmodel'),

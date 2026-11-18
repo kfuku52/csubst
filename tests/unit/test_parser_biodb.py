@@ -183,27 +183,32 @@ def test_pdb_sequence_search_rejects_none_branch_ids_with_clear_error(monkeypatc
         parser_biodb.pdb_sequence_search(g)
 
 
-def test_pdb_sequence_search_alphafill_handles_qblast_failure(monkeypatch):
+def test_pdb_sequence_search_retries_failed_qblast_for_next_provider(monkeypatch):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
     a_node = [n for n in tr.traverse() if n.name == "A"][0]
     a_bid = int(ete.get_prop(a_node, "numerical_label"))
     monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda nlabel, mode, g: "AAAA")
-    monkeypatch.setattr(
-        parser_biodb,
-        "run_qblast",
-        lambda aa_query, num_display=10, evalue_cutoff=10: (_ for _ in ()).throw(RuntimeError("qblast failed")),
-    )
+    attempts = []
+
+    def qblast(query, **_):
+        attempts.append(query)
+        if len(attempts) == 1:
+            raise RuntimeError("qblast failed")
+        return []
+
+    monkeypatch.setattr(parser_biodb, "run_qblast", qblast)
     g = {
         "branch_ids": [a_bid],
         "tree": tr,
-        "database": "alphafill",
+        "database": "alphafill,alphafold,swissmodel",
         "database_evalue_cutoff": 10,
         "database_minimum_identity": 0.0,
         "pymol_max_num_chain": 999,
     }
     out = parser_biodb.pdb_sequence_search(g)
     assert out["pdb"] is None
+    assert attempts == ["AAAA", "AAAA"]
 
 
 def test_pdb_sequence_search_strips_database_tokens(monkeypatch):
@@ -227,7 +232,7 @@ def test_pdb_sequence_search_strips_database_tokens(monkeypatch):
     g = {
         "branch_ids": [a_bid],
         "tree": tr,
-        "database": "pdb, alphafill",
+        "database": "pdb, alphafill, alphafold, swissmodel",
         "database_evalue_cutoff": 10,
         "database_minimum_identity": 0.0,
         "pymol_max_num_chain": 999,
@@ -314,6 +319,7 @@ def test_local_pdb_search_keeps_provider_order_and_reuses_blast_hits(monkeypatch
     out = parser_biodb.pdb_sequence_search({
         'branch_ids': [int(ete.get_prop(tip, 'numerical_label'))], 'tree': tr,
         'database': 'pdb,swissmodel,alphafold', 'database_search': 'local',
+        'alphafold_version': '6',
         'mmseqs_db': '/db/pdb', 'blastp_db': '/db/swissprot',
         'database_evalue_cutoff': 1.0, 'database_minimum_identity': 0.25, 'pymol_max_num_chain': 20,
     })
@@ -404,46 +410,28 @@ def test_pdb_sequence_search_rejects_empty_database_list(monkeypatch):
         parser_biodb.pdb_sequence_search(g)
 
 
-def test_pdb_sequence_search_alphafold_download_uses_shared_cache(monkeypatch, tmp_path):
+def test_pdb_sequence_search_alphafold_continues_after_missing_model(monkeypatch, tmp_path, capsys):
     parser_biodb = _import_parser_biodb_with_fake_pymol(monkeypatch)
     tr = tree.add_numerical_node_labels(ete.PhyloNode("(A:1,B:1)R;", format=1))
-    a_node = [n for n in tr.traverse() if n.name == "A"][0]
-    a_bid = int(ete.get_prop(a_node, "numerical_label"))
-    monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda nlabel, mode, g: "AAAA")
-    monkeypatch.setattr(
-        parser_biodb,
-        "run_qblast",
-        lambda aa_query, num_display=10, evalue_cutoff=10, timeout=30: ["P12345"],
-    )
-    monkeypatch.chdir(tmp_path)
-    state = {"timeout": None, "source": None, "filename": None}
-    cached_path = tmp_path / "cache" / "AF-P12345-F1-model_v2.pdb"
-    cached_path.parent.mkdir()
-    cached_path.write_bytes(b"MODEL")
+    tip = next(node for node in tr.traverse() if node.name == "A")
+    monkeypatch.setattr(parser_biodb.sequence, "translate_state", lambda **_: "AAAA")
+    monkeypatch.setattr(parser_biodb, "run_qblast", lambda _query, **_: ["P11111", "P22222"])
 
-    def _ensure_remote_structure(**kwargs):
-        state["timeout"] = kwargs["network_timeout"]
-        state["source"] = kwargs["source"]
-        state["filename"] = kwargs["filename"]
-        return str(cached_path)
+    def lookup(accession, timeout):
+        assert timeout == 9
+        if accession == "P11111":
+            raise ValueError("No current PDB")
+        return 7, "https://alphafold.ebi.ac.uk/files/current-P22222.pdb"
 
-    monkeypatch.setattr(parser_biodb.structure_resources, "ensure_remote_structure", _ensure_remote_structure)
-    g = {
-        "branch_ids": [a_bid],
-        "tree": tr,
-        "database": "alphafold",
-        "database_timeout": 9,
-        "database_evalue_cutoff": 10,
-        "database_minimum_identity": 0.0,
-        "pymol_max_num_chain": 999,
-    }
-    out = parser_biodb.pdb_sequence_search(g)
+    monkeypatch.setattr(parser_biodb.structure_resources, "_download_url_bytes", lambda *_: b"MODEL")
+    out = parser_biodb.pdb_sequence_search({
+        "branch_ids": [ete.get_prop(tip, "numerical_label")], "tree": tr,
+        "database": "alphafold", "database_timeout": 9, "database_evalue_cutoff": 1,
+        "resource_cache_dir": str(tmp_path),
+    }, alphafold_lookup=lookup)
     assert out["selected_database"] == "alphafold"
-    assert out["pdb"] == str(cached_path)
-    assert state["timeout"] == 9.0
-    assert state["source"] == "alphafold"
-    assert state["filename"] == "AF-P12345-F1-model_v2.pdb"
-    assert not (tmp_path / "AF-P12345-F1-model_v2.pdb").exists()
+    assert out["pdb"].endswith("/AF-P22222-F1-model_v7.pdb")
+    assert "P11111 (version latest): No current PDB" in capsys.readouterr().out
 
 
 def test_get_swissmodel_download_info_selects_best_provider_model(monkeypatch):
