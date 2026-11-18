@@ -213,7 +213,7 @@ def write_mafft_alignment(g):
     if not wrote_input_alignment:
         sequence.write_alignment(outfile=leaf_aa_fasta, mode='aa', g=g, leaf_only=True)
     cmd_mafft = [g['mafft_exe'], '--keeplength', '--mapout', '--quiet',
-                 '--thread', '1',]
+                 '--thread', str(g['threads']),]
     if g['mafft_op'] >= 0:
         cmd_mafft += ['--op', str(g['mafft_op']),]
     if g['mafft_ep'] >= 0:

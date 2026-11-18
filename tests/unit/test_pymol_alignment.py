@@ -67,6 +67,7 @@ def test_write_mafft_alignment_uses_input_codon_alignment_before_internal_filter
         returncode = 0
 
     def _run(cmd, cwd, **_kwargs):
+        assert cmd[cmd.index("--thread") + 1] == "4"
         leaf_path = os.path.join(cwd, cmd[-1])
         captured["leaf_alignment"] = open(leaf_path, encoding="utf-8").read()
         open(os.path.join(cwd, "tmp.csubst.pdb_seq.fa.map"), "w", encoding="utf-8").write(
@@ -78,6 +79,7 @@ def test_write_mafft_alignment_uses_input_codon_alignment_before_internal_filter
         "tree": tr,
         "alignment_file": str(alignment_path),
         "codon_table": [("A", "GCT")],
+        "threads": 4,
         "mafft_exe": "mafft",
         "mafft_op": -1,
         "mafft_ep": -1,
@@ -245,6 +247,7 @@ def test_write_mafft_alignment_rejects_empty_output(tmp_path, monkeypatch):
         pdb_fasta=">x_A\nAAAA\n",
     )
     g = {
+        "threads": 1,
         "mafft_exe": "mafft",
         "mafft_op": -1,
         "mafft_ep": -1,
@@ -271,6 +274,7 @@ def test_write_mafft_alignment_raises_on_mafft_nonzero_exit(tmp_path, monkeypatc
         pdb_fasta=">x_A\nAAAA\n",
     )
     g = {
+        "threads": 1,
         "mafft_exe": "mafft",
         "mafft_op": -1,
         "mafft_ep": -1,
@@ -296,6 +300,7 @@ def test_write_mafft_alignment_raises_when_mapout_file_is_missing(tmp_path, monk
         pdb_fasta=">x_A\nAAAA\n",
     )
     g = {
+        "threads": 1,
         "mafft_exe": "mafft",
         "mafft_op": -1,
         "mafft_ep": -1,
@@ -322,6 +327,7 @@ def test_write_mafft_alignment_raises_clear_error_when_mafft_executable_missing(
         pdb_fasta=">x_A\nAAAA\n",
     )
     g = {
+        "threads": 1,
         "mafft_exe": "missing-mafft",
         "mafft_op": -1,
         "mafft_ep": -1,
