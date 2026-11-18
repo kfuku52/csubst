@@ -3,8 +3,26 @@
 Use `csubst simulate --simulate_scenario NAME` to start from a scenario
 used in the PEPC and PGK evaluations. Explicit options such as
 `--num_simulated_site`, `--background_omega`, and `--simulate_asrv` override
-the preset. Named scenarios enable `--export_expected_omega` by default.
+the preset. Named scenarios enable `--export_expected_omegaC` by default.
 The `custom` scenario uses the ordinary simulation options and defaults.
+
+The numeric targets for `--background_omega` and
+`--foreground_omega` are the sum of nonsynonymous off-diagonal
+entries in Q divided by the sum of synonymous entries. Each entry is summed
+once, without weighting by the frequency of the source codon. In `auto` mode
+the background target uses the numeric IQ-TREE omega estimate when available.
+Use `model` to simulate with the fitted background Q itself.
+`--export_expected_omegaC` reports the expected convergence statistic for each
+independent branch pair under the resulting simulation.
+
+`--percent_foreground_sites` sets the percentage of sites assigned the foreground
+process. These sites can show directional preference, relaxation, or a change in
+branch length. For directional simulations, `--target_amino_acids` specifies
+the favored amino acids and `--target_bias_strength` sets their enrichment.
+For strength `b` and initial fraction `f` of nonsynonymous Q rates entering
+those targets, their rate multiplier is `1 / (f * (1 - b/100))` before
+normalization. At zero strength the multiplier is `1/f`. To turn off
+directional preference, use `--target_amino_acids random0`.
 
 ```bash
 csubst simulate --alignment_file alignment.fa --rooted_tree_file tree.nwk \
@@ -55,14 +73,14 @@ to change the rate multiplier. Distances use the selected simulation
 tree after tree scaling.
 
 Without `--foreground`, the presets sample up to 24 terminal edges at
-even intervals in leaf order. Set `--simulate_focal_tips` to change this
+even intervals in leaf order. Set `--simulate_max_focal_tips` to change this
 limit. With a foreground file, the matched tips define the terminal
 edges. Focal lengths default to 0.08 and can be set using
 `--simulate_focal_branch_length`. Use `input` to keep their scaled
 lengths. The generated foreground IDs are written to
 `csubst_foreground_branch.txt` with the current prefix.
 
-`--export_expected_omega yes` integrates the latent preferences and
+`--export_expected_omegaC yes` integrates the latent preferences and
 ancestral states to produce the usual expected-count TSV. True-ASR
 export also adds the realized counts. [Output and formulas](SIMULATE_EXPECTED_OMEGA.md)
 

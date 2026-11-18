@@ -83,11 +83,11 @@ def test_get_global_parameters_parses_custom_omega_pvalue_niter_schedule():
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_niter_schedule():
-    with pytest.raises(ValueError, match="omega_pvalue_niter_schedule"):
+    with pytest.raises(ValueError, match="omegaC_pvalue_niter_schedule"):
         param.get_global_parameters(_args(omega_pvalue_niter_schedule="100,abc"))
-    with pytest.raises(ValueError, match="omega_pvalue_niter_schedule"):
+    with pytest.raises(ValueError, match="omegaC_pvalue_niter_schedule"):
         param.get_global_parameters(_args(omega_pvalue_niter_schedule="1000,100"))
-    with pytest.raises(ValueError, match="omega_pvalue_niter_schedule"):
+    with pytest.raises(ValueError, match="omegaC_pvalue_niter_schedule"):
         param.get_global_parameters(_args(omega_pvalue_niter_schedule="200,20000"))
 
 
@@ -97,7 +97,7 @@ def test_get_global_parameters_accepts_omega_pvalue_refine_upper_edge_bins():
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_refine_upper_edge_bins():
-    with pytest.raises(ValueError, match="omega_pvalue_refine_upper_edge_bins"):
+    with pytest.raises(ValueError, match="omegaC_pvalue_refine_upper_edge_bins"):
         param.get_global_parameters(_args(omega_pvalue_refine_upper_edge_bins=-1))
 
 
@@ -112,12 +112,12 @@ def test_get_global_parameters_rejects_removed_omega_pvalue_refine_ci_alpha():
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_rounding():
-    with pytest.raises(ValueError, match="omega_pvalue_rounding"):
+    with pytest.raises(ValueError, match="omegaC_pvalue_rounding"):
         param.get_global_parameters(_args(omega_pvalue_rounding="invalid"))
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_null_model():
-    with pytest.raises(ValueError, match="omega_pvalue_null_model"):
+    with pytest.raises(ValueError, match="omegaC_pvalue_null_model"):
         param.get_global_parameters(_args(omega_pvalue_null_model="invalid"))
 
 
@@ -142,9 +142,9 @@ def test_get_global_parameters_accepts_fixed_omega_pvalue_nbinom_alpha():
 
 
 def test_get_global_parameters_rejects_invalid_omega_pvalue_nbinom_alpha():
-    with pytest.raises(ValueError, match="omega_pvalue_nbinom_alpha"):
+    with pytest.raises(ValueError, match="omegaC_pvalue_nbinom_alpha"):
         param.get_global_parameters(_args(omega_pvalue_nbinom_alpha=-0.1))
-    with pytest.raises(ValueError, match="omega_pvalue_nbinom_alpha"):
+    with pytest.raises(ValueError, match="omegaC_pvalue_nbinom_alpha"):
         param.get_global_parameters(_args(omega_pvalue_nbinom_alpha=float("nan")))
 
 

@@ -198,9 +198,9 @@ def test_apply_percent_biased_sub_with_no_targets_rescales_omega_without_nan():
     "g,pattern",
     [
         ({"num_simulated_site": 0, "percent_convergent_site": 10, "percent_biased_sub": 90}, "num_simulated_site"),
-        ({"num_simulated_site": 10, "percent_convergent_site": -1, "percent_biased_sub": 90}, "percent_convergent_site"),
-        ({"num_simulated_site": 10, "percent_convergent_site": 101, "percent_biased_sub": 90}, "percent_convergent_site"),
-        ({"num_simulated_site": 10, "percent_convergent_site": 10, "percent_biased_sub": 100}, "percent_biased_sub"),
+        ({"num_simulated_site": 10, "percent_convergent_site": -1, "percent_biased_sub": 90}, "percent_foreground_sites"),
+        ({"num_simulated_site": 10, "percent_convergent_site": 101, "percent_biased_sub": 90}, "percent_foreground_sites"),
+        ({"num_simulated_site": 10, "percent_convergent_site": 10, "percent_biased_sub": 100}, "target_bias_strength"),
     ],
 )
 def test_validate_simulate_params_rejects_out_of_range_values(g, pattern):

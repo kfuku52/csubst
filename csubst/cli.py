@@ -425,7 +425,8 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              '"wallenius" uses Wallenius-type inclusion probabilities; '
                              '"fisher" uses Fisher-type inclusion probabilities; '
                              '"factorized_approx" uses the legacy factorized approximation.')
-    parser.add_argument('--calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
+    parser.add_argument('--calc_omegaC_pvalue', '--calc_omega_pvalue',
+                        dest='calc_omega_pvalue', metavar='yes|no', default='no', type=strtobool,
                         help='default=%(default)s: Experimental feature. Estimate branch-combination-wise one-sided empirical '
                              'P values of omega_C under fitted count nulls (--expectation_method urn only). '
                              'dif categories and empirical/auto pseudocounts require the poisson null. '
@@ -454,40 +455,45 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                         help='Write detailed per-category weight diagnostics in urn_provenance.json. '
                              'Basic provenance is always written for urn analyses.')
 
-    _add_advanced_argument(advanced_statistics, '--omega_pvalue_null_model', show_advanced=show_advanced,
+    _add_advanced_argument(advanced_statistics, '--omegaC_pvalue_null_model', '--omega_pvalue_null_model',
+                        dest='omega_pvalue_null_model', show_advanced=show_advanced,
                         metavar='hypergeom|poisson|poisson_full|nbinom', default='hypergeom', type=str,
                         choices=['hypergeom', 'poisson', 'poisson_full', 'nbinom'],
-                        help='default=%(default)s: Experimental feature. Null count generator for --calc_omega_pvalue. '
+                        help='default=%(default)s: Experimental feature. Null count generator for --calc_omegaC_pvalue. '
                              '"hypergeom" uses legacy site-subset randomization with integer draw sizes. '
                              '"poisson" uses factorized branch/site continuous-rate nulls (Poisson sampling from expected counts). '
                              '"poisson_full" uses observed branch-specific site masses to obtain an urn-overlap mean, then samples counts; '
                              '"nbinom" adds Gamma-Poisson overdispersion on factorized mean counts. '
                              'Poisson supports joint dif categories and empirical/auto pseudocounts when category means are compatible. '
                              'These are fitted count nulls, not full phylogenetic simulations; calibration is not established.')
-    _add_advanced_argument(advanced_statistics, '--omega_pvalue_nbinom_alpha', show_advanced=show_advanced,
+    _add_advanced_argument(advanced_statistics, '--omegaC_pvalue_nbinom_alpha', '--omega_pvalue_nbinom_alpha',
+                        dest='omega_pvalue_nbinom_alpha', show_advanced=show_advanced,
                         metavar='auto|FLOAT', default='auto', type=str,
                         help='default=%(default)s: Experimental feature. Overdispersion coefficient for '
-                             '--omega_pvalue_null_model nbinom. Variance is mean + alpha*mean^2. '
+                             '--omegaC_pvalue_null_model nbinom. Variance is mean + alpha*mean^2. '
                              '"auto" estimates alpha from observed-vs-expected count dispersion.')
-    _add_advanced_argument(advanced_statistics, '--omega_pvalue_niter_schedule', show_advanced=show_advanced,
+    _add_advanced_argument(advanced_statistics, '--omegaC_pvalue_niter_schedule', '--omega_pvalue_niter_schedule',
+                        dest='omega_pvalue_niter_schedule', show_advanced=show_advanced,
                         metavar='0|N1,N2,...', default='0', type=str,
                         help='default=%(default)s: Experimental feature. Iteration schedule for staged '
-                             '--calc_omega_pvalue refinement under all --omega_pvalue_null_model modes '
+                             '--calc_omegaC_pvalue refinement under all --omegaC_pvalue_null_model modes '
                              '(upper-tail edge focused). '
                              'Set 0 (auto) for stages (100,1000). Smoothed, joint-category and calibrated tests use '
                              'the final budget for all rows; other base tests retain adaptive refinement. '
                              'Custom values should be comma-delimited strictly increasing integers '
                              '(e.g., 200,2000,10000).')
-    _add_advanced_argument(advanced_statistics, '--omega_pvalue_refine_upper_edge_bins', show_advanced=show_advanced,
+    _add_advanced_argument(advanced_statistics, '--omegaC_pvalue_refine_upper_edge_bins', '--omega_pvalue_refine_upper_edge_bins',
+                        dest='omega_pvalue_refine_upper_edge_bins', show_advanced=show_advanced,
                         metavar='INTEGER', default=2, type=int,
                         help='default=%(default)s: Experimental feature. Number of upper-tail p-value edge bins '
                              'used to select rows for the next refinement stage. '
                              'Rows with exceedance rank <= this value are refined; set 0 to disable.')
-    _add_advanced_argument(advanced_statistics, '--omega_pvalue_rounding', show_advanced=show_advanced,
+    _add_advanced_argument(advanced_statistics, '--omegaC_pvalue_rounding', '--omega_pvalue_rounding',
+                        dest='omega_pvalue_rounding', show_advanced=show_advanced,
                         metavar='round|stochastic|floor|ceil', default='stochastic', type=str,
                         choices=['round', 'stochastic', 'floor', 'ceil'],
                         help='default=%(default)s: Experimental feature. How fractional branch-wise substitution masses are converted to '
-                             'integer draw sizes in randomization for --calc_omega_pvalue. '
+                             'integer draw sizes in randomization for --calc_omegaC_pvalue. '
                              '"round" reproduces legacy behavior; "stochastic" applies per-iteration '
                              'stochastic rounding; "floor"/"ceil" provide deterministic lower/upper bounds.')
     parser.add_argument('--asrv', metavar='auto|empirical_all|empirical|no|pool|sn|each|file|file_each', default='auto', type=str,
@@ -539,7 +545,7 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                         metavar='off|auto|FLOAT', default='off', type=str,
                         help='default=%(default)s: Experimental feature. Exploratory structure weighting; requires independent context and urn/ASRV sn. '
                              'Set "off"/0 to disable, a non-negative float for fixed strength, '
-                             'or "auto" for clade-blocked nested CV. No omega P values.')
+                             'or "auto" for clade-blocked nested CV. Incompatible with omegaC P values.')
     _add_advanced_argument(advanced_epistasis, '--epistasis_beta_partition', show_advanced=show_advanced,
                         metavar='global|branch_depth', default='global', type=str,
                         help='default=%(default)s: Experimental feature. Scope of epistasis beta estimation. '
@@ -759,7 +765,7 @@ def _make_common_parser(show_advanced):
                        help='default=%(default)s: Native BLAS/OpenMP threads per process. Keep at 1 when '
                             'using --threads to avoid CPU oversubscription.')
     psr_co.add_argument('--random_seed', metavar='INT', default=1, type=int, required=False,
-                        help='default=%(default)s: Reproducible seed for stochastic search, omega p-value, '
+                        help='default=%(default)s: Reproducible seed for stochastic search, omegaC p-value, '
                              'and foreground-clade permutation operations. Set -1 for a non-deterministic seed.')
     advanced_performance = psr_co.add_argument_group('advanced numerical and output options')
     _add_advanced_argument(advanced_performance, '--expected_state_backend', show_advanced=show_advanced,
@@ -830,7 +836,7 @@ def _make_ancestral_parser():
     psr_as.add_argument('--min_sub_pp', metavar='FLOAT', default=0, type=float,
                          help='default=%(default)s: The minimum posterior probability of single substitutions to count. '
                               'Set 0 for a counting without binarization. Omitted if --ml_anc is set to "yes". '
-                              'For empirical omega_C p-values (--calc_omega_pvalue yes), values around 0.05 are recommended.')
+                              'For empirical omega_C p-values (--calc_omegaC_pvalue yes), values around 0.05 are recommended.')
     psr_as.add_argument('--drop_invariant_tip_sites', metavar='no|tip_invariant|zero_sub_mass', default='no', type=str,
                         help='default=%(default)s: Site-drop criterion before substitution-tensor generation. '
                              '"no" disables site dropping. '
@@ -1062,38 +1068,50 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
     from csubst.simulate_scenarios import PRESETS
 
     help_txt = 'generates a simulated sequence alignment under a convergent evolutionary scenario. See `csubst simulate -h`'
-    simulate = subparsers.add_parser('simulate', help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_out_simulate])
+    # The retired --export_expected_omega is a prefix of the omegaC option.
+    simulate = subparsers.add_parser('simulate', help=help_txt, allow_abbrev=False,
+                                     parents=[psr_co, psr_iq, psr_fg, psr_out_simulate])
     simulate.add_argument('--simulate_scenario', default='custom', choices=tuple(PRESETS),
                           help='Preset for a simulation evaluation. Explicit options override preset defaults.')
-    simulate.add_argument('--background_omega', metavar='FLOAT|auto|model', default=None,
-                          help='default=IQ-TREE estimate (fallback 0.2): dN/dS for background branches. '
-                               'Use model to preserve the fitted background Q without N/S rescaling.')
-    simulate.add_argument('--foreground_omega', metavar='FLOAT|background', default=None,
-                          help='Default with custom scenario: 0.2. Use background to match the generating Q N/S mass.')
+    simulate.add_argument('--background_omega', '--background_nonsyn_syn_rate_ratio',
+                          metavar='FLOAT|auto|model', default=None,
+                          help='Target ratio of summed nonsynonymous to synonymous off-diagonal Q entries. '
+                               'With custom settings, auto uses the IQ-TREE omega estimate as the numeric '
+                               'target (fallback 0.2). Use model to keep the fitted background Q.')
+    simulate.add_argument('--foreground_omega', '--foreground_nonsyn_syn_rate_ratio',
+                          metavar='FLOAT|background', default=None,
+                          help='Target ratio of summed nonsynonymous to synonymous Q entries on foreground '
+                               'branches at selected sites. Default with custom settings: 0.2. '
+                               'Use background to match the background Q ratio.')
     simulate.add_argument('--num_simulated_site', metavar='INT', default=None, type=int,
                           help='Default with custom scenario: -1. Number of codon sites to simulate. '
                                '-1 to set the size of input alignment.')
-    simulate.add_argument('--percent_convergent_site', metavar='FLOAT', default=None, type=float,
-                          help='Default with custom scenario: 100. Percentage of codon sites to evolve convergently. '
-                               'If --convergent_amino_acids randomN, '
-                               'Convergent amino acids are randomly selected within each partition. ')
+    simulate.add_argument('--percent_foreground_sites', '--percent_convergent_site',
+                          dest='percent_convergent_site', metavar='FLOAT', default=None, type=float,
+                          help='Percentage of codon sites assigned the foreground process on the focal '
+                               'branches. Default with custom settings: 100 when foregrounds are supplied.')
     simulate.add_argument('--optimized_branch_length', metavar='yes|no', default='no', type=strtobool,
                           help='default=%(default)s: Whether to use the branch lengths optimized by IQ-TREE. '
                                'If "no", the branch lengths in the input tree are used.')
-    simulate.add_argument('--tree_scaling_factor', metavar='FLOAT', default=None, type=float,
+    simulate.add_argument('--tree_branch_length_scale', '--tree_scaling_factor',
+                          dest='tree_scaling_factor', metavar='FLOAT', default=None, type=float,
                           help='Default with custom scenario: 1. Branch lengths are multiplied by this value.')
-    simulate.add_argument('--foreground_scaling_factor', metavar='FLOAT', default=None, type=float,
-                          help='Default with custom scenario: 1. In the codon sites specified by --percent_convergent_site, '
+    simulate.add_argument('--foreground_branch_length_scale', '--foreground_scaling_factor',
+                          dest='foreground_scaling_factor', metavar='FLOAT', default=None, type=float,
+                          help='Default with custom scenario: 1. In the codon sites specified by --percent_foreground_sites, '
                                'branch lengths in foreground lineages are multiplied by this value.')
-    simulate.add_argument('--convergent_amino_acids', metavar='STR', default=None, type=str,
+    simulate.add_argument('--target_amino_acids', '--convergent_amino_acids',
+                          dest='convergent_amino_acids', metavar='STR', default=None, type=str,
                           help='Default with custom scenario: random1. Non-delimited list of favored amino acids. '
                                'e.g, AQTS, ACQ, WDETS... '
                                '"randomN" specifies randomly selected N amino acids. '
-                               '"random0" does not cause convergence.')
-    simulate.add_argument('--percent_biased_sub', metavar='FLOAT', default=90, type=float,
-                          help='default=%(default)s: Controls the enrichment of nonsynonymous Q rates '
-                               'toward the target amino acids. Zero still applies the historical enrichment; '
-                               'use --convergent_amino_acids random0 to disable directional bias.')
+                               '"random0" disables directional amino-acid preference.')
+    simulate.add_argument('--target_bias_strength', '--percent_biased_sub',
+                          dest='percent_biased_sub', metavar='FLOAT', default=90, type=float,
+                          help='default=%(default)s: Strength of directional enrichment on a 0 to <100 scale. '
+                               'Larger values favor higher nonsynonymous rates into the target amino acids. '
+                               'Zero still applies the historical enrichment; '
+                               'use --target_amino_acids random0 to disable directional bias.')
     simulate.add_argument('--simulate_seed', metavar='INT', default=-1, type=int,
                           help='default=%(default)s: Random seed for simulation. '
                                'Set -1 to use non-deterministic seed.')
@@ -1107,8 +1125,10 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
                           help='Distance scale d0 for epistasis_inverse. The preference retention is 1/(1+d/d0).')
     simulate.add_argument('--simulate_epistasis_preference_multiplier', type=float, metavar='FLOAT',
                           help='Multiplier on rates into the preferred amino acid in epistasis scenarios.')
-    simulate.add_argument('--simulate_focal_tips', type=int, metavar='INT',
-                          help='Number of evenly spaced focal tips in epistasis scenarios without --foreground.')
+    simulate.add_argument('--simulate_max_focal_tips', '--simulate_focal_tips',
+                          dest='simulate_focal_tips', type=int, metavar='INT',
+                          help='Maximum number of evenly spaced focal tips selected in epistasis scenarios '
+                               'when no foreground file is supplied.')
     simulate.add_argument('--simulate_focal_branch_length', metavar='FLOAT|input',
                           help='Focal terminal length in epistasis scenarios. Use input to keep the scaled tree lengths.')
     simulate.add_argument('--simulate_eq_freq', metavar='auto|iqtree|alignment', default='auto', type=str,
@@ -1120,7 +1140,7 @@ def _register_simulate_parser(psr_co, psr_fg, psr_iq, psr_out_simulate, subparse
     simulate.add_argument('--export_true_asr', metavar='yes|no', default='yes', type=strtobool,
                           help='default=%(default)s: Export true ancestral-state bundle from simulation '
                                '(.state/.treefile/.rate/.iqtree/.log/.anc.fa) for search-time evaluation.')
-    simulate.add_argument('--export_expected_omega', metavar='yes|no', default=None, type=strtobool,
+    simulate.add_argument('--export_expected_omegaC', dest='export_expected_omega', metavar='yes|no', default=None, type=strtobool,
                           help='Default: yes with a named preset, no with custom. Export Q-based expected omegaCany2spe for independent '
                                'branch pairs, with realized counts when true ASR is exported.')
     simulate.add_argument('--true_asr_prefix', metavar='PATH_PREFIX', default='', type=str,

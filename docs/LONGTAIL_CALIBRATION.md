@@ -15,18 +15,18 @@ the empirical full-table reference and an independently sampled null reference:
 ```bash
 csubst search --alignment_file alignment.fa --rooted_tree_file tree.nwk \
   --expectation_method urn --output_stat any2any,any2spe \
-  --calc_omega_pvalue yes --omega_pvalue_niter_schedule 1000 \
+  --calc_omegaC_pvalue yes --omegaC_pvalue_niter_schedule 1000 \
   --random_seed 1 --calibrate_longtail no --outdir uncalibrated
 
 csubst search --alignment_file alignment.fa --rooted_tree_file tree.nwk \
   --expectation_method urn --output_stat any2any,any2spe \
-  --calc_omega_pvalue yes --omega_pvalue_niter_schedule 1000 \
+  --calc_omegaC_pvalue yes --omegaC_pvalue_niter_schedule 1000 \
   --random_seed 1 --calibrate_longtail yes --longtail_method empirical \
   --outdir empirical
 
 csubst search --alignment_file alignment.fa --rooted_tree_file tree.nwk \
   --expectation_method urn --output_stat any2any,any2spe \
-  --calc_omega_pvalue yes --omega_pvalue_niter_schedule 1000 \
+  --calc_omegaC_pvalue yes --omegaC_pvalue_niter_schedule 1000 \
   --random_seed 1 --calibrate_longtail yes --longtail_method independent_null \
   --longtail_null_niter 1000 --outdir independent_null
 ```
@@ -83,7 +83,7 @@ per row provides marginal tests; it does not preserve a joint null over all
 overlapping branch combinations for a family-wide test.
 
 The observed row and each test replicate use exactly the same frozen map. The
-test uses the final value of `--omega_pvalue_niter_schedule` for every row,
+test uses the final value of `--omegaC_pvalue_niter_schedule` for every row,
 without adaptive stopping. The maps are regenerated deterministically when
 testing and their hashes must match the hashes used for the observation.
 `--longtail_test_block_size` (default 256) controls statistic evaluation blocks;
@@ -100,7 +100,7 @@ Supported combinations:
 - `--expectation_method urn` and the base categories `any2any`, `any2spe`,
   `spe2any`, `spe2spe`.
 - `hypergeom`, `poisson`, `poisson_full`, and `nbinom` with an explicitly fixed
-  `--omega_pvalue_nbinom_alpha`.
+  `--omegaC_pvalue_nbinom_alpha`.
 - Fixed symmetric pseudocount smoothing, mode `none`, fixed alpha zero,
   and report-only settings. Observations, calibration samples and test samples
   use the same count transformation.

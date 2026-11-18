@@ -38,7 +38,7 @@ def validate_options(g):
     if g.get('asrv_report', False):
         raise ValueError('--asrv_report cannot describe clade-specific priors; use the automatic epistasis.json report.')
     if g.get('calc_omega_pvalue', False):
-        raise ValueError('Structure weighting with --calc_omega_pvalue is not supported: '
+        raise ValueError('Structure weighting with --calc_omegaC_pvalue is not supported: '
                          'joint null generation and refitting are not calibrated (review IDs 2/3/4).')
 
 

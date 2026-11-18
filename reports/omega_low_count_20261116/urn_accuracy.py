@@ -46,8 +46,8 @@ def search_argv(mode, seed, draws):
         path = 'generating.rate' if mode == 'oracle_file' and ext == 'rate' else 'fit.' + ext
         argv += ['--iqtree_' + ext, path]
     if draws > 0 and mode in SAMPLED:
-        argv += ['--calc_omega_pvalue', 'yes', '--omega_pvalue_null_model', 'hypergeom',
-                 '--omega_pvalue_niter_schedule', str(draws), '--min_sub_pp', '0']
+        argv += ['--calc_omegaC_pvalue', 'yes', '--omegaC_pvalue_null_model', 'hypergeom',
+                 '--omegaC_pvalue_niter_schedule', str(draws), '--min_sub_pp', '0']
     if mode == 'each_tau2':
         argv += ['--asrv_concentration', '2']
     return outdir, argv

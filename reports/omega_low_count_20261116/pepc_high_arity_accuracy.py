@@ -137,10 +137,10 @@ def replay(panel, scenario, seed):
             '--foreground', str(fit.parent / 'foreground.txt'), '--num_simulated_site', '520',
             '--simulate_seed', str(seed), '--background_omega', (panel/'background-omega.txt').read_text().strip(),
             '--foreground_omega', (panel/'background-omega.txt').read_text().strip(),
-            '--percent_convergent_site', '20' if scenario == 'biased' else '0',
-            '--convergent_amino_acids', 'random1' if scenario == 'biased' else 'random0',
-            '--percent_biased_sub', '90', '--simulate_asrv', 'file' if scenario == 'rate_mixture' else 'no',
-            '--export_expected_omega', 'yes', '--outdir', 'replay', '--output_prefix', 'sim']
+            '--percent_foreground_sites', '20' if scenario == 'biased' else '0',
+            '--target_amino_acids', 'random1' if scenario == 'biased' else 'random0',
+            '--target_bias_strength', '90', '--simulate_asrv', 'file' if scenario == 'rate_mixture' else 'no',
+            '--export_expected_omegaC', 'yes', '--outdir', 'replay', '--output_prefix', 'sim']
     for ext in EXT:
         path = fit.parent/'synthetic.rate' if ext == 'rate' and scenario == 'rate_mixture' else str(fit)+'.'+ext
         argv.extend(['--iqtree_' + ext, str(path)])

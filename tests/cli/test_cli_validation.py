@@ -84,6 +84,39 @@ def test_other_iqtree_commands_keep_ecmk07_default(command):
     assert _get_cli_parser(False).parse_args([command]).iqtree_model == 'ECMK07+F+R4'
 
 
+@pytest.mark.parametrize('command, first, second, value', [
+    ('simulate', 'background_omega', 'background_nonsyn_syn_rate_ratio', 'model'),
+    ('simulate', 'foreground_omega', 'foreground_nonsyn_syn_rate_ratio', 'background'),
+    ('simulate', 'percent_convergent_site', 'percent_foreground_sites', '25'),
+    ('simulate', 'convergent_amino_acids', 'target_amino_acids', 'A'),
+    ('simulate', 'percent_biased_sub', 'target_bias_strength', '50'),
+    ('simulate', 'tree_scaling_factor', 'tree_branch_length_scale', '0.5'),
+    ('simulate', 'foreground_scaling_factor', 'foreground_branch_length_scale', '2'),
+    ('simulate', 'simulate_focal_tips', 'simulate_max_focal_tips', '4'),
+    ('search', 'calc_omega_pvalue', 'calc_omegaC_pvalue', 'yes'),
+    ('search', 'omega_pvalue_null_model', 'omegaC_pvalue_null_model', 'poisson'),
+    ('search', 'omega_pvalue_nbinom_alpha', 'omegaC_pvalue_nbinom_alpha', '1'),
+    ('search', 'omega_pvalue_niter_schedule', 'omegaC_pvalue_niter_schedule', '100'),
+    ('search', 'omega_pvalue_refine_upper_edge_bins', 'omegaC_pvalue_refine_upper_edge_bins', '3'),
+    ('search', 'omega_pvalue_rounding', 'omegaC_pvalue_rounding', 'floor'),
+])
+def test_scientific_option_aliases_set_the_same_value(command, first, second, value):
+    parser = _get_cli_parser(True)
+    commands = ('search', 'analyze', 'benchmark') if command == 'search' else (command,)
+    for name in commands:
+        assert parser.parse_args([name, '--' + first, value]) == parser.parse_args([name, '--' + second, value])
+
+
+@pytest.mark.parametrize('old_args', [['--export_expected_omega', 'yes'], ['--export_expected_omega=yes']])
+def test_expected_omegaC_export_requires_full_option_name(old_args, capsys):
+    parser = _get_cli_parser(False)
+    assert parser.parse_args(['simulate', '--export_expected_omegaC', 'yes']).export_expected_omega
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(['simulate', *old_args])
+    assert exc.value.code == 2
+    assert 'unrecognized arguments: --export_expected_omega' in capsys.readouterr().err
+
+
 def test_download_default_resource_matches_3di_backend():
     parser = _get_cli_parser(False)
     assert parser.parse_args(['download']).resource == parser.parse_args(['sites']).sa_backend

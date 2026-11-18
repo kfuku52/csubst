@@ -2739,7 +2739,7 @@ def _compose_permutation_count_matrix(stat, mode_to_count, tol):
         any2dif = _calc_dif_count_matrix(mode_to_count['any2any'], mode_to_count['any2spe'], tol=tol)
         spe2dif = _calc_dif_count_matrix(mode_to_count['spe2any'], mode_to_count['spe2spe'], tol=tol)
         return _calc_dif_count_matrix(any2dif, spe2dif, tol=tol)
-    raise ValueError('Unsupported output stat for permutation omega p-value: {}'.format(stat))
+    raise ValueError('Unsupported output stat for permutation omegaC p-value: {}'.format(stat))
 
 
 def _resolve_omega_pvalue_null_model(g):
@@ -3217,7 +3217,7 @@ def add_omega_empirical_pvalues(cb, ON_tensor, OS_tensor, g):
     if not bool(g.get('calc_omega_pvalue', False)):
         return cb
     if _resolve_expectation_method(g=g) != 'urn':
-        txt = 'Skipping --calc_omega_pvalue because --expectation_method is not "urn".\n'
+        txt = 'Skipping --calc_omegaC_pvalue because --expectation_method is not "urn".\n'
         sys.stderr.write(txt)
         return cb
     from csubst import omega_null

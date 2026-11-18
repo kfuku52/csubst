@@ -105,7 +105,7 @@ def test_simulate_log_collision_preserves_expected_omega(tmp_path, parse_error):
     log = tmp_path / 'output.log'
     os.link(table, log)
     args = ['simulate', '--outdir', str(tmp_path), '--output_prefix', 'sim',
-            '--export_expected_omega', 'yes', '--log_file', str(log)]
+            '--export_expected_omegaC', 'yes', '--log_file', str(log)]
     if parse_error:
         args[1:1] = ['--threads', 'invalid']
     result = run_csubst(args, tmp_path)

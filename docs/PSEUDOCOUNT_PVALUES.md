@@ -1,6 +1,6 @@
 # Pseudocounts and conditional omegaC P values
 
-`--calc_omega_pvalue yes` with `--expectation_method urn` compares the observed
+`--calc_omegaC_pvalue yes` with `--expectation_method urn` compares the observed
 omegaC to a fitted **count** null. Observed counts and every null replicate use
 the same transformation, including pseudocounts and any long-tail step. This is
 not a bootstrap of alignment generation, ASR, site-rate fitting or search
@@ -22,21 +22,21 @@ cannot silently reuse parameters fitted to the tested observation. See
 
 The default output categories include `any2dif`, while the default count null is
 `hypergeom`. To request P values for the default categories, explicitly select
-`--omega_pvalue_null_model poisson`. To retain the hypergeom null, explicitly
+`--omegaC_pvalue_null_model poisson`. To retain the hypergeom null, explicitly
 select base categories such as `--output_stat any2any,any2spe`. No null model is
 switched automatically. These restrictions concern P values; they do not
 remove untested effect-size categories from ordinary runs.
 
 ```bash
 csubst search --alignment_file alignment.fa --rooted_tree_file tree.nwk \
-  --expectation_method urn --calc_omega_pvalue yes \
-  --omega_pvalue_null_model poisson --omega_pvalue_niter_schedule 1000 \
+  --expectation_method urn --calc_omegaC_pvalue yes \
+  --omegaC_pvalue_null_model poisson --omegaC_pvalue_niter_schedule 1000 \
   --pseudocount_mode symmetric --pseudocount_alpha 1 \
   --calibrate_longtail no --random_seed 1 --outdir smoothed
 
 csubst search --alignment_file alignment.fa --rooted_tree_file tree.nwk \
-  --expectation_method urn --calc_omega_pvalue yes \
-  --omega_pvalue_null_model poisson --omega_pvalue_niter_schedule 1000 \
+  --expectation_method urn --calc_omegaC_pvalue yes \
+  --omegaC_pvalue_null_model poisson --omegaC_pvalue_niter_schedule 1000 \
   --pseudocount_mode empirical --pseudocount_alpha auto \
   --calibrate_longtail yes --longtail_method empirical \
   --random_seed 1 --outdir refitted

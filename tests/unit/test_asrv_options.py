@@ -13,7 +13,7 @@ from csubst import cli, param
     (['--max_arity', '3'], 'empirical_all'),
     (['--max_arity', '3', '--output_stat', 'spe2spe'], 'each'),
     (['--urn_model', 'fisher'], 'each'),
-    (['--calc_omega_pvalue', 'yes', '--output_stat', 'any2spe'], 'each'),
+    (['--calc_omegaC_pvalue', 'yes', '--output_stat', 'any2spe'], 'each'),
 ])
 def test_resolve_search_urn_default(extra, expected):
     args = cli._build_parser().parse_args(['search', '--expectation_method', 'urn', *extra])

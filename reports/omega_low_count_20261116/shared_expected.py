@@ -195,8 +195,8 @@ def mask_sister_input(rep, tr, model, tips, frame, alignment):
         if len(rates) != sites or not rates.eq(1.).all():
             raise ValueError('The masking contrast requires unit generating rates.')
         log = (source / 'sim.log').read_text()
-        if any(flag not in log for flag in ('--background_omega 0.2 ', '--tree_scaling_factor 1.0 ',
-                                            '--foreground_scaling_factor 1.0 ')):
+        if any(flag not in log for flag in ('--background_omega 0.2 ', '--tree_branch_length_scale 1.0 ',
+                                            '--foreground_branch_length_scale 1.0 ')):
             raise ValueError('The PEPC reference fits must use the same background-Q setup.')
         if (source / 'sim_true_asr.treefile').read_bytes() != (baseline / 'sim_true_asr.treefile').read_bytes():
             raise ValueError('The masked and reference simulation use different trees.')

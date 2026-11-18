@@ -28,9 +28,9 @@ def test_get_global_parameters_rejects_invalid_3di_predictor_options(options, ma
 
 
 def test_get_global_parameters_rejects_invalid_percent_biased_sub():
-    with pytest.raises(ValueError, match="percent_biased_sub"):
+    with pytest.raises(ValueError, match="target_bias_strength"):
         param.get_global_parameters(_args(percent_biased_sub=-1))
-    with pytest.raises(ValueError, match="percent_biased_sub"):
+    with pytest.raises(ValueError, match="target_bias_strength"):
         param.get_global_parameters(_args(percent_biased_sub=100))
 
 

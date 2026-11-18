@@ -134,7 +134,7 @@ masses and concentration are rejected.
 
 No automatic tau fitting or empirical prior has been introduced. ASRV
 concentration is separate from `--pseudocount_alpha`, which acts on omega
-counts, and from `--omega_pvalue_nbinom_alpha`, which models overdispersion.
+counts, and from `--omegaC_pvalue_nbinom_alpha`, which models overdispersion.
 
 `file_each` retains the original definition `c[s] = empirical_mass[s] *
 file_rate[s]` before smoothing. With a fixed prior mass, scaling all file

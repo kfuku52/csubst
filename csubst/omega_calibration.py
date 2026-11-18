@@ -43,7 +43,7 @@ def validate_config(g, calibration_active=None):
         raise ValueError('Independent-null calibration supports fixed symmetric pseudocounts only; empirical/auto requires empirical calibration or no calibration.')
     if (g.get('omega_pvalue_null_model', 'hypergeom') == 'nbinom'
             and str(g.get('omega_pvalue_nbinom_alpha', 'auto')).lower() == 'auto'):
-        raise ValueError('Independent-null calibration with nbinom requires a fixed --omega_pvalue_nbinom_alpha; automatic dispersion estimation is not independent of the tested rows.')
+        raise ValueError('Independent-null calibration with nbinom requires a fixed --omegaC_pvalue_nbinom_alpha; automatic dispersion estimation is not independent of the tested rows.')
 
 
 def _base_seed(g):

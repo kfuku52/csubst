@@ -235,8 +235,8 @@ def real_case(dataset, workdir):
     argv = ['search', '--alignment_file', str(data / (dataset + '.alignment.fa')),
             '--rooted_tree_file', str(data / (dataset + '.tree.nwk')), '--outdir', str(workdir / 'out'),
             '--threads', '1', '--blas_threads', '1', '--max_arity', '2', '--random_seed', '8',
-            '--expectation_method', 'urn', '--output_stat', 'any2spe', '--calc_omega_pvalue', 'yes',
-            '--omega_pvalue_null_model', 'poisson', '--omega_pvalue_niter_schedule', '1000',
+            '--expectation_method', 'urn', '--output_stat', 'any2spe', '--calc_omegaC_pvalue', 'yes',
+            '--omegaC_pvalue_null_model', 'poisson', '--omegaC_pvalue_niter_schedule', '1000',
             '--calibrate_longtail', 'no']
     for suffix in ('treefile', 'state', 'rate', 'iqtree', 'log'):
         argv += ['--iqtree_' + suffix, str(data / (dataset + '.alignment.fa.' + suffix))]

@@ -99,7 +99,7 @@ def main():
             ('sites', ['--branch_id', pair, '--tree_site_plot', 'no', '--site_state_plot', 'no', '--site_summary_plot', 'no']),
             ('inspect', []),
             ('benchmark', ['--max_arity', '2', '--calibrate_longtail', 'no']),
-            ('simulate', ['--num_simulated_site', '10', '--percent_convergent_site', '0'])]:
+            ('simulate', ['--num_simulated_site', '10', '--percent_foreground_sites', '0'])]:
         out = work / ('mg_' + command_name)
         command = [sys.executable, '-m', 'csubst', command_name, '--alignment_file', str(alignment),
                    '--rooted_tree_file', str(topology), '--outdir', str(out), '--threads', '1',

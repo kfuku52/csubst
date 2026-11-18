@@ -20,9 +20,9 @@ def test_get_global_parameters_rejects_invalid_simulate_ranges():
         param.get_global_parameters(_args(num_simulated_site=0))
     with pytest.raises(ValueError, match="num_simulated_site"):
         param.get_global_parameters(_args(num_simulated_site=-2))
-    with pytest.raises(ValueError, match="percent_convergent_site"):
+    with pytest.raises(ValueError, match="percent_foreground_sites"):
         param.get_global_parameters(_args(percent_convergent_site=-1))
-    with pytest.raises(ValueError, match="percent_convergent_site"):
+    with pytest.raises(ValueError, match="percent_foreground_sites"):
         param.get_global_parameters(_args(percent_convergent_site=101))
 
 
@@ -54,7 +54,7 @@ def test_simulation_presets_and_explicit_overrides():
     parser = cli._build_parser()
     args = parser.parse_args([
         'simulate', '--simulate_scenario', 'rate_mixture_bias', '--foreground', 'fg.tsv',
-        '--num_simulated_site', '40', '--simulate_asrv', 'no', '--export_expected_omega', 'no',
+        '--num_simulated_site', '40', '--simulate_asrv', 'no', '--export_expected_omegaC', 'no',
     ])
     g = param.get_global_parameters(args)
     assert g['num_simulated_site'] == 40
@@ -91,9 +91,9 @@ def test_get_global_parameters_validates_simulate_eq_freq_mode():
 
 
 def test_get_global_parameters_rejects_negative_simulate_scalars():
-    with pytest.raises(ValueError, match="tree_scaling_factor"):
+    with pytest.raises(ValueError, match="tree_branch_length_scale"):
         param.get_global_parameters(_args(tree_scaling_factor=-0.1))
-    with pytest.raises(ValueError, match="foreground_scaling_factor"):
+    with pytest.raises(ValueError, match="foreground_branch_length_scale"):
         param.get_global_parameters(_args(foreground_scaling_factor=-0.1))
     with pytest.raises(ValueError, match="background_omega"):
         param.get_global_parameters(_args(background_omega=-0.1))

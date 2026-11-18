@@ -140,7 +140,7 @@ def test_build_only_cython_is_not_reported_as_missing(monkeypatch, capsys, missi
     [
         ({"min_single_prob": float("nan")}, "min_single_prob"),
         ({"min_combinat_prob": float("inf")}, "min_combinat_prob"),
-        ({"percent_biased_sub": float("inf")}, "percent_biased_sub"),
+        ({"percent_biased_sub": float("inf")}, "target_bias_strength"),
         ({"database_timeout": float("inf")}, "database_timeout"),
         ({"mafft_op": float("nan")}, "mafft_op"),
     ],

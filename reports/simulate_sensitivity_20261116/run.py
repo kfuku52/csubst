@@ -102,10 +102,10 @@ def simulate(cwd, dataset, sources, condition, seed):
     run_cli(cwd, 'simulate.stdout', [
         *args, '--num_simulated_site', condition.sites, '--simulate_seed', seed,
         '--background_omega', condition.omega, '--foreground_omega', condition.foreground_omega,
-        '--percent_convergent_site', condition.percent, '--convergent_amino_acids', condition.target,
-        '--percent_biased_sub', 90, '--tree_scaling_factor', condition.length,
-        '--foreground_scaling_factor', condition.foreground_length, '--simulate_asrv',
-        'file' if condition.asrv else 'no', '--export_expected_omega', 'yes',
+        '--percent_foreground_sites', condition.percent, '--target_amino_acids', condition.target,
+        '--target_bias_strength', 90, '--tree_branch_length_scale', condition.length,
+        '--foreground_branch_length_scale', condition.foreground_length, '--simulate_asrv',
+        'file' if condition.asrv else 'no', '--export_expected_omegaC', 'yes',
         '--outdir', 'sim', '--output_prefix', 'sim',
     ])
 

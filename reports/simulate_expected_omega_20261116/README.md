@@ -90,8 +90,8 @@ for scenario in null biased; do
       --iqtree_treefile PEPC.alignment.fa.treefile --iqtree_iqtree PEPC.alignment.fa.iqtree \
       --iqtree_log PEPC.alignment.fa.log --iqtree_state PEPC.alignment.fa.state --iqtree_rate PEPC.alignment.fa.rate \
       --foreground PEPC.foreground.txt --num_simulated_site 1000 --background_omega 0.2 --foreground_omega 0.2 \
-      --percent_convergent_site "$percent" --convergent_amino_acids random1 --percent_biased_sub 90 \
-      --simulate_seed "$seed" --export_expected_omega yes --outdir "$run/sim" --output_prefix sim
+      --percent_foreground_sites "$percent" --target_amino_acids random1 --target_bias_strength 90 \
+      --simulate_seed "$seed" --export_expected_omegaC yes --outdir "$run/sim" --output_prefix sim
     python -m csubst search --alignment_file "$run/sim/sim.fa" --rooted_tree_file "$run/sim/sim_true_asr.treefile" \
       --iqtree_exe "${IQTREE_EXE:-iqtree}" --iqtree_model ECMK07+F+R4 --iqtree_redo yes --iqtree_outdir "$run/iqtree" \
       --random_seed "$seed" --substitution_posterior joint --expectation_method codon_model \

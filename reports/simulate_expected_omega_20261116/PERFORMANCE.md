@@ -41,6 +41,8 @@ and fit files as in [the PEPC report](README.md), and run in the temporary
 directory containing the copies. For each checkout, set `PYTHONPATH` to
 its repository root. Give each run a fresh output directory. Use the same
 command for the uniform case with `--num_simulated_site 1000 --simulate_asrv no`.
+The command below uses the spelling accepted by the benchmarked versions.
+For the current CLI, change `--export_expected_omega` to `--export_expected_omegaC`.
 
 ```bash
 export MPLBACKEND=Agg VECLIB_MAXIMUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1

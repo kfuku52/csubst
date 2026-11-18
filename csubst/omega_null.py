@@ -39,7 +39,7 @@ def validate_config(g):
     if not g.get('calc_omega_pvalue', False):
         return
     if needs_joint(g) and g.get('omega_pvalue_null_model', 'hypergeom') != 'poisson':
-        raise ValueError('dif P values and empirical/auto pseudocount P values require --omega_pvalue_null_model poisson; other marginal nulls do not define a supported joint category distribution.')
+        raise ValueError('dif P values and empirical/auto pseudocount P values require --omegaC_pvalue_null_model poisson; other marginal nulls do not define a supported joint category distribution.')
     if (data_dependent(g) and g.get('calibrate_longtail', False)
             and g.get('longtail_method', 'independent_null') == 'independent_null'):
         raise ValueError('Independent-null calibration supports fixed symmetric pseudocounts only; empirical/auto requires --longtail_method empirical or --calibrate_longtail no.')

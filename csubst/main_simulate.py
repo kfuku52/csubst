@@ -165,9 +165,9 @@ def get_biased_amino_acids(convergent_amino_acids, codon_table, rng=None):
     if convergent_amino_acids.startswith('random'):
         num_random_aa = int(convergent_amino_acids.replace('random',''))
         if num_random_aa < 0:
-            raise ValueError('--convergent_amino_acids randomN requires N >= 0.')
+            raise ValueError('--target_amino_acids randomN requires N >= 0.')
         if num_random_aa > amino_acids.shape[0]:
-            msg = '--convergent_amino_acids random{} exceeds available amino acids ({}).'
+            msg = '--target_amino_acids random{} exceeds available amino acids ({}).'
             raise ValueError(msg.format(num_random_aa, amino_acids.shape[0]))
         if num_random_aa == 0:
             return np.array([], dtype=amino_acids.dtype)
@@ -181,7 +181,7 @@ def get_biased_amino_acids(convergent_amino_acids, codon_table, rng=None):
         invalid = sorted(list(set([aa for aa in biased_aas.tolist() if aa not in amino_acids])))
         if len(invalid) > 0:
             invalid_txt = ','.join(invalid)
-            raise ValueError('Unknown amino acid(s) in --convergent_amino_acids: {}'.format(invalid_txt))
+            raise ValueError('Unknown amino acid(s) in --target_amino_acids: {}'.format(invalid_txt))
     return biased_aas
 
 def get_biased_codon_index(biased_aas, codon_table, codon_order):
@@ -321,7 +321,7 @@ def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, 
     if (target_index is None) or (np.asarray(target_index).shape[0] == 0) or (len(biased_aas) == 0):
         dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
         if dnds == 0:
-            raise ValueError('Cannot rescale nonsynonymous rates: background dN/dS is zero.')
+            raise ValueError('Cannot rescale nonsynonymous rates: the background N/S rate sum ratio is zero.')
         omega_scaling_factor = foreground_omega / dnds
         mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor, eq_freq=eq_freq)
         return mat
@@ -333,7 +333,7 @@ def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, 
     mat = rescale_substitution_matrix(mat, target_index, scaling_factor, eq_freq=eq_freq)
     dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
     if dnds == 0:
-        raise ValueError('Cannot rescale nonsynonymous rates: current dN/dS is zero.')
+        raise ValueError('Cannot rescale nonsynonymous rates: the current N/S rate sum ratio is zero.')
     omega_scaling_factor = foreground_omega/dnds
     mat = rescale_substitution_matrix(mat, all_nsy_cdn_index, omega_scaling_factor, eq_freq=eq_freq)
     return mat
@@ -343,9 +343,9 @@ def _validate_simulate_params(g):
     if int(g['num_simulated_site']) <= 0:
         raise ValueError('--num_simulated_site must be a positive integer.')
     if (g['percent_convergent_site'] < 0) or (g['percent_convergent_site'] > 100):
-        raise ValueError('--percent_convergent_site must be within [0, 100].')
+        raise ValueError('--percent_foreground_sites must be within [0, 100].')
     if (g['percent_biased_sub'] < 0) or (g['percent_biased_sub'] >= 100):
-        raise ValueError('--percent_biased_sub must be within [0, 100).')
+        raise ValueError('--target_bias_strength must be within [0, 100).')
     return None
 
 
@@ -480,7 +480,7 @@ def evolve_convergent_partitions(g, expected_omega=None):
         np.savetxt(save_path, models[-1].params['state_freqs'])
     if biased_q_fractions:
         txt = 'Mean share of foreground nonsynonymous Q rates entering target amino acids ' \
-              'over {:,} convergent sites: {:,.2f}%'
+              'over {:,} foreground-process sites: {:,.2f}%'
         print(txt.format(num_convergent_partition, np.mean(biased_q_fractions) * 100))
     evolver = pyvolve.Evolver(partitions=convergent_partitions, tree=g['foreground_tree'])
     kwargs = dict(
@@ -608,15 +608,15 @@ def _resolve_simulation_background_omega(g):
     iqtree_omega = g.get('omega', None)
     if iqtree_omega is None:
         default_omega = 0.2
-        txt = 'IQ-TREE omega was unavailable. Falling back to background omega={}.'
+        txt = 'IQ-TREE omega was unavailable. Using {} as the background N/S rate sum ratio.'
         print(txt.format(default_omega), flush=True)
         return float(default_omega)
     iqtree_omega = float(iqtree_omega)
     if not np.isfinite(iqtree_omega):
-        raise ValueError('IQ-TREE omega should be finite when used as simulation background omega.')
+        raise ValueError('IQ-TREE omega should be finite when used as the background N/S rate sum ratio.')
     if iqtree_omega < 0:
         raise ValueError('IQ-TREE omega should be >= 0 when used for simulation.')
-    txt = 'Using IQ-TREE estimated omega for simulation background: {:.6f}'
+    txt = 'Using the IQ-TREE omega estimate as the background N/S rate sum ratio: {:.6f}'
     print(txt.format(iqtree_omega), flush=True)
     return float(iqtree_omega)
 
@@ -1019,7 +1019,7 @@ def main_simulate(g, Q_method='auto'):
     if g.get('foreground_omega') == 'background':
         g['foreground_omega'] = g['background_omega']
     if g['foreground'] is None and epistasis is None:
-        print('--foreground was not provided. --percent_convergent_site will be set to 0.')
+        print('--foreground was not provided. --percent_foreground_sites will be set to 0.')
         g['num_convergent_site'] = 0
     else:
         g['num_convergent_site'] = int(g['num_simulated_site'] * g['percent_convergent_site'] / 100)
@@ -1036,8 +1036,8 @@ def main_simulate(g, Q_method='auto'):
             float(np.max(g['simulate_site_rates'])),
             float(np.mean(g['simulate_site_rates'])),
         ), flush=True)
-    txt = '{:,} out of {:,} sites ({:.1f}%) will evolve convergently in the foreground lineages.'
-    print(txt.format(g['num_convergent_site'], g['num_simulated_site'], g['percent_convergent_site']))
+    txt = '{:,} out of {:,} sites will use the foreground process on focal branches.'
+    print(txt.format(g['num_convergent_site'], g['num_simulated_site']))
     expected_omega = None
     if expected_omega_path is not None:
         from csubst.simulate_omega import ExpectedOmega

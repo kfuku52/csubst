@@ -72,7 +72,7 @@ def main():
                '--rooted_tree_file', str(data / 'PEPC.tree.nwk'),
                '--expectation_method', 'urn', '--output_stat', 'any2spe,any2any',
                '--calibrate_longtail', 'yes', '--random_seed', '20260910',
-               '--omega_pvalue_null_model', 'poisson', '--threads', '1',
+               '--omegaC_pvalue_null_model', 'poisson', '--threads', '1',
                '--max_arity', '2', '--longtail_null_niter', str(args.niter),
                '--outdir', str(args.outdir / 'search')]
     for kind in ['treefile', 'state', 'rate', 'iqtree', 'log']:

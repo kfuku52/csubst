@@ -91,9 +91,9 @@ def simulation_arguments(work, row):
     sim_args = ['simulate', '--alignment_file', fa, '--rooted_tree_file', phylogeny,
                 '--foreground', SOURCE / 'PEPC.foreground.txt', '--num_simulated_site', SITES,
                 '--simulate_seed', row.seed, '--background_omega', BACKGROUND, '--foreground_omega', row.omega,
-                '--percent_convergent_site', row.percent, '--convergent_amino_acids',
-                'random1' if row.scenario == 'directional' else 'random0', '--percent_biased_sub', 90,
-                '--export_expected_omega', 'yes', '--outdir', 'sim', '--output_prefix', 'sim']
+                '--percent_foreground_sites', row.percent, '--target_amino_acids',
+                'random1' if row.scenario == 'directional' else 'random0', '--target_bias_strength', 90,
+                '--export_expected_omegaC', 'yes', '--outdir', 'sim', '--output_prefix', 'sim']
     for ext in EXT:
         sim_args += ['--iqtree_' + ext, str(fa) + '.' + ext]
     return sim_args

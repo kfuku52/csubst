@@ -7,9 +7,10 @@ edges use their preference-specific endpoint kernels for simulated
 counts and the background kernel for null counts. The paths to their
 parents use the background Q in both calculations.
 
-`csubst simulate --export_expected_omega yes` adds
+`csubst simulate --export_expected_omegaC yes` adds
 `<output_prefix>_expected_omega.tsv` to the simulation output directory.
-The default is off. The table covers `any2spe` for every pair of branches
+Export is enabled by default for named scenarios and disabled for `custom`.
+The table covers `any2spe` for every pair of branches
 without an ancestor–descendant relationship, including sisters. It uses
 the simulated tree's branch IDs and node names. The foreground flags describe
 the foreground annotation on that tree. Use `--exclude_sister_pair no` in
@@ -17,15 +18,15 @@ an exhaustive pairwise search if you want to compare the same pair set.
 
 At each site the calculation uses the root frequencies and rate-scaled custom
 matrices passed to Pyvolve, and the branch lengths and model assignments it
-actually used. Only branches marked as foreground receive the foreground
-matrix and length multiplier at convergent sites. Invariant sites draw a root
+actually used. At sites selected by `--percent_foreground_sites`, branches
+marked as foreground receive the foreground matrix and length multiplier. Invariant sites draw a root
 codon from the background equilibrium distribution and copy it unchanged
 to every node. `--simulate_asrv file` uses IQ-TREE's posterior-mean `Rate`
 column when present, with `C_Rate` as the alternative.
 The simulation log reports the share of nonsynonymous Q rates directed
 toward the target amino acids. To remove directional bias, use
-`--convergent_amino_acids random0`. To run all sites under background Q,
-use `--percent_convergent_site 0`.
+`--target_amino_acids random0`. To run all sites under background Q,
+use `--percent_foreground_sites 0`.
 
 An event is a change between the two branch endpoints. N
 matches two amino-acid changes to the same derived amino acid. S matches
@@ -54,8 +55,8 @@ columns are `NA`. The expected ratio describes a ratio of mean counts. For short
 alignments the ratio of realized counts can fluctuate widely or be undefined.
 
 The true-ASR `.treefile` stores the baseline branch lengths after
-`--tree_scaling_factor`. The Q-based table also accounts for the
-`--foreground_scaling_factor` applied at convergent sites. A single Newick
+`--tree_branch_length_scale`. The Q-based table also accounts for the
+`--foreground_branch_length_scale` applied at sites assigned the foreground process. A single Newick
 tree cannot encode both sets of lengths for a mixture of site classes.
 
 For an end-to-end comparison, refit `csubst search` to the simulated tips and

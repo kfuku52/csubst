@@ -40,7 +40,7 @@ def test_inference_topology_contains_no_true_lengths_or_parameters(tmp_path):
     assert cmd[cmd.index('--max_arity') + 1] == '3'
     assert cmd[cmd.index('--cutoff_stat') + 1] == pipeline.CUTOFF
     assert cmd[cmd.index('--iqtree_state') + 1] == str(tmp_path / 'fit.state')
-    assert cmd[cmd.index('--omega_pvalue_niter_schedule') + 1] == '3999'
+    assert cmd[cmd.index('--omegaC_pvalue_niter_schedule') + 1] == '3999'
 
 
 def test_seed_channels_and_replicates_are_distinct():

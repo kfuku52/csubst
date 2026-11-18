@@ -124,20 +124,20 @@ def _parse_omega_pvalue_niter_schedule(value, max_niter=MAX_QUANTILE_NITER):
             return None
         raw_tokens = [token.strip() for token in raw_txt.split(',') if token.strip() != '']
     if len(raw_tokens) == 0:
-        raise ValueError('--omega_pvalue_niter_schedule should not be empty.')
+        raise ValueError('--omegaC_pvalue_niter_schedule should not be empty.')
     schedule = list()
     for token in raw_tokens:
         if not re.fullmatch(r'[0-9]+', token):
-            raise ValueError('--omega_pvalue_niter_schedule should contain integers.')
+            raise ValueError('--omegaC_pvalue_niter_schedule should contain integers.')
         niter = int(token)
         if niter <= 0:
-            raise ValueError('--omega_pvalue_niter_schedule should contain positive integers.')
+            raise ValueError('--omegaC_pvalue_niter_schedule should contain positive integers.')
         schedule.append(niter)
     for prev, curr in zip(schedule, schedule[1:]):
         if curr <= prev:
-            raise ValueError('--omega_pvalue_niter_schedule should be strictly increasing.')
+            raise ValueError('--omegaC_pvalue_niter_schedule should be strictly increasing.')
     if max(schedule) > int(max_niter):
-        txt = '--omega_pvalue_niter_schedule upper bound should be <= {}.'
+        txt = '--omegaC_pvalue_niter_schedule upper bound should be <= {}.'
         raise ValueError(txt.format(int(max_niter)))
     return schedule
 
@@ -214,7 +214,7 @@ def _normalize_input_parameters(g: dict[str, Any]) -> dict[str, Any]:
 
 def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'calc_omega_pvalue' in g.keys():
-        g['calc_omega_pvalue'] = _parse_bool_like(g['calc_omega_pvalue'], '--calc_omega_pvalue')
+        g['calc_omega_pvalue'] = _parse_bool_like(g['calc_omega_pvalue'], '--calc_omegaC_pvalue')
     else:
         g['calc_omega_pvalue'] = False
     expectation_method = None
@@ -234,13 +234,13 @@ def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if g.get('subcommand') in ['search', 'analyze']:
         recoding_config.validate_nonsyn_expectation(g.get('nonsyn_recode', 'no'), expectation_method, g.get('sa_asr_mode', 'direct'), g.get('sa_iqtree_model', 'GTR'))
     if g['calc_omega_pvalue'] and (g['expectation_method'] != 'urn'):
-        raise ValueError('--calc_omega_pvalue "yes" should be used with --expectation_method "urn".')
+        raise ValueError('--calc_omegaC_pvalue "yes" should be used with --expectation_method "urn".')
     if 'omega_pvalue_null_model' in g.keys():
         g['omega_pvalue_null_model'] = str(g['omega_pvalue_null_model']).strip().lower()
     else:
         g['omega_pvalue_null_model'] = 'hypergeom'
     if g['omega_pvalue_null_model'] not in ['hypergeom', 'poisson', 'poisson_full', 'nbinom']:
-        raise ValueError('--omega_pvalue_null_model should be one of hypergeom, poisson, poisson_full, nbinom.')
+        raise ValueError('--omegaC_pvalue_null_model should be one of hypergeom, poisson, poisson_full, nbinom.')
     if 'omega_pvalue_nbinom_alpha' in g.keys():
         token = g['omega_pvalue_nbinom_alpha']
     else:
@@ -250,14 +250,14 @@ def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
     else:
         g['omega_pvalue_nbinom_alpha'] = _require_finite_float(
             value=float(token),
-            param_name='--omega_pvalue_nbinom_alpha',
+            param_name='--omegaC_pvalue_nbinom_alpha',
         )
         if g['omega_pvalue_nbinom_alpha'] < 0:
-            raise ValueError('--omega_pvalue_nbinom_alpha should be >= 0.')
+            raise ValueError('--omegaC_pvalue_nbinom_alpha should be >= 0.')
     if 'omega_pvalue_safe_min_sub_pp' in g.keys():
         raise ValueError(
             '--omega_pvalue_safe_min_sub_pp was removed. '
-            'Use --min_sub_pp explicitly when running --calc_omega_pvalue.'
+            'Use --min_sub_pp explicitly when running --calc_omegaC_pvalue.'
         )
     if 'ml_anc' in g.keys():
         g['ml_anc'] = _parse_bool_like(g['ml_anc'], '--ml_anc')
@@ -277,7 +277,7 @@ def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'omega_pvalue_niter' in g.keys():
         raise ValueError(
             '--omega_pvalue_niter was removed. '
-            'Use --omega_pvalue_niter_schedule.'
+            'Use --omegaC_pvalue_niter_schedule.'
         )
     if 'omega_pvalue_niter_schedule' in g.keys():
         g['omega_pvalue_niter_schedule'] = _parse_omega_pvalue_niter_schedule(g['omega_pvalue_niter_schedule'])
@@ -286,25 +286,25 @@ def _normalize_model_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'omega_pvalue_refine_threshold' in g.keys():
         raise ValueError(
             '--omega_pvalue_refine_threshold was removed. '
-            'Use --omega_pvalue_refine_upper_edge_bins.'
+            'Use --omegaC_pvalue_refine_upper_edge_bins.'
         )
     if 'omega_pvalue_refine_ci_alpha' in g.keys():
         raise ValueError(
             '--omega_pvalue_refine_ci_alpha was removed. '
-            'Use --omega_pvalue_refine_upper_edge_bins.'
+            'Use --omegaC_pvalue_refine_upper_edge_bins.'
         )
     if 'omega_pvalue_refine_upper_edge_bins' in g.keys():
         g['omega_pvalue_refine_upper_edge_bins'] = int(g['omega_pvalue_refine_upper_edge_bins'])
     else:
         g['omega_pvalue_refine_upper_edge_bins'] = 2
     if g['omega_pvalue_refine_upper_edge_bins'] < 0:
-        raise ValueError('--omega_pvalue_refine_upper_edge_bins should be >= 0.')
+        raise ValueError('--omegaC_pvalue_refine_upper_edge_bins should be >= 0.')
     if 'omega_pvalue_rounding' in g.keys():
         g['omega_pvalue_rounding'] = str(g['omega_pvalue_rounding']).strip().lower()
     else:
         g['omega_pvalue_rounding'] = 'stochastic'
     if g['omega_pvalue_rounding'] not in ['round', 'stochastic', 'floor', 'ceil']:
-        raise ValueError('--omega_pvalue_rounding should be one of round, stochastic, floor, ceil.')
+        raise ValueError('--omegaC_pvalue_rounding should be one of round, stochastic, floor, ceil.')
     if 'asrv' in g.keys():
         g['asrv'] = str(g['asrv']).strip().lower()
     else:
@@ -626,10 +626,10 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'percent_convergent_site' in g.keys():
         g['percent_convergent_site'] = _require_finite_float(
             value=float(g['percent_convergent_site']),
-            param_name='--percent_convergent_site',
+            param_name='--percent_foreground_sites',
         )
         if (g['percent_convergent_site'] < 0) or (g['percent_convergent_site'] > 100):
-            raise ValueError('--percent_convergent_site should be between 0 and 100.')
+            raise ValueError('--percent_foreground_sites should be between 0 and 100.')
     if 'simulate_seed' in g.keys():
         g['simulate_seed'] = int(g['simulate_seed'])
         if (g['simulate_seed'] < -1):
@@ -650,7 +650,7 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'export_expected_omega' in g:
         g['export_expected_omega'] = _parse_bool_like(
             value=g['export_expected_omega'],
-            param_name='--export_expected_omega',
+            param_name='--export_expected_omegaC',
         )
     if 'true_asr_prefix' in g.keys():
         if g['true_asr_prefix'] is None:
@@ -661,17 +661,17 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'tree_scaling_factor' in g.keys():
         g['tree_scaling_factor'] = _require_finite_float(
             value=float(g['tree_scaling_factor']),
-            param_name='--tree_scaling_factor',
+            param_name='--tree_branch_length_scale',
         )
         if g['tree_scaling_factor'] < 0:
-            raise ValueError('--tree_scaling_factor should be >= 0.')
+            raise ValueError('--tree_branch_length_scale should be >= 0.')
     if 'foreground_scaling_factor' in g.keys():
         g['foreground_scaling_factor'] = _require_finite_float(
             value=float(g['foreground_scaling_factor']),
-            param_name='--foreground_scaling_factor',
+            param_name='--foreground_branch_length_scale',
         )
         if g['foreground_scaling_factor'] < 0:
-            raise ValueError('--foreground_scaling_factor should be >= 0.')
+            raise ValueError('--foreground_branch_length_scale should be >= 0.')
     if 'background_omega' in g.keys():
         raw_background_omega = g['background_omega']
         if raw_background_omega is None:
@@ -709,29 +709,29 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
     if 'convergent_amino_acids' in g.keys():
         conv_aa = str(g['convergent_amino_acids']).strip()
         if conv_aa == '':
-            raise ValueError('--convergent_amino_acids should be non-empty.')
+            raise ValueError('--target_amino_acids should be non-empty.')
         if conv_aa.startswith('random'):
             suffix = conv_aa.replace('random', '', 1)
             if not re.fullmatch(r'\d+', suffix):
-                raise ValueError('--convergent_amino_acids random mode should be randomN (N is an integer).')
+                raise ValueError('--target_amino_acids random mode should be randomN (N is an integer).')
             num_random_aa = int(suffix)
             if num_random_aa > 20:
-                raise ValueError('--convergent_amino_acids randomN should satisfy 0 <= N <= 20.')
+                raise ValueError('--target_amino_acids randomN should satisfy 0 <= N <= 20.')
         else:
             from csubst import genetic_code
             codon_table = genetic_code.get_codon_table(ncbi_id=g.get('genetic_code', 1))
             valid_aas = set([item[0] for item in codon_table if item[0] != '*'])
             invalid_aas = sorted(set([aa for aa in conv_aa if aa not in valid_aas]))
             if len(invalid_aas):
-                raise ValueError('--convergent_amino_acids contains unsupported amino acids: {}.'.format(','.join(invalid_aas)))
+                raise ValueError('--target_amino_acids contains unsupported amino acids: {}.'.format(','.join(invalid_aas)))
         g['convergent_amino_acids'] = conv_aa
     if 'percent_biased_sub' in g.keys():
         g['percent_biased_sub'] = _require_finite_float(
             value=float(g['percent_biased_sub']),
-            param_name='--percent_biased_sub',
+            param_name='--target_bias_strength',
         )
         if (g['percent_biased_sub'] < 0) or (g['percent_biased_sub'] >= 100):
-            raise ValueError('--percent_biased_sub should be between 0 and <100.')
+            raise ValueError('--target_bias_strength should be between 0 and <100.')
     epistasis = simulate_scenarios.epistasis_mode(g)
     if epistasis is not None:
         for key in ('simulate_epistasis_distance_scale', 'simulate_epistasis_preference_multiplier'):
@@ -742,7 +742,7 @@ def _normalize_simulation_parameters(g: dict[str, Any]) -> dict[str, Any]:
             raise ValueError('--simulate_epistasis_preference_multiplier should be at least 1.')
         g['simulate_focal_tips'] = int(g['simulate_focal_tips'])
         if g['simulate_focal_tips'] < 2:
-            raise ValueError('--simulate_focal_tips should be at least 2.')
+            raise ValueError('--simulate_max_focal_tips should be at least 2.')
         if str(g['simulate_focal_branch_length']).strip().lower() == 'input':
             g['simulate_focal_branch_length'] = None
         else:

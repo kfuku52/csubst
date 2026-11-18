@@ -149,7 +149,7 @@ def test_invalid_joint_means_fail_without_clipping():
 @pytest.mark.parametrize('model', ['hypergeom', 'poisson_full', 'nbinom'])
 @pytest.mark.parametrize('kwargs', [dict(output_stats=['any2dif']), dict(output_stats=['any2spe'], pseudocount_alpha='auto')])
 def test_unsupported_joint_models_fail_early(model, kwargs):
-    with pytest.raises(ValueError, match='require --omega_pvalue_null_model poisson'):
+    with pytest.raises(ValueError, match='require --omegaC_pvalue_null_model poisson'):
         omega_null.validate_config(config(omega_pvalue_null_model=model, **kwargs))
 
 

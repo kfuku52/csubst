@@ -10,7 +10,7 @@ of epistasis. The former response-weighted branch context has been removed.
 Active fixed or automatic beta requires `--expectation_method urn --asrv sn`,
 independently obtained branch context, and site features supplied through
 `--epistasis_degree_file` or `--epistasis_pdb`. Other ASRV modes, custom ASRV
-training/concentration, `--asrv_report`, and `--calc_omega_pvalue yes` are rejected.
+training/concentration, `--asrv_report`, and `--calc_omegaC_pvalue yes` are rejected.
 Use the automatic `csubst_epistasis.json` report for fold-specific diagnostics.
 No new 3Di model expectation or calibrated omega P value is provided.
 
