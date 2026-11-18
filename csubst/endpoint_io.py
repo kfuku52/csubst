@@ -243,11 +243,17 @@ def _events(raw, kind, g, mapping):
     return result
 
 
-def _projections(events):
-    return {'any2any': events.sum(axis=(2, 3)),
-            'spe2any': events.sum(axis=3),
-            'any2spe': events.sum(axis=2),
-            'spe2spe': events}
+def _projections(events, stats):
+    projections = {}
+    if 'any2any' in stats:
+        projections['any2any'] = events.sum(axis=(2, 3))
+    if 'spe2any' in stats:
+        projections['spe2any'] = events.sum(axis=3)
+    if 'any2spe' in stats:
+        projections['any2spe'] = events.sum(axis=2)
+    if 'spe2spe' in stats:
+        projections['spe2spe'] = events
+    return projections
 
 
 
@@ -330,8 +336,7 @@ def _projection_transform(g, kinds, mappings, stats, predictive=False, cache_byt
                                    g['max_synonymous_size'], g['max_synonymous_size']))
                 sg, a, d, ca, cd = syn_axes
                 events[:, sg, a, d] = left[:, ca] * transition[ca, cd] * right[:, cd]
-                out.update({(kind, stat): value for stat, value in _projections(events).items()
-                            if stat in stats})
+                out.update({(kind, stat): value for stat, value in _projections(events, stats).items()})
             else:
                 if predictive:
                     # Predictive right likelihoods are one. Contract constant
@@ -473,6 +478,9 @@ def _build(g, structural=False):
         pairwise = _pairwise_storage_bound(n, num_site, shapes, kinds, selected_stats,
                                            block_size, g) <= 64 * 1024 * 1024
     empirical = g.get('asrv') in asrv.EMPIRICAL_MODES
+    # The empirical urn trains synonymous destination rates even for an
+    # any2any-only report.
+    syn_observed_stats = observed_stats | {'any2spe'} if empirical else observed_stats
     if ('spe2spe' in selected_stats or g.get('asrv') == 'empirical') and not pairwise:
         projected = False
     direct = projected and 'AA' not in kinds and 'spe2spe' not in selected_stats and not empirical
@@ -557,7 +565,7 @@ def _build(g, structural=False):
                     events = record.reduced[kind, 'events']
                     events[~valid] = 0
                     if projected:
-                        projections = _projections(events)
+                        projections = _projections(events, syn_observed_stats if kind == 'S' else observed_stats)
                 else:
                     projections = {stat: record.reduced[kind, stat] for stat in observed_stats}
                     for values in projections.values():
@@ -593,7 +601,7 @@ def _build(g, structural=False):
                     else:
                         prediction = record.reduced_predictive[kind, 'events']
                         prediction[~valid] = 0
-                        prediction_projections = _projections(prediction)
+                        prediction_projections = _projections(prediction, observed_stats)
                     totals[kind] += float(prediction_projections['any2any'].sum())
                     for stat, accumulator in ebuilders[kind].items():
                         accumulator.append(node, prediction_projections[stat], record.start, num_site)

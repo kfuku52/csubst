@@ -433,14 +433,18 @@ def test_streaming_retains_projections_when_later_consumers_need_them(tmp_path, 
     assert not isinstance(g['_endpoint_tensors']['N'], PairwiseSubstitutionSummary)
 
 
-@pytest.mark.parametrize('mode, arity', [('empirical', 2), ('empirical_all', 2), ('empirical_all', 3)])
-def test_empirical_urn_stream_retains_learning_totals_and_observed_counts(tmp_path, mode, arity):
+@pytest.mark.parametrize('mode, arity, stats', [
+    ('empirical', 2, ['any2any', 'any2spe']),
+    ('empirical_all', 2, ['any2any', 'any2spe']),
+    ('empirical_all', 3, ['any2any', 'any2spe']),
+    ('empirical_all', 2, ['any2any']),
+])
+def test_empirical_urn_stream_retains_learning_totals_and_observed_counts(tmp_path, mode, arity, stats):
     import pandas as pd
     from csubst import empirical_urn
     from csubst.substitution_sparse import PairwiseSubstitutionSummary, ProjectedSubstitutionTensor
 
     streamed, ids = toy_context(tmp_path)
-    stats = ['any2any', 'any2spe']
     streamed.update(subcommand='search', max_arity=arity, num_node=len(ids), expectation_method='urn', asrv=mode,
                     output_stats=stats, b=True)
     full = copy.deepcopy(streamed)
@@ -503,6 +507,36 @@ def test_native_classified_events_match_full_mapping(tmp_path, monkeypatch, size
     for pairs in (np.array([[0, -1, 0]]), np.array([[100, 0, 0]]), np.zeros((1, 2), dtype=np.int64)):
         with pytest.raises(ValueError):
             cy.project_endpoint_events_double(left, right, transition, pairs, 2, 2)
+
+
+@pytest.mark.native
+@pytest.mark.parametrize('exceptional', [None, 'nonfinite_left', 'overflow'])
+def test_native_sparse_child_events_match_ordered_pair_sum(exceptional):
+    cy = endpoint_io.substitution_sparse.substitution_sparse_cy
+    if cy is None:
+        pytest.skip('Endpoint event extension is not built.')
+    rng = np.random.default_rng(118)
+    size, k = 23, 13
+    left = rng.random((size, k * 2))[:, ::2]
+    right = np.eye(k)[rng.integers(k, size=size)]
+    right[0] = 0
+    right[1, :2] = .5
+    right[2] = 1
+    right = right[:, ::-1]
+    transition = rng.random((k, k)).T
+    pairs = np.array([((a % 2) * 2 + d % 2, a, d) for a in range(k) for d in range(k)], dtype=np.int64)
+    rng.shuffle(pairs)
+    if exceptional == 'nonfinite_left':
+        left[0, 0] = np.inf
+    elif exceptional == 'overflow':
+        left[0, 0] = np.finfo(float).max
+        transition[0, 0] = 2
+    expected = np.zeros((size, 4))
+    with np.errstate(over='ignore', invalid='ignore'):
+        for feature, a, d in pairs:
+            expected[:, feature] += left[:, a] * transition[a, d] * right[:, d]
+    events = cy.project_endpoint_events_double(left, right, transition, pairs, 1, 2)
+    np.testing.assert_allclose(events.reshape(size, 4), expected, rtol=1e-14, atol=0)
 
 
 @pytest.mark.parametrize('structural', [False, True])

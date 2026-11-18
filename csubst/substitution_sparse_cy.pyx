@@ -915,13 +915,42 @@ cpdef project_endpoint_events_double(
                 pairs[p, 1] < 0 or pairs[p, 1] >= k or
                 pairs[p, 2] < 0 or pairs[p, 2] >= k):
             raise ValueError('Invalid endpoint event pair indices.')
-    # Traverse contiguous sites inside each codon pair. Besides reusing pair
-    # metadata and transition weights, this gives the compiler a vector loop.
-    cdef const double[:, ::1] left_sites = numpy.ascontiguousarray(numpy.asarray(left).T)
-    cdef const double[:, ::1] right_sites = numpy.ascontiguousarray(numpy.asarray(right).T)
-    cdef object events = numpy.zeros((features, size))
-    cdef double[:, ::1] output = events
+    cdef const double[:, ::1] left_sites, right_sites
+    cdef object events
+    cdef double[:, ::1] output
     cdef double weight
+    cdef numpy.intp_t[:, ::1] sites
+    cdef numpy.intp_t[::1] counts
+    cdef Py_ssize_t i
+    # At observed tips only a few child states usually have likelihood at
+    # each site. Reuse their site lists across all incoming codon pairs.
+    # Short pair lists (e.g. synonymous events) favor the dense vector loop.
+    # Only omit zero terms when left * transition is guaranteed finite.
+    if (pairs.shape[0] > 4 * k and
+            numpy.count_nonzero(right) * 4 < size * k and
+            numpy.isfinite(left).all() and numpy.max(numpy.abs(numpy.asarray(transition))) <= 1):
+        events = numpy.zeros((size, features))
+        output = events
+        sites = numpy.empty((k, size), dtype=numpy.intp)
+        counts = numpy.zeros(k, dtype=numpy.intp)
+        with nogil:
+            for s in range(size):
+                for d in range(k):
+                    if right[s, d] != 0:
+                        sites[d, counts[d]] = s
+                        counts[d] += 1
+            for p in range(pairs.shape[0]):
+                target, a, d = pairs[p, 0], pairs[p, 1], pairs[p, 2]
+                weight = transition[a, d]
+                for i in range(counts[d]):
+                    s = sites[d, i]
+                    output[s, target] += left[s, a] * weight * right[s, d]
+        return events.reshape(size, num_group, num_state, num_state)
+    # Dense messages use a vector loop over contiguous sites for each pair.
+    left_sites = numpy.ascontiguousarray(numpy.asarray(left).T)
+    right_sites = numpy.ascontiguousarray(numpy.asarray(right).T)
+    events = numpy.zeros((features, size))
+    output = events
     with nogil:
         for p in range(pairs.shape[0]):
             target, a, d = pairs[p, 0], pairs[p, 1], pairs[p, 2]
