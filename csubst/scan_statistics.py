@@ -113,6 +113,10 @@ def rate_score(x_target, l_target, x_other, l_other):
             return scale * (scaled_terms / math.log(10)), 0.
         return terms / math.log(10), 0.
     deviance = max(0., 2 * terms)
+    if deviance <= 1.:
+        # The tail is close to one half. Return it directly to avoid a log/exp round trip.
+        tail = .5 * math.erfc(math.sqrt(deviance * .5))
+        return -math.log10(tail), tail
     log_tail = float(log_ndtr(-math.sqrt(deviance)))
     return -log_tail / math.log(10), math.exp(log_tail)
 
