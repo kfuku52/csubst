@@ -51,7 +51,8 @@ directional bias. Rows sharing branches or alignments are dependent.
 
 The [Wallenius urn simulation](URN_ACCURACY.md) uses the PEPC alignments
 to check expected counts against the generating Q and compare sampled
-tail probabilities across the same scenarios.
+tail probabilities across the same scenarios. The [matched PEPC relaxation study](PEPC_RELAXATION.md)
+compares whole-branch and shared-domain relaxation with directional preferences at equal expected N totals.
 
 ## Reproduce
 
