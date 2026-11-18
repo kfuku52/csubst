@@ -99,9 +99,9 @@ can change when N changes. Compare OCS/ECS and `dSC*_nocalib`, or use
 `--calibrate_longtail no`, when checking the unchanged synonymous component.
 
 `translate` ASR, rate mixtures (`+G`, `+R`, `+I`), and other 3Di models are not
-yet supported for model-based expectations and fail explicitly. An explicit
-`--expectation_method urn` is respected and remains available for these
-exploratory analyses. Neither route establishes calibrated evidence for
+yet supported for model-based expectations and fail explicitly. For exploratory
+`search` runs with these settings, select `--substitution_posterior marginal`
+and `--expectation_method urn`. Neither route establishes calibrated evidence for
 structural adaptation: omegaC combines structural N with synonymous codon S,
 and still uses the existing marginal-posterior expected-count approximation.
 GTR estimates many parameters and may be poorly determined by short alignments.
@@ -112,15 +112,20 @@ scan with its independent fitted uniform GTRX+FQ model. Structural observations
 and exposure use structural branch lengths; synonymous summaries use the codon
 fit. Analytical, parametric and bridge 3Di scans remain unsupported.
 
-Use a codon alignment and matching rooted tree. Supply a full CDS alignment
-when the analysis alignment has been trimmed:
+For 3Di recoding, supply an in-frame, full-length codon alignment containing
+every tree tip with `--full_cds_alignment_file`, and omit `--alignment_file`.
+Use the matching rooted tree.
 
 ```bash
-csubst inspect --alignment_file alignment.fa --rooted_tree_file tree.nwk \
-  --full_cds_alignment_file full-cds.fa --nonsyn_recode 3di20 \
-  --sa_asr_mode translate --sa_backend esm3di-35m --sa_device cpu \
+csubst inspect --full_cds_alignment_file full-cds.fa --rooted_tree_file tree.nwk \
+  --nonsyn_recode 3di20 \
+  --sa_asr_mode direct --sa_backend esm3di-35m --sa_device cpu \
   --blas_threads 4 --sa_batch_size 4 --sa_no_download yes
 ```
+
+`inspect` defaults to `--substitution_posterior joint`, which requires
+`--sa_asr_mode direct` for 3Di. To use `--sa_asr_mode translate` with `inspect`,
+also set `--substitution_posterior marginal`.
 
 The same predictor options are available in `search`, `sites`, and other
 commands using the shared recoding options. They work with both ancestral
