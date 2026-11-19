@@ -327,5 +327,22 @@ def test_get_df_dist_reports_max_distance_for_multi_branch_substitutions(tiny_tr
     out = main_sites.get_df_dist(sub_tensor=sub_tensor, g=g, mode="nsy")
     row_ab = out.loc[(out["state_from"] == "A") & (out["state_to"] == "B"), :]
     row_ba = out.loc[(out["state_from"] == "B") & (out["state_to"] == "A"), :]
-    assert pytest.approx(float(row_ab["max_dist_bl"].iloc[0]), rel=0, abs=1e-12) == 1.0
+    assert row_ab["max_dist_bl"].iloc[0] == row_ab["max_dist_parent_bl"].iloc[0] == 0.
+    assert pytest.approx(float(row_ab["max_dist_bl_legacy"].iloc[0]), rel=0, abs=1e-12) == 1.0
     assert pd.isna(row_ba["max_dist_bl"].iloc[0])
+
+
+@pytest.mark.parametrize('use_sparse', [False, True])
+def test_combined_state_plot_summary_matches_all_separate_ranks(tiny_tree, use_sparse):
+    g = {'tree': tiny_tree, 'amino_acid_orders': np.array(['A', 'B', 'C'])}
+    dense = np.zeros((len(tuple(tiny_tree.traverse())), 3, 1, 3, 3))
+    branch = ete.get_prop(tiny_tree['A'], 'numerical_label')
+    dense[branch, :, 0, 0, 2] = [.1, .4, .4]
+    dense[branch, :, 0, 1, 2] = [.3, np.nan, .9]
+    tensor = substitution_sparse.SparseSubstitutionTensor.from_dense(dense) if use_sparse else dense
+    reference = main_sites.get_df_ad(tensor, g, 'nsy')
+    for stat in ['tsi', 'rank1', 'rank2', 'rank3', 'rank4', 'rank5']:
+        reference = main_sites.add_site_stats(reference, tensor, g, 'nsy', stat)
+    stats, distances = main_sites._state_plot_summary(tensor, g, 'nsy')
+    pd.testing.assert_frame_equal(reference[stats.columns], stats)
+    assert distances.max_dist_parent_bl.isna().all()

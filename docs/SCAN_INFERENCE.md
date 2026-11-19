@@ -207,7 +207,12 @@ check are validated with IQ-TREE 2.3.6; incompatible checkpoint/log formats
 fail explicitly rather than using rounded parameters.
 
 `--scan_n_permutations` denotes the number of null datasets in this mode.
-Replicates currently run sequentially; each IQ-TREE fit uses `--threads`.
+The default `--scan_bootstrap_workers 1` runs the refits sequentially.
+With `--threads T --scan_bootstrap_workers W`, at most `min(T,W,B)` refits
+run concurrently, each in a separate directory. Concurrent fits divide the
+thread budget evenly (rounded down) and use one BLAS thread per child.
+Peak memory can rise with the worker count. The manifest records seeds,
+scores and failures in replicate order. A failed fit invalidates calibration.
 Bootstrap requires a nonnegative `--scan_permutation_seed`.
 Seeds are deterministic functions of the base seed and replicate index and
 are supplied to both the simulator and IQ-TREE. Scan fits use verbose logs

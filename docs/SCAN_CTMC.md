@@ -158,7 +158,8 @@ replicate reconstructs its own node states and posterior category weights.
 `p_rate_enrichment_asymptotic` and its trait × match BH column remain exploratory
 diagnostics. `full_scan` calibration itself still permutes foreground clades
 against fixed ASR tensors; it does not simulate sequences or refit ancestors.
-All simulation modes run serially and have minimum Monte Carlo P `1/(B+1)`.
+The simulation modes have minimum Monte Carlo P `1/(B+1)`. Fitted bootstrap
+replicates support `--scan_bootstrap_workers`; the default runs one fit at a time.
 
 ## Supported data and explicit limits
 

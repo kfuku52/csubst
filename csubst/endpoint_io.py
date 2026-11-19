@@ -259,6 +259,7 @@ def _projections(events, stats):
 
 def _pairwise_search(g):
     return (int(g.get('max_arity', 0)) == 2
+            and (not g.get('cutoff_ocn_stats') or g.get('pair_posterior') == 'joint')
             and not g.get('site_filter_report', False)
             and int(g.get('fg_clade_permutation', 0)) == 0)
 
@@ -684,7 +685,8 @@ def _input_fingerprint(g):
                 'synonymous_indices', 'amino_acid_orders', 'nonsyn_state_orders', 'output_stats',
                 'b', 'cs', 'cbs', 'max_arity', 'calibrate_longtail', 'min_sub_pp', '_endpoint_retained_branches',
                 'calc_omega_pvalue', 'asrv_report', 'epistasis_requested', 'asrv_training_branches', 'asrv_posterior_draws',
-                'site_filter_report', 'fg_clade_permutation', 'max_synonymous_size'):
+                'site_filter_report', 'fg_clade_permutation', 'max_synonymous_size', 'cutoff_ocn_stats',
+                'pair_posterior'):
         digest.update(str((key, g.get(key))).encode())
     if g.get('asrv') in asrv.EMPIRICAL_MODES:
         digest.update(b'empirical_urn_event_totals' if g['asrv'] == 'empirical' else b'all_branch_urn_event_totals')
@@ -742,7 +744,9 @@ def observed_pair_counts(g, pairs):
     missing = {leaf: ~observed[leaf] for leaf in model.leaves}
     amino = _mapping(g, 'AA', len(pi)).argmax(axis=1)
     size = min(4, int(g.get('endpoint_block_size', 64)))
-    return count_any2spe(model, tips, amino, pairs, size, tip_missing=missing, eligible=eligible)
+    minimum = g['min_ocn_site_pp'] if g.get('cutoff_ocn_stats') else 0
+    return count_any2spe(model, tips, amino, pairs, size, tip_missing=missing, eligible=eligible,
+                         min_ocn_site_pp=minimum)
 
 
 def invalidate(g):

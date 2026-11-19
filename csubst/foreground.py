@@ -903,12 +903,15 @@ def get_marginal_branch(g):
                     f.write(str(x)+'\n')
     return g
 
-def get_foreground_branch_num(cb, g):
+def get_foreground_branch_num(cb, g, pruned_branches=None):
     start_time = time.time()
     bid_cols = cb.columns[cb.columns.str.startswith('branch_id_')]
     arity = len(bid_cols)
     bid_matrix = np.asarray(cb.loc[:, bid_cols].to_numpy(copy=False), dtype=np.int64)
     precomputed_bid_key = _build_order_invariant_row_keys(bid_matrix, assume_sorted=False)
+    if pruned_branches is not None:
+        pruned_ids = pruned_branches[bid_cols].to_numpy(dtype=np.int64, copy=False)
+        pruned_keys = _build_order_invariant_row_keys(pruned_ids, assume_sorted=False)
     trait_names = _get_trait_names(g)
     for trait_name in trait_names:
         col_num_fg = 'branch_num_fg_' + trait_name
@@ -945,6 +948,16 @@ def get_foreground_branch_num(cb, g):
         num_fg = int(is_fg.sum())
         num_fg_enough = int((is_enough_stat & is_fg).sum())
         num_all = cb.shape[0]
+        # Rows pruned on OCN cannot pass the cutoff. They still belong to the
+        # generated population used for the foreground enrichment denominator.
+        if pruned_branches is not None:
+            excluded = _compute_dependent_foreground_mask(
+                cb=pruned_branches, bid_cols=bid_cols,
+                dependent_id_combinations=g['fg_dependent_id_combinations'][trait_name],
+                precomputed_bid_key=pruned_keys)
+            membership = _count_branch_memberships_from_bid_matrix(pruned_ids, g['fg_ids'][trait_name])
+            num_fg += int(np.sum((membership == arity) & ~excluded))
+            num_all += len(pruned_ids)
         percent_fg_enough, enrichment_factor = _calculate_fg_enrichment(
             num_enough=num_enough,
             num_fg=num_fg,
@@ -1140,24 +1153,9 @@ def _resolve_cb_stats_for_median_and_total(cb):
     EN_cols = cb.columns[is_EN].tolist()
     ES_cols = cb.columns[is_ES].tolist()
     stats = dict()
-    stats['median'] = ['dist_bl', 'dist_node_num'] + omega_cols
+    stats['median'] = ['dist_bl', 'dist_bl_legacy', 'dist_node_num'] + omega_cols
     stats['total'] = ON_cols + OS_cols + EN_cols + ES_cols
     return stats
-
-
-def _build_cutoff_column_plan(cb, cutoff_stat_str):
-    cutoff_stat_entries = table.parse_cutoff_stat(cutoff_stat_str=cutoff_stat_str)
-    cutoff_column_plan = []
-    for cutoff_stat_exp, cutoff_stat_value in cutoff_stat_entries:
-        is_col = cb.columns.str.fullmatch(cutoff_stat_exp, na=False)
-        if is_col.sum() == 0:
-            txt = 'The column "{}" was not found in the cb table. '
-            txt += 'Check the format of the --cutoff_stat specification ("{}") carefully.'
-            raise ValueError(txt.format(cutoff_stat_exp, cutoff_stat_str))
-        cutoff_stat_cols = cb.columns[is_col]
-        for cutoff_stat_col in cutoff_stat_cols:
-            cutoff_column_plan.append((str(cutoff_stat_col), float(cutoff_stat_value)))
-    return cutoff_column_plan
 
 
 def _evaluate_cutoff_column_plan(cb, cutoff_column_plan):
@@ -1209,7 +1207,7 @@ def _build_clade_permutation_fast_stats_plan(g, cb, trait_names, target_col_pref
         median_output_cols[suffix] = ['median_' + ms + suffix for ms in median_stats]
         total_output_cols[suffix] = ['total_' + ms + suffix for ms in total_stats]
         count_output_cols[suffix] = ('num' + suffix, 'num_qualified' + suffix)
-    cutoff_column_plan = _build_cutoff_column_plan(cb=cb, cutoff_stat_str=g['cutoff_stat'])
+    cutoff_column_plan = table.cutoff_column_plan(cb=cb, cutoff_stat_str=g['cutoff_stat'])
     return {
         'all_stats': all_stats,
         'median_indices': median_indices,

@@ -161,18 +161,27 @@ def chisq_test(x, total_S, total_N):
         out = chi2_contingency(contingency_table, lambda_="log-likelihood")
         return out[1]
 
-def get_cutoff_stat_bool_array(cb, cutoff_stat_str):
-    cutoff_stat_entries = parse_cutoff_stat(cutoff_stat_str=cutoff_stat_str)
-    is_enough_stat = True
-    for cutoff_stat_exp,cutoff_stat_value in cutoff_stat_entries:
+def cutoff_column_plan(cb, cutoff_stat_str):
+    plan = []
+    for cutoff_stat_exp, cutoff_stat_value in parse_cutoff_stat(cutoff_stat_str):
         is_col = cb.columns.str.fullmatch(cutoff_stat_exp, na=False)
         if is_col.sum()==0:
             txt = 'The column "{}" was not found in the cb table. '
             txt += 'Check the format of the --cutoff_stat specification ("{}") carefully.'
             raise ValueError(txt.format(cutoff_stat_exp, cutoff_stat_str))
         cutoff_stat_cols = cb.columns[is_col]
-        for cutoff_stat_col in cutoff_stat_cols:
-            is_enough_stat &= (cb.loc[:,cutoff_stat_col] >= cutoff_stat_value).fillna(False)
+        for col in cutoff_stat_cols:
+            adjusted = 'cutoff_' + col
+            plan.append((adjusted if col.startswith('OCN') and adjusted in cb.columns else col, cutoff_stat_value))
+    return plan
+
+
+def get_cutoff_stat_bool_array(cb, cutoff_stat_str, *, plan=None):
+    if plan is None:
+        plan = cutoff_column_plan(cb, cutoff_stat_str)
+    is_enough_stat = True
+    for col, minimum in plan:
+        is_enough_stat &= (cb.loc[:, col] >= minimum).fillna(False)
     return is_enough_stat
 
 
@@ -247,3 +256,20 @@ def parse_cutoff_stat(cutoff_stat_str):
         txt = 'No valid --cutoff_stat token was found in "{}".'
         raise ValueError(txt.format(cutoff_stat_str))
     return cutoff_stat_entries
+
+
+def expansion_ocn_bound(criteria, mode):
+    """Resolve the observed-count bound for extending a lower-order combination."""
+    if mode == 'all_cutoffs':
+        return None
+    if mode not in ('auto', 'ocn_bound'):
+        raise ValueError('--high_order_pruning must be all_cutoffs, ocn_bound, or auto.')
+    ocn_cols = ('OCNany2spe', 'cutoff_OCNany2spe')
+    if all(name in (*ocn_cols, 'omegaCany2spe') for name, _ in criteria):
+        bounds = [value for name, value in criteria if name in ocn_cols]
+        if bounds:
+            return max(bounds)
+    if mode == 'ocn_bound':
+        raise ValueError('--high_order_pruning ocn_bound requires a literal OCNany2spe cutoff, '
+                         'optionally combined with omegaCany2spe.')
+    return None

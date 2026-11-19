@@ -174,3 +174,40 @@ def test_same_destination_and_any_destination_triple_have_distinct_products(monk
     empirical_urn._add_group_overlaps(out, np.array([[0, 1, 2]]), probs, np.ones((3, 2)), {})
     np.testing.assert_allclose(out['any2spe'], [.2 * .4 * .7 + .1 ** 3])
     np.testing.assert_allclose(out['any2any'], [.5 * .5 * .7 + .1 * .3 * .4])
+
+
+def test_regional_n_preserves_s_and_accounts_for_removed_alignment_sites():
+    import pytest
+    g, ids, n, s = _example()
+    g.update(asrv='empirical_all', site_index_alignment=np.array([0, 2, 5, 7]), num_input_site=9)
+    pairs = np.array([[ids['A'], ids['E']]])
+    ns = n.sum(axis=(2, 3, 4))
+    groups = empirical_urn._regional_n_counts(dict(g, urn_n_regions='2-2,3-6'), ns)
+    np.testing.assert_array_equal(groups[0][0], [0, 3])
+    np.testing.assert_array_equal(groups[1][0], [1, 2])
+    np.testing.assert_allclose(groups[0][1] + groups[1][1], ns.sum(axis=1))
+    with pytest.raises(ValueError, match='overlap'):
+        empirical_urn.parse_n_regions('1-4,4-9')
+    with pytest.raises(ValueError, match='beyond'):
+        empirical_urn._regional_n_counts(dict(g, urn_n_regions='9-10'), ns)
+
+    def estimate(**options):
+        return empirical_urn.expected_counts(dict(g, **options), pairs, _tensor(n), _tensor(s), ['any2spe'])
+
+    whole, one, split = estimate(), estimate(urn_n_regions='1-9'), estimate(urn_n_regions='1-1')
+    for key in whole:
+        np.testing.assert_allclose(whole[key], one[key], rtol=1e-12)
+    np.testing.assert_array_equal(whole['ECSany2spe'], split['ECSany2spe'])
+    assert not np.allclose(whole['ECNany2spe'], split['ECNany2spe'])
+
+
+def test_regions_require_the_joint_empirical_all_urn():
+    import pytest
+    from csubst import asrv
+    base = dict(urn_n_regions='1-10', asrv='auto', expectation_method='urn')
+    assert asrv.effective_mode(base) == 'empirical_all'
+    for options in [dict(expectation_method='codon_model'), dict(asrv='empirical')]:
+        with pytest.raises(ValueError, match='empirical_all'):
+            asrv.validate_options(dict(base, **options))
+    with pytest.raises(ValueError, match='Wallenius'):
+        asrv.effective_mode(dict(base, urn_model='fisher'))

@@ -156,7 +156,7 @@ def get_default_cutoff_stat_for_output_stats(output_stats):
 def validate_cutoff_stat_compatibility(cutoff_stat, output_stats):
     stats = set(parse_output_stats(output_stats, default=DEFAULT_OUTPUT_STATS))
     known_suffixes = set(ALL_OUTPUT_STATS)
-    known_prefixes = ("OCN", "OCS", "ECN", "ECS", "omegaC", "dNC", "dSC")
+    known_prefixes = ("OCN", "cutoff_OCN", "OCS", "ECN", "ECS", "omegaC", "dNC", "dSC")
     for token in _split_cutoff_stat_tokens(cutoff_stat):
         token = token.strip()
         if token == "":

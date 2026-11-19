@@ -230,9 +230,9 @@ def _accumulate_terminal_query(probes, nodes, uses, measure, edges, direct, labe
             del mass[node]
 
 
-def count_any2spe(model, tips, amino, pairs, block_size, *, tip_missing=None, eligible=None):
+def count_any2spe(model, tips, amino, pairs, block_size, *, tip_missing=None, eligible=None, min_ocn_site_pp=0):
     """Propagate only supported terminal destinations and stream blocks of site patterns."""
-    totals = np.zeros((len(pairs), 2))
+    totals = np.zeros((len(pairs), 3 if min_ocn_site_pp else 2))
     if not len(pairs):
         return totals
     groups = make_plan(model.parents, pairs)
@@ -286,6 +286,10 @@ def count_any2spe(model, tips, amino, pairs, block_size, *, tip_missing=None, el
     destinations = slice(0, amino_count), slice(amino_count, amino_count + len(amino))
     selected = (focal - called.keys()) | internal
     precached = {child: np.stack([model.transition(child, c) for c in range(rate_count)]) for child in selected}
+    if min_ocn_site_pp:
+        # Aggregate rate classes and destination states within a single site
+        # pattern before thresholding. Multiply by its frequency afterwards.
+        block_size = 1
     records = model.iter_blocks(
         tips, block_size=block_size, branch_ids=selected, joint=False,
         transform=_EdgeEvidence(rate_count), transform_rate_context=True, category_nodes=True,
@@ -293,11 +297,13 @@ def count_any2spe(model, tips, amino, pairs, block_size, *, tip_missing=None, el
     )
     for start, block in groupby(records, key=lambda record: record.start):
         weights, edges, direct = {}, {}, {}
+        counts = np.zeros((len(pairs), 2)) if min_ocn_site_pp else totals
         for record in block:
             sites = slice(start, record.stop)
             child = record.child
             if child in required_nodes:
-                weights[child] = np.sqrt(record.category_node * multiplicity[None, sites, None])
+                weights[child] = (np.sqrt(record.category_node) if min_ocn_site_pp else
+                                  np.sqrt(record.category_node * multiplicity[None, sites, None]))
             if child in called:
                 codons = called[child][sites]
                 support = transitions[child][:, :, codons].transpose(0, 2, 1)
@@ -355,7 +361,7 @@ def count_any2spe(model, tips, amino, pairs, block_size, *, tip_missing=None, el
                 features = np.concatenate([consume(path) for path in paths_to_probe], axis=-2)
                 measure = features * weights[ancestor][..., None, :] ** 2
                 _accumulate_terminal_query(paths_to_probe, nodes, query_uses, measure, edges, direct, labels, sites,
-                                           amino_count, model.parents, totals)
+                                           amino_count, model.parents, counts)
             for _, left, right, (target, a, b) in crosses:
                 x, y = ([consume(path) for path in side] for side in (left, right))
                 dense_only = all(path[0] not in called for path in (*left, *right))
@@ -363,11 +369,14 @@ def count_any2spe(model, tips, amino, pairs, block_size, *, tip_missing=None, el
                     if dense_only:
                         ldata = _pack_dense(x, weights[ancestor], section)
                         rdata = _pack_dense(y, weights[ancestor], section)
-                        totals[target, channel] += (ldata @ rdata.T)[a, b]
+                        counts[target, channel] += (ldata @ rdata.T)[a, b]
                     else:
                         ldata = _pack(left, x, labels, weights[ancestor], channel, sites, section)
                         rdata = _pack(right, y, labels, weights[ancestor], channel, sites, section)
-                        totals[target, channel] += _cross(ldata, rdata)[a, b]
+                        counts[target, channel] += _cross(ldata, rdata)[a, b]
                     del ldata, rdata
                 del x, y
+        if min_ocn_site_pp:
+            totals[:, :2] += counts * multiplicity[start]
+            totals[:, 2] += np.where(counts[:, 0] >= min_ocn_site_pp, counts[:, 0], 0) * multiplicity[start]
     return totals

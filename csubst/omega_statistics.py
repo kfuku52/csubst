@@ -15,6 +15,22 @@ IntArray: TypeAlias = NDArray[np.int64]
 BoolArray: TypeAlias = NDArray[np.bool_]
 
 
+def count_ratio_omega(n, s, null_n, null_s):
+    # Keep the individual rates from overflowing or rounding to zero before
+    # their ratio is taken. All four count arrays are nonnegative.
+    null_n, null_s = np.asarray(null_n), np.asarray(null_s)
+    n_frac, n_exp = np.frexp(n)
+    s_frac, s_exp = np.frexp(s)
+    null_n_frac, null_n_exp = np.frexp(null_n)
+    null_s_frac, null_s_exp = np.frexp(null_s)
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore', under='ignore'):
+        value = np.ldexp(
+            (n_frac * null_s_frac) / (s_frac * null_n_frac),
+            (n_exp + null_s_exp) - (s_exp + null_n_exp),
+        )
+    return np.where((null_n > 0) & (null_s > 0), value, np.nan)
+
+
 def _calc_raw_rate(
     obs: ArrayLike,
     exp: ArrayLike,

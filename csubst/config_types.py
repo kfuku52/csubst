@@ -52,9 +52,12 @@ class NumericConfig(TypedDict, total=False):
     blas_threads: int
     random_seed: int
     current_arity: int
+    high_order_pruning: str
     max_arity: int
     min_arity: int
     min_sub_pp: float
+    min_ocn_site_pp: float
+    cutoff_ocn_stats: list[str]
 
 
 class ModelConfig(TypedDict, total=False):
@@ -69,6 +72,7 @@ class ModelConfig(TypedDict, total=False):
     expected_state_backend: str
     nonsyn_recode: str
     nonsyn_recode_training_alignment: str
+    urn_n_regions: str
     asrv_training_branches: str
     asrv_concentration: float | None
     asrv_report: bool
@@ -152,6 +156,7 @@ class ScanConfig(TypedDict, total=False):
     scan_min_event_count: float
     scan_ctmc_model_precision: dict[str, Any]
     scan_pvalue_calibration: str
+    scan_bootstrap_workers: int
     scan_n_permutations: int
     scan_permutation_seed: int
     scan_site_plot_filter: str

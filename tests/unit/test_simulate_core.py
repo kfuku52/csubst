@@ -751,3 +751,28 @@ def test_mg_alignment_frequency_override_is_rejected():
     with pytest.raises(ValueError, match='not supported for MG'):
         main_simulate._resolve_simulation_eq_freq({
             'simulate_eq_freq': 'alignment', 'substitution_model': 'MG+F3X4'})
+
+
+def test_scalar_background_kernel_matches_expm_and_rejects_irreducibility_failure():
+    from scipy.linalg import expm
+    pi = np.array([.2, .3, .5])
+    q = np.tile(pi, (3, 1)) - np.eye(3)
+    transition = main_simulate._background_transition(q, pi)
+    for t in (0., 1e-12, .25, 12.):
+        np.testing.assert_allclose(transition(t), expm(q * t), rtol=1e-12, atol=1e-16)
+    assert main_simulate._background_transition(np.zeros((3, 3)), pi) is None
+    cycle = np.roll(np.eye(3), 1, axis=1) - np.eye(3)
+    assert main_simulate._background_transition(cycle, np.ones(3)/3) is None
+
+
+def test_zero_n_generator_retains_all_synonymous_classes(tmp_path):
+    pi = np.array([.1, .2, .3, .4])
+    q = np.tile(pi, (4, 1)) - np.eye(4)
+    nonsyn = np.array([(i, j) for i in range(4) for j in range(4) if i//2 != j//2])
+    syn = np.array([(0, 1), (1, 0), (2, 3), (3, 2)])
+    q = main_simulate.apply_percent_biased_sub(q, 80, nonsyn[:1], ['A'], [], [], nonsyn, syn, 0., pi)
+    g = dict(eq_freq=pi, background_omega=0., simulate_custom_frequency_file=str(tmp_path/'pi.txt'))
+    model = main_simulate._make_pyvolve_custom_model(main_simulate._require_pyvolve(), g, 'root', q)
+    np.testing.assert_array_equal(model.params['state_freqs'], pi)
+    np.testing.assert_array_equal(model.matrix[tuple(nonsyn.T)], 0.)
+    assert (model.matrix[tuple(syn.T)] > 0.).all()

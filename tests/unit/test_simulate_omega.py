@@ -55,6 +55,9 @@ def test_expected_omega_matches_enumeration_with_shared_ancestry(tmp_path):
     }
     pa, pu = expm(background * 0.2), expm(biased * 0.4)
     pair = rows[frozenset(('A', 'B'))]
+    assert float(pair['dist_bl']) == 0.4
+    assert float(rows[frozenset(('B', 'C'))]['dist_bl']) == 0.
+    assert all(row['dist_bl'] == row['dist_parent_bl'] for row in rows.values())
     for label, pb in [('sim', expm(biased * 0.3)), ('null', expm(background * 0.3))]:
         n = s = 0.0
         for r, u, a, b in product(range(4), repeat=4):

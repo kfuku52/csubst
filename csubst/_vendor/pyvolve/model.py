@@ -376,6 +376,13 @@ class Model():
         self.matrix = custom_matrix
         
         # Multiply by frequencies or extract frequencies if none were provided
+        if "root_frequencies" in self.params:
+            frequencies = np.asarray(self.params["root_frequencies"], dtype=float)
+            if (frequencies.shape != (dim,) or not np.isfinite(frequencies).all()
+                    or (frequencies < 0).any() or not np.isclose(frequencies.sum(), 1.)):
+                raise ValueError("Invalid root frequencies for custom generator.")
+            self.params["state_freqs"] = frequencies.copy()
+            return
         if "state_freqs" in self.params:
             diag_state_freqs = np.diag(self.params["state_freqs"])
             self.matrix = np.dot(diag_state_freqs, self.matrix) 

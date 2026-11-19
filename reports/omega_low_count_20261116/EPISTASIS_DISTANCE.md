@@ -47,7 +47,9 @@ joint-endpoint counts. The urn search uses the default cross-fitted
 empirical site and route estimator. The simulator's focal branches are
 used to summarize the results after the searches. The primary analysis
 bins pairs by the true distance between parents. A secondary analysis
-bins pairs by the fitted `dist_bl` reported by `search`.
+bins pairs by the historical fitted `dist_bl` reported by `search`.
+With the parent-distance definition, the reproduction script reads that
+historical statistic from `dist_bl_legacy`.
 
 Within each bin, pool N and S counts before computing `omegaCany2spe`.
 The near/far ratio is the first bin's pooled omegaC divided by that of

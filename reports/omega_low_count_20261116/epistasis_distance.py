@@ -174,7 +174,10 @@ def score(job):
     np.testing.assert_allclose(codon[OBS], urn[OBS], rtol=1e-10, atol=6e-12)
     frames = {'truth': truth}
     for label, tab in [('codon', codon), ('urn', urn)]:
-        frame = truth.merge(tab[KEY + OBS + EXPECTED + ['dist_bl']], on=KEY, validate='one_to_one', how='left')
+        # Reproduce this report's original secondary axis with either output schema.
+        fitted_axis = 'dist_bl_legacy' if 'dist_bl_legacy' in tab else 'dist_bl'
+        selected = tab[KEY + OBS + EXPECTED + [fitted_axis]].rename(columns={fitted_axis: 'dist_bl'})
+        frame = truth.merge(selected, on=KEY, validate='one_to_one', how='left')
         assert frame[OBS + EXPECTED + ['dist_bl']].notna().all().all() and len(frame) == 276
         frame = frame.rename(columns=dict(zip(OBS + EXPECTED, ('ocn','ocs','ecn','ecs'))))
         frames[label] = frame

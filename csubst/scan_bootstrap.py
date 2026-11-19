@@ -6,6 +6,8 @@ IQ-TREE, then passes through recoding, ASR, site filtering and scan discovery.
 This is model-conditional bootstrap inference, not finite-sample exact testing.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 import copy
 import json
 import os
@@ -40,6 +42,8 @@ def capture_options(args, parser):
 
 
 def validate_options(g):
+    if g.get('scan_bootstrap_workers', 1) < 1:
+        raise ValueError('--scan_bootstrap_workers must be positive.')
     if g.get('scan_pvalue_calibration') != 'parametric_bootstrap':
         return
     if int(g.get('scan_permutation_seed', 1)) < 0:
@@ -302,26 +306,42 @@ def calibrate(g, observed, model):
     manifest.write_text(json.dumps(summary, indent=2) + '\n')
     transitions = transition_matrices(model)
     scores = []
-    for index in range(requested):
+    workers = min(requested, g.get('threads', 1), g.get('scan_bootstrap_workers', 1))
+    options = dict(g['scan_cli_options'])
+    if workers > 1:
+        options.update(threads=max(1, g['threads'] // workers), blas_threads=1)
+    summary['workers'] = workers
+
+    def evaluate(index):
         seed = replicate_seed(summary['seed'], index)
-        print('Scan parametric bootstrap: replicate {}/{} (seed={}).'.format(index + 1, requested, seed), flush=True)
         record = {'index': index, 'seed': seed}
         try:
-            value = run_replicate(g['scan_cli_options'], model, directory / 'rep{:06d}'.format(index), seed, transitions)
+            value = run_replicate(options, model, directory / 'rep{:06d}'.format(index), seed, transitions)
             if np.isnan(value) or value == np.inf:
                 raise ValueError('Undefined replicate maximum score.')
-            scores.append(value)
             record.update(status='success', empty=bool(value == -np.inf),
                           maximum_score=None if value == -np.inf else value)
-            summary['success_count'] += 1
         except Exception as exc:
+            value = np.nan
             record.update(status='failed', reason='{}: {}'.format(type(exc).__name__, exc))
-            summary['failure_count'] += 1
-        summary['replicates'].append(record)
-        manifest.write_text(json.dumps(summary, indent=2, allow_nan=False) + '\n')
-        if summary['failure_count']:
-            # Stop and expose the failure; neither retry-until-success nor remove it from the denominator.
-            break
+        return record, value
+
+    # Bound in-flight subprocesses and publish records in replicate order.
+    with (ThreadPoolExecutor(workers) if workers > 1 else nullcontext()) as pool:
+        for first in range(0, requested, workers):
+            indices = range(first, min(first + workers, requested))
+            results = map(evaluate, indices) if pool is None else pool.map(evaluate, indices)
+            for record, value in results:
+                summary['replicates'].append(record)
+                if record['status'] == 'success':
+                    scores.append(value)
+                    summary['success_count'] += 1
+                else:
+                    summary['failure_count'] += 1
+            print('Scan bootstrap: {}/{} replicates completed.'.format(len(summary['replicates']), requested), flush=True)
+            manifest.write_text(json.dumps(summary, indent=2, allow_nan=False) + '\n')
+            if summary['failure_count']:
+                break
     if summary['failure_count']:
         summary['status'] = 'failed_null_replicates'
         print('Scan bootstrap failed; calibrated P values are undefined. See {}.'.format(manifest), flush=True)

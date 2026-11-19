@@ -2171,7 +2171,7 @@ def _run_cb_parallel_jobs(writer, id_combinations, sub_tensor, g, arity, selecte
     )
 
 
-def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
+def _get_cb_totals(id_combinations, sub_tensor, g, attr, selected_base_stats):
     if isinstance(sub_tensor, substitution_sparse.PairwiseSubstitutionSummary):
         return get_cb_from_pairwise_grams(id_combinations, sub_tensor.pairwise, attr, selected_base_stats)
     if isinstance(sub_tensor, substitution_sparse.ProjectedSubstitutionTensor):
@@ -2200,6 +2200,38 @@ def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
     if not attr.startswith('EC'):
         df = table.set_substitution_dtype(df=df)
     return df
+
+
+def get_cb(id_combinations, sub_tensor, g, attr, selected_base_stats=None):
+    cb = _get_cb_totals(id_combinations, sub_tensor, g, attr, selected_base_stats)
+    stats = g.get('cutoff_ocn_stats') if attr == 'OCN' else None
+    if not stats:
+        return cb
+    tensor = get_reducer_sub_tensor(sub_tensor, g, label='cb_OCN')
+    base = output_stat.get_required_base_stats(stats)
+    projections = {stat: _get_sparse_cb_projection(tensor, stat) for stat in base}
+    ids = cb.loc[:, cb.columns.str.startswith('branch_id_')].to_numpy(dtype=np.int64)
+    totals = {stat: np.zeros(len(cb)) for stat in stats}
+    # Keep site vectors for a bounded number of combinations at a time.
+    sites = tensor.num_site
+    chunk = max(1, (8 * 1024**2) // max(1, 8 * sites * (len(base) + len(stats))))
+    for start in range(0, len(ids), chunk):
+        part = ids[start:start + chunk]
+        values = {stat: _calc_sparse_projection_products(projection, part, num_site=sites)
+                  for stat, projection in projections.items()}
+        if any(stat not in base for stat in stats):
+            frame = pd.DataFrame({'OCN' + stat: array.ravel() for stat, array in values.items()})
+            frame = add_dif_stats(frame, g['float_tol'], 'OC', output_stats=stats)
+            for stat in stats:
+                if stat not in values:
+                    values[stat] = frame['OCN' + stat].to_numpy().reshape(len(part), sites)
+        for stat in stats:
+            pp = values[stat]
+            totals[stat][start:start + len(part)] = np.sum(pp, axis=1, where=pp >= g['min_ocn_site_pp'])
+    for stat in stats:
+        cb['cutoff_OCN' + stat] = totals[stat]
+    return cb
+
 
 def sub_tensor2cbs(id_combinations, sub_tensor, mmap=False, df_mmap=None, mmap_start=0):
     if _can_use_cython_dense_cbs(

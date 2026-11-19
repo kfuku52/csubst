@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+import re
 from itertools import combinations_with_replacement
 
 import numpy as np
@@ -13,6 +14,37 @@ from csubst import ete, omega
 FOLD_COUNT = 4
 ROUTE_PRIOR_COUNT = 0.5
 SUPPORTED_STATS = frozenset(('any2any', 'any2spe'))
+
+
+def parse_n_regions(value):
+    intervals = []
+    for token in value.split(','):
+        match = re.fullmatch(r'([1-9][0-9]*)-([1-9][0-9]*)', token.strip())
+        if not match:
+            raise ValueError('--urn_n_regions expects comma-separated 1-based START-END intervals.')
+        start, end = map(int, match.groups())
+        if end < start:
+            raise ValueError('--urn_n_regions interval ends before its start.')
+        intervals.append((start, end))
+    intervals.sort()
+    if any(left[1] >= right[0] for left, right in zip(intervals, intervals[1:])):
+        raise ValueError('--urn_n_regions intervals overlap.')
+    return intervals
+
+
+def _regional_n_counts(g, counts):
+    from csubst.parser_misc import get_site_index_alignment
+    positions = get_site_index_alignment(g, counts.shape[1]) + 1
+    labels = np.zeros(len(positions), dtype=int)
+    for i, (start, end) in enumerate(parse_n_regions(g['urn_n_regions']), 1):
+        if end > g.get('num_input_site', counts.shape[1]):
+            raise ValueError('--urn_n_regions extends beyond the original codon alignment.')
+        labels[(positions >= start) & (positions <= end)] = i
+    groups = []
+    for label in np.unique(labels):
+        sites = np.flatnonzero(labels == label)
+        groups.append((sites, counts[:, sites].sum(axis=1)))
+    return groups
 
 
 def _row_probabilities(mass, uniform):
@@ -132,6 +164,7 @@ class _BranchData:
     ns_counts: np.ndarray
     route_totals: np.ndarray
     syn_totals: np.ndarray
+    regions: list | None = None
 
 
 def _branch_data(g, nonsyn, syn):
@@ -155,7 +188,8 @@ def _branch_data(g, nonsyn, syn):
     for i, group in enumerate(groups):
         aa_membership[group, i] = 1.
     return _BranchData(parents, in_scope, groups, eligible, (state @ aa_membership)[parents], effort,
-                       ns_counts, route_totals, syn_totals)
+                       ns_counts, route_totals, syn_totals,
+                       _regional_n_counts(g, n_sites) if g.get('urn_n_regions') else None)
 
 
 @dataclass
@@ -227,18 +261,21 @@ def _score(g, combos, select, data, rates, stats, out):
     s_counts = {stat: np.zeros(len(local)) for stat in stats}
     # Gathering all selected parents would copy a second branch-by-site-by-AA
     # tensor. Fill the destination weights one branch at a time.
-    n_weights = np.empty((len(ids), data.aa_parent.shape[1], rates.routes.shape[1]),
-                         dtype=np.result_type(data.aa_parent, rates.routes, rates.n_rate))
-    for row, branch in enumerate(ids):
-        np.matmul(data.aa_parent[branch], rates.routes, out=n_weights[row])
-        n_weights[row] *= (rates.n_rate * data.eligible[branch])[:, None]
-    if g.get('asrv') == 'empirical_all':
-        observed_n = data.route_totals[ids].sum(axis=(1, 2))
-        n_total = _allocate_branch_totals(n_weights.sum(axis=1), observed_n, 'N')
-    else:
-        n_total = _pool_n_totals(rates.count, rates.exposure, rates.routes, n_weights, data.effort[ids])
-    _add_group_overlaps(n_counts, local, n_weights, n_total, g)
-    del n_weights
+    regions = data.regions if data.regions is not None else [(slice(None), None)]
+    for sites, masses in regions:
+        site_rate = rates.n_rate[sites]
+        n_weights = np.empty((len(ids), site_rate.size, rates.routes.shape[1]),
+                             dtype=np.result_type(data.aa_parent, rates.routes, site_rate))
+        for row, branch in enumerate(ids):
+            np.matmul(data.aa_parent[branch, sites], rates.routes, out=n_weights[row])
+            n_weights[row] *= (site_rate * data.eligible[branch, sites])[:, None]
+        if g.get('asrv') == 'empirical_all':
+            observed = data.route_totals[ids].sum(axis=(1, 2)) if masses is None else masses[ids]
+            n_total = _allocate_branch_totals(n_weights.sum(axis=1), observed, 'N')
+        else:
+            n_total = _pool_n_totals(rates.count, rates.exposure, rates.routes, n_weights, data.effort[ids])
+        _add_group_overlaps(n_counts, local, n_weights, n_total, g)
+        del n_weights
     state = g['state_cdn']
     s_rate = rates.s_rate * data.eligible[ids]
     s_draws = data.syn_totals if rates.s_draw_totals is None else rates.s_draw_totals

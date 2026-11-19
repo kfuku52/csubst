@@ -69,6 +69,7 @@ def test_pair_any2spe_matches_enumeration_with_missing_events(first_tip, exclude
         mass += likelihood
     posterior = mass / mass.sum(axis=0)
     expected = []
+    filtered = []
     for a, b in pairs:
         aa, ab = states[:, parents[a]], states[:, parents[b]]
         da, db = states[:, a], states[:, b]
@@ -76,10 +77,14 @@ def test_pair_any2spe_matches_enumeration_with_missing_events(first_tip, exclude
         n = ena & enb & (amino[da] == amino[db])
         s = ~ena & ~enb & (da == db) & (aa != da) & (ab != db)
         expected.append([posterior[event][:, eligible[a] & eligible[b]].sum() for event in (n, s)])
+        pp = posterior[n][:, eligible[a] & eligible[b]].sum(axis=0)
+        filtered.append(pp[pp >= .05].sum())
     model = EndpointModel(parents, lengths, q, pi, rates, weights)
     for block_size in (1, 2, 4):
         values = count_any2spe(model, tips, amino, pairs, block_size, tip_missing=missing, eligible=eligible)
         np.testing.assert_allclose(values, expected, atol=2e-14, rtol=0)
+    called = count_any2spe(model, tips, amino, pairs, 4, tip_missing=missing, eligible=eligible, min_ocn_site_pp=.05)
+    np.testing.assert_allclose(called, np.column_stack([expected, filtered]), atol=2e-14, rtol=0)
 
 
 def test_pair_any2spe_compresses_called_patterns_with_explicit_tip_masks():
@@ -92,6 +97,11 @@ def test_pair_any2spe_compresses_called_patterns_with_explicit_tip_masks():
     masks = {leaf: np.zeros(4, dtype=bool) for leaf in tips}
     actual = count_any2spe(model, tips, amino, [(1, 2)], 2, tip_missing=masks)
     np.testing.assert_array_equal(actual, expected)
+    separately = [count_any2spe(model, {k: v[i:i+1] for k, v in tips.items()}, amino, [(1, 2)], 1)[0, 0]
+                  for i in range(4)]
+    threshold = (min(separately) + max(separately)) / 2
+    filtered = count_any2spe(model, tips, amino, [(1, 2)], 4, min_ocn_site_pp=threshold)
+    np.testing.assert_allclose(filtered[0, 2], sum(x for x in separately if x >= threshold), atol=1e-14)
 
 
 @pytest.mark.parametrize('block_size', [1, 2, 64])

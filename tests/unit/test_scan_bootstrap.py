@@ -240,3 +240,26 @@ def test_joint_precision_uses_reported_frequency_scheme_for_supplied_fit(tmp_pat
     np.testing.assert_array_equal(g['equilibrium_frequency'],[.5,.5])
     assert g['iqtree_model'] == 'GY+F'  # original CLI procedure is not rewritten
     assert g['scan_ctmc_model_precision']['verified']
+
+
+@pytest.mark.parametrize('fail', [False, True])
+def test_parallel_refits_have_ordered_draws_and_share_cpu_budget(tmp_path, monkeypatch, fail):
+    g = dict(scan_n_permutations=4, scan_permutation_seed=17, scan_cli_options={'threads': 8},
+             scan_bootstrap_workers=2, threads=3, outdir=str(tmp_path))
+    def run(options, model, directory, seed, transitions):
+        index = int(directory.name.removeprefix('rep'))
+        assert (options['threads'], options['blas_threads']) == (1, 1)
+        assert seed == boot.replicate_seed(17, index)
+        if fail and index == 0:
+            raise RuntimeError('failed fit')
+        return float(index)
+    monkeypatch.setattr(boot, 'run_replicate', run)
+    result = boot.calibrate(g, pd.DataFrame({'score_rate_enrichment': [2.]}), _model())
+    summary = g['scan_bootstrap_summary']
+    assert [r['index'] for r in summary['replicates']] == list(range(2 if fail else 4))
+    assert summary['failure_count'] == int(fail)
+    if fail:
+        assert result.p_rate_enrichment_bootstrap_maxT.isna().all()
+    else:
+        assert result.p_rate_enrichment_bootstrap_maxT.tolist() == [.6]
+    assert g['scan_cli_options'] == {'threads': 8}

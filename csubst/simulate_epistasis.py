@@ -8,6 +8,7 @@ import pandas as pd
 from scipy.linalg import expm
 
 from csubst import ete, foreground
+from csubst.tree import parent_distance
 
 
 def configure_focal_branches(g):
@@ -118,8 +119,7 @@ def _overlap(joint, left, right, amino_count):
 
 
 def _expected_counts(g, focal, mode, transition, oracle):
-    distances = [(i, j, ete.get_distance(oracle.nodes[i].up, oracle.nodes[j].up)
-                  if oracle.nodes[i].up is not oracle.nodes[j].up else 0.) for i, j in oracle.pairs]
+    distances = [(i, j, parent_distance(oracle.nodes[i], oracle.nodes[j])) for i, j in oracle.pairs]
     amino_count = oracle.aa_membership.shape[1]
     rates = g['simulate_site_rates']
     active = np.arange(len(rates)) < g['num_convergent_site']

@@ -2629,6 +2629,15 @@ def get_omega(cb, g, context=None):
         raise ValueError('Explicit pseudocount context does not match the requested statistics.')
     g['_pseudocount_context'] = context
     config = context['config']
+    from csubst.omega_statistics import count_ratio_omega
+    for sub in requested_output_stats:
+        names = [prefix + sub for prefix in ('OCN', 'OCS', 'ECN', 'ECS')]
+        if all(name in cb for name in names):
+            n, s, en, es = (cb[name].to_numpy(dtype=float, copy=False) for name in names)
+            cb['count_ratio_omegaC' + sub] = count_ratio_omega(n, s, en, es)
+            cb['ocs_status_' + sub] = pd.Categorical.from_codes(
+                np.select([~np.isfinite(s), s == 0., s < g['float_tol'], s < 1.], [0, 1, 2, 3], default=4),
+                categories=['missing', 'zero', 'below_tolerance', 'below_one', 'at_least_one'])
     if (not config['pseudocount_enabled']) and (not config['pseudocount_add_output_columns']):
         for sub in requested_output_stats:
             col_omega = 'omegaC'+sub

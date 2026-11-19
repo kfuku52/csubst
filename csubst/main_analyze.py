@@ -119,16 +119,21 @@ def _plot_state_tree_in_directory(output_dir, state, orders, mode, g):
 
 def _select_high_order_candidates(cb, g):
     """Apply eligibility before the cap, preserving the requested stat priority."""
-    stat_columns = []
-    for expression, _ in table.parse_cutoff_stat(g['cutoff_stat']):
-        for column in cb.columns[cb.columns.str.fullmatch(expression, na=False)]:
-            if column not in stat_columns:
-                stat_columns.append(column)
-    eligible = table.get_cutoff_stat_bool_array(cb, g['cutoff_stat'])
+    criteria = table.parse_cutoff_stat(g['cutoff_stat'])
+    plan = table.cutoff_column_plan(cb, g['cutoff_stat'])
+    stat_columns = list(dict.fromkeys(col for col, _ in plan))
+    bound = table.expansion_ocn_bound(criteria, g.get('high_order_pruning', 'all_cutoffs'))
+    bound_col = 'cutoff_OCNany2spe' if 'cutoff_OCNany2spe' in cb else 'OCNany2spe'
+    eligible = (cb[bound_col].ge(bound) if bound is not None
+                else table.get_cutoff_stat_bool_array(cb, g['cutoff_stat'], plan=plan))
     if g['foreground'] is not None:
         trait_masks = combination.get_foreground_candidate_masks(cb, g)
         eligible = eligible & np.logical_or.reduce(list(trait_masks.values()))
     selected = cb.loc[eligible, :]
+    if 'df_cb_stats' in g:
+        g['df_cb_stats'].loc[0, 'high_order_pruning'] = 'ocn_bound' if bound is not None else 'all_cutoffs'
+        g['df_cb_stats'].loc[0, 'expansion_eligible'] = len(selected)
+        g['df_cb_stats'].loc[0, 'expansion_cap_dropped'] = max(0, len(selected) - g['max_combination'])
     if selected.shape[0] > g['max_combination']:
         print('Limiting eligible K-1 candidates from {:,} to {:,} (--max_combination).'.format(
             selected.shape[0], g['max_combination']), flush=True)
@@ -145,6 +150,8 @@ def _get_observed_cb(g, id_combinations, OS_tensor, ON_tensor):
         counts = endpoint_io.observed_pair_counts(g, id_combinations)
         cb = pd.DataFrame(id_combinations, columns=['branch_id_1', 'branch_id_2'])
         cb['OCSany2spe'], cb['OCNany2spe'] = counts[:, 1], counts[:, 0]
+        if counts.shape[1] == 3:
+            cb['cutoff_OCNany2spe'] = counts[:, 2]
         return table.set_substitution_dtype(table.sort_branch_ids(cb))
     tables = []
     for attr, tensor in (('OCS', OS_tensor), ('OCN', ON_tensor)):
@@ -166,6 +173,8 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         start = time.time()
         g['current_arity'] = current_arity
         g = param.initialize_df_cb_stats(g)
+        if g.get('min_ocn_site_pp', 0):
+            g['df_cb_stats'].loc[0, 'min_ocn_site_pp'] = g['min_ocn_site_pp']
         print("Arity (K) = {:,}: Generating cb table".format(current_arity), flush=True)
         if (current_arity==2):
             if (g['exhaustive_until']<current_arity)&(g['foreground'] is not None):
@@ -183,12 +192,9 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
         elif (current_arity >= 3):
             id_columns = cb.columns[cb.columns.str.startswith('branch_id_')].tolist()
             if (g['exhaustive_until'] < current_arity):
-                is_stat_enough = table.get_cutoff_stat_bool_array(cb=cb, cutoff_stat_str=g['cutoff_stat'])
-                num_branch_ids = is_stat_enough.sum()
-                txt = 'Arity (K) = {:,}: Heuristic search with {:,} K-1 branch combinations that passed cutoff stats ({})'
-                print(txt.format(current_arity, num_branch_ids, g['cutoff_stat']), flush=True)
                 g['df_cb_stats'].at[0, 'mode'] = 'branch_and_bound'
                 cb_passed = _select_high_order_candidates(cb, g)
+                g['df_cb_stats'].loc[0, 'num_generated'] = 0
                 if len(set(cb_passed.loc[:,id_columns].values.ravel().tolist())) < current_arity:
                     cb = pd.DataFrame()
                     txt = 'Arity (K) = {:,}: Not enough eligible branches after --cutoff_stat, foreground selection, and --max_combination. Ending higher-order search at K = {:,}.'
@@ -196,6 +202,7 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
                     break
                 g,id_combinations = combination.get_node_combinations(g=g, cb_passed=cb_passed, cb_all=(g['foreground'] is None),
                                                                       arity=current_arity, check_attr='name')
+                g['df_cb_stats'].loc[0, 'num_generated'] = len(id_combinations)
             else:
                 txt = 'Arity (K) = {:,}: Direct exhaustive generation of all independent branch combinations'
                 print(txt.format(current_arity))
@@ -215,6 +222,23 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             break
         cb = _get_observed_cb(g, id_combinations, OS_tensor_reducer, ON_tensor_reducer)
         cb = substitution.add_dif_stats(cb, g['float_tol'], prefix='OC', output_stats=g.get('output_stats'))
+        pruned_branches = None
+        bound = table.expansion_ocn_bound(table.parse_cutoff_stat(g['cutoff_stat']), g.get('high_order_pruning', 'all_cutoffs'))
+        if (current_arity > max(2, g['exhaustive_until']) and bound is not None
+                and g.get('pseudocount_mode', 'none') == 'none'
+                and not any(g.get(key) for key in ('calc_omega_pvalue', 'calibrate_longtail',
+                                                   'epistasis_enabled', 'fg_clade_permutation', 'site_filter_report'))):
+            bound_col = 'cutoff_OCNany2spe' if 'cutoff_OCNany2spe' in cb else 'OCNany2spe'
+            keep = cb[bound_col].ge(bound)
+            g['df_cb_stats'].loc[0, 'ocn_bound_pruned'] = int((~keep).sum())
+            if not keep.any():
+                cb = cb.iloc[:0]
+                print(f'Arity (K) = {current_arity}: No combination meets the observed count bound. Ending search.')
+                break
+            if not keep.all():
+                cb = table.get_linear_regression(cb)
+                pruned_branches = cb.loc[~keep, cb.columns.str.startswith('branch_id_')]
+                cb = cb.loc[keep].reset_index(drop=True)
         cb, g = omega.calc_omega(cb, OS_tensor_reducer, ON_tensor_reducer, g)
         if bool(g.get('epistasis_enabled', False)):
             g['df_cb_stats'].loc[0, 'epistasis_enabled'] = 'Y'
@@ -277,9 +301,14 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             )
         cb = substitution.get_substitutions_per_branch(cb, b, g)
         #cb = combination.calc_substitution_patterns(cb)
-        cb = table.get_linear_regression(cb)
+        if pruned_branches is None:
+            cb = table.get_linear_regression(cb)
         cb = output_stat.drop_unrequested_stat_columns(cb, g.get('output_stats'))
-        cb, g = foreground.get_foreground_branch_num(cb, g)
+        if pruned_branches is None:
+            cb, g = foreground.get_foreground_branch_num(cb, g)
+        else:
+            cb, g = foreground.get_foreground_branch_num(cb, g, pruned_branches=pruned_branches)
+            del pruned_branches
         cb = table.sort_cb(cb)
         if write_cb:
             file_name = runtime.output_path(g, "cb_" + str(current_arity) + ".tsv")
@@ -303,6 +332,11 @@ def cb_search(g, b, OS_tensor, ON_tensor, id_combinations, write_cb=True):
             txt = 'Maximum arity (K = {:,}) reached. Ending higher-order search of branch combinations.'
             print(txt.format(g['max_arity']))
             break
+    if cb.empty and 'expansion_cap_dropped' in g['df_cb_stats']:
+        g['df_cb_stats'].loc[0, 'num_all'] = 0
+        g['df_cb_stats'].loc[0, 'num_qualified_all'] = 0
+        g['df_cb_stats'].at[0, 'elapsed_sec'] = time.time() - start
+        g['df_cb_stats_main'] = pd.concat([g['df_cb_stats_main'], g['df_cb_stats']], ignore_index=True)
     return g,cb
 
 

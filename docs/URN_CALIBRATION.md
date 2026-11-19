@@ -43,6 +43,16 @@ N draws. Thus ECN asks how much overlap is expected given the amount of
 amino-acid change on each branch. Constraints that relax at the same sites
 on several branches can still change where the observed events occur.
 
+For a prespecified domain, `--urn_n_regions 1-100,201-300` fits the
+`empirical_all` N expectation conditional on each branch's observed N mass
+in each listed interval and in the pooled remaining sites. Coordinates are
+1-based codon positions in the original alignment, inclusive and disjoint.
+Site and route profiles are learned once over all eligible sites. Within a
+region the branch's N mass is allocated to destinations by regional opportunity,
+then overlap expectations are summed across regions. S retains its whole-branch
+fit. Choosing intervals after inspecting the hits changes the interpretation.
+The default pools the whole sequence. See the [regional simulation panel](../reports/branch_search_review/README.md).
+
 For S, the branch total includes all synonymous families. Destination rates
 are fully pooled across eligible branches. For a branch `b` and destination
 codon `d`, the opportunity

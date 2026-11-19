@@ -1079,6 +1079,10 @@ def _normalize_output_parameters(g: dict[str, Any]) -> dict[str, Any]:
             if g.get(key):
                 raise ValueError('--pair_posterior joint is incompatible with --{}.'.format(key))
     if 'cutoff_stat' in g.keys():
+        min_pp = _require_finite_float(float(g.get('min_ocn_site_pp', 0)), '--min_ocn_site_pp')
+        if not 0 <= min_pp <= 1:
+            raise ValueError('--min_ocn_site_pp should satisfy 0 <= value <= 1.')
+        g['min_ocn_site_pp'] = min_pp
         if str(g['cutoff_stat']) == output_stat.DEFAULT_CUTOFF_STAT:
             adjusted = output_stat.get_default_cutoff_stat_for_output_stats(g['output_stats'])
             if adjusted != g['cutoff_stat']:
@@ -1087,7 +1091,15 @@ def _normalize_output_parameters(g: dict[str, Any]) -> dict[str, Any]:
                 g['cutoff_stat'] = adjusted
         output_stat.validate_cutoff_stat_compatibility(g['cutoff_stat'], g['output_stats'])
         # Fail fast on malformed cutoff tokens/regex/value ranges.
-        table.parse_cutoff_stat(cutoff_stat_str=g['cutoff_stat'])
+        criteria = table.parse_cutoff_stat(cutoff_stat_str=g['cutoff_stat'])
+        if min_pp == 0 and any(expr == 'cutoff_OCN' + stat for expr, _ in criteria for stat in g['output_stats']):
+            raise ValueError('A cutoff_OCN column requires --min_ocn_site_pp > 0.')
+        benchmark_ocn = g.get('benchmark_ocn_column')
+        g['cutoff_ocn_stats'] = [stat for stat in g['output_stats'] if min_pp > 0 and
+                                 (benchmark_ocn in ('OCN' + stat, 'cutoff_OCN' + stat) or
+                                  any(re.fullmatch(expr, prefix + stat) for expr, _ in criteria
+                                      for prefix in ('OCN', 'cutoff_OCN')))]
+        table.expansion_ocn_bound(criteria, g.get('high_order_pruning', 'all_cutoffs'))
     g = runtime.ensure_output_layout(g, create_dir=False)
     return g
 

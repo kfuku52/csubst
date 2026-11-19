@@ -264,3 +264,14 @@ def test_supplemental_rows_reuse_original_prior_and_do_not_test_subset(monkeypat
     assert result.pomegaCany2spe.isna().all() and result.qomegaCany2spe.isna().all()
     assert (result.pvalue_status_any2spe == 'unavailable_full_population_null').all()
     assert g['_pseudocount_context'] is original_context
+
+
+def test_count_ratio_and_support_keep_positive_tiny_synonymous_counts():
+    cb = pd.DataFrame({'OCNany2spe': 1., 'ECNany2spe': 1.,
+                       'OCSany2spe': [0., 1e-280, .5, 1., np.nan, 1.],
+                       'ECSany2spe': [1., 1e-280, .5, 1., 1., 0.]})
+    result = omega.get_omega(cb, config(output_stats=['any2spe'], pseudocount_mode='none', pseudocount_alpha=0))
+    np.testing.assert_allclose(result.count_ratio_omegaCany2spe, [np.inf, 1, 1, 1, np.nan, np.nan])
+    assert np.isposinf(result.omegaCany2spe[1])
+    assert result.ocs_status_any2spe.tolist() == ['zero', 'below_tolerance', 'below_one',
+                                                  'at_least_one', 'missing', 'at_least_one']

@@ -79,6 +79,18 @@ def test_search_iqtree_model_default_and_override(command):
     assert parser.parse_args([command, '--iqtree_model', 'ECMK07+F+R4']).iqtree_model == 'ECMK07+F+R4'
 
 
+@pytest.mark.parametrize('command', ['search', 'analyze'])
+def test_high_order_pruning_modes(command):
+    parser = _get_cli_parser(False)
+    assert parser.parse_args([command]).high_order_pruning == 'all_cutoffs'
+    for value in ('all_cutoffs', 'ocn_bound', 'auto'):
+        args = parser.parse_args([command, '--high_order_pruning', value])
+        assert args.high_order_pruning == value
+    with pytest.raises(SystemExit) as error:
+        parser.parse_args([command, '--high_order_pruning', 'legacy'])
+    assert error.value.code == 2
+
+
 @pytest.mark.parametrize('command', ['simulate', 'scan', 'doctor', 'sites', 'inspect'])
 def test_other_iqtree_commands_keep_ecmk07_default(command):
     assert _get_cli_parser(False).parse_args([command]).iqtree_model == 'ECMK07+F+R4'

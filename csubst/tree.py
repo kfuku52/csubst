@@ -303,24 +303,36 @@ def transfer_internal_node_names(tree_to, tree_from):
                         to.name = fr.name
     return tree_to
 
+def parent_distance(left, right):
+    """Patristic distance between the origins of two directed tree edges."""
+    if left.up is None or right.up is None:
+        return np.nan
+    if left.up is right.up:
+        return 0.
+    return ete.get_distance(left.up, right.up, topology_only=False)
+
+
 def calc_node_dist_chunk(chunk, start, tree_dict, float_type):
     start_time = time.time()
     nrow = chunk.shape[0]
-    arr_dist = np.zeros(shape=(nrow, 3), dtype=float_type)
+    arr_dist = np.zeros(shape=(nrow, 4), dtype=float_type)
     arr_dist[:,0] = np.arange(nrow) + start
     for i in np.arange(nrow):
         nodes = [ tree_dict[n] for n in chunk[i,:] ]
         node_dists = list()
+        parent_dists = []
         node_nums = list()
         for nds in list(itertools.combinations(nodes, 2)):
             node_dist = ete.get_distance(nds[0], nds[1], topology_only=False)
             right_dist = 0.0 if nds[1].dist is None else float(nds[1].dist)
             node_dists.append(node_dist - right_dist)
+            parent_dists.append(parent_distance(*nds))
             node_nums.append(ete.get_distance(nds[0], nds[1], topology_only=True))
         node_dist = max(node_dists) # Maximum value among pairwise distances
         node_num = max(node_nums) # Maximum value among pairwise distances
         arr_dist[i,1] = node_num
         arr_dist[i,2] = node_dist
+        arr_dist[i,3] = max(parent_dists)
         if i % 10000 == 0:
             end = start + nrow
             txt = 'Inter-branch distance: {:,}th in the id range {:,}-{:,}: {:,} sec'
@@ -433,6 +445,7 @@ def get_node_distance(
         )
         max_node_num = legacy[:, 1].astype(np.int64, copy=False)
         max_branch_length = legacy[:, 2].astype(float_type, copy=False)
+        parent_lengths = legacy[:, 3].astype(float_type, copy=False)
     else:
         txt = 'Branch-distance scheduler: combinations={}, workers=1 (threads={}, vectorized, nodes={})'
         print(txt.format(id_combinations.shape[0], ncpu, used_labels.shape[0]), flush=True)
@@ -450,8 +463,17 @@ def get_node_distance(
             branch_length=branch_length,
             float_type=float_type,
         )
+        parents = np.zeros_like(branch_length)
+        for i, a in enumerate(matrix_labels):
+            for j in range(i):
+                parents[i, j] = parents[j, i] = parent_distance(tree_dict[a], tree_dict[matrix_labels[j]])
+        parent_lengths = np.full(len(matrix_ids), -np.inf, dtype=float_type)
+        for a, b in itertools.combinations(range(arity), 2):
+            np.maximum(parent_lengths, parents[matrix_ids[:, a], matrix_ids[:, b]], out=parent_lengths)
+    cb['dist_bl'] = parent_lengths
+    cb['dist_parent_bl'] = parent_lengths
     cb['dist_node_num'] = np.asarray(max_node_num, dtype=np.int64)
-    cb['dist_bl'] = np.asarray(max_branch_length, dtype=float_type)
+    cb['dist_bl_legacy'] = np.asarray(max_branch_length, dtype=float_type)
     print('Time elapsed for calculating inter-branch distances: {:,} sec'.format(int(time.time() - start_time)))
     return(cb)
 

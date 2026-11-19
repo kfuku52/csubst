@@ -31,6 +31,11 @@ def parse_training_branches(value):
 
 def validate_options(g):
     g['asrv_training_branches'] = parse_training_branches(g.get('asrv_training_branches', 'all'))
+    if g.get('urn_n_regions'):
+        if g.get('expectation_method') != 'urn' or g.get('asrv') not in ('empirical_all', 'auto'):
+            raise ValueError('--urn_n_regions requires the empirical_all urn.')
+        from csubst.empirical_urn import parse_n_regions
+        parse_n_regions(g['urn_n_regions'])
     concentration = g.get('asrv_concentration', None)
     if concentration is not None:
         concentration = float(concentration)
@@ -94,7 +99,7 @@ def effective_mode(g):
     if not reasons:
         return 'empirical' if requested == 'empirical' else 'empirical_all'
     message = 'Empirical urn requires ' + '; '.join(reasons) + '.'
-    if requested in EMPIRICAL_MODES:
+    if requested in EMPIRICAL_MODES or g.get('urn_n_regions'):
         raise ValueError(message + ' Use --asrv each for the legacy urn.')
     print('Automatic ASRV resolved to each. ' + message, flush=True)
     return 'each'
@@ -269,6 +274,8 @@ def write_provenance(g, path):
         'weight_diagnostics_requested': bool(g.get('asrv_report', False)),
         'wallenius_methods_complete': bool(g.get('_asrv_diagnostics_complete', False)),
     }
+    if g.get('urn_n_regions'):
+        payload['n_regions_1based_inclusive'] = g['urn_n_regions']
     if g.get('asrv') in EMPIRICAL_MODES:
         from csubst import empirical_urn
         cross_fit = g['asrv'] == 'empirical'
@@ -279,7 +286,8 @@ def write_provenance(g, path):
             'site_regularization': 'leave_one_training_branch_out_log_score',
             'route_prior_count': empirical_urn.ROUTE_PRIOR_COUNT,
             'n_draw_totals': ('pooled_branch_n_plus_s' if cross_fit
-                              else 'observed_branch_n_with_pooled_route_rates'),
+                              else ('observed_branch_region_n' if g.get('urn_n_regions')
+                                    else 'observed_branch_n_with_pooled_route_rates')),
             's_draw_totals': ('observed_destination_mass' if cross_fit
                               else 'observed_branch_s_with_pooled_destination_rates'),
             'folds': g.get('_empirical_urn_folds', []) if cross_fit else [],

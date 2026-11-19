@@ -625,6 +625,8 @@ def main_benchmark(g):
     if g["benchmark_score_column"] == "":
         raise ValueError("--benchmark_score_column should be non-empty.")
     g["benchmark_ocn_column"] = str(g.get("benchmark_ocn_column", "OCNany2spe")).strip()
+    if g["benchmark_ocn_column"] in ['OCN' + stat for stat in g.get('cutoff_ocn_stats', [])]:
+        g["benchmark_ocn_column"] = 'cutoff_' + g["benchmark_ocn_column"]
     if g["benchmark_ocn_column"] == "":
         raise ValueError("--benchmark_ocn_column should be non-empty.")
     configs = _iter_benchmark_configs(g)

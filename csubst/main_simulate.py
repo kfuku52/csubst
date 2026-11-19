@@ -68,6 +68,9 @@ def _make_pyvolve_custom_model(pyvolve, g, name, q_matrix, rate_factor=1.0):
         'name': name,
         'parameters': {'matrix': matrix},
     }
+    if g.get('background_omega' if name == 'root' else 'foreground_omega') == 0.:
+        # A synonymous-only generator has a closed class per amino acid.
+        kwargs['parameters']['root_frequencies'] = g['eq_freq']
     save_path = str(g.get('simulate_custom_frequency_file', '')).strip()
     if save_path != '':
         kwargs['save_custom_frequencies'] = save_path
@@ -75,7 +78,47 @@ def _make_pyvolve_custom_model(pyvolve, g, name, q_matrix, rate_factor=1.0):
         model = pyvolve.Model(**kwargs)
     if invariant:
         model.matrix = np.zeros_like(matrix)
+    if name == 'root' and 'eq_freq' in g and g.get('simulate_asrv') == 'file':
+        cached = g.get('_background_transition')
+        if cached is None or cached[0] is not q_matrix:
+            cached = (q_matrix, _background_transition(q_matrix, g['eq_freq']))
+            g['_background_transition'] = cached
+        if cached[1] is not None:
+            model.scaled_transition = (cached[1], rate_factor)
     return model
+
+
+def _background_transition(q, pi):
+    """Share one reversible eigensystem across positive scalar multiples of Q."""
+    from csubst.omega import _build_reversible_expected_state_projector
+    from scipy.sparse.csgraph import connected_components
+    if np.any(pi <= 0) or connected_components(q > 0, directed=True, connection='strong')[0] != 1:
+        return None
+    basis = _build_reversible_expected_state_projector(q, float_tol=1e-12, stationary=pi)
+    if basis is None:
+        return None
+    values, u, root = basis['eigenvalues'], basis['eigenvectors'], basis['sqrt_stationary']
+    left, right = u / root[:, None], u.T * root
+    identity = np.eye(len(pi))
+    roundoff = np.finfo(float).eps * len(pi) * root.max() / root.min()
+
+    def transition(time):
+        if time == 0:
+            return identity
+        tau = values * time
+        magnitude = -tau.min()
+        if magnitude < 1.:
+            result = identity + (left * np.expm1(tau)) @ right
+        else:
+            result = (left * np.exp(tau)) @ right
+        # A tiny positive entry can also be cancellation noise on a multi-step path.
+        if (result.min() <= roundoff * min(1., magnitude)
+                or not np.allclose(result.sum(axis=1), 1., rtol=0, atol=1e-12)):
+            return None
+        return result
+
+    return transition
+
 
 def scale_tree(tree, scaling_factor):
     for node in tree.traverse():
@@ -318,6 +361,8 @@ def apply_percent_biased_sub(mat, percent_biased_sub, target_index, biased_aas, 
     mat = copy.copy(mat)
     diag_bool = np.eye(mat.shape[0], dtype=bool)
     mat[diag_bool] = 0
+    if foreground_omega == 0.:
+        return rescale_substitution_matrix(mat, all_nsy_cdn_index, 0., eq_freq=eq_freq)
     if (target_index is None) or (np.asarray(target_index).shape[0] == 0) or (len(biased_aas) == 0):
         dnds = get_total_Q(mat, all_nsy_cdn_index) / get_total_Q(mat, all_syn_cdn_index)
         if dnds == 0:
@@ -419,7 +464,7 @@ def evolve_convergent_partitions(g, expected_omega=None):
                 g['pyvolve_codon_orders'],
             )
             biased_Q = apply_percent_biased_sub(
-                mat=g['background_Q'],
+                mat=g.get('foreground_template_Q', g['background_Q']),
                 percent_biased_sub=g['percent_biased_sub'],
                 target_index=biased_nsy_sub_index,
                 biased_aas=biased_aas,
@@ -444,13 +489,15 @@ def evolve_convergent_partitions(g, expected_omega=None):
         total_nsy_Q = biased_context['total_nsy_Q']
         total_biased_Q = biased_context['total_biased_Q']
         bg_total_biased_Q = biased_context['bg_total_biased_Q']
-        fraction_biased_Q = total_biased_Q / total_nsy_Q
-        bg_fraction_biased_Q = bg_total_biased_Q / bg_total_nsy_Q
-        txt = 'Total in Q toward the codons before and after the bias introduction = ' \
-              '{:,.1f}% ({:,.1f}/{:,.1f}) and {:,.1f}% ({:,.1f}/{:,.1f})'
-        print(txt.format(bg_fraction_biased_Q*100, bg_total_biased_Q, bg_total_nsy_Q,
-                         fraction_biased_Q*100, total_biased_Q, total_nsy_Q))
-        biased_q_fractions.append(fraction_biased_Q)
+        fraction_biased_Q = total_biased_Q / total_nsy_Q if total_nsy_Q else np.nan
+        bg_fraction_biased_Q = bg_total_biased_Q / bg_total_nsy_Q if bg_total_nsy_Q else np.nan
+        before = f'{bg_fraction_biased_Q:.1%}' if bg_total_nsy_Q else 'undefined (zero N rate)'
+        after = f'{fraction_biased_Q:.1%}' if total_nsy_Q else 'undefined (zero N rate)'
+        print(f'Share of N rates entering target codons before and after bias: '
+              f'{before} ({bg_total_biased_Q:.1f}/{bg_total_nsy_Q:.1f}) and '
+              f'{after} ({total_biased_Q:.1f}/{total_nsy_Q:.1f})')
+        if total_nsy_Q:
+            biased_q_fractions.append(fraction_biased_Q)
         models = list()
         for model_name in model_names:
             is_nonroot_model = (model_name!='root')
@@ -675,6 +722,7 @@ def _resolve_simulation_eq_freq(g):
 
 
 def get_background_Q(g, Q_method):
+    g.pop('foreground_template_Q', None)
     if g.get('background_omega') == 'model':
         order = parser_misc.get_codon_order_index(g['pyvolve_codon_orders'], g['codon_orders'])
         print('Using the fitted codon Q without scaling its nonsynonymous rates.', flush=True)
@@ -697,32 +745,23 @@ def get_background_Q(g, Q_method):
                 print(txt.format(base_model, matrix_file), flush=True)
             g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(matrix_file, g['pyvolve_codon_orders'])
             unscaled_mat = parser_misc.exchangeability2Q(g['exchangeability_matrix'], g['eq_freq'])
-        dnds = get_total_Q(unscaled_mat, g['all_nsy_cdn_index']) / get_total_Q(unscaled_mat, g['all_syn_cdn_index'])
-        scaling_factor = g['background_omega'] / dnds
-        background_Q = rescale_substitution_matrix(
-            unscaled_mat,
-            g['all_nsy_cdn_index'],
-            scaling_factor,
-            eq_freq=g['eq_freq'],
-        )
     elif (q_method == 'csubst'):
         matrix_file = 'substitution_matrix/ECMunrest.dat'
         g['exchangeability_matrix'] = parser_misc.read_exchangeability_matrix(matrix_file, g['pyvolve_codon_orders'])
         unscaled_mat = parser_misc.exchangeability2Q(g['exchangeability_matrix'], g['eq_freq'])
-        dnds = get_total_Q(unscaled_mat, g['all_nsy_cdn_index']) / get_total_Q(unscaled_mat, g['all_syn_cdn_index'])
-        scaling_factor = g['background_omega'] / dnds
-        background_Q = rescale_substitution_matrix(
-            unscaled_mat,
-            g['all_nsy_cdn_index'],
-            scaling_factor,
-            eq_freq=g['eq_freq'],
-        )
     elif (q_method == 'pyvolve'):
-        background_Q = generate_Q_matrix(g['eq_freq'], g['background_omega'], g['all_nsy_cdn_index'], g['all_syn_cdn_index'])
-        background_Q = _normalize_matrix_by_expected_rate(background_Q, g['eq_freq'])
+        unscaled_mat = generate_Q_matrix(g['eq_freq'], g['background_omega'] or 1.,
+                                         g['all_nsy_cdn_index'], g['all_syn_cdn_index'])
+        if g['background_omega'] > 0.:
+            return _normalize_matrix_by_expected_rate(unscaled_mat, g['eq_freq'])
     else:
         raise ValueError('Unsupported Q matrix method: {}'.format(Q_method))
-    return background_Q
+    if g['background_omega'] == 0.:
+        # A positive foreground N rate needs the exchangeabilities before the background mask.
+        g['foreground_template_Q'] = unscaled_mat
+    dnds = get_total_Q(unscaled_mat, g['all_nsy_cdn_index']) / get_total_Q(unscaled_mat, g['all_syn_cdn_index'])
+    return rescale_substitution_matrix(unscaled_mat, g['all_nsy_cdn_index'],
+                                      scaling_factor=g['background_omega'] / dnds, eq_freq=g['eq_freq'])
 
 def concatenate_alignment(in1, in2, out):
     seqs1 = read_fasta(in1)

@@ -74,11 +74,14 @@ class Evolver(object):
         # caching.  Unique site-rate matrices do not, and retaining every one
         # of them makes ASRV simulations grow by several GB.
         matrix_counts = Counter()
+        self._scaled_transitions = {}
         for partition in self.partitions:
             for model in partition.models:
                 matrix = model.matrix
                 if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
                     matrix_counts[id(matrix)] += 1
+                    if hasattr(model, "scaled_transition"):
+                        self._scaled_transitions[id(matrix)] = model.scaled_transition
                 elif isinstance(matrix, (list, tuple)):
                     for q_matrix in matrix:
                         if isinstance(q_matrix, np.ndarray) and q_matrix.ndim == 2:
@@ -449,7 +452,10 @@ class Evolver(object):
                     int(getattr(self, '_transition_matrix_cache_nbytes', 0))
                     - int(cached[1].nbytes),
                 )
-        P = linalg.expm( np.multiply(Q, float(t) ) )
+        scaled = getattr(self, "_scaled_transitions", {}).get(q_id)
+        P = scaled[0](float(t) * scaled[1]) if scaled is not None else None
+        if P is None:
+            P = linalg.expm(np.multiply(Q, float(t)))
         assert( np.allclose( np.sum(P, axis = 1), np.ones(len(self._code))) ), "Rows in transition matrix do not each sum to 1."
         max_cache_bytes = int(
             getattr(self, '_transition_matrix_cache_max_bytes', 128 * 1024 * 1024)

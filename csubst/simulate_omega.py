@@ -9,22 +9,9 @@ from itertools import combinations
 import numpy as np
 
 from csubst import ete, output_safety
+from csubst.tree import parent_distance
 from csubst._vendor.pyvolve.evolver import ZERO
-
-
-def _omega(n, s, null_n, null_s):
-    # Keep the individual rates from overflowing or rounding to zero before
-    # their ratio is taken. All four count arrays are nonnegative.
-    n_frac, n_exp = np.frexp(n)
-    s_frac, s_exp = np.frexp(s)
-    null_n_frac, null_n_exp = np.frexp(null_n)
-    null_s_frac, null_s_exp = np.frexp(null_s)
-    with np.errstate(divide='ignore', invalid='ignore', over='ignore', under='ignore'):
-        value = np.ldexp(
-            (n_frac * null_s_frac) / (s_frac * null_n_frac),
-            (n_exp + null_s_exp) - (s_exp + null_n_exp),
-        )
-    return np.where((null_n > 0) & (null_s > 0), value, np.nan)
+from csubst.omega_statistics import count_ratio_omega as _omega
 
 
 class ExpectedOmega:
@@ -172,6 +159,7 @@ class ExpectedOmega:
             'foreground_1', 'foreground_2',
             'muNany2spe_sim', 'muSany2spe_sim', 'muNany2spe_null', 'muSany2spe_null',
             'omegaCany2spe_expected', 'OCNany2spe_true', 'OCSany2spe_true', 'omegaCany2spe_true',
+            'dist_parent_bl', 'dist_bl',
         )
         output_safety.validate_destination(path)
         with tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(path))) as directory:
@@ -181,8 +169,9 @@ class ExpectedOmega:
                 writer.writerow(columns)
                 for i, (a, b) in enumerate(self.pairs):
                     first, second = self.nodes[a], self.nodes[b]
+                    distance = parent_distance(first, second)
                     values = (sim_n[i], sim_s[i], null_n[i], null_s[i], expected[i],
-                              true_n[i], true_s[i], realized[i])
+                              true_n[i], true_s[i], realized[i], distance, distance)
                     writer.writerow((
                         ete.get_prop(first, 'numerical_label'), ete.get_prop(second, 'numerical_label'),
                         first.name, second.name, self.foreground[a], self.foreground[b],

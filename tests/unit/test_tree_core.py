@@ -492,3 +492,16 @@ def test_transfer_root_rejects_invalid_input_root_lengths(length):
     ete.get_children(reference)[0].dist = float(length)
     with pytest.raises(ValueError, match='finite and nonnegative'):
         tree.transfer_root(raw, reference)
+
+
+@pytest.mark.parametrize('repeats', [1, 10])
+def test_parent_distances_are_symmetric_and_use_maximum_for_triples(repeats):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('((A:.1,B:.2)X:.3,(C:.4,D:.5)Y:.6)R;', format=1))
+    labels = {n.name: ete.get_prop(n, 'numerical_label') for n in tr.traverse()}
+    rows = [[labels[x] for x in order] for order in ('ABC', 'CBA')] * repeats
+    frame = pd.DataFrame(rows, columns=['branch_id_1', 'branch_id_2', 'branch_id_3'])
+    result = tree.get_node_distance(tr, frame, 1, np.float64)
+    np.testing.assert_allclose(result.dist_bl, .9)
+    np.testing.assert_array_equal(result.dist_parent_bl, result.dist_bl)
+    np.testing.assert_allclose(result.dist_bl_legacy, [1.1, 1.3] * repeats)
+    assert tree.parent_distance(tr['A'], tr['B']) == 0.

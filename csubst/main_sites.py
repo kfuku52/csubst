@@ -1045,46 +1045,55 @@ def add_has_target_high_combinat_prob_site(df_ad, sub_tensor, g, mode):
     return df_ad
 
 
-def get_df_dist(sub_tensor, g, mode):
-    tree_dict = dict()
-    for node in g['tree'].traverse():
-        tree_dict[ete.get_prop(node, "numerical_label")] = node
-    state_orders, state_keys = get_state_orders(g, mode)
-    validate_state_orders_against_sub_tensor(state_orders, state_keys, sub_tensor, mode)
-    cols = ['group','state_from','state_to','max_dist_bl']
-    inds = np.arange(np.array(sub_tensor.shape[2:]).prod()-sub_tensor.shape[4])
-    df_dist = pd.DataFrame(columns=cols, index=inds)
-    bgad = substitution.get_branch_group_state_totals(sub_tensor=sub_tensor)
-    b_index = np.arange(bgad.shape[0])
-    g_index = np.arange(bgad.shape[1])
-    a_index = np.arange(bgad.shape[2])
-    d_index = np.arange(bgad.shape[3])
-    current_row = 0
-    for g,a,d in itertools.product(g_index, a_index, d_index):
-        if (a==d):
-            continue
-        state_key = state_keys[g]
-        if (len(state_orders[state_key])<(a+1))|(len(state_orders[state_key])<(d+1)):
-            continue
-        state_from = state_orders[state_key][a]
-        state_to = state_orders[state_key][d]
-        has_enough_sub = (bgad[:,g,a,d] >= 0.5)
-        branch_ids = b_index[has_enough_sub]
-        if branch_ids.shape[0]==0:
-            interbranch_dist = np.nan
-        elif branch_ids.shape[0]==1:
-            interbranch_dist = np.nan
-        elif branch_ids.shape[0]>=2:
-            node_dists = list()
-            nodes = [ tree_dict[n] for n in branch_ids ]
-            for nds in list(itertools.combinations(nodes, 2)):
-                node_dist = ete.get_distance(nds[0], nds[1], topology_only=False)
-                node_dists.append(node_dist - nds[1].dist)
-            interbranch_dist = max(node_dists) # Maximum value among pairwise distances
-        df_dist.loc[current_row, :] = [state_key, state_from, state_to, interbranch_dist]
-        current_row += 1
-    df_dist = df_dist.loc[~df_dist['group'].isnull(),:]
-    return df_dist
+def get_df_dist(sub_tensor, g, mode, *, branch_totals=None):
+    nodes = {ete.get_prop(node, 'numerical_label'): node for node in g['tree'].traverse()}
+    orders, keys = get_state_orders(g, mode)
+    validate_state_orders_against_sub_tensor(orders, keys, sub_tensor, mode)
+    if branch_totals is None:
+        branch_totals = substitution.get_branch_group_state_totals(sub_tensor)
+
+    @lru_cache(maxsize=65536)
+    def distances(a, b):
+        left, right = nodes[a], nodes[b]
+        return (ete.get_distance(left, right) - right.dist, tree.parent_distance(left, right))
+
+    rows = []
+    for group, key in enumerate(keys):
+        for a, d in itertools.permutations(range(len(orders[key])), 2):
+            ids = np.flatnonzero(branch_totals[:, group, a, d] >= .5)
+            legacy = parent = -np.inf
+            for left, right in itertools.combinations(ids, 2):
+                x, y = distances(left, right)
+                legacy = max(legacy, x)
+                parent = max(parent, y)
+            rows.append((key, orders[key][a], orders[key][d],
+                         parent if parent > -np.inf else np.nan, legacy if len(ids) >= 2 else np.nan))
+    # Historically these distance cells used full-precision TSV serialization.
+    frame = pd.DataFrame(rows, dtype=object,
+                         columns=['group', 'state_from', 'state_to', 'max_dist_bl', 'max_dist_bl_legacy'])
+    frame['max_dist_parent_bl'] = frame['max_dist_bl']
+    return frame
+
+
+def _state_plot_summary(tensor, g, mode):
+    if isinstance(tensor, substitution_sparse.SparseSubstitutionTensor):
+        branch, site = substitution_sparse.summarize_sparse_sub_tensor(tensor, mode='spe2spe')
+    else:
+        branch, site = tensor.sum(axis=1), tensor.sum(axis=0)
+    orders, keys = get_state_orders(g, mode)
+    rows = []
+    for i, key in enumerate(keys):
+        for a, d in itertools.permutations(range(len(orders[key])), 2):
+            values = site[:, i, a, d]
+            total = values.sum()
+            ranks = np.full(5, np.nan)
+            if total != 0:
+                k = min(5, len(values))
+                ranks.fill(0)
+                ranks[:k] = np.sort(np.partition(values, len(values) - k)[-k:])[::-1]
+            rows.append((ranks[0] / total if total != 0 else np.nan, *ranks))
+    stats = pd.DataFrame(rows, columns=['site_tsi'] + ['site_rank' + str(i) for i in range(1, 6)])
+    return stats, get_df_dist(tensor, g, mode, branch_totals=branch)
 
 
 def plot_state(ON_tensor, OS_tensor, branch_ids, g):
@@ -1122,13 +1131,8 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         df_ad.loc[:,'target'] = df_ad_target.loc[:,'value']
         df_ad.loc[:,'target_combinat'] = df_ad_combinat.loc[:,'value']
         df_ad = add_has_target_high_combinat_prob_site(df_ad, sub_target_combinat, g, mode)
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='tsi')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank1')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank2')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank3')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank4')
-        df_ad = add_site_stats(df_ad=df_ad, sub_tensor=sub_tensor, g=g, mode=mode, method='rank5')
-        df_dist = get_df_dist(sub_tensor=sub_tensor, g=g, mode=mode)
+        stats, df_dist = _state_plot_summary(sub_tensor, g, mode)
+        df_ad = pd.concat([df_ad, stats], axis=1)
         df_ad = pd.merge(df_ad, df_dist, on=['group','state_from','state_to'])
         out_path = os.path.join(g['site_outdir'], outfile)
         tsv.write_dataframe(df_ad, out_path, report_context=g, float_format=g['float_format'], chunksize=10000)
@@ -1149,10 +1153,11 @@ def plot_state(ON_tensor, OS_tensor, branch_ids, g):
         ax.set_xlabel('Site specificity index', fontsize=font_size)
         ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
         ax = axes[2,ax_col]
-        bins = np.arange(21) / 20 * df_dist.loc[:,'max_dist_bl'].max()
-        ax.hist(x=df_dist.loc[:, 'max_dist_bl'].dropna(), bins=bins, color='black')
-        #ax.hist(x=df_dist_target.loc[:, 'max_dist_bl'].dropna(), bins=bins, color=color)
-        ax.set_xlabel('Max inter-branch distance of substitution category', fontsize=font_size)
+        distances = df_dist['max_dist_bl'].dropna().to_numpy(dtype=float)
+        upper = distances.max(initial=0)
+        bins = np.linspace(0, upper if upper > 0 else 1., 21)
+        ax.hist(x=distances, bins=bins, color='black')
+        ax.set_xlabel('Max distance between branch parents', fontsize=font_size)
         ax.set_ylabel('Count of\nsubstitution categories', fontsize=font_size)
     fig.tight_layout(h_pad=0.5, w_pad=1)
     outbase = os.path.join(g['site_outdir'], output_prefix + '.state')

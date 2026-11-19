@@ -181,6 +181,30 @@ def test_get_global_parameters_rejects_malformed_cutoff_stat(cutoff_stat, expect
         param.get_global_parameters(_args(cutoff_stat=cutoff_stat))
 
 
+def test_get_global_parameters_requires_supported_cutoff_for_explicit_ocn_pruning():
+    with pytest.raises(ValueError, match='ocn_bound requires a literal OCNany2spe cutoff'):
+        param.get_global_parameters(_args(high_order_pruning='ocn_bound', cutoff_stat='omegaCany2spe,5'))
+
+
+def test_get_global_parameters_rejects_legacy_high_order_pruning():
+    with pytest.raises(ValueError, match='--high_order_pruning must be all_cutoffs, ocn_bound, or auto'):
+        param.get_global_parameters(_args(high_order_pruning='legacy', cutoff_stat='OCNany2spe,2'))
+
+
+@pytest.mark.parametrize('threshold', [-.1, 1.1, float('nan'), float('inf')])
+def test_get_global_parameters_rejects_invalid_min_ocn_site_pp(threshold):
+    with pytest.raises(ValueError, match='min_ocn_site_pp'):
+        param.get_global_parameters(_args(min_ocn_site_pp=threshold, cutoff_stat='OCNany2spe,2'))
+
+
+def test_site_pp_cutoff_column_can_be_requested_explicitly():
+    args = dict(cutoff_stat='cutoff_OCNany2spe,2', output_stat='any2spe', high_order_pruning='ocn_bound')
+    with pytest.raises(ValueError, match='requires --min_ocn_site_pp > 0'):
+        param.get_global_parameters(_args(**args))
+    g = param.get_global_parameters(_args(min_ocn_site_pp=.5, **args))
+    assert g['cutoff_ocn_stats'] == ['any2spe']
+
+
 def test_drop_unrequested_stat_columns_removes_helper_stats():
     cb = {
         "OCNany2any": [1.0],

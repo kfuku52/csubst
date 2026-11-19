@@ -384,6 +384,17 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'This does not cap the number of generated K combinations.')
     parser.add_argument('--exclude_sister_pair', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Set to "yes" for excluding sister branches in branch combination analysis.')
+    parser.add_argument('--high_order_pruning', choices=['all_cutoffs', 'ocn_bound', 'auto'],
+                        default='all_cutoffs',
+                        help='default=%(default)s: all_cutoffs requires each retained subset to pass every cutoff. '
+                             'ocn_bound expands subsets meeting a literal OCNany2spe minimum and applies any '
+                             'omegaCany2spe cutoff to hits. This can generate more candidates and change which '
+                             'subsets survive --max_combination. auto uses ocn_bound for supported cutoff '
+                             'expressions and all_cutoffs otherwise.')
+    parser.add_argument('--min_ocn_site_pp', metavar='FLOAT', default=0.0, type=float,
+                        help='default=%(default)s: For each OCN cutoff, sum only site contributions with '
+                             'combination-level probability >= this value (0 to 1). Export the sum as '
+                             'cutoff_OCN<stat>. Raw OCN and omegaC use all sites.')
     parser.add_argument('--cutoff_stat', metavar='[STAT1,VALUE1|STAT2,VALUE2|...]',
                         default='OCNany2spe,2.0|omegaCany2spe,5.0', type=str,
                         help='default=%(default)s: Cutoff statistics for searching higher-order branch combinations. '
@@ -398,7 +409,8 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                              'any2any, any2spe, any2dif, dif2any, dif2spe, dif2dif, '
                              'spe2any, spe2spe, spe2dif.')
     parser.add_argument('--branch_dist', metavar='yes|no', default='yes', type=strtobool,
-                        help='default=%(default)s: Set "yes" to calculate inter-branch distance.')
+                        help='default=%(default)s: Report patristic distance between branch parents (dist_bl), '
+                             'the historical ordered distance (dist_bl_legacy), and topological distance.')
     # Substitution outputs
     parser.add_argument('--b', metavar='yes|no', default='yes', type=strtobool,
                         help='default=%(default)s: Branch output. Set "yes" to generate the output tsv.')
@@ -454,6 +466,10 @@ def _add_search_subcommand_args(parser, show_advanced=False):
                         default=None, type=float, metavar='FLOAT',
                         help='Optional total uniform-prior mass for sn/each/file_each. Overrides per-site '
                              'asrv_dirichlet_alpha; fixed total mass does not grow with valid site count.')
+    _add_advanced_argument(advanced_statistics, '--urn_n_regions', show_advanced=show_advanced,
+                        default='', metavar='START-END,...',
+                        help='Experimental empirical_all urn: fix branch N totals separately in each '
+                             'prespecified, nonoverlapping 1-based alignment codon interval and the remaining sites.')
     _add_advanced_argument(advanced_statistics, '--asrv_report', show_advanced=show_advanced,
                         default='no', type=strtobool, metavar='yes|no',
                         help='Write detailed per-category weight diagnostics in urn_provenance.json. '
@@ -713,9 +729,12 @@ def _add_scan_subcommand_args(parser, show_advanced=False):
                              'and reports diagnostic maxT-style empirical P values; '
                              '"parametric_bootstrap" simulates a fitted uniform codon null, refits ASR, and repeats discovery. '
                              'parametric holds Q/lengths fixed and repeats ASR/discovery (joint/bridge only). Asymptotic P and trait-by-match BH values are exploratory diagnostics.')
+    parser.add_argument('--scan_bootstrap_workers', type=int, default=1, metavar='INTEGER',
+                        help='Maximum concurrent IQ-TREE refits in parametric_bootstrap. Bounded by --threads. '
+                             'Use 1 for the lowest peak memory.')
     parser.add_argument('--scan_n_permutations', metavar='INT', default=1000, type=int,
                         help='default=%(default)s: Number of null replicates. Clade spaces no larger than this are evaluated exactly. '
-                             'Clade permutations use --threads; bootstrap datasets run sequentially with each IQ-TREE fit using --threads.')
+                             'Clade permutations use --threads; use --scan_bootstrap_workers for concurrent refits.')
     parser.add_argument('--scan_permutation_seed', metavar='INT', default=1, type=int,
                         help='default=%(default)s: Random seed for scan null replicates.')
     advanced_scan = parser.add_argument_group('advanced scan tuning')
