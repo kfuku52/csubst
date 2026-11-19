@@ -110,3 +110,15 @@ For example, with a parent-node path of 0.9 and focal branches of 0.1 and
 0.4, `dist_bl` is 0.9 in either order. The historical values are 1.0
 and 1.3 in the two orders.
 [v0.20.17 distance calculation](https://github.com/kfuku52/csubst/blob/bbe7ef7ae3c7054d462c432877ec484f3efe3351/csubst/tree.py#L76-L92)
+
+### Foreground clade permutations
+
+At each arity reached by the observed search, `--fg_clade_permutation N`
+draws clade sets for each trait, preserving the number of stems in each
+clade-size bin. It enumerates independent K-branch combinations within
+each draw. With `--fg_stem_only no`, the draw also includes descendants
+of its sampled stems. Beyond the exhaustive range, `--fg_exclude_wg yes`
+excludes combinations sharing a sampled foreground clade. The summary
+compares the observed foreground median ωC with valid permuted medians at
+that K. A joint null distribution for the highest qualifying K requires
+reusing one clade draw across all arities and retaining draws with zero hits.

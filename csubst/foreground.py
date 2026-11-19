@@ -59,7 +59,7 @@ def _invalidate_clade_permutation_cache(g):
         '_clade_permutation_pair_block_cache',
         '_clade_permutation_combination_count_cache',
         '_clade_permutation_randomization_plan_cache',
-        '_permutation_cb_pair_lookup_cache',
+        '_permutation_cb_lookup_cache',
         '_clade_permutation_fast_stats_plan_cache',
         '_clade_permutation_selected_rows_plan_cache',
     ]:
@@ -128,6 +128,8 @@ def _build_trait_clade_permutation_cache(g, trait_name):
         'branch_ids': branch_ids,
         'branch_id_to_index': branch_id_to_index,
         'size': size_array,
+        'clade_starts': index.starts,
+        'clade_stops': index.stops,
         'is_fg_stem': is_fg_stem,
         'descendant_branch_ids_by_bid': descendant_branch_ids_by_bid,
         'descendant_indices_by_bid': descendant_indices_by_bid,
@@ -503,37 +505,28 @@ def _randomize_foreground_stem_flags_from_plan(
     if rng is None:
         rng = np.random.default_rng()
     is_fg_stem = np.asarray(trait_cache['is_fg_stem'], dtype=bool).reshape(-1)
-    descendant_indices_by_index = trait_cache['descendant_indices_by_index']
+    starts, stops = trait_cache['clade_starts'], trait_cache['clade_stops']
+    draws = []
+    for bin_no in sorted(randomization_plan['fg_bins'].tolist(), reverse=True):
+        indices = randomization_plan['bin_indices'][bin_no]
+        count = int(is_fg_stem[indices].sum())
+        eligible = indices if sample_original_foreground else indices[~is_fg_stem[indices]]
+        draws.append((bin_no, count, eligible))
     last_error = None
     for _attempt in range(100):
         is_fg_stem_randomized = np.zeros(shape=is_fg_stem.shape, dtype=bool)
         is_blocked = np.zeros(shape=is_fg_stem.shape, dtype=bool)
         try:
-            for bin_no in sorted(randomization_plan['fg_bins'].tolist(), reverse=True):
-                indices = randomization_plan['bin_indices'].get(int(bin_no), None)
-                if (indices is None) or (indices.shape[0] == 0):
-                    continue
-                num_bin_fg = int(is_fg_stem[indices].sum())
-                for _ in range(num_bin_fg):
-                    eligible_indices = indices[~is_blocked[indices] & ~is_fg_stem_randomized[indices]]
-                    if not sample_original_foreground:
-                        eligible_indices = eligible_indices[~is_fg_stem[eligible_indices]]
-                    is_ancestor_of_selected = np.array(
-                        [
-                            bool(is_fg_stem_randomized[descendant_indices_by_index[int(idx)]].any())
-                            for idx in eligible_indices.tolist()
-                        ],
-                        dtype=bool,
-                    )
-                    eligible_indices = eligible_indices[~is_ancestor_of_selected]
+            for bin_no, count, indices in draws:
+                for _ in range(count):
+                    eligible_indices = indices[~is_blocked[indices]]
                     if eligible_indices.shape[0] == 0:
                         txt = 'Not enough non-overlapping clades for permutation in bin {}.'
                         raise ValueError(txt.format(int(bin_no)))
                     new_fg_index = int(rng.choice(eligible_indices))
                     is_fg_stem_randomized[new_fg_index] = True
-                    descendant_indices = descendant_indices_by_index[new_fg_index]
-                    descendant_indices = descendant_indices[descendant_indices != new_fg_index]
-                    is_blocked[descendant_indices] = True
+                    # Subtrees overlap exactly when their half-open preorder intervals intersect.
+                    is_blocked |= (starts < stops[new_fg_index]) & (stops > starts[new_fg_index])
             return is_fg_stem_randomized
         except ValueError as exc:
             last_error = exc
@@ -853,6 +846,11 @@ def randomize_foreground_branch(g, trait_name, sample_original_foreground=False)
         randomized_stem_indices=randomized_stem_indices,
         fg_stem_only=bool(g.get('fg_stem_only', False)),
     )
+    groups = []
+    if g.get('fg_exclude_wg') and not g.get('fg_stem_only'):
+        descendants = trait_cache['descendant_branch_ids_by_index']
+        groups = [descendants[i] for i in randomized_stem_indices if trait_cache['size'][i] > 1]
+    g.setdefault('r_fg_dep_ids', {})[trait_name] = groups
     g['r_fg_ids'][trait_name] = g['r_target_ids'][trait_name].copy()
     g['r_fg_leaf_names'][trait_name] = _resolve_randomized_fg_leaf_names(
         trait_cache=trait_cache,
@@ -1020,14 +1018,12 @@ def get_num_foreground_lineages(tree, trait_name):
     return num_fl
 
 
-def _build_clade_permutation_pair_block_cache(g, trait_name):
+def _build_clade_permutation_pair_block_cache(g):
     node_by_id = _get_node_by_branch_id(g)
     max_branch_id = max([int(bid) for bid in node_by_id.keys()]) if len(node_by_id) > 0 else 0
     multiplier = np.int64(max_branch_id + 1)
     blocked_keys = []
     dep_groups = [np.asarray(dep, dtype=np.int64).reshape(-1) for dep in g.get('dep_ids', [])]
-    if int(g.get('exhaustive_until', 0)) < int(g.get('current_arity', 2)):
-        dep_groups += [np.asarray(dep, dtype=np.int64).reshape(-1) for dep in g.get('fg_dep_ids', {}).get(trait_name, [])]
     for dep_group in dep_groups:
         dep_group = np.unique(_normalize_branch_ids(dep_group))
         if dep_group.shape[0] < 2:
@@ -1047,19 +1043,10 @@ def _build_clade_permutation_pair_block_cache(g, trait_name):
     }
 
 
-def _get_clade_permutation_pair_block_cache(g, trait_name):
-    pair_cache_dict = g.get('_clade_permutation_pair_block_cache', None)
-    if pair_cache_dict is None:
-        pair_cache_dict = dict()
-        g['_clade_permutation_pair_block_cache'] = pair_cache_dict
-    cache_key = (
-        str(trait_name),
-        int(g.get('current_arity', 2)),
-        int(g.get('exhaustive_until', 0)),
-    )
-    if cache_key not in pair_cache_dict:
-        pair_cache_dict[cache_key] = _build_clade_permutation_pair_block_cache(g=g, trait_name=trait_name)
-    return pair_cache_dict[cache_key]
+def _get_clade_permutation_pair_block_cache(g):
+    if '_clade_permutation_pair_block_cache' not in g:
+        g['_clade_permutation_pair_block_cache'] = _build_clade_permutation_pair_block_cache(g)
+    return g['_clade_permutation_pair_block_cache']
 
 
 def _get_randomized_pair_combinations(g, trait_name):
@@ -1069,28 +1056,32 @@ def _get_randomized_pair_combinations(g, trait_name):
     left, right = np.triu_indices(target_ids.shape[0], k=1)
     pair_left = target_ids[left].astype(np.int64, copy=False)
     pair_right = target_ids[right].astype(np.int64, copy=False)
-    cache = _get_clade_permutation_pair_block_cache(g=g, trait_name=trait_name)
+    cache = _get_clade_permutation_pair_block_cache(g)
     blocked_keys = cache['blocked_keys']
     if blocked_keys.shape[0] > 0:
         pair_keys = pair_left * cache['multiplier'] + pair_right
         is_blocked = np.isin(pair_keys, blocked_keys)
         pair_left = pair_left[~is_blocked]
         pair_right = pair_right[~is_blocked]
-    if pair_left.shape[0] == 0:
-        return np.zeros(shape=(0, 2), dtype=np.int64)
-    return np.column_stack([pair_left, pair_right]).astype(np.int64, copy=False)
+    pairs = np.column_stack([pair_left, pair_right])
+    if g.get('exhaustive_until', 0) < 2:
+        groups = g.get('r_fg_dep_ids', {}).get(trait_name, [])
+        if len(groups):
+            pairs = pairs[~combination._mark_dependent_row_combinations(pairs, groups)]
+    return pairs
 
 
 def _try_randomized_foreground_combinations(g, trait_name, current_arity, sample_original_foreground):
     g = randomize_foreground_branch(g, trait_name, sample_original_foreground=sample_original_foreground)
-    if g['r_target_ids'][trait_name].shape[0] < 2:
+    if g['r_target_ids'][trait_name].shape[0] < current_arity:
         return g, None
     if int(current_arity) == 2:
         rid_combinations = _get_randomized_pair_combinations(g=g, trait_name=trait_name)
     else:
-        g, rid_combinations = combination.get_node_combinations(
-            g=g,
-            target_id_dict=g['r_target_ids'],
+        # Keep observed trait annotations intact and restrict the draw to this trait.
+        _, rid_combinations = combination.get_node_combinations(
+            g=dict(g, fg_dep_ids={**g['fg_dep_ids'], trait_name: g['r_fg_dep_ids'][trait_name]}),
+            target_id_dict={trait_name: g['r_target_ids'][trait_name]},
             arity=current_arity,
             check_attr="name",
             verbose=False,
@@ -1112,6 +1103,10 @@ def set_random_foreground_branch(g, trait_name, num_trial=100, sample_original_f
     # Refresh tree foreground annotations only once; repeated refresh is expensive.
     if not bool(g.get('_foreground_annotation_ready', False)):
         g = get_foreground_branch(g)
+    if g.get('fg_stem_only'):
+        cache = _get_trait_clade_permutation_cache(g, trait_name)
+        if np.count_nonzero(cache['is_fg_stem']) < g['current_arity']:
+            raise ValueError('Fewer foreground stems than requested arity K = {}.'.format(g['current_arity']))
     for i in np.arange(num_trial):
         g, rid_combinations = _try_randomized_foreground_combinations(
             g=g,
@@ -1744,85 +1739,38 @@ def _recompute_missing_permutation_rows(g, missing_id_combinations, OS_tensor_re
     return cb_missing, g
 
 
-def _get_permutation_cb_pair_lookup(cb, bid_columns, g):
-    cache = g.get('_permutation_cb_pair_lookup_cache', None)
-    cache_key = (id(cb), tuple(bid_columns))
-    if (cache is not None) and (cache.get('cache_key', None) == cache_key):
-        return cache['lookup'], cache['multiplier']
-    bid_values = cb.loc[:, bid_columns].to_numpy(copy=False, dtype=np.int64)
-    if bid_values.shape[0] == 0:
-        lookup = dict()
-        multiplier = np.int64(1)
-    else:
-        bid_values = np.sort(bid_values, axis=1)
-        multiplier = np.int64(int(bid_values.max()) + 1)
-        keys = bid_values[:, 0].astype(np.int64, copy=False) * multiplier + bid_values[:, 1].astype(np.int64, copy=False)
-        lookup = dict()
-        for i, key in enumerate(keys.tolist()):
-            lookup.setdefault(int(key), []).append(i)
-    g['_permutation_cb_pair_lookup_cache'] = {
-        'cache_key': cache_key,
-        'lookup': lookup,
-        'multiplier': multiplier,
-    }
-    return lookup, multiplier
+def _get_permutation_cb_lookup(cb, bid_columns, g):
+    cache = g.get('_permutation_cb_lookup_cache')
+    if cache is not None and cache['table'] is cb and cache['columns'] == tuple(bid_columns):
+        return cache['lookup']
+    ids = np.sort(cb.loc[:, bid_columns].to_numpy(dtype=np.int64), axis=1)
+    lookup = {}
+    for index, row in enumerate(ids.tolist()):
+        lookup.setdefault(tuple(row), []).append(index)
+    g['_permutation_cb_lookup_cache'] = {'table': cb, 'columns': tuple(bid_columns), 'lookup': lookup}
+    return lookup
 
 
-def _get_permutation_cb_rows_fast_pairs(rid_combinations, cb, bid_columns, g, build_rcb=True):
-    rid_array = np.asarray(rid_combinations, dtype=np.int64)
-    if (rid_array.ndim != 2) or (rid_array.shape[1] != 2):
-        return None
-    if rid_array.shape[0] == 0:
-        empty_rows = np.zeros(shape=(0,), dtype=np.int64)
-        if build_rcb:
-            return cb.iloc[0:0, :].copy(), 0, 0, empty_rows
-        return None, 0, 0, empty_rows
-    rid_sorted = np.sort(rid_array, axis=1)
-    lookup, multiplier = _get_permutation_cb_pair_lookup(cb=cb, bid_columns=bid_columns, g=g)
-    keys = rid_sorted[:, 0].astype(np.int64, copy=False) * multiplier + rid_sorted[:, 1].astype(np.int64, copy=False)
-    selected_rows = []
-    missing_rows = []
-    for rid_idx, key in enumerate(keys.tolist()):
-        row_ids = lookup.get(int(key), None)
-        if row_ids is None:
-            missing_rows.append(rid_idx)
-            continue
-        selected_rows.extend(row_ids)
+def _get_permutation_cb_rows_indexed(rid_combinations, cb, bid_columns, g, build_rcb=True):
+    ids = np.sort(np.asarray(rid_combinations, dtype=np.int64), axis=1)
+    if ids.shape[1] > 2:
+        ids = ids[np.lexsort(ids.T[::-1])]  # Same order as the higher-order table merge.
+    lookup = _get_permutation_cb_lookup(cb, bid_columns, g)
+    selected_rows = [index for row in ids.tolist() for index in lookup.get(tuple(row), ())]
     selected_rows = np.asarray(selected_rows, dtype=np.int64)
-    if len(selected_rows) > 0:
-        if build_rcb:
-            rcb = cb.take(selected_rows, axis=0)
-        else:
-            rcb = None
-    else:
-        if build_rcb:
-            rcb = cb.iloc[0:0, :].copy()
-        else:
-            rcb = None
+    rcb = cb.take(selected_rows, axis=0) if build_rcb else None
     num_kept = int(selected_rows.shape[0])
-    return rcb, rid_array.shape[0] - num_kept, rid_array.shape[0], selected_rows
+    return rcb, ids.shape[0] - num_kept, ids.shape[0], selected_rows
 
 def _get_permutation_cb_rows(rid_combinations, cb, cb_cache, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
     bid_columns = ['branch_id_' + str(k + 1) for k in np.arange(rid_combinations.shape[1])]
     selected_rows = None
     if cb_cache.shape[0] == 0:
-        fast_out = _get_permutation_cb_rows_fast_pairs(
-            rid_combinations=rid_combinations,
-            cb=cb,
-            bid_columns=bid_columns,
-            g=g,
-            build_rcb=(not _is_default_add_median_cb_stats_impl()),
+        rcb, missing, requested, selected_rows = _get_permutation_cb_rows_indexed(
+            rid_combinations, cb, bid_columns, g, build_rcb=not _is_default_add_median_cb_stats_impl(),
         )
-        if fast_out is not None:
-            rcb, dropped_before_recompute, requested_rows, selected_rows = fast_out
-            if (dropped_before_recompute == 0) or (OS_tensor_reducer is None) or (ON_tensor_reducer is None):
-                if selected_rows is not None:
-                    dropped_after_recompute = requested_rows - selected_rows.shape[0]
-                elif rcb is not None:
-                    dropped_after_recompute = requested_rows - rcb.shape[0]
-                else:
-                    dropped_after_recompute = requested_rows
-                return rcb, cb_cache, g, requested_rows, dropped_before_recompute, dropped_after_recompute, selected_rows
+        if missing == 0 or OS_tensor_reducer is None or ON_tensor_reducer is None:
+            return rcb, cb_cache, g, requested, missing, missing, selected_rows
     rid_combinations = pd.DataFrame(rid_combinations, columns=bid_columns)
     rid_combinations = table.sort_branch_ids(rid_combinations)
     if cb_cache.shape[0] == 0:
@@ -2335,7 +2283,7 @@ def _make_clade_permutation_worker_g(g):
     local_g['_clade_permutation_rows_buffer'] = []
     local_g['_clade_permutation_current_stat_row'] = None
     for cache_key in [
-        '_permutation_cb_pair_lookup_cache',
+        '_permutation_cb_lookup_cache',
         '_clade_permutation_fast_stats_plan_cache',
         '_clade_permutation_selected_rows_plan_cache',
     ]:
@@ -2688,8 +2636,8 @@ def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
             target_col_prefixes=target_col_prefixes,
         )
         bid_columns = ['branch_id_' + str(k + 1) for k in np.arange(int(g.get('current_arity', 2)))]
-        if (int(g.get('current_arity', 2)) == 2) and all(col in cb.columns for col in bid_columns):
-            _get_permutation_cb_pair_lookup(cb=cb, bid_columns=bid_columns, g=g)
+        if all(col in cb.columns for col in bid_columns):
+            _get_permutation_cb_lookup(cb=cb, bid_columns=bid_columns, g=g)
     for trait_name in trait_names:
         if n_jobs > 1:
             g = _run_clade_permutation_for_trait_parallel(
@@ -2726,4 +2674,5 @@ def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
         del g['_clade_permutation_current_stat_row']
     if '_clade_permutation_selected_rows_plan_cache' in g:
         del g['_clade_permutation_selected_rows_plan_cache']
+    g.pop('_permutation_cb_lookup_cache', None)
     return g

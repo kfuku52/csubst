@@ -1114,26 +1114,21 @@ def get_node_combinations(g, target_id_dict=None, cb_passed=None, exhaustive=Fal
                 )
                 trait_target_rows = trait_target_rows[~is_input_dependent, :]
             pair_count = trait_target_rows.shape[0] * (trait_target_rows.shape[0] - 1) // 2
-            if (arity == 2) and (trait_target_nodes.shape[1] == 1):
-                if pair_count > 0:
+            if trait_target_nodes.shape[1] == 1:
+                # A vector of branch IDs specifies a pool, not a table of (K-1)-tuples.
+                pool = np.unique(trait_target_rows[:, 0])
+                if pool.size >= arity:
                     is_all_trait_no_branch_combination = False
                     if dependency_bitset is None:
-                        pairwise = _pairwise_node_combinations(trait_target_rows[:, 0])
+                        rows = _generate_all_k_combinations_from_sorted_nodes(pool, arity)
                     else:
-                        pairwise = _generate_independent_row_combinations(
-                            candidate_rows=trait_target_rows[:, 0],
-                            arity=2,
-                            dependency_bitset=dependency_bitset,
-                        )
+                        rows = _generate_independent_row_combinations(pool, arity, dependency_bitset)
                     if verbose:
-                        txt = 'Number of branch combinations before independency check for {}: {:,}'
-                        print(txt.format(trait_name, pairwise.shape[0]), flush=True)
-                    node_combination_dict[trait_name] = pairwise
+                        print('Number of branch combinations before independency check for {}: {:,}'.format(
+                            trait_name, rows.shape[0]), flush=True)
+                    node_combination_dict[trait_name] = rows
                 else:
-                    if verbose:
-                        txt = 'There is no target branch combination for {} at K = {:,}.\n'
-                        sys.stderr.write(txt.format(trait_name, arity))
-                    node_combination_dict[trait_name] = np.zeros(shape=[0, arity], dtype=np.int64)
+                    node_combination_dict[trait_name] = np.zeros((0, arity), dtype=np.int64)
                 continue
             if pair_count > 0:
                 is_all_trait_no_branch_combination = False

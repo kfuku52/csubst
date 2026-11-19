@@ -326,3 +326,37 @@ def test_report_permutation_clade_permutation_ocn_excludes_inf_from_mean_std(cap
     assert not any("invalid value encountered" in str(w.message) for w in captured_warnings)
     out = capsys.readouterr().out
     assert "Trait traitA: Total OCNany2spe in permutation lineages = 3.0; 2.0 ± 1.0" in out
+
+
+def test_randomized_higher_arities_match_brute_force_without_other_trait_rows(monkeypatch):
+    import itertools
+    from csubst import ete, tree
+
+    tr = tree.add_numerical_node_labels(ete.PhyloNode('(A,B,C,D,E,F,G,H)R;', format=1))
+    ids = {n.name: int(ete.get_prop(n, 'numerical_label')) for n in tr.traverse()}
+    pool = [ids[x] for x in 'ABCDEF']
+    global_block = [ids['B'], ids['D']]
+    draw_block = [ids['A'], ids['C']]
+    original = {'trait': [[ids['E'], ids['F']]], 'other': []}
+    g = dict(tree=tr, threads=1, dep_ids=[global_block], fg_dep_ids=original,
+             fg_df=pd.DataFrame(columns=['name', 'other', 'trait']), exhaustive_until=1,
+             r_target_ids={'trait': np.asarray(pool), 'other': np.asarray([ids[x] for x in 'EFGH'])},
+             r_fg_dep_ids={'trait': [draw_block]})
+    monkeypatch.setattr(foreground, 'randomize_foreground_branch', lambda g, *a, **kw: g)
+    for k in (2, 3, 4, 5):
+        g['current_arity'] = k
+        _, rows = foreground._try_randomized_foreground_combinations(g, 'trait', k, False)
+        expected = {q for q in itertools.combinations(sorted(pool), k)
+                    if not any(set(pair).issubset(q) for pair in (global_block, draw_block))}
+        assert (set() if rows is None else {tuple(sorted(row)) for row in rows}) == expected
+        assert g['fg_dep_ids'] is original
+
+
+def test_permutation_row_lookup_uses_all_branch_ids_at_each_arity():
+    g = {}
+    for target, query in [([1, 2], [0, 5]), ([1, 2, 5], [1, 2, 6])]:
+        cols = ['branch_id_' + str(i+1) for i in range(len(target))]
+        cb = pd.DataFrame([target], columns=cols)
+        _, missing, requested, selected = foreground._get_permutation_cb_rows_indexed(
+            [target[::-1], query], cb, cols, g)
+        assert (missing, requested, selected.tolist()) == (1, 2, [0])

@@ -163,6 +163,8 @@ def test_randomize_foreground_flags_without_sample_original_raises_when_candidat
 def test_randomize_foreground_stems_preserves_bin_counts_without_nested_clades():
     trait_cache = {
         "is_fg_stem": np.array([False, True, False, False, True], dtype=bool),
+        "clade_starts": np.array([0, 1, 2, 3, 4]),
+        "clade_stops": np.array([3, 2, 3, 4, 5]),
         "descendant_indices_by_index": [
             np.array([0, 1, 2], dtype=np.int64),
             np.array([1], dtype=np.int64),
