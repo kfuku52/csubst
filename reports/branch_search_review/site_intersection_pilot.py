@@ -2,9 +2,10 @@
 import argparse
 from collections import Counter
 from contextlib import redirect_stdout
-from functools import lru_cache
+from functools import lru_cache, reduce
 from itertools import combinations
 from math import comb, gcd
+from operator import and_
 from pathlib import Path
 import io
 
@@ -25,7 +26,7 @@ def ids(n, k):
     return list(combinations(range(n), k))
 
 
-def realization(scenario, n, length, seed):
+def realization(scenario, n, length, seed, *, arity=K):
     rng = np.random.default_rng(seed)
     qn = np.full(length, .075)
     qs = np.full(length, .11)
@@ -38,7 +39,7 @@ def realization(scenario, n, length, seed):
     # Sites have two possible derived N states and one shared derived S state.
     u = rng.random((n, length))
     state = np.select([u < .8 * qn, u < qn, u < qn + qs], [1, 2, 3], default=0)
-    planted = tuple(sorted(rng.choice(n, K, replace=False).tolist()))
+    planted = tuple(sorted(rng.choice(n, arity, replace=False).tolist()))
     if scenario != 'null':
         sites = np.flatnonzero(quality == (.55 if scenario == 'uncertain' else 1.))
         targets = rng.choice(sites, 32 if scenario == 'uncertain' else 4, replace=False)
@@ -55,7 +56,10 @@ def overlap(masks, branches, k):
         return np.fromiter(((masks[a] & masks[b]).bit_count() for a, b in branches), np.int32, len(branches))
     if k == 3:
         return np.fromiter(((masks[a] & masks[b] & masks[c]).bit_count() for a, b, c in branches), np.int32, len(branches))
-    counts = ((masks[a] & masks[b] & masks[c] & masks[d]).bit_count() for a, b, c, d in branches)
+    if k == 4:
+        counts = ((masks[a] & masks[b] & masks[c] & masks[d]).bit_count() for a, b, c, d in branches)
+    else:
+        counts = (reduce(and_, (masks[b] for b in group)).bit_count() for group in branches)
     return np.fromiter(counts, np.int32, len(branches))
 
 
@@ -87,13 +91,13 @@ def existing(tabs, mode, *, parent_cap=PARENT_CAP):
         parents = tabs[k].merge(pd.DataFrame(sets, columns=cols), on=cols, how='inner')
 
 
-def sample_groups(members, count, rng):
-    if comb(len(members), K) <= count:
-        return combinations(members, K)
+def sample_groups(members, count, rng, *, arity=K):
+    if comb(len(members), arity) <= count:
+        return combinations(members, arity)
     # Uniform subset of combinations without materializing a dense posting's tuples.
     chosen = set()
     while len(chosen) < count:
-        group = rng.choice(members, K, replace=False)
+        group = rng.choice(members, arity, replace=False)
         chosen.add(tuple(sorted(group.tolist())))
     return sorted(chosen)
 

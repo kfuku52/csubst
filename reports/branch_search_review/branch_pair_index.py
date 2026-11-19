@@ -7,10 +7,14 @@ import time
 import numpy as np
 from scipy import sparse
 
+import group_refinement
 import site_intersection_pilot as pilot
 
 
-def witness_sample(events, limit, rng):
+DEFAULT_DRAWS = pilot.ROUNDS * pilot.PER_ROUND
+
+
+def witness_sample(events, limit, rng, *, arity=pilot.K):
     """Block the sparse product and keep a uniform sample of supported site pairs."""
     num_events, branches = events.shape
     indices = []
@@ -44,7 +48,7 @@ def witness_sample(events, limit, rng):
     for start in range(0, num_events, width):
         product = (index[start:start + width] @ inverted).tocoo()
         left = product.row.astype(np.int64) + start
-        keep = (left < product.col) & (product.data >= comb(pilot.K, 2))
+        keep = (left < product.col) & (product.data >= comb(arity, 2))
         keys = left[keep] * num_events + product.col[keep]
         eligible += len(keys)
         if not len(keys):
@@ -57,54 +61,96 @@ def witness_sample(events, limit, rng):
     return sample[np.argsort(priorities)], index.nnz, eligible
 
 
-def rank_witnesses(posting_rounds, rounds, rng):
+def rank_witnesses(posting_rounds, rounds, rng, *, score=None, draw_budget=DEFAULT_DRAWS,
+                   witness_seeds=None, checkpoint=None, arity=pilot.K):
     votes = {}
-    budget = pilot.ROUNDS * pilot.PER_ROUND // rounds
+    budget = draw_budget // rounds
+    if budget < 1:
+        raise ValueError("draw budget must allow at least one proposal per round")
     index_entries = witnesses = draws = 0
-    for events in posting_rounds:
-        events = events[events.sum(axis=1) >= pilot.K]
-        sample, nnz, eligible = witness_sample(events, budget, rng)
+    for i, events in enumerate(posting_rounds):
+        events = events[events.sum(axis=1) >= arity]
+        sample_rng = rng if witness_seeds is None else np.random.default_rng(witness_seeds[i])
+        sample, nnz, eligible = witness_sample(events, budget, sample_rng, arity=arity)
+        patterns = group_refinement.site_pattern_moves(events, arity, rng) if score is not None else None
         index_entries += nnz
         witnesses += eligible
         used = 0
+        next_checkpoint = 4096
         for left, right in zip(*np.divmod(np.asarray(sample, dtype=np.int64), max(1, len(events)))):
             members = np.flatnonzero(events[left] & events[right]).tolist()
-            for group in pilot.sample_groups(members, min(pilot.PER_POSTING, budget-used), rng):
+            limit = min(pilot.PER_POSTING, budget - used)
+            if score is None:
+                groups = pilot.sample_groups(members, limit, rng, arity=arity)
+            else:
+                groups = group_refinement.refine_group(members, arity, limit, score, rng, patterns=patterns)
+            for group in groups:
                 votes[group] = votes.get(group, 0) + 1
                 used += 1
+            if checkpoint is not None and used >= next_checkpoint:
+                checkpoint(votes, rng)
+                next_checkpoint += 4096
             if used == budget:
                 break
         draws += used
+    if checkpoint is not None:
+        checkpoint(votes, rng)
+    return rank_votes(votes, rng), index_entries, witnesses, draws
+
+
+def rank_votes(votes, rng):
     keys = sorted(votes)
     rng.shuffle(keys)
-    return sorted(keys, key=votes.get, reverse=True), index_entries, witnesses, draws
+    return sorted(keys, key=votes.get, reverse=True)
 
 
-def indexed_candidates(state, quality, rng):
+def indexed_candidates(state, quality, rng, *, score=None, draw_budget=DEFAULT_DRAWS, checkpoint=None, arity=pilot.K):
     rounds = pilot.ROUNDS if np.any(quality < 1) else 1
 
     def postings():
         for _ in range(rounds):
             keep = True if rounds == 1 else rng.random(state.shape) < quality
             yield np.concatenate([((state == d) & keep).T for d in (1, 2)])
-    return rank_witnesses(postings(), rounds, rng)
+    return rank_witnesses(postings(), rounds, rng, score=score, draw_budget=draw_budget, checkpoint=checkpoint,
+                          arity=arity)
 
 
-def run(method, branches, length, seed, scenario):
-    state, quality, qn, qs, plant = pilot.realization(scenario, branches, length, seed)
-    plant_passes = pilot.qualifying(pilot.reference(state[list(plant)], quality, qn, qs, pilot.K)).item()
+def run(method, branches, length, seed, scenario, *, draw_budget=DEFAULT_DRAWS, arity=pilot.K,
+        min_ocn_site_pp=None):
+    if not 2 <= arity <= branches:
+        raise ValueError("arity must be between 2 and the number of branches")
+    if method == 'two_sites' and arity != pilot.K:
+        raise ValueError("the direct site-pair pilot supports only K=4")
+    if min_ocn_site_pp is None:
+        min_ocn_site_pp = .5 if method == 'group_refined' else 0.
+    if not 0 <= min_ocn_site_pp <= 1:
+        raise ValueError("site PP must be between 0 and 1")
+    state, quality, qn, qs, plant = pilot.realization(scenario, branches, length, seed, arity=arity)
+    planted_state = state[list(plant)]
+    reference = pilot.reference(planted_state, quality, qn, qs, arity)
+    # Apply the PP minimum only to the observed-count cutoff. The full
+    # alignment still supplies the reference omega, including at weak sites.
+    pp = quality ** arity
+    shared = (planted_state == 1).all(axis=0) | (planted_state == 2).all(axis=0)
+    cutoff_ocn = pp[shared & (pp >= min_ocn_site_pp)].sum()
+    plant_passes = bool(cutoff_ocn >= 2 and reference.omegaCany2spe.item() >= 5)
     start = time.perf_counter()
-    if method == 'indexed':
-        keys, entries, witnesses, draws = indexed_candidates(state, quality, np.random.default_rng(seed + 9000))
+    if method in ('indexed', 'group_refined'):
+        score = group_refinement.known_support(state, quality, min_ocn_site_pp) if method == 'group_refined' else None
+        keys, entries, witnesses, draws = indexed_candidates(
+            state, quality, np.random.default_rng(seed + 9000), score=score, draw_budget=draw_budget, arity=arity
+        )
     else:
         keys, entries, draws = pilot.two_site_candidates(state, quality, np.random.default_rng(seed + 7000))
         witnesses = -1
     # Use the same whole-alignment N support and the same full-score budget on both arms.
     support = np.zeros(len(keys))
     for prob in np.unique(quality):
+        if prob ** arity < min_ocn_site_pp:
+            continue
         for dest in (1, 2):
             rows = pilot.pack_rows((state == dest) & (quality == prob))
-            support += prob ** pilot.K * pilot.overlap(rows, keys, pilot.K)
+            support += prob ** arity * pilot.overlap(rows, keys, arity)
     order = np.argsort(-support, kind='stable')[:64]
     top = [keys[i] for i in order]
     elapsed = time.perf_counter() - start
@@ -114,10 +160,18 @@ def run(method, branches, length, seed, scenario):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('method', choices=['indexed','two_sites'])
+    parser.add_argument('method', choices=['indexed','two_sites','group_refined'])
     parser.add_argument('branches', type=int)
     parser.add_argument('sites', type=int)
     parser.add_argument('seed', type=int)
     parser.add_argument('--scenario', choices=list(pilot.SCENARIOS), default='long')
+    parser.add_argument('--arity', type=int, default=pilot.K)
+    parser.add_argument('--min-ocn-site-pp', type=float,
+                        help='Minimum site PP for OCN selection and ranking. Defaults to 0.5 for group_refined and 0 otherwise.')
+    parser.add_argument('--draw-budget', type=int, default=DEFAULT_DRAWS,
+                        help='Maximum emitted branch combinations across indexed proposal rounds.')
     args = parser.parse_args()
-    print(*run(args.method, args.branches, args.sites, args.seed, args.scenario), sep='\t')
+    if args.method == 'two_sites' and args.draw_budget != DEFAULT_DRAWS:
+        parser.error('--draw-budget applies to the index methods')
+    print(*run(args.method, args.branches, args.sites, args.seed, args.scenario,
+               draw_budget=args.draw_budget, arity=args.arity, min_ocn_site_pp=args.min_ocn_site_pp), sep='\t')

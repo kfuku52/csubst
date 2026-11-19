@@ -35,6 +35,8 @@ list, but four of those seven fell below rank 64. The timing covers candidate
 generation and N-support ranking. Peak RSS includes the entire Python process.
 Each seed and method ran in a separate process, alternating method order after
 one warm-up per method. These measurements support keeping the index experimental.
+The [group-removal comparison](GROUP_REFINEMENT.md) tests whether additional
+sites can guide selection within each intersection.
 
 ## PGK codon simulations with inferred ancestors
 
