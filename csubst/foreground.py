@@ -19,6 +19,7 @@ from csubst import output_safety
 from csubst import substitution
 from csubst import tree
 from csubst import output_stat
+from csubst import trait_ctmc
 
 
 def _get_trait_names(g):
@@ -776,6 +777,8 @@ def get_foreground_branch(g, simulate=False, write=True):
         g['target_ids'] = {trait_name: np.zeros(shape=(0,), dtype=np.int64)}
     else:
         g['fg_df'] = read_foreground_file(g)
+        if g.get('fg_trait_tree'):
+            _prepare_trait_ctmc_foreground(g)
         if simulate:
             if g['fg_format'] == 2:
                 first_trait_name = g['fg_df'].columns[1]
@@ -788,6 +791,31 @@ def get_foreground_branch(g, simulate=False, write=True):
     g = _invalidate_clade_permutation_cache(g)
     g['_foreground_annotation_ready'] = True
     return g
+
+
+def _prepare_trait_ctmc_foreground(g):
+    trait_names = _get_trait_names(g)
+    if len(trait_names) != 1:
+        raise ValueError('--fg_trait_tree requires exactly one binary foreground trait.')
+    trait_name = trait_names[0]
+    lineages = _get_non_background_lineages(g['fg_df'][trait_name])
+    positive_names = {name for group in get_fg_leaf_names(lineages, trait_name, g) for name in group}
+    with open(g['fg_trait_tree'], encoding='utf-8') as handle:
+        time_tree = ete.PhyloNode(handle.read(), format=1)
+    rate_model = g.get('fg_trait_rate_model', 'er')
+    model = trait_ctmc.fit(g['tree'], time_tree, positive_names, rate_model)
+    nodes = _get_node_by_branch_id(g)
+    # Nonzero labels specify positive tips. Each maximal positive clade is
+    # one lineage, so observed and simulated gains use the same rule.
+    rows = [(re.escape(name), lineage) for lineage, bid in enumerate(model.observed_stems, 1)
+            for name in ete.get_leaf_names(nodes[bid])]
+    g['fg_df'] = pd.DataFrame(rows, columns=['name', trait_name])
+    g['_fg_trait_model'] = model
+    print(f"Foreground trait CTMC ({rate_model}, root=0): gain rate={model.gain_rate:.8g}, "
+          f"loss rate={model.loss_rate:.8g}, log likelihood={model.log_likelihood:.8g}, "
+          f"origins={len(model.observed_stems)}, positive tips={model.positive_tips}/{model.n_tips}, "
+          f"match positive tip count={bool(g.get('fg_trait_match_tip_count', False))}.", flush=True)
+
 
 def print_num_possible_permuted_combinations(df_clade_size, trait_name, sample_original_foreground):
     num_possible_permutation_combination = 1
@@ -807,12 +835,6 @@ def print_num_possible_permuted_combinations(df_clade_size, trait_name, sample_o
     return int(num_possible_permutation_combination)
 
 def randomize_foreground_branch(g, trait_name, sample_original_foreground=False):
-    if 'r_target_ids' not in g:
-        g['r_target_ids'] = dict()
-    if 'r_fg_ids' not in g:
-        g['r_fg_ids'] = dict()
-    if 'r_fg_leaf_names' not in g:
-        g['r_fg_leaf_names'] = dict()
     trait_cache = _get_trait_clade_permutation_cache(g=g, trait_name=trait_name)
     randomization_plan = _get_clade_permutation_randomization_plan(
         g=g,
@@ -841,6 +863,12 @@ def randomize_foreground_branch(g, trait_name, sample_original_foreground=False)
         count_cache[count_cache_key] = int(randomization_plan['num_possible_permutation_combination'])
         txt = 'Number of possible clade-permuted combinations without considering branch dependency = {:,}'
         print(txt.format(int(count_cache[count_cache_key])))
+    return _set_randomized_stem_targets(g, trait_name, trait_cache, randomized_stem_indices)
+
+
+def _set_randomized_stem_targets(g, trait_name, trait_cache, randomized_stem_indices):
+    for key in ('r_target_ids', 'r_fg_ids', 'r_fg_leaf_names'):
+        g.setdefault(key, {})
     g['r_target_ids'][trait_name] = _resolve_randomized_target_ids(
         trait_cache=trait_cache,
         randomized_stem_indices=randomized_stem_indices,
@@ -1073,8 +1101,12 @@ def _get_randomized_pair_combinations(g, trait_name):
 
 def _try_randomized_foreground_combinations(g, trait_name, current_arity, sample_original_foreground):
     g = randomize_foreground_branch(g, trait_name, sample_original_foreground=sample_original_foreground)
+    return g, _get_randomized_combinations(g, trait_name, current_arity)
+
+
+def _get_randomized_combinations(g, trait_name, current_arity):
     if g['r_target_ids'][trait_name].shape[0] < current_arity:
-        return g, None
+        return None
     if int(current_arity) == 2:
         rid_combinations = _get_randomized_pair_combinations(g=g, trait_name=trait_name)
     else:
@@ -1086,9 +1118,7 @@ def _try_randomized_foreground_combinations(g, trait_name, current_arity, sample
             check_attr="name",
             verbose=False,
         )
-    if rid_combinations.shape[0] == 0:
-        return g, None
-    return g, rid_combinations
+    return rid_combinations if rid_combinations.shape[0] else None
 
 
 def _raise_foreground_permutation_failure(num_trial, sample_original_foreground):
@@ -2099,7 +2129,11 @@ def _report_clade_permutation_stats(g, trait_name):
         return
     num_positive = (obs_value <= permutation_values).sum()
     num_all = permutation_values.shape[0]
-    pvalue = num_positive / num_all
+    trait_model = bool(g.get('fg_trait_tree'))
+    if trait_model and num_all != int(g['fg_clade_permutation']):
+        sys.stderr.write(f'Trait {trait_name}: Missing null statistics; trait CTMC P value is unavailable.\n')
+        return
+    pvalue = (num_positive + 1) / (num_all + 1) if trait_model else num_positive / num_all
     _report_observed_clade_permutation_ocn(
         g=g,
         trait_name=trait_name,
@@ -2117,8 +2151,9 @@ def _report_clade_permutation_stats(g, trait_name):
     finite_mean, finite_std = _get_finite_mean_std(permutation_values)
     txt = 'Trait {}: Median omegaCany2spe in permutation lineages = {:,.3}; {:,.3} ± {:,.3} (median; mean ± SD excluding inf)'
     print(txt.format(trait_name, np.median(permutation_values), finite_mean, finite_std))
-    txt = 'Trait {}: P value of foreground convergence (omegaCany2spe) by clade permutations = {} (observation <= permutation = {:,}/{:,})'
-    print(txt.format(trait_name, pvalue, num_positive, num_all))
+    method = 'fitted binary trait CTMC' if trait_model else 'clade permutations'
+    txt = 'Trait {}: P value of foreground convergence (omegaCany2spe) by {} = {} (observation <= permutation = {:,}/{:,})'
+    print(txt.format(trait_name, method, pvalue, num_positive, num_all))
 
 
 def _append_clade_permutation_failure_row(g, trait_name, trial_no, reason):
@@ -2270,7 +2305,7 @@ def _resolve_clade_permutation_backend():
 
 
 def _make_clade_permutation_worker_g(g):
-    local_g = copy.copy(g)
+    local_g = g.copy()
     if '_clade_permutation_cb_stats_template' in g:
         local_g['_clade_permutation_cb_stats_template'] = g['_clade_permutation_cb_stats_template'].copy(deep=True)
         local_g['df_cb_stats'] = g['_clade_permutation_cb_stats_template'].copy(deep=True)
@@ -2611,6 +2646,63 @@ def _run_clade_permutation_for_trait_parallel(
     return g
 
 
+def _run_trait_ctmc_calibration(cb, g, trait_name):
+    model = g['_fg_trait_model']
+    cache = _get_trait_clade_permutation_cache(g, trait_name)
+    by_id = cache['branch_id_to_index']
+    arity = g['current_arity']
+    bid_columns = [f'branch_id_{i}' for i in range(1, arity + 1)]
+    valid_ids = set(cb.loc[:, bid_columns].to_numpy(dtype=np.int64).ravel())
+    if g.get('fg_stem_only'):
+        eligible = np.isin(model.branch_ids, list(valid_ids))
+    else:
+        descendants = cache['descendant_branch_ids_by_index']
+        eligible = np.array([not valid_ids.isdisjoint(descendants[by_id[bid]]) for bid in model.branch_ids])
+    if not set(model.observed_stems).issubset(model.branch_ids[eligible]):
+        reason = 'An observed trait origin has no analyzable search target branches.'
+        _append_clade_permutation_failure_row(g, trait_name, 0, reason)
+        g['_clade_permutation_rows_buffer'][-1]['clade_permutation_null'] = 'fitted_binary_trait_ctmc'
+        sys.stderr.write(f'Trait CTMC calibration unavailable at K={arity}. {reason}\n')
+        return _flush_clade_permutation_rows_buffer(g)
+    rng = randomness.next_generator(g, 'foreground_trait_ctmc', str(trait_name), arity)
+    matched_tips = g.get('fg_trait_match_tip_count', False)
+    for trial in range(1, int(g['fg_clade_permutation']) + 1):
+        attempts = 0
+        try:
+            stems, attempts = trait_ctmc.sample_stems(model, eligible, matched_tips, rng)
+            indices = np.array([by_id[bid] for bid in stems], dtype=np.int64)
+            _set_randomized_stem_targets(g, trait_name, cache, indices)
+            combinations = _get_randomized_combinations(g, trait_name, arity)
+            groups = g['r_fg_dep_ids'][trait_name]
+            if combinations is not None and groups:
+                combinations = combinations[~combination._mark_dependent_row_combinations(combinations, groups)]
+            if combinations is None or len(combinations) == 0:
+                raise ValueError('No independent foreground branch combination.')
+            result = _evaluate_clade_permutation_candidate(cb, g, trait_name, combinations)
+            if result['dropped_after_recompute'] or not result['is_valid']:
+                raise ValueError('The foreground omegaC statistic could not be evaluated on the exhaustive table.')
+        except (trait_ctmc.SamplingError, ValueError) as exc:
+            reason = str(exc)
+            _append_clade_permutation_failure_row(g, trait_name, trial, reason)
+            g['_clade_permutation_rows_buffer'][-1].update(
+                clade_permutation_null='fitted_binary_trait_ctmc',
+                clade_permutation_sampling_attempts=getattr(exc, 'attempts', attempts),
+            )
+            sys.stderr.write(f'Trait CTMC calibration unavailable at K={arity}, trial {trial}. {reason}\n')
+            return _flush_clade_permutation_rows_buffer(g)
+        row = dict(result['row'])
+        row.update(
+            mode=_build_clade_permutation_mode(trait_name, trial, g['r_fg_ids'][trait_name], False),
+            clade_permutation_null='fitted_binary_trait_ctmc',
+            clade_permutation_trial_no=trial,
+            clade_permutation_sampling_attempts=attempts,
+        )
+        g['_clade_permutation_rows_buffer'].append(row)
+    _flush_clade_permutation_rows_buffer(g)
+    _report_clade_permutation_stats(g, trait_name)
+    return g
+
+
 def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
     print('Starting foreground clade permutation.')
     trait_names = _get_trait_names(g)
@@ -2627,7 +2719,8 @@ def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
     cb_cache = pd.DataFrame()
     n_jobs = _resolve_clade_permutation_n_jobs(g=g)
     backend = _resolve_clade_permutation_backend()
-    if n_jobs > 1:
+    use_trait_model = bool(g.get('fg_trait_tree'))
+    if n_jobs > 1 or use_trait_model:
         target_col_prefixes = ['is_fg', 'is_mg', 'is_mf', 'is_all']
         _get_clade_permutation_selected_rows_plan(
             g=g,
@@ -2639,7 +2732,9 @@ def clade_permutation(cb, g, OS_tensor_reducer=None, ON_tensor_reducer=None):
         if all(col in cb.columns for col in bid_columns):
             _get_permutation_cb_lookup(cb=cb, bid_columns=bid_columns, g=g)
     for trait_name in trait_names:
-        if n_jobs > 1:
+        if use_trait_model:
+            g = _run_trait_ctmc_calibration(cb, g, trait_name)
+        elif n_jobs > 1:
             g = _run_clade_permutation_for_trait_parallel(
                 cb=cb,
                 g=g,

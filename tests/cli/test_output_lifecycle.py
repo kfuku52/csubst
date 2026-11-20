@@ -22,7 +22,7 @@ def tiny_fit(tmp_path):
     return args, ','.join(str(ids[name]) for name in 'AC')
 
 
-def write_sites_test_fit(tmp_path, newick, derived_tips):
+def write_sites_test_fit(tmp_path, newick, derived_tips, derived_ancestors=()):
     import numpy as np
     from csubst import ete, main_simulate, tree
 
@@ -34,7 +34,8 @@ def write_sites_test_fit(tmp_path, newick, derived_tips):
     ))
     ancestors = tmp_path / 'ancestors.fa'
     ancestors.write_text(''.join(
-        '>{}\nGCTAAA\n'.format(node.name) for node in phylogeny.traverse() if not ete.is_leaf(node)
+        '>{}\n{}\n'.format(node.name, 'GATAAG' if node.name in derived_ancestors else 'GCTAAA')
+        for node in phylogeny.traverse() if not ete.is_leaf(node)
     ))
     files = main_simulate.write_true_asr_bundle(
         dict(tree=phylogeny, eq_freq=np.full(61, 1 / 61), substitution_model='GY+F',
@@ -50,6 +51,45 @@ def write_sites_test_fit(tmp_path, newick, derived_tips):
         args += ['--iqtree_' + option, files[key]]
     ids = {node.name: int(ete.get_prop(node, 'numerical_label')) for node in phylogeny.traverse()}
     return args, ids
+
+
+@pytest.mark.parametrize("command", ["search", "scan"])
+def test_trait_ctmc_calibration_through_cli(tmp_path, command):
+    import pandas as pd
+
+    molecular_tree = ("(((A:0.1,B:0.2)AB:0.2,(C:0.1,D:0.1)CD:0.1)X:0.1,"
+                      "((E:0.1,F:0.1)EF:0.1,(G:0.1,H:0.1)GH:0.1)Y:0.1)R;")
+    inputs, _ = write_sites_test_fit(tmp_path, molecular_tree, {"A", "B", "E"}, derived_ancestors={"AB"})
+    foreground = tmp_path / "foreground.tsv"
+    foreground.write_text("1\tA\n1\tB\n1\tE\n")
+    timed = tmp_path / "time.nwk"
+    timed.write_text("(((A:0.1,B:0.1)AB:1.9,(C:1.9,D:1.9)CD:0.1)X:1,"
+                     "((E:1,F:1)EF:1,(G:1,H:1)GH:1)Y:1)R;")
+    common = [command, *inputs, "--foreground", str(foreground), "--fg_trait_tree", str(timed),
+              "--fg_trait_match_tip_count", "yes"]
+    if command == "scan":
+        opts = ["--scan_n_permutations", "3", "--scan_unit_mode", "stem",
+                "--scan_min_event_pp", "0.1", "--scan_site_plot", "no"]
+    else:
+        opts = ["--fg_clade_permutation", "3", "--output_stat", "any2spe"]
+    result = run_csubst([*common, *opts, "--outdir", "out"], tmp_path)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "origins=2, positive tips=3/8" in result.stdout
+    if command == "scan":
+        manifest = json.loads((tmp_path / "out/csubst_scan_calibration.json").read_text())
+        assert manifest["null"] == "fitted_binary_trait_ctmc"
+        assert manifest["status"] == "conditional_trait_model"
+        assert manifest["success_count"] == 3
+    else:
+        summary = pd.read_csv(tmp_path / "out/csubst_cb_stats.tsv", sep="\t")
+        trials = summary[summary["clade_permutation_null"] == "fitted_binary_trait_ctmc"]
+        assert trials["clade_permutation_trial_no"].tolist() == [1, 2, 3]
+        assert "by fitted binary trait CTMC =" in result.stdout
+    # Passing the molecular tree as the time tree must fail for either command.
+    timed.write_text(molecular_tree)
+    rejected = run_csubst([*common, *opts, "--outdir", "rejected"], tmp_path)
+    assert rejected.returncode == 2, rejected.stderr + rejected.stdout
+    assert "--fg_trait_tree requires an ultrametric time tree" in rejected.stderr + rejected.stdout
 
 
 def test_sites_writes_long_branch_list_under_short_directory(tmp_path):

@@ -122,3 +122,20 @@ excludes combinations sharing a sampled foreground clade. The summary
 compares the observed foreground median ωC with valid permuted medians at
 that K. A joint null distribution for the highest qualifying K requires
 reusing one clade draw across all arities and retaining draws with zero hits.
+
+Pass an ultrametric time tree with `--fg_trait_tree species_time.nwk` to use the
+[fitted binary-trait CTMC](SCAN_CALIBRATION.md#binary-trait-evolution-on-a-time-tree).
+The new mode uses the same observed/simulated origin rule as scan and works
+through exhaustive arities (`--max_arity` at most `--exhaustive_until`).
+It reuses the molecular fit and the exhaustive branch-combination table for
+each tested K. A configuration with an undefined median or a failed draw
+makes that arity's P value unavailable. Successful calibrations use the
+upper tail `(1 + exceedances) / (N + 1)` for each arity and identify the
+null and proposal counts in `csubst_cb_stats.tsv`. Search scores the fitted
+trait replicates serially.
+
+```bash
+csubst search --alignment_file alignment.fa --rooted_tree_file gene.nwk \
+  --foreground trait.tsv --fg_clade_permutation 1000 \
+  --fg_trait_tree species_time.nwk --fg_trait_match_tip_count yes
+```

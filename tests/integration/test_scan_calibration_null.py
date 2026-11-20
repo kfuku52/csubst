@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from csubst import ete, main_scan, substitution_scan
+from csubst import ete, foreground, main_scan, substitution_scan, trait_ctmc
 from scan_fixtures import make_scan_context
 
 
@@ -68,6 +68,49 @@ def test_full_scan_reselects_competing_candidates():
     assert results["candidate_fixed"].iloc[0]["p_rate_enrichment_empirical"] == pytest.approx(1 / 6)
     assert results["full_scan"].iloc[0]["p_rate_enrichment_empirical"] == pytest.approx(1 / 6)
     assert results["full_scan"].iloc[0]["p_rate_enrichment_empirical_maxT"] == pytest.approx(1 / 3)
+
+
+def test_trait_ctmc_rediscovery_uses_fixed_data_and_retains_empty_trials(tmp_path, monkeypatch):
+    newick = "(((A:0.1,B:0.1)AB:1.9,(C:1.9,D:1.9)CD:0.1)X:1,((E:1,F:1)EF:1,(G:1,H:1)GH:1)Y:1)R;"
+    g, tensor = make_scan_context(newick, event_branches=("AB", "E"))
+    states = tmp_path / "traits.tsv"
+    states.write_text("name\ttrait\nA\t1\nB\t1\nE\t1\n")
+    time_tree = tmp_path / "time.nwk"
+    time_tree.write_text(newick)
+    g.update(foreground=str(states), fg_format=2, fg_trait_tree=str(time_tree),
+             fg_trait_match_tip_count=True, scan_unit_mode="stem",
+             scan_pvalue_calibration="full_scan", scan_n_permutations=40)
+    foreground.get_foreground_branch(g, write=False)
+    assert len(g["fg_leaf_names"]["trait"]) == 2
+    scan, units = substitution_scan.scan_substitutions(g, tensor)
+    assert len(units) == 2
+    diagnostic = g["scan_calibration_diagnostics"]
+    assert diagnostic["status"] == "conditional_trait_model"
+    assert diagnostic["sampling"] == "monte_carlo"
+    assert diagnostic["plan"]["conditioned_origin_count"] == 2
+    assert diagnostic["plan"]["condition_on_positive_tip_count"] is True
+    assert diagnostic["plan"]["gain_rate"] == diagnostic["plan"]["loss_rate"]
+    assert diagnostic["success_count"] == 40
+    assert diagnostic["unique_configuration_count"] > 1
+    assert any(trial["candidate_count"] == 0 for trial in diagnostic["trials"])
+    max_exceedances = sum(trial["max_score"] is not None and
+                          trial["max_score"] >= diagnostic["observed"]["max_score"]
+                          for trial in diagnostic["trials"])
+    assert scan.iloc[0]["p_rate_enrichment_empirical_maxT"] == pytest.approx((1 + max_exceedances) / 41)
+    again, _ = substitution_scan.scan_substitutions(g, tensor)
+    pd.testing.assert_frame_equal(scan, again)
+    assert g["scan_calibration_diagnostics"] == diagnostic
+
+    def cannot_sample(*args):
+        raise trait_ctmc.SamplingError()
+
+    monkeypatch.setattr(trait_ctmc, "sample_stems", cannot_sample)
+    scan, _ = substitution_scan.scan_substitutions(g, tensor)
+    assert scan.iloc[0]["scan_calibration_status"] == "unavailable_failed_trials"
+    assert np.isnan(scan.iloc[0]["p_rate_enrichment_empirical_maxT"])
+    diagnostic = g["scan_calibration_diagnostics"]
+    assert diagnostic["failure_count"] == 40
+    assert diagnostic["sampling_attempts"] == 40 * trait_ctmc.MAX_PROPOSALS
 
 
 @pytest.mark.parametrize("mode", ["candidate_fixed", "full_scan"])

@@ -975,6 +975,20 @@ def _make_treeplot_parser():
     return psr_treeplot
 
 
+def _add_foreground_trait_options(parser, *, search=False):
+    options = parser.add_argument_group('foreground trait evolution')
+    calibration = ('Requires --fg_clade_permutation > 0 and exhaustive search.' if search
+                   else 'Requires --scan_pvalue_calibration full_scan and stem or clade units.')
+    options.add_argument('--fg_trait_tree', metavar='PATH', default=None,
+                         help='Opt in to a binary-trait CTMC null. Supply a rooted ultrametric Newick with time-scale branch '
+                              'lengths and the same topology and tips as the analysis tree. ' + calibration)
+    options.add_argument('--fg_trait_rate_model', choices=['er', 'ard'], default='er',
+                         help='default=%(default)s: Fit equal (er) or separate (ard) gain and loss rates.')
+    options.add_argument('--fg_trait_match_tip_count', metavar='yes|no', default='no', type=strtobool,
+                         help='default=%(default)s: Condition on the observed positive tip count as well as '
+                              'the number of analyzable foreground origins.')
+
+
 def _make_foreground_parser(show_advanced):
     psr_fg = argparse.ArgumentParser(add_help=False)
     psr_fg.add_argument('--foreground', metavar='PATH', default=None, type=str, required=False,
@@ -1000,7 +1014,7 @@ def _make_foreground_parser(show_advanced):
     psr_fg.add_argument('--fg_clade_permutation', metavar='INT', default=0, type=int,
                     help='default=%(default)s: Experimental. Randomly select the same/similar number and size of clades as foreground '
                          'and run analysis N times to obtain a permutation-based P value of convergence. '
-                         'Permutation candidate statistics are parallelized over --threads. '
+                         'Size-matched permutation candidate statistics are parallelized over --threads. '
                          'At least 1000 is recommended.')
     advanced_foreground = psr_fg.add_argument_group('advanced foreground tuning')
     _add_advanced_argument(advanced_foreground, '--min_clade_bin_count', show_advanced=show_advanced,
@@ -1175,6 +1189,7 @@ def _register_scan_parser(psr_as, psr_co, psr_fg_scan, psr_iq, psr_out_scan, psr
     # scan
     help_txt = 'scans foreground recurrent nonsynonymous-state substitutions without omega_C branch-combination search. See `csubst scan -h`'
     scan = subparsers.add_parser('scan', help=help_txt, parents=[psr_co,psr_iq,psr_fg_scan,psr_as,psr_rc,psr_treeplot,psr_out_scan])
+    _add_foreground_trait_options(scan)
     scan.set_defaults(handler=command_scan)
     _add_scan_subcommand_args(scan, show_advanced=show_advanced)
 
@@ -1397,6 +1412,7 @@ def _register_search_parser(psr_as, psr_co, psr_fg, psr_iq, psr_out_analyze, psr
     help_txt = 'calculates convergence rates and other metrics on branch combinations. '
     help_txt += 'See `csubst search -h` (legacy alias: `csubst analyze -h`).'
     analyze = subparsers.add_parser('search', aliases=['analyze'], help=help_txt, parents=[psr_co,psr_iq,psr_fg,psr_as,psr_rc,psr_out_analyze])
+    _add_foreground_trait_options(analyze, search=True)
     analyze.set_defaults(handler=command_search)
     _add_search_subcommand_args(analyze, show_advanced=show_advanced)
     analyze.add_argument('--pair_posterior', choices=['separate', 'joint'], default='separate',

@@ -16,6 +16,9 @@ class InputConfig(TypedDict, total=False):
     rooted_tree_file: str
     foreground: str
     fg_stem_only: bool
+    fg_trait_tree: str | None
+    fg_trait_rate_model: str
+    fg_trait_match_tip_count: bool
     path_iqtree_state: str
     path_iqtree_rate: str
     infile_type: str
@@ -147,6 +150,7 @@ class InternalControls(TypedDict, total=False):
     _cbs_stream_target_bytes: int
     _scan_trait_plans: dict[Any, Any]
     _scan_permutation_exact: bool
+    _fg_trait_model: Any
 
 
 class ScanConfig(TypedDict, total=False):

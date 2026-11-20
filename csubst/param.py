@@ -520,6 +520,16 @@ def _normalize_search_parameters(g: dict[str, Any]) -> dict[str, Any]:
         if g['fg_clade_permutation']>0:
             if (g['foreground'] is None):
                 raise ValueError('To enable --fg_clade_permutation, use --foreground')
+    if g.get('fg_trait_tree'):
+        if not g.get('foreground'):
+            raise ValueError('--fg_trait_tree requires --foreground with one binary trait.')
+        if 'fg_clade_permutation' in g:
+            if g['fg_clade_permutation'] <= 0:
+                raise ValueError('--fg_trait_tree requires --fg_clade_permutation > 0 for search.')
+            if g.get('max_arity', 2) > g.get('exhaustive_until', 2):
+                raise ValueError('--fg_trait_tree requires exhaustive search through --max_arity.')
+    elif g.get('fg_trait_match_tip_count') or g.get('fg_trait_rate_model', 'er') != 'er':
+        raise ValueError('Trait CTMC rate and tip-count options require --fg_trait_tree.')
     g = runtime.ensure_iqtree_layout(g, create_dir=False)
     alignment_file_txt = str(g.get('alignment_file', '')).strip()
     if alignment_file_txt != '':

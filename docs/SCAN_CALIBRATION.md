@@ -45,6 +45,55 @@ The fitted sequence `parametric_bootstrap` also supports multiple fixed traits;
 it simulates a joint alignment rather than randomizing trait labels.
 Separate single-trait runs do not correct across traits.
 
+## Binary trait evolution on a time tree
+
+Add `--fg_trait_tree` to `full_scan` to draw foregrounds under a fitted
+two-state continuous-time Markov model. Supply a rooted ultrametric Newick with
+branch lengths proportional to elapsed time and the same rooted topology and
+tip names as the analysis tree. This mode assumes contemporaneous tips. The
+spread of root-to-tip distances may be at most `1e-6` of the greatest
+distance to allow for rounding. The ultrametric check verifies those distances.
+Confirm the branch length units from the source of the tree.
+
+The trait model uses the time tree's lengths. ASR, sequence substitution
+estimates and exposures use the molecular fit. Use `--scan_unit_mode stem`
+to target only the stems, or `clade` to include the rest of each positive clade.
+
+```bash
+csubst scan --alignment_file alignment.fa --rooted_tree_file gene.nwk \
+  --foreground trait.tsv --fg_trait_tree species_time.nwk \
+  --scan_unit_mode stem --scan_pvalue_calibration full_scan
+```
+
+Provide a single trait. Each tip matching a nonzero foreground label is
+positive, and all other tips are treated as known negatives. CSUBST assigns a
+separate origin to the stem of each maximal all-positive clade, using that
+rule for both observed and simulated tips. Input lineage IDs indicate positive
+tips in this mode. A stem is inferred from the tip pattern, so a loss inside
+a larger positive clade can appear as multiple origins under this rule.
+
+The likelihood conditions on root state 0 and integrates internal states.
+The default `--fg_trait_rate_model er` fits a common gain/loss rate.
+`--fg_trait_rate_model ard` estimates the two rates separately. Boundary or
+saturated fits are reported as input/model errors. Few origins give limited
+information about rates, especially the loss rate.
+
+Each replicate generates tip states under the fitted model and accepts only
+configurations with the observed number of origins and with an analyzable
+target in every origin. Use `--fg_trait_match_tip_count yes` to additionally
+condition on the number of positive tips. There are no size bins in this
+mode. The scanner rediscovers candidates for each accepted assignment and
+includes empty scans in the Monte Carlo denominator. Failure to sample an
+eligible configuration in 10,000 proposals makes calibration unavailable.
+
+The empirical P values are approximate and conditional on the fitted trait
+model and the fixed molecular data. The null assumes that the trait process is
+independent of those data on the supplied tree. The JSON records the
+`fitted_binary_trait_ctmc` null, inferred rates in inverse time-tree units,
+root state, conditioning, and per-trial proposals. Successful computation has
+status `conditional_trait_model`. Type I error and power depend on the trait
+model and its fit. See also [the search implementation](HIGHER_ORDER_SEARCH.md#foreground-clade-permutations).
+
 ## Sampling and tail probabilities
 
 The sampler first counts bin/group allocations ignoring clade overlap. If that

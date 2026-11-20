@@ -9,16 +9,16 @@ def _set_state(state, branch_id, site, state_id):
     state[int(branch_id), int(site), int(state_id)] = 1.0
 
 
-def make_scan_context():
-    tr = tree.add_numerical_node_labels(
-        ete.PhyloNode("((A:1,B:1)X:1,(C:1,D:1)Y:1)R;", format=1)
-    )
-    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in tr.traverse()}
-    num_node = max(labels.values()) + 1
+def make_scan_context(newick="((A:1,B:1)X:1,(C:1,D:1)Y:1)R;", event_branches=("A", "C")):
+    tr = tree.add_numerical_node_labels(ete.PhyloNode(newick, format=1))
+    nodes = list(tr.traverse())
+    labels = {node.name: int(ete.get_prop(node, "numerical_label")) for node in nodes}
+    num_node = len(nodes)
     for node in tr.traverse():
         ete.set_prop(node, "SNdist", 0.25)
         ete.set_prop(node, "Ndist", 0.10)
-    fg_leaf_names = {"trait": [["A"], ["C"]]}
+    nodes_by_name = {node.name: node for node in nodes}
+    fg_leaf_names = {"trait": [ete.get_leaf_names(nodes_by_name[name]) for name in event_branches]}
     for i, names in enumerate(fg_leaf_names["trait"], start=1):
         name_set = set(names)
         for node in tr.traverse():
@@ -31,21 +31,22 @@ def make_scan_context():
         ete.add_features(node, is_fg_trait=False)
     state_nsy = np.zeros((num_node, 1, 2), dtype=float)
     state_pep = np.zeros((num_node, 1, 2), dtype=float)
-    for node_id in labels.values():
+    for node_id in range(num_node):
         _set_state(state_nsy, node_id, 0, 0)
         _set_state(state_pep, node_id, 0, 0)
-    for name in ["A", "C"]:
+    for name in event_branches:
         _set_state(state_nsy, labels[name], 0, 1)
         _set_state(state_pep, labels[name], 0, 1)
         ete.add_features(next(node for node in tr.traverse() if node.name == name), is_fg_trait=True)
     on_tensor = np.zeros((num_node, 1, 1, 2, 2), dtype=float)
-    on_tensor[labels["A"], 0, 0, 0, 1] = 0.9
-    on_tensor[labels["C"], 0, 0, 0, 1] = 0.8
+    for name, weight in zip(event_branches, (0.9, 0.8)):
+        on_tensor[labels[name], 0, 0, 0, 1] = weight
     g = {
         "tree": tr,
-        "fg_df": pd.DataFrame({"name": ["A", "C"], "trait": [1, 2]}),
+        "fg_df": pd.DataFrame([(name, i) for i, tips in enumerate(fg_leaf_names["trait"], 1)
+                               for name in tips], columns=["name", "trait"]),
         "fg_leaf_names": fg_leaf_names,
-        "fg_ids": {"trait": np.array([labels["A"], labels["C"]], dtype=np.int64)},
+        "fg_ids": {"trait": np.array([labels[name] for name in event_branches], dtype=np.int64)},
         "fg_stem_only": True,
         "scan_sister_stem_only": True,
         "state_nsy": state_nsy,

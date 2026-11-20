@@ -26,6 +26,7 @@ from csubst import scan_permutation
 from csubst import sequence
 from csubst import scan_statistics
 from csubst import substitution
+from csubst import trait_ctmc
 from csubst import site_storage
 
 
@@ -403,6 +404,11 @@ def validate_scan_configuration(g):
                 calibration
             )
         )
+    if g.get("fg_trait_tree"):
+        if calibration != "full_scan":
+            raise ValueError("--fg_trait_tree requires --scan_pvalue_calibration full_scan.")
+        if normalize_scan_unit_mode(g.get("scan_unit_mode", "clade")) == "lineage":
+            raise ValueError("--fg_trait_tree requires --scan_unit_mode stem or clade.")
     if calibration in ("candidate_fixed", "full_scan"):
         if not bool(g.get("scan_permutation_sample_original", True)):
             raise ValueError(
@@ -1181,6 +1187,25 @@ def _get_scan_trait_plan(g, trait_name, valid_branch_ids):
         ], dtype=bool)
     if not eligible.any():
         raise ValueError("No clades have analyzable target branches for scan calibration.")
+    if g.get("fg_trait_tree"):
+        model = g["_fg_trait_model"]
+        stem_ids = trait_cache["branch_ids"]
+        observed_ids = tuple(sorted(int(stem_ids[index]) for index in observed[0]))
+        if observed_ids != model.observed_stems:
+            raise ValueError("Observed scan units do not match the binary trait origins.")
+        observed_indices = tuple(sorted(observed[0]))
+        if not eligible[list(observed_indices)].all():
+            raise ValueError("An observed trait origin has no analyzable scan target branches.")
+        plan = {
+            "sampler": None,
+            "observed": (observed_indices,),
+            "trait_cache": trait_cache,
+            "groups": groups,
+            "eligible": eligible,
+            "eligible_model_branches": np.isin(model.branch_ids, stem_ids[eligible]),
+        }
+        plans[cache_key] = plan
+        return plan
     min_count = int(g.get("min_clade_bin_count", g.get("scan_permutation_min_clade_bin_count", 10)))
     if min_count < 1:
         raise ValueError("The minimum clade bin count must be positive.")
@@ -1201,6 +1226,7 @@ def _get_scan_trait_plan(g, trait_name, valid_branch_ids):
     )
     plan = {
         "sampler": sampler,
+        "observed": sampler.observed,
         "trait_cache": trait_cache,
         "groups": groups,
         "eligible": eligible,
@@ -1230,7 +1256,14 @@ def _build_permuted_trait_context(
     if rng is None:
         rng = randomness.next_generator(g, 'scan_permutation_direct', str(trait_name))
     plan = _get_scan_trait_plan(g, trait_name, valid_branch_ids)
-    if configuration is None:
+    if configuration is None and plan["sampler"] is None:
+        model = g["_fg_trait_model"]
+        stems, attempts = trait_ctmc.sample_stems(
+            model, plan["eligible_model_branches"], g.get("fg_trait_match_tip_count", False), rng,
+        )
+        by_id = plan["trait_cache"]["branch_id_to_index"]
+        configuration = (tuple(sorted(by_id[bid] for bid in stems)),)
+    elif configuration is None:
         configuration, attempts = scan_permutation.sample_configuration(plan["sampler"], rng)
     else:
         attempts = 0
@@ -2953,7 +2986,7 @@ def _run_scan_permutation(
     except Exception as exc:
         reason = "{}: {}".format(type(exc).__name__, str(exc))
         diagnostic["failure_reason"] = reason
-        if isinstance(exc, scan_permutation.SamplingError):
+        if isinstance(exc, (scan_permutation.SamplingError, trait_ctmc.SamplingError)):
             diagnostic["sampling_attempts"] = exc.attempts
         return {
             "success": False, "max_score": np.nan, "candidate_scores": {},
@@ -3068,7 +3101,7 @@ def _scan_plan_diagnostics(g, trait_name, plan, branch_meta):
             "parent_branch_id": int(ete.get_prop(nodes[int(bid)].up, "numerical_label")),
             "leaf_names": list(trait_cache["leaf_names_by_index"][i]),
             "leaf_count": int(trait_cache["size"][i]),
-            "bin": int(plan["bin_array"][i]),
+            "bin": int(plan["bin_array"][i]) if sampler is not None else None,
             "eligible": bool(plan["eligible"][i]),
             "target_branch_ids": target_ids,
             "root_distance": finite_or_none(depths[int(bid)]),
@@ -3079,6 +3112,16 @@ def _scan_plan_diagnostics(g, trait_name, plan, branch_meta):
             "analyzable_state_fraction": valid_count / cell_count if cell_count else 0.0,
             "mean_state_entropy": finite_or_none(entropy_sums[target_ids].sum() / valid_count) if valid_count else None,
         })
+    if sampler is None:
+        model = g["_fg_trait_model"]
+        return {
+            "trait": str(trait_name),
+            "sampling_law": "fitted_binary_trait_ctmc",
+            "rate_model": g.get("fg_trait_rate_model", "er"),
+            "time_tree": str(g["fg_trait_tree"]),
+            **model.details(g.get("fg_trait_match_tip_count", False)),
+            "clades": clades,
+        }
     return {
         "trait": str(trait_name),
         "bin_boundaries": [int(v) for v in plan["bins"]],
@@ -3171,10 +3214,18 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
     plan = _get_scan_trait_plan(g, trait_names[0], valid_branch_ids)
     sampler = plan["sampler"]
     diagnostic["plan"] = _scan_plan_diagnostics(g, trait_names[0], plan, branch_meta)
-    diagnostic["space_size"] = len(sampler.configurations) if sampler.configurations is not None else None
+    enumerated = None if sampler is None else sampler.configurations
+    diagnostic["space_size"] = None if enumerated is None else len(enumerated)
+    if sampler is None:
+        diagnostic.update(
+            null="fitted_binary_trait_ctmc",
+            assumption="The binary trait follows the fitted CTMC on the time tree independently of "
+                       "the fixed molecular data, conditional on the analyzable origin count and "
+                       "any specified positive tip count.",
+        )
     observed_context = _build_permuted_scan_context(
         g, trait_names, valid_branch_ids,
-        configurations={trait_names[0]: sampler.observed},
+        configurations={trait_names[0]: plan["observed"]},
     )
     diagnostic["observed"] = {
         "configuration": observed_context["configuration"],
@@ -3197,9 +3248,9 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
     observed_keys = {_scan_row_key(row) for row in observed_candidates.to_dict('records')}
     if len(observed_keys) != len(observed_df):
         raise ValueError("Duplicate observed candidate keys in scan calibration.")
-    exact = sampler.configurations is not None and len(sampler.configurations) <= requested_count
+    exact = enumerated is not None and len(enumerated) <= requested_count
     g["_scan_permutation_exact"] = exact
-    n_permutations = len(sampler.configurations) if exact else requested_count
+    n_permutations = len(enumerated) if exact else requested_count
     diagnostic.update(
         sampling="exact" if exact else "monte_carlo",
         pvalue_resolution=1.0 / (n_permutations if exact else n_permutations + 1),
@@ -3266,7 +3317,7 @@ def _calibrate_scan_pvalues(g, observed_df, ON_tensor, rate_ON_tensor, scan_stat
             observed_scores, max_perm_score, n_permutations, exact=exact,
         )
         diagnostic["global_pvalue"] = _empirical_p_from_scores(observed_maximum, max_perm_score, n_permutations, exact=exact)
-    diagnostic["status"] = "conditional_assignment"
+    diagnostic["status"] = "conditional_trait_model" if sampler is None else "conditional_assignment"
     return _finish_scan_calibration(g, out, diagnostic)
 
 
