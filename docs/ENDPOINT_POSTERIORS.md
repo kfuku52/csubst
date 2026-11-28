@@ -172,6 +172,14 @@ cutoff priority, and the candidate cap.
 
 ## Memory and time
 
+`csubst search` logs the size of its basic state arrays before allocating them.
+Joint inference also reports the size of its main pruning buffers at the actual
+site block size. Peak RAM also reflects other temporaries, substitution storage,
+expected-count calculation and branch-combination search. Candidate memory
+depends on arity, foreground and cutoffs. External IQ-TREE runs have their own
+memory requirements. Selective marginal loading reports the logical size of
+its memory-mapped state arrays.
+
 For N nodes, C categories, K states and block size B, the principal inference
 workspace is O(N C B K). Parent-to-child marginals use matrix multiplication;
 they do not need a site × from × to array. The transition cache is capped at

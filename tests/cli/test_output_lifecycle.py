@@ -138,6 +138,13 @@ def test_search_pair_joint_changes_observed_counts_only(tmp_path, tiny_fit):
         result = run_csubst([*base, '--pair_posterior', mode, '--outdir', mode], tmp_path)
         assert result.returncode == 0, result.stderr
         out = tmp_path / mode
+        if mode == 'separate':
+            log = (out / 'csubst.log').read_text()
+            states = log.index('RAM for basic state arrays = 13.92 KiB (11 nodes x 2 codon sites, float64).')
+            pruning = log.index('codon joint-endpoint pruning buffers: 21.14 KiB (1 fitted rate(s), '
+                                'up to 2 sites per block).')
+            assert states < log.index('Joint endpoint input:') < pruning
+            assert 'branch-combination search (depends on arity, foreground and thresholds)' in log
         manifest = json.loads((out / 'csubst_endpoint_model.json').read_text())
         assert manifest['branch_combinations'] == {'separate': 'factorized_edge_scores',
                                                    'joint': 'joint_observed_any2spe'}[mode]

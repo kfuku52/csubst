@@ -478,6 +478,12 @@ def _build(g, structural=False):
             block_size = max(1, block_size // 2)
         pairwise = _pairwise_storage_bound(n, num_site, shapes, kinds, selected_stats,
                                            block_size, g) <= 64 * 1024 * 1024
+    if g.get('subcommand') in ('search', 'analyze'):
+        workspace_bytes = model.pruning_workspace_bytes(num_site, block_size)
+        alphabet = '3Di' if structural else 'codon'
+        print(f'Memory estimate for {alphabet} joint-endpoint pruning buffers: '
+              f'{runtime.format_byte_size(workspace_bytes)} '
+              f'({len(rates):,} fitted rate(s), up to {min(num_site, block_size):,} sites per block).', flush=True)
     empirical = g.get('asrv') in asrv.EMPIRICAL_MODES
     # The empirical urn trains synonymous destination rates even for an
     # any2any-only report.

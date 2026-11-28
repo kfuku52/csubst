@@ -1203,6 +1203,37 @@ def apply_site_filters(g):
     return g
 
 
+def _report_search_state_memory(g, memory_mapped):
+    # annotate_tree assigns contiguous labels on the fitted tree after rooting.
+    nodes = sum(1 for _ in g['tree'].traverse())
+    sites, codons = int(g['num_input_site']), int(g['num_input_state'])
+    amino_acids = len(g['amino_acid_orders'])
+    input_dtype = np.dtype(g['float_type'])
+    state_dtype = np.dtype(bool) if g['ml_anc'] else input_dtype
+    state_bytes = nodes * sites * state_dtype.itemsize
+    codon_bytes, amino_acid_bytes = state_bytes * codons, state_bytes * amino_acids
+    storage = 'memory-mapped state arrays (logical size)' if memory_mapped else 'RAM for basic state arrays'
+    print(f'Memory estimate for search: {storage} = {runtime.format_byte_size(codon_bytes + amino_acid_bytes)} '
+          f'({nodes:,} nodes x {sites:,} codon sites, {state_dtype.name}).', flush=True)
+    print(f'  Codon states ({codons}): {runtime.format_byte_size(codon_bytes)}; '
+          f'amino-acid states ({amino_acids}): {runtime.format_byte_size(amino_acid_bytes)}.', flush=True)
+    if g['ml_anc']:
+        input_bytes = nodes * sites * codons * input_dtype.itemsize
+        location = ' (memory-mapped)' if memory_mapped else ''
+        print(f'  Codon probabilities before binarization{location}: {runtime.format_byte_size(input_bytes)}.', flush=True)
+    if not memory_mapped:
+        print(f'  Temporary amino-acid conversion buffer: {runtime.format_byte_size(amino_acid_bytes)}.', flush=True)
+    stages = ['state preparation', 'substitution storage']
+    if g.get('nonsyn_recode', 'no') != 'no':
+        stages.append('nonsynonymous recoding')
+    if g.get('substitution_posterior') == 'joint':
+        stages.append('joint-endpoint inference')
+    if g.get('cb', False):
+        stages.append('urn expectations' if g.get('expectation_method') == 'urn' else 'codon-model expectations')
+        stages.append('branch-combination search (depends on arity, foreground and thresholds)')
+    print(f'  Additional RAM is used for {", ".join(stages)}.', flush=True)
+
+
 def prep_state(g, apply_site_filtering=True):
     state_nuc = None
     state_cdn = None
@@ -1316,6 +1347,8 @@ def prep_state(g, apply_site_filtering=True):
                 'Non-codon input is obsolete and no longer supported. '
                 'Run ancestral reconstruction with a codon model.'
             )
+        if g.get('subcommand') in ('search', 'analyze'):
+            _report_search_state_memory(g, memory_mapped=loaded_branch_ids is not None)
         state_cdn = parser_iqtree.get_state_tensor(g, selected_branch_ids=loaded_branch_ids)
         state_pep = sequence.cdn2pep_state(state_cdn=state_cdn, g=g, selected_branch_ids=loaded_branch_ids)
         # The default nonsynonymous alphabet is the amino-acid alphabet, so

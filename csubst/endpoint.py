@@ -206,6 +206,14 @@ class EndpointModel:
         self._transitions.move_to_end(t)
         return self._transitions[t]
 
+    def _pruning_message_shape(self, num_sites, block_size):
+        return self.rates.size, self.parents.size, min(int(block_size), num_sites), self.pi.size
+
+    def pruning_workspace_bytes(self, num_sites, block_size):
+        """Size of the two main message arrays and the scaling array."""
+        nc, n, capacity, k = self._pruning_message_shape(num_sites, block_size)
+        return nc * n * capacity * (2 * k + 1) * np.dtype(float).itemsize
+
     def iter_blocks(self, tips, block_size=64, branch_ids=None, joint=True, predictive=False, transform=None,
                     predictive_transform=None, category_nodes=False, unselected_transform=None,
                     transform_rate_context=False, tip_missing=None, rate_posterior=False, likelihood_only=False):
@@ -253,12 +261,12 @@ class EndpointModel:
         selected = set(self.order[1:]) if branch_ids is None else {int(i) for i in branch_ids}
         if not selected.issubset(set(self.order) - {self.root}):
             raise ValueError('Endpoint branch selection contains a root or unknown branch.')
-        n, k, nc = self.parents.size, self.pi.size, self.rates.size
+        message_shape = self._pruning_message_shape(first.shape[0], block_size)
+        nc, _, _, k = message_shape
         forward_floor = (2 * k) / np.finfo(float).max
-        capacity = min(int(block_size), first.shape[0])
-        inside_buffer = np.empty((nc, n, capacity, k))
+        inside_buffer = np.empty(message_shape)
         post_buffer = np.empty_like(inside_buffer)
-        scale_buffer = np.empty((nc, n, capacity))
+        scale_buffer = np.empty(message_shape[:-1])
         internal_postorder = [node for node in reversed(self.order) if node not in arrays]
         for start in range(0, first.shape[0], int(block_size)):
             stop = min(start + int(block_size), first.shape[0])

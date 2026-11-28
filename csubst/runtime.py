@@ -26,6 +26,14 @@ _NATIVE_THREAD_ENV_VARS = (
 )
 
 
+def format_byte_size(num_bytes):
+    size = num_bytes
+    for unit in ('B', 'KiB', 'MiB', 'GiB', 'TiB'):
+        if size < 1024 or unit == 'TiB':
+            return f'{size:,.0f} B' if unit == 'B' else f'{size:,.2f} {unit}'
+        size /= 1024
+
+
 def configure_native_threads(num_threads=1):
     """Set native-library thread limits before NumPy/SciPy are imported."""
 
